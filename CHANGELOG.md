@@ -15,10 +15,6 @@ All notable changes to PG Accountant will be documented here.
 
 ---
 
-# Changelog
-
-All notable changes to PG Accountant will be documented here.
-
 ## [1.3.0] — 2026-03-13
 
 ### Added

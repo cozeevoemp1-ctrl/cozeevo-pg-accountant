@@ -172,6 +172,28 @@ visit                    → book a tour
 
 ---
 
+## Multi-step Flows (test these via WhatsApp)
+
+### Tenant KYC Onboarding
+```
+Owner sends:  "start onboarding for Arjun 9876543210"
+Bot creates tenant + 48-hr session, then walks through 12 questions:
+DOB → father name → father phone → home address → email → occupation →
+gender → emergency name → emergency relationship → emergency phone →
+ID type → ID number → done (saved to Tenant record)
+```
+
+### Checkout Checklist
+```
+Owner sends:  "record checkout Arjun"
+Bot finds tenant and asks 5 questions:
+cupboard key returned? → main key returned? → any damage? →
+pending dues? → deposit refund amount + date
+→ CheckoutRecord created, Tenancy marked exited
+```
+
+---
+
 ## File Structure (what matters)
 
 ```
@@ -184,16 +206,19 @@ AI Watsapp PG Accountant/
 │   └── WA-01-whatsapp-router.json   ← Import this into n8n
 ├── src/
 │   ├── database/
-│   │   ├── models.py            ← 19-table schema
+│   │   ├── models.py            ← 21-table schema
 │   │   ├── db_manager.py        ← DB operations
 │   │   ├── seed.py              ← Initial data (already run)
 │   │   └── excel_import.py      ← One-time Excel import (already done)
 │   └── whatsapp/
 │       ├── chat_api.py          ← Main WhatsApp endpoint
-│       ├── role_service.py      ← Detects caller role
-│       ├── intent_detector.py   ← Understands what they're asking
+│       ├── role_service.py      ← Detects caller role (6-tier system)
+│       ├── intent_detector.py   ← Rules-based intent detection (97% free)
+│       ├── gatekeeper.py        ← Smart router: (role, intent) → worker
 │       └── handlers/
-│           ├── owner_handler.py    ← Admin/partner commands
-│           ├── tenant_handler.py   ← Tenant self-service
-│           └── lead_handler.py     ← Room enquiry bot
+│           ├── account_handler.py  ← AccountWorker: 11 financial intents
+│           ├── owner_handler.py    ← OwnerWorker: operational intents
+│           ├── tenant_handler.py   ← TenantWorker + KYC onboarding flow
+│           ├── lead_handler.py     ← LeadWorker: room enquiry bot
+│           └── _shared.py          ← Shared fuzzy-search helpers
 ```

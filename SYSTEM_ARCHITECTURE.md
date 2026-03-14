@@ -133,7 +133,7 @@ L4 — Leads & Bot
 
 L5 — Operational (multi-step flows)
      vacations   reminders   onboarding_sessions   checkout_records
-     pending_actions   pending_learning
+     pending_actions
 
 L6 — Access Control
      authorized_users

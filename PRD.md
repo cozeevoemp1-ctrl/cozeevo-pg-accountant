@@ -1,180 +1,259 @@
-# PG Ledger AI — Product Requirements Document
-> Living document. Update after every workflow is tested and deployed.
-> Last updated: 2026-03-11
+# Cozeevo PG Accountant — Product Requirements Document
+> Living document. Update after every major release.
+> Last updated: 2026-03-14 (v1.4.0)
 
 ---
 
 ## 1. Product Vision
 
-**WhatsApp-first operating system for PG and hostel owners** that automates rent tracking, payment reconciliation, and tenant management.
+**What:** AI-powered bookkeeping + WhatsApp bot for PG (Paying Guest) businesses.
 
-Owner sends a WhatsApp message → AI understands → database updates → owner gets confirmation.
-No app. No login. No accounting knowledge needed.
+**Who:** PG owners in Bangalore/Hyderabad managing 50–200 rooms and 100–400 tenants.
 
----
+**Why:** PG owners currently use paper registers or WhatsApp manually. No affordable software handles the PG business model (room-based rent, security deposits, prorated first month, daily stays, shared rooms, monthly cycles).
 
-## 2. Primary User
-
-- PG owner managing **20–2000 rooms**
-- Non-technical, uses WhatsApp daily
-- Minimal accounting knowledge
-- Wants instant answers
+**SaaS Future:** Same codebase deployed per PG customer — each gets their own Supabase project + WhatsApp Business number + `.env` config. No shared state between customers.
 
 ---
 
-## 3. Core Problems Solved
+## 2. Users and Roles
 
-| Problem | Solution |
-|---|---|
-| Don't know who paid rent | Payment logging + query via WhatsApp |
-| UPI payments with unclear names | AI reconciliation matches bank txn to tenant |
-| Deposit disputes | Deposits tracked separately in ledger |
-| Manual rent reminders | Automated WhatsApp reminders |
-| No financial visibility | On-demand reports via WhatsApp |
+| Role | Identified by | Capabilities |
+|------|--------------|-------------|
+| `admin` | `authorized_users` table, role=admin | Full CRUD, add/remove authorized users, all intents |
+| `power_user` | `authorized_users` table, role=power_user | Full business access — same as admin except user management |
+| `key_user` | `authorized_users` table, role=key_user | Log payments + view assigned tenants only |
+| `tenant` | Phone number in `tenants` table | Read-only: own balance, payment history, complaints, rules |
+| `lead` | Unknown phone number | Room enquiry, pricing, availability, visit booking |
+| `blocked` | Rate limit exceeded (10 msg/10min, 50/day) | Silently ignored — no reply |
+
+Anti-spam applies to **all roles including admin** (prevents accidental flood).
 
 ---
 
-## 4. Database Schema (PostgreSQL / Supabase)
+## 3. Core Features (v1.4.0)
 
-### Core Tables
+### 3.1 AccountWorker — Financial Intents
 
-```sql
--- authorized_users: Who can talk to the bot
-authorized_users(id, phone, role[owner|tenant], property_id, is_active)
+Accessed by admin/power_user/key_user when intent is financial.
+All responses use `Rs.` prefix and show full due/paid/balance breakdowns.
 
--- properties: PG buildings
-properties(id, name, address, owner_phone, created_at)
+| Intent | Trigger examples | Action |
+|--------|-----------------|--------|
+| `PAYMENT_LOG` | "Raj paid 15000 upi" | Record payment against tenant's rent_schedule |
+| `QUERY_DUES` | "who hasn't paid", "dues this month" | List tenants with outstanding balances |
+| `QUERY_TENANT` | "Raj balance", "show Arjun's account" | Full account: due, paid, balance, last payment |
+| `ADD_EXPENSE` | "maintenance 5000 cash" | Log expense with category + payment mode |
+| `QUERY_EXPENSES` | "expenses this month", "show expenses" | Expense breakdown by category |
+| `REPORT` | "monthly report", "summary" | Revenue, occupancy, outstanding, expenses |
+| `RENT_CHANGE` | "change rent for room 205 to 12000" | Update rate_card from next month |
+| `RENT_DISCOUNT` | "give Raj 500 discount" | One-time rent reduction for specific tenant |
+| `VOID_PAYMENT` | "void payment 42" | Mark payment as void (is_void=true, never deleted) |
+| `ADD_REFUND` | "refund 5000 to Raj" | Log security deposit or other refund |
+| `QUERY_REFUNDS` | "show refunds", "refund history" | List all refunds for a tenant |
 
--- rooms: Room inventory
-rooms(id, property_id, room_number, capacity, rent_amount, status[vacant|occupied])
+### 3.2 OwnerWorker — Operational Intents
 
--- tenants: Tenant records
-tenants(id, property_id, room_id, name, phone, rent_amount, deposit_paid,
-        check_in_date, check_out_date, status[active|vacated])
+Accessed by admin/power_user/key_user for non-financial operations.
 
--- transactions: All payments
-transactions(id, tenant_id, property_id, amount, txn_type[rent|deposit|maintenance],
-             payment_mode[upi|cash|bank], reference_id, txn_date,
-             unique_hash, confirmed, notes, created_at)
+| Intent | Trigger examples | Action |
+|--------|-----------------|--------|
+| `ADD_TENANT` | "add tenant Arjun 9876543210 room 204" | Create Tenant + Tenancy record |
+| `START_ONBOARDING` | "start onboarding for Arjun 9876543210" | Begin 12-step KYC flow (see §4) |
+| `UPDATE_CHECKIN` | "checkin date for Raj is March 1" | Correct check-in date |
+| `CHECKOUT` | "Raj is leaving", "checkout Raj" | Schedule checkout |
+| `SCHEDULE_CHECKOUT` | "Raj checkout on 31st March" | Set future checkout date |
+| `NOTICE_GIVEN` | "Raj gave notice" | Mark notice period started |
+| `RECORD_CHECKOUT` | "record checkout Raj" | Begin 5-step offboarding checklist (see §4) |
+| `LOG_VACATION` | "Raj on vacation 10 days" | Log vacation (affects food billing) |
+| `COMPLAINT_REGISTER` | "AC not working in room 205" | Log maintenance complaint |
+| `QUERY_VACANT_ROOMS` | "vacant rooms", "empty rooms" | List unoccupied rooms |
+| `QUERY_OCCUPANCY` | "occupancy", "how full are we" | Occupancy % + room count |
+| `QUERY_EXPIRING` | "who is leaving this month" | Tenants with upcoming checkouts |
+| `REMINDER_SET` | "remind Raj about rent on 5th" | Set one-time reminder |
+| `SEND_REMINDER_ALL` | "send rent reminders" | Bulk reminder to all tenants with dues |
+| `ADD_PARTNER` | "add partner 9876543210" | Add power_user to authorized_users |
+| `RULES` | "pg rules", "house rules" | Show 19 PG rules |
+| `HELP` | "help", "commands" | Full command menu |
 
--- bank_payments: Raw imported bank/UPI data
-bank_payments(id, property_id, amount, sender_name, reference_id,
-              payment_date, matched_tenant_id, match_status[pending|matched|unmatched])
+### 3.3 TenantWorker — Tenant Self-Service
 
--- conversation_state: Short-term memory (5 min TTL)
-conversation_state(id, phone, state, data JSONB, expires_at)
+Accessed by tenants (phones in `tenants` table). Read-only.
 
--- audit_logs: Every action
-audit_logs(id, action, user_phone, property_id, details JSONB, created_at)
+| Intent | Trigger | Response |
+|--------|---------|---------|
+| `MY_BALANCE` | "my balance", "how much do I owe" | Due amount + breakdown |
+| `MY_PAYMENTS` | "my payments", "payment history" | Last 6 payments with dates |
+| `MY_DETAILS` | "my details", "my room" | Room number, check-in date, rent amount |
+| `COMPLAINT_REGISTER` | "AC not working", "water problem" | Log complaint (auto-categorized) |
+| `RULES` | "rules", "regulations" | 19 PG house rules |
+
+### 3.4 LeadWorker — Room Enquiry Bot
+
+Accessed by unknown phone numbers. Conversational AI via Ollama.
+
+| Intent | Trigger | Response |
+|--------|---------|---------|
+| `ROOM_PRICE` | "price", "rent", "how much" | Room pricing by type |
+| `AVAILABILITY` | "available", "any rooms" | Current vacant rooms |
+| `ROOM_TYPE` | "single room", "double room" | Room type details |
+| `VISIT_REQUEST` | "visit", "tour", "see the room" | Collect name + preferred time, save as Lead |
+| `GENERAL` | Anything else | Conversational AI response via Ollama |
+
+---
+
+## 4. Multi-Step Flows
+
+### 4.1 Tenant KYC Onboarding (12 steps)
+
+**Trigger:** Owner sends "start onboarding for [name] [phone]"
+
+**Flow:**
+1. Owner handler creates `Tenant` + `OnboardingSession` (48-hr TTL)
+2. When tenant messages, `chat_api` detects active session BEFORE intent detection
+3. Bot walks tenant through 12 questions:
+
+```
+ask_dob → ask_father_name → ask_father_phone → ask_address →
+ask_email (skippable) → ask_occupation (skippable) → ask_gender →
+ask_emergency_name → ask_emergency_relationship → ask_emergency_phone →
+ask_id_type → ask_id_number → done
 ```
 
----
+4. On completion: data saved to `Tenant` record, `OnboardingSession.completed = True`
 
-## 5. Security Architecture
+Accepted ID types: Aadhar, Passport, Driving License, PAN Card, Voter ID, Ration Card
 
-1. **Sender Verification** — Every message checks `authorized_users` table. Unknown numbers get rejected.
-2. **Role Isolation** — Owners get full control. Tenants get read-only (balance check only).
-3. **Webhook Signature** — Meta webhook verified via `hub.verify_token`.
-4. **Idempotency** — `unique_hash` on transactions prevents double-counting.
-5. **Transaction Confirmation** — Bot asks "YES to confirm?" before logging payments.
-6. **Audit Logs** — Every action logged with phone + timestamp.
-7. **Conversation TTL** — State expires in 5 minutes. No stale memory.
+### 4.2 Checkout Checklist (5 steps)
 
----
+**Trigger:** Owner sends "record checkout [name]"
 
-## 6. AI Strategy (Low Token Usage)
+**Flow:**
+1. Owner handler finds tenant via fuzzy name search
+2. Saves `PendingAction` with step=ask_cupboard_key
+3. `resolve_pending_action` walks through:
 
 ```
-Incoming Message
+cupboard key returned? → main key returned? → any damage? →
+pending dues? → deposit refund amount + date
+```
+
+4. On completion: creates `CheckoutRecord`, marks `Tenancy.status = exited`, sets `checkout_date = today`
+
+---
+
+## 5. Architecture
+
+### 5.1 Tech Stack
+
+| Component | Technology | Cost |
+|-----------|-----------|------|
+| API | FastAPI + Uvicorn (Python 3.11) | Free |
+| Database | Supabase PostgreSQL (cloud) | Free tier |
+| WhatsApp | Meta Cloud API | Free (1,000 msgs/day free tier) |
+| Automation | n8n (Docker, self-hosted) | Free |
+| LLM | Ollama llama3.2 (local) | Free |
+| Intent detection | Python regex rules (97%) | Free |
+| LLM fallback | Ollama / Groq / Anthropic (3%) | Free/Low |
+
+### 5.2 Gatekeeper Routing
+
+Single `gatekeeper.py` is the only file that knows which worker handles what:
+
+```
+(role=admin/power_user/key_user) + FINANCIAL_INTENT → AccountWorker
+(role=admin/power_user/key_user) + OPERATIONAL_INTENT → OwnerWorker
+role=tenant → TenantWorker
+role=lead/unknown → LeadWorker
+```
+
+### 5.3 Database (21 Tables, 7 Layers)
+
+```
+L0 Permanent:    investment_expenses, pg_contacts
+L1 Master:       properties, rooms, rate_cards, tenants, staff, food_plans, expense_categories
+L2 Tenancy:      tenancies
+L3 Transactions: rent_schedule, payments, refunds, expenses
+L4 Bot:          leads, rate_limit_log, whatsapp_log, conversation_memory
+L5 Operational:  vacations, reminders, onboarding_sessions, checkout_records, pending_actions
+L6 Access:       authorized_users
+```
+
+### 5.4 n8n Integration
+
+Only **one** n8n workflow: `WA-01-whatsapp-router.json`
+
+```
+Meta Cloud API webhook
       ↓
-Regex Parser (handles ~85% — no AI cost)
-      ↓
-Rule Parser (structured commands)
-      ↓
-AI Fallback (only for ambiguous natural language)
+n8n: WhatsApp Trigger → Extract Message → Is Text? → Call FastAPI → Should Reply? → Send Reply
+      POST /api/whatsapp/process
+      Body: { phone, message, message_id }
+      Response: { reply, intent, role, confidence, skip }
 ```
 
-**AI used ONLY for:** natural language parsing, fuzzy name matching
-**AI NEVER used for:** calculations, DB writes, financial logic
-
-**Model:** GPT-4o-mini (primary) / Claude Haiku (fallback)
+n8n is a thin pipe only — all business logic lives in FastAPI.
 
 ---
 
-## 7. The 10 Workflows (n8n)
+## 6. AI Usage Policy
 
-| # | Workflow | Trigger | Status |
-|---|---|---|---|
-| WA-01 | WhatsApp Router | Webhook (every message) | 🔨 Building |
-| WA-02 | Message Parser | Called by WA-01 | ⏳ Next |
-| WA-03 | Payment Logger | Called by WA-01 | ⏳ Pending |
-| WA-04 | Tenant Creator | Called by WA-01 | ⏳ Pending |
-| WA-05 | Rent Reminder Scheduler | Daily cron 10am | ⏳ Pending |
-| WA-06 | Bank Statement Importer | Every 5 min / manual | ⏳ Pending |
-| WA-07 | Payment Reconciliation | Called by WA-01 | ⏳ Pending |
-| WA-08 | Dashboard Metrics | Hourly cron | ⏳ Pending |
-| WA-09 | Tenant Checkout | Called by WA-01 | ⏳ Pending |
-| WA-10 | Weekly Financial Report | Sunday 9am cron | ⏳ Pending |
+| Task | Method | Cost |
+|------|--------|------|
+| Intent detection (97%) | Regex rules (`intent_detector.py`) | Free |
+| Intent detection (ambiguous ~3%) | Ollama llama3.2 (local) | Free |
+| Lead conversation | Ollama llama3.2 (local) | Free |
+| Merchant categorization (unknown) | Ollama / Groq | Free/Low |
+| All financial math | Python only (`property_logic.py`) | Free |
+| Reports, dedup, reconciliation | Python only | Free |
+
+Switch provider: set `LLM_PROVIDER=groq` or `LLM_PROVIDER=anthropic` in `.env`.
 
 ---
 
-## 8. WhatsApp Commands (Owner UX)
+## 7. Anti-Spam Policy
 
-```
-💳 Payments
-  "Rahul paid 8500"
-  "Received 5000 from room 204"
-
-👤 Tenant Management
-  "Add tenant Rahul room 204 rent 8500"
-  "Rahul is vacating"
-
-🔍 Queries
-  "Who hasn't paid?"
-  "Pending rent this month?"
-  "Balance for Rahul?"
-
-📊 Reports
-  "Show report"
-  "Occupancy today?"
-  "Revenue this month"
-
-🔔 Reminders
-  "Send rent reminders"
-  "Remind room 204"
-
-❓ Help
-  "help" or "menu"
-```
+- 10 messages per 10 minutes per phone number
+- 50 messages per day per phone number
+- Applies to ALL roles including admin
+- Blocked callers: no reply, no processing — silently dropped
+- Tracked in `rate_limit_log` table
 
 ---
 
-## 9. Non-Goals (v1)
+## 8. Roadmap
 
-- GST filing
-- Full accounting (P&L, balance sheet)
-- Inventory management
-- Marketplace listings
-- Tenant-facing app
+### Completed (v1.0.0 – v1.4.0)
+- [x] 21-table database schema + Supabase setup
+- [x] Excel import (234 tenants, 292 tenancies, 705 payments)
+- [x] 6-tier role system + phone normalization
+- [x] Rules-based intent detection (97% coverage)
+- [x] AccountWorker — 11 financial intents
+- [x] OwnerWorker — 18+ operational intents
+- [x] TenantWorker — 5 self-service intents
+- [x] LeadWorker — conversational AI sales bot
+- [x] Gatekeeper routing (role + intent → worker)
+- [x] 12-step KYC onboarding flow (digitized registration form)
+- [x] 5-step checkout checklist (offboarding)
+- [x] 19 PG house rules (RULES intent)
+- [x] investment_expenses table (Rs 2.05 Cr tracked)
+- [x] pg_contacts table (62 maintenance contacts)
+- [x] Git version control + GitHub repository
 
----
+### Next: Local Testing
+- [ ] Install Docker Desktop + start n8n
+- [ ] ngrok tunnel → Meta Cloud API webhook
+- [ ] End-to-end WhatsApp test
 
-## 10. Success Metrics
+### Next: Cloud Deployment
+- [ ] Hostinger VPS KVM 1 (~$5/month)
+- [ ] systemd service for FastAPI
+- [ ] nginx + SSL (certbot)
+- [ ] n8n on same server (Docker)
 
-Owner can WhatsApp-query and get answer in < 5 seconds:
-- "Who hasn't paid rent?" → list of names
-- "Expected rent this month?" → ₹X from Y tenants
-- "Current occupancy?" → X/Y rooms occupied
-
----
-
-## 11. Tech Stack
-
-| Layer | Tool |
-|---|---|
-| Automation | n8n (Docker self-hosted or n8n.cloud) |
-| Database | Supabase (PostgreSQL) |
-| WhatsApp | Meta WhatsApp Cloud API (free) |
-| AI | GPT-4o-mini / Claude Haiku |
-| File Parsing | Python FastAPI (bank statements only) |
-| Hosting | Any VPS or Railway.app |
+### Future: SaaS
+- [ ] Per-customer onboarding script (new Supabase project + .env)
+- [ ] Admin dashboard (web UI for non-WhatsApp management)
+- [ ] Automated rent reminders (scheduled, not manual)
+- [ ] PDF rent receipts
+- [ ] Salary payment tracking for staff

@@ -1,299 +1,296 @@
-# PG Accountant — AI-Powered Bookkeeping for PG Businesses
+# Cozeevo PG Accountant
 
-A production-ready, locally-runnable accounting system for PG (paying guest) businesses.
-Handles income, expenses, rent tracking, and salary management with WhatsApp integration.
-
-> **Clone-friendly:** Each PG owner gets their own isolated instance with their own API keys, data, and LLM tokens.
+> AI-powered WhatsApp bot + bookkeeping system for PG (Paying Guest) businesses.
+> Version 1.4.0 — Gatekeeper + Worker Architecture
 
 ---
 
-## Features
+## What is this?
 
-- **Multi-source ingestion** — PhonePe, Paytm, HDFC/SBI/ICICI bank statements, UPI, cash
-- **Smart deduplication** — SHA-256 hash prevents double-counting across imports
-- **97% rule-based classification** — fast, free, deterministic
-- **~3% AI classification** — Claude API for unknown merchants only
-- **WhatsApp interface** — query summaries, export reports, check rent status
-- **Interactive approval** — new tenants/vendors need your confirmation before being added
-- **Auto-reports** — text, CSV, Excel, and 24h HTML dashboards
-- **n8n automation** — file ingestion, daily reconciliation, WhatsApp replies
-- **VS Code friendly** — all prompts work in the integrated terminal
+Cozeevo PG Accountant lets a PG owner manage their entire business through WhatsApp:
+
+- **Log payments** — "Raj paid 15000 upi" → instantly recorded
+- **Check dues** — "who hasn't paid March?" → list of defaulters
+- **Tenant details** — "show Arjun's account" → full balance breakdown
+- **Add expenses** — "maintenance 5000 cash" → logged under correct category
+- **Monthly report** — revenue, occupancy, outstanding dues
+- **Tenant onboarding** — 12-step KYC form over WhatsApp (no paperwork)
+- **Tenant checkout** — 5-step checklist: keys, damage, dues, deposit refund
+- **Room enquiry bot** — leads get pricing, availability, and can book visits
+- **Tenant self-service** — tenants check their own balance, payments, and raise complaints
+
+Everything runs on **free/low-cost infrastructure** — no per-message fees, no Twilio.
+
+---
+
+## Stack
+
+| Component | Technology |
+|-----------|-----------|
+| API | FastAPI (Python 3.11) on port 8000 |
+| Database | Supabase PostgreSQL (cloud) |
+| WhatsApp | Meta Cloud API (free) |
+| Automation | n8n (Docker, port 5678) — thin webhook pipe only |
+| AI / LLM | Ollama llama3.2 (local, free) |
+| Intent Detection | Regex rules (97% free) + Ollama fallback (~3%) |
+
+---
+
+## 6-Tier Role System
+
+Every caller is automatically identified by their phone number:
+
+| Role | How identified | What they can do |
+|------|---------------|-----------------|
+| `admin` | `authorized_users` table, role=admin | Everything — add users, full CRUD |
+| `power_user` | `authorized_users` table, role=power_user | Full business access |
+| `key_user` | `authorized_users` table, role=key_user | Log payments + view assigned tenants |
+| `tenant` | Phone in `tenants` table | Read-only: balance, payments, complaints |
+| `lead` | Unknown phone number | Room enquiry + pricing + visit booking |
+| `blocked` | Rate limit exceeded (10/10min, 50/day) | No reply — silently ignored |
+
+---
+
+## Worker Architecture (Gatekeeper Pattern)
+
+```
+WhatsApp Message
+      │
+      ▼
+FastAPI chat_api.py
+      │ detect_intent() — 97% regex rules
+      ▼
+gatekeeper.route(role, intent)
+      │
+      ├── admin/power_user/key_user + financial intent ──► AccountWorker
+      │      PAYMENT_LOG, QUERY_DUES, QUERY_TENANT, ADD_EXPENSE,
+      │      QUERY_EXPENSES, REPORT, RENT_CHANGE, RENT_DISCOUNT,
+      │      VOID_PAYMENT, ADD_REFUND, QUERY_REFUNDS
+      │
+      ├── admin/power_user/key_user + operational intent ──► OwnerWorker
+      │      ADD_TENANT, START_ONBOARDING, CHECKOUT, RECORD_CHECKOUT,
+      │      QUERY_OCCUPANCY, QUERY_VACANT_ROOMS, REMINDER_SET, etc.
+      │
+      ├── tenant ──────────────────────────────────────────► TenantWorker
+      │      MY_BALANCE, MY_PAYMENTS, MY_DETAILS, COMPLAINT_REGISTER
+      │
+      └── lead / unknown ──────────────────────────────────► LeadWorker
+             ROOM_PRICE, AVAILABILITY, VISIT_REQUEST, GENERAL
+```
+
+See [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) for the full data flow diagram.
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- VS Code (recommended)
-- n8n (Docker or cloud)
-- Twilio account (for WhatsApp)
 
-### Installation
+- Python 3.11+
+- [Ollama](https://ollama.com) installed locally (`ollama pull llama3.2`)
+- Docker Desktop (for n8n)
+- Supabase account (free tier works)
+- Meta WhatsApp Business account (free — [developers.facebook.com](https://developers.facebook.com))
+
+### 1. Clone and install
 
 ```bash
-# 1. Clone / copy this project
-git clone <repo_url> my-pg-accountant
-cd my-pg-accountant
-
-# 2. Create virtual environment
+git clone https://github.com/cozeevoemp1-ctrl/cozeevo-pg-accountant.git
+cd cozeevo-pg-accountant
 python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
-
-# 3. Install dependencies
+venv\Scripts\activate        # Windows
 pip install -r requirements.txt
-
-# 4. Configure environment
-cp .env.template .env
-# Edit .env with your API keys (see Configuration section)
-
-# 5. Start the API server
-python -m cli.start_api
-
-# API docs available at: http://localhost:8000/docs
 ```
 
----
-
-## Configuration
-
-Edit `.env` with your settings:
+### 2. Configure `.env`
 
 ```env
-# Your identity
-PG_OWNER_NAME="Your Name"
-PG_BUSINESS_NAME="My PG House"
+# Supabase
+DATABASE_URL=postgresql+asyncpg://postgres:[password]@db.[ref].supabase.co:5432/postgres
+SUPABASE_URL=https://[ref].supabase.co
+SUPABASE_KEY=your-anon-key
 
-# Claude API (for ~3% AI classification)
-ANTHROPIC_API_KEY="sk-ant-..."
+# Meta WhatsApp Cloud API
+META_WHATSAPP_TOKEN=your-access-token
+PHONE_NUMBER_ID=your-phone-number-id
+VERIFY_TOKEN=pg-accountant-verify
 
-# WhatsApp via Twilio
-TWILIO_ACCOUNT_SID="AC..."
-TWILIO_AUTH_TOKEN="..."
-TWILIO_WHATSAPP_FROM="whatsapp:+14155238886"
-
-# n8n automation
-N8N_BASE_URL="http://localhost:5678"
-N8N_API_KEY="..."
+# LLM (local Ollama — free)
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2
 ```
 
----
+### 3. Run the database migrations
 
-## CLI Commands
-
-### Ingest a File
 ```bash
-# Auto-detect source (PhonePe/Paytm/Bank/UPI)
-python -m cli.ingest_file data/raw/phonepe_march_2025.csv
-
-# Preview without saving
-python -m cli.ingest_file data/raw/statement.pdf --dry-run
-
-# Skip interactive approval prompts
-python -m cli.ingest_file data/raw/file.csv --no-interactive
+python src/database/migrate_all.py
 ```
 
-### Run Reconciliation
+### 4. Start the API
+
 ```bash
-# Monthly (current month)
-python -m cli.run_reconciliation --period monthly
+# Windows
+START_API.bat
 
-# Specific month
-python -m cli.run_reconciliation --period monthly --year 2025 --month 3
-
-# Daily / Weekly
-python -m cli.run_reconciliation --period daily
-python -m cli.run_reconciliation --period weekly
+# Or directly
+uvicorn main:app --reload --port 8000
 ```
 
-### Generate Reports
-```bash
-# Text summary in terminal
-python -m cli.generate_report --format text --period monthly
+Test: `http://localhost:8000/healthz` → `{"status":"ok"}`
 
-# CSV export
-python -m cli.generate_report --format csv --period monthly
+### 5. Start n8n and connect WhatsApp
 
-# Excel with charts
-python -m cli.generate_report --format excel --period monthly --open
-
-# HTML Dashboard (opens in browser)
-python -m cli.generate_report --format dashboard --open
-```
-
-### Configure n8n Workflows (Interactive)
-```bash
-python -m cli.configure_workflow
-# Walks through: n8n connection → Twilio setup → generate JSONs → deploy
-```
-
-### Start API Server
-```bash
-python -m cli.start_api              # production
-python -m cli.start_api --reload     # development with hot-reload
-python -m cli.start_api --port 9000  # custom port
-```
-
----
-
-## File Ingestion
-
-Drop any supported file in `data/raw/` and either:
-- Run `python -m cli.ingest_file data/raw/<file>`, or
-- Let the n8n 15-min scheduled workflow pick it up automatically
-
-### Supported Formats
-
-| Source | CSV | PDF |
-|---|---|---|
-| PhonePe | ✓ | ✓ |
-| Paytm | ✓ | ✓ |
-| HDFC Bank | ✓ | ✓ |
-| SBI Bank | ✓ | ✓ |
-| ICICI Bank | ✓ | ✓ |
-| Axis Bank | ✓ | ✓ |
-| Generic UPI | ✓ | ✓ |
-| Google Pay | ✓ | - |
-| Any CSV | ✓ | - |
+See [QUICKSTART.md](QUICKSTART.md) for the full local setup guide (Docker, ngrok, Meta webhook config).
 
 ---
 
 ## WhatsApp Commands
 
-Send these messages to your WhatsApp number:
+### Admin / Power User
 
 ```
-show march summary
-show this month summary
-export expenses csv
-export excel
-show dashboard
-show rent collected this month
-rent pending march
-salary status
-help
-approve 42        (approve a pending entity by ID)
-reject 42         (reject a pending entity by ID)
+# Payments
+Raj paid 15000 upi             → log payment
+void payment 42                → void a transaction
+
+# Dues & Reports
+who hasn't paid                → defaulters this month
+Raj balance                    → tenant account details
+monthly report                 → full monthly summary
+expenses this month            → expense breakdown
+
+# Rent
+change rent for room 205 to 12000   → rent change from next month
+give Raj 500 discount               → one-time discount
+
+# Tenant management
+add tenant Arjun 9876543210 room 204  → add new tenant
+start onboarding for Arjun 9876543210 → begin 12-step KYC
+record checkout Arjun                  → begin checkout checklist
+who is checking out this month         → upcoming checkouts
+
+# Operations
+vacant rooms                   → empty rooms
+occupancy                      → current occupancy %
+rules                          → show PG house rules
+help                           → full command list
 ```
 
-Send a PDF or CSV file directly — it will be ingested automatically.
+### Tenant
+
+```
+my balance                     → pending rent + dues
+my payments                    → last 6 payments
+my details                     → room number, check-in date
+water problem                  → raise plumbing complaint
+rules                          → PG house rules
+```
+
+### Lead (unknown number)
+
+```
+price / rent                   → room pricing
+available rooms                → what's available
+single room                    → single room details
+visit / tour                   → book a visit
+```
+
+---
+
+## Database (21 Tables)
+
+```
+L0 — Permanent:    investment_expenses   pg_contacts
+L1 — Master:       properties  rooms  rate_cards  tenants  staff  food_plans  expense_categories
+L2 — Tenancy:      tenancies
+L3 — Transactions: rent_schedule  payments  refunds  expenses
+L4 — Bot:          leads  rate_limit_log  whatsapp_log  conversation_memory
+L5 — Operational:  vacations  reminders  onboarding_sessions  checkout_records  pending_actions
+L6 — Access:       authorized_users
+```
+
+Key design principles:
+- `rent_schedule` ≠ `payments` — enables "who hasn't paid?" queries
+- `is_void` flag on payments/expenses — never hard-delete financial records
+- SHA-256 deduplication on all imports
+- `room_number` as TEXT — handles "G15", "508/509", double rooms
+
+---
+
+## Multi-PG / SaaS
+
+Each PG customer gets their own isolated instance:
+- Own Supabase project (isolated DB)
+- Own WhatsApp Business number
+- Own `.env` config
+- Same codebase — config-driven
+
+No shared state between instances.
+
+---
+
+## Cloud Deployment
+
+Target: Hostinger VPS KVM 1 (~$5/month, Ubuntu 22.04)
+- FastAPI runs as a systemd service
+- n8n runs in Docker
+- Supabase stays as cloud DB (no migration needed)
+- SSL via nginx + certbot
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full cloud setup guide.
 
 ---
 
 ## Project Structure
 
 ```
-.
 ├── src/
-│   ├── agents/          LangGraph router, intent detector, master data agent
-│   ├── database/        SQLAlchemy models, DB manager, schema
-│   ├── parsers/         PhonePe, Paytm, bank, UPI, PDF, CSV parsers
-│   ├── rules/           Categorization, deduplication, merchant normalization
-│   ├── llm_gateway/     Claude API client and prompt templates
-│   ├── reports/         Reconciliation engine, report generator, Excel exporter
-│   ├── dashboard/       HTML dashboard generator + 24h cleanup
-│   ├── whatsapp/        Webhook handler + response formatter
-│   └── n8n_hooks/       Workflow generator + n8nMCP REST client
-├── cli/                 Click CLI commands
-├── data/
-│   ├── raw/             Drop input files here
-│   ├── processed/       Files moved here after ingestion
-│   └── exports/         CSV/Excel reports
-├── dashboards/          HTML dashboards (auto-deleted after 24h)
-├── workflows/n8n/       Generated n8n workflow JSON files
-├── tests/               Unit tests
-├── main.py              FastAPI application
-├── setup.py             Package entry points
-├── docker-compose.yml   Docker setup (API + n8n + Redis)
-├── .env.template        Configuration template
-├── BRAIN.md             Architecture memory (auto-updated)
-├── SYSTEM_ARCHITECTURE.md   Technical diagrams
-└── CHANGELOG.md         Version history
+│   ├── database/
+│   │   ├── models.py              # 21-table SQLAlchemy ORM
+│   │   ├── db_manager.py          # CRUD operations
+│   │   ├── seed.py                # Initial master data
+│   │   └── migrate_all.py         # Idempotent migration script
+│   ├── whatsapp/
+│   │   ├── chat_api.py            # FastAPI endpoint — main entry point
+│   │   ├── role_service.py        # 6-tier role detection + phone normalize
+│   │   ├── intent_detector.py     # Rules-based intent detection (97% free)
+│   │   ├── gatekeeper.py          # Smart router: (role, intent) → worker
+│   │   └── handlers/
+│   │       ├── account_handler.py # AccountWorker — 11 financial intents
+│   │       ├── owner_handler.py   # OwnerWorker — operational intents
+│   │       ├── tenant_handler.py  # TenantWorker + 12-step KYC onboarding
+│   │       ├── lead_handler.py    # LeadWorker — room enquiry bot
+│   │       └── _shared.py         # Shared fuzzy-search helpers
+│   ├── services/
+│   │   └── property_logic.py      # All financial math (dues, prorate, balance)
+│   └── llm_gateway/
+│       └── claude_client.py       # LLM client (Ollama/Groq/Anthropic)
+├── workflows/
+│   └── WA-01-whatsapp-router.json # n8n workflow — import this
+├── main.py                        # App entry point
+├── START_API.bat                  # Windows quick-start
+├── docker-compose.yml             # n8n container
+├── BRAIN.md                       # Full architecture reference
+├── QUICKSTART.md                  # Local setup guide
+└── DEPLOYMENT.md                  # Cloud deployment guide
 ```
 
 ---
 
-## Docker Deployment
+## Documentation
 
-```bash
-# Copy and configure environment
-cp .env.template .env
-# Edit .env ...
-
-# Start all services
-docker-compose up -d
-
-# Access:
-# API:   http://localhost:8000
-# n8n:   http://localhost:5678  (admin/pgaccountant2024)
-# Docs:  http://localhost:8000/docs
-```
-
----
-
-## Master Data Management
-
-When a new tenant, vendor, or employee appears in a transaction:
-1. System detects they don't exist in master data
-2. Queued in `pending_entities` table
-3. VS Code terminal shows an approval prompt (or WhatsApp if from mobile)
-4. You approve/reject with details
-5. Only then is the entity added to the master table
-
-**Approve via terminal:**
-```
-============================================================
-  New CUSTOMER detected in transaction:
-  Date:   2025-03-15
-  Amount: ₹8000
-  Desc:   UPI payment from Rahul Sharma
-  Party:  Rahul Sharma
-============================================================
-Add 'Rahul Sharma' as a new customer? [Y/n]: Y
-Name: Rahul Sharma
-Phone (optional): 9876543210
-UPI ID (optional): rahul@ybl
-Room number (optional): 101
-Monthly rent amount (optional): 8000
-```
-
-**Approve via WhatsApp:**
-```
-You: approve 42
-Bot: ✅ Approved: Rahul Sharma
-```
-
----
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-pytest tests/test_deduplication.py
-pytest tests/test_parsers.py
-```
-
----
-
-## Contributing / Cloning
-
-This is a **template** — fork it and make it yours:
-1. Replace `PG_OWNER_NAME` and `PG_BUSINESS_NAME` in `.env`
-2. Add your own API keys
-3. Drop your first statement in `data/raw/` and run `ingest-file`
-4. Your data stays in `data/pg_accountant.db` — never shared
-
----
-
-## Security Notes
-
-- Never commit `.env` to version control (it's in `.gitignore`)
-- SQLite DB file (`data/pg_accountant.db`) contains financial data — back it up regularly
-- Dashboard files auto-delete after 24h
-- Twilio credentials give access to your WhatsApp number — keep them secret
+| File | Purpose |
+|------|---------|
+| [BRAIN.md](BRAIN.md) | Complete architecture reference — read first |
+| [QUICKSTART.md](QUICKSTART.md) | Local setup (Docker, n8n, WhatsApp) |
+| [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) | Data flow diagrams |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Cloud deployment (Hostinger VPS) |
+| [DATA_STRATEGY.md](DATA_STRATEGY.md) | DB load strategy, dedup guarantees |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
 
 ---
 
 ## License
 
-MIT — use freely, clone for every PG you own.
+Private — Cozeevo. All rights reserved.
