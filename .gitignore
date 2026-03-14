@@ -1,0 +1,45 @@
+# Environment
+.env
+*.env.*
+!.env.template
+
+# Database
+data/pg_accountant.db
+data/pg_accountant.db-shm
+data/pg_accountant.db-wal
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Exports & dashboards (user data)
+data/raw/
+data/processed/
+data/exports/
+dashboards/
+
+# Logs
+*.log
+data/*.log
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+
+# n8n credentials
+workflows/n8n/*.json
+
+# OS
+.DS_Store
+Thumbs.db

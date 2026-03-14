@@ -1,0 +1,300 @@
+"""
+Multi-provider LLM client for PG Accountant.
+
+Supports three backends — switch by setting LLM_PROVIDER in .env:
+  LLM_PROVIDER=ollama     → free, runs on your PC (default)
+  LLM_PROVIDER=groq       → free cloud API (groq.com)
+  LLM_PROVIDER=anthropic  → paid Claude API (anthropic.com)
+
+Used ONLY for ~3% of transactions:
+  1. Merchant classification when rules confidence < threshold
+  2. WhatsApp intent detection fallback
+  3. Clarification questions
+  4. New entity suggestions
+
+All other operations are deterministic Python — no LLM calls.
+"""
+from __future__ import annotations
+
+import json
+import os
+from typing import Optional
+
+import httpx
+from loguru import logger
+
+from src.llm_gateway.prompts import (
+    MERCHANT_CLASSIFY_PROMPT,
+    INTENT_DETECT_PROMPT,
+    WHATSAPP_INTENT_PROMPT,
+    CLARIFICATION_PROMPT,
+    NEW_ENTITY_PROMPT,
+)
+
+
+# ── Provider implementations ───────────────────────────────────────────────
+
+class _OllamaBackend:
+    """
+    Calls a locally running Ollama instance (http://localhost:11434).
+    Free forever. Install from https://ollama.com then run:
+        ollama pull llama3.2
+    """
+    def __init__(self):
+        self.url   = os.getenv("OLLAMA_URL", "http://localhost:11434") + "/api/generate"
+        self.model = os.getenv("OLLAMA_MODEL", "llama3.2")
+
+    async def call(self, prompt: str) -> str:
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.0, "num_predict": 512},
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(self.url, json=payload)
+            resp.raise_for_status()
+            return resp.json()["response"].strip()
+
+
+class _GroqBackend:
+    """
+    Calls the Groq cloud API (free tier — fast Llama inference).
+    Get a free key at https://console.groq.com
+    """
+    def __init__(self):
+        self.api_key = os.getenv("GROQ_API_KEY", "")
+        if not self.api_key:
+            raise RuntimeError("GROQ_API_KEY not set. Get a free key at https://console.groq.com")
+        self.url   = "https://api.groq.com/openai/v1/chat/completions"
+        self.model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+
+    async def call(self, prompt: str) -> str:
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.0,
+            "max_tokens": 512,
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(self.url, headers=headers, json=payload)
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+class _AnthropicBackend:
+    """
+    Calls the Anthropic Claude API (paid).
+    Get a key at https://console.anthropic.com
+    """
+    def __init__(self):
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if not api_key or api_key.startswith("PASTE_"):
+            raise RuntimeError("ANTHROPIC_API_KEY not set in .env")
+        import anthropic as _anthropic
+        self.client     = _anthropic.AsyncAnthropic(api_key=api_key)
+        self.model      = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        self.max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS", "512"))
+
+    async def call(self, prompt: str) -> str:
+        msg = await self.client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            temperature=0.0,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return msg.content[0].text
+
+
+def _make_backend():
+    provider = os.getenv("LLM_PROVIDER", "ollama").lower().strip()
+    if provider == "groq":
+        logger.info("[LLM] Using Groq (free cloud Llama)")
+        return _GroqBackend()
+    elif provider == "anthropic":
+        logger.info("[LLM] Using Anthropic Claude")
+        return _AnthropicBackend()
+    else:
+        logger.info("[LLM] Using Ollama (local Llama)")
+        return _OllamaBackend()
+
+
+# ── Public client (same interface regardless of provider) ──────────────────
+
+class ClaudeClient:
+    """
+    Drop-in LLM client. Same methods regardless of which backend is active.
+    Switch provider by changing LLM_PROVIDER in .env — no code changes needed.
+    """
+
+    def __init__(self):
+        self._backend = _make_backend()
+        self._usage_log: list[dict] = []
+
+    # ── Merchant classification ───────────────────────────────────────────
+
+    async def classify_merchant(
+        self,
+        description: str,
+        merchant: str,
+        date: str,
+        amount: float,
+        txn_type: str,
+        categories: list[str],
+    ) -> dict:
+        """Returns {"category": str, "confidence": float, "reason": str}."""
+        prompt = MERCHANT_CLASSIFY_PROMPT.format(
+            categories="\n".join(f"  - {c}" for c in categories),
+            date=date, amount=amount, txn_type=txn_type,
+            description=description, merchant=merchant,
+        )
+        try:
+            response = await self._call(prompt)
+            result = json.loads(response)
+            result["method"] = "ai"
+            self._log("classify_merchant", prompt)
+            return result
+        except Exception as e:
+            logger.warning(f"[LLM] classify_merchant failed: {e}")
+            return {"category": "Miscellaneous", "confidence": 0.50, "reason": "AI fallback failed", "method": "ai_fallback"}
+
+    # ── Intent detection ──────────────────────────────────────────────────
+
+    async def detect_intent(self, message: str) -> dict:
+        """Parses a WhatsApp message into structured intent."""
+        prompt = INTENT_DETECT_PROMPT.format(message=message)
+        try:
+            response = await self._call(prompt)
+            result = json.loads(response)
+            self._log("detect_intent", prompt)
+            return result
+        except Exception as e:
+            logger.warning(f"[LLM] detect_intent failed: {e}")
+            return {"intent": "unknown", "period": None, "format": "text", "category": None, "entities": [], "confidence": 0.0}
+
+    # ── WhatsApp intent (NLP fallback) ────────────────────────────────────
+
+    _OWNER_INTENTS = (
+        "PAYMENT_LOG     : tenant paid rent (e.g. 'Raj paid 15000', 'received 8k from 203')\n"
+        "QUERY_DUES      : who hasn't paid, pending list, outstanding balances\n"
+        "QUERY_TENANT    : balance / dues / details of a specific tenant\n"
+        "ADD_TENANT      : add new tenant, check-in, onboard\n"
+        "CHECKOUT        : tenant leaving / vacating (immediate)\n"
+        "SCHEDULE_CHECKOUT: tenant leaving on a future date\n"
+        "NOTICE_GIVEN    : tenant gave notice / plans to leave\n"
+        "UPDATE_CHECKIN  : correct/backdate a check-in date\n"
+        "RENT_CHANGE     : permanent rent increase or decrease\n"
+        "RENT_DISCOUNT   : one-time concession, discount, surcharge, waiver\n"
+        "ADD_EXPENSE     : log a property expense (electricity, salary, maintenance)\n"
+        "REPORT          : monthly summary, P&L, collection report\n"
+        "ADD_PARTNER     : add a new admin or power user\n"
+        "REMINDER_SET    : set a reminder for a tenant or event\n"
+        "VOID_PAYMENT    : cancel, reverse, or void a payment\n"
+        "HELP            : help, menu, list of commands\n"
+        "UNKNOWN         : cannot determine intent"
+    )
+
+    _TENANT_INTENTS = (
+        "MY_BALANCE  : how much do I owe, my dues, my pending\n"
+        "MY_PAYMENTS : my payment history, receipts, what I paid\n"
+        "MY_DETAILS  : my room details, rent, check-in date\n"
+        "HELP        : help, hi, hello\n"
+        "UNKNOWN     : cannot determine"
+    )
+
+    _LEAD_INTENTS = (
+        "ROOM_PRICE    : price, rent, cost, how much, rates\n"
+        "AVAILABILITY  : available rooms, vacancy\n"
+        "ROOM_TYPE     : single, double, sharing, private, AC\n"
+        "VISIT_REQUEST : visit, tour, come see, show room\n"
+        "GENERAL       : everything else (general enquiry or conversation)"
+    )
+
+    async def detect_whatsapp_intent(self, message: str, role: str) -> dict:
+        """
+        NLP fallback for WhatsApp messages that don't match any regex rule.
+        Returns {"intent": str, "confidence": float, "entities": dict}.
+        """
+        if role in ("admin", "power_user", "key_user"):
+            intents_text = self._OWNER_INTENTS
+        elif role == "tenant":
+            intents_text = self._TENANT_INTENTS
+        else:
+            intents_text = self._LEAD_INTENTS
+
+        prompt = WHATSAPP_INTENT_PROMPT.format(
+            role=role,
+            intents=intents_text,
+            message=message,
+        )
+        try:
+            response = await self._call(prompt)
+            # Strip markdown fences if model wraps in ```json ... ```
+            clean = response.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+            result = json.loads(clean)
+            result.setdefault("entities", {})
+            result.setdefault("confidence", 0.7)
+            self._log("detect_whatsapp_intent", prompt)
+            return result
+        except Exception as e:
+            logger.warning(f"[LLM] detect_whatsapp_intent failed: {e}")
+            return {"intent": "UNKNOWN", "confidence": 0.0, "entities": {}}
+
+    # ── Clarification ─────────────────────────────────────────────────────
+
+    async def ask_clarification(self, context: str, message: str, unclear: str) -> str:
+        prompt = CLARIFICATION_PROMPT.format(context=context, message=message, unclear=unclear)
+        try:
+            response = await self._call(prompt)
+            self._log("clarification", prompt)
+            return response.strip()
+        except Exception as e:
+            logger.warning(f"[LLM] ask_clarification failed: {e}")
+            return "Could you please clarify your request?"
+
+    # ── Entity suggestion ─────────────────────────────────────────────────
+
+    async def suggest_entity(
+        self, entity_type: str, date: str, amount: float,
+        description: str, party: str, upi_id: str = ""
+    ) -> dict:
+        prompt = NEW_ENTITY_PROMPT.format(
+            entity_type=entity_type, date=date, amount=amount,
+            description=description, party=party, upi_id=upi_id,
+        )
+        try:
+            response = await self._call(prompt)
+            result = json.loads(response)
+            self._log("suggest_entity", prompt)
+            return result
+        except Exception as e:
+            logger.warning(f"[LLM] suggest_entity failed: {e}")
+            return {"name": party or description[:50], "phone": None, "upi_id": upi_id or None, "notes": ""}
+
+    # ── Internal ──────────────────────────────────────────────────────────
+
+    async def _call(self, prompt: str) -> str:
+        return await self._backend.call(prompt)
+
+    def _log(self, operation: str, prompt: str):
+        self._usage_log.append({"operation": operation, "approx_chars": len(prompt)})
+        logger.debug(f"[LLM] {operation} via {type(self._backend).__name__} | ~{len(prompt)} chars")
+
+    def get_usage_summary(self) -> dict:
+        by_op = {}
+        for e in self._usage_log:
+            by_op[e["operation"]] = by_op.get(e["operation"], 0) + 1
+        return {"total_ai_calls": len(self._usage_log), "by_operation": by_op, "provider": type(self._backend).__name__}
+
+
+# ── Singleton ──────────────────────────────────────────────────────────────
+
+_client: Optional[ClaudeClient] = None
+
+
+def get_claude_client() -> ClaudeClient:
+    global _client
+    if _client is None:
+        _client = ClaudeClient()
+    return _client

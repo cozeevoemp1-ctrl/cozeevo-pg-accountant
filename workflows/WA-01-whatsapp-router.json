@@ -1,0 +1,163 @@
+{
+  "name": "WA-01 \u2013 WhatsApp Router",
+  "nodes": [
+    {
+      "id": "node-trigger",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "pg-whatsapp-trigger",
+      "parameters": {
+        "updates": ["messages"]
+      },
+      "credentials": {
+        "whatsAppOAuth2Api": {
+          "id": "",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "id": "node-extract",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Pull the message from the WhatsApp trigger payload.\n// whatsAppTrigger already unwraps the Meta envelope,\n// so $json = the 'value' object directly.\nconst msg     = $json.messages?.[0];\nconst contact = $json.contacts?.[0];\n\n// Skip non-text messages (images, audio, stickers, etc.)\nif (!msg || msg.type !== 'text') {\n  return { json: { skip: true, reason: 'non-text' } };\n}\n\nreturn {\n  json: {\n    skip:      false,\n    phone:     msg.from,                           // e.g. \"917845952289\"\n    message:   msg.text.body.trim(),\n    message_id: msg.id,\n    sender_name: contact?.profile?.name ?? ''\n  }\n};"
+      }
+    },
+    {
+      "id": "node-skip-check",
+      "name": "Is Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [640, 300],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip }}",
+              "operator": { "type": "boolean", "operation": "false" },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-api-call",
+      "name": "Call FastAPI Brain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.FASTAPI_URL }}/api/whatsapp/process",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"phone\": \"+{{ $json.phone }}\",\n  \"message\": \"{{ $json.message }}\",\n  \"message_id\": \"{{ $json.message_id }}\"\n}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "node-blocked-check",
+      "name": "Should Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1080, 200],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip }}",
+              "operator": { "type": "boolean", "operation": "false" },
+              "rightValue": ""
+            },
+            {
+              "leftValue": "={{ $json.reply }}",
+              "operator": { "type": "string", "operation": "isNotEmpty" },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-send-reply",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [1300, 100],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "1037434219449187",
+        "recipientPhoneNumber": "={{ $('Extract Message').item.json.phone }}",
+        "textBody": "={{ $json.reply }}"
+      },
+      "credentials": {
+        "whatsAppApi": {
+          "id": "",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [{ "node": "Extract Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Message": {
+      "main": [
+        [{ "node": "Is Text?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Text?": {
+      "main": [
+        [{ "node": "Call FastAPI Brain", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Call FastAPI Brain": {
+      "main": [
+        [{ "node": "Should Reply?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Should Reply?": {
+      "main": [
+        [{ "node": "Send Reply", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "staticData": null
+}
