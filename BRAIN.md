@@ -2,14 +2,18 @@
 # BRAIN.md — PG Accountant Architecture Reference
 
 > Read this file at the start of every session. It is the ground truth for the system.
-> Last updated: 2026-03-14
+> Last updated: 2026-03-14 (session 3)
 
 ---
 
 ## 1. System Overview
 
 **Product:** Cozeevo PG Accountant — AI-powered bookkeeping + WhatsApp bot for a PG business.
-**Stack:** Python 3.11 · FastAPI · Supabase (PostgreSQL) · LangGraph · n8n · Meta WhatsApp Cloud API
+**Stack:** Python 3.11 · FastAPI · Supabase (PostgreSQL) · Ollama llama3.2 · APScheduler · n8n · Meta WhatsApp Cloud API
+
+> **Note on LangGraph:** `src/agents/langgraph_router.py` exists (v1.0 artifact) but is NOT wired into the WhatsApp flow.
+> The Gatekeeper+Worker architecture + PendingAction state machine replaces it. LangGraph is not needed here —
+> our business logic is deterministic rules, not multi-step AI reasoning chains.
 
 **Future goal:** Multi-tenant SaaS — same codebase, each PG gets its own Supabase project + WhatsApp number.
 
@@ -42,7 +46,7 @@ Supabase (PostgreSQL)  — cloud DB, always on
 | Table | Key columns | Notes |
 |-------|------------|-------|
 | `properties` | id, name, address, total_rooms | "Cozeevo THOR", "Cozeevo HULK" |
-| `rooms` | id, property_id, room_number (TEXT), room_type, max_occupancy | room_number is TEXT — handles "G15", "508/509" |
+| `rooms` | id, property_id, room_number (TEXT), room_type, max_occupancy, is_charged, is_staff_room | room_number is TEXT. is_charged=False for owner-free rooms (G05, G06 THOR). is_staff_room skips room from tenant occupancy. |
 | `rate_cards` | id, room_id, effective_from, effective_to (NULL=active), monthly_rent, daily_rate | Price history — new row when rent changes |
 | `tenants` | id, name, phone (UNIQUE), gender, id_proof_type | phone = WhatsApp identity key |
 | `staff` | id, property_id, name, phone, role, active | Lokesh, Lakshmi, Kiran, Chandra etc. |
@@ -61,7 +65,7 @@ Supabase (PostgreSQL)  — cloud DB, always on
 |-------|------------|-------|
 | `rent_schedule` | id, tenancy_id, period_month (DATE, 1st of month), rent_due, status | "What's owed" — separate from payments |
 | `payments` | id, tenancy_id, amount, payment_date, payment_mode (cash/upi/bank/cheque), for_type, period_month, is_void | "What's paid" — never delete, use is_void |
-| `refunds` | id, tenancy_id, amount, status (pending/processed/cancelled) | Security deposit returns |
+| `refunds` | id, tenancy_id, amount, refund_date, status (pending/processed/cancelled), reason, notes | Security deposit returns. Created automatically at RECORD_CHECKOUT. Finalised when staff says "process". |
 | `expenses` | id, property_id, category_id, amount, expense_date, is_void | Operational costs |
 
 ### Layer 4 — Leads & Bot
@@ -122,7 +126,8 @@ Supabase (PostgreSQL)  — cloud DB, always on
 | Intent | Trigger phrases |
 |--------|----------------|
 | START_ONBOARDING | "start onboarding for Ravi 9876543210", "begin kyc", "checkin for [name]" |
-| RECORD_CHECKOUT | "record checkout", "offboard", "keys returned", "mark checkout complete" |
+| RECORD_CHECKOUT | "record checkout", "offboard", "keys returned", "mark checkout complete" — 5-step form: keys → damage → dues → deposit refund → creates CheckoutRecord + Refund(pending) |
+| CONFIRM_DEPOSIT_REFUND | Auto-created by 9am checkout alert. Reply: "process" (confirm refund), "deduct XXXX" (adjust maintenance), "deduct XXXX process" (adjust+confirm). Creates Refund(processed). |
 | PAYMENT_LOG | "Raj paid 15000 upi", "received 12500 cash from room 201" |
 | QUERY_DUES | "who hasn't paid", "pending rent", "dues list" |
 | QUERY_TENANT | "Raj balance", "room 201 status" |
@@ -191,7 +196,9 @@ Supabase (PostgreSQL)  — cloud DB, always on
 | **Shared fuzzy-search helpers** | **`src/whatsapp/handlers/_shared.py`** |
 | Tenant handlers + onboarding flow | `src/whatsapp/handlers/tenant_handler.py` |
 | Lead conversation handlers | `src/whatsapp/handlers/lead_handler.py` |
-| LangGraph router | `src/agents/langgraph_router.py` |
+| LangGraph router (NOT active — v1.0 artifact) | `src/agents/langgraph_router.py` |
+| Business scheduler (5 jobs — rent reminders, recon, backup, checkout alerts) | `src/scheduler.py` |
+| Diagnostic scripts (occupancy, empty rooms, payment breakdown, deposit check) | `scripts/` |
 | LLM client (Ollama/Groq/Anthropic) | `src/llm_gateway/claude_client.py` |
 | Reconciliation engine | `src/reports/reconciliation.py` |
 | n8n workflow | `workflows/WA-01-whatsapp-router.json` |
@@ -245,8 +252,8 @@ Both AccountWorker and OwnerWorker share:
 | Lead conversation (natural chat) | Ollama/Groq | Free/Low |
 | Reporting, dedup, reconciliation | Python only | Free |
 
-**LangGraph guardrails:** max_iterations=2, timeout=30s, no loops.
 **LLM_PROVIDER=ollama** (default, local, free) — switch to `groq` (free cloud) or `anthropic` (paid) in `.env`.
+**No LangGraph** — Gatekeeper+Worker is the agent architecture. PendingAction is the state machine.
 
 ---
 
@@ -280,21 +287,38 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Supabase DB | **Live** | 21 tables (19 original + onboarding_sessions + checkout_records) |
-| FastAPI | **Needs restart** | Restart `START_API.bat` to pick up 2026-03-14 refactor |
+| Supabase DB | **Live** | 21 tables. Excel data: 234 tenants, 292 tenancies, 929 rent_schedule, 705 payments |
+| FastAPI | **Needs restart** | Restart `START_API.bat` to pick up all 2026-03-14 changes |
 | Ollama | **Running** | llama3.2 at http://localhost:11434 |
+| APScheduler | **5 jobs** | rent_reminder_early, rent_reminder_late, daily_reconciliation, weekly_backup, checkout_deposit_alerts |
 | n8n | **Not running** | Needs Docker Desktop installed |
 | Docker | **Not installed** | Install from docker.com |
 | WhatsApp Meta API | **Credentials configured** | Token + Phone ID in .env, webhook not yet pointed |
 
-### Recently completed (2026-03-14)
+### Recently completed (2026-03-14 session 3)
+- **Deposit tracking + checkout flow fixes:**
+  - `rooms.is_charged` field: G05 and G06 (THOR) marked is_charged=False (owner-free rooms)
+  - `rooms.is_staff_room` field: staff rooms excluded from tenant occupancy/vacancy counts
+  - `refunds` table now actively used: `RECORD_CHECKOUT` creates `Refund(status=pending)` on completion
+  - `CONFIRM_DEPOSIT_REFUND` intent: 9am daily scheduler job alerts staff on checkout day
+  - Staff WhatsApp replies: `process` / `deduct XXXX` / `deduct XXXX process` finalise the refund
+  - `resolve_pending_action` structural fix: RECORD_CHECKOUT text-reply steps (Q2–Q5) now correctly intercepted before numeric check
+  - `scheduler.py`: 5th job `_checkout_deposit_alerts` — daily 9am, checks expected_checkout=today
+  - Deposit query clarity: deposits split by payment_date (when received) vs for whom (by checkin_date) vs total held (active tenants)
+
+- **Data verification scripts (`scripts/`):**
+  - `occupancy_today.py` — current bed/room snapshot, breakdown by THOR/HULK
+  - `empty_rooms.py` — floor-wise empty rooms + partial rooms, exports CSV
+  - `payment_breakdown.py` — payments by mode (cash/UPI/bank/cheque) and for_type (rent/deposit/booking)
+  - `deposit_check.py` — 4 views: received in month, by checkin date, total held, advance payments
+
+### Completed (2026-03-14 session 2)
 - **Gatekeeper + AccountWorker Architecture** refactor:
   - `gatekeeper.py` — smart router replacing flat if/elif chain in chat_api.py
   - `account_handler.py` — AccountWorker owning all 11 financial intents
   - `_shared.py` — 8 shared fuzzy-search/disambiguation helpers
   - `owner_handler.py` slimmed from 2,595 → 1,434 lines (operational only)
   - `chat_api.py` updated to use `route()` from gatekeeper
-  - Import verification passed: `python -c "from src.whatsapp.gatekeeper import route; print('OK')"`
 
 ### Completed (2026-03-13 session 2)
 - PG Rules & Regulations (19 rules) → RULES intent in both tenant + owner handlers
@@ -361,6 +385,13 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 | 2026-03-14 | **AccountWorker** (`account_handler.py`): dedicated accounting persona for 11 financial intents |
 | 2026-03-14 | **Shared helpers** (`_shared.py`): 8 fuzzy-search helpers extracted from owner_handler — used by both workers |
 | 2026-03-14 | `owner_handler.py` trimmed from 2,595 → 1,434 lines — operational intents only |
+| 2026-03-14 | `rooms.is_charged` + `rooms.is_staff_room` fields added — G05/G06 THOR marked free, staff rooms excluded from occupancy |
+| 2026-03-14 | Canonical room migration: `migrate_rooms.py` — upserts 166 rooms, deactivates non-canonical |
+| 2026-03-14 | **Deposit tracking**: `refunds` table now used. RECORD_CHECKOUT creates Refund(pending). Staff confirms via "process" |
+| 2026-03-14 | **9am checkout alerts**: `_checkout_deposit_alerts` scheduler job — sends deposit summary to staff, creates CONFIRM_DEPOSIT_REFUND PendingAction |
+| 2026-03-14 | `resolve_pending_action` structural fix: RECORD_CHECKOUT text steps (Q2–Q5 yes/no) now work correctly |
+| 2026-03-14 | Data verification scripts: `occupancy_today.py`, `empty_rooms.py`, `payment_breakdown.py`, `deposit_check.py` |
+| 2026-03-14 | Data fixes: 17 future no_show tenancies corrected to active. 9 real no-shows identified (past checkin, never arrived) |
 
 ---
 

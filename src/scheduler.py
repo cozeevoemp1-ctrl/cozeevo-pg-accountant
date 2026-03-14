@@ -123,8 +123,16 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        _checkout_deposit_alerts,
+        trigger=CronTrigger(hour=9, minute=0),   # every day at 9am IST
+        id="checkout_deposit_alerts",
+        name="Checkout Deposit Alerts — 9am daily",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info("[Scheduler] Started — 4 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 5 jobs registered (jobs persist in Supabase)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -369,3 +377,129 @@ def _prune_old_backups(max_keep: int = 8) -> None:
         import shutil
         shutil.rmtree(old, ignore_errors=True)
         logger.info(f"[Scheduler] pruned old backup: {old.name}")
+
+
+# ── Job: Checkout Deposit Alerts ───────────────────────────────────────────────
+
+async def _checkout_deposit_alerts() -> None:
+    """
+    Runs every day at 09:00 IST.
+    Finds tenancies with expected_checkout = today, sends deposit settlement
+    summary to assigned staff + all admin/power_user phones.
+    Creates a PendingAction(CONFIRM_DEPOSIT_REFUND) per recipient so they can
+    reply 'process' or 'deduct XXXX' to finalise the refund.
+    """
+    import json
+    from datetime import datetime, timedelta
+    from src.whatsapp.webhook_handler import _send_whatsapp
+
+    today = date.today()
+    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    logger.info(f"[Scheduler] checkout_deposit_alerts — {today}")
+
+    try:
+        async with engine.connect() as conn:
+            # Tenancies checking out today (scheduled via expected_checkout)
+            rows = await conn.execute(text("""
+                SELECT
+                    tn.id             AS tenancy_id,
+                    t.name            AS tenant_name,
+                    r.room_number,
+                    p.name            AS property_name,
+                    p.id              AS property_id,
+                    tn.security_deposit,
+                    COALESCE(s.phone, '') AS staff_phone,
+                    COALESCE(
+                        (SELECT SUM(pay.amount) FROM payments pay
+                         WHERE pay.tenancy_id = tn.id
+                           AND pay.for_type = 'deposit'
+                           AND pay.is_void = FALSE), 0
+                    ) AS deposit_paid,
+                    COALESCE(
+                        (SELECT SUM(rs.due_amount - COALESCE(rs.paid_amount,0))
+                         FROM rent_schedule rs
+                         WHERE rs.tenancy_id = tn.id
+                           AND rs.is_void = FALSE
+                           AND rs.due_amount > COALESCE(rs.paid_amount, 0)), 0
+                    ) AS outstanding_dues
+                FROM tenancies tn
+                JOIN tenants  t  ON t.id  = tn.tenant_id
+                JOIN rooms    r  ON r.id  = tn.room_id
+                JOIN properties p ON p.id = r.property_id
+                LEFT JOIN staff s ON s.id = tn.assigned_staff_id
+                WHERE tn.expected_checkout = :today
+                  AND tn.status = 'active'
+            """), {"today": today.isoformat()})
+            checkouts = rows.fetchall()
+
+            if not checkouts:
+                logger.info("[Scheduler] checkout_deposit_alerts — no checkouts today.")
+                return
+
+            # All admin + power_user phones (to always notify owners)
+            auth_rows = await conn.execute(text("""
+                SELECT phone FROM authorized_users
+                WHERE role IN ('admin', 'power_user') AND active = TRUE
+            """))
+            owner_phones = [r[0] for r in auth_rows.fetchall() if r[0]]
+
+    finally:
+        await engine.dispose()
+
+    # Re-open engine for inserts (PendingActions)
+    engine2 = create_async_engine(_ASYNC_DB_URL, echo=False)
+    try:
+        async with engine2.connect() as conn:
+            for row in checkouts:
+                tenancy_id    = row.tenancy_id
+                tenant_name   = row.tenant_name
+                room_number   = row.room_number
+                prop_name     = row.property_name
+                deposit_held  = int(row.deposit_paid or row.security_deposit or 0)
+                outstanding   = int(row.outstanding_dues or 0)
+                net_refund    = max(0, deposit_held - outstanding)
+                staff_phone   = row.staff_phone
+
+                msg = (
+                    f"⚠️ *Checkout Today — {tenant_name}*\n"
+                    f"Room       : {room_number} ({prop_name})\n"
+                    f"Deposit    : Rs.{deposit_held:,}\n"
+                    f"Outstanding: -Rs.{outstanding:,}\n"
+                    f"*Net refund : Rs.{net_refund:,}*\n\n"
+                    "Reply:\n"
+                    "• *process* — confirm refund as above\n"
+                    "• *deduct XXXX* — deduct maintenance first\n"
+                    "• *deduct XXXX process* — deduct and confirm in one step"
+                )
+
+                action_data = json.dumps({
+                    "tenancy_id":   tenancy_id,
+                    "tenant_name":  tenant_name,
+                    "room":         room_number,
+                    "deposit_held": deposit_held,
+                    "maintenance":  outstanding,
+                    "net_refund":   net_refund,
+                })
+                expires_at = (datetime.utcnow() + timedelta(hours=48)).isoformat()
+
+                # Collect unique phones to notify
+                phones_to_notify = set(owner_phones)
+                if staff_phone:
+                    phones_to_notify.add(staff_phone)
+
+                for phone in phones_to_notify:
+                    await _send_whatsapp(phone, msg)
+                    # Create PendingAction so 'process' reply is caught
+                    await conn.execute(text("""
+                        INSERT INTO pending_actions (phone, intent, action_data, choices, expires_at, resolved)
+                        VALUES (:phone, 'CONFIRM_DEPOSIT_REFUND', :action_data, '[]', :expires_at, FALSE)
+                    """), {"phone": phone, "action_data": action_data, "expires_at": expires_at})
+
+                await conn.commit()
+                logger.info(
+                    f"[Scheduler] checkout alert sent — {tenant_name} ({room_number})"
+                    f" deposit=Rs.{deposit_held:,} net=Rs.{net_refund:,}"
+                    f" → {len(phones_to_notify)} recipients"
+                )
+    finally:
+        await engine2.dispose()

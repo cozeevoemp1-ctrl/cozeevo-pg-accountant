@@ -23,8 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Payment, PaymentFor,
-    PaymentMode, PendingAction, PendingLearning, LearnedRule, RentSchedule, RentStatus,
-    Room, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
+    PaymentMode, PendingAction, PendingLearning, LearnedRule, Refund, RefundStatus, RentSchedule, RentStatus,
+    Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
 from src.whatsapp.role_service import CallerContext
 from src.database.validators import check_no_active_tenancy, check_tenancy_active
@@ -109,6 +109,214 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
         num = int(reply_text.rstrip("."))
         if 1 <= num <= len(choices):
             chosen_idx = num - 1
+
+    # ── Multi-step text-based flows — handled BEFORE numeric check ───────────
+
+    if pending.intent == "CONFIRM_DEPOSIT_REFUND":
+        ans = reply_text.lower().strip()
+        tenancy_id   = action_data.get("tenancy_id")
+        tenant_name  = action_data.get("tenant_name", "Tenant")
+        deposit_held = int(action_data.get("deposit_held", 0))
+        maintenance  = int(action_data.get("maintenance", 0))
+        net_refund   = int(action_data.get("net_refund", deposit_held))
+
+        # "deduct 2000" or "deduct 2000 process"
+        deduct_match = re.search(r"deduct\s+(\d+)", ans)
+        if deduct_match:
+            extra_deduction = int(deduct_match.group(1))
+            maintenance = maintenance + extra_deduction
+            net_refund  = max(0, deposit_held - maintenance)
+            action_data["maintenance"] = maintenance
+            action_data["net_refund"]  = net_refund
+
+        do_process = "process" in ans
+
+        if deduct_match and not do_process:
+            # Updated deduction — ask to confirm
+            await _save_pending(pending.phone, "CONFIRM_DEPOSIT_REFUND", action_data, [], session)
+            return (
+                f"*Updated — {tenant_name}*\n"
+                f"Deposit held  : Rs.{deposit_held:,}\n"
+                f"Maintenance   : -Rs.{maintenance:,}\n"
+                f"Net refund    : Rs.{net_refund:,}\n\n"
+                "Reply *process* to confirm, or *deduct XXXX* to adjust further."
+            )
+
+        if do_process:
+            if not tenancy_id:
+                return "Error: tenancy not found in pending action."
+            # Check if already processed
+            existing_refund = (await session.execute(
+                select(Refund).where(
+                    Refund.tenancy_id == tenancy_id,
+                    Refund.status == RefundStatus.processed,
+                )
+            )).scalars().first()
+            if existing_refund:
+                return f"Deposit refund for *{tenant_name}* already processed (Rs.{int(existing_refund.amount):,})."
+
+            # Create or update Refund row
+            pending_refund = (await session.execute(
+                select(Refund).where(
+                    Refund.tenancy_id == tenancy_id,
+                    Refund.status == RefundStatus.pending,
+                )
+            )).scalars().first()
+
+            if pending_refund:
+                pending_refund.amount      = Decimal(str(net_refund))
+                pending_refund.refund_date = date.today()
+                pending_refund.status      = RefundStatus.processed
+                pending_refund.notes       = f"Maintenance deducted: Rs.{maintenance:,}"
+            else:
+                session.add(Refund(
+                    tenancy_id   = tenancy_id,
+                    amount       = Decimal(str(net_refund)),
+                    refund_date  = date.today(),
+                    reason       = "deposit refund on checkout",
+                    status       = RefundStatus.processed,
+                    notes        = f"Maintenance deducted: Rs.{maintenance:,}",
+                ))
+
+            # Update CheckoutRecord if it exists
+            cr = (await session.execute(
+                select(CheckoutRecord).where(CheckoutRecord.tenancy_id == tenancy_id)
+            )).scalars().first()
+            if cr:
+                cr.deposit_refunded_amount = Decimal(str(net_refund))
+                cr.deposit_refund_date     = date.today()
+
+            return (
+                f"*Deposit Processed — {tenant_name}*\n"
+                f"Deposit held  : Rs.{deposit_held:,}\n"
+                f"Maintenance   : -Rs.{maintenance:,}\n"
+                f"*Returned     : Rs.{net_refund:,}*\n"
+                f"Date          : {date.today().strftime('%d %b %Y')}\n\n"
+                "Refund record saved."
+            )
+
+        # Unrecognised reply — re-prompt
+        return (
+            f"Reply *process* to confirm refund of Rs.{net_refund:,}\n"
+            "or *deduct XXXX* to reduce for maintenance first."
+        )
+
+    if pending.intent == "RECORD_CHECKOUT":
+        step = action_data.get("step", "")
+
+        # Step 0 (confirm_tenant) needs a numbered choice
+        if step == "confirm_tenant":
+            if not reply_text.rstrip(".").isdigit():
+                return None
+            num = int(reply_text.rstrip("."))
+            if not (1 <= num <= len(choices)):
+                return None
+            chosen_tenant = choices[num - 1]
+            action_data["step"]        = "ask_cupboard_key"
+            action_data["tenancy_id"]  = chosen_tenant["tenancy_id"]
+            action_data["tenant_name"] = chosen_tenant["label"]
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            return (
+                f"*Checkout Form — {chosen_tenant['label']}*\n\n"
+                "*Q1/5* Was the *cupboard/almirah key* returned?\n"
+                "Reply: *yes* or *no*"
+            )
+
+        # Steps 1–5 are text-based
+        ans = reply_text.lower().strip()
+        yes = ans in ("yes", "y", "haan", "ha", "done", "returned", "1")
+
+        if step == "ask_cupboard_key":
+            action_data["cupboard_key"] = yes
+            action_data["step"] = "ask_main_key"
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            return "*Q2/5* Was the *main gate / room key* returned?\nReply: *yes* or *no*"
+
+        if step == "ask_main_key":
+            action_data["main_key"] = yes
+            action_data["step"] = "ask_damage"
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            return "*Q3/5* Any *damages* to report?\nReply: *no* — or describe them (e.g. 'broken fan, cracked mirror')"
+
+        if step == "ask_damage":
+            action_data["damage"] = "" if ans in ("no", "n", "none", "nil", "nahi", "nope") else reply_text.strip()
+            action_data["step"] = "ask_dues"
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            return "*Q4/5* Any *pending dues* at checkout? (Rs.)\nReply: *0* if fully paid, or the amount"
+
+        if step == "ask_dues":
+            try:
+                dues = int("".join(filter(str.isdigit, reply_text)) or "0")
+            except ValueError:
+                dues = 0
+            action_data["dues"] = dues
+            action_data["step"] = "ask_deposit_refund"
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            # Pre-calculate expected refund for convenience
+            tenancy_id_hint = action_data.get("tenancy_id")
+            deposit_hint = 0
+            if tenancy_id_hint:
+                tenancy_hint = await session.get(Tenancy, tenancy_id_hint)
+                if tenancy_hint and tenancy_hint.security_deposit:
+                    deposit_hint = int(tenancy_hint.security_deposit)
+            hint_line = f"\n_(Deposit on record: Rs.{deposit_hint:,} — dues: Rs.{dues:,} — expected refund: Rs.{max(0, deposit_hint - dues):,})_" if deposit_hint else ""
+            return (
+                f"*Q5/5* Deposit refund amount? (Rs.){hint_line}\n"
+                "Reply: *0* if not refunding, or the amount"
+            )
+
+        if step == "ask_deposit_refund":
+            try:
+                refund_amt = int("".join(filter(str.isdigit, reply_text)) or "0")
+            except ValueError:
+                refund_amt = 0
+
+            tenancy_id = action_data.get("tenancy_id")
+            cr = CheckoutRecord(
+                tenancy_id=tenancy_id,
+                cupboard_key_returned=action_data.get("cupboard_key", False),
+                main_key_returned=action_data.get("main_key", False),
+                damage_notes=action_data.get("damage") or None,
+                pending_dues_amount=action_data.get("dues", 0),
+                deposit_refunded_amount=refund_amt,
+                deposit_refund_date=date.today() if refund_amt > 0 else None,
+                actual_exit_date=date.today(),
+                recorded_by=pending.phone,
+            )
+            session.add(cr)
+
+            # Create Refund row (pending until explicitly processed)
+            if tenancy_id:
+                session.add(Refund(
+                    tenancy_id  = tenancy_id,
+                    amount      = Decimal(str(refund_amt)),
+                    refund_date = date.today() if refund_amt > 0 else None,
+                    reason      = "deposit refund on checkout",
+                    status      = RefundStatus.pending if refund_amt > 0 else RefundStatus.cancelled,
+                    notes       = f"Recorded during checkout form by {pending.phone}",
+                ))
+
+            # Mark tenancy as exited
+            tenancy = await session.get(Tenancy, tenancy_id)
+            if tenancy:
+                tenancy.status = TenancyStatus.exited
+                tenancy.checkout_date = date.today()
+
+            name = action_data.get("tenant_name", "Tenant")
+            return (
+                f"*Checkout Complete — {name}*\n\n"
+                f"Cupboard key: {'Returned' if action_data.get('cupboard_key') else 'Not returned'}\n"
+                f"Main key: {'Returned' if action_data.get('main_key') else 'Not returned'}\n"
+                f"Damages: {action_data.get('damage') or 'None'}\n"
+                f"Pending dues: Rs.{int(action_data.get('dues', 0)):,}\n"
+                f"Deposit refund: Rs.{refund_amt:,} _(status: pending — reply *process* to finalise)_\n"
+                f"Exit date: {date.today().strftime('%d %b %Y')}\n\n"
+                "Record saved. Room is now vacant."
+            )
+
+        return None  # Unrecognised step
+
+    # ── Numbered-choice disambiguation ────────────────────────────────────────
 
     if chosen_idx is None:
         return None   # Not a valid numbered choice — let normal flow handle it
@@ -283,93 +491,6 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 session=session,
             )
         return "Void cancelled — payment remains as logged."
-
-    if pending.intent == "RECORD_CHECKOUT":
-        step = action_data.get("step", "")
-
-        # Step 0: tenant disambiguation chosen — start Q1
-        if step == "confirm_tenant":
-            action_data["step"] = "ask_cupboard_key"
-            action_data["tenancy_id"] = chosen["tenancy_id"]
-            action_data["tenant_name"] = chosen["label"]
-            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-            return (
-                f"*Checkout Form — {chosen['label']}*\n\n"
-                "*Q1/5* Was the *cupboard/almirah key* returned?\n"
-                "Reply: *yes* or *no*"
-            )
-
-        ans = reply_text.lower().strip()
-        yes = ans in ("yes", "y", "haan", "ha", "done", "returned", "1")
-
-        if step == "ask_cupboard_key":
-            action_data["cupboard_key"] = yes
-            action_data["step"] = "ask_main_key"
-            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-            return "*Q2/5* Was the *main gate / room key* returned?\nReply: *yes* or *no*"
-
-        if step == "ask_main_key":
-            action_data["main_key"] = yes
-            action_data["step"] = "ask_damage"
-            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-            return "*Q3/5* Any *damages* to report?\nReply: *no* — or describe them (e.g. 'broken fan, cracked mirror')"
-
-        if step == "ask_damage":
-            action_data["damage"] = "" if ans in ("no", "n", "none", "nil", "nahi", "nope") else reply_text.strip()
-            action_data["step"] = "ask_dues"
-            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-            return "*Q4/5* Any *pending dues* at checkout? (Rs.)\nReply: *0* if fully paid, or the amount"
-
-        if step == "ask_dues":
-            try:
-                dues = int("".join(filter(str.isdigit, reply_text)) or "0")
-            except ValueError:
-                dues = 0
-            action_data["dues"] = dues
-            action_data["step"] = "ask_deposit_refund"
-            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-            return (
-                "*Q5/5* Deposit refund amount? (Rs.)\n"
-                "Reply: *0* if not refunding, or the amount (refund date = today)"
-            )
-
-        if step == "ask_deposit_refund":
-            try:
-                refund_amt = int("".join(filter(str.isdigit, reply_text)) or "0")
-            except ValueError:
-                refund_amt = 0
-
-            tenancy_id = action_data.get("tenancy_id")
-            cr = CheckoutRecord(
-                tenancy_id=tenancy_id,
-                cupboard_key_returned=action_data.get("cupboard_key", False),
-                main_key_returned=action_data.get("main_key", False),
-                damage_notes=action_data.get("damage") or None,
-                pending_dues_amount=action_data.get("dues", 0),
-                deposit_refunded_amount=refund_amt,
-                deposit_refund_date=date.today() if refund_amt > 0 else None,
-                actual_exit_date=date.today(),
-                recorded_by=pending.phone,
-            )
-            session.add(cr)
-
-            # Mark tenancy as exited
-            tenancy = await session.get(Tenancy, tenancy_id)
-            if tenancy:
-                tenancy.status = TenancyStatus.exited
-                tenancy.checkout_date = date.today()
-
-            name = action_data.get("tenant_name", "Tenant")
-            return (
-                f"*Checkout Complete — {name}*\n\n"
-                f"Cupboard key: {'Returned' if action_data.get('cupboard_key') else 'Not returned'}\n"
-                f"Main key: {'Returned' if action_data.get('main_key') else 'Not returned'}\n"
-                f"Damages: {action_data.get('damage') or 'None'}\n"
-                f"Pending dues: Rs.{int(action_data.get('dues', 0)):,}\n"
-                f"Deposit refunded: Rs.{refund_amt:,}\n"
-                f"Exit date: {date.today().strftime('%d %b %Y')}\n\n"
-                "Record saved. Room is now vacant."
-            )
 
     return None
 

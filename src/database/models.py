@@ -218,6 +218,7 @@ class Room(Base):
     has_ac            = Column(Boolean, default=False)
     has_attached_bath = Column(Boolean, default=False)
     is_staff_room     = Column(Boolean, default=False)   # True = reserved for staff, not tenant
+    is_charged        = Column(Boolean, default=True)    # False = owner gives this room free (excluded from rent cost)
     active            = Column(Boolean, default=True)
     notes             = Column(Text)
 
