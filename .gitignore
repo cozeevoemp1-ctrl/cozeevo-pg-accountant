@@ -3,11 +3,10 @@
 *.env.*
 !.env.template
 
-# Database
-data/pg_accountant.db
-data/pg_accountant.db-shm
-data/pg_accountant.db-wal
+# Database files (use Supabase — no local DB)
 *.db
+*.db-shm
+*.db-wal
 
 # Python
 __pycache__/
@@ -22,20 +21,35 @@ env/
 dist/
 build/
 
-# Exports & dashboards (user data)
+# Exports, dashboards, raw data (user-specific, not in repo)
 data/raw/
 data/processed/
 data/exports/
+data/reports/
+data/documents/
+data/uploads/
+data/master/
 dashboards/
 
 # Logs
 *.log
 data/*.log
+tests/failures_log.jsonl
+
+# Sensitive / local-only
+ngrok_recovery_codes.txt
+*.xlsx
+*.csv
+*.jpeg
+*.jpg
+*.png
+!docs/images/
 
 # IDE
 .vscode/settings.json
 .idea/
 *.swp
+pyrightconfig.json
 
 # n8n credentials
 workflows/n8n/*.json

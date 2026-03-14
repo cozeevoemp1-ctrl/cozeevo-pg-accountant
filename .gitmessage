@@ -1,0 +1,23 @@
+# <type>(<scope>): <short summary> (max 72 chars)
+#
+# Types:
+#   feat     — new feature or intent
+#   fix      — bug fix
+#   docs     — documentation only
+#   refactor — code restructure, no behaviour change
+#   chore    — deps, config, CI, gitignore, scripts
+#   test     — tests only
+#   perf     — performance improvement
+#
+# Scopes (optional):
+#   whatsapp, db, account, owner, tenant, lead, gatekeeper,
+#   intent, api, n8n, deploy, auth, models, seed, migration
+#
+# Body (optional — explain WHY, not WHAT):
+#
+# Examples:
+#   feat(account): add QUERY_REFUNDS intent to AccountWorker
+#   fix(gatekeeper): route key_user QUERY_DUES to AccountWorker
+#   docs: update README to remove Twilio references
+#   chore: add .env.template and .gitignore for xlsx files
+#   refactor(owner): extract _shared helpers into _shared.py

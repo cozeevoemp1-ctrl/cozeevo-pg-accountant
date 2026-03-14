@@ -1,0 +1,65 @@
+[
+  {"_comment": "──── PAYMENT LOG ────────────────────────────────────────"},
+  {"message": "Raj paid 15000",                           "expect_intent": "PAYMENT_LOG",  "expect_entities": {"amount": 15000}},
+  {"message": "received 8k from room 203",                "expect_intent": "PAYMENT_LOG",  "expect_entities": {"amount": 8000}},
+  {"message": "Jeevan deposited 9000 by UPI",             "expect_intent": "PAYMENT_LOG",  "expect_entities": {"amount": 9000, "payment_mode": "upi"}},
+  {"message": "collected rent from Suresh 12000 cash",    "expect_intent": "PAYMENT_LOG",  "expect_entities": {"amount": 12000, "payment_mode": "cash"}},
+  {"message": "Karthik transferred 18500",                "expect_intent": "PAYMENT_LOG",  "expect_entities": {"amount": 18500}},
+
+  {"_comment": "──── QUERY DUES ─────────────────────────────────────────"},
+  {"message": "who hasn't paid this month",               "expect_intent": "QUERY_DUES"},
+  {"message": "pending list",                             "expect_intent": "QUERY_DUES"},
+  {"message": "show me all outstanding dues",             "expect_intent": "QUERY_DUES"},
+  {"message": "baki kaun hai",                            "expect_intent": "QUERY_DUES"},
+  {"message": "which tenants have unpaid rent for March", "expect_intent": "QUERY_DUES",   "expect_entities": {"month": 3}},
+
+  {"_comment": "──── QUERY TENANT ───────────────────────────────────────"},
+  {"message": "Jeevan balance",                           "expect_intent": "QUERY_TENANT", "expect_entities": {"name": "Jeevan"}},
+  {"message": "Raj dues",                                 "expect_intent": "QUERY_TENANT", "expect_entities": {"name": "Raj"}},
+  {"message": "room 203 details",                         "expect_intent": "QUERY_TENANT", "expect_entities": {"room": "203"}},
+  {"message": "Jeevan CH balance how much?",              "expect_intent": "QUERY_TENANT", "expect_entities": {"name": "Jeevan"}},
+  {"message": "how much does Suresh owe",                 "expect_intent": "QUERY_TENANT", "expect_entities": {"name": "Suresh"}},
+  {"message": "Jeevan CH has how much due?",              "expect_intent": "QUERY_TENANT", "expect_entities": {"name": "Jeevan"}},
+  {"message": "tell me Karthik's current balance",        "expect_intent": "QUERY_TENANT", "expect_entities": {"name": "Karthik"}},
+
+  {"_comment": "──── ADD TENANT ─────────────────────────────────────────"},
+  {"message": "add tenant Priya room 205 rent 9000",      "expect_intent": "ADD_TENANT",   "expect_entities": {"name": "Priya", "room": "205", "amount": 9000}},
+  {"message": "new checkin tomorrow",                     "expect_intent": "ADD_TENANT"},
+  {"message": "onboard new tenant Arjun",                 "expect_intent": "ADD_TENANT",   "expect_entities": {"name": "Arjun"}},
+
+  {"_comment": "──── CHECKOUT ───────────────────────────────────────────"},
+  {"message": "Suresh is leaving",                        "expect_intent": "CHECKOUT",     "expect_entities": {"name": "Suresh"}},
+  {"message": "checkout Raj",                             "expect_intent": "CHECKOUT",     "expect_entities": {"name": "Raj"}},
+  {"message": "vacate room 203",                          "expect_intent": "CHECKOUT",     "expect_entities": {"room": "203"}},
+  {"message": "Suresh is checking out on 31 March",       "expect_intent": "SCHEDULE_CHECKOUT", "expect_entities": {"name": "Suresh", "month": 3}},
+  {"message": "Priya gave notice she wants to leave",     "expect_intent": "NOTICE_GIVEN", "expect_entities": {"name": "Priya"}},
+
+  {"_comment": "──── EXPENSES ───────────────────────────────────────────"},
+  {"message": "electricity bill 4500",                    "expect_intent": "ADD_EXPENSE",  "expect_entities": {"amount": 4500}},
+  {"message": "paid salary 12000 to Lokesh",              "expect_intent": "ADD_EXPENSE",  "expect_entities": {"amount": 12000}},
+  {"message": "internet bill 999",                        "expect_intent": "ADD_EXPENSE",  "expect_entities": {"amount": 999}},
+
+  {"_comment": "──── REPORT ─────────────────────────────────────────────"},
+  {"message": "monthly report",                           "expect_intent": "REPORT"},
+  {"message": "show P&L for March",                       "expect_intent": "REPORT",       "expect_entities": {"month": 3}},
+  {"message": "total collection this month",              "expect_intent": "REPORT"},
+
+  {"_comment": "──── RENT CHANGES ───────────────────────────────────────"},
+  {"message": "Jeevan rent from April is 10000",          "expect_intent": "RENT_CHANGE",  "expect_entities": {"name": "Jeevan", "amount": 10000}},
+  {"message": "give Raj 500 discount this month",         "expect_intent": "RENT_DISCOUNT","expect_entities": {"name": "Raj", "amount": 500}},
+
+  {"_comment": "──── VOID PAYMENT ───────────────────────────────────────"},
+  {"message": "void last payment from Raj",               "expect_intent": "VOID_PAYMENT", "expect_entities": {"name": "Raj"}},
+  {"message": "wrong payment received from Suresh cancel it", "expect_intent": "VOID_PAYMENT"},
+
+  {"_comment": "──── HELP ───────────────────────────────────────────────"},
+  {"message": "help",                                     "expect_intent": "HELP"},
+  {"message": "menu",                                     "expect_intent": "HELP"},
+  {"message": "hi",                                       "expect_intent": "HELP"},
+
+  {"_comment": "──── NLP / NATURAL LANGUAGE (AI fallback cases) ─────────"},
+  {"message": "can you tell me if anyone is behind on payments", "expect_intent": "QUERY_DUES"},
+  {"message": "what is the financial situation this month",      "expect_intent": "REPORT"},
+  {"message": "I want to add a new resident joining next week",  "expect_intent": "ADD_TENANT"},
+  {"message": "someone from room 203 says they paid but I don't see it", "expect_intent": "QUERY_TENANT", "expect_entities": {"room": "203"}}
+]
