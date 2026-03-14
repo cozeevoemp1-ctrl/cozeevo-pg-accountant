@@ -84,6 +84,7 @@ async def handle_owner(
         "START_ONBOARDING":   _start_onboarding,
         "RECORD_CHECKOUT":    _record_checkout,
         "COMPLAINT_REGISTER": _owner_complaint_register,
+        "GET_TENANT_NOTES":   _get_tenant_notes,
         "RULES":              _rules,
         "HELP":               _help,
         "UNKNOWN":            _unknown,
@@ -425,6 +426,16 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             tenancy_id=chosen["tenancy_id"],
             session=session,
         )
+
+    if pending.intent == "GET_TENANT_NOTES":
+        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+        tenant = await session.get(Tenant, chosen["tenant_id"])
+        if not tenancy or not tenant:
+            return "Tenant not found."
+        notes = tenancy.notes
+        if not notes or not notes.strip():
+            return f"*{tenant.name}* (Room {tenancy.room_id}) — no agreed terms on record."
+        return f"*{tenant.name}* — Room {tenancy.room_id}\nAgreed terms:\n{notes}"
 
     if pending.intent == "DUPLICATE_CONFIRM":
         if chosen.get("seq") == 1:  # Log anyway
@@ -1184,6 +1195,46 @@ async def _send_reminder_all(entities: dict, ctx: CallerContext, session: AsyncS
         lines.append(f"• {name} ({phone}) — Rs.{int(rent_due or 0):,} due")
     lines.append("\n_WhatsApp reminders queued. Tenants will be notified shortly._")
     return "\n".join(lines)
+
+
+async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    Owner/staff asks: "notes room 204", "agreement Mahika", "notes for 9876543210"
+    Returns tenancy.notes for the matched tenant (internal use only — never tenant-facing).
+    """
+    # Try room number first, then name, then raw text
+    room = entities.get("room")
+    name = entities.get("name")
+
+    tenancies: list = []
+
+    if room:
+        tenancies = await _find_active_tenants_by_room(room, session)
+    if not tenancies and name:
+        tenancies = await _find_active_tenants_by_name(name, session)
+
+    # No match — try extracting any word from the original message as a last resort
+    if not tenancies:
+        return (
+            "Couldn't find an active tenant matching that room/name.\n"
+            "Try: *notes room 204* or *agreement Mahika*"
+        )
+
+    if len(tenancies) > 1:
+        choices = _make_choices(tenancies)
+        await _save_pending(ctx.phone, "GET_TENANT_NOTES", {}, choices, session)
+        return _format_choices_message(choices, "Which tenant?")
+
+    t, tncy = tenancies[0]
+    notes = tncy.notes
+
+    if not notes or not notes.strip():
+        return f"*{t.name}* (Room {tncy.room_id}) — no agreed terms on record."
+
+    return (
+        f"*{t.name}* — Room {tncy.room_id}\n"
+        f"Agreed terms:\n{notes}"
+    )
 
 
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
