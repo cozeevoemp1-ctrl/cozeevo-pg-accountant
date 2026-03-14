@@ -56,18 +56,18 @@ SALARY_ROWS = [
     (date(2025, 12, 10), "Abhishek Mandal",      8_310, 5, "Dec 2025 salary",                        False),
     (date(2025, 12, 10), "Bikey Dey",            9_000, 5, "Dec 2025 salary",                        False),
     (date(2025, 12, 11), "Murari (helper)",        500, 5, "Dec helper weekly payment",              False),
-    (date(2025, 12, 19), "Murari (helper)",        500, 5, "Dec helper weekly payment (date ~19)",   True),  # date unclear in image
+    (date(2025, 12, 14), "Murari (helper)",        500, 5, "Dec helper weekly payment (14 Dec)",    False),
     (date(2025, 12, 31), "Phirose",              5_000, 5, "Dec year-end partial salary",            False),
     (date(2025, 12, 31), "Nikhil",              15_000, 5, "Dec 2025 salary",                        False),
 
     # ── JANUARY 2026 ────────────────────────────────────────────────────────
-    (date(2026,  1,  1), "Arjun",                  809, 5, "Jan topup (mobile recharge?)",           True),  # amount unclear — could be 803 or 809
+    (date(2026,  1, 21), "Arjun",                  203, 5, "Jan topup (21 Jan)",                    False),
     (date(2026,  1,  1), "Arjun",              14_698, 5, "Jan 2026 salary",                        False),
-    (date(2026,  1,  5), "Arjun",               1_000, 5, "Jan advance (received by Fence/person)", True),  # note: 'Received by Fence' — unclear
+    (date(2026,  1,  5), "Arjun",               1_000, 5, "Jan advance — received by Feroz",        False),
     (date(2026,  1, 10), "Ram Bilas Mandal",    15_120, 5, "Jan 2026 salary",                        False),
     (date(2026,  1, 10), "Phiros",              10_000, 5, "Jan 2026 salary",                        False),
-    (date(2026,  1, 10), "Arjun",               6_000, 5, "Jan 2026 salary (2nd property batch?)",  True),  # Arjun already got 14,698 on 1 Jan — verify
-    (date(2026,  1, 10), "Arjun",               1_000, 5, "Jan advance with salary batch",          True),
+    (date(2026,  1, 10), "Arjun",               6_000, 5, "Jan 2026 salary (family batch)",         False),
+    (date(2026,  1, 10), "Arjun",               1_000, 5, "Jan advance with salary batch",          False),
     (date(2026,  1, 10), "Saurav",              6_000, 5, "Jan 2026 salary",                        False),
     (date(2026,  1, 10), "Kalyani",             6_000, 5, "Jan 2026 salary",                        False),
     (date(2026,  1, 10), "Lokesh",             16_000, 5, "Jan 2026 salary",                        False),
@@ -80,6 +80,7 @@ SALARY_ROWS = [
     (date(2026,  1, 16), "BESCOM",                 200, 1, "Electricity bill (Jan 16)",              False),  # NOT salary — Electricity
     (date(2026,  1, 16), "Electrician",            200, 7, "Electrician visit (Jan 16)",             False),  # NOT salary — Maintenance
     (date(2026,  1, 20), "Vivek (helper)",         302, 5, "Jan topup (20 Jan)",                     False),
+    (date(2026,  1, 21), "Murari (helper)",        302, 5, "Jan topup (21 Jan)",                     False),
 
     # ── FEBRUARY 2026 ───────────────────────────────────────────────────────
     (date(2026,  2,  2), "Lokesh",               1_000, 5, "Feb advance (2 Feb)",                    False),
@@ -87,16 +88,16 @@ SALARY_ROWS = [
     (date(2026,  2, 10), "Ram Chandra Cook",       222, 5, "Feb advance/partial (10 Feb)",            False),
     (date(2026,  2, 10), "Ram Chandra Cook",     2_600, 5, "Feb salary part 1",                      False),
     (date(2026,  2, 10), "Ram Chandra Cook",     1_000, 5, "Feb salary part 2 (cash)",               False),
-    (date(2026,  2, 10), "Arjun",              35_000, 5, "Feb disbursement — VERIFY: may be bulk payout for multiple staff", True),
-    (date(2026,  2, 10), "Arjun",              36_000, 5, "Feb disbursement 2nd entry — VERIFY: same day duplicate?",        True),
+    (date(2026,  2, 10), "Arjun",              35_000, 5, "Feb 2026 bulk salary disbursement",      False),
     (date(2026,  2, 11), "Lokesh",             16_000, 5, "Feb 2026 salary",                        False),
     (date(2026,  2, 11), "Krishnaveni",        13_000, 5, "Feb 2026 salary",                        False),
-    (date(2026,  2, 12), "Ram Chandra Cook",   21_056, 5, "Feb salary — VERIFY: unusually high, may include Jan arrears", True),
+    (date(2026,  2, 12), "Ram Chandra Cook",   21_056, 5, "Feb 2026 salary",                        False),
 
     # ── MARCH 2026 ──────────────────────────────────────────────────────────
     (date(2026,  3,  4), "Ram Chandra Cook",     1_000, 6, "Holi bonus (Rs 1,000 each — 3 staff)",  False),
     (date(2026,  3,  4), "Vivek (helper)",        1_000, 6, "Holi bonus",                            False),
     (date(2026,  3,  4), "Ram (helper)",          1_000, 6, "Holi bonus",                            False),
+    (date(2026,  3, 10), "Arjun",              36_000, 5, "Mar 2026 bulk salary disbursement",      False),
     (date(2026,  3, 13), "Ram Chandra Cook",      1_000, 6, "Medical allowance (13 Mar)",            False),
 ]
 
