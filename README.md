@@ -82,6 +82,27 @@ See [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) for the full data flow diag
 
 ---
 
+## Accounting & P&L Tools
+
+Standalone Python scripts for bookkeeping from bank statements — no WhatsApp required.
+
+| Script | Run | Output |
+|--------|-----|--------|
+| Extract PDF → Excel | `python scripts/bank_statement_extractor.py` | `*_extracted.xlsx` |
+| Monthly P&L report | `python scripts/pnl_report.py` | `PnL_Report.xlsx` |
+| Review unclassified | `python scripts/check_others.py` | Console list |
+
+**How it works:**
+1. Export YES Bank statement as PDF → run `bank_statement_extractor.py` → get clean Excel
+2. Run `pnl_report.py` → get month-by-month P&L with 15 expense categories
+3. Run `check_others.py` to see any unclassified transactions and reclassify them
+
+**Classification rules** live in `scripts/pnl_report.py` → `EXPENSE_RULES` (keyword-based, ordered, first match wins). Add new rules there — no code changes needed anywhere else.
+
+> **Roadmap:** These scripts will evolve into the `finance/` reconciliation engine — a standalone Python package that handles multi-source UPI + bank statement deduplication and feeds a FinancialWorker on the WhatsApp bot. See [FINANCIAL_VISION.md](FINANCIAL_VISION.md).
+
+---
+
 ## Quick Start
 
 ### Prerequisites

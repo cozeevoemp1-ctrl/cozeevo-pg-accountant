@@ -91,18 +91,37 @@ FastAPI chat_api.py (port 8000)
                     │  which worker handles what   │
                     └──────────────┬──────────────┘
                                    │
-          ┌────────────────────────┼──────────────────────┐
-          │                        │                       │
-          ▼                        ▼                       ▼
- AccountWorker              OwnerWorker             TenantWorker / LeadWorker
- account_handler.py         owner_handler.py        tenant_handler.py
- (financial intents)        (operational intents)   lead_handler.py
-          │                        │
-          └──────────┬─────────────┘
-                     ▼
-               _shared.py
-         (fuzzy search, disambiguation,
-          pending action helpers)
+     ┌─────────────────────────────┼──────────────────────────┐
+     │                             │                           │
+     ▼                             ▼                           ▼
+AccountWorker               OwnerWorker               TenantWorker / LeadWorker
+account_handler.py          owner_handler.py          tenant_handler.py
+(financial queries:         (operational intents:     lead_handler.py
+ dues, payments, reports)    onboarding, checkout,
+     │                       occupancy, reminders)
+     │                             │
+     └─────────────┬───────────────┘
+                   ▼
+             _shared.py
+       (fuzzy search, disambiguation,
+        pending action helpers)
+
+── PLANNED ──────────────────────────────────────────────────────────
+                    ┌─────────────────────────────┐
+                    │    ledger_handler.py         │
+                    │  LedgerWorker (thin adapter) │
+                    └──────────────┬──────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │    finance/  package          │
+                    │  (fully self-contained,       │
+                    │   zero imports from src/)     │
+                    │                               │
+                    │  extractors/ → parsers/       │
+                    │  matching/   → categorization/│
+                    │  output/     → config/        │
+                    └──────────────────────────────┘
 ```
 
 **Design rules:**
@@ -110,6 +129,7 @@ FastAPI chat_api.py (port 8000)
 - `_shared.py` is pure DB helpers — no business logic, no HTTP calls
 - `resolve_pending_action` stays in owner_handler (imported by chat_api) — no circular imports
 - `_do_*` functions live in account_handler, imported back by owner_handler for pending action resolution
+- **`finance/` package has zero imports from `src/`** — fully standalone, callable from CLI or WhatsApp
 
 ---
 

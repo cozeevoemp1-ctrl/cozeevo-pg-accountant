@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.6.0] — 2026-03-14 — Accounting & P&L Scripts
+
+### Added
+- `scripts/bank_statement_extractor.py` — PDF bank statement extractor using word-coordinate layout parsing (fixes pdfplumber multi-line cell bug). Extracts transactions with UPI metadata: UTR, payer/payee UPI IDs, transaction type, keyword-based category. Outputs enriched Excel.
+- `scripts/pnl_report.py` — Month-by-month P&L classifier. Keyword-based `EXPENSE_RULES` (15 categories, 100+ sub-rules) + `INCOME_RULES`. `MANUAL_ENTRIES` / `MANUAL_INCOME_ENTRIES` stubs for confirmed manual additions. Outputs `PnL_Report.xlsx` (Dec 2025–Mar 2026).
+- `scripts/check_others.py` — Diagnostic: lists all unclassified transactions (Other Expenses) so owner can review and reclassify.
+- `scripts/simple_pnl.py` — Lightweight P&L export (same rules, no formatting).
+- `scripts/detailed_expense_report.py`, `scripts/export_salary_to_excel.py`, `scripts/validate_jan.py` — supporting utilities.
+
+### Classification Rules Established
+- `chandan865858` UPI → Maintenance & Repairs / Plumbing
+- `sunilgn8834@okaxis` / "Dg rent" → Fuel & Diesel / DG Rent Generator (not Property Rent)
+- Bharathi RTGS Rs 5L → Advance / Recoverable (recoverable hand loan, not an operating expense)
+- Sri Lakshmi Chandrasekhar keyword tightened to `"lakshmi chandrasekhar"` — prevents `chandrasekhar1996krish` UPI payments being misclassified as Property Rent
+- `MANUAL_ENTRIES = []` — never populated by assumption; only add with user-confirmed exact amounts
+
+---
+
 ## [1.5.0] — 2026-03-14
 
 ### Added

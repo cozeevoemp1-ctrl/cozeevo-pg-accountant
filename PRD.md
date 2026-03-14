@@ -257,3 +257,32 @@ Switch provider: set `LLM_PROVIDER=groq` or `LLM_PROVIDER=anthropic` in `.env`.
 - [ ] Automated rent reminders (scheduled, not manual)
 - [ ] PDF rent receipts
 - [ ] Salary payment tracking for staff
+
+### Future: Financial Reconciliation Engine (`finance/` package)
+
+A second major selling point — multi-source UPI + bank statement reconciliation. See [FINANCIAL_VISION.md](FINANCIAL_VISION.md) for full design.
+
+**What it solves:** A single payment appears in 3 places (bank statement + UPI app + merchant gateway). The engine merges duplicates, keeps one canonical record, and enriches it with metadata.
+
+**Already built (Phase 0):**
+- `scripts/bank_statement_extractor.py` — YES Bank PDF extraction (word-coordinate layout)
+- `scripts/pnl_report.py` — EXPENSE_RULES keyword classifier (15 categories)
+
+**Planned package structure:**
+```
+finance/                    ← completely self-contained, zero imports from src/
+  extractors/               ← pdf_extractor.py, csv_extractor.py
+  parsers/                  ← paytm_parser.py, phonepe_parser.py, bank_parser.py
+  matching/                 ← fingerprint.py, transaction_matcher.py
+  categorization/           ← categorizer.py (EXPENSE_RULES → YAML config)
+  output/                   ← excel_exporter.py
+  config/                   ← column_mappings.yaml, category_rules.yaml
+  main.py                   ← standalone CLI entry point
+
+src/whatsapp/handlers/
+  financial_worker.py       ← thin adapter: WhatsApp intent → finance.main
+```
+
+**Sources supported:** YES Bank, HDFC, Paytm, PhonePe, Google Pay, Razorpay, BharatPe
+
+**Integration:** FinancialWorker routes through the same Gatekeeper — same WhatsApp number, same role system, one combined AI assistant.
