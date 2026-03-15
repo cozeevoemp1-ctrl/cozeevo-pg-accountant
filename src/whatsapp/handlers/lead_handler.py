@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import Lead, Property, RateCard, Room, RoomType
 from src.whatsapp.role_service import CallerContext
-from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time
+from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time, bot_intro
 
 
 async def handle_lead(
@@ -199,10 +199,9 @@ async def _visit_request(message: str, ctx: CallerContext, session: AsyncSession
 
 async def _general_chat(message: str, ctx: CallerContext, session: AsyncSession) -> str:
     greeting = time_greeting()
-    first_time = await is_first_time(ctx.phone, session)
-    intro = f"I'm *{BOT_NAME}*, Cozeevo's PG assistant! 🏠\n\n" if first_time else ""
+    intro = bot_intro(await is_first_time(ctx.phone, session))
     return (
-        f"*{greeting}!* {intro}"
+        f"*{greeting}!*\n{intro}"
         "I can help you with:\n\n"
         "• Room prices → say *price* or *rent*\n"
         "• Availability → say *available*\n"

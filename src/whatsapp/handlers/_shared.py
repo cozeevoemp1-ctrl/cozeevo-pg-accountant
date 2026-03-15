@@ -43,6 +43,14 @@ async def is_first_time(phone: str, session: AsyncSession) -> bool:
     return result.scalar() is None
 
 
+def bot_intro(first_time: bool) -> str:
+    """
+    Return the one-time Artha intro paragraph (ends with blank line), or empty string.
+    Usage:  f"*{greeting}, {name}!*\n{bot_intro(first_time)}Here's what..."
+    """
+    return f"I'm *{BOT_NAME}*, your PG assistant!\n\n" if first_time else ""
+
+
 def parse_target_month(entities: dict) -> date:
     """
     Parse target month from intent entities dict.

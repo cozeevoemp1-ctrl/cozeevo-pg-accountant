@@ -33,7 +33,7 @@ from src.whatsapp.handlers._shared import (
     _find_similar_names, _check_room_overlap,
     _make_choices, _save_pending,
     _format_choices_message, _format_no_match_message,
-    BOT_NAME, time_greeting, is_first_time,
+    BOT_NAME, time_greeting, is_first_time, bot_intro,
     is_affirmative, is_negative, parse_target_month,
 )
 from src.whatsapp.handlers.account_handler import (
@@ -1022,10 +1022,9 @@ async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     role_label = "Admin" if ctx.role == "admin" else "Owner"
     greeting = time_greeting()
-    first_time = await is_first_time(ctx.phone, session)
-    intro = f"I'm *{BOT_NAME}*, your PG assistant! 🏠\n\n" if first_time else ""
+    intro = bot_intro(await is_first_time(ctx.phone, session))
     return (
-        f"*{greeting}, {ctx.name}!* {intro}\n"
+        f"*{greeting}, {ctx.name}!*\n{intro}"
         f"*{BOT_NAME} — {role_label} Menu*\n\n"
         "*Payments*\n"
         "• Raj paid 15000 upi\n"
