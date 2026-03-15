@@ -944,48 +944,65 @@ async def _reminder_prompt(entities: dict, ctx: CallerContext, session: AsyncSes
     )
 
 
-async def _fetch_active_property(session: AsyncSession):
+async def _fetch_active_property(session: AsyncSession) -> "Property | None":
     """Fetch the single active property (owner context)."""
     result = await session.execute(select(Property).where(Property.active == True).limit(1))
     return result.scalars().first()
 
 
+_OWNER_FLOOR_LABELS = {
+    "G": "Ground Floor", "1": "1st Floor", "2": "2nd Floor",
+    "3": "3rd Floor", "4": "4th Floor", "5": "5th Floor", "6": "6th Floor",
+    "top": "Dining Area (TOP)", "ws": "Work Area (WS)", "gym": "Gym",
+}
+
+
 async def _get_wifi_password(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Show all WiFi credentials for the property."""
+    """Show WiFi credentials. Can filter by block (thor/hulk) or floor."""
     prop = await _fetch_active_property(session)
     if not prop:
         return "No active property found."
 
-    lines = ["*WiFi Credentials*\n"]
     floor_map: dict = prop.wifi_floor_map or {}
-    if floor_map:
-        for key, info in floor_map.items():
-            label = "Common Area" if key == "common" else f"Floor {key}"
-            lines.append(f"*{label}*")
-            lines.append(f"  Network : `{info.get('ssid', 'N/A')}`")
-            lines.append(f"  Password: `{info.get('password', 'N/A')}`\n")
-    if prop.wifi_ssid:
-        lines.append("*Property-Wide*")
-        lines.append(f"  Network : `{prop.wifi_ssid}`")
-        lines.append(f"  Password: `{prop.wifi_password or 'N/A'}`")
-
-    if len(lines) == 1:
+    if not floor_map or ("thor" not in floor_map and "hulk" not in floor_map):
         return (
             "No WiFi configured yet.\n\n"
-            "To add WiFi:\n"
-            "*set wifi floor 1 SSID CozeevoPG1 password PG2024Floor1*\n"
-            "*set wifi common SSID CozeevaCommon password CommonPass*"
+            "Run seed on VPS:\n"
+            "`python -m src.database.seed_wifi`"
         )
+
+    msg = (entities.get("description") or "").lower()
+    show_block = "thor" if "thor" in msg else ("hulk" if "hulk" in msg else None)
+
+    floor_filter = None
+    fm = re.search(r"\bfloor\s+(\d+|g|ground)\b", msg, re.I)
+    if fm:
+        f = fm.group(1).lower()
+        floor_filter = "G" if f in ("g", "ground", "0") else f
+
+    lines = ["*WiFi Credentials*\n"]
+    for block in (["thor", "hulk"] if not show_block else [show_block]):
+        block_data: dict = floor_map.get(block, {})
+        if not block_data:
+            continue
+        lines.append(f"*{'Thor Block' if block == 'thor' else 'Hulk Block'}*")
+        for floor_key, nets in block_data.items():
+            if floor_filter and floor_key.lower() != floor_filter.lower():
+                continue
+            label = _OWNER_FLOOR_LABELS.get(floor_key, f"Floor {floor_key}")
+            lines.append(f"  _{label}_")
+            for net in nets:
+                lines.append(f"    {net['ssid']} → `{net['password']}`")
+        lines.append("")
+    lines.append("📶 _5GHz for mobiles/laptops · 2.4GHz for TV_")
     return "\n".join(lines)
 
 
 async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """
-    Parse and save WiFi credentials.
-    Formats:
-      set wifi floor 1 SSID <name> password <pass>
-      set wifi common SSID <name> password <pass>
-      set wifi SSID <name> password <pass>   (property-wide)
+    Update a WiFi network password.
+    Format: update wifi [thor/hulk] [ssid_name] password [newpass]
+    Example: update wifi thor cozeevo G2 password cozeevo@g2new
     """
     from sqlalchemy.orm.attributes import flag_modified
 
@@ -994,29 +1011,35 @@ async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -
     if not prop:
         return "No active property found."
 
-    # Parse floor/common/global
-    floor_m = re.search(r"(?:floor\s+(\d+)|(common))\s+ssid\s+(\S+)\s+password\s+(\S+)", msg, re.I)
-    global_m = re.search(r"ssid\s+(\S+)\s+password\s+(\S+)", msg, re.I) if not floor_m else None
+    # Parse: [block] [ssid] password [newpass]
+    m = re.search(r"(thor|hulk)\s+(.+?)\s+password\s+(\S+)", msg, re.I)
+    if not m:
+        return (
+            "Format: *update wifi [block] [network name] password [new password]*\n"
+            "Example: *update wifi thor cozeevo G2 password cozeevo@g2new*"
+        )
 
-    if floor_m:
-        floor_key = floor_m.group(1) if floor_m.group(1) else "common"
-        ssid, pw = floor_m.group(3), floor_m.group(4)
-        floor_map = dict(prop.wifi_floor_map or {})
-        floor_map[floor_key] = {"ssid": ssid, "password": pw}
-        prop.wifi_floor_map = floor_map
-        flag_modified(prop, "wifi_floor_map")   # tell SQLAlchemy the JSONB dict changed
-        label = "Common Area" if floor_key == "common" else f"Floor {floor_key}"
-        return f"WiFi updated for *{label}*\nNetwork: `{ssid}`\nPassword: `{pw}`"
-    elif global_m:
-        prop.wifi_ssid = global_m.group(1)
-        prop.wifi_password = global_m.group(2)
-        return f"Property WiFi updated\nNetwork: `{prop.wifi_ssid}`\nPassword: `{prop.wifi_password}`"
+    block = m.group(1).lower()
+    target_ssid = m.group(2).strip()
+    new_pw = m.group(3)
 
-    return (
-        "Couldn't parse WiFi details. Use format:\n"
-        "*set wifi floor 1 SSID CozeevoPG1 password PG2024Floor1*\n"
-        "*set wifi common SSID CozeevaCommon password CommonPass*"
-    )
+    floor_map = dict(prop.wifi_floor_map or {})
+    block_data = floor_map.get(block, {})
+    updated = False
+    for floor_key, nets in block_data.items():
+        for net in nets:
+            if net["ssid"].lower() == target_ssid.lower():
+                net["password"] = new_pw
+                updated = True
+                break
+
+    if not updated:
+        return f"Network `{target_ssid}` not found in *{block.capitalize()} Block*."
+
+    prop.wifi_floor_map = floor_map
+    flag_modified(prop, "wifi_floor_map")
+    await session.commit()
+    return f"✅ WiFi updated\nNetwork: `{target_ssid}`\nNew password: `{new_pw}`"
 
 
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:

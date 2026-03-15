@@ -326,9 +326,16 @@ async def _checkout_notice(entities: dict, ctx: CallerContext, session: AsyncSes
 
 # ── WiFi password (floor-scoped) ──────────────────────────────────────────────
 
+_FLOOR_NUM_TO_KEY = {0: "G", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6"}
+_FLOOR_LABELS = {
+    "G": "Ground Floor", "1": "1st Floor", "2": "2nd Floor",
+    "3": "3rd Floor", "4": "4th Floor", "5": "5th Floor", "6": "6th Floor",
+    "top": "Dining Area", "ws": "Work Area", "gym": "Gym",
+}
+
+
 async def _get_wifi_password(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Show WiFi credentials scoped to the tenant's floor (or property fallback)."""
-    # Single query: Tenancy → Room → Property
+    """Show WiFi credentials for the tenant's floor (Thor + Hulk blocks)."""
     result = await session.execute(
         select(Tenancy, Room, Property)
         .join(Room, Tenancy.room_id == Room.id)
@@ -345,37 +352,51 @@ async def _get_wifi_password(entities: dict, ctx: CallerContext, session: AsyncS
 
     msg = entities.get("description", "").lower()
     floor_map: dict = prop.wifi_floor_map or {}
+    thor: dict = floor_map.get("thor", {})
+    hulk: dict = floor_map.get("hulk", {})
 
-    # "common area wifi" → show common entry
-    if "common" in msg:
-        common = floor_map.get("common")
-        if common:
-            return (
-                f"*Common Area WiFi*\n"
-                f"Network : `{common.get('ssid', 'N/A')}`\n"
-                f"Password: `{common.get('password', 'N/A')}`"
-            )
-        return "Common area WiFi details not configured. Contact the PG office."
+    # Special areas
+    if any(w in msg for w in ("dining", "top", "terrace")):
+        nets = thor.get("top", [])
+        return _fmt_wifi_nets("Dining Area (TOP)", nets) if nets else "Dining WiFi not configured."
+    if any(w in msg for w in ("work", "ws", "workspace")):
+        nets = thor.get("ws", [])
+        return _fmt_wifi_nets("Work Area (WS)", nets) if nets else "Work area WiFi not configured."
+    if "gym" in msg:
+        nets = thor.get("gym", [])
+        return _fmt_wifi_nets("Gym", nets) if nets else "Gym WiFi not configured."
 
-    # Try tenant's floor
-    floor_key = str(room.floor) if room.floor is not None else None
-    floor_wifi = floor_map.get(floor_key) if floor_key else None
-    if floor_wifi:
+    # Derive floor key from room
+    floor_key = _FLOOR_NUM_TO_KEY.get(room.floor) if room.floor is not None else None
+    if not floor_key:
         return (
-            f"*WiFi — Floor {room.floor}*\n"
-            f"Network : `{floor_wifi.get('ssid', 'N/A')}`\n"
-            f"Password: `{floor_wifi.get('password', 'N/A')}`"
+            "I couldn't find your floor details.\n"
+            "Please contact the PG office for the WiFi password."
         )
 
-    # Fallback: property-wide WiFi
-    if prop.wifi_ssid:
-        return (
-            f"*WiFi*\n"
-            f"Network : `{prop.wifi_ssid}`\n"
-            f"Password: `{prop.wifi_password or 'N/A'}`"
-        )
+    label = _FLOOR_LABELS.get(floor_key, f"Floor {floor_key}")
+    lines = [f"*WiFi — {label}*\n"]
+    lines.append("*Thor Block:*")
+    for net in thor.get(floor_key, []):
+        lines.append(f"  Network : `{net['ssid']}`")
+        lines.append(f"  Password: `{net['password']}`")
+    if hulk.get(floor_key):
+        lines.append("\n*Hulk Block:*")
+        for net in hulk.get(floor_key, []):
+            lines.append(f"  Network : `{net['ssid']}`")
+            lines.append(f"  Password: `{net['password']}`")
+    lines.append("\n📶 _Use 5GHz for mobiles/laptops, 2.4GHz for TV_")
+    lines.append("🔤 _All passwords are lowercase_")
+    return "\n".join(lines)
 
-    return "WiFi details not configured yet. Please contact the PG office."
+
+def _fmt_wifi_nets(label: str, nets: list) -> str:
+    lines = [f"*WiFi — {label}*\n"]
+    for net in nets:
+        lines.append(f"  Network : `{net['ssid']}`")
+        lines.append(f"  Password: `{net['password']}`")
+    lines.append("\n📶 _5GHz for mobiles/laptops, 2.4GHz for TV_")
+    return "\n".join(lines)
 
 
 # ── Vacation notice ────────────────────────────────────────────────────────────
