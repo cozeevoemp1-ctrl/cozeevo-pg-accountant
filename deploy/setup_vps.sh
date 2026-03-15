@@ -29,7 +29,7 @@ echo ""
 echo "[1/7] Installing system packages..."
 apt-get update -qq
 apt-get install -y -qq \
-    python3.11 python3.11-venv python3-pip \
+    python3 python3-venv python3-pip \
     git nginx certbot python3-certbot-nginx \
     libpoppler-cpp-dev poppler-utils \
     curl
@@ -60,7 +60,7 @@ else
 fi
 
 # Python virtualenv
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install --quiet --upgrade pip
 pip install --quiet -r requirements.txt
