@@ -2,14 +2,14 @@
 # BRAIN.md — PG Accountant Architecture Reference
 
 > Read this file at the start of every session. It is the ground truth for the system.
-> Last updated: 2026-03-14 (session 3)
+> Last updated: 2026-03-15 (session 4)
 
 ---
 
 ## 1. System Overview
 
 **Product:** Cozeevo PG Accountant — AI-powered bookkeeping + WhatsApp bot for a PG business.
-**Stack:** Python 3.11 · FastAPI · Supabase (PostgreSQL) · Ollama llama3.2 · APScheduler · n8n · Meta WhatsApp Cloud API
+**Stack:** Python 3.11 · FastAPI · Supabase (PostgreSQL) · Groq llama-3.3-70b-versatile · APScheduler · Meta WhatsApp Cloud API
 
 > **Note on LangGraph:** `src/agents/langgraph_router.py` exists (v1.0 artifact) but is NOT wired into the WhatsApp flow.
 > The Gatekeeper+Worker architecture + PendingAction state machine replaces it. LangGraph is not needed here —
@@ -17,7 +17,7 @@
 
 **Future goal:** Multi-tenant SaaS — same codebase, each PG gets its own Supabase project + WhatsApp number.
 
-**Current phase:** Local development + testing. Cloud deployment (Hostinger VPS) planned after local testing is solid.
+**Current phase:** **LIVE on VPS** — Hostinger KVM 1 (187.127.130.194), domain api.getkozzy.com, SSL active, Meta webhook configured.
 
 ---
 
@@ -28,14 +28,14 @@ WhatsApp User
       ↓
 Meta Cloud API  (free — no Twilio)
       ↓  webhook POST
-n8n (Docker, port 5678)  — thin pipe only: receive + send
-      ↓  POST /api/whatsapp/process
-FastAPI Brain (port 8000) — all logic lives here
+nginx (api.getkozzy.com, Let's Encrypt SSL)
+      ↓  proxy_pass
+FastAPI Brain (port 8000, systemd service) — all logic lives here
       ↓
 Supabase (PostgreSQL)  — cloud DB, always on
 ```
 
-**Design principle:** n8n is a dumb pipe. All intelligence (role detection, intent, handlers) is in FastAPI.
+**Note:** n8n was evaluated but skipped entirely. Meta webhooks go directly to FastAPI via nginx reverse proxy. n8n workflow file (`workflows/`) kept for reference only.
 
 ---
 
@@ -45,7 +45,7 @@ Supabase (PostgreSQL)  — cloud DB, always on
 
 | Table | Key columns | Notes |
 |-------|------------|-------|
-| `properties` | id, name, address, total_rooms | "Cozeevo THOR", "Cozeevo HULK" |
+| `properties` | id, name, address, total_rooms, wifi_floor_map (JSONB) | "Cozeevo THOR", "Cozeevo HULK". wifi_floor_map: `{"thor": {"G": [{ssid,password},...], "1": [...], ...}, "hulk": {...}}` — seeded via `src/database/seed_wifi.py` |
 | `rooms` | id, property_id, room_number (TEXT), room_type, max_occupancy, is_charged, is_staff_room | room_number is TEXT. is_charged=False for owner-free rooms (G05, G06 THOR). is_staff_room skips room from tenant occupancy. |
 | `rate_cards` | id, room_id, effective_from, effective_to (NULL=active), monthly_rent, daily_rate | Price history — new row when rent changes |
 | `tenants` | id, name, phone (UNIQUE), gender, id_proof_type | phone = WhatsApp identity key |
