@@ -31,7 +31,7 @@ import asyncio
 from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
 
-from src.database.db_manager import get_async_session
+from src.database.db_manager import get_db_session as get_async_session
 from src.database.models import Property
 
 # ─── WiFi data ────────────────────────────────────────────────────────────────
