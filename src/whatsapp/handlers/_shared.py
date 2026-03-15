@@ -24,15 +24,13 @@ _IST_OFFSET = timedelta(hours=5, minutes=30)
 
 
 def time_greeting() -> str:
-    """Return time-appropriate greeting in IST."""
+    """Return time-appropriate greeting in IST. Never 'Good night' — that's a farewell, not a greeting."""
     hour = (datetime.now(timezone.utc) + _IST_OFFSET).hour
     if 5 <= hour < 12:
         return "Good morning"
     if 12 <= hour < 17:
         return "Good afternoon"
-    if 17 <= hour < 21:
-        return "Good evening"
-    return "Good night"
+    return "Good evening"
 
 
 async def is_first_time(phone: str, session: AsyncSession) -> bool:
@@ -45,10 +43,12 @@ async def is_first_time(phone: str, session: AsyncSession) -> bool:
 
 def bot_intro(first_time: bool) -> str:
     """
-    Return the one-time Artha intro paragraph (ends with blank line), or empty string.
-    Usage:  f"*{greeting}, {name}!*\n{bot_intro(first_time)}Here's what..."
+    Return intro line. First-time: full intro. Returning: short tagline.
+    Always ends with blank line so caller can append menu directly.
     """
-    return f"I'm *{BOT_NAME}*, your PG assistant!\n\n" if first_time else ""
+    if first_time:
+        return f"I'm *{BOT_NAME}*, your Virtual PG Front Desk Manager. How can I help you today?\n\n"
+    return f"_Your Virtual PG Front Desk_ — How can I help you today?\n\n"
 
 
 def parse_target_month(entities: dict) -> date:
