@@ -31,7 +31,7 @@ import asyncio
 from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
 
-from src.database.db_manager import get_db_session as get_async_session
+from src.database.db_manager import get_session, init_engine
 from src.database.models import Property
 
 # ─── WiFi data ────────────────────────────────────────────────────────────────
@@ -153,7 +153,13 @@ FLOOR_LABELS = {
 
 
 async def seed():
-    async with get_async_session() as session:
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    db_url = os.environ["DATABASE_URL"]
+    init_engine(db_url)
+
+    async with get_session() as session:
         prop = await session.scalar(select(Property).limit(1))
         if not prop:
             print("ERROR: No property found in DB. Run migrate_all first.")
@@ -161,7 +167,6 @@ async def seed():
 
         prop.wifi_floor_map = WIFI_DATA
         flag_modified(prop, "wifi_floor_map")
-        await session.commit()
         print(f"WiFi data seeded for property: {prop.name or prop.id}")
         print(f"  Thor block: {len(WIFI_DATA['thor'])} zones")
         print(f"  Hulk block: {len(WIFI_DATA['hulk'])} zones")
