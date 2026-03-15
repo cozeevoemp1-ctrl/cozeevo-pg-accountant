@@ -446,4 +446,24 @@ def _extract_entities(text: str, intent: str) -> dict:
     elif re.search(r"\b(?:upi|gpay|phonepe|paytm|online|transfer)\b", text, re.I):
         entities["payment_mode"] = "upi"
 
+    # Extract expense category (for ADD_EXPENSE — avoids unnecessary "choose category" prompt)
+    if intent == "ADD_EXPENSE":
+        _EXPENSE_KEYWORDS = [
+            (r"\belectricity\b|\blight\s+bill\b|\beb\s+bill\b", "electricity"),
+            (r"\bwater\s+bill\b|\bwater\b", "water"),
+            (r"\binternet\b|\bbroadband\b|\bwifi\s+bill\b", "internet"),
+            (r"\bsalary\b|\bwages?\b|\bstaff\s+pay\b", "salary"),
+            (r"\bplumb\w*\b|\bpipe\b|\btap\b|\bdrain\b|\bsewage\b", "maintenance"),
+            (r"\bmaintena?na?ce?\b|\brepair\b|\bpainting\b|\bcarpenter\b|\belectrician\b", "maintenance"),
+            (r"\bgroceries?\b|\bgrocery\b|\bvegetable\b|\bprovision\b", "groceries"),
+            (r"\bfood\b|\bcooking\b|\bcaterer\b", "groceries"),
+            (r"\bgenerator\b|\bdiesel\b|\bfuel\b|\bdg\b", "maintenance"),
+            (r"\bcleaning\b|\bhousekeeping\b|\bmaid\b|\bsweeping\b", "maintenance"),
+            (r"\bsecurity\b|\bwatchman\b|\bguard\b", "salary"),
+        ]
+        for pattern, cat in _EXPENSE_KEYWORDS:
+            if re.search(pattern, text, re.I):
+                entities["category"] = cat
+                break
+
     return entities

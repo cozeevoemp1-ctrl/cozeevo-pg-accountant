@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     Expense, Payment, PaymentFor, PaymentMode,
-    Refund, RefundStatus, RentSchedule, RentStatus,
+    PendingAction, Refund, RefundStatus, RentSchedule, RentStatus,
     Room, Tenant, Tenancy, TenancyStatus,
 )
 from src.whatsapp.role_service import CallerContext
@@ -853,14 +853,36 @@ async def _do_rent_change(
 
 async def _add_expense_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     amount = entities.get("amount")
+    category = entities.get("category")
+    description = entities.get("description", "")
+
+    # Both amount and category known — go straight to confirmation
+    if amount and category:
+        label = category.capitalize()
+        pending = PendingAction(
+            phone=ctx.phone,
+            intent="CONFIRM_ADD_EXPENSE",
+            payload={"amount": amount, "category": category, "description": description},
+            expires_at=datetime.utcnow() + timedelta(minutes=5),
+        )
+        session.add(pending)
+        await session.commit()
+        return (
+            f"Log expense?\n"
+            f"• Category: {label}\n"
+            f"• Amount: ₹{int(amount):,}\n\n"
+            "Reply *Yes* to confirm or *No* to cancel."
+        )
+
     if amount:
         return (
-            f"Log expense of Rs.{int(amount):,}?\n\n"
+            f"Log expense of ₹{int(amount):,}?\n\n"
             "Choose category:\n"
             "1. Electricity  2. Water  3. Internet\n"
             "4. Salary       5. Maintenance  6. Groceries\n"
             "7. Other\n\n"
-            "Reply: *expense [category number] [amount]*"
+            "Reply: *expense [category] [amount]*\n"
+            "e.g. *expense electricity 4500*"
         )
     return (
         "*Log an expense*\n\n"
