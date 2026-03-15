@@ -1,0 +1,1630 @@
+[
+  {
+    "id": "G001",
+    "name": "Expense — all fields in one message, must NOT ask for category",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid plumber 2500 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["2,500", "Confirm"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G002",
+    "name": "Expense — electricity bill with amount, category auto-detected",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity bill paid 8400",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["8,400", "Confirm"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G003",
+    "name": "Payment log — name, amount, mode all in one message, no extra questions",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Arjun paid 14000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["14,000", "UPI", "Arjun", "Confirm"],
+        "reply_must_not_contain": ["which mode", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G004",
+    "name": "Add tenant — name and phone extracted without asking again",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add tenant Suresh 9876543210",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": ["Suresh"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G005",
+    "name": "Checkin update — name and date in one message, no extra date question",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Kiran checked in on 15 March",
+        "expected_intent": "UPDATE_CHECKIN",
+        "expected_state": "confirming",
+        "reply_must_contain": ["March", "Confirm"],
+        "reply_must_not_contain": ["which date", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G006",
+    "name": "Schedule checkout — tenant name and date extracted",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Priya leaving on March 31",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["31", "Priya"],
+        "reply_must_not_contain": ["which date", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G007",
+    "name": "Rent discount — tenant, amount in one message",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "discount Raj 1000 this month electricity issue",
+        "expected_intent": "RENT_DISCOUNT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["1,000", "Raj"],
+        "reply_must_not_contain": ["which tenant", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G008",
+    "name": "Rent change — tenant and new amount extracted",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "rent is now 16000 for Rahul from April",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["16,000", "Rahul"],
+        "reply_must_not_contain": ["which tenant", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G009",
+    "name": "Refund — tenant and amount in one message",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "return deposit 8000 to Priya",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": ["8,000", "Priya"],
+        "reply_must_not_contain": ["which amount", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G010",
+    "name": "Log vacation — tenant and duration extracted from one message",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Kiran on vacation 10 days",
+        "expected_intent": "LOG_VACATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Kiran", "vacation"],
+        "reply_must_not_contain": ["how many days", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G011",
+    "name": "Salary paid — category auto-detected as Salary",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid salary to Ramesh 15000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["15,000", "Salary"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G012",
+    "name": "Payment log — name, amount, cash in one message",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Priya 12000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["12,000", "Priya"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G013",
+    "name": "Water bill — category auto-detected from keyword",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "water bill 1200",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["1,200", "Water"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G014",
+    "name": "Complaint — category and room in one message, no extra questions",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "complaint plumbing room 203",
+        "expected_intent": "COMPLAINT_REGISTER",
+        "expected_state": "idle",
+        "reply_must_contain": ["PLUM"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G015",
+    "name": "Internet bill — expense category auto-detected",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "internet bill paid 1800",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["1,800", "Internet"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G016",
+    "name": "Payment correction — cash to UPI mid-confirm, bot updates and re-shows",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Raj paid 15000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["15,000", "Raj", "Confirm"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "no it's upi",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["UPI", "15,000"],
+        "reply_must_not_contain": ["I didn't understand", "rephrase", "error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G017",
+    "name": "Payment correction — wrong amount corrected mid-confirm",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Priya paid 12000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["12,000", "Priya"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "actually 13500",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,500"],
+        "reply_must_not_contain": ["I didn't understand", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G018",
+    "name": "Expense correction — amount corrected mid-confirm",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity 8400",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["8,400"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "no 8900",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["8,900"],
+        "reply_must_not_contain": ["I didn't understand", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G019",
+    "name": "Checkout — user cancels correctly with 'no'",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Kiran",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Kiran"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["cancel"],
+        "reply_must_not_contain": ["I didn't understand", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G020",
+    "name": "Rent change — different amount corrected after confirm shown",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "rent is now 15000 for Suresh",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["15,000", "Suresh"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "change to 15500",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["15,500"],
+        "reply_must_not_contain": ["I didn't understand", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G021",
+    "name": "Payment confirm — 'confirm' word accepted as yes",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Raj paid 18000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["18,000", "Raj", "Confirm"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "confirm",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G022",
+    "name": "Expense confirm — 'ok' accepted as affirmative",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "internet 1800",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["1,800"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "ok",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G023",
+    "name": "Expense confirm — Hindi 'haan' accepted as yes",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "maintenance 3000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["3,000"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "haan",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G024",
+    "name": "Ambiguous disambiguation — user selects option 2",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Kumar",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "ambiguous",
+        "reply_must_contain": ["1.", "2."],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "2",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G025",
+    "name": "Void payment — confirm then execute",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void Raj payment 15000",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["15,000", "Raj", "Confirm"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["void"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G026",
+    "name": "Record checkout multi-step — keys answered, moves to next step",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "record checkout Kiran",
+        "expected_intent": "RECORD_CHECKOUT",
+        "expected_state": "collecting",
+        "reply_must_contain": ["key"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "collecting",
+        "reply_must_contain": ["key"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G027",
+    "name": "Expense — user says 'no' to cancel correctly",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "plumber 5000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["5,000", "Confirm"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["cancel"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G028",
+    "name": "Refund — confirm and execute correctly",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund Priya 10000",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": ["10,000", "Priya"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["refund"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G029",
+    "name": "Checkin update — confirm with '1' selects first match",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "update checkin Suresh to 1 March",
+        "expected_intent": "UPDATE_CHECKIN",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Suresh", "March"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["updated"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G030",
+    "name": "Add partner — completes immediately, no extra confirmation needed",
+    "category": "correction_mid_flow",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add partner +919876543210 Suresh",
+        "expected_intent": "ADD_PARTNER",
+        "expected_state": "idle",
+        "reply_must_contain": ["Suresh"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G031",
+    "name": "Query complaints — question form must NOT start complaint logging flow",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "what are all plumbing issues?",
+        "expected_intent": "COMPLAINT_REGISTER",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["describe the issue", "tell me more", "register", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G032",
+    "name": "Log complaint — action form correctly creates a ticket",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "report plumbing issue room 203",
+        "expected_intent": "COMPLAINT_REGISTER",
+        "expected_state": "idle",
+        "reply_must_contain": ["PLUM"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G033",
+    "name": "Query expenses — question form goes to report, not add expense",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "what did we spend this month?",
+        "expected_intent": "QUERY_EXPENSES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["add expense", "confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G034",
+    "name": "Did Raj pay — query, not payment log",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "did Raj pay this month?",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm payment", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G035",
+    "name": "Who hasn't paid — QUERY_DUES, not PAYMENT_LOG",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who hasn't paid?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm payment", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G036",
+    "name": "Priya balance — QUERY_TENANT, not PAYMENT_LOG",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Priya balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm payment", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G037",
+    "name": "Room status query — ROOM_STATUS, not ADD_TENANT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who's in room 203?",
+        "expected_intent": "ROOM_STATUS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G038",
+    "name": "Vacant rooms — QUERY_VACANT_ROOMS, not ADD_TENANT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "which rooms are empty?",
+        "expected_intent": "QUERY_VACANT_ROOMS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["add tenant", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G039",
+    "name": "Tenant: my balance — gets own balance only, not all tenants",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "my balance",
+        "expected_intent": "MY_BALANCE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["all tenants", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G040",
+    "name": "Show March report — REPORT intent, no confirm prompt",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show March report",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": ["March"],
+        "reply_must_not_contain": ["confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G041",
+    "name": "Expiring tenancies — QUERY_EXPIRING, not CHECKOUT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who's leaving next month?",
+        "expected_intent": "QUERY_EXPIRING",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm checkout", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G042",
+    "name": "Who checked in — QUERY_CHECKINS, not ADD_TENANT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who checked in this month?",
+        "expected_intent": "QUERY_CHECKINS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["add tenant", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G043",
+    "name": "Pending refunds — QUERY_REFUNDS, not ADD_REFUND",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pending refunds?",
+        "expected_intent": "QUERY_REFUNDS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G044",
+    "name": "Show house rules — RULES intent, no write action",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show me the house rules",
+        "expected_intent": "RULES",
+        "expected_state": "idle",
+        "reply_must_contain": ["rule"],
+        "reply_must_not_contain": ["confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G045",
+    "name": "WiFi password — GET_WIFI_PASSWORD, not SET_WIFI",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "what's the wifi password?",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["set wifi", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G046",
+    "name": "Set wifi — SET_WIFI intent, action form",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "set wifi floor 1 SSID CozeevoPG password PG2024",
+        "expected_intent": "SET_WIFI",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G047",
+    "name": "Occupancy count — QUERY_OCCUPANCY, not room assignment",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how many rooms occupied?",
+        "expected_intent": "QUERY_OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["add tenant", "confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G048",
+    "name": "Who vacated — QUERY_CHECKOUTS, not CHECKOUT action",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who vacated this month?",
+        "expected_intent": "QUERY_CHECKOUTS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm checkout", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G049",
+    "name": "Tenant notes — read only query",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "notes for Kiran",
+        "expected_intent": "GET_TENANT_NOTES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G050",
+    "name": "Financial summary — REPORT not ADD_EXPENSE",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "financial summary for March",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm expense", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G051",
+    "name": "Payment log with ambiguous name — shows disambiguation list",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Raj paid 15000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "ambiguous",
+        "reply_must_contain": ["1.", "2."],
+        "reply_must_not_contain": ["logged", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G052",
+    "name": "Balance with ambiguous name — shows disambiguation list",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Raj balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "ambiguous",
+        "reply_must_contain": ["1.", "2."],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G053",
+    "name": "Checkout with ambiguous name — shows disambiguation list",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Kumar",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "ambiguous",
+        "reply_must_contain": ["1.", "2."],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G054",
+    "name": "Name + date only — AMBIGUOUS intent asks checkin or checkout",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Raj 31st March",
+        "expected_intent": "AMBIGUOUS",
+        "expected_state": "ambiguous",
+        "reply_must_contain": ["1.", "2."],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G055",
+    "name": "No tenant found — suggests similar names not crash",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Rajeshwari balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G056",
+    "name": "Room number resolves uniquely — no disambiguation needed",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 203 balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["which", "1.", "2.", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G057",
+    "name": "Typo name — fuzzy match finds nearest tenant",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Keerthan balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G058",
+    "name": "Checkout with room number — resolves uniquely, goes to confirm",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout room 305",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["1.", "2.", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G059",
+    "name": "Onboarding with new tenant name — no match clash",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "start onboarding for Priya 9876543210",
+        "expected_intent": "START_ONBOARDING",
+        "expected_state": "idle",
+        "reply_must_contain": ["Priya"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G060",
+    "name": "Refund with ambiguous name — disambiguation list shown",
+    "category": "ambiguous_name",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund Raj 5000",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "ambiguous",
+        "reply_must_contain": ["1.", "2."],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G061",
+    "name": "Expense amount missing — bot asks only for amount",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity expense",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "collecting",
+        "reply_must_contain": ["amount"],
+        "reply_must_not_contain": ["which category", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G062",
+    "name": "Payment amount missing — bot asks only for amount",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Arjun paid upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "collecting",
+        "reply_must_contain": ["amount"],
+        "reply_must_not_contain": ["which mode", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G063",
+    "name": "Rent change amount missing — bot asks for new rent only",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "change rent for Kiran",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "collecting",
+        "reply_must_contain": ["rent", "amount"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G064",
+    "name": "Checkout with no name — bot asks which tenant only",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "collecting",
+        "reply_must_contain": ["tenant"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G065",
+    "name": "Notice given with no name — asks which tenant",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "notice given",
+        "expected_intent": "NOTICE_GIVEN",
+        "expected_state": "collecting",
+        "reply_must_contain": ["tenant"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G066",
+    "name": "Void payment with no details — asks what to void",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G067",
+    "name": "Add tenant name only — asks for phone number next",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add tenant Suresh",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": ["phone"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G068",
+    "name": "Discount amount only — asks which tenant",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "discount 500 this month",
+        "expected_intent": "RENT_DISCOUNT",
+        "expected_state": "collecting",
+        "reply_must_contain": ["tenant", "which"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G069",
+    "name": "Refund amount only — asks which tenant",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund 8000",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "collecting",
+        "reply_must_contain": ["tenant", "which"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G070",
+    "name": "Add expense with no details — asks for category and amount",
+    "category": "incomplete_input",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add expense",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G071",
+    "name": "Balance in Hindi — kiran ka balance batao",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kiran ka balance batao",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G072",
+    "name": "Payment with typo — pajment 14000 raj upi",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pajment 14000 raj upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["14,000"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G073",
+    "name": "Wifi in Hindi — wifi batao",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "wifi batao",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G074",
+    "name": "Dues in Hindi — kisne nahi diya",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kisne nahi diya",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G075",
+    "name": "Vacant rooms in Hindi — khali kamre",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "khali kamre",
+        "expected_intent": "QUERY_VACANT_ROOMS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G076",
+    "name": "Electricity typo — elecrticity bill 5000",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "elecrticity bill 5000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["5,000"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G077",
+    "name": "Checkout in Hindi — ja raha hai Raj",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ja raha hai Raj",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Raj"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G078",
+    "name": "Vacation in Hindi — chutti Kiran 5 din",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "chutti Kiran 5 din",
+        "expected_intent": "LOG_VACATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Kiran"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G079",
+    "name": "Send reminder in Hindi — sabko reminder bhejo",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "sabko reminder bhejo",
+        "expected_intent": "SEND_REMINDER_ALL",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G080",
+    "name": "Help in Hindi — kya kar sakte ho",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kya kar sakte ho",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G081",
+    "name": "Tenant tries to see all dues — blocked cleanly",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "who hasn't paid?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["defaulters", "₹", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G082",
+    "name": "Tenant tries to log payment — blocked cleanly",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "Raj paid 15000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm payment", "logged", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G083",
+    "name": "Tenant sees another tenant balance — blocked with clear message",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "show me Raj's balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["own"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G084",
+    "name": "Lead asks for wifi password — blocked, told to contact owner",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "wifi password",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": ["owner"],
+        "reply_must_not_contain": ["CozeevoPG", "PG2024", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G085",
+    "name": "Lead tries to log expense — not allowed",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "electricity 5000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["logged", "confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G086",
+    "name": "Tenant tries to add another tenant — blocked",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "add tenant Suresh 9876543210",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["added", "confirm", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G087",
+    "name": "Lead tries to see tenant list — blocked",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "show all tenants",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["tenant list", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G088",
+    "name": "Tenant asks for P&L report — blocked",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "show March P&L",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["revenue", "expense", "profit", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G089",
+    "name": "Lead tries to schedule checkout — blocked",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "checkout Raj",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["confirm checkout", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G090",
+    "name": "Tenant sees own balance — allowed without issues",
+    "category": "role_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "my balance",
+        "expected_intent": "MY_BALANCE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["not allowed", "blocked", "error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G091",
+    "name": "Greeting first time today — shows Artha intro with name",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hi",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": ["Artha"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G092",
+    "name": "Invalid payment amount — handled gracefully, no crash",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Raj paid -99999 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "exception", "File \"", "vps", "seed", "database"]
+      }
+    ]
+  },
+  {
+    "id": "G093",
+    "name": "Random yes with no pending action — handled gracefully",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "error", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G094",
+    "name": "Random number with no pending — handled gracefully",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "2",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "error", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G095",
+    "name": "Whitespace message — handled gracefully",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "   ",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "error", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G096",
+    "name": "Completely random gibberish — handled gracefully with helpful message",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "asdfjkl qwerty 123",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "error", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G097",
+    "name": "Lead hello first time — shows Artha intro",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "hello",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": ["Artha"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G098",
+    "name": "Tenant hello first time — shows Artha intro + tenant menu",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "hi",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": ["Artha"],
+        "reply_must_not_contain": ["error", "traceback", "vps", "seed", "database", "exception"]
+      }
+    ]
+  },
+  {
+    "id": "G099",
+    "name": "SQL injection attempt — sanitized, no technical response",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "'; DROP TABLE tenants; --",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "SQL", "DROP", "vps", "seed", "database", "exception", "error"]
+      }
+    ]
+  },
+  {
+    "id": "G100",
+    "name": "Very long message with all fields — still parsed correctly",
+    "category": "state_guard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid electricity bill for the month of march 2026 the amount was eight thousand four hundred rupees only paid by upi to the bwssb board via phonepe",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["traceback", "error", "vps", "seed", "database", "exception", "timeout"]
+      }
+    ]
+  }
+]
