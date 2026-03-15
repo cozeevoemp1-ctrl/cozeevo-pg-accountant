@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import Lead, Property, RateCard, Room, RoomType
 from src.whatsapp.role_service import CallerContext
+from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time
 
 
 async def handle_lead(
@@ -163,13 +164,30 @@ async def _visit_request(message: str, ctx: CallerContext, session: AsyncSession
         select(Lead).where(Lead.phone == ctx.phone)
     )
     lead = result.scalars().first()
+    today_str = date.today().strftime("%d %b %Y")
     if lead:
-        lead.notes = (lead.notes or "") + f" | Visit requested on {date.today()}"
+        lead.notes = (lead.notes or "") + f" | Visit requested on {today_str}"
 
     admin_phone = os.getenv("ADMIN_PHONE", "")
 
+    # Notify admin via WhatsApp (fire-and-forget, best-effort)
+    if admin_phone:
+        try:
+            from src.whatsapp.webhook_handler import _send_whatsapp
+            lead_name = ctx.name or ctx.phone
+            await _send_whatsapp(
+                admin_phone,
+                f"🔔 *New Visit Request*\n"
+                f"From  : {lead_name} ({ctx.phone})\n"
+                f"Date  : {today_str}\n"
+                f"Message: {message[:120]}\n\n"
+                f"Reply to schedule the visit.",
+            )
+        except Exception:
+            pass  # Don't fail the lead response if notification fails
+
     return (
-        "*Great! Let's arrange a visit.*\n\n"
+        "*Great! Let's arrange a visit.* 🏠\n\n"
         "Please share:\n"
         "1. Your name\n"
         "2. Preferred date & time\n"
@@ -180,8 +198,11 @@ async def _visit_request(message: str, ctx: CallerContext, session: AsyncSession
 
 
 async def _general_chat(message: str, ctx: CallerContext, session: AsyncSession) -> str:
+    greeting = time_greeting()
+    first_time = await is_first_time(ctx.phone, session)
+    intro = f"I'm *{BOT_NAME}*, Cozeevo's PG assistant! 🏠\n\n" if first_time else ""
     return (
-        "*Welcome to Cozeevo PG!*\n\n"
+        f"*{greeting}!* {intro}"
         "I can help you with:\n\n"
         "• Room prices → say *price* or *rent*\n"
         "• Availability → say *available*\n"

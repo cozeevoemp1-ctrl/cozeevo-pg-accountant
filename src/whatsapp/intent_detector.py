@@ -82,7 +82,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:void|cancel|reverse|undo payment|mark void|failed payment|payment failed|wrong payment|duplicate payment)", re.I), "VOID_PAYMENT", 0.93),
     # Send reminder to ALL tenants
     (re.compile(r"(?:send reminder(?:s)? to all|send\s+(?:rent\s+|dues?\s+)?reminders?(?:\s+to\s+all)?$|send\s+all\s+reminders?|remind all|remind everyone|blast reminder|mass reminder|send dues reminder|nudge all|sabko reminder|sabko\s+(?:bhejo|send)|sabko\s+\S+.*?reminder|bulk reminder|remind all tenants?)", re.I), "SEND_REMINDER_ALL", 0.95),
-    # Query refunds (MUST come before ADD_REFUND — query words are more specific)
+    # ADD_REFUND with amount (has a number → action, not query) — MUST come before QUERY_REFUNDS
+    (re.compile(r"(?:add\s+refund|return\s+deposit|give\s+back\s+deposit|deposit\s+(?:back|refund)|repay\s+deposit|disburse\s+deposit|pay\s*back\s+deposit|deposit\s+wapas|wapas\s+karo\b).*\d", re.I), "ADD_REFUND", 0.93),
+    (re.compile(r"(?:refund|deposit\s+refund)\s+\w+\s+\d|refund\s+\d[\d,k]+\s+(?:to|for)\s+\w+|\w+\s+deposit\s+refund\s+\d", re.I), "ADD_REFUND", 0.93),
+    # Query refunds (MUST come after amount-bearing ADD_REFUND patterns above)
     (re.compile(r"(?:pending refunds?|refunds? due|who needs? refund|deposits? to return|list (?:all )?refunds?|show refunds?|refund history|refund summary|refund status|refunds? this|refunds? for\s+\w+|all refunds?|\w+\s+refunds?)", re.I), "QUERY_REFUNDS", 0.91),
     # Refund / deposit return (generic — matches after QUERY_REFUNDS above)
     (re.compile(r"(?:refund|return deposit|give back deposit|deposit back|repay deposit|disburse deposit|pay\s*back\s+deposit|deposit\s+wapas|wapas\s+karo\b)", re.I), "ADD_REFUND", 0.92),
@@ -177,6 +180,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:add partner|add owner|add power user|new admin|give access|add\s+staff\b)", re.I), "ADD_PARTNER", 0.97),
     # Reminder
     (re.compile(r"(?:remind|reminder|remindr?\b|remaindr?\b|reminde\b|set reminder|alert|notify|yaad\s+(?:dilao|dilaao|karo)\b|ko\s+yaad\s+dilao)", re.I), "REMINDER_SET", 0.90),
+    # WiFi password — owner reads or sets WiFi credentials
+    (re.compile(r"(?:set\s+wifi|update\s+wifi|change\s+wifi|wifi\s+(?:ssid|network|password)\s+\w+|set\s+(?:floor|common)\s+wifi)", re.I), "SET_WIFI", 0.95),
+    (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
+    (re.compile(r"(?:what.?s?\s+(?:the\s+)?wifi|whats?\s+(?:the\s+)?wifi|wifi\s+(?:ka\s+)?password|password\s+(?:for\s+)?wifi)", re.I), "GET_WIFI_PASSWORD", 0.95),
     # Complaint / maintenance — owner can log for a room
     (re.compile(r"(?:complaint|complain|issue|problem|not working|broken|leak(?:ing)?\b|fix|tap|flush|bulb|fan|switch|slow net|food (?:complaint|bad|issue|quality)|bed sheet|mattress|pillow|chair|table|shelf|almirah|\bAC\b|air.?condition|toilet|blocked|door\s*lock|kharab\b|pest\b|wifi\s+(?:not|issue|problem|broken|slow)|internet\s+(?:not|issue|problem|down|slow))", re.I), "COMPLAINT_REGISTER", 0.88),
     # PG rules & regulations
@@ -201,6 +208,9 @@ _TENANT_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:i want to (?:leave|vacate|move out|checkout|check out)|i(?:'m| am) (?:leaving|moving out)|(?:giving|serve|serving) notice|i(?:'ll| will) vacate|my last day|i want to give notice|notice to vacate|plan(?:ning)? to leave|want to (?:checkout|check out|leave|vacate))", re.I), "CHECKOUT_NOTICE", 0.94),
     # Vacation / going home notice
     (re.compile(r"(?:going home|on vacation|on leave|going to (?:native|village|hometown)|will be (?:away|absent|back on)|coming back on|out of (?:station|town|city)|vacation\s+notice\s+\d+\s+days?)", re.I), "VACATION_NOTICE", 0.92),
+    # WiFi password request — before COMPLAINT_REGISTER so "wifi password" doesn't become a complaint
+    (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
+    (re.compile(r"(?:what.?s?\s+(?:the\s+)?wifi|whats?\s+(?:the\s+)?wifi|wifi\s+(?:ka\s+)?password|password\s+(?:for\s+)?wifi)", re.I), "GET_WIFI_PASSWORD", 0.95),
     # Complaint / maintenance request
     (re.compile(r"(?:complaint|complain|issue|problem|not working|broken|leak(?:ing)?\b|repair|fix|tap|flush|bulb|fan|switch|wifi|wi-fi|internet|slow net|food (?:complaint|bad|issue|quality)|bed sheet|mattress|pillow|chair|table|shelf|almirah|\bAC\b|air.?condition|toilet|blocked|door\s*lock|kharab\b|pest\b|light\s+nahi\b)", re.I), "COMPLAINT_REGISTER", 0.91),
     # Balance

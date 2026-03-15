@@ -139,14 +139,28 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
 
     if len(rows) == 1:
         tenant, tenancy, _room = rows[0]
-        return await _do_log_payment_by_ids(
-            tenant_id=tenant.id,
-            tenancy_id=tenancy.id,
-            amount=amount,
-            mode=mode,
-            ctx_name=ctx.name or ctx.phone,
-            period_month_str=period_month_str,
-            session=session,
+        mode_label = (mode or "cash").upper()
+        await _save_pending(
+            ctx.phone, "CONFIRM_PAYMENT_LOG",
+            {
+                "tenant_id": tenant.id,
+                "tenancy_id": tenancy.id,
+                "amount": amount,
+                "mode": mode,
+                "logged_by": ctx.name or ctx.phone,
+                "period_month": period_month_str,
+                "tenant_name": tenant.name,
+                "room_number": _room.room_number,
+            },
+            [], session,
+        )
+        return (
+            f"*Confirm Payment?*\n\n"
+            f"• Tenant : {tenant.name} (Room {_room.room_number})\n"
+            f"• Amount : Rs.{int(amount):,}\n"
+            f"• Mode   : {mode_label}\n"
+            f"• Month  : {period_month.strftime('%B %Y')}\n\n"
+            "Reply *Yes* to log or *No* to cancel."
         )
 
     # Multiple matches — ask which one

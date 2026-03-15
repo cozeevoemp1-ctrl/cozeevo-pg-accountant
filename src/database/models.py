@@ -71,6 +71,7 @@ from sqlalchemy import (
     Column, Integer, String, Numeric, Date, DateTime, Enum,
     ForeignKey, Text, Boolean, Index, UniqueConstraint
 )
+from sqlalchemy.dialects.postgresql import JSONB
 try:
     from pgvector.sqlalchemy import Vector
     _HAS_PGVECTOR = True
@@ -197,8 +198,13 @@ class Property(Base):
     phone       = Column(String(20))
     gstin       = Column(String(20))
     total_rooms = Column(Integer, default=0)
-    active      = Column(Boolean, default=True)
-    created_at  = Column(DateTime, default=datetime.utcnow)
+    active          = Column(Boolean, default=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    # WiFi credentials — floor-scoped via wifi_floor_map
+    wifi_ssid       = Column(String(120))   # property-wide fallback SSID
+    wifi_password   = Column(String(120))   # property-wide fallback password
+    # e.g. {"1": {"ssid": "PG_Floor1", "password": "abc123"}, "common": {"ssid": "PG_Common", "password": "xyz"}}
+    wifi_floor_map  = Column(JSONB, default=dict)
 
     rooms     = relationship("Room", back_populates="property")
     staff     = relationship("Staff", back_populates="property")

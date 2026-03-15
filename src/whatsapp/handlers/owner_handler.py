@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Payment, PaymentFor,
-    PaymentMode, PendingAction, PendingLearning, LearnedRule, Refund, RefundStatus, RentSchedule, RentStatus,
+    PaymentMode, PendingAction, PendingLearning, LearnedRule, Property, Refund, RefundStatus, RentSchedule, RentStatus,
     Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
 from src.whatsapp.role_service import CallerContext
@@ -33,6 +33,8 @@ from src.whatsapp.handlers._shared import (
     _find_similar_names, _check_room_overlap,
     _make_choices, _save_pending,
     _format_choices_message, _format_no_match_message,
+    BOT_NAME, time_greeting, is_first_time,
+    is_affirmative, is_negative, parse_target_month,
 )
 from src.whatsapp.handlers.account_handler import (
     _calc_outstanding_dues,       # needed by _room_status + _do_checkout
@@ -83,6 +85,8 @@ async def handle_owner(
         "SEND_REMINDER_ALL":  _send_reminder_all,
         "START_ONBOARDING":   _start_onboarding,
         "RECORD_CHECKOUT":    _record_checkout,
+        "GET_WIFI_PASSWORD":  _get_wifi_password,
+        "SET_WIFI":           _set_wifi,
         "COMPLAINT_REGISTER": _owner_complaint_register,
         "GET_TENANT_NOTES":   _get_tenant_notes,
         "RULES":              _rules,
@@ -112,6 +116,24 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             chosen_idx = num - 1
 
     # ── Multi-step text-based flows — handled BEFORE numeric check ───────────
+
+    if pending.intent == "CONFIRM_PAYMENT_LOG":
+        if is_affirmative(reply_text):
+            return await _do_log_payment_by_ids(
+                tenant_id=action_data["tenant_id"],
+                tenancy_id=action_data["tenancy_id"],
+                amount=action_data["amount"],
+                mode=action_data["mode"],
+                ctx_name=action_data["logged_by"],
+                period_month_str=action_data["period_month"],
+                session=session,
+            )
+        if is_negative(reply_text):
+            return "❌ Payment cancelled. Nothing was logged."
+        return (
+            f"Reply *Yes* to confirm logging Rs.{int(action_data['amount']):,} "
+            f"for {action_data['tenant_name']}, or *No* to cancel."
+        )
 
     if pending.intent == "CONFIRM_DEPOSIT_REFUND":
         ans = reply_text.lower().strip()
@@ -922,10 +944,89 @@ async def _reminder_prompt(entities: dict, ctx: CallerContext, session: AsyncSes
     )
 
 
+async def _fetch_active_property(session: AsyncSession):
+    """Fetch the single active property (owner context)."""
+    result = await session.execute(select(Property).where(Property.active == True).limit(1))
+    return result.scalars().first()
+
+
+async def _get_wifi_password(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show all WiFi credentials for the property."""
+    prop = await _fetch_active_property(session)
+    if not prop:
+        return "No active property found."
+
+    lines = ["*WiFi Credentials*\n"]
+    floor_map: dict = prop.wifi_floor_map or {}
+    if floor_map:
+        for key, info in floor_map.items():
+            label = "Common Area" if key == "common" else f"Floor {key}"
+            lines.append(f"*{label}*")
+            lines.append(f"  Network : `{info.get('ssid', 'N/A')}`")
+            lines.append(f"  Password: `{info.get('password', 'N/A')}`\n")
+    if prop.wifi_ssid:
+        lines.append("*Property-Wide*")
+        lines.append(f"  Network : `{prop.wifi_ssid}`")
+        lines.append(f"  Password: `{prop.wifi_password or 'N/A'}`")
+
+    if len(lines) == 1:
+        return (
+            "No WiFi configured yet.\n\n"
+            "To add WiFi:\n"
+            "*set wifi floor 1 SSID CozeevoPG1 password PG2024Floor1*\n"
+            "*set wifi common SSID CozeevaCommon password CommonPass*"
+        )
+    return "\n".join(lines)
+
+
+async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    Parse and save WiFi credentials.
+    Formats:
+      set wifi floor 1 SSID <name> password <pass>
+      set wifi common SSID <name> password <pass>
+      set wifi SSID <name> password <pass>   (property-wide)
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    msg = entities.get("description", "")
+    prop = await _fetch_active_property(session)
+    if not prop:
+        return "No active property found."
+
+    # Parse floor/common/global
+    floor_m = re.search(r"(?:floor\s+(\d+)|(common))\s+ssid\s+(\S+)\s+password\s+(\S+)", msg, re.I)
+    global_m = re.search(r"ssid\s+(\S+)\s+password\s+(\S+)", msg, re.I) if not floor_m else None
+
+    if floor_m:
+        floor_key = floor_m.group(1) if floor_m.group(1) else "common"
+        ssid, pw = floor_m.group(3), floor_m.group(4)
+        floor_map = dict(prop.wifi_floor_map or {})
+        floor_map[floor_key] = {"ssid": ssid, "password": pw}
+        prop.wifi_floor_map = floor_map
+        flag_modified(prop, "wifi_floor_map")   # tell SQLAlchemy the JSONB dict changed
+        label = "Common Area" if floor_key == "common" else f"Floor {floor_key}"
+        return f"WiFi updated for *{label}*\nNetwork: `{ssid}`\nPassword: `{pw}`"
+    elif global_m:
+        prop.wifi_ssid = global_m.group(1)
+        prop.wifi_password = global_m.group(2)
+        return f"Property WiFi updated\nNetwork: `{prop.wifi_ssid}`\nPassword: `{prop.wifi_password}`"
+
+    return (
+        "Couldn't parse WiFi details. Use format:\n"
+        "*set wifi floor 1 SSID CozeevoPG1 password PG2024Floor1*\n"
+        "*set wifi common SSID CozeevaCommon password CommonPass*"
+    )
+
+
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     role_label = "Admin" if ctx.role == "admin" else "Owner"
+    greeting = time_greeting()
+    first_time = await is_first_time(ctx.phone, session)
+    intro = f"I'm *{BOT_NAME}*, your PG assistant! 🏠\n\n" if first_time else ""
     return (
-        f"*Cozeevo PG Bot — {role_label} Menu*\n\n"
+        f"*{greeting}, {ctx.name}!* {intro}\n"
+        f"*{BOT_NAME} — {role_label} Menu*\n\n"
         "*Payments*\n"
         "• Raj paid 15000 upi\n"
         "• Received 8000 cash from Priya\n\n"
@@ -938,8 +1039,10 @@ async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> st
         "• Start onboarding for Ravi 9876543210\n"
         "• Checkout Raj\n"
         "• Record checkout Priya\n\n"
-        "*Expenses*\n"
-        "• Expense electricity 4500\n\n"
+        "*Expenses & WiFi*\n"
+        "• Expense electricity 4500\n"
+        "• wifi password\n"
+        "• set wifi floor 1 SSID CozeevoPG password PG2024\n\n"
         "• rules — View PG rules\n\n"
         "Just type naturally — I'll understand!"
     )

@@ -4,6 +4,7 @@ Tenants can only see their own data. No writes allowed.
 """
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
@@ -13,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     Complaint, ComplaintCategory, ComplaintStatus,
-    OnboardingSession, Payment, PaymentMode, PendingAction, RentSchedule, RentStatus,
+    OnboardingSession, Payment, PaymentMode, PendingAction, Property, RentSchedule, RentStatus,
     Room, Tenancy, TenancyStatus, Vacation,
 )
 import json
 from src.whatsapp.role_service import CallerContext
+from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time, parse_target_month
+from src.whatsapp.intent_detector import _extract_date_entity as _parse_date
 from services.property_logic import (
     NOTICE_BY_DAY as _NOTICE_BY_DAY,   # single source of truth
     calc_notice_last_day,
@@ -37,6 +40,7 @@ async def handle_tenant(
         "MY_DETAILS":        _my_details,
         "CHECKOUT_NOTICE":   _checkout_notice,
         "VACATION_NOTICE":   _vacation_notice,
+        "GET_WIFI_PASSWORD":  _get_wifi_password,
         "COMPLAINT_REGISTER": _complaint_register,
         "REQUEST_RECEIPT":   _request_receipt,
         "RULES":             _rules,
@@ -153,6 +157,16 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
 
 
 async def _my_payments(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # Always ask for month — never assume or show "last 6"
+    month_num = entities.get("month")
+    date_str  = entities.get("date", "")
+    if not month_num and not date_str:
+        return (
+            "Which month would you like to see?\n\n"
+            "Example: *my payments March 2026*\n"
+            "or just say: *March payments*"
+        )
+
     result = await session.execute(
         select(Tenancy).where(
             Tenancy.tenant_id == ctx.tenant_id,
@@ -163,23 +177,26 @@ async def _my_payments(entities: dict, ctx: CallerContext, session: AsyncSession
     if not tenancy:
         return "No active tenancy found."
 
+    target_month = parse_target_month(entities)
+
     result = await session.execute(
         select(Payment).where(
             Payment.tenancy_id == tenancy.id,
+            Payment.period_month == target_month,
             Payment.is_void == False,
-        ).order_by(Payment.payment_date.desc()).limit(6)
+        ).order_by(Payment.payment_date.desc())
     )
     payments = result.scalars().all()
 
     if not payments:
-        return "No payment records found for your account."
+        return f"No payment records found for *{target_month.strftime('%B %Y')}*."
 
-    lines = ["*Your Recent Payments*\n"]
+    total = sum((p.amount or Decimal("0")) for p in payments)
+    lines = [f"*Your Payments — {target_month.strftime('%B %Y')}*\n"]
     for p in payments:
-        month_str = p.period_month.strftime("%b %Y") if p.period_month else "—"
-        mode = p.payment_mode.value.upper() if p.payment_mode else ""
-        lines.append(f"• {p.payment_date.strftime('%d %b')}: Rs.{int(p.amount):,} {mode} ({month_str})")
-
+        dt = p.payment_date.strftime("%d %b %Y") if p.payment_date else "—"
+        lines.append(f"• {dt}: Rs.{int(p.amount or 0):,}")
+    lines.append(f"\n*Total paid: Rs.{int(total):,}*")
     return "\n".join(lines)
 
 
@@ -208,14 +225,19 @@ async def _my_details(entities: dict, ctx: CallerContext, session: AsyncSession)
 
 
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    greeting = time_greeting()
+    first_time = await is_first_time(ctx.phone, session)
+    intro = f"I'm *{BOT_NAME}*, your PG assistant! 🏠\n\n" if first_time else ""
     return (
-        f"*Hi {ctx.name}!*\n\n"
+        f"*{greeting}, {ctx.name}!* {intro}\n"
         "Here's what you can ask me:\n\n"
-        "• *my balance* — Check this month's dues\n"
-        "• *my payments* — View payment history\n"
+        "• *my balance* — This month's dues\n"
+        "• *my payments* — Payment history (by month)\n"
         "• *my details* — Room and stay info\n"
-        "• *rules* — View PG rules & regulations\n\n"
-        "For any issues, please contact the PG office directly."
+        "• *wifi password* — Get WiFi details\n"
+        "• *complaint* — Report an issue\n"
+        "• *rules* — PG rules & regulations\n\n"
+        "For urgent issues, contact the PG office directly."
     )
 
 
@@ -303,7 +325,65 @@ async def _checkout_notice(entities: dict, ctx: CallerContext, session: AsyncSes
     )
 
 
+# ── WiFi password (floor-scoped) ──────────────────────────────────────────────
+
+async def _get_wifi_password(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show WiFi credentials scoped to the tenant's floor (or property fallback)."""
+    # Single query: Tenancy → Room → Property
+    result = await session.execute(
+        select(Tenancy, Room, Property)
+        .join(Room, Tenancy.room_id == Room.id)
+        .join(Property, Property.id == Room.property_id)
+        .where(
+            Tenancy.tenant_id == ctx.tenant_id,
+            Tenancy.status == TenancyStatus.active,
+        )
+    )
+    row = result.first()
+    if not row:
+        return "No active tenancy found. Please contact the PG office."
+    tenancy, room, prop = row
+
+    msg = entities.get("description", "").lower()
+    floor_map: dict = prop.wifi_floor_map or {}
+
+    # "common area wifi" → show common entry
+    if "common" in msg:
+        common = floor_map.get("common")
+        if common:
+            return (
+                f"*Common Area WiFi*\n"
+                f"Network : `{common.get('ssid', 'N/A')}`\n"
+                f"Password: `{common.get('password', 'N/A')}`"
+            )
+        return "Common area WiFi details not configured. Contact the PG office."
+
+    # Try tenant's floor
+    floor_key = str(room.floor) if room.floor is not None else None
+    floor_wifi = floor_map.get(floor_key) if floor_key else None
+    if floor_wifi:
+        return (
+            f"*WiFi — Floor {room.floor}*\n"
+            f"Network : `{floor_wifi.get('ssid', 'N/A')}`\n"
+            f"Password: `{floor_wifi.get('password', 'N/A')}`"
+        )
+
+    # Fallback: property-wide WiFi
+    if prop.wifi_ssid:
+        return (
+            f"*WiFi*\n"
+            f"Network : `{prop.wifi_ssid}`\n"
+            f"Password: `{prop.wifi_password or 'N/A'}`"
+        )
+
+    return "WiFi details not configured yet. Please contact the PG office."
+
+
 # ── Vacation notice ────────────────────────────────────────────────────────────
+
+_RE_FROM = re.compile(r"from\s+(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*)", re.I)
+_RE_BACK = re.compile(r"(?:back\s+on|return(?:ing)?\s+on|till?|until|to)\s+(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*)", re.I)
+
 
 async def _vacation_notice(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     result = await session.execute(
@@ -316,20 +396,57 @@ async def _vacation_notice(entities: dict, ctx: CallerContext, session: AsyncSes
     if not tenancy:
         return "No active tenancy found."
 
-    date_str = entities.get("date", "")
-    if date_str:
+    # Try to extract from/to dates from entities or raw message
+    raw_message = entities.get("description", "")
+    from_date_str = entities.get("from_date") or entities.get("date")
+    to_date_str   = entities.get("to_date") or entities.get("back_date")
+
+    if not from_date_str:
+        m = _RE_FROM.search(raw_message)
+        if m:
+            from_date_str = m.group(1)
+    if not to_date_str:
+        m = _RE_BACK.search(raw_message)
+        if m:
+            to_date_str = m.group(1)
+
+    if not from_date_str or not to_date_str:
         return (
-            f"*Vacation noted — {ctx.name}*\n"
-            f"We've noted you'll be away. Please inform the PG office of your return date.\n\n"
-            "Your room will be secured while you're away."
+            f"*Going home, {ctx.name}?* 🏠\n\n"
+            "Please let us know:\n"
+            "• _From date_ (when you leave)\n"
+            "• _Back on_ (when you return)\n\n"
+            "Example: *going home from 20 Apr, back on 5 May*"
         )
+
+    from_iso = _parse_date(from_date_str)
+    to_iso   = _parse_date(to_date_str)
+    if not from_iso or not to_iso:
+        return (
+            "Couldn't read the dates. Please use format: *going home from 20 Apr, back on 5 May*"
+        )
+
+    from_dt = date.fromisoformat(from_iso)
+    to_dt   = date.fromisoformat(to_iso)
+    if to_dt < from_dt:
+        return "Return date can't be before departure date. Please check and resend."
+
+    # Save vacation record
+    vacation = Vacation(
+        tenancy_id=tenancy.id,
+        from_date=from_dt,
+        to_date=to_dt,
+        affects_billing=False,
+        notes=f"Self-reported via WhatsApp",
+    )
+    session.add(vacation)
+
+    days = (to_dt - from_dt).days
     return (
-        f"*Going home, {ctx.name}?*\n\n"
-        "Please let us know:\n"
-        "• From date: _DD Mon_\n"
-        "• Back on: _DD Mon_\n\n"
-        "Example: *going home from 20 Apr, back on 5 May*\n\n"
-        "We'll note it in your record."
+        f"✅ *Vacation Noted — {ctx.name}*\n\n"
+        f"Away from : *{from_dt.strftime('%d %b %Y')}*\n"
+        f"Back on   : *{to_dt.strftime('%d %b %Y')}* ({days} day{'s' if days != 1 else ''})\n\n"
+        "Your room will be secured while you're away. Safe travels! 🙏"
     )
 
 
@@ -365,6 +482,19 @@ _CATEGORY_ENUM = {
     "furniture":   ComplaintCategory.furniture,
     "other":       ComplaintCategory.other,
 }
+
+_TICKET_PREFIX = {
+    ComplaintCategory.plumbing:    "PLUM",
+    ComplaintCategory.electricity: "ELEC",
+    ComplaintCategory.wifi:        "WIFI",
+    ComplaintCategory.food:        "FOOD",
+    ComplaintCategory.furniture:   "FURN",
+    ComplaintCategory.other:       "OTH",
+}
+
+def _ticket_number(category: ComplaintCategory, complaint_id: int) -> str:
+    prefix = _TICKET_PREFIX.get(category, "OTH")
+    return f"{prefix}-{complaint_id:03d}"
 
 
 def _detect_complaint_category(text: str) -> ComplaintCategory:
@@ -447,6 +577,9 @@ async def resolve_tenant_complaint(pending: PendingAction, reply: str, session: 
         status=ComplaintStatus.open,
     )
     session.add(complaint)
+    await session.flush()   # get complaint.id before commit
+
+    ticket = _ticket_number(category, complaint.id)
 
     cat_label = {
         ComplaintCategory.plumbing:    "Plumbing",
@@ -458,18 +591,28 @@ async def resolve_tenant_complaint(pending: PendingAction, reply: str, session: 
     }.get(category, "Other")
 
     return (
-        f"*Complaint Registered*\n"
+        f"✅ *Complaint Registered*\n"
+        f"Ticket : *{ticket}*\n"
         f"Category: {cat_label}\n"
         f"Details: {original_desc}\n"
-        f"Location/Duration: {reply}\n"
-        f"Status: Open\n\n"
-        "The PG team has been notified and will address your issue shortly."
+        f"Location/Duration: {reply}\n\n"
+        "The PG team has been notified. We'll fix it ASAP!"
     )
 
 
 # ── Request receipt ────────────────────────────────────────────────────────────
 
 async def _request_receipt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # Always ask for month — never assume
+    month_num = entities.get("month")
+    date_str  = entities.get("date", "")
+    if not month_num and not date_str:
+        return (
+            "Which month's receipt do you need?\n\n"
+            "Example: *receipt March 2026*\n"
+            "or: *January receipt*"
+        )
+
     result = await session.execute(
         select(Tenancy).where(
             Tenancy.tenant_id == ctx.tenant_id,
@@ -480,40 +623,41 @@ async def _request_receipt(entities: dict, ctx: CallerContext, session: AsyncSes
     if not tenancy:
         return "No active tenancy found."
 
-    # Get last 3 payments
+    target_month = parse_target_month(entities)
+
     result = await session.execute(
         select(Payment).where(
             Payment.tenancy_id == tenancy.id,
+            Payment.period_month == target_month,
             Payment.is_void == False,
-        ).order_by(Payment.payment_date.desc()).limit(3)
+        ).order_by(Payment.payment_date.desc())
     )
     payments = result.scalars().all()
     if not payments:
-        return "No payment records found for your account."
+        return f"No payment records found for *{target_month.strftime('%B %Y')}*."
 
-    lines = [f"*Payment Receipts — {ctx.name}*\n"]
+    total = sum((p.amount or Decimal("0")) for p in payments)
+    lines = [f"*Payment Receipt — {ctx.name}*\n*{target_month.strftime('%B %Y')}*\n"]
     for p in payments:
-        month_str = p.period_month.strftime("%B %Y") if p.period_month else "—"
-        mode = p.payment_mode.value.upper() if p.payment_mode else ""
         dt = p.payment_date.strftime("%d %b %Y") if p.payment_date else "—"
-        lines.append(
-            f"• {dt}\n"
-            f"  Amount: Rs.{int(p.amount):,} ({mode})\n"
-            f"  For: {month_str}"
-        )
+        lines.append(f"• {dt}: Rs.{int(p.amount or 0):,}")
+    lines.append(f"\n*Total: Rs.{int(total):,}*")
     lines.append("\nFor a formal PDF receipt, please contact the PG office.")
     return "\n".join(lines)
 
 
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    greeting = time_greeting()
     return (
-        f"Hi {ctx.name}! I can help you with:\n\n"
+        f"{greeting}, {ctx.name}! I didn't quite get that.\n\n"
+        "I can help you with:\n"
         "• *my balance* — this month's dues\n"
-        "• *my payments* — payment history\n"
+        "• *my payments* — payment history (by month)\n"
         "• *my details* — your room info\n"
+        "• *wifi password* — WiFi details\n"
         "• *complaint* — report an issue\n"
         "• *I'm leaving* — give notice to vacate\n\n"
-        "Type *help* for more options."
+        "Type *help* for full menu."
     )
 
 

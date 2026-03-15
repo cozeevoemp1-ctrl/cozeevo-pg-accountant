@@ -11,13 +11,74 @@ from __future__ import annotations
 
 import difflib
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus
+from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus, WhatsappLog
+
+BOT_NAME = "Artha"
+_IST_OFFSET = timedelta(hours=5, minutes=30)
+
+
+def time_greeting() -> str:
+    """Return time-appropriate greeting in IST."""
+    hour = (datetime.now(timezone.utc) + _IST_OFFSET).hour
+    if 5 <= hour < 12:
+        return "Good morning"
+    if 12 <= hour < 17:
+        return "Good afternoon"
+    if 17 <= hour < 21:
+        return "Good evening"
+    return "Good night"
+
+
+async def is_first_time(phone: str, session: AsyncSession) -> bool:
+    """Return True if this phone has never messaged the bot before."""
+    result = await session.execute(
+        select(WhatsappLog.id).where(WhatsappLog.from_number == phone).limit(1)
+    )
+    return result.scalar() is None
+
+
+def parse_target_month(entities: dict) -> date:
+    """
+    Parse target month from intent entities dict.
+    Handles 'date' (ISO string), 'month' (int 1-12), or defaults to current month.
+    Never returns a future month — rolls back one year if month hasn't arrived yet.
+    """
+    today = date.today()
+    date_str = entities.get("date", "")
+    month_num = entities.get("month")
+    if date_str:
+        try:
+            return date.fromisoformat(date_str).replace(day=1)
+        except ValueError:
+            pass
+    if month_num:
+        m = int(month_num)
+        year = today.year
+        candidate = date(year, m, 1)
+        if candidate > today.replace(day=1):
+            year -= 1
+        return date(year, m, 1)
+    return today.replace(day=1)
+
+
+# ── Yes / No answer helpers ───────────────────────────────────────────────────
+
+_AFFIRMATIVE = {"yes", "y", "confirm", "ok", "haan", "ha", "yeah", "sure", "proceed", "done", "returned"}
+_NEGATIVE    = {"no", "n", "cancel", "nahi", "nope", "stop", "none", "nil"}
+
+
+def is_affirmative(text: str) -> bool:
+    return text.lower().strip() in _AFFIRMATIVE
+
+
+def is_negative(text: str) -> bool:
+    return text.lower().strip() in _NEGATIVE
 
 
 # ── Fuzzy tenant search helpers ───────────────────────────────────────────────
