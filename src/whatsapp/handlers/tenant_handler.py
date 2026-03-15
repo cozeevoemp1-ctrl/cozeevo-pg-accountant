@@ -19,7 +19,7 @@ from src.database.models import (
 )
 import json
 from src.whatsapp.role_service import CallerContext
-from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time, bot_intro, parse_target_month
+from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time_today, bot_intro, parse_target_month
 from src.whatsapp.intent_detector import _extract_date_entity as _parse_date
 from services.property_logic import (
     NOTICE_BY_DAY as _NOTICE_BY_DAY,   # single source of truth
@@ -225,10 +225,9 @@ async def _my_details(entities: dict, ctx: CallerContext, session: AsyncSession)
 
 
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    greeting = time_greeting()
-    intro = bot_intro(await is_first_time(ctx.phone, session))
+    header = bot_intro(await is_first_time_today(ctx.phone, session), ctx.name)
     return (
-        f"*{greeting}, {ctx.name}!*\n{intro}"
+        f"{header}"
         "Here's what you can ask me:\n\n"
         "• *my balance* — This month's dues\n"
         "• *my payments* — Payment history (by month)\n"

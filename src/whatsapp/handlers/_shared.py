@@ -33,22 +33,33 @@ def time_greeting() -> str:
     return "Good evening"
 
 
-async def is_first_time(phone: str, session: AsyncSession) -> bool:
-    """Return True if this phone has never messaged the bot before."""
+async def is_first_time_today(phone: str, session: AsyncSession) -> bool:
+    """Return True if this phone hasn't messaged the bot yet today (IST)."""
+    ist_now = datetime.now(timezone.utc) + _IST_OFFSET
+    ist_today_start = ist_now.replace(hour=0, minute=0, second=0, microsecond=0) - _IST_OFFSET
     result = await session.execute(
-        select(WhatsappLog.id).where(WhatsappLog.from_number == phone).limit(1)
+        select(WhatsappLog.id)
+        .where(WhatsappLog.from_number == phone)
+        .where(WhatsappLog.created_at >= ist_today_start)
+        .limit(1)
     )
     return result.scalar() is None
 
 
-def bot_intro(first_time: bool) -> str:
+def bot_intro(first_time_today: bool, name: str = "") -> str:
     """
-    Return intro line. First-time: full intro. Returning: short tagline.
-    Always ends with blank line so caller can append menu directly.
+    Return greeting header.
+    First time today: "Hi [name]! 😊 I'm Artha, your PG assistant. How may I assist you today?"
+    Returning (already messaged today): time-based greeting + name only.
+    Always ends with \\n\\n so caller can append menu directly.
     """
-    if first_time:
-        return f"I'm *{BOT_NAME}*, your Virtual PG Front Desk Manager. How can I help you today?\n\n"
-    return f"_Your Virtual PG Front Desk_ — How can I help you today?\n\n"
+    if first_time_today:
+        greeting_name = f"Hi {name}! 😊" if name else "Hi! 😊"
+        return f"{greeting_name} I'm *{BOT_NAME}*, your PG assistant. How may I assist you today?\n\n"
+    greeting = time_greeting()
+    if name:
+        return f"*{greeting}, {name}!*\n\n"
+    return f"*{greeting}!*\n\n"
 
 
 def parse_target_month(entities: dict) -> date:

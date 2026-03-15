@@ -201,7 +201,7 @@ async def process_message(
     # If intent router is not confident enough, ask the user to rephrase
     # rather than taking a potentially wrong action.
     if (
-        intent_result.confidence < 0.85
+        intent_result.confidence < 0.70
         and intent not in _LOW_CONF_PASSTHROUGH
         and ctx.role != "lead"   # leads always get conversational handling
     ):

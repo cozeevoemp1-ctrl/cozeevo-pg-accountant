@@ -52,6 +52,8 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
     ("tenants", "email",                          "VARCHAR(120)"),
     ("tenants", "occupation",                     "VARCHAR(120)"),
     ("tenants", "emergency_contact_relationship", "VARCHAR(60)"),
+    # WiFi floor map (added 2026-03-15)
+    ("properties", "wifi_floor_map",              "JSONB"),
 ]
 
 # -- Tables to create if missing -----------------------------------------------
@@ -130,6 +132,30 @@ CREATE_TABLES: list[str] = [
     """,
     """
     CREATE INDEX IF NOT EXISTS ix_learned_rules_active ON learned_rules(active)
+    """,
+    # ── Complaints / maintenance tickets (added 2026-03-15) ──────────────────
+    """
+    CREATE TABLE IF NOT EXISTS complaints (
+        id          SERIAL PRIMARY KEY,
+        tenancy_id  INTEGER NOT NULL REFERENCES tenancies(id),
+        category    VARCHAR(20) NOT NULL,
+        sub_item    VARCHAR(100),
+        description TEXT NOT NULL,
+        status      VARCHAR(20) DEFAULT 'open',
+        created_at  TIMESTAMP DEFAULT NOW(),
+        resolved_at TIMESTAMP,
+        resolved_by VARCHAR(20),
+        notes       TEXT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_complaints_tenancy ON complaints(tenancy_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_complaints_status  ON complaints(status)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_complaints_created ON complaints(created_at)
     """,
 ]
 
