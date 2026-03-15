@@ -1,0 +1,7879 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "total": 544,
+    "created": "2026-03-14",
+    "description": "500-scenario test suite for Cozeevo PG Accountant v1.4.0",
+    "workers": {
+      "AccountWorker": 167,
+      "OwnerWorker": 177,
+      "TenantWorker": 100,
+      "LeadWorker": 100
+    },
+    "phones": {
+      "admin": "+917845952289",
+      "power_user": "+917358341775",
+      "key_user": "CONFIGURE_KEY_USER_PHONE",
+      "tenant": "CONFIGURE_TENANT_PHONE",
+      "lead": "+919000000001"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "A001",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A002",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Arjun 12000 cash",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A003",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "received 10000 from Kumar bank transfer",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A004",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Suresh paid 7500",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A005",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "15000 from Raj upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A006",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak paid rent 11000 cheque",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A007",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Mohan paid 9000 phonepe",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A008",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Ravi gave 13000 cash",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A009",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "log payment Sanjay 8500",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A010",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Priya paid 6000 neft",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A011",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Anand 14000 imps",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A012",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "payment received from Rahul 10500 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A013",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Kumar paid 7000 paytm",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A014",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Mahesh paid 12500 bank",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A015",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram ko payment mil gaya 8000 gpay",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A016",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who hasn't paid",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "A017",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "dues this month",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "A018",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "defaulters list",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A019",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who owes money",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A020",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show pending payments",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A021",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "outstanding dues",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A022",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who hasn't paid March",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A023",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "unpaid rent this month",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A024",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "list of defaulters",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A025",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "dues March 2026",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A026",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "A027",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show Arjun's account",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A028",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram details",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A029",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "how much does Kumar owe",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A030",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "check Suresh balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A031",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak ka balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A032",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Mohan outstanding",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A033",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Ravi payment history",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A034",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "balance for Sanjay",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A035",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Anand account statement",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A036",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Priya total dues",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A037",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "tell me Rahul balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A038",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "maintenance 5000 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A039",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "electricity bill 3000 upi",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A040",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "water bill 800 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A041",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "cleaning 2000 bank",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A042",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "plumber 1500 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A043",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "electrician 2500 upi",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A044",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "repairs 7000 cheque",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A045",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "furniture 15000 bank",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A046",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "food supplies 8000 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A047",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "internet 2000 upi",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A048",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "generator maintenance 4000 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A049",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add expense security guard salary 9000 bank",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A050",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "expenses this month",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "A051",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show expenses",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A052",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "expense breakdown",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A053",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "monthly expenses",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A054",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "what did we spend",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A055",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "expense summary",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A056",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "March expenses",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A057",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "total expenses",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A058",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "monthly report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "A059",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "summary",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A060",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show monthly summary",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A061",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "financial report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A062",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "March report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A063",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "generate report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A064",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "revenue summary",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A065",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "occupancy report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A066",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "change rent for room 205 to 12000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "A067",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "update rent room 204 to 11000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A068",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 101 rent change to 9000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A069",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "increase rent room 301 to 13000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A070",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "new rent for room 202 is 10500",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A071",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 201 rent updated to 10000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A072",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "revise rent for room 102 to 8500",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A073",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room G15 rent 12000 from next month",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A074",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "change room 105 rent to 9500",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A075",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "set rent room 203 to 11500",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "A076",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "give Raj 500 discount",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A077",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "discount 1000 for Arjun",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A078",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram rent discount 750",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A079",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "reduce Kumar's rent by 500 this month",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A080",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "one time discount Suresh 1000",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A081",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak ko 500 discount do",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A082",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "waive 750 for Mohan this month",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A083",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Ravi discount 500",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A084",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "void payment 42",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A085",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "cancel payment 15",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A086",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "payment 23 was wrong void it",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A087",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "reverse payment id 8",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A088",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "mark payment 67 as void",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A089",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "payment 12 incorrect cancel",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A090",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "payment 45 cancel karo",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A091",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "void transaction 88",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A092",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "refund 5000 to Raj",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "financial"
+      ]
+    },
+    {
+      "id": "A093",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "return deposit 10000 Arjun",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A094",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram deposit refund 8000",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A095",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add refund Kumar 7500",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A096",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "security deposit back to Suresh 15000",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A097",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "refund Deepak 3000",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A098",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "pay back deposit Mohan 12000",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "A099",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Ravi ko deposit wapas karo 6000",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "financial",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A100",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show refunds",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "A101",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "refund history",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A102",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "list all refunds",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A103",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj refunds",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A104",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "refund summary",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A105",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "refunds this month",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "A106",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A107",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "Anand 9000 cash",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A108",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "who hasn't paid",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A109",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "Raj balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A110",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "maintenance 4000 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A111",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "monthly report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A112",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "expenses this month",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A113",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "change rent for room 201 to 11000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "operational"
+      ]
+    },
+    {
+      "id": "A114",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "refund 5000 to Kumar",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A115",
+      "worker": "AccountWorker",
+      "intent": "QUERY_REFUNDS",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "show refunds",
+      "expected_intent": "QUERY_REFUNDS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A116",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A117",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "Suresh 8000 cash",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A118",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "Raj balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A119",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "who hasn't paid",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A120",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "plumber 1500 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "financial"
+      ]
+    },
+    {
+      "id": "A121",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "expenses this month",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A122",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "monthly report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "role",
+        "query"
+      ]
+    },
+    {
+      "id": "A123",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj ₹15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "financial"
+      ]
+    },
+    {
+      "id": "A124",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "💰 15000 Raj gpay",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "financial"
+      ]
+    },
+    {
+      "id": "A125",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "A126",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "5000 cash maintenance",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "financial"
+      ]
+    },
+    {
+      "id": "A127",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show stats",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "A128",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak payment received",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "partial"
+      ]
+    },
+    {
+      "id": "A129",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who owes",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "query"
+      ]
+    },
+    {
+      "id": "A130",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 205 rent 12000",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "operational"
+      ]
+    },
+    {
+      "id": "A131",
+      "worker": "AccountWorker",
+      "intent": "VOID_PAYMENT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "payment 42 galat tha cancel",
+      "expected_intent": "VOID_PAYMENT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A132",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "maintenance 5k cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "financial"
+      ]
+    },
+    {
+      "id": "A133",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj ka paise",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A134",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Arjun ne diya 12000",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "A135",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "backlogs",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "O001",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add tenant Arjun 9876543210 room 204",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O002",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "new tenant Priya 8765432109 room 101",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O003",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add tenant Vikram room 202",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O004",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "check in Kumar 7654321098 in room 301",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O005",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "new admission Suresh 9988776655",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O006",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "admit Deepak 9123456789 room 205",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O007",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add new tenant Mohan 9012345678",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O008",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "tenant Ravi 8901234567 room 102",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O009",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "start onboarding for Arjun 9876543210",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "flow"
+      ]
+    },
+    {
+      "id": "O010",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "begin kyc Priya 8765432109",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O011",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "onboarding for Vikram 9876543210",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O012",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "start registration Kumar 7654321098",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O013",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "onboard Suresh 9988776655",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O014",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "begin KYC for Deepak",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O015",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkin date for Raj is March 1",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O016",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "update checkin Arjun March 5",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O017",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram joined on 1st March",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O018",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Kumar checkin was 15 Feb",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O019",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "correct checkin date Suresh 10 March",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O020",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak checkin March 20",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O021",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj is leaving",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O022",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkout Arjun",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O023",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram is vacating",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O024",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Kumar is moving out",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O025",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Suresh leaving at end of month",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O026",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak checkout",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O027",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Mohan vacating",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O028",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Ravi is checking out",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O029",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj checkout on 31st March",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O030",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "schedule checkout Arjun 28 March",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O031",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram leaving on March 30",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O032",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Kumar checkout scheduled for April 15",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O033",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "plan checkout Suresh 31 March",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O034",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak leaving March end",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O035",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj gave notice",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O036",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Arjun gave one month notice",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O037",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram gave notice today",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O038",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Kumar is serving notice",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O039",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "notice received from Suresh",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O040",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak gave notice",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O041",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "record checkout Raj",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "flow"
+      ]
+    },
+    {
+      "id": "O042",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "process checkout Arjun",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O043",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "complete checkout Vikram",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O044",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "finalize checkout Kumar",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O045",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkout process Suresh",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O046",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "do checkout Deepak",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "O047",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj on vacation 10 days",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O048",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Arjun going home for 5 days",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O049",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram vacation from March 15 to 25",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O050",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Kumar on leave 7 days",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O051",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Suresh going out of station 3 days",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O052",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Deepak vacation 2 weeks",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O053",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "AC not working in room 205",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O054",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "water leak in room 101",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O055",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "complaint room 202 fan broken",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O056",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 301 door lock issue",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O057",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "plumbing problem room 204",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O058",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 102 light not working",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O059",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "wifi issue room 203",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O060",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 201 toilet blocked",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O061",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "vacant rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "O062",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "empty rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O063",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "which rooms are free",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O064",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "available rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O065",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "vacancy",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O066",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "how many rooms empty",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O067",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "list vacant rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O068",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "free rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O069",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "occupancy",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "O070",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "how full are we",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O071",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "occupancy rate",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O072",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "how many tenants",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O073",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "occupancy this month",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O074",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "how many rooms occupied",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O075",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who is leaving this month",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "O076",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "upcoming checkouts",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O077",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who is vacating",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O078",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "tenants leaving in March",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O079",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "end of month checkouts",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O080",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "expiring tenancies",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O081",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who checked in this month",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "O082",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "new tenants this month",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O083",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "recent admissions",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O084",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkins March",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O085",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "new joinings",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O086",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who joined recently",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O087",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who checked out this month",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "O088",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "recent checkouts",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O089",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "tenants who left",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O090",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "exits this month",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O091",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkouts March",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O092",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who left recently",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O093",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "remind Raj about rent on 5th",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O094",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "set reminder Arjun rent March 5",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O095",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "reminder for Vikram on March 10",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O096",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "remind Kumar rent 3rd",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O097",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "send reminder to Suresh on 7th",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O098",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "reminder Deepak March 5",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O099",
+      "worker": "OwnerWorker",
+      "intent": "SEND_REMINDER_ALL",
+      "role": "admin",
+      "phone": "admin",
+      "message": "send rent reminders",
+      "expected_intent": "SEND_REMINDER_ALL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O100",
+      "worker": "OwnerWorker",
+      "intent": "SEND_REMINDER_ALL",
+      "role": "admin",
+      "phone": "admin",
+      "message": "remind all tenants about rent",
+      "expected_intent": "SEND_REMINDER_ALL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O101",
+      "worker": "OwnerWorker",
+      "intent": "SEND_REMINDER_ALL",
+      "role": "admin",
+      "phone": "admin",
+      "message": "bulk reminder for rent",
+      "expected_intent": "SEND_REMINDER_ALL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O102",
+      "worker": "OwnerWorker",
+      "intent": "SEND_REMINDER_ALL",
+      "role": "admin",
+      "phone": "admin",
+      "message": "send reminders to all",
+      "expected_intent": "SEND_REMINDER_ALL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O103",
+      "worker": "OwnerWorker",
+      "intent": "ADD_PARTNER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add partner 9876543210",
+      "expected_intent": "ADD_PARTNER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "O104",
+      "worker": "OwnerWorker",
+      "intent": "ADD_PARTNER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add power user 8765432109",
+      "expected_intent": "ADD_PARTNER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O105",
+      "worker": "OwnerWorker",
+      "intent": "ADD_PARTNER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "give access 9876543210",
+      "expected_intent": "ADD_PARTNER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O106",
+      "worker": "OwnerWorker",
+      "intent": "ADD_PARTNER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add staff 7654321098",
+      "expected_intent": "ADD_PARTNER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "O107",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "pg rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "info"
+      ]
+    },
+    {
+      "id": "O108",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "house rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O109",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O110",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "what are the rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O111",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "list PG rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O112",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "rules and regulations",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O113",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "help",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "info"
+      ]
+    },
+    {
+      "id": "O114",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "commands",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O115",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "what can you do",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O116",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "how to use",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O117",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show commands",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O118",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "menu",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "O119",
+      "worker": "OwnerWorker",
+      "intent": "ROOM_STATUS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "status of room 205",
+      "expected_intent": "ROOM_STATUS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "O120",
+      "worker": "OwnerWorker",
+      "intent": "ROOM_STATUS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 101 status",
+      "expected_intent": "ROOM_STATUS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O121",
+      "worker": "OwnerWorker",
+      "intent": "ROOM_STATUS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "is room 202 occupied",
+      "expected_intent": "ROOM_STATUS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O122",
+      "worker": "OwnerWorker",
+      "intent": "ROOM_STATUS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 301 details",
+      "expected_intent": "ROOM_STATUS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "O123",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "naya tenant add karo Arjun 9876543210 room 204",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O124",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj ja raha hai",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O125",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "khali rooms kaun se hain",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "O126",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "kitne log rehte hain",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "O127",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "kisne nahi diya abhi tak",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "O128",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 205 ka AC kharab hai",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O129",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj chutti pe hai 10 din",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O130",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj ko rent yaad dilao 5 tarikh ko",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O131",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Arjun ne notice de diya",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O132",
+      "worker": "OwnerWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "is mahine ka report do",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "O133",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "is mahine kaun ja raha hai",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "O134",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "niyam batao",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "info"
+      ]
+    },
+    {
+      "id": "O135",
+      "worker": "OwnerWorker",
+      "intent": "HELP",
+      "role": "admin",
+      "phone": "admin",
+      "message": "kya kar sakte ho",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "info"
+      ]
+    },
+    {
+      "id": "O136",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj ka checkout process karo",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "flow"
+      ]
+    },
+    {
+      "id": "O137",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "is mahine kaun aaya",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "O138",
+      "worker": "OwnerWorker",
+      "intent": "SEND_REMINDER_ALL",
+      "role": "admin",
+      "phone": "admin",
+      "message": "sabko rent reminder bhejo",
+      "expected_intent": "SEND_REMINDER_ALL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O139",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj 31 March ko jayega",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O140",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Vikram 5 din ke liye ghar gaya",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "O141",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj leaving",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "O142",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add tenant Arjun",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "partial"
+      ]
+    },
+    {
+      "id": "O143",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "any rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "O144",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "rooms occupied?",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "O145",
+      "worker": "OwnerWorker",
+      "intent": "NOTICE_GIVEN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj notice",
+      "expected_intent": "NOTICE_GIVEN",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "O146",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 205 problem",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "O147",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "remind Raj",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "partial"
+      ]
+    },
+    {
+      "id": "O148",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj not here",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "O149",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_EXPIRING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who is leaving",
+      "expected_intent": "QUERY_EXPIRING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "query"
+      ]
+    },
+    {
+      "id": "O150",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "do Raj checkout",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "flow"
+      ]
+    },
+    {
+      "id": "O151",
+      "worker": "OwnerWorker",
+      "intent": "UPDATE_CHECKIN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj checkin March 1",
+      "expected_intent": "UPDATE_CHECKIN",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "operational"
+      ]
+    },
+    {
+      "id": "O152",
+      "worker": "OwnerWorker",
+      "intent": "AMBIGUOUS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj March 31",
+      "expected_intent": "AMBIGUOUS",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "O153",
+      "worker": "OwnerWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room issue 204",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "O154",
+      "worker": "OwnerWorker",
+      "intent": "ADD_PARTNER",
+      "role": "admin",
+      "phone": "admin",
+      "message": "9876543210 add partner",
+      "expected_intent": "ADD_PARTNER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "operational"
+      ]
+    },
+    {
+      "id": "O155",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKINS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkins this month",
+      "expected_intent": "QUERY_CHECKINS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "query"
+      ]
+    },
+    {
+      "id": "O156",
+      "worker": "OwnerWorker",
+      "intent": "LOG_VACATION",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj 7 din bahar",
+      "expected_intent": "LOG_VACATION",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "O157",
+      "worker": "OwnerWorker",
+      "intent": "RULES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "rules batao",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish",
+        "info"
+      ]
+    },
+    {
+      "id": "O158",
+      "worker": "OwnerWorker",
+      "intent": "SEND_REMINDER_ALL",
+      "role": "admin",
+      "phone": "admin",
+      "message": "send all reminders",
+      "expected_intent": "SEND_REMINDER_ALL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "operational"
+      ]
+    },
+    {
+      "id": "O159",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj chhod raha hai",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "O160",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_CHECKOUTS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "March mein kaun gaya",
+      "expected_intent": "QUERY_CHECKOUTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "T001",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my balance",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "T002",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "how much do I owe",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T003",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my dues",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T004",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "what's my outstanding",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T005",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "pending rent",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T006",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "how much is my rent",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T007",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "balance kya hai",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "T008",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "mera balance",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "T009",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "tell me my balance",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T010",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "what do I need to pay",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T011",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "outstanding amount",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T012",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my rent status",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T013",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my payments",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "T014",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "payment history",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T015",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "past payments",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T016",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "show my payments",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T017",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "when did I last pay",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T018",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "meri payments",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "T019",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "transaction history",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T020",
+      "worker": "TenantWorker",
+      "intent": "REQUEST_RECEIPT",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my receipts",
+      "expected_intent": "REQUEST_RECEIPT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T021",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my details",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "T022",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my room",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T023",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my room number",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T024",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "when did I check in",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T025",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my profile",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T026",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "show my details",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T027",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my information",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T028",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "my account details",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T029",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "AC not working",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "T030",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "water problem",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T031",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "light not working in my room",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T032",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "toilet blocked",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T033",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "wifi not working",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T034",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "fan broken",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T035",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "door lock issue",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T036",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "pest problem in my room",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T037",
+      "worker": "TenantWorker",
+      "intent": "RULES",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "info"
+      ]
+    },
+    {
+      "id": "T038",
+      "worker": "TenantWorker",
+      "intent": "RULES",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "regulations",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T039",
+      "worker": "TenantWorker",
+      "intent": "RULES",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "pg rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T040",
+      "worker": "TenantWorker",
+      "intent": "RULES",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "house rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T041",
+      "worker": "TenantWorker",
+      "intent": "RULES",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "what are the rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T042",
+      "worker": "TenantWorker",
+      "intent": "RULES",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "show rules",
+      "expected_intent": "RULES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T043",
+      "worker": "TenantWorker",
+      "intent": "CHECKOUT_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "I am leaving",
+      "expected_intent": "CHECKOUT_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "T044",
+      "worker": "TenantWorker",
+      "intent": "CHECKOUT_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "I want to vacate",
+      "expected_intent": "CHECKOUT_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T045",
+      "worker": "TenantWorker",
+      "intent": "CHECKOUT_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "planning to leave next month",
+      "expected_intent": "CHECKOUT_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T046",
+      "worker": "TenantWorker",
+      "intent": "CHECKOUT_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "I'm moving out",
+      "expected_intent": "CHECKOUT_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T047",
+      "worker": "TenantWorker",
+      "intent": "CHECKOUT_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "want to checkout",
+      "expected_intent": "CHECKOUT_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T048",
+      "worker": "TenantWorker",
+      "intent": "CHECKOUT_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "giving notice",
+      "expected_intent": "CHECKOUT_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T049",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "I will be on vacation for 5 days",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "operational"
+      ]
+    },
+    {
+      "id": "T050",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "going home for a week",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T051",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "out of town 3 days",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T052",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "on leave next week",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T053",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "vacation notice 10 days",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T054",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "going home for Diwali",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational"
+      ]
+    },
+    {
+      "id": "T055",
+      "worker": "TenantWorker",
+      "intent": "REQUEST_RECEIPT",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "send me receipt",
+      "expected_intent": "REQUEST_RECEIPT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "T056",
+      "worker": "TenantWorker",
+      "intent": "REQUEST_RECEIPT",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "I need my payment receipt",
+      "expected_intent": "REQUEST_RECEIPT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T057",
+      "worker": "TenantWorker",
+      "intent": "REQUEST_RECEIPT",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "receipt for last payment",
+      "expected_intent": "REQUEST_RECEIPT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T058",
+      "worker": "TenantWorker",
+      "intent": "REQUEST_RECEIPT",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "payment receipt",
+      "expected_intent": "REQUEST_RECEIPT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "T059",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "help",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "info"
+      ]
+    },
+    {
+      "id": "T060",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "what can I ask",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T061",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "commands",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T062",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "menu",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "info"
+      ]
+    },
+    {
+      "id": "T063",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "hello",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "greeting"
+      ]
+    },
+    {
+      "id": "T064",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "good morning",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "greeting"
+      ]
+    },
+    {
+      "id": "T065",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "what is this",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "unknown"
+      ]
+    },
+    {
+      "id": "T066",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "thanks",
+      "expected_intent": "HELP",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "greeting"
+      ]
+    },
+    {
+      "id": "T067",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "add tenant Arjun 9876543210 room 204",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T068",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "who hasn't paid",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T069",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "monthly report",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T070",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "add expense 5000 cash",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T071",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "change rent for room 205 to 12000",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T072",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "void payment 42",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T073",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "add partner 9876543210",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T074",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "Raj balance",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "permission",
+        "boundary"
+      ]
+    },
+    {
+      "id": "T075",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "mera balance kya hai",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "T076",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "kitna dena hai mujhe",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "T077",
+      "worker": "TenantWorker",
+      "intent": "MY_PAYMENTS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "meri payment history",
+      "expected_intent": "MY_PAYMENTS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "T078",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "AC kharab hai",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "T079",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "room ki light nahi hai",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "operational"
+      ]
+    },
+    {
+      "id": "T080",
+      "worker": "TenantWorker",
+      "intent": "MY_DETAILS",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "mera room number kya hai",
+      "expected_intent": "MY_DETAILS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "hinglish",
+        "query"
+      ]
+    },
+    {
+      "id": "T081",
+      "worker": "TenantWorker",
+      "intent": "GET_WIFI_PASSWORD",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "wifi password",
+      "expected_intent": "GET_WIFI_PASSWORD",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "wifi"
+      ]
+    },
+    {
+      "id": "T082",
+      "worker": "TenantWorker",
+      "intent": "VACATION_NOTICE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "going home for 5 days",
+      "expected_intent": "VACATION_NOTICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "operational",
+        "vacation"
+      ]
+    },
+    {
+      "id": "T083",
+      "worker": "TenantWorker",
+      "intent": "REQUEST_RECEIPT",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "show my receipt for February",
+      "expected_intent": "REQUEST_RECEIPT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "receipt"
+      ]
+    },
+    {
+      "id": "L001",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "price",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "L002",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "rent",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L003",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "how much",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L004",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "room price",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L005",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "how much does a room cost",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L006",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "monthly rent",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L007",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "what's the rent",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L008",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "pricing",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L009",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "rate per room",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L010",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "kitna rent hai",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "L011",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "room charges",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L012",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "cost of staying",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L013",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "available",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "L014",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "any rooms available",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L015",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "vacancy",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L016",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "do you have rooms",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L017",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "is anything available",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L018",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "room available kya hai",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "L019",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "any empty rooms",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L020",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "looking for a room",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L021",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "single room",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "query"
+      ]
+    },
+    {
+      "id": "L022",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "double room",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L023",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "triple sharing",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L024",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "AC room",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L025",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "non AC room",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L026",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "what types of rooms do you have",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L027",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "shared room",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L028",
+      "worker": "LeadWorker",
+      "intent": "ROOM_TYPE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "private room",
+      "expected_intent": "ROOM_TYPE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L029",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "visit",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "flow"
+      ]
+    },
+    {
+      "id": "L030",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "tour",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L031",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "can I see the room",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L032",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "I want to visit",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L033",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "book a tour",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L034",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "site visit",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L035",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "want to come see the room",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L036",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "schedule a visit",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L037",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "hello",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "basic",
+        "general"
+      ]
+    },
+    {
+      "id": "L038",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "hi",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L039",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "tell me more about the PG",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L040",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "what facilities do you have",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L041",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "food included?",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L042",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "is parking available",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L043",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "what's included in rent",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L044",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "nearby metro station",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L045",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "okay",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "L046",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "maybe",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "L047",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "12000",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "L048",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "🙏",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "emoji"
+      ]
+    },
+    {
+      "id": "L049",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "rooms?",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "L050",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "visit please",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge"
+      ]
+    },
+    {
+      "id": "L051",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "monthly rent?",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L052",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "how much per month",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L053",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "kitna rent hai",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "L054",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "rent for single occupancy",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L055",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "charges per month",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L056",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "AC room charges",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L057",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "triple sharing rent",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L058",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "what is the monthly fee",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L059",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "cost of a room",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L060",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "double occupancy rate",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L061",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "any room available now",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L062",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "single room available?",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L063",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "do you have vacancy",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L064",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "koi room khali hai kya",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "L065",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "is there a room",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L066",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "AC room available",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L067",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "double room available",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L068",
+      "worker": "LeadWorker",
+      "intent": "AVAILABILITY",
+      "role": "lead",
+      "phone": "lead",
+      "message": "vacancy for single",
+      "expected_intent": "AVAILABILITY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "query"
+      ]
+    },
+    {
+      "id": "L069",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "I want to come see the PG",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L070",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "can I visit this weekend",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L071",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "I want to see the room tomorrow",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L072",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "dekhne aana chahta hoon",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "hinglish"
+      ]
+    },
+    {
+      "id": "L073",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "arrange a visit for me",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L074",
+      "worker": "LeadWorker",
+      "intent": "VISIT_REQUEST",
+      "role": "lead",
+      "phone": "lead",
+      "message": "I'd like a tour of the PG",
+      "expected_intent": "VISIT_REQUEST",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow"
+      ]
+    },
+    {
+      "id": "L075",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "good morning",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general",
+        "greeting"
+      ]
+    },
+    {
+      "id": "L076",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "what are the rules",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L077",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "is it safe for girls",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L078",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "laundry facility",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L079",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "gym nearby",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L080",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "wifi speed",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L081",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "water supply",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L082",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "housekeeping included",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "L083",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L084",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "who hasn't paid",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L085",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "monthly report",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L086",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "show all tenants",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L087",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "add expense 5000 cash",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L088",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "wifi password",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "wifi",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L089",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "my balance",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L090",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "show expenses",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "L091",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "void payment 42",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "security",
+        "blocked"
+      ]
+    },
+    {
+      "id": "E001",
+      "worker": "AccountWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": ".",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "empty"
+      ]
+    },
+    {
+      "id": "E002",
+      "worker": "AccountWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "?",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "empty"
+      ]
+    },
+    {
+      "id": "E003",
+      "worker": "LeadWorker",
+      "intent": "UNKNOWN",
+      "role": "lead",
+      "phone": "lead",
+      "message": "ok",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "minimal"
+      ]
+    },
+    {
+      "id": "E004",
+      "worker": "TenantWorker",
+      "intent": "HELP",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "ok",
+      "expected_intent": "HELP",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "minimal"
+      ]
+    },
+    {
+      "id": "E005",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "  ",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "empty"
+      ]
+    },
+    {
+      "id": "E006",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Hi sir Raj paid rent today he gave 15000 rupees through UPI and the transaction ID is UPI123456789 and I saw it in the bank statement",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "long"
+      ]
+    },
+    {
+      "id": "E007",
+      "worker": "TenantWorker",
+      "intent": "COMPLAINT_REGISTER",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "The AC in my room has not been working for the past 3 days and it is very hot and I have complained twice before and no one has fixed it please help",
+      "expected_intent": "COMPLAINT_REGISTER",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "long"
+      ]
+    },
+    {
+      "id": "E008",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "Hello I am looking for a PG near Whitefield with good facilities good food and reasonable rent preferably AC room single or double sharing please let me know",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "long"
+      ]
+    },
+    {
+      "id": "E009",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Can you please tell me which tenants have not paid their rent this month because I need to send them reminders and also prepare a report",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "long"
+      ]
+    },
+    {
+      "id": "E010",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj Kumar from room 205 has informed me that he is planning to leave the PG by end of this month and wants to complete the checkout process",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "long"
+      ]
+    },
+    {
+      "id": "E011",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj paid ₹15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "special_chars"
+      ]
+    },
+    {
+      "id": "E012",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "💰 15000 from Raj gpay",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "emoji"
+      ]
+    },
+    {
+      "id": "E013",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "*Raj* paid 15000",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "special_chars"
+      ]
+    },
+    {
+      "id": "E014",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who hasn't paid? 🤔",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "emoji"
+      ]
+    },
+    {
+      "id": "E015",
+      "worker": "TenantWorker",
+      "intent": "MY_BALANCE",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "💸 my balance?",
+      "expected_intent": "MY_BALANCE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "emoji"
+      ]
+    },
+    {
+      "id": "E016",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj paid fifteen thousand",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "numbers_as_words"
+      ]
+    },
+    {
+      "id": "E017",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "expenses five thousand cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "numbers_as_words"
+      ]
+    },
+    {
+      "id": "E018",
+      "worker": "AccountWorker",
+      "intent": "RENT_CHANGE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room two zero five rent twelve thousand",
+      "expected_intent": "RENT_CHANGE",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "numbers_as_words"
+      ]
+    },
+    {
+      "id": "E019",
+      "worker": "AccountWorker",
+      "intent": "RENT_DISCOUNT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "give Raj five hundred discount",
+      "expected_intent": "RENT_DISCOUNT",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "numbers_as_words"
+      ]
+    },
+    {
+      "id": "E020",
+      "worker": "AccountWorker",
+      "intent": "ADD_REFUND",
+      "role": "admin",
+      "phone": "admin",
+      "message": "refund ten thousand to Arjun",
+      "expected_intent": "ADD_REFUND",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "numbers_as_words"
+      ]
+    },
+    {
+      "id": "E021",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj piad 15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.7,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E022",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who hasnt piad",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.7,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E023",
+      "worker": "AccountWorker",
+      "intent": "QUERY_EXPENSES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "expneses this month",
+      "expected_intent": "QUERY_EXPENSES",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E024",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "monhtly report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.7,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E025",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "vacnt rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E026",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "ocupancy",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E027",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "chekout Raj",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E028",
+      "worker": "OwnerWorker",
+      "intent": "REMINDER_SET",
+      "role": "admin",
+      "phone": "admin",
+      "message": "remaind Raj about rent 5th",
+      "expected_intent": "REMINDER_SET",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E029",
+      "worker": "AccountWorker",
+      "intent": "ADD_EXPENSE",
+      "role": "admin",
+      "phone": "admin",
+      "message": "maintanace 5000 cash",
+      "expected_intent": "ADD_EXPENSE",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E030",
+      "worker": "OwnerWorker",
+      "intent": "ADD_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "add teant Arjun 9876543210",
+      "expected_intent": "ADD_TENANT",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "edge",
+        "typo"
+      ]
+    },
+    {
+      "id": "E031",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E032",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "monthly report",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E033",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "who hasn't paid",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E034",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "add expense 5000 cash",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E035",
+      "worker": "LeadWorker",
+      "intent": "GENERAL",
+      "role": "lead",
+      "phone": "lead",
+      "message": "void payment 42",
+      "expected_intent": "GENERAL",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E036",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E037",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "who hasn't paid",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E038",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "monthly report",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E039",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "add tenant Arjun room 204",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E040",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "void payment 42",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E041",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E042",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "monthly report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E043",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "power_user",
+      "phone": "power_user",
+      "message": "who hasn't paid",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E044",
+      "worker": "AccountWorker",
+      "intent": "PAYMENT_LOG",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "Raj paid 15000 upi",
+      "expected_intent": "PAYMENT_LOG",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E045",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "key_user",
+      "phone": "key_user",
+      "message": "Raj balance",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "boundary",
+        "role"
+      ]
+    },
+    {
+      "id": "E046",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj dues",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E047",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "show Raj account",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E048",
+      "worker": "AccountWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "15000",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E049",
+      "worker": "AccountWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "paid",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E050",
+      "worker": "OwnerWorker",
+      "intent": "ROOM_STATUS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "room 205",
+      "expected_intent": "ROOM_STATUS",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E051",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "March report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E052",
+      "worker": "AccountWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "vacancy report",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.55,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E053",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "checkout",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.65,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E054",
+      "worker": "OwnerWorker",
+      "intent": "CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "Raj checkout",
+      "expected_intent": "CHECKOUT",
+      "min_confidence": 0.7,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E055",
+      "worker": "AccountWorker",
+      "intent": "QUERY_TENANT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "payment history",
+      "expected_intent": "QUERY_TENANT",
+      "min_confidence": 0.6,
+      "reply_contains": [],
+      "tags": [
+        "ambiguous"
+      ]
+    },
+    {
+      "id": "E056",
+      "worker": "OwnerWorker",
+      "intent": "START_ONBOARDING",
+      "role": "admin",
+      "phone": "admin",
+      "message": "start onboarding for TestUser 9199000001",
+      "expected_intent": "START_ONBOARDING",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep"
+      ]
+    },
+    {
+      "id": "E057",
+      "worker": "OwnerWorker",
+      "intent": "RECORD_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "record checkout TestUser",
+      "expected_intent": "RECORD_CHECKOUT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep"
+      ]
+    },
+    {
+      "id": "E058",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "Male",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E059",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "1995-06-15",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E060",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "Rajesh Kumar",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E061",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "9876500000",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E062",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "123 MG Road Bangalore 560001",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E063",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "skip",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E064",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "Software Engineer",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E065",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "Aadhar",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E066",
+      "worker": "TenantWorker",
+      "intent": "UNKNOWN",
+      "role": "tenant",
+      "phone": "tenant",
+      "message": "1234-5678-9012",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "onboarding"
+      ]
+    },
+    {
+      "id": "E067",
+      "worker": "OwnerWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "yes",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "checkout"
+      ]
+    },
+    {
+      "id": "E068",
+      "worker": "OwnerWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "no",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "checkout"
+      ]
+    },
+    {
+      "id": "E069",
+      "worker": "OwnerWorker",
+      "intent": "UNKNOWN",
+      "role": "admin",
+      "phone": "admin",
+      "message": "yes minor damage",
+      "expected_intent": "UNKNOWN",
+      "min_confidence": 0.0,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "checkout"
+      ]
+    },
+    {
+      "id": "E070",
+      "worker": "OwnerWorker",
+      "intent": "SCHEDULE_CHECKOUT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "5000 by March 31",
+      "expected_intent": "SCHEDULE_CHECKOUT",
+      "min_confidence": 0.5,
+      "reply_contains": [],
+      "tags": [
+        "flow",
+        "multistep",
+        "checkout"
+      ]
+    },
+    {
+      "id": "E071",
+      "worker": "AccountWorker",
+      "intent": "QUERY_DUES",
+      "role": "admin",
+      "phone": "admin",
+      "message": "who hasn't paid",
+      "expected_intent": "QUERY_DUES",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "stress",
+        "rapid"
+      ]
+    },
+    {
+      "id": "E072",
+      "worker": "AccountWorker",
+      "intent": "REPORT",
+      "role": "admin",
+      "phone": "admin",
+      "message": "monthly report",
+      "expected_intent": "REPORT",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "stress",
+        "rapid"
+      ]
+    },
+    {
+      "id": "E073",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_VACANT_ROOMS",
+      "role": "admin",
+      "phone": "admin",
+      "message": "vacant rooms",
+      "expected_intent": "QUERY_VACANT_ROOMS",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "stress",
+        "rapid"
+      ]
+    },
+    {
+      "id": "E074",
+      "worker": "OwnerWorker",
+      "intent": "QUERY_OCCUPANCY",
+      "role": "admin",
+      "phone": "admin",
+      "message": "occupancy",
+      "expected_intent": "QUERY_OCCUPANCY",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "stress",
+        "rapid"
+      ]
+    },
+    {
+      "id": "E075",
+      "worker": "LeadWorker",
+      "intent": "ROOM_PRICE",
+      "role": "lead",
+      "phone": "lead",
+      "message": "price",
+      "expected_intent": "ROOM_PRICE",
+      "min_confidence": 0.8,
+      "reply_contains": [],
+      "tags": [
+        "stress",
+        "rapid"
+      ]
+    }
+  ]
+}

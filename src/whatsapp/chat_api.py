@@ -50,7 +50,7 @@ class OutboundReply(BaseModel):
     skip:       bool = False    # True = don't send reply (spam / non-text)
 
 # Intents that are safe to pass through even at low confidence
-_LOW_CONF_PASSTHROUGH = frozenset({"HELP", "GENERAL", "UNKNOWN", "SYSTEM_HARD_UNKNOWN", "BLOCKED", "ONBOARDING", "CONFIRMATION", "COMPLAINT_REGISTER"})
+_LOW_CONF_PASSTHROUGH = frozenset({"HELP", "GENERAL", "UNKNOWN", "SYSTEM_HARD_UNKNOWN", "BLOCKED", "ONBOARDING", "CONFIRMATION", "COMPLAINT_REGISTER", "AMBIGUOUS"})
 
 
 @router.post("/process", response_model=OutboundReply)

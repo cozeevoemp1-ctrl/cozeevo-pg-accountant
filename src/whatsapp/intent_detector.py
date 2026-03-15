@@ -92,7 +92,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Room status — who's in / status of a specific room (incl bare "room 205" and "room X details")
     (re.compile(r"(?:who(?:'?s| is) in room|room\s+[\w-]+\s+(?:who|occupant|tenant|person|status|details?)|who lives in|who stays in|status\s+of\s+room\s+[\w-]+|is\s+room\s+[\w-]+\s+(?:occupied|free|vacant|empty|available)|room\s+[\w-]+\s+occupied|^room\s+[\d\w-]+\s*$)", re.I), "ROOM_STATUS", 0.94),
     # Vacant rooms
-    (re.compile(r"(?:vacant rooms?|vacnt\s+rooms?|vacent\s+rooms?|empty rooms?|available rooms?|which rooms? (?:are |is )?(?:empty|free|vacant|available)|free rooms?|unoccupied|vacancy\b|khali\s+(?:rooms?|kamre)|rooms?\s+(?:empty|free|vacant|available)\b|how\s+many\s+rooms?\s+(?:are\s+)?empty|any\s+(?:vacant\s+|free\s+|empty\s+)?rooms?\b|kaun\s+se\s+rooms?\s+(?:khali|free))", re.I), "QUERY_VACANT_ROOMS", 0.94),
+    (re.compile(r"(?:vacant rooms?|vacnt\s+rooms?|vacent\s+rooms?|empty rooms?|available rooms?|which rooms? (?:are |is )?(?:empty|free|vacant|available)|free rooms?|unoccupied|vacancy\b|khali\s+(?:rooms?|kamre)|rooms?\s+(?:empty|free|vacant|available)\b|how\s+many\s+rooms?\s+(?:are\s+)?empty|\bany\s+(?:vacant\s+|free\s+|empty\s+)?rooms?\b|kaun\s+se\s+rooms?\s+(?:khali|free))", re.I), "QUERY_VACANT_ROOMS", 0.94),
     # Occupancy overview
     (re.compile(r"(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)
@@ -104,7 +104,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Checkouts this month
     (re.compile(r"(?:who checked? ?out|checkouts? this month|who left|who vacated|exits? this month|move(?:d)? out this month|recent checkouts?|who left recently|checkouts?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+mein\s+kaun\s+gaya|March\s+mein\s+kaun\s+gaya)", re.I), "QUERY_CHECKOUTS", 0.91),
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
-    (re.compile(r"(?:what did we spend|expense report|total expenses?|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|expense\s+(?:summary|breakdown|analysis)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
+    (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|expense\s+(?:summary|breakdown|analysis)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
+    # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
+    (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
     # Log vacation / absence for tenant (any name, not hardcoded)
     (re.compile(r"(?:\w+\s+(?:on vacation|going home|on leave|absent|away|out of station|on holiday|chutti)|log vacation|\w+\s+vacation\s+(?:from|for|\d)|going home for|on leave from|will be away|out of station|vacation\s+(?:for\s+)?\d+\s+days?|chutti\s+(?:pe|par|\d+)|din\s+ke\s+liye\s+(?:bahar|ghar)|ghar\s+(?:gaya|gayi|gaye)\b|\w+\s+\d+\s+din\s+bahar\b|\w+\s+not\s+here\b|chutti\s+pe\s+(?:hai|hain|ho)\b)", re.I), "LOG_VACATION", 0.89),
     # Report — early catch for "occupancy report", "monthly report" before other patterns grab them
@@ -118,7 +120,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Service/repair payments with amount — plumber, electrician, etc. (before COMPLAINT_REGISTER)
     (re.compile(r"(?:plumber|electrician|carpenter|painter|pest\s*control|cleaning\s*(?:service|staff)|security\s+guard|watchman|cook|maid|housekeeping|caretaker)\s+\d|paid\s+(?:plumber|electrician|carpenter|painter|pest|cleaning|security|watchman|cook|maid)\b|\d+\s+(?:for\s+)?(?:plumber|electrician|repair|maintenance|pest|cleaning)", re.I), "ADD_EXPENSE", 0.93),
     # Expense (add new expense — must come before PAYMENT_LOG)
-    (re.compile(r"(?:expense|electricity\s+\d|water\s+bill|internet\s+bill|salary|maintenance\s+cost|paid\s+for|vendor|repair\s+\d|\d+\s+repair)", re.I), "ADD_EXPENSE", 0.88),
+    (re.compile(r"(?:expense|electricity\s+(?:bill\s+)?\d|water\s+bill|internet\s+bill|salary|maintenance\s+cost|paid\s+for|vendor|repair\s+\d|\d+\s+repair|generator\s+(?:maintenance|fuel|diesel|repair|rent|bill|expense|cost)\b|diesel\s+\d|\d+\s+diesel)", re.I), "ADD_EXPENSE", 0.88),
+    # Amount-first expense shorthand: "5000 cash maintenance", "3000 upi electricity"
+    (re.compile(r"^\d[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|naqad)\s+(?:maintena?na?ce?|cleaning|repair|electricity|water|internet|generator|groceries?|housekeeping|supplies|security|pest|plumbing|painting|furniture|food)\b", re.I), "ADD_EXPENSE", 0.92),
     # Early QUERY_DUES — explicit patterns before QUERY_TENANT grabs "outstanding"/"month" as a name
     (re.compile(
         r"(?:outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
@@ -133,7 +137,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"(?:"
         r"(?:balance|dues|status)\s+(?:of\s+|for\s+)?(?!(?:my|all|total|pending|outstanding|show|the|everyone|all|this|last)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)"  # "balance of Raj"
         r"|"
-        r"(?!(?:my|all|total|pending|outstanding|show|the|everyone)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)\s+(?:balance|dues|status|outstanding|account\s+statement)"  # "Raj balance", "Mohan outstanding"
+        r"(?!(?:my|all|total|pending|outstanding|show|the|everyone)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)'?s?\s+(?:balance|dues|status|outstanding|account\s+statement|details?)"  # "Raj balance", "Raj's account", "Vikram details"
         r"|"
         r"room\s+[\w-]+\s+(?:balance|dues|status|who|tenant|person|occupant)"  # "room 203 balance" (removed "details" — goes to ROOM_STATUS)
         r"|"
@@ -144,14 +148,22 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"(?!(?:my|all|total|pending|outstanding|show|the|everyone)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)\s+(?:ka|ki|ke)\s+(?:paise|paisa|account|balance)\b"  # "Raj ka paise"
         r"|"
         r"payment\s+history\b"  # "payment history" = show all tenant payment history
+        r"|"
+        r"show\s+(?!(?:all|total|pending|outstanding|p&l|pl|profit|summary|report|financial|income|collection|accounts|stats)\b)([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]+)?)'?s?\s+(?:account|details|info|summary)\b"  # "show Arjun account", "show Arjun's account"
+        r"|"
+        r"(?!(?:my|all|total|pending|outstanding|show|the|everyone)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)\s+(?:account|account\s+details|account\s+summary)\b"  # "Arjun account"
         r")",
         re.I
     ), "QUERY_TENANT", 0.88),
     # Financial summary queries with "show" — must come before the QUERY_DUES "show" catch
-    (re.compile(r"(?:show\s+(?:p&l|pl|profit|summary|report|financial|income|collection|accounts)|what\s+(?:is|was|are)?\s+(?:the\s+)?(?:financial|p&l|total\s+(?:income|collection|revenue))|how\s+much\s+(?:total|overall|did\s+we\s+collect|have\s+we\s+made))", re.I), "REPORT", 0.92),
+    (re.compile(r"(?:show\s+(?:p&l|pl|profit|summary|report|financial|income|collection|accounts|stats?\b)|what\s+(?:is|was|are)?\s+(?:the\s+)?(?:financial|p&l|total\s+(?:income|collection|revenue))|how\s+much\s+(?:total|overall|did\s+we\s+collect|have\s+we\s+made)|\bstats?\b|(?:jan|feb|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+report\b|report\s+for\s+(?:jan|feb|mar|apr|may))", re.I), "REPORT", 0.92),
     # Dues / pending — bulk queries (who hasn't paid, show pending, etc.)
     # NOT for single-tenant queries like "Raj dues" (those go to QUERY_TENANT above)
-    (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|pending\s+(?:dues|list|rent|payments?)|list\s+(?:dues|pending|unpaid)|show\s+(?:all\s+)?(?:dues|pending|unpaid|outstanding)|baki|unpaid|not\s+paid|haven.?t\s+paid|dues\s+(?:list|for\s+(?:all|everyone|this|the))|all\s+(?:pending|dues|outstanding)|outstanding\s+(?:dues|rent|payments?))", re.I), "QUERY_DUES", 0.90),
+    (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|who\s+owes\b|pending\s+(?:dues|list|rent|payments?)|list\s+(?:dues|pending|unpaid)|show\s+(?:all\s+)?(?:dues|pending|unpaid|outstanding)|baki|unpaid|not\s+paid|haven.?t\s+paid|dues\s+(?:list|this|for\s+(?:all|everyone|this|the))|dues\s+this\s+month|all\s+(?:pending|dues|outstanding)|outstanding\s+(?:dues|rent|payments?)|defaulters?\b)", re.I), "QUERY_DUES", 0.90),
+    # Backdated check-in correction — BEFORE SCHEDULE_CHECKOUT (catches "update checkin Arjun March 5")
+    (re.compile(r"(?:update|correct|change|backdat)\w*\s+check.?in|checked?\s+in\s+on\b|actually\s+joined|joined\s+on\b|check.?in\s+date\s+(?:for|of)\s+\w+|\w+\s+joined\s+on\s+\d|check.?in\s+was\s+on|joining\s+date\s+(?:for|is|was)|\w+\s+check.?in\s+(?:was\s+)?(?:on\s+)?\d|\w+\s+check.?in\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", re.I), "UPDATE_CHECKIN", 0.94),
+    # Reminder — BEFORE SCHEDULE_CHECKOUT (catches "reminder Deepak March 5")
+    (re.compile(r"(?:remind|reminder|remindr?\b|remaindr?\b|reminde\b|set reminder|alert|notify|yaad\s+(?:dilao|dilaao|karo)\b|ko\s+yaad\s+dilao)", re.I), "REMINDER_SET", 0.90),
     # Scheduled / date-specific checkout — "checkout on 31 May", "leaving on March 10"
     (re.compile(
         r"(?:check(?:ing)?\s*out|leaving|vacating|moving\s*out)\s+(?:on|by|from|before)\b"
@@ -164,22 +176,18 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|\w+\s+\d+\s+(?:jan|feb|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?)\s+ko\s+jayega|\w+\s+(?:ko|mein)\s+jayega\b",
         re.I
     ), "SCHEDULE_CHECKOUT", 0.93),
-    # Notice period — "gave notice", "serving notice", "wants to leave"
-    (re.compile(r"gave notice|giving notice|serving notice|notice period|plans? to (?:leave|vacate)|wants? to (?:leave|move)", re.I), "NOTICE_GIVEN", 0.92),
-    # Backdated check-in correction (MUST be before ADD_TENANT — catches "checkin date for X")
-    (re.compile(r"(?:update|correct|change|backdat)\w*\s+check.?in|checked?\s+in\s+on\b|actually\s+joined|joined\s+on\b|check.?in\s+date\s+(?:for|of)\s+\w+|\w+\s+joined\s+on\s+\d|check.?in\s+was\s+on|joining\s+date\s+(?:for|is|was)|\w+\s+check.?in\s+(?:was\s+)?(?:on\s+)?\d|\w+\s+check.?in\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", re.I), "UPDATE_CHECKIN", 0.94),
+    # Notice period — "gave notice", "serving notice", "wants to leave", bare "notice"
+    (re.compile(r"gave notice|giving notice|serving notice|\bnotice\b|notice period|plans? to (?:leave|vacate)|wants? to (?:leave|move)", re.I), "NOTICE_GIVEN", 0.92),
     # Immediate checkout (no date)
     (re.compile(r"(?:check.?out|vacate|vacating|leaving|exit|moving out|ja\s+raha\s+hai\b|chhod\s+raha\s+hai\b)", re.I), "CHECKOUT", 0.95),
     # Add tenant
-    (re.compile(r"(?:add tenant|new tenant|\btenant\s+\w+\s+\d{7,}|\bcheck.?in\b|joining|new room|onboard|register tenant)", re.I), "ADD_TENANT", 0.95),
+    (re.compile(r"(?:add\s+te(?:nant?|ant|nent|nnant?)\b|new\s+tenant|new\s+admission|\badmit\s+\w+|\btenant\s+\w+\s+\d{7,}|\bcheck.?in\b|joining|new\s+room|onboard|register\s+tenant|naya\s+tenant\b|tenant\s+add\s+karo)", re.I), "ADD_TENANT", 0.95),
     # Rent change (permanent or from a month) — must come before RENT_DISCOUNT
-    (re.compile(r"rent (?:is now|from\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next)|change|increase|hike|reduce|decrease)|new rent|from \w+ rent|rent to \d|from\s+next\s+month\s+rent|room\s+[\w-]+\s+rent\s+\d", re.I), "RENT_CHANGE", 0.91),
+    (re.compile(r"rent (?:is now|from\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next)|change|increase|hike|reduce|decrease)|new rent|from \w+ rent|rent to \d|from\s+next\s+month\s+rent|room\s+[\w-]+\s+rent\s+(?:\d|updated?|changed?|revised?)|(?:change|update|revise|set|increase)\s+rent\b|room\s+[\w-]+\s+to\s+\d{4,}|increase\s+rent\s+(?:for\s+)?room|(?:change|update|revise|set|increase)\s+rent\s+(?:for\s+)?(?:room|[A-Z][a-z]+)\b", re.I), "RENT_CHANGE", 0.91),
     # One-time discount / concession / surcharge
     (re.compile(r"(?:concession|discount|waive|deduct|give.*less|less this month|reduce this month|reduce\s+\w+'?s?\s+rent\s+by|extra charge|add.*surcharge|add.*electricity|add.*food charge)", re.I), "RENT_DISCOUNT", 0.90),
     # Add partner / staff
     (re.compile(r"(?:add partner|add owner|add power user|new admin|give access|add\s+staff\b)", re.I), "ADD_PARTNER", 0.97),
-    # Reminder
-    (re.compile(r"(?:remind|reminder|remindr?\b|remaindr?\b|reminde\b|set reminder|alert|notify|yaad\s+(?:dilao|dilaao|karo)\b|ko\s+yaad\s+dilao)", re.I), "REMINDER_SET", 0.90),
     # WiFi password — owner reads or sets WiFi credentials
     (re.compile(r"(?:set\s+wifi|update\s+wifi|change\s+wifi|wifi\s+(?:ssid|network|password)\s+\w+|set\s+(?:floor|common)\s+wifi)", re.I), "SET_WIFI", 0.95),
     (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
@@ -190,15 +198,21 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
     # Tenant notes / agreed terms / payment method lookup
     (re.compile(r"(?:notes?|agreement|agreed\s+terms?|payment\s+method|cash\s+only|rent\s+terms?|terms?)\s+(?:for\s+|of\s+)?(?:room\s+)?[\w-]+|(?:check|show|get|what(?:'?s|\s+is)?)\s+(?:the\s+)?(?:notes?|agreement|terms?|payment\s+method)\s+(?:for\s+|of\s+)?[\w\s-]+|room\s+[\w-]+\s+(?:notes?|terms?|agreement|payment\s+method|cash\s+only)|(?:notes?|agreement|terms?)\s+room\s+[\w-]+", re.I), "GET_TENANT_NOTES", 0.93),
-    # Help
-    (re.compile(r"^(?:hi|hello|hey|help|menu|commands|start|hii|helo)\b|kya\s+kar\s+sakte|what\s+can\s+(?:i|you)\b", re.I), "HELP", 0.95),
     # Expense category shorthand "Category Amount Mode" — MUST come before PAYMENT_LOG shorthand
     (re.compile(r"^(?:maintena?na?ce?|maintanace|maintanance|cleaning|repairs?|furniture|plumbing|painting|pest\s*(?:control)?|food\s+(?:supplies?|expense|stuff)|internet|generator|groceries?|housekeeping|supplies|security)\s+[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "ADD_EXPENSE", 0.94),
-    # Payment log — lowest priority so specific exceptions match first
-    (re.compile(r"(?:paid|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
-    (re.compile(r"\d[\d,k]+\s*(?:paid|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),
+    # Payment log — before HELP so "Hi sir Raj paid 15000" doesn't become HELP
+    (re.compile(r"(?:p[ai]{2,3}d?|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
+    (re.compile(r"\d[\d,k]+\s*(?:paid|p[ai]{2,3}d?|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),
+    # "Deepak payment received" — payment received without explicit digit (assume most recent payment)
+    (re.compile(r"(?:[A-Z][a-z]{2,})\s+payment\s+(?:received|confirmed|done|collected|cleared)\b", re.I), "PAYMENT_LOG", 0.90),
     # Shorthand "Name Amount Mode" — e.g. "Arjun 12000 cash", "Raj 8000 upi"
     (re.compile(r"^[A-Z][a-z]{2,}\s+\d[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "PAYMENT_LOG", 0.91),
+    # Amount-first shorthand: "15000 Raj gpay", "8000 from Suresh cash"
+    (re.compile(r"^\d[\d,k]+\s+(?:[A-Z][a-z]{2,}|from\s+[A-Z][a-z]{2,})\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "PAYMENT_LOG", 0.91),
+    # Word-number payments: "Raj paid fifteen thousand", "paid ten thousand"
+    (re.compile(r"(?:[A-Z][a-z]+\s+)?p[ai]{2,3}d?\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty)\s+(?:thousand|hundred|lakh)\b", re.I), "PAYMENT_LOG", 0.90),
+    # Help — only for short greeting messages (moved after PAYMENT_LOG)
+    (re.compile(r"^(?:hi|hello|hey|help|menu|commands?|start|hii|helo)\b|kya\s+kar\s+sakte|what\s+can\s+(?:i|you)\b|how\s+to\s+use\b|show\s+commands?\b", re.I), "HELP", 0.95),
 ]
 
 # ── Tenant intents ────────────────────────────────────────────────────────────
@@ -214,17 +228,17 @@ _TENANT_RULES: list[tuple[re.Pattern, str, float]] = [
     # Complaint / maintenance request
     (re.compile(r"(?:complaint|complain|issue|problem|not working|broken|leak(?:ing)?\b|repair|fix|tap|flush|bulb|fan|switch|wifi|wi-fi|internet|slow net|food (?:complaint|bad|issue|quality)|bed sheet|mattress|pillow|chair|table|shelf|almirah|\bAC\b|air.?condition|toilet|blocked|door\s*lock|kharab\b|pest\b|light\s+nahi\b)", re.I), "COMPLAINT_REGISTER", 0.91),
     # Balance
-    (re.compile(r"(?:my balance|how much|i owe|dues|pending|baki|outstanding|need to pay|kitna dena|rent status|kitna bacha)", re.I), "MY_BALANCE", 0.92),
-    # Payment history — MUST come before REQUEST_RECEIPT so "my receipts" goes here
-    (re.compile(r"(?:my payment|payment history|when did i last pay|my receipts?|paid|transaction)", re.I), "MY_PAYMENTS", 0.90),
-    # Request receipt / payment proof
-    (re.compile(r"(?:receipt|payment proof|payment (?:receipt|slip|confirmation)|send receipt|need receipt|my receipt)", re.I), "REQUEST_RECEIPT", 0.92),
+    (re.compile(r"(?:my balance|mera balance|balance\s+kya\s+hai?|how much|i owe|dues|pending|baki|outstanding|need to pay|kitna dena|rent status|kitna bacha|mera\s+(?:balance|paisa|account))", re.I), "MY_BALANCE", 0.92),
+    # Request receipt / payment proof — BEFORE MY_PAYMENTS so "payment receipt" routes here
+    (re.compile(r"(?:receipt|payment\s+proof|payment\s+(?:receipt|slip|confirmation)|send\s+receipt|need\s+receipt|my\s+receipt)", re.I), "REQUEST_RECEIPT", 0.92),
+    # Payment history — bare "paid" removed to avoid catching "who hasn't paid" (admin cmd)
+    (re.compile(r"(?:my\s+payments?|past\s+payments?|payment\s+history|when\s+did\s+i\s+last\s+pay|meri\s+payments?|transaction\s+history|previous\s+payments?)", re.I), "MY_PAYMENTS", 0.90),
     # My details
     (re.compile(r"(?:my room|my details|my rent|checkin|when did i|my info|my profile|my information|my account|mera room|mera number)", re.I), "MY_DETAILS", 0.88),
     # PG rules & regulations
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|what rules?|niyam\b)", re.I), "RULES", 0.91),
     # Help / greeting
-    (re.compile(r"^(?:hi|hello|hey|help|menu|start|commands?|good\s+morning|good\s+evening|good\s+afternoon|thanks?|thank\s+you|ok|okay)\b|what\s+can\s+(?:i|you)\b", re.I), "HELP", 0.95),
+    (re.compile(r"^(?:hi|hello|hey|help|menu|start|commands?|good\s+morning|good\s+evening|good\s+afternoon|thanks?|thank\s+you|ok(?:ay)?)\b|what\s+can\s+(?:i|you)\b", re.I), "HELP", 0.95),
 ]
 
 # ── Lead intents ──────────────────────────────────────────────────────────────
