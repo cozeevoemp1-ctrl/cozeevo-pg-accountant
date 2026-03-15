@@ -175,7 +175,8 @@ The `docker-compose.yml` starts n8n on port 5678.
 
 Open `http://your-server-ip:5678` (temporarily) to:
 1. Create admin account
-2. Go to **Settings → Variables** → add `FASTAPI_URL` = `http://localhost:8000`
+2. Go to **Settings → Variables** → add `FASTAPI_URL` = `http://host.docker.internal:8000`
+   > ⚠️ Use `host.docker.internal`, NOT `localhost` — from inside Docker, localhost is the container. `host.docker.internal` resolves to the VPS host where FastAPI runs.
 3. Import workflow: **Workflows → Import from File** → `workflows/WA-01-whatsapp-router.json`
 4. Open the workflow → click **Active** toggle → copy the **Webhook URL**
 
@@ -193,6 +194,15 @@ nano /etc/nginx/sites-available/pg-accountant
 server {
     server_name api.yourpg.com;
 
+    # WhatsApp webhook — Meta Cloud API sends messages here
+    location /webhook/ {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Internal API (healthz, docs etc.)
     location /api/ {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
@@ -200,6 +210,11 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
+    location /healthz {
+        proxy_pass http://localhost:8000;
+    }
+
+    # n8n dashboard (optional — only needed for workflow management)
     location /n8n/ {
         proxy_pass http://localhost:5678/;
         proxy_set_header Host $host;
@@ -214,6 +229,8 @@ server {
 Enable and get SSL:
 
 ```bash
+# Remove default site to avoid port 80 conflict
+rm -f /etc/nginx/sites-enabled/default
 ln -s /etc/nginx/sites-available/pg-accountant /etc/nginx/sites-enabled/
 nginx -t
 systemctl reload nginx
@@ -227,7 +244,7 @@ certbot --nginx -d api.yourpg.com
 In your Meta Developer Console ([developers.facebook.com](https://developers.facebook.com)):
 
 1. Go to your app → **WhatsApp → Configuration**
-2. **Webhook URL:** `https://api.yourpg.com/api/whatsapp/webhook`
+2. **Webhook URL:** `https://api.yourpg.com/webhook/whatsapp`
 3. **Verify Token:** `pg-accountant-verify` (matches `VERIFY_TOKEN` in `.env`)
 4. Click **Verify and Save**
 5. Subscribe to: **messages**
@@ -236,11 +253,26 @@ Test: Send a WhatsApp message to your business number → should get a reply.
 
 ---
 
-## Step 9 — Health Check
+## Step 9 — Run Database Migrations
+
+```bash
+cd /opt/pg-accountant
+source venv/bin/activate
+
+# Master migration (creates all tables — idempotent, safe to re-run)
+python -m src.database.migrate_all
+
+# WiFi columns (v2.0+ — adds wifi_ssid, wifi_password, wifi_floor_map to properties)
+python -m src.database.migrate_wifi
+```
+
+---
+
+## Step 10 — Health Check
 
 ```bash
 # FastAPI
-curl https://api.yourpg.com/api/healthz
+curl https://api.yourpg.com/healthz
 
 # n8n
 curl https://api.yourpg.com/n8n/
