@@ -157,6 +157,22 @@ CREATE_TABLES: list[str] = [
     """
     CREATE INDEX IF NOT EXISTS ix_complaints_created ON complaints(created_at)
     """,
+    # ── v2 Supervisor Agent: conversation history window (added 2026-03-16) ──
+    """
+    CREATE TABLE IF NOT EXISTS conversation_history (
+        id         SERIAL PRIMARY KEY,
+        phone      VARCHAR(30) NOT NULL,
+        sent_by    VARCHAR(10) NOT NULL,
+        message    TEXT NOT NULL,
+        intent     VARCHAR(60),
+        role       VARCHAR(20),
+        created_at TIMESTAMP DEFAULT NOW()
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_conv_hist_phone_created
+        ON conversation_history(phone, created_at DESC)
+    """,
 ]
 
 
@@ -174,7 +190,7 @@ async def run_schema(conn: AsyncConnection) -> None:
     # 1. Create new tables
     for stmt in CREATE_TABLES:
         await conn.execute(text(stmt))
-    print("  [ok] onboarding_sessions, checkout_records, pending_learning, learned_rules - created or already exist")
+    print("  [ok] onboarding_sessions, checkout_records, pending_learning, learned_rules, complaints, conversation_history - created or already exist")
 
     # 2. Add new columns to existing tables
     for (table, col, col_type) in ADD_COLUMNS:

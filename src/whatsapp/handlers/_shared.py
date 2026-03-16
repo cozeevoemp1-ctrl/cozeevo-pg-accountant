@@ -36,7 +36,8 @@ def time_greeting() -> str:
 async def is_first_time_today(phone: str, session: AsyncSession) -> bool:
     """Return True if this phone hasn't messaged the bot yet today (IST)."""
     ist_now = datetime.now(timezone.utc) + _IST_OFFSET
-    ist_today_start = ist_now.replace(hour=0, minute=0, second=0, microsecond=0) - _IST_OFFSET
+    # Strip tzinfo before subtracting — DB column is TIMESTAMP WITHOUT TIME ZONE
+    ist_today_start = (ist_now.replace(hour=0, minute=0, second=0, microsecond=0) - _IST_OFFSET).replace(tzinfo=None)
     result = await session.execute(
         select(WhatsappLog.id)
         .where(WhatsappLog.from_number == phone)

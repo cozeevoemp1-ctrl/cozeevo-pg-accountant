@@ -94,6 +94,10 @@ app.include_router(whatsapp_router)
 from src.whatsapp.chat_api import router as chat_router
 app.include_router(chat_router)
 
+# ── v2: LangGraph Supervisor Agent pipeline ────────────────────────────────
+from src.whatsapp.v2.chat_api_v2 import router as chat_v2_router
+app.include_router(chat_v2_router)
+
 # ── Ingest API ─────────────────────────────────────────────────────────────
 
 from fastapi import APIRouter, UploadFile, File, Form
@@ -234,6 +238,35 @@ async def reject(entity_id: int):
     return {"status": "rejected"}
 
 app.include_router(entity_router)
+
+# ── Test utilities (TEST_MODE=1 only) ────────────────────────────────────
+
+if os.getenv("TEST_MODE") == "1":
+    from fastapi import Depends
+    from sqlalchemy import text
+    from src.database.db_manager import get_db_session
+
+    test_router = APIRouter(prefix="/api/test", tags=["test"])
+
+    @test_router.post("/clear-pending")
+    async def clear_pending(body: Optional[dict] = None, session=Depends(get_db_session)):
+        """Delete pending actions for a phone (or all) — TEST_MODE only."""
+        phone = body.get("phone") if body else None
+        if phone:
+            # Normalize: strip leading + and country code
+            normalized = phone.lstrip("+")
+            if normalized.startswith("91") and len(normalized) == 12:
+                normalized = normalized[2:]
+            await session.execute(
+                text("DELETE FROM pending_actions WHERE phone = :phone OR phone = :raw"),
+                {"phone": normalized, "raw": phone},
+            )
+        else:
+            await session.execute(text("DELETE FROM pending_actions"))
+        await session.commit()
+        return {"status": "cleared", "phone": phone or "all"}
+
+    app.include_router(test_router)
 
 # ── Health check ───────────────────────────────────────────────────────────
 

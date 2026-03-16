@@ -28,11 +28,12 @@ async def handle_lead(
     await _upsert_lead(ctx.phone, intent, message, session)
 
     handlers = {
-        "ROOM_PRICE":    _room_price,
-        "AVAILABILITY":  _availability,
-        "ROOM_TYPE":     _room_type_info,
-        "VISIT_REQUEST": _visit_request,
-        "GENERAL":       _general_chat,
+        "ROOM_PRICE":         _room_price,
+        "AVAILABILITY":       _availability,
+        "ROOM_TYPE":          _room_type_info,
+        "VISIT_REQUEST":      _visit_request,
+        "GET_WIFI_PASSWORD":  _wifi_blocked,
+        "GENERAL":            _general_chat,
     }
     fn = handlers.get(intent, _general_chat)
     return await fn(message, ctx, session)
@@ -195,6 +196,10 @@ async def _visit_request(message: str, ctx: CallerContext, session: AsyncSession
         "Our team will confirm the visit shortly.\n"
         f"You can also call us directly at {admin_phone or 'the number on our listing'}."
     )
+
+
+async def _wifi_blocked(message: str, ctx: CallerContext, session: AsyncSession) -> str:
+    return "WiFi details are only available to registered tenants. Please contact the owner or manager."
 
 
 async def _general_chat(message: str, ctx: CallerContext, session: AsyncSession) -> str:

@@ -101,7 +101,7 @@ async def process_message(
 
     # ── 2b. Check pending disambiguation (owner) or complaint follow-up (tenant) ──
     if ctx.role in ("admin", "power_user", "key_user"):
-        pending = await _get_active_pending(phone, session)
+        pending = await _get_active_pending(ctx.phone, session)
         if pending:
             # ── Intent-ambiguity resolution (e.g. "Raj 31st March" → checkin or checkout?) ──
             if pending.intent == "INTENT_AMBIGUOUS":
@@ -134,6 +134,12 @@ async def process_message(
 
             resolved_reply = await resolve_pending_action(pending, message, session)
             if resolved_reply:
+                # Prefix "__KEEP_PENDING__" means correction re-prompt — keep pending alive
+                if resolved_reply.startswith("__KEEP_PENDING__"):
+                    clean_reply = resolved_reply[len("__KEEP_PENDING__"):]
+                    await _log(session, phone, message, ctx.role, "CONFIRMATION", clean_reply)
+                    await session.commit()
+                    return OutboundReply(reply=clean_reply, intent="CONFIRMATION", role=ctx.role)
                 pending.resolved = True
                 await _log(session, phone, message, ctx.role, "CONFIRMATION", resolved_reply)
                 await session.commit()
@@ -141,7 +147,7 @@ async def process_message(
             pending.resolved = True
 
     if ctx.role == "tenant":
-        pending = await _get_active_pending(phone, session)
+        pending = await _get_active_pending(ctx.phone, session)
         if pending and pending.intent == "COMPLAINT_REGISTER":
             resolved_reply = await resolve_tenant_complaint(pending, message, session)
             pending.resolved = True

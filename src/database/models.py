@@ -71,7 +71,11 @@ from sqlalchemy import (
     Column, Integer, String, Numeric, Date, DateTime, Enum,
     ForeignKey, Text, Boolean, Index, UniqueConstraint
 )
-from sqlalchemy.dialects.postgresql import JSONB
+import os as _os
+if _os.getenv("DATABASE_URL", "sqlite").startswith("sqlite"):
+    from sqlalchemy import JSON as JSONB  # SQLite fallback
+else:
+    from sqlalchemy.dialects.postgresql import JSONB  # type: ignore[assignment]
 try:
     from pgvector.sqlalchemy import Vector
     _HAS_PGVECTOR = True
@@ -812,6 +816,32 @@ class ConversationMemory(Base):
     __table_args__ = (
         Index("ix_conv_memory_phone", "phone"),
         Index("ix_conv_memory_created", "created_at"),
+    )
+
+
+class ConversationHistory(Base):
+    """
+    Simple per-user conversation window for the v2 Supervisor Agent.
+
+    Stores the last N turns (user + bot) so the LangGraph supervisor can
+    include chat history in every Groq call — enabling context-aware intent
+    classification (e.g. "also wifi is slow" after a payment conversation).
+
+    Auto-pruned to 50 rows per phone by memory.save_turn().
+    Different from ConversationMemory (which is pgvector semantic search).
+    """
+    __tablename__ = "conversation_history"
+
+    id         = Column(Integer, primary_key=True)
+    phone      = Column(String(30), nullable=False)
+    sent_by    = Column(String(10), nullable=False)  # "user" or "bot"
+    message    = Column(Text, nullable=False)
+    intent     = Column(String(60))
+    role       = Column(String(20))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_conv_hist_phone_created", "phone", "created_at"),
     )
 
 

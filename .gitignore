@@ -35,7 +35,9 @@ dashboards/
 # Logs
 *.log
 data/*.log
-tests/failures_log.jsonl
+
+# Test results (auto-generated, keep local only)
+tests/results/
 
 # Sensitive / local-only
 ngrok_recovery_codes.txt

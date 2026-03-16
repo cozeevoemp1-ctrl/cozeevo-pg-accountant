@@ -26,6 +26,7 @@ from typing import Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.database.models import (
     Expense, Payment, PaymentFor, PaymentMode,
@@ -109,7 +110,7 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
 
     if not name and not room:
         return (
-            "Whose payment? Please say: *[Name] paid [Amount]*\n"
+            f"Whose payment of Rs.{int(amount):,}? Please say: *[Name] paid [Amount]*\n"
             "For family payments covering multiple tenants, send separately:\n"
             "• *Raj paid 15000 upi*\n"
             "• *Rahul paid 15000 upi*"
@@ -862,7 +863,7 @@ async def _add_expense_prompt(entities: dict, ctx: CallerContext, session: Async
         pending = PendingAction(
             phone=ctx.phone,
             intent="CONFIRM_ADD_EXPENSE",
-            payload={"amount": amount, "category": category, "description": description},
+            action_data=json.dumps({"amount": amount, "category": category, "description": description}),
             expires_at=datetime.utcnow() + timedelta(minutes=5),
         )
         session.add(pending)
@@ -976,6 +977,7 @@ async def _query_expenses(entities: dict, ctx: CallerContext, session: AsyncSess
 
     result = await session.execute(
         select(Expense)
+        .options(selectinload(Expense.category))
         .where(
             Expense.expense_date >= target_month,
             Expense.expense_date <= month_end,
@@ -991,7 +993,7 @@ async def _query_expenses(entities: dict, ctx: CallerContext, session: AsyncSess
     total = sum(e.amount for e in expenses)
     lines = [f"*Expenses — {target_month.strftime('%B %Y')}*\n"]
     for e in expenses:
-        cat = e.category.value if hasattr(e.category, "value") else str(e.category or "other")
+        cat = e.category.name if e.category else str(e.category_id or "Other")
         lines.append(
             f"• {e.expense_date.strftime('%d %b')} {cat.title()}: Rs.{int(e.amount):,}"
             + (f" ({e.description[:30]})" if e.description else "")
@@ -1035,6 +1037,13 @@ async def _add_refund(entities: dict, ctx: CallerContext, session: AsyncSession)
     if not amount:
         return (
             "How much to refund?\n"
+            "Say: *refund [Name] [amount]*\n"
+            "Example: *refund Raj 15000 deposit*"
+        )
+
+    if not name and not room:
+        return (
+            f"Which tenant's refund of Rs.{int(amount):,}?\n"
             "Say: *refund [Name] [amount]*\n"
             "Example: *refund Raj 15000 deposit*"
         )

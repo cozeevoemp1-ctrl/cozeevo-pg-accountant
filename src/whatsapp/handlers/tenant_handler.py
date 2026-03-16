@@ -666,6 +666,20 @@ async def _request_receipt(entities: dict, ctx: CallerContext, session: AsyncSes
 
 
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # Check if tenant is trying to look up another person's data
+    desc = (entities.get("description") or "").lower()
+    _others_patterns = re.compile(
+        r"\w+(?:'s|s)?\s+balance"           # "Raj's balance", "someone balance"
+        r"|\bbalance\s+of\s+\w+"            # "balance of Raj"
+        r"|(?:who\s+(?:hasn.?t|has|paid|owes)|defaulter|due\s+list|all\s+tenants?)",
+        re.I,
+    )
+    if _others_patterns.search(desc):
+        return (
+            f"{time_greeting()}, {ctx.name}! You can only access your own account information.\n\n"
+            "• *my balance* — your dues\n"
+            "• *my payments* — your payment history"
+        )
     greeting = time_greeting()
     return (
         f"{greeting}, {ctx.name}! I didn't quite get that.\n\n"

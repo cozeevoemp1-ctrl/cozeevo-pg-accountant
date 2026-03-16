@@ -108,7 +108,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
     (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
     # Log vacation / absence for tenant (any name, not hardcoded)
-    (re.compile(r"(?:\w+\s+(?:on vacation|going home|on leave|absent|away|out of station|on holiday|chutti)|log vacation|\w+\s+vacation\s+(?:from|for|\d)|going home for|on leave from|will be away|out of station|vacation\s+(?:for\s+)?\d+\s+days?|chutti\s+(?:pe|par|\d+)|din\s+ke\s+liye\s+(?:bahar|ghar)|ghar\s+(?:gaya|gayi|gaye)\b|\w+\s+\d+\s+din\s+bahar\b|\w+\s+not\s+here\b|chutti\s+pe\s+(?:hai|hain|ho)\b)", re.I), "LOG_VACATION", 0.89),
+    (re.compile(r"(?:\w+\s+(?:on vacation|going home|on leave|absent|away|out of station|on holiday|chutti)|log vacation|\w+\s+vacation\s+(?:from|for|\d)|going home for|on leave from|will be away|out of station|vacation\s+(?:for\s+)?\d+\s+days?|chutti\s+(?:pe|par|\d+)|din\s+ke\s+liye\s+(?:bahar|ghar)|ghar\s+(?:gaya|gayi|gaye)\b|\w+\s+\d+\s+din\s+bahar\b|\w+\s+not\s+here\b|chutti\s+pe\s+(?:hai|hain|ho)\b|chutti\s+\w+\s+\d+\s+din\b)", re.I), "LOG_VACATION", 0.89),
+    # Complaint REGISTER with "report" verb — "report plumbing issue" = file complaint (before REPORT)
+    (re.compile(r"^report\s+(?:plumbing|electrical|electric|water|fan|ac|air.?con|pest|toilet|door|window|lift|wifi|internet|issue|problem|complaint|broken|leak|not\s+working)", re.I), "COMPLAINT_REGISTER", 0.93),
     # Report — early catch for "occupancy report", "monthly report" before other patterns grab them
     (re.compile(r"(?:occupancy\s+report|\w+(?:\s+\w+)?\s+report\b|monthly\s+report)", re.I), "REPORT", 0.92),
     # Report — general
@@ -117,6 +119,12 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:how much (?:cash|upi|rent|money|total|was|is|have|did)|how much collect|cash collect|upi collect|total cash|total upi|what.?s collect|collect\w* in|collect\w* for|cash (?:for|in|this|last|march|feb|jan|dec|nov|oct|sep|aug|jul|jun|apr)|upi (?:for|in|this|last|march|feb|jan|dec|nov|oct|sep|aug|jul|jun|apr))", re.I), "REPORT", 0.92),
     # Salary / staff payment — must come BEFORE generic PAYMENT_LOG and ADD_EXPENSE
     (re.compile(r"(?:paid\s+salary|salary\s+paid|staff\s+salary|pay\s+salary|salary\s+to\s+\w+|wages?|disburse\w*\s+salary)", re.I), "ADD_EXPENSE", 0.92),
+    # Bill payments (electricity/water/internet + "bill" + "paid") — ADD_EXPENSE not PAYMENT_LOG
+    (re.compile(r"(?:paid\s+(?:electricity|electric|water|internet|eb|bwssb|bescom|broadband)\s+bill|(?:electricity|water|internet|eb)\s+bill\s+(?:paid|pay|payment)\b|(?:electricity|elec|electric|elecrticity|elecrtric)\s+bill\s+\d)", re.I), "ADD_EXPENSE", 0.94),
+    # Typo patterns for payment: "pajment", "paiment"
+    (re.compile(r"p[ai]{0,2}j?[ai]{0,2}m[ae]{0,2}nt\s+\d|(?:pajment|paiment|payemnt|pymnt)\b", re.I), "PAYMENT_LOG", 0.88),
+    # Typo patterns for electricity ADD_EXPENSE: "elecrticity", "electrcity", etc.
+    (re.compile(r"(?:elecrt?icity|electrcity|elecricity|elecrtrcity)\s+(?:bill\s+)?[\d,k]+", re.I), "ADD_EXPENSE", 0.90),
     # Service/repair payments with amount — plumber, electrician, etc. (before COMPLAINT_REGISTER)
     (re.compile(r"(?:plumber|electrician|carpenter|painter|pest\s*control|cleaning\s*(?:service|staff)|security\s+guard|watchman|cook|maid|housekeeping|caretaker)\s+\d|paid\s+(?:plumber|electrician|carpenter|painter|pest|cleaning|security|watchman|cook|maid)\b|\d+\s+(?:for\s+)?(?:plumber|electrician|repair|maintenance|pest|cleaning)", re.I), "ADD_EXPENSE", 0.93),
     # Expense (add new expense — must come before PAYMENT_LOG)
@@ -128,6 +136,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"(?:outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
         re.I
     ), "QUERY_DUES", 0.92),
+    # "did Raj pay this month?" / "did Suresh pay?" — query, NOT payment log
+    (re.compile(r"did\s+(?!my\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)\s+pay\b", re.I), "QUERY_TENANT", 0.92),
     # Specific tenant query — "Raj dues", "Jeevan balance", "room 203 balance"
     # Must come before QUERY_DUES catch-all. Three patterns:
     #   1. Named person + dues/balance/status/outstanding/account statement
@@ -198,8 +208,11 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
     # Tenant notes / agreed terms / payment method lookup
     (re.compile(r"(?:notes?|agreement|agreed\s+terms?|payment\s+method|cash\s+only|rent\s+terms?|terms?)\s+(?:for\s+|of\s+)?(?:room\s+)?[\w-]+|(?:check|show|get|what(?:'?s|\s+is)?)\s+(?:the\s+)?(?:notes?|agreement|terms?|payment\s+method)\s+(?:for\s+|of\s+)?[\w\s-]+|room\s+[\w-]+\s+(?:notes?|terms?|agreement|payment\s+method|cash\s+only)|(?:notes?|agreement|terms?)\s+room\s+[\w-]+", re.I), "GET_TENANT_NOTES", 0.93),
-    # Expense category shorthand "Category Amount Mode" — MUST come before PAYMENT_LOG shorthand
+    # Expense category shorthand "Category Amount [Mode]" — MUST come before PAYMENT_LOG shorthand
+    # With payment mode (e.g. "maintenance 3000 upi")
     (re.compile(r"^(?:maintena?na?ce?|maintanace|maintanance|cleaning|repairs?|furniture|plumbing|painting|pest\s*(?:control)?|food\s+(?:supplies?|expense|stuff)|internet|generator|groceries?|housekeeping|supplies|security)\s+[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "ADD_EXPENSE", 0.94),
+    # Without payment mode (e.g. "electricity 8400", "internet 1800", "maintenance 3000")
+    (re.compile(r"^(?:electricity|water\s*bill|internet|maintenance|food|groceries?|cleaning|plumbing|pest\s*(?:control)?|generator|security|supplies|housekeeping|repairs?|diesel|salary)\s+[\d,k]+\s*$", re.I), "ADD_EXPENSE", 0.92),
     # Payment log — before HELP so "Hi sir Raj paid 15000" doesn't become HELP
     (re.compile(r"(?:p[ai]{2,3}d?|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
     (re.compile(r"\d[\d,k]+\s*(?:paid|p[ai]{2,3}d?|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),
@@ -247,7 +260,10 @@ _LEAD_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:price|pricing\b|rent|cost|how much|rates?|charge|fee|monthly(?!\s+report)|what.?s\s+included)", re.I), "ROOM_PRICE", 0.90),
     (re.compile(r"(?:available|vacancy|empty|free room|any room|do\s+you\s+have\s+rooms?|looking\s+for\s+a\s+(?:room|pg)|rooms?\s+available)", re.I), "AVAILABILITY", 0.90),
     (re.compile(r"(?:single|double|triple|sharing|private|attached|ac room|non.?ac|what\s+types?\s+of\s+rooms?|shared\s+room)", re.I), "ROOM_TYPE", 0.88),
-    (re.compile(r"(?:visit|tour|come see|show me|can i see|viewing|inspect)", re.I), "VISIT_REQUEST", 0.92),
+    (re.compile(r"(?:visit|tour|come see|can i see|viewing|inspect)", re.I), "VISIT_REQUEST", 0.92),
+    # Detect admin-only intents so lead handler can give a helpful "contact owner" response
+    (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
+    (re.compile(r"(?:what.?s?\s+(?:the\s+)?wifi|wifi\s+(?:ka\s+)?password|password\s+(?:for\s+)?wifi)", re.I), "GET_WIFI_PASSWORD", 0.95),
 ]
 
 

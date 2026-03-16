@@ -22,9 +22,9 @@ from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
-    AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Payment, PaymentFor,
-    PaymentMode, PendingAction, PendingLearning, LearnedRule, Property, Refund, RefundStatus, RentSchedule, RentStatus,
-    Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
+    AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Expense, ExpenseCategory,
+    Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, Property, Refund, RefundStatus,
+    RentSchedule, RentStatus, Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
 from src.whatsapp.role_service import CallerContext
 from src.database.validators import check_no_active_tenancy, check_tenancy_active
@@ -118,6 +118,39 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
     # ── Multi-step text-based flows — handled BEFORE numeric check ───────────
 
     if pending.intent == "CONFIRM_PAYMENT_LOG":
+        # ── Correction check (before yes/no) ──────────────────────────────────
+        _MODE_MAP = {
+            "upi": "UPI", "cash": "Cash", "gpay": "GPay", "phonepe": "PhonePe",
+            "paytm": "Paytm", "online": "Online", "bank": "Bank Transfer",
+            "neft": "NEFT", "cheque": "Cheque", "imps": "IMPS",
+        }
+        _corrected = False
+        _rl = reply_text.lower()
+        for _word, _label in _MODE_MAP.items():
+            if _word in _rl and _label != action_data.get("mode", ""):
+                action_data["mode"] = _label
+                _corrected = True
+                break
+        _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
+        if _amt_m:
+            _new_amt = float(_amt_m.group(1).replace(",", ""))
+            if _new_amt != action_data.get("amount", 0) and _new_amt > 0:
+                action_data["amount"] = _new_amt
+                _corrected = True
+        if _corrected:
+            pending.action_data = json.dumps(action_data)
+            await session.flush()
+            _amt   = int(action_data["amount"])
+            _mode  = action_data.get("mode", "Cash")
+            _tname = action_data.get("tenant_name", "")
+            return (
+                "__KEEP_PENDING__"
+                f"✏️ Updated. Please confirm:\n"
+                f"• Tenant: {_tname}\n"
+                f"• Amount: ₹{_amt:,}\n"
+                f"• Mode: {_mode}\n\n"
+                "Reply *Yes* to confirm or *No* to cancel."
+            )
         if is_affirmative(reply_text):
             return await _do_log_payment_by_ids(
                 tenant_id=action_data["tenant_id"],
@@ -131,8 +164,59 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
         if is_negative(reply_text):
             return "❌ Payment cancelled. Nothing was logged."
         return (
+            "__KEEP_PENDING__"
             f"Reply *Yes* to confirm logging Rs.{int(action_data['amount']):,} "
             f"for {action_data['tenant_name']}, or *No* to cancel."
+        )
+
+    if pending.intent == "CONFIRM_ADD_EXPENSE":
+        # ── Correction check (before yes/no) ──────────────────────────────────
+        _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
+        if _amt_m:
+            _new_amt = float(_amt_m.group(1).replace(",", ""))
+            if _new_amt != action_data.get("amount", 0) and _new_amt > 0:
+                action_data["amount"] = _new_amt
+                pending.action_data = json.dumps(action_data)
+                await session.flush()
+                _cat = action_data.get("category", "").capitalize()
+                return (
+                    "__KEEP_PENDING__"
+                    f"✏️ Updated. Log expense?\n"
+                    f"• Category: {_cat}\n"
+                    f"• Amount: ₹{int(_new_amt):,}\n\n"
+                    "Reply *Yes* to confirm or *No* to cancel."
+                )
+        if is_negative(reply_text):
+            return "❌ Expense cancelled. Nothing was logged."
+        if is_affirmative(reply_text):
+            amount      = action_data.get("amount", 0)
+            cat_name    = action_data.get("category", "Miscellaneous")
+            description = action_data.get("description", "")
+            prop = await _fetch_active_property(session)
+            property_id = prop.id if prop else 1
+            cat_row = (await session.execute(
+                select(ExpenseCategory).where(ExpenseCategory.name.ilike(f"%{cat_name}%"))
+            )).scalars().first()
+            exp = Expense(
+                property_id  = property_id,
+                category_id  = cat_row.id if cat_row else None,
+                amount       = amount,
+                expense_date = date.today(),
+                description  = description or cat_name,
+            )
+            session.add(exp)
+            await session.commit()
+            label = cat_name.capitalize()
+            return f"✅ Expense logged — {label} ₹{int(amount):,} on {date.today().strftime('%d %b %Y')}."
+        # Neither yes/no — re-prompt
+        amount   = action_data.get("amount", 0)
+        cat_name = action_data.get("category", "")
+        return (
+            "__KEEP_PENDING__"
+            f"Log expense?\n"
+            f"• Category: {cat_name.capitalize()}\n"
+            f"• Amount: ₹{int(amount):,}\n\n"
+            "Reply *Yes* to confirm or *No* to cancel."
         )
 
     if pending.intent == "CONFIRM_DEPOSIT_REFUND":
@@ -338,6 +422,75 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             )
 
         return None  # Unrecognised step
+
+    # ── Correction: user provides a new amount for RENT_CHANGE ───────────────
+    if pending.intent == "RENT_CHANGE" and not reply_text.rstrip(".").isdigit():
+        _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
+        if _amt_m:
+            _new_amt = float(_amt_m.group(1).replace(",", ""))
+            if _new_amt != action_data.get("new_amount", 0) and _new_amt > 100:
+                action_data["new_amount"] = _new_amt
+                pending.action_data = json.dumps(action_data)
+                await session.flush()
+                _tname = action_data.get("tenant_name", "")
+                _options = "\n".join(f"*{c['seq']}*. {c['label']}" for c in choices)
+                return (
+                    "__KEEP_PENDING__"
+                    f"✏️ Updated. Change {_tname}'s rent to ₹{int(_new_amt):,}?\n\n"
+                    f"{_options}"
+                )
+
+    # ── Cancel any pending confirmation with "no" ─────────────────────────────
+
+    if is_negative(reply_text) and pending.intent in (
+        "CHECKOUT", "SCHEDULE_CHECKOUT", "PAYMENT_LOG", "QUERY_TENANT",
+        "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
+        "VOID_PAYMENT", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
+    ):
+        return "❌ Cancelled. Nothing was changed."
+
+    # ── Correction: amount/mode update while disambiguation is pending ────────
+    if chosen_idx is None and choices and pending.intent == "PAYMENT_LOG":
+        _corrected = False
+        _rl = reply_text.lower()
+        _MODE_MAP = {
+            "upi": "UPI", "cash": "Cash", "gpay": "GPay", "phonepe": "PhonePe",
+            "paytm": "Paytm", "online": "Online", "bank": "Bank Transfer",
+            "neft": "NEFT", "cheque": "Cheque", "imps": "IMPS",
+        }
+        for _word, _label in _MODE_MAP.items():
+            if _word in _rl and _label != action_data.get("mode", ""):
+                action_data["mode"] = _label
+                _corrected = True
+                break
+        _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
+        if _amt_m:
+            _new_amt = float(_amt_m.group(1).replace(",", ""))
+            if _new_amt != action_data.get("amount", 0) and _new_amt > 0:
+                action_data["amount"] = _new_amt
+                _corrected = True
+        if _corrected:
+            pending.action_data = json.dumps(action_data)
+            await session.flush()
+            _name_raw = action_data.get("name_raw", "")
+            _amt = int(action_data["amount"])
+            _mode = action_data.get("mode", "Cash")
+            _options_str = "\n".join(f"*{c['seq']}*. {c['label']}" for c in choices)
+            return (
+                "__KEEP_PENDING__"
+                f"✏️ Updated. Which tenant for Rs.{_amt:,} ({_mode})?\n\n"
+                f"{_options_str}\n\nOr say *cancel* to stop."
+            )
+
+    # ── Re-prompt if reply isn't a valid number for disambiguation ───────────
+
+    if chosen_idx is None and choices:
+        # If only 1 option and user says yes — auto-select it
+        if len(choices) == 1 and is_affirmative(reply_text):
+            chosen_idx = 0
+        else:
+            options = "\n".join(f"*{c['seq']}*. {c['label']}" for c in choices)
+            return "__KEEP_PENDING__" + f"Please reply with a number:\n{options}\n\nOr say *cancel* to stop."
 
     # ── Numbered-choice disambiguation ────────────────────────────────────────
 
@@ -965,11 +1118,7 @@ async def _get_wifi_password(entities: dict, ctx: CallerContext, session: AsyncS
 
     floor_map: dict = prop.wifi_floor_map or {}
     if not floor_map or ("thor" not in floor_map and "hulk" not in floor_map):
-        return (
-            "No WiFi configured yet.\n\n"
-            "Run seed on VPS:\n"
-            "`python -m src.database.seed_wifi`"
-        )
+        return "WiFi details are not configured yet. Please contact the manager."
 
     msg = (entities.get("description") or "").lower()
     show_block = "thor" if "thor" in msg else ("hulk" if "hulk" in msg else None)
@@ -1350,14 +1499,14 @@ async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSe
         await _save_pending(ctx.phone, "GET_TENANT_NOTES", {}, choices, session)
         return _format_choices_message(choices, "Which tenant?")
 
-    t, tncy = tenancies[0]
+    t, tncy, room_obj = tenancies[0]
     notes = tncy.notes
 
     if not notes or not notes.strip():
-        return f"*{t.name}* (Room {tncy.room_id}) — no agreed terms on record."
+        return f"*{t.name}* (Room {room_obj.room_number}) — no agreed terms on record."
 
     return (
-        f"*{t.name}* — Room {tncy.room_id}\n"
+        f"*{t.name}* — Room {room_obj.room_number}\n"
         f"Agreed terms:\n{notes}"
     )
 
