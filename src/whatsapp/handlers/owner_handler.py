@@ -91,6 +91,7 @@ async def handle_owner(
         "GET_TENANT_NOTES":   _get_tenant_notes,
         "RULES":              _rules,
         "HELP":               _help,
+        "MORE_MENU":          _more_menu,
         "UNKNOWN":            _unknown,
     }
     fn = handlers.get(intent, _unknown)
@@ -143,10 +144,12 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             _amt   = int(action_data["amount"])
             _mode  = action_data.get("mode", "Cash")
             _tname = action_data.get("tenant_name", "")
+            _room  = action_data.get("room_number", "")
+            _tlabel = f"{_tname} (Room {_room})" if _room else _tname
             return (
                 "__KEEP_PENDING__"
                 f"✏️ Updated. Please confirm:\n"
-                f"• Tenant: {_tname}\n"
+                f"• Tenant: {_tlabel}\n"
                 f"• Amount: ₹{_amt:,}\n"
                 f"• Mode: {_mode}\n\n"
                 "Reply *Yes* to confirm or *No* to cancel."
@@ -163,10 +166,13 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             )
         if is_negative(reply_text):
             return "❌ Payment cancelled. Nothing was logged."
+        _room  = action_data.get("room_number", "")
+        _tname = action_data.get("tenant_name", "")
+        _tlabel = f"{_tname} (Room {_room})" if _room else _tname
         return (
             "__KEEP_PENDING__"
             f"Reply *Yes* to confirm logging Rs.{int(action_data['amount']):,} "
-            f"for {action_data['tenant_name']}, or *No* to cancel."
+            f"for {_tlabel}, or *No* to cancel."
         )
 
     if pending.intent == "CONFIRM_ADD_EXPENSE":
@@ -1192,31 +1198,24 @@ async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -
 
 
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    role_label = "Admin" if ctx.role == "admin" else "Owner"
-    header = bot_intro(await is_first_time_today(ctx.phone, session), ctx.name)
+    header = bot_intro(await is_first_time_today(ctx.phone, session), ctx.name, ctx.role)
     return (
         f"{header}"
-        f"*{BOT_NAME} — {role_label} Menu*\n\n"
-        "*Payments*\n"
-        "• Raj paid 15000 upi\n"
-        "• Received 8000 cash from Priya\n\n"
-        "*Queries*\n"
-        "• Who hasn't paid?\n"
-        "• Raj balance\n"
-        "• Monthly report\n\n"
-        "*Onboarding (New Tenant)*\n"
-        "• Start onboarding for Ravi 9876543210 room 203\n"
-        "• Add tenant Ravi 9876543210\n\n"
-        "*Offboarding (Checkout)*\n"
-        "• Record checkout Raj from room 203\n"
-        "• Checkout Priya — confirms keys, dues, deposit refund\n\n"
-        "*Expenses & WiFi*\n"
-        "• Expense electricity 4500\n"
-        "• wifi password\n"
-        "• set wifi floor 1 SSID CozeevoPG password PG2024\n\n"
-        "• rules — View PG rules\n\n"
-        "Just type naturally — I'll understand!"
+        "*Payments:* Raj paid 15000 upi\n"
+        "*Dues:* Who hasn't paid?\n"
+        "*Report:* Monthly report\n"
+        "*Tenant:* Raj balance\n"
+        "*Onboard:* Add tenant Ravi 9876543210\n"
+        "*Checkout:* Checkout Priya\n"
+        "*Expense:* Electricity 4500\n"
+        "*WiFi:* wifi password\n\n"
+        "Tap a button above or just type naturally."
     )
+
+
+async def _more_menu(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Triggered when owner taps 'More Options' button — chat_api attaches the list payload."""
+    return "Here are all available actions:"
 
 
 async def _rules(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:

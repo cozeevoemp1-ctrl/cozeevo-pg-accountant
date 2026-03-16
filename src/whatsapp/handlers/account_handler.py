@@ -340,8 +340,10 @@ async def _do_log_payment_by_ids(
         )
 
     status_str = "Paid ✅" if rs and rs.status == RentStatus.paid else "Partial ⏳"
+    room_obj = await session.get(Room, tenancy.room_id)
+    room_label = f" (Room {room_obj.room_number})" if room_obj else ""
     return (
-        f"*Payment logged — {tenant.name}*\n"
+        f"*Payment logged — {tenant.name}{room_label}*\n"
         f"Amount: Rs.{int(amount_dec):,} ({mode.upper()})\n"
         f"Month: {period_month.strftime('%B %Y')}\n"
         f"Status: {status_str}"

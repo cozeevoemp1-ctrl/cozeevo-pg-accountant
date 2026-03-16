@@ -139,6 +139,21 @@ async def process_message_v2(
     session: AsyncSession = Depends(get_session),
 ):
     """Process one inbound WhatsApp message via the v2 LangGraph supervisor pipeline."""
+    try:
+        return await _process_v2_inner(body, session)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Unhandled error in process_message_v2")
+        return OutboundReply(
+            reply="Sorry, something went wrong. Please try again in a moment.",
+            intent="ERROR", role="unknown",
+        )
+
+
+async def _process_v2_inner(
+    body: InboundMessage,
+    session: AsyncSession,
+) -> OutboundReply:
     phone   = body.phone.strip()
     message = body.message.strip()
 

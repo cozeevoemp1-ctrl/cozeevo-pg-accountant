@@ -43,11 +43,12 @@ class InboundMessage(BaseModel):
 
 
 class OutboundReply(BaseModel):
-    reply:      str
-    intent:     str
-    role:       str
-    confidence: float = 0.0
-    skip:       bool = False    # True = don't send reply (spam / non-text)
+    reply:               str
+    intent:              str
+    role:                str
+    confidence:          float = 0.0
+    skip:                bool  = False          # True = don't send reply (spam / non-text)
+    interactive_payload: Optional[dict] = None  # set for button/list messages
 
 # Intents that are safe to pass through even at low confidence
 _LOW_CONF_PASSTHROUGH = frozenset({"HELP", "GENERAL", "UNKNOWN", "SYSTEM_HARD_UNKNOWN", "BLOCKED", "ONBOARDING", "CONFIRMATION", "COMPLAINT_REGISTER", "AMBIGUOUS"})
@@ -58,6 +59,21 @@ async def process_message(
     body: InboundMessage,
     session: AsyncSession = Depends(get_session),
 ):
+    try:
+        return await _process_message_inner(body, session)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Unhandled error in process_message")
+        return OutboundReply(
+            reply="Sorry, something went wrong. Please try again in a moment.",
+            intent="ERROR", role="unknown",
+        )
+
+
+async def _process_message_inner(
+    body: InboundMessage,
+    session: AsyncSession,
+) -> OutboundReply:
     phone   = body.phone.strip()
     message = body.message.strip()
 
@@ -186,22 +202,6 @@ async def process_message(
             message=message[:1000],
             detected_intent="UNKNOWN",
         ))
-        admin_phone = os.getenv("ADMIN_PHONE", "")
-        if admin_phone and ctx.phone != admin_phone:
-            # Queue an outbound notification to admin (n8n will deliver it)
-            session.add(WhatsappLog(
-                direction=MessageDirection.outbound,
-                caller_role=CallerRole.owner,
-                from_number="system",
-                to_number=admin_phone,
-                message_text=(
-                    f"⚠️ *Unknown message* from {ctx.role} ({ctx.phone}):\n"
-                    f"\"{message[:200]}\"\n\n"
-                    f"Teach me: `!learn INTENT keyword1, keyword2`"
-                ),
-                intent="SYSTEM_ADMIN_NOTIFY",
-                created_at=datetime.utcnow(),
-            ))
 
     # ── 3b. Low-confidence gate → SYSTEM_HARD_UNKNOWN ───────────────────
     # If intent router is not confident enough, ask the user to rephrase
@@ -265,11 +265,90 @@ async def process_message(
 
     reply = await route(intent, intent_result.entities, ctx, message, session)
 
+    # ── 4b. Attach interactive payload for menu intents ───────────────────
+    interactive_payload = None
+    if intent in ("HELP", "MORE_MENU") and ctx.role in ("admin", "power_user", "key_user"):
+        interactive_payload = _build_owner_interactive(intent, reply, ctx)
+
     # ── 5. Log ────────────────────────────────────────────────────────────
     await _log(session, phone, message, ctx.role, intent, reply)
     await session.commit()
 
-    return OutboundReply(reply=reply, intent=intent, role=ctx.role, confidence=intent_result.confidence)
+    return OutboundReply(
+        reply=reply, intent=intent, role=ctx.role,
+        confidence=intent_result.confidence,
+        interactive_payload=interactive_payload,
+    )
+
+
+def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict]:
+    """
+    Build a Meta WhatsApp interactive message payload for owner HELP / MORE_MENU.
+    reply_text is used as the body for HELP (already contains the rotating greeting).
+    Returns None if payload cannot be built (e.g. reply too long).
+    """
+    # WhatsApp interactive body max = 1024 chars; strip to greeting line only
+    body = reply_text.split("\n\n")[0].strip()[:1024] or "How can I help?"
+
+    if intent == "HELP":
+        return {
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "header": {"type": "text", "text": "Artha — Owner"},
+                "body":   {"text": body},
+                "footer": {"text": "getkozzy.com"},
+                "action": {
+                    "buttons": [
+                        {"type": "reply", "reply": {"id": "REPORT",     "title": "Revenue & Report"}},
+                        {"type": "reply", "reply": {"id": "QUERY_DUES", "title": "Who Hasn't Paid?"}},
+                        {"type": "reply", "reply": {"id": "MORE_MENU",  "title": "More Options"}},
+                    ]
+                },
+            },
+        }
+
+    if intent == "MORE_MENU":
+        return {
+            "type": "interactive",
+            "interactive": {
+                "type": "list",
+                "header": {"type": "text", "text": "Owner Actions"},
+                "body":   {"text": "Select an action:"},
+                "footer": {"text": "Artha"},
+                "action": {
+                    "button": "Open Menu",
+                    "sections": [
+                        {
+                            "title": "Tenants",
+                            "rows": [
+                                {"id": "ADD_TENANT",   "title": "Add New Tenant",  "description": "Start onboarding"},
+                                {"id": "CHECKOUT",     "title": "Record Checkout", "description": "Offboard tenant"},
+                                {"id": "QUERY_TENANT", "title": "Tenant Account",  "description": "Balance & history"},
+                            ],
+                        },
+                        {
+                            "title": "Finance",
+                            "rows": [
+                                {"id": "ADD_EXPENSE",  "title": "Log Expense",    "description": "Electricity, salary..."},
+                                {"id": "PAYMENT_LOG",  "title": "Log Payment",    "description": "Rent received"},
+                                {"id": "ADD_REFUND",   "title": "Refund Deposit", "description": "Return security deposit"},
+                            ],
+                        },
+                        {
+                            "title": "Settings & Info",
+                            "rows": [
+                                {"id": "QUERY_VACANT_ROOMS",  "title": "Vacant Rooms",   "description": "Check availability"},
+                                {"id": "GET_WIFI_PASSWORD",   "title": "WiFi Passwords", "description": "View credentials"},
+                                {"id": "RULES",               "title": "PG Rules",       "description": "House rules"},
+                            ],
+                        },
+                    ],
+                },
+            },
+        }
+
+    return None
 
 
 def _learn_from_selection(original_msg: str, intent: str) -> None:
