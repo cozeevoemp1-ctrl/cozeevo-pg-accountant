@@ -395,32 +395,69 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 
 ---
 
-## 15. Real Property Master Data Structure (166 Rooms)
+## 15. Real Property Master Data Structure
 
-**Total Planned Rooms:** ~166 spread across 2 properties 83 in Thor and 83 in Hulk.
+**Last verified:** 2026-03-17 by Kiran
+**Two properties:** Cozeevo THOR + Cozeevo HULK (83 rooms each, ~166 total)
+**PG business name:** Cozeevo Co-living. Platform brand: Kozzy / getkozzy.com. Bot name: Artha.
 
-### Property 1: Cozeevo THOR (83 rooms)
-- **Ground Floor (G01 to G10):**
+### Staff Rooms (excluded from occupancy/revenue counts)
+| Room | Property | Type | Notes |
+|------|----------|------|-------|
+| G05  | THOR | Single | Staff |
+| G06  | THOR | Double | Staff |
+| 107  | THOR | Double | Staff |
+| 108  | THOR | Double | Staff |
+| 114  | THOR | — | Staff (extra, non-standard) |
+| 701  | THOR | Single | Staff, 7th floor |
+| G12  | HULK | Triple | Staff |
+| 702  | HULK | Single | Staff, 7th floor |
+
+### Property 1: Cozeevo THOR
+- **Ground Floor (G01–G10):**
   - **Single:** G01, G10
+  - **Double:** G02, G03, G04
   - **Triple:** G07, G08, G09
-  - **Double:** G02, G03, G04, G06
-  - **Staff:** G05 (non-revenue generating)
-- **Floors 1 to 6 (12 rooms each, e.g. 101-112, 201-212...):**
+  - **Staff (excluded):** G05, G06
+- **Floor 1 (101–112 + extras):**
+  - **Single:** 101, 112
+  - **Double:** 102, 103, 104, 105, 106, 109, 110, 111
+  - **Staff (excluded):** 107, 108, 114
+- **Floors 2–6 (12 revenue rooms each, e.g. 201–212...):**
   - **Single:** `x01` and `x12` on every floor
   - **Double:** All remaining rooms (`x02` to `x11`)
-- **Extra Staff Rooms / Non-Standard non revenue generating till staff is there:**
-  - 117 (Staff, Double)
-  - 118 (Staff, Double)
-  - 701 (Staff, Single on 7th floor)
+- **Floor 7:** 701 = Staff only (excluded)
 
-### Property 2: Cozeevo HULK (83 rooms)
-- **Basement/Ground Floor (G11 to G20):**
-  - **Triple:** G12, G13, G14
-  - **Double:** G11, G15-G20
-- **Floors 1 to 6 (12 rooms each, e.g. 101-112, 201-212...):**
+**THOR revenue rooms: ~78 rooms, ~145 beds**
+
+### Property 2: Cozeevo HULK
+- **Ground Floor (G11–G20):**
+  - **Single:** G11, G20
+  - **Double:** G15, G16, G17, G18, G19
+  - **Triple:** G13, G14
+  - **Staff (excluded):** G12
+- **Floors 1–6 (12 revenue rooms each, e.g. 101–112...):**
   - **Single:** `x01` and `x12` on every floor
   - **Double:** All remaining rooms (`x02` to `x11`)
-- **Extra Staff Rooms / Non-Standard:**
-  - 702 (Staff, Single on 7th floor)
+- **Floor 7:** 702 = Staff only (excluded)
 
-*Note: 3 additional unknown rooms are planned to be added later to bring the total to 166.*
+**HULK revenue rooms: ~81 rooms, ~150 beds**
+
+### Totals (revenue only, staff excluded)
+| | Rooms | Beds |
+|--|--|--|
+| THOR | ~78 | ~145 |
+| HULK | ~81 | ~150 |
+| **Total** | **~159** | **~295** |
+
+*Exact totals to be confirmed when DB max_occupancy values are verified against physical count.*
+
+### Current Occupancy (from Untitled spreadsheet.xlsx, 2026-03-17)
+| | THOR | HULK | Total |
+|--|--|--|--|
+| Active tenants (beds occupied) | 112 | 73 | **185** |
+| Rooms with ≥1 tenant | ~78 | ~47 | **~125** |
+| Occupancy by beds | 112/145 = **77%** | 73/150 = **49%** | 185/295 = **63%** |
+| Occupancy by rooms | ~96% | ~57%  | **~77%** |
+
+Pending bookings (room TBD, arriving May): Prasad Vadlamani, Aravind, Santhosh (all HULK)

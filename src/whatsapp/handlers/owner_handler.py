@@ -1606,22 +1606,39 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
 # ── Occupancy overview ────────────────────────────────────────────────────────
 
 async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    active_rooms_filter = and_(Room.active == True, Room.is_staff_room == False)
-    total_rooms = await session.scalar(
-        select(func.count(Room.id)).where(active_rooms_filter)
+    revenue_filter = and_(Room.active == True, Room.is_staff_room == False)
+
+    # Total beds = sum(max_occupancy) across all revenue rooms
+    total_beds = await session.scalar(
+        select(func.sum(Room.max_occupancy)).where(revenue_filter)
     ) or 0
-    # Occupied = distinct rooms that have at least one active tenancy
+
+    # Total revenue rooms
+    total_rooms = await session.scalar(
+        select(func.count(Room.id)).where(revenue_filter)
+    ) or 0
+
+    # Occupied beds = count of active tenancies (1 tenancy = 1 bed sold)
+    occupied_beds = await session.scalar(
+        select(func.count(Tenancy.id)).where(Tenancy.status == TenancyStatus.active)
+    ) or 0
+
+    # Occupied rooms = distinct rooms with at least 1 active tenancy
     occupied_rooms = await session.scalar(
         select(func.count(func.distinct(Tenancy.room_id))).where(Tenancy.status == TenancyStatus.active)
     ) or 0
+
+    vacant_beds  = total_beds - occupied_beds
     vacant_rooms = total_rooms - occupied_rooms
-    pct = int(occupied_rooms * 100 / total_rooms) if total_rooms else 0
+    bed_pct  = int(occupied_beds  * 100 / total_beds)  if total_beds  else 0
+    room_pct = int(occupied_rooms * 100 / total_rooms) if total_rooms else 0
+
     return (
         f"*Occupancy*\n\n"
-        f"Total rooms : {total_rooms}\n"
-        f"Occupied    : {occupied_rooms}\n"
-        f"Vacant      : {vacant_rooms}\n"
-        f"Occupancy   : {pct}%\n\n"
+        f"Beds occupied : {occupied_beds} / {total_beds}  ({bed_pct}%)\n"
+        f"Beds vacant   : {vacant_beds}\n\n"
+        f"Rooms occupied: {occupied_rooms} / {total_rooms}  ({room_pct}%)\n"
+        f"Rooms vacant  : {vacant_rooms}\n\n"
         "Say *vacant rooms* to see which rooms are empty."
     )
 
