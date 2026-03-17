@@ -18,7 +18,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, case as sa_case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -1618,19 +1618,29 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         select(func.count(Room.id)).where(revenue_filter)
     ) or 0
 
-    # Physical: actually checked in
+    # Physical beds occupied:
+    #   - Non-premium: 1 tenancy = 1 bed
+    #   - Premium: 1 tenancy = 2 beds (person reserves the whole room)
     physical_beds = await session.scalar(
-        select(func.count(Tenancy.id)).where(Tenancy.status == TenancyStatus.active)
+        select(func.sum(
+            sa_case((Room.room_type == "premium", 2), else_=1)
+        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(and_(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False))
     ) or 0
     physical_rooms = await session.scalar(
         select(func.count(func.distinct(Tenancy.room_id))).where(Tenancy.status == TenancyStatus.active)
     ) or 0
 
-    # No-shows: booked + assigned a room but not yet arrived
+    # No-shows: booked + assigned a room but not yet arrived (same premium rule)
     noshow_beds = await session.scalar(
-        select(func.count(Tenancy.id)).where(
-            and_(Tenancy.status == TenancyStatus.no_show, Tenancy.room_id.isnot(None))
-        )
+        select(func.sum(
+            sa_case((Room.room_type == "premium", 2), else_=1)
+        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(and_(
+            Tenancy.status == TenancyStatus.no_show,
+            Tenancy.room_id.isnot(None),
+            Room.is_staff_room == False,
+        ))
     ) or 0
 
     booked_beds  = physical_beds + noshow_beds
