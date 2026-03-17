@@ -103,12 +103,12 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     if media_id:
         await _download_media(media_id, media_mime)
 
-    # -- Route through the main bot brain --------------------------------------
+    # -- Route through the v2 LangGraph supervisor pipeline -------------------
     try:
         from src.database.db_manager import _session_factory
-        from src.whatsapp.chat_api import process_message, InboundMessage
+        from src.whatsapp.v2.chat_api_v2 import _process_v2_inner, InboundMessage
         async with _session_factory() as session:
-            result = await process_message(
+            result = await _process_v2_inner(
                 body=InboundMessage(phone=from_number, message=body, message_id=None),
                 session=session,
             )

@@ -80,6 +80,36 @@ class PGState(TypedDict):
     response:    str   # message to send back on WhatsApp
 
 
+# ── Humanizer system prompt ───────────────────────────────────────────────────
+_HUMANIZER_PROMPT = """\
+You are Artha, the AI assistant for Kozzy PG (paying guest hostel).
+You speak warmly, naturally, and like a helpful human colleague — not a robot.
+
+User: {name} | Role: {role}
+{history_block}
+
+User just said: "{message}"
+Topic: {topic} | Type: {intent_type}
+
+Bot's raw answer to convey:
+{raw_result}
+
+Rewrite the raw answer as a warm, natural WhatsApp message.
+Rules:
+- Keep ALL facts exactly as given (amounts ₹, dates, names, balances)
+- Owner/admin: professional but friendly, use their first name occasionally
+- Tenant: warm and supportive — they live here, make them feel at home
+- Lead: enthusiastic and helpful — make the PG sound welcoming
+- Max 2 emojis per message — only where they genuinely add warmth
+- Use *bold* for key numbers, names, amounts
+- Be concise — no padding, no "As an AI...", no disclaimers
+- Match the user's language (Hindi / English / Hinglish — match what they wrote)
+- If raw answer is empty (GREETING), generate a warm personalised greeting using their name and conversation history
+- Reference prior context naturally if relevant (e.g. "like we discussed earlier...")
+
+Reply ONLY with the final WhatsApp message — no preamble, no quotes around it."""
+
+
 # ── Supervisor system prompt ───────────────────────────────────────────────────
 _SYSTEM_PROMPT = """\
 You are the Artha PG management assistant supervisor.
@@ -263,6 +293,40 @@ async def agent_executor(state: PGState) -> dict:
     return {"v1_intent": v1_intent, "raw_result": result, "response": result}
 
 
+async def humanize_response(state: PGState) -> dict:
+    """Call Groq to rewrite the raw v1 handler result as a warm, contextual reply.
+
+    For GREETING with no raw_result, Groq generates a personalised greeting from scratch.
+    Falls back to raw_result unchanged if the LLM call fails.
+    """
+    raw = state.get("raw_result", "") or ""
+    # Don't humanize very short canned replies (already human enough) or empty
+    # — but DO humanize greetings (raw may be empty for GREETING)
+    intent_type = state.get("intent_type", "")
+
+    history_block = _build_history_block(state.get("history", []))
+    prompt = _HUMANIZER_PROMPT.format(
+        name=state.get("user_name") or "there",
+        role=state.get("role", ""),
+        history_block=history_block,
+        message=state.get("message", ""),
+        topic=state.get("topic", ""),
+        intent_type=intent_type,
+        raw_result=raw if raw else "(no data — generate warm greeting)",
+    )
+
+    try:
+        llm = _get_llm()
+        resp = await llm.ainvoke(prompt)
+        humanized = resp.content.strip()
+        if humanized:
+            return {"response": humanized}
+    except Exception:
+        pass  # fall back to raw_result
+
+    return {"response": raw}
+
+
 async def save_memory_node(state: PGState) -> dict:
     """For STATEMENT / GREETING intents: set a canned response and return.
 
@@ -294,6 +358,7 @@ def build_graph() -> StateGraph:
     graph.add_node("load_context",        load_context)
     graph.add_node("supervisor_classify", supervisor_classify)
     graph.add_node("agent_executor",      agent_executor)
+    graph.add_node("humanize_response",   humanize_response)
     graph.add_node("save_memory",         save_memory_node)
 
     graph.set_entry_point("load_context")
@@ -306,7 +371,8 @@ def build_graph() -> StateGraph:
             "save_memory":    "save_memory",
         },
     )
-    graph.add_edge("agent_executor", "save_memory")
+    graph.add_edge("agent_executor",    "humanize_response")
+    graph.add_edge("humanize_response", "save_memory")
     graph.add_edge("save_memory", END)
 
     return graph.compile()
