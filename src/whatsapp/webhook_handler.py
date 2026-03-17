@@ -113,7 +113,12 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
                 logger.info(f"[Webhook] Voice transcribed: {transcribed[:80]}")
                 body = transcribed
             else:
-                logger.warning("[Webhook] Voice transcription failed — ignoring message")
+                logger.warning("[Webhook] Voice transcription failed — notifying user")
+                background.add_task(
+                    _send_whatsapp,
+                    from_number,
+                    "Sorry, I couldn't understand the voice note. Please type your message instead.",
+                )
                 return {"status": "ok"}
         else:
             # Non-audio (PDF, image, etc.) — save to disk for downstream processing

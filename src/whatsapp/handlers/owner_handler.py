@@ -1608,8 +1608,9 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
     total = await session.scalar(
         select(func.count(Room.id)).where(Room.active == True, Room.is_staff_room == False)
     ) or 0
+    # Count distinct rooms that have at least one active tenancy (not tenancy rows)
     occupied = await session.scalar(
-        select(func.count(Tenancy.id)).where(Tenancy.status == TenancyStatus.active)
+        select(func.count(func.distinct(Tenancy.room_id))).where(Tenancy.status == TenancyStatus.active)
     ) or 0
     vacant = total - occupied
     pct = int(occupied * 100 / total) if total else 0

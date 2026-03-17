@@ -90,7 +90,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Refund / deposit return (generic — matches after QUERY_REFUNDS above)
     (re.compile(r"(?:refund|return deposit|give back deposit|deposit back|repay deposit|disburse deposit|pay\s*back\s+deposit|deposit\s+wapas|wapas\s+karo\b)", re.I), "ADD_REFUND", 0.92),
     # Room status — who's in / status of a specific room (incl bare "room 205" and "room X details")
-    (re.compile(r"(?:who(?:'?s| is) in room|room\s+[\w-]+\s+(?:who|occupant|tenant|person|status|details?)|who lives in|who stays in|status\s+of\s+room\s+[\w-]+|is\s+room\s+[\w-]+\s+(?:occupied|free|vacant|empty|available)|room\s+[\w-]+\s+occupied|^room\s+[\d\w-]+\s*$)", re.I), "ROOM_STATUS", 0.94),
+    (re.compile(r"(?:who(?:'?s| is)(?: living| staying)? in room|room\s+[\w-]+\s+(?:who|occupant|tenant|person|status|details?)|who (?:lives?|stays?|is living|is staying) in|status\s+of\s+room\s+[\w-]+|is\s+room\s+[\w-]+\s+(?:occupied|free|vacant|empty|available)|room\s+[\w-]+\s+occupied|^room\s+[\d\w-]+\s*$)", re.I), "ROOM_STATUS", 0.94),
     # Vacant rooms
     (re.compile(r"(?:vacant rooms?|vacnt\s+rooms?|vacent\s+rooms?|empty rooms?|available rooms?|which rooms? (?:are |is )?(?:empty|free|vacant|available)|free rooms?|unoccupied|vacancy\b|khali\s+(?:rooms?|kamre)|rooms?\s+(?:empty|free|vacant|available)\b|how\s+many\s+rooms?\s+(?:are\s+)?empty|\bany\s+(?:vacant\s+|free\s+|empty\s+)?rooms?\b|kaun\s+se\s+rooms?\s+(?:khali|free))", re.I), "QUERY_VACANT_ROOMS", 0.94),
     # Occupancy overview
