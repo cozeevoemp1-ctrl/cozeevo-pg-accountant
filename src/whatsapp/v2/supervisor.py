@@ -367,8 +367,8 @@ def build_graph() -> StateGraph:
         "supervisor_classify",
         route_after_classify,
         {
-            "agent_executor": "agent_executor",
-            "save_memory":    "save_memory",
+            "agent_executor":   "agent_executor",
+            "humanize_response": "humanize_response",
         },
     )
     graph.add_edge("agent_executor",    "humanize_response")
