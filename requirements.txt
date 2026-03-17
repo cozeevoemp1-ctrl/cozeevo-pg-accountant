@@ -67,7 +67,7 @@ passlib[bcrypt]==1.7.4
 
 # LLM / AI
 groq==0.37.1                 # Groq Cloud API — LLM (llama-3.3-70b) + Whisper audio transcription
-langchain-groq==1.1.2        # LangChain wrapper for Groq
+langchain-groq==0.2.4        # LangChain wrapper for Groq (0.2.x matches langchain-core 0.3.x)
 
 # WhatsApp (Meta Cloud API — uses httpx, already listed above)
 
