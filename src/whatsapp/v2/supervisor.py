@@ -294,37 +294,48 @@ async def agent_executor(state: PGState) -> dict:
 
 
 async def humanize_response(state: PGState) -> dict:
-    """Call Groq to rewrite the raw v1 handler result as a warm, contextual reply.
+    """Call Groq to rewrite the raw v1 handler result as a warm, contextual reply."""
+    import logging
+    log = logging.getLogger(__name__)
 
-    For GREETING with no raw_result, Groq generates a personalised greeting from scratch.
-    Falls back to raw_result unchanged if the LLM call fails.
-    """
-    raw = state.get("raw_result", "") or ""
-    # Don't humanize very short canned replies (already human enough) or empty
-    # — but DO humanize greetings (raw may be empty for GREETING)
+    raw         = state.get("raw_result", "") or ""
     intent_type = state.get("intent_type", "")
+    name        = state.get("user_name") or "there"
+    first_name  = name.split()[0] if name and name != "there" else ""
+
+    # Canned fallback greeting — used if Groq fails and raw is empty
+    _FALLBACK_GREETING = (
+        f"👋 Hey {first_name}! Welcome to Kozzy PG — I'm *Artha*, your assistant.\n\n"
+        "How can I help you today?"
+        if first_name else
+        "👋 Hey! Welcome to Kozzy PG — I'm *Artha*, your assistant.\n\nHow can I help you today?"
+    )
 
     history_block = _build_history_block(state.get("history", []))
     prompt = _HUMANIZER_PROMPT.format(
-        name=state.get("user_name") or "there",
+        name=name,
         role=state.get("role", ""),
         history_block=history_block,
         message=state.get("message", ""),
         topic=state.get("topic", ""),
         intent_type=intent_type,
-        raw_result=raw if raw else "(no data — generate warm greeting)",
+        raw_result=raw if raw else "(no data — generate a warm personalised greeting)",
     )
 
     try:
         llm = _get_llm()
         resp = await llm.ainvoke(prompt)
         humanized = resp.content.strip()
+        log.info(f"[Humanizer] intent={intent_type} raw_len={len(raw)} humanized_len={len(humanized)}")
         if humanized:
             return {"response": humanized}
-    except Exception:
-        pass  # fall back to raw_result
+    except Exception as e:
+        log.error(f"[Humanizer] Groq call failed: {e}")
 
-    return {"response": raw}
+    # Fallback: use raw if available, otherwise canned greeting
+    fallback = raw if raw else _FALLBACK_GREETING
+    log.info(f"[Humanizer] Using fallback, len={len(fallback)}")
+    return {"response": fallback}
 
 
 async def save_memory_node(state: PGState) -> dict:
