@@ -35,6 +35,7 @@ TOPIC_INTENT_MAP: dict[tuple[str, str, str], str] = {
     ("finance", "refund",        "QUERY"):    "QUERY_REFUNDS",
     ("finance", "void",          "ACTION"):   "VOID_PAYMENT",
     ("finance", "rent",          "ACTION"):   "RENT_CHANGE",
+    ("finance", "rent",          "QUERY"):    "QUERY_TENANT",
     ("finance", "discount",      "ACTION"):   "RENT_DISCOUNT",
     ("finance", "general",       "QUERY"):    "QUERY_DUES",
     # Operations agent
@@ -105,6 +106,7 @@ async def run_finance_agent(
     """Extract entities from message and call account_handler.handle_account()."""
     from src.whatsapp.handlers.account_handler import handle_account
     entities = _extract_entities(message, v1_intent)
+    entities.setdefault("description", message)
     return await handle_account(v1_intent, entities, ctx, session)
 
 
@@ -117,6 +119,7 @@ async def run_operations_agent(
     """Extract entities from message and call owner_handler.handle_owner()."""
     from src.whatsapp.handlers.owner_handler import handle_owner
     entities = _extract_entities(message, v1_intent)
+    entities.setdefault("description", message)
     return await handle_owner(v1_intent, entities, ctx, session)
 
 
@@ -129,6 +132,7 @@ async def run_tenant_agent(
     """Extract entities from message and call tenant_handler.handle_tenant()."""
     from src.whatsapp.handlers.tenant_handler import handle_tenant
     entities = _extract_entities(message, v1_intent)
+    entities.setdefault("description", message)
     return await handle_tenant(v1_intent, entities, ctx, session)
 
 

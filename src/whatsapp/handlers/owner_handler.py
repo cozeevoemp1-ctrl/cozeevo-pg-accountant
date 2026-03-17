@@ -26,7 +26,7 @@ from src.database.models import (
     Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, Property, Refund, RefundStatus,
     RentSchedule, RentStatus, Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
-from src.whatsapp.role_service import CallerContext
+from src.whatsapp.role_service import CallerContext, _normalize as _normalize_phone
 from src.database.validators import check_no_active_tenancy, check_tenancy_active
 from src.whatsapp.handlers._shared import (
     _find_active_tenants_by_name, _find_active_tenants_by_room,
@@ -684,6 +684,13 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             )
         return "Void cancelled — payment remains as logged."
 
+    if pending.intent == "CONFIRM_ADD_TENANT":
+        if is_negative(reply_text):
+            return "❌ Tenant check-in cancelled. Nothing was saved."
+        if is_affirmative(reply_text):
+            return await _do_add_tenant(action_data, session)
+        return "__KEEP_PENDING__Reply *Yes* to save the new tenant or *No* to cancel."
+
     return None
 
 
@@ -1038,31 +1045,88 @@ async def _do_update_checkin(
 
 # ── Other handlers ────────────────────────────────────────────────────────────
 
+_SKIP_VALUES = {"skip", "none", "no", "nil", "-", "n/a", "na", "0"}
+
+_MONTHS_MAP = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _get_ff(text: str, field: str) -> str:
+    """Extract value from 'Field: value' in multi-line form text."""
+    m = re.search(rf"^{field}\s*:\s*(.+?)$", text, re.I | re.M)
+    return m.group(1).strip() if m else ""
+
+
+def _is_form_submission(text: str) -> bool:
+    """Return True if message looks like a filled ADD_TENANT form (≥3 key fields present)."""
+    keys = ["name", "phone", "room", "rent", "deposit", "checkin", "food"]
+    matches = sum(1 for k in keys if re.search(rf"^{k}\s*:", text, re.I | re.M))
+    return matches >= 3
+
+
+def _parse_discount_field(s: str, base_rent: float) -> dict:
+    """Parse Discount form field. Returns {} for no discount."""
+    s = s.strip().lower()
+    if not s or s in _SKIP_VALUES:
+        return {}
+    # "flat 6400 until may" or "6400 until june"
+    m = re.search(r"(?:flat\s+)?(\d[\d,]+)\s+(?:until|till|upto)\s+(\w+)", s)
+    if m:
+        amt = float(m.group(1).replace(",", ""))
+        return {"type": "flat_rent", "discounted_rent": amt, "until_month": m.group(2)[:3].lower()}
+    # "20% off 2 months"
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%.*?(\d+)\s*months?", s)
+    if m:
+        pct = float(m.group(1))
+        months = int(m.group(2))
+        return {"type": "percent", "pct": pct, "months": months,
+                "discounted_rent": round(base_rent * (1 - pct / 100))}
+    # "1500 off" / "discount 1500"
+    m = re.search(r"(\d[\d,]+)\s*(?:off|discount|concession)", s) or \
+        re.search(r"(?:off|discount|concession)\s+(\d[\d,]+)", s)
+    if m:
+        off_amt = float(m.group(1).replace(",", ""))
+        return {"type": "flat_off", "off_amount": off_amt, "discounted_rent": base_rent - off_amt}
+    return {}
+
+
+def _parse_amount_field(s: str) -> float:
+    """Parse a numeric amount from a field value; returns 0 for skip/none."""
+    s = s.strip().lower()
+    if not s or s in _SKIP_VALUES:
+        return 0.0
+    m = re.search(r"(\d[\d,]*(?:\.\d+)?)", s)
+    return float(m.group(1).replace(",", "")) if m else 0.0
+
+
 async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    # Guard: if phone provided upfront, block if already has active tenancy
+    msg = entities.get("description", "").strip()
+
+    # ── Detect filled form submission ──────────────────────────────────────
+    if _is_form_submission(msg):
+        return await _process_tenant_form(msg, ctx, session)
+
+    # ── Show blank form template ───────────────────────────────────────────
     phone = entities.get("phone", "").strip()
     if phone:
         ok, reason = await check_no_active_tenancy(phone, session)
         if not ok:
             return reason
 
-    # Check if a known tenant name was mentioned (possible re-entry)
     name = entities.get("name", "").strip()
     reentry_note = ""
     if name:
         rows = await _find_active_tenants_by_name(name, session)
         if rows:
-            # Active tenant — shouldn't be adding again
             tenant, tenancy, room_obj = rows[0]
             reentry_note = (
                 f"\n⚠️ *{tenant.name}* already has an active tenancy in Room {room_obj.room_number}.\n"
                 "If this is a room change, first checkout the old room then add new.\n"
             )
         else:
-            # Check if they exist as a past tenant (re-entry after gap)
-            past = await session.scalar(
-                select(Tenant).where(Tenant.name.ilike(f"%{name}%"))
-            )
+            past = await session.scalar(select(Tenant).where(Tenant.name.ilike(f"%{name}%")))
             if past:
                 reentry_note = (
                     f"\n📋 *{past.name}* has a previous record in the system.\n"
@@ -1083,6 +1147,268 @@ async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncS
         "Checkin: [DD/MM/YYYY]\n"
         "Food: [veg/non-veg/egg/none]\n\n"
         "I'll confirm before saving."
+    )
+
+
+async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSession) -> str:
+    """Parse and validate a filled ADD_TENANT form, then save pending confirmation."""
+    from src.whatsapp.intent_detector import _extract_date_entity
+
+    name       = _get_ff(msg, "name")
+    phone_raw  = _get_ff(msg, "phone")
+    room_str   = _get_ff(msg, "room")
+    rent_str   = _get_ff(msg, "rent")
+    discount_s = _get_ff(msg, "discount")
+    deposit_s  = _get_ff(msg, "deposit")
+    advance_s  = _get_ff(msg, "advance")
+    maint_s    = _get_ff(msg, "maintenance")
+    checkin_s  = _get_ff(msg, "checkin")
+    food_s     = _get_ff(msg, "food").lower()
+
+    errors = []
+    if not name:    errors.append("Name is missing")
+    if not phone_raw: errors.append("Phone is missing")
+    if not room_str:  errors.append("Room number is missing")
+    if not rent_str:  errors.append("Rent amount is missing")
+    if not checkin_s: errors.append("Checkin date is missing")
+    if errors:
+        return ("⚠️ *Form incomplete*\n\n"
+                + "\n".join(f"• {e}" for e in errors)
+                + "\n\nPlease resend the complete form.")
+
+    # Normalise phone
+    phone = _normalize_phone(phone_raw)
+    if len(phone) != 10 or not phone.isdigit():
+        return f"⚠️ Phone *{phone_raw}* doesn't look valid (10 digits needed). Please correct and resend."
+
+    # Validate room exists
+    room_row = await session.scalar(select(Room).where(Room.room_number.ilike(room_str)))
+    if not room_row:
+        result = await session.execute(
+            select(Room).where(Room.room_number.ilike(f"%{room_str}%")).limit(5)
+        )
+        similar = [r.room_number for r in result.scalars().all()]
+        if similar:
+            return (f"⚠️ Room *{room_str}* not found.\n\n"
+                    f"Did you mean: {', '.join(f'*{r}*' for r in similar[:4])}?\n\n"
+                    "Correct the room number and resend.")
+        return (f"⚠️ Room *{room_str}* does not exist.\n\n"
+                "Type *vacant rooms* to see available rooms, then resend.")
+
+    # Check room capacity
+    active_result = await session.execute(
+        select(Tenancy).where(Tenancy.room_id == room_row.id, Tenancy.status == TenancyStatus.active)
+    )
+    occupants = active_result.scalars().all()
+    if len(occupants) >= (room_row.max_occupancy or 1):
+        tenant_ids = [tncy.tenant_id for tncy in occupants]
+        name_rows = await session.execute(select(Tenant.name).where(Tenant.id.in_(tenant_ids)))
+        occ_names = [r for r in name_rows.scalars().all()]
+        return (f"⚠️ Room *{room_str}* is full "
+                f"({len(occupants)}/{room_row.max_occupancy} occupants: {', '.join(occ_names)}).\n\n"
+                "Checkout an existing tenant first or use a different room.")
+
+    # Duplicate phone check
+    existing_tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+    if existing_tenant:
+        active_tncy = await session.scalar(
+            select(Tenancy).where(Tenancy.tenant_id == existing_tenant.id, Tenancy.status == TenancyStatus.active)
+        )
+        if active_tncy:
+            r2 = await session.get(Room, active_tncy.room_id)
+            return (f"⚠️ Phone *{phone}* already belongs to *{existing_tenant.name}* "
+                    f"(active in Room {r2.room_number if r2 else '?'}).\n\n"
+                    "Cannot add duplicate — checkout current room first if this is a move.")
+
+    # Parse amounts
+    base_rent   = _parse_amount_field(rent_str)
+    deposit     = _parse_amount_field(deposit_s)
+    advance     = _parse_amount_field(advance_s)
+    maintenance = _parse_amount_field(maint_s)
+    if base_rent <= 0:
+        return f"⚠️ Rent amount *{rent_str}* could not be read. Use a number (e.g. 15000)."
+
+    discount_info = _parse_discount_field(discount_s, base_rent)
+
+    # Parse checkin date
+    checkin_iso = _extract_date_entity(checkin_s) or _extract_date_entity(msg)
+    if not checkin_iso:
+        return (f"⚠️ Checkin date *{checkin_s}* could not be parsed.\n\n"
+                "Please use DD/MM/YYYY format (e.g. 18/03/2026) and resend.")
+    checkin_date = date.fromisoformat(checkin_iso)
+    today = date.today()
+    days_ago = (today - checkin_date).days
+
+    date_warn = ""
+    if days_ago > 730:
+        return (f"⚠️ Checkin date *{checkin_date.strftime('%d %b %Y')}* is over 2 years in the past.\n\n"
+                "Please verify the date (DD/MM/YYYY) and resend.")
+    if days_ago > 90:
+        date_warn = (f"\n⚠️ Checkin {checkin_date.strftime('%d %b %Y')} is {days_ago} days "
+                     "in the past — please confirm this is correct.")
+
+    # Food preference
+    food_pref = "none"
+    if re.search(r"\bnon.?veg\b", food_s):
+        food_pref = "non-veg"
+    elif re.search(r"\bveg\b", food_s):
+        food_pref = "veg"
+    elif "egg" in food_s:
+        food_pref = "egg"
+
+    # Discount display line
+    discount_line = ""
+    if discount_info:
+        d = discount_info
+        if d.get("type") == "flat_rent":
+            discount_line = (f"\nDiscount: Rs.{int(d['discounted_rent']):,}/month until "
+                             f"{d.get('until_month','?').title()} (then Rs.{int(base_rent):,})")
+        elif d.get("type") == "percent":
+            discount_line = (f"\nDiscount: {d['pct']}% off × {d['months']} months "
+                             f"= Rs.{int(d['discounted_rent']):,}/month")
+        elif d.get("type") == "flat_off":
+            discount_line = (f"\nDiscount: Rs.{int(d['off_amount']):,} off "
+                             f"= Rs.{int(d['discounted_rent']):,}/month")
+
+    # Save pending
+    pending_data = {
+        "name": name, "phone": phone,
+        "room_id": room_row.id, "room_number": room_row.room_number,
+        "base_rent": base_rent, "deposit": deposit,
+        "advance": advance, "maintenance": maintenance,
+        "checkin_date": checkin_iso, "food_pref": food_pref,
+        "discount": discount_info,
+        "existing_tenant_id": existing_tenant.id if existing_tenant else None,
+    }
+    session.add(PendingAction(
+        phone=ctx.phone,
+        intent="CONFIRM_ADD_TENANT",
+        action_data=json.dumps(pending_data),
+        choices=json.dumps([]),
+        expires_at=datetime.utcnow() + timedelta(minutes=15),
+    ))
+
+    return (
+        f"*Confirm New Tenant?*{date_warn}\n\n"
+        f"Name: {name}\n"
+        f"Phone: {phone}\n"
+        f"Room: {room_row.room_number}\n"
+        f"Rent: Rs.{int(base_rent):,}/month{discount_line}\n"
+        f"Deposit: Rs.{int(deposit):,}\n"
+        + (f"Advance paid: Rs.{int(advance):,}\n" if advance > 0 else "")
+        + (f"Maintenance: Rs.{int(maintenance):,}/month\n" if maintenance > 0 else "")
+        + f"Checkin: {checkin_date.strftime('%d %b %Y')}\n"
+        f"Food: {food_pref}\n\n"
+        "Reply *Yes* to save or *No* to cancel."
+    )
+
+
+async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
+    """Create Tenant + Tenancy + RentSchedule(s) + advance Payment from confirmed form data."""
+    today        = date.today()
+    name         = data["name"]
+    phone        = data["phone"]
+    room_id      = data["room_id"]
+    room_number  = data["room_number"]
+    base_rent    = Decimal(str(data["base_rent"]))
+    deposit      = Decimal(str(data["deposit"]))
+    advance      = Decimal(str(data.get("advance") or 0))
+    maintenance  = Decimal(str(data.get("maintenance") or 0))
+    checkin_date = date.fromisoformat(data["checkin_date"])
+    discount     = data.get("discount") or {}
+    existing_tid = data.get("existing_tenant_id")
+
+    # Tenant record
+    if existing_tid:
+        tenant = await session.get(Tenant, existing_tid)
+    else:
+        tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+    if not tenant:
+        tenant = Tenant(name=name, phone=phone)
+        session.add(tenant)
+        await session.flush()
+
+    # Tenancy record
+    tenancy = Tenancy(
+        tenant_id        = tenant.id,
+        room_id          = room_id,
+        checkin_date     = checkin_date,
+        agreed_rent      = base_rent,
+        security_deposit = deposit,
+        booking_amount   = advance,
+        maintenance_fee  = maintenance,
+        status           = TenancyStatus.active,
+    )
+    session.add(tenancy)
+    await session.flush()
+
+    # Determine discount end
+    discount_until = None
+    if discount.get("type") == "flat_rent" and discount.get("until_month"):
+        um_num = _MONTHS_MAP.get(discount["until_month"][:3].lower())
+        if um_num:
+            y = today.year if um_num >= checkin_date.month else today.year + 1
+            discount_until = date(y, um_num, 1)
+    elif discount.get("type") == "percent" and discount.get("months"):
+        extra = int(discount["months"])
+        total_m = checkin_date.month - 1 + extra
+        discount_until = date(checkin_date.year + total_m // 12, total_m % 12 + 1, 1)
+
+    # Generate RentSchedule from checkin month to current month
+    period = checkin_date.replace(day=1)
+    current_month = today.replace(day=1)
+    while period <= current_month:
+        effective_rent = base_rent
+        adjustment = Decimal("0")
+        if discount and discount.get("discounted_rent"):
+            disc_rent = Decimal(str(discount["discounted_rent"]))
+            if discount.get("type") == "flat_rent" and discount_until and period <= discount_until:
+                adjustment = disc_rent - base_rent
+            elif discount.get("type") in ("percent", "flat_off"):
+                months_into = (period.year - checkin_date.year) * 12 + (period.month - checkin_date.month)
+                if months_into < int(discount.get("months", 1)):
+                    adjustment = disc_rent - base_rent
+
+        adj_note = None
+        if adjustment:
+            adj_note = (f"discount until {discount_until.strftime('%b %Y')}"
+                        if discount_until else "discount")
+
+        session.add(RentSchedule(
+            tenancy_id      = tenancy.id,
+            period_month    = period,
+            rent_due        = base_rent,
+            maintenance_due = maintenance,
+            adjustment      = adjustment if adjustment != Decimal("0") else None,
+            adjustment_note = adj_note,
+            status          = RentStatus.pending,
+            due_date        = period,
+        ))
+        if period.month == 12:
+            period = date(period.year + 1, 1, 1)
+        else:
+            period = date(period.year, period.month + 1, 1)
+
+    # Log advance as Payment
+    if advance > 0:
+        session.add(Payment(
+            tenancy_id   = tenancy.id,
+            amount       = advance,
+            payment_date = checkin_date,
+            payment_mode = PaymentMode.cash,
+            for_type     = PaymentFor.booking,
+            period_month = checkin_date.replace(day=1),
+            notes        = "Booking advance at check-in",
+        ))
+
+    return (
+        f"*Tenant saved — {name}* ✅\n\n"
+        f"Room: {room_number}\n"
+        f"Rent: Rs.{int(base_rent):,}/month\n"
+        f"Deposit: Rs.{int(deposit):,}\n"
+        f"Checkin: {checkin_date.strftime('%d %b %Y')}\n"
+        + (f"Advance logged: Rs.{int(advance):,}\n" if advance > 0 else "")
+        + "Rent schedule created."
     )
 
 

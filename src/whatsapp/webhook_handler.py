@@ -99,9 +99,18 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         background.add_task(_send_whatsapp, from_number, f"Rejected: #{pid}")
         return {"status": "ok"}
 
-    # -- Download media if attached --------------------------------------------
+    # -- Download media + transcribe audio if attached ------------------------
     if media_id:
-        await _download_media(media_id, media_mime)
+        file_path = await _download_media(media_id, media_mime)
+        # Voice message: transcribe to text via Groq Whisper
+        if file_path and media_mime and media_mime.startswith("audio/"):
+            transcribed = await _transcribe_audio(file_path)
+            if transcribed:
+                logger.info(f"[Webhook] Voice transcribed: {transcribed[:80]}")
+                body = transcribed
+            else:
+                logger.warning("[Webhook] Voice transcription failed — ignoring message")
+                return {"status": "ok"}
 
     # -- Route through the v2 LangGraph supervisor pipeline -------------------
     try:
@@ -281,4 +290,41 @@ async def _download_media(media_id: str, media_mime: Optional[str]) -> Optional[
         return str(out_path)
     except Exception as e:
         logger.error(f"[Webhook] Media download failed: {e}")
+        return None
+
+
+# -- Groq Whisper voice transcription -----------------------------------------
+
+async def _transcribe_audio(file_path: str) -> Optional[str]:
+    """
+    Transcribe a voice message using Groq Whisper.
+    Supports Hindi, English, Hinglish, Telugu, Kannada (auto-detected).
+    Returns transcribed text or None on failure.
+    """
+    import asyncio
+    from pathlib import Path
+
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key:
+        logger.warning("[Whisper] GROQ_API_KEY not set — cannot transcribe audio")
+        return None
+
+    def _sync_transcribe() -> str:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        with open(file_path, "rb") as f:
+            result = client.audio.transcriptions.create(
+                file=(Path(file_path).name, f),
+                model="whisper-large-v3-turbo",   # fast + multilingual
+                response_format="text",
+                language=None,                     # auto-detect language
+            )
+        return result if isinstance(result, str) else getattr(result, "text", "")
+
+    try:
+        loop = asyncio.get_running_loop()
+        text = await loop.run_in_executor(None, _sync_transcribe)
+        return text.strip() if text else None
+    except Exception as e:
+        logger.error(f"[Whisper] Transcription error: {e}")
         return None

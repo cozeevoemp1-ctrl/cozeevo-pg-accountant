@@ -138,6 +138,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     ), "QUERY_DUES", 0.92),
     # "did Raj pay this month?" / "did Suresh pay?" — query, NOT payment log
     (re.compile(r"did\s+(?!my\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)\s+pay\b", re.I), "QUERY_TENANT", 0.92),
+    # "what is the rent for X" / "what's X's rent from July" — tenant account query
+    (re.compile(r"(?:what(?:'?s|\s+is|\s+was)\s+(?:the\s+)?rent|rent\s+(?:for|of)\s+\w|how\s+much\s+(?:is|was)\s+(?:the\s+)?rent)", re.I), "QUERY_TENANT", 0.91),
     # Specific tenant query — "Raj dues", "Jeevan balance", "room 203 balance"
     # Must come before QUERY_DUES catch-all. Three patterns:
     #   1. Named person + dues/balance/status/outstanding/account statement
@@ -440,10 +442,14 @@ def _extract_entities(text: str, intent: str) -> dict:
         text, re.I,
     )
     if not amount_match:
-        amount_match = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?", text, re.I)
+        # Strip room numbers before fallback scan so "room 811" doesn't become amount=811
+        _text_no_room = re.sub(r"\b(?:room|bed|flat|unit)\s+[\w-]+", "", text, flags=re.I)
+        amount_match = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?", _text_no_room, re.I)
     if amount_match:
         raw = amount_match.group(1).replace(",", "")
-        multiplier = 1000 if "k" in text[amount_match.end():amount_match.end()+2].lower() else 1
+        # Check for "k" suffix in the 2 chars after the match (use matched text itself)
+        after = amount_match.group(0)
+        multiplier = 1000 if after.lower().endswith("k") else 1
         try:
             entities["amount"] = float(raw) * multiplier
         except ValueError:
