@@ -29,25 +29,25 @@ _DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Su
 # {name} = first name, {tod} = time of day, {dow} = day of week
 _GREETINGS: dict[str, list[str]] = {
     "owner": [
-        "{tod}, {name}. Dashboard ready — what are we working on?",          # 0 Professional
-        "{name}. What do you need?",                                          # 1 Minimalist
-        "Hey {name}! It's {dow} — let's get things done.",                   # 2 Energetic
-        "{tod}, {name}. Your property is in good hands.",                     # 3 Supportive
-        "{name}! Artha reporting for duty. First order of business?",         # 4 Witty
+        "👋 {tod}, {name}! Dashboard is ready — what are we working on today?",   # 0 Professional
+        "⚡ {name}! Artha here. What do you need?",                                # 1 Minimalist
+        "🚀 Hey {name}! It's {dow} — let's crush it together.",                   # 2 Energetic
+        "🏠 {tod}, {name}! Your property is in good hands. How can I help?",      # 3 Supportive
+        "🤖 {name}! Artha reporting for duty. First order of business?",           # 4 Witty
     ],
     "tenant": [
-        "{tod}, {name}. How can I help today?",                              # 0 Professional
-        "Hi {name}.",                                                         # 1 Minimalist
-        "Hey {name}! Happy {dow} — what's up?",                             # 2 Energetic
-        "{tod}, {name}. Hope you're settling in well.",                      # 3 Supportive
-        "Look who's up! {tod}, {name}.",                                     # 4 Witty
+        "👋 {tod}, {name}! How can I help you today?",                            # 0 Professional
+        "😊 Hi {name}! Good to hear from you.",                                    # 1 Minimalist
+        "🎉 Hey {name}! Happy {dow} — what's up?",                               # 2 Energetic
+        "🏡 {tod}, {name}! Hope you're comfortable and settling in well.",        # 3 Supportive
+        "✨ Look who's here! {tod}, {name}. What can I do for you?",              # 4 Witty
     ],
     "lead": [
-        "{tod}! Thanks for reaching out to Kozzy PG.",                       # 0 Professional
-        "Hi! Looking for a room?",                                            # 1 Minimalist
-        "Hey! Great timing — what are you looking for?",                     # 2 Energetic
-        "{tod}! Finding the right PG can be tough. Let me help.",            # 3 Supportive
-        "Hello! You just walked into Kozzy PG — virtually at least.",        # 4 Witty
+        "👋 {tod}! Welcome to Kozzy PG — I'm Artha, your virtual guide! 🏠",     # 0 Professional
+        "😊 Hi there! Looking for a great PG? You're in the right place!",        # 1 Minimalist
+        "🎯 Hey! Great timing — let me help you find your perfect room! 🏠",      # 2 Energetic
+        "🤝 {tod}! Finding the right PG can be tough — I'm here to make it easy.",# 3 Supportive
+        "✨ Hello! You just walked into Kozzy PG — virtually at least. Welcome!",  # 4 Witty
     ],
 }
 
