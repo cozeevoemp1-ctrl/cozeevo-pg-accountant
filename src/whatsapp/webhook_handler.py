@@ -118,7 +118,10 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         reply = None  # Never send error messages to users — log only
 
     if reply:
-        background.add_task(_send_whatsapp, from_number, reply)
+        if getattr(result, "interactive_payload", None):
+            background.add_task(_send_whatsapp_interactive, from_number, result.interactive_payload)
+        else:
+            background.add_task(_send_whatsapp, from_number, reply)
     return {"status": "ok"}
 
 
@@ -153,6 +156,18 @@ def _extract_message(payload: dict) -> Optional[dict]:
 
         if msg_type == "text":
             return {"from": from_num, "body": msg["text"]["body"]}
+
+        # Interactive: button tap or list selection — extract the id as the body
+        if msg_type == "interactive":
+            interactive = msg.get("interactive", {})
+            itype = interactive.get("type", "")
+            if itype == "button_reply":
+                btn_id = interactive.get("button_reply", {}).get("id", "")
+                return {"from": from_num, "body": btn_id}
+            if itype == "list_reply":
+                row_id = interactive.get("list_reply", {}).get("id", "")
+                return {"from": from_num, "body": row_id}
+            return None  # unknown interactive subtype — ignore
 
         # Document / image / audio / video
         media_obj = msg.get(msg_type, {})
@@ -198,6 +213,34 @@ async def _send_whatsapp(to_number: str, message: str):
             logger.error(f"[Meta] Send failed {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
         logger.error(f"[Meta] Send exception: {e}")
+
+
+# -- Meta interactive message sender ------------------------------------------
+
+async def _send_whatsapp_interactive(to_number: str, payload: dict):
+    """Send a WhatsApp interactive message (buttons / list) via Meta Graph API."""
+    token    = os.getenv("WHATSAPP_TOKEN", "")
+    phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+
+    if not (token and phone_id):
+        logger.warning("[Meta] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set -- skipping send.")
+        return
+
+    to = to_number.lstrip("+").replace(" ", "")
+    url     = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {"messaging_product": "whatsapp", "recipient_type": "individual", "to": to, **payload}
+
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(url, json=body, headers=headers)
+        if resp.status_code == 200:
+            logger.info(f"[Meta] Interactive sent to {to}")
+        else:
+            logger.error(f"[Meta] Interactive send failed {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"[Meta] Interactive send exception: {e}")
 
 
 # -- Meta media downloader -----------------------------------------------------

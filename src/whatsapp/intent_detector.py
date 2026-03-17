@@ -351,12 +351,41 @@ _INTENT_LABELS: dict[str, str] = {
 }
 
 
+# ── Direct intent passthrough (WhatsApp button / list replies) ────────────────
+# When a user taps a button or selects from a list, Meta sends the button id as
+# the message body verbatim. We bypass regex and route it directly.
+_OWNER_DIRECT: frozenset[str] = frozenset({
+    "ADD_TENANT", "CHECKOUT", "RECORD_CHECKOUT", "START_ONBOARDING",
+    "PAYMENT_LOG", "ADD_EXPENSE", "ADD_REFUND",
+    "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
+    "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS",
+    "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
+    "COMPLAINT_REGISTER", "RULES", "HELP", "MORE_MENU",
+})
+_TENANT_DIRECT: frozenset[str] = frozenset({
+    "MY_BALANCE", "MY_PAYMENTS", "MY_DETAILS", "REQUEST_RECEIPT",
+    "GET_WIFI_PASSWORD", "COMPLAINT_REGISTER", "CHECKOUT_NOTICE", "RULES", "HELP",
+})
+_LEAD_DIRECT: frozenset[str] = frozenset({
+    "ROOM_PRICE", "AVAILABILITY", "ROOM_TYPE", "VISIT_REQUEST",
+})
+
+
 def detect_intent(text: str, role: str) -> IntentResult:
     """
     Detect intent from message text based on caller role.
     Returns IntentResult with intent name, confidence, and extracted entities.
     """
     text = text.strip()
+
+    # ── Button / list tap: exact intent name sent by Meta ─────────────────────
+    upper = text.upper()
+    if role in ("admin", "power_user", "key_user") and upper in _OWNER_DIRECT:
+        return IntentResult(intent=upper, confidence=0.99)
+    if role == "tenant" and upper in _TENANT_DIRECT:
+        return IntentResult(intent=upper, confidence=0.99)
+    if role == "lead" and upper in _LEAD_DIRECT:
+        return IntentResult(intent=upper, confidence=0.99)
 
     if role in ("admin", "power_user", "key_user"):
         rules = _OWNER_RULES

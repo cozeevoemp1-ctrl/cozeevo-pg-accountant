@@ -10,6 +10,7 @@ Import them from here; never duplicate them in another handler.
 from __future__ import annotations
 
 import difflib
+import hashlib
 import json
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -21,6 +22,57 @@ from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancySta
 
 BOT_NAME = "Artha"
 _IST_OFFSET = timedelta(hours=5, minutes=30)
+
+_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# 5 greeting styles per role — index 0-4
+# {name} = first name, {tod} = time of day, {dow} = day of week
+_GREETINGS: dict[str, list[str]] = {
+    "owner": [
+        "{tod}, {name}. Dashboard ready — what are we working on?",          # 0 Professional
+        "{name}. What do you need?",                                          # 1 Minimalist
+        "Hey {name}! It's {dow} — let's get things done.",                   # 2 Energetic
+        "{tod}, {name}. Your property is in good hands.",                     # 3 Supportive
+        "{name}! Artha reporting for duty. First order of business?",         # 4 Witty
+    ],
+    "tenant": [
+        "{tod}, {name}. How can I help today?",                              # 0 Professional
+        "Hi {name}.",                                                         # 1 Minimalist
+        "Hey {name}! Happy {dow} — what's up?",                             # 2 Energetic
+        "{tod}, {name}. Hope you're settling in well.",                      # 3 Supportive
+        "Look who's up! {tod}, {name}.",                                     # 4 Witty
+    ],
+    "lead": [
+        "{tod}! Thanks for reaching out to Kozzy PG.",                       # 0 Professional
+        "Hi! Looking for a room?",                                            # 1 Minimalist
+        "Hey! Great timing — what are you looking for?",                     # 2 Energetic
+        "{tod}! Finding the right PG can be tough. Let me help.",            # 3 Supportive
+        "Hello! You just walked into Kozzy PG — virtually at least.",        # 4 Witty
+    ],
+}
+
+
+def _greeting_style(role: str) -> int:
+    """Deterministic style index for today × role. Rotates daily, never same two consecutive days."""
+    bucket = "owner" if role in ("admin", "power_user", "key_user") else (
+        "tenant" if role == "tenant" else "lead"
+    )
+    raw = hashlib.md5(f"{date.today().isoformat()}:{bucket}".encode()).hexdigest()
+    return int(raw, 16) % 5
+
+
+def _make_greeting(role: str, name: str) -> str:
+    """Build a role-appropriate, daily-rotating greeting line."""
+    bucket = "owner" if role in ("admin", "power_user", "key_user") else (
+        "tenant" if role == "tenant" else "lead"
+    )
+    style    = _greeting_style(role)
+    template = _GREETINGS[bucket][style]
+    tod_hour = (datetime.now(timezone.utc) + _IST_OFFSET).hour
+    tod = "Good morning" if 5 <= tod_hour < 12 else "Good afternoon" if tod_hour < 17 else "Good evening"
+    first    = name.split()[0] if name else ("boss" if bucket == "owner" else "there")
+    dow      = _DAYS[date.today().weekday()]
+    return template.format(name=first, tod=tod, dow=dow)
 
 
 def time_greeting() -> str:
@@ -47,19 +99,21 @@ async def is_first_time_today(phone: str, session: AsyncSession) -> bool:
     return result.scalar() is None
 
 
-def bot_intro(first_time_today: bool, name: str = "") -> str:
+def bot_intro(first_time_today: bool, name: str = "", role: str = "owner") -> str:
     """
     Return greeting header.
-    First time today: "Hi [name]! 😊 I'm Artha, your PG assistant. How may I assist you today?"
-    Returning (already messaged today): time-based greeting + name only.
+    First time today: rotating style (5 variants, changes daily).
+    Returning (already messaged today): short time-based greeting only.
     Always ends with \\n\\n so caller can append menu directly.
+    role param added for style routing — defaults to "owner" for backward compat.
     """
     if first_time_today:
-        greeting_name = f"Hi {name}! 😊" if name else "Hi! 😊"
-        return f"{greeting_name} I'm *{BOT_NAME}*, your PG assistant. How may I assist you today?\n\n"
+        line = _make_greeting(role, name)
+        return f"*{line}*\n\n"
     greeting = time_greeting()
-    if name:
-        return f"*{greeting}, {name}!*\n\n"
+    first = name.split()[0] if name else ""
+    if first:
+        return f"*{greeting}, {first}!*\n\n"
     return f"*{greeting}!*\n\n"
 
 

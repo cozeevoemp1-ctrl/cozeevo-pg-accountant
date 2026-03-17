@@ -1,0 +1,5238 @@
+[
+  {
+    "id": "E001",
+    "name": "HELP intent: bare 'hi' from admin",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hi",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "paid",
+          "report"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E002",
+    "name": "HELP intent: 'menu' from power_user",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "power_user",
+        "input": "menu",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E003",
+    "name": "QUERY_DUES: 'who owes rent'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who owes rent",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E004",
+    "name": "QUERY_DUES: 'baki' (Hindi short for pending)",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "baki",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E005",
+    "name": "PAYMENT_LOG: amount-first shorthand",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "15000 Ankit gpay",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "15,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E006",
+    "name": "ADD_EXPENSE: amount-first shorthand with mode",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "3000 upi maintenance",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "3,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E007",
+    "name": "REPORT: 'show march summary'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show march summary",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E008",
+    "name": "REPORT: 'P&L'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "P&L",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E009",
+    "name": "QUERY_VACANT_ROOMS: 'khali rooms'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "khali rooms",
+        "expected_intent": "QUERY_VACANT_ROOMS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E010",
+    "name": "QUERY_OCCUPANCY: 'how full are we'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how full are we",
+        "expected_intent": "QUERY_OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E011",
+    "name": "VOID_PAYMENT: 'wrong payment'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "wrong payment",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E012",
+    "name": "VOID_PAYMENT: 'void'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E013",
+    "name": "NOTICE_GIVEN: 'gave notice'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit gave notice",
+        "expected_intent": "NOTICE_GIVEN",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E014",
+    "name": "LOG_VACATION: 'on vacation'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit on vacation",
+        "expected_intent": "LOG_VACATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E015",
+    "name": "LOG_VACATION: 'chutti pe hai'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit chutti pe hai",
+        "expected_intent": "LOG_VACATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E016",
+    "name": "COMPLAINT_REGISTER: 'report plumbing issue'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "report plumbing issue",
+        "expected_intent": "COMPLAINT_REGISTER",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E017",
+    "name": "RULES: 'niyam' (Hindi)",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "niyam",
+        "expected_intent": "RULES",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "rent"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E018",
+    "name": "GET_WIFI_PASSWORD: 'net ka password'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "net ka password",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E019",
+    "name": "QUERY_TENANT: 'did Ankit pay this month'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "did Ankit pay this month",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E020",
+    "name": "QUERY_TENANT: 'how much does Ankit owe'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how much does Ankit owe",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E021",
+    "name": "SEND_REMINDER_ALL: 'sabko reminder'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "sabko reminder",
+        "expected_intent": "SEND_REMINDER_ALL",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E022",
+    "name": "QUERY_EXPIRING: 'who is leaving this month'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who is leaving this month",
+        "expected_intent": "QUERY_EXPIRING",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E023",
+    "name": "QUERY_CHECKINS: 'who joined this month'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who joined this month",
+        "expected_intent": "QUERY_CHECKINS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E024",
+    "name": "QUERY_CHECKOUTS: 'who checked out this month'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who checked out this month",
+        "expected_intent": "QUERY_CHECKOUTS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E025",
+    "name": "RENT_CHANGE: 'increase rent for room 203'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "increase rent for room 203",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E026",
+    "name": "RENT_DISCOUNT: 'give Ankit 500 less this month'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "give Ankit 500 less this month",
+        "expected_intent": "RENT_DISCOUNT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E027",
+    "name": "QUERY_REFUNDS: 'pending refunds'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pending refunds",
+        "expected_intent": "QUERY_REFUNDS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E028",
+    "name": "ADD_REFUND: 'deposit wapas 8000 Ankit'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "deposit wapas 8000 Ankit",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E029",
+    "name": "ROOM_STATUS: bare 'room 201'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 201",
+        "expected_intent": "ROOM_STATUS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E030",
+    "name": "SCHEDULE_CHECKOUT: 'Ankit leaving end of month'",
+    "category": "intent_detection",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit leaving end of month",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E031",
+    "name": "Amount in 'k': '8k' parsed as 8000",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8k upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E032",
+    "name": "Amount with comma: '15,000 cash'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 15,000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "15,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E033",
+    "name": "Expense: salary with amount auto-categorises",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid salary 12000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "12,000"
+        ],
+        "reply_must_not_contain": [
+          "which category",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E034",
+    "name": "Expense: water bill auto-categorises",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "water bill 1800",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1,800"
+        ],
+        "reply_must_not_contain": [
+          "which category",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E035",
+    "name": "Expense: diesel auto-categorises",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "diesel 3500",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "3,500"
+        ],
+        "reply_must_not_contain": [
+          "which category",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E036",
+    "name": "Payment mode: 'gpay' maps to UPI",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 10000 gpay",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E037",
+    "name": "Payment mode: 'neft' recognised",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 10000 neft",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E038",
+    "name": "Room number extracted from 'room 201 paid 8000'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 201 paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E039",
+    "name": "Date extracted: 'Ankit checked in on 10 March'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit checked in on 10 March",
+        "expected_intent": "UPDATE_CHECKIN",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Mar"
+        ],
+        "reply_must_not_contain": [
+          "which date",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E040",
+    "name": "Date extracted: 'Priya leaving March 31'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Priya leaving March 31",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "31"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E041",
+    "name": "Expense category: 'internet 1500' auto-detected",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "internet 1500",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1,500"
+        ],
+        "reply_must_not_contain": [
+          "which category",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E042",
+    "name": "Expense: electricity typo 'elecrticity 8400'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "elecrticity 8400",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,400"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E043",
+    "name": "Word-number payment: 'paid fifteen thousand cash'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid fifteen thousand cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E044",
+    "name": "Bill payment: 'paid electricity bill 6200' is expense not payment",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid electricity bill 6200",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "6,200"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E045",
+    "name": "Salary expense: 'staff salary 15000' is expense",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "staff salary 15000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "15,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E046",
+    "name": "Plumber payment is expense not tenant payment",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "plumber 800",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "800"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E047",
+    "name": "Month extracted: 'expenses for january'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "expenses for january",
+        "expected_intent": "QUERY_EXPENSES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E048",
+    "name": "Name with room: 'room 201 balance' -> QUERY_TENANT",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 201 balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E049",
+    "name": "First-name only payment still routes: 'Ankit 12000 cash'",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit 12000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "12,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E050",
+    "name": "Expense: security guard salary is expense",
+    "category": "entity_extraction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "security guard 8000 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E051",
+    "name": "Payment confirm then yes",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000",
+          "Ankit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E052",
+    "name": "Payment confirm then no — nothing logged",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "cancel"
+        ],
+        "reply_must_not_contain": [
+          "logged",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E053",
+    "name": "Payment: received shorthand",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "received 14000 from Ankit upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "14,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E054",
+    "name": "Payment: 'jama' Hindi keyword",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit ne 10000 jama kiya",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E055",
+    "name": "Payment: 'payment received' without amount prompts for amount",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit payment received",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E056",
+    "name": "Payment: mid-flow correction of amount",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "actually 9000",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "9,000"
+        ],
+        "reply_must_not_contain": [
+          "8,000",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E057",
+    "name": "Payment: mid-flow correction of mode cash→upi",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "upi not cash",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E058",
+    "name": "Payment: 'haan' (Hindi yes) confirms",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "haan",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E059",
+    "name": "Payment: 'nahi' (Hindi no) cancels",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "nahi",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "cancel"
+        ],
+        "reply_must_not_contain": [
+          "logged",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E060",
+    "name": "Payment: pajment typo still routes",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pajment 14000 Ankit upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "14,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E061",
+    "name": "Payment: CONFIRM button tap (interactive) triggers confirm flow",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "confirm",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E062",
+    "name": "Payment: extra text after 'yes' still confirms",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes proceed",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E063",
+    "name": "Payment: 'collected 8000 cash' without name prompts disambiguation",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "collected 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E064",
+    "name": "Payment: month-specific 'Ankit paid march rent 10000'",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid march rent 10000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E065",
+    "name": "Payment: transferred keyword",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit transferred 9000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "9,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E066",
+    "name": "Payment: 'deposited' keyword",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit deposited 12000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "12,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E067",
+    "name": "Payment: paytm mode recognised",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 7000 paytm",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "7,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E068",
+    "name": "Payment: online mode recognised",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 7000 online",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "7,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E069",
+    "name": "Payment: 'naqad' (Hindi cash) recognised",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit 10000 naqad",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E070",
+    "name": "Payment: 'diya' (Hindi gave) recognised",
+    "category": "payment_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit ne 8000 diya cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E071",
+    "name": "Expense confirm then yes",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity 8400",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,400"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E072",
+    "name": "Expense: mid-flow amount correction",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity 8400",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,400"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "8600 actually",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,600"
+        ],
+        "reply_must_not_contain": [
+          "8,400",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "logged"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E073",
+    "name": "Expense: cancel mid-flow",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "maintenance 5000 upi",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "5,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "cancel"
+        ],
+        "reply_must_not_contain": [
+          "logged",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E074",
+    "name": "Expense: pest control auto-category maintenance",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pest control 2000 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "2,000"
+        ],
+        "reply_must_not_contain": [
+          "which category",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E075",
+    "name": "Expense: groceries auto-category",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "groceries 3200",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "3,200"
+        ],
+        "reply_must_not_contain": [
+          "which category",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E076",
+    "name": "Expense: 'paid for repairs 4000'",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid for repairs 4000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "4,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E077",
+    "name": "Expense: generator maintenance",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "generator maintenance 6000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "6,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E078",
+    "name": "Expense: housekeeping staff pay",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "housekeeping 5000 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "5,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E079",
+    "name": "Expense: 'expense' keyword alone with amount",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "expense 2500 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "2,500"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E080",
+    "name": "Expense: 'vendor payment 7500'",
+    "category": "expense_log",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "vendor payment 7500",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "7,500"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E081",
+    "name": "QUERY_DUES: returns list or empty notice",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who hasn't paid this month",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E082",
+    "name": "REPORT: total collection report responds",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "monthly report",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E083",
+    "name": "REPORT: cash collection query",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how much cash collected this month",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E084",
+    "name": "REPORT: UPI collection query",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "total upi this month",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E085",
+    "name": "QUERY_EXPENSES: 'show expenses'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show expenses",
+        "expected_intent": "QUERY_EXPENSES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E086",
+    "name": "QUERY_EXPENSES: 'what did we spend this month'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "what did we spend this month",
+        "expected_intent": "QUERY_EXPENSES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E087",
+    "name": "QUERY_VACANT_ROOMS: 'any empty rooms'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "any empty rooms",
+        "expected_intent": "QUERY_VACANT_ROOMS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E088",
+    "name": "QUERY_OCCUPANCY: 'total rooms occupied'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "total rooms occupied",
+        "expected_intent": "QUERY_OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E089",
+    "name": "ROOM_STATUS: 'who is in room 201'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who is in room 201",
+        "expected_intent": "ROOM_STATUS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E090",
+    "name": "QUERY_EXPIRING: 'agreements ending'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "agreements ending this month",
+        "expected_intent": "QUERY_EXPIRING",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E091",
+    "name": "GET_TENANT_NOTES: 'notes for room 201'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "notes for room 201",
+        "expected_intent": "GET_TENANT_NOTES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E092",
+    "name": "QUERY_REFUNDS: 'who needs refund'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who needs refund",
+        "expected_intent": "QUERY_REFUNDS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E093",
+    "name": "QUERY_CHECKINS: 'who checked in this month'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who checked in this month",
+        "expected_intent": "QUERY_CHECKINS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E094",
+    "name": "QUERY_CHECKOUTS: 'who left this month'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who left this month",
+        "expected_intent": "QUERY_CHECKOUTS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E095",
+    "name": "REPORT: 'financial summary'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "financial summary",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E096",
+    "name": "REPORT: 'stats'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "stats",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E097",
+    "name": "REPORT: month-specific 'march report'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "march report",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E098",
+    "name": "QUERY_TENANT: 'show Ankit account'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show Ankit account",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E099",
+    "name": "QUERY_TENANT: 'Ankit ka balance'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit ka balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E100",
+    "name": "QUERY_DUES: 'defaulters list'",
+    "category": "query_intents",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "defaulters list",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E101",
+    "name": "Disambiguation: 0 results → suggests similar names",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankeet paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E102",
+    "name": "Disambiguation: multiple matches → numbered list",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Kumar paid 10000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E103",
+    "name": "Disambiguation: reply '1' selects first match",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Kumar paid 10000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E104",
+    "name": "Disambiguation: out-of-range reply re-prompts",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Kumar paid 10000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "9",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E105",
+    "name": "Ambiguous date: 'Ankit 15 March' → asks intent",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit 15 March",
+        "expected_intent": "AMBIGUOUS",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1",
+          "2"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E106",
+    "name": "Ambiguous date resolved as checkin",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit 15 March",
+        "expected_intent": "AMBIGUOUS",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1",
+          "2"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "UPDATE_CHECKIN",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E107",
+    "name": "Ambiguous date resolved as checkout",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit 31 March",
+        "expected_intent": "AMBIGUOUS",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1",
+          "2"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "2",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E108",
+    "name": "Disambiguation: no match + no similar names",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Xyzqwerty paid 5000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E109",
+    "name": "RENT_CHANGE: confirm flow",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "change rent for room 201 to 12000",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E110",
+    "name": "RENT_CHANGE: correction mid-flow",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "change rent for room 201 to 12000",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "actually 13000",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "13,000"
+        ],
+        "reply_must_not_contain": [
+          "12,000",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E111",
+    "name": "CHECKOUT: confirm flow with dues",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Ankit",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E112",
+    "name": "CHECKOUT: cancel flow",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Ankit",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "cancel"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E113",
+    "name": "ADD_REFUND: confirm flow",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund deposit Ankit 8000",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "process",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E114",
+    "name": "ADD_REFUND: deduct correction",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund deposit Ankit 8000",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "deduct 1000",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E115",
+    "name": "REMINDER_SET: simple future date",
+    "category": "disambiguation",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "remind Ankit on 5 April",
+        "expected_intent": "REMINDER_SET",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E116",
+    "name": "Button tap: REPORT → revenue report",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "REPORT",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E117",
+    "name": "Button tap: QUERY_DUES → dues list",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "QUERY_DUES",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E118",
+    "name": "Button tap: MORE_MENU → list message",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "MORE_MENU",
+        "expected_intent": "MORE_MENU",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E119",
+    "name": "List tap: ADD_TENANT → onboarding prompt",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ADD_TENANT",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E120",
+    "name": "List tap: ADD_EXPENSE → asks for expense details",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ADD_EXPENSE",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E121",
+    "name": "List tap: PAYMENT_LOG → asks for payment details",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "PAYMENT_LOG",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E122",
+    "name": "List tap: GET_WIFI_PASSWORD → wifi creds",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "GET_WIFI_PASSWORD",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E123",
+    "name": "List tap: RULES → house rules",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "RULES",
+        "expected_intent": "RULES",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "rent"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E124",
+    "name": "List tap: QUERY_VACANT_ROOMS → vacancy list",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "QUERY_VACANT_ROOMS",
+        "expected_intent": "QUERY_VACANT_ROOMS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E125",
+    "name": "List tap: CHECKOUT → checkout prompt",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "CHECKOUT",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E126",
+    "name": "List tap: QUERY_TENANT → asks for name",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "QUERY_TENANT",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E127",
+    "name": "Button tap: HELP from power_user",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "power_user",
+        "input": "HELP",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E128",
+    "name": "List tap: ADD_REFUND → refund flow",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ADD_REFUND",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E129",
+    "name": "List tap: QUERY_OCCUPANCY → occupancy stats",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "QUERY_OCCUPANCY",
+        "expected_intent": "QUERY_OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E130",
+    "name": "List tap: COMPLAINT_REGISTER → complaint prompt",
+    "category": "button_tap_routing",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "COMPLAINT_REGISTER",
+        "expected_intent": "COMPLAINT_REGISTER",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E131",
+    "name": "Lead: cannot access tenant payment data",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "Ankit paid 8000",
+        "expected_intent": "GENERAL",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "8,000",
+          "logged",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E132",
+    "name": "Lead: cannot see dues list",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "who hasn't paid",
+        "expected_intent": "GENERAL",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E133",
+    "name": "Lead: cannot see monthly report",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "monthly report",
+        "expected_intent": "GENERAL",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "collection",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E134",
+    "name": "Lead: GET_WIFI_PASSWORD blocked",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "wifi password",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_not_contain": [
+          "cozeevo",
+          "password is",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E135",
+    "name": "Tenant: MY_BALANCE returns only own data",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "my balance",
+        "expected_intent": "MY_BALANCE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E136",
+    "name": "Tenant: cannot log payments (no PAYMENT_LOG route)",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "paid 8000 upi",
+        "expected_intent": "MY_BALANCE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "logged",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E137",
+    "name": "Tenant: cannot see who hasn't paid",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "who hasn't paid",
+        "expected_intent": "MY_BALANCE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E138",
+    "name": "Tenant: cannot see expense report",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "monthly expenses",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "electricity",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E139",
+    "name": "Tenant: wifi password returns floor-specific (no other floor data)",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "wifi password",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E140",
+    "name": "Lead: ROOM_PRICE is allowed",
+    "category": "security_boundary",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "what is the price",
+        "expected_intent": "ROOM_PRICE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E141",
+    "name": "Hinglish: 'Ankit ne rent diya 9000'",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit ne rent diya 9000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "9,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E142",
+    "name": "Hinglish: 'bijli ka bill 7200 diya'",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "bijli bill 7200",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "7,200"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E143",
+    "name": "Typo: 'recieved' still routes",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "recieved 8000 from Ankit upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E144",
+    "name": "Typo: 'paiment' routes to PAYMENT_LOG",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paiment 14000 Ankit upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "14,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E145",
+    "name": "Hinglish: 'kaun nahi diya' → QUERY_DUES",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kisne nahi diya",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E146",
+    "name": "Hinglish: 'khali kamre'",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "khali kamre",
+        "expected_intent": "QUERY_VACANT_ROOMS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E147",
+    "name": "Typo: 'chekout Ankit' → CHECKOUT",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "chekout Ankit",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E148",
+    "name": "Typo: 'expnese' → QUERY_EXPENSES",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show expneses",
+        "expected_intent": "QUERY_EXPENSES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E149",
+    "name": "Hinglish: 'Ankit ka checkout karo' → CHECKOUT",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit ka checkout karo",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E150",
+    "name": "Hinglish: 'wifi ka password batao'",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "wifi ka password batao",
+        "expected_intent": "GET_WIFI_PASSWORD",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E151",
+    "name": "Hinglish: 'naya tenant add karo' → ADD_TENANT",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "naya tenant add karo",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E152",
+    "name": "Hinglish: 'sabko rent reminder bhejo'",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "sabko rent reminder bhejo",
+        "expected_intent": "SEND_REMINDER_ALL",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E153",
+    "name": "Typo: 'maintanance 3000' → ADD_EXPENSE",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "maintanance 3000 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "3,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E154",
+    "name": "Hinglish: 'Ankit chutti pe gaya 10 din'",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit chutti pe gaya 10 din",
+        "expected_intent": "LOG_VACATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E155",
+    "name": "Hinglish: 'Ankit March mein jayega' → SCHEDULE_CHECKOUT",
+    "category": "hinglish_typo",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit March mein jayega",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E156",
+    "name": "Amount: '1k' → 1000",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 1k cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E157",
+    "name": "Amount: '12k' → 12000",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 12k upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "12,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E158",
+    "name": "Room number 203 not confused with amount",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 203 paid 8000 cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "203",
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E159",
+    "name": "Amount with decimal: '8000.50'",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000.50 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E160",
+    "name": "Expense: '10,000' with comma parsed correctly",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity 10,000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E161",
+    "name": "Phone number in message not confused with amount",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add tenant Ravi 9876543210 room 201",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E162",
+    "name": "Year in date not confused with amount",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit checked in on 10 March 2026",
+        "expected_intent": "UPDATE_CHECKIN",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Mar"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E163",
+    "name": "Large amount: '100000' (1 lakh)",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 100000 bank transfer",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1,00,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E164",
+    "name": "Expense: Rs. prefix in amount",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity Rs. 8400",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,400"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E165",
+    "name": "Small amount: '100 cash' expense",
+    "category": "edge_numbers",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "cleaning 100 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "100"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E166",
+    "name": "HELP from admin returns reply with menu content",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "help",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "paid",
+          "report"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E167",
+    "name": "HELP: 'hello' triggers help",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hello",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E168",
+    "name": "HELP: 'commands' triggers help",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "commands",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E169",
+    "name": "MORE_MENU: returns some reply",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "MORE_MENU",
+        "expected_intent": "MORE_MENU",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E170",
+    "name": "HELP: power_user gets menu",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "power_user",
+        "input": "help",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E171",
+    "name": "HELP: key_user gets menu",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "key_user",
+        "input": "help",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E172",
+    "name": "RULES: response contains rule text",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "rules",
+        "expected_intent": "RULES",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "rent",
+          "30"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E173",
+    "name": "HELP: 'start' triggers help",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "start",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E174",
+    "name": "HELP: 'hii' typo triggers help",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hii",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E175",
+    "name": "HELP: 'hey' triggers help",
+    "category": "interactive_menu",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hey",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E176",
+    "name": "Bill payment is expense not income",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid internet bill 1800",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1,800"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E177",
+    "name": "Salary payment is expense not income",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid salary to watchman 8000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E178",
+    "name": "'show dues' is QUERY_DUES not REPORT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show dues",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E179",
+    "name": "'pending' alone is QUERY_DUES",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pending",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E180",
+    "name": "Checkout vs SCHEDULE: 'Ankit leaving' (no date) is CHECKOUT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit leaving",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E181",
+    "name": "Checkout vs SCHEDULE: 'leaving on 31st' is SCHEDULE_CHECKOUT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit leaving on 31st March",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E182",
+    "name": "'report plumbing' is COMPLAINT not REPORT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "report plumbing leak",
+        "expected_intent": "COMPLAINT_REGISTER",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E183",
+    "name": "'monthly report' is REPORT not COMPLAINT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "monthly report",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E184",
+    "name": "VOID_PAYMENT vs PAYMENT_LOG: 'reverse payment' is VOID not LOG",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "reverse payment",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E185",
+    "name": "ADD_REFUND with amount is action not query",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "return deposit 8000 to Ankit",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E186",
+    "name": "'outstanding dues' is QUERY_DUES not QUERY_TENANT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "outstanding dues",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E187",
+    "name": "'Ankit dues' is QUERY_TENANT not QUERY_DUES",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit dues",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E188",
+    "name": "'payment history' is QUERY_TENANT (all tenants)",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "payment history",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E189",
+    "name": "'add power user' is ADD_PARTNER not ADD_TENANT",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add power user 9876543210",
+        "expected_intent": "ADD_PARTNER",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E190",
+    "name": "GET_TENANT_NOTES not confused with RULES",
+    "category": "action_vs_query",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "notes for Ankit",
+        "expected_intent": "GET_TENANT_NOTES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E191",
+    "name": "Empty message does not crash",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "   ",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E192",
+    "name": "All-caps message: 'MONTHLY REPORT'",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "MONTHLY REPORT",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E193",
+    "name": "Mixed case: 'ankit PAID 8000 Cash'",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ankit PAID 8000 Cash",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E194",
+    "name": "Message with extra spaces: 'who   hasn't   paid'",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who   hasn't   paid",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E195",
+    "name": "Emoji in message: 'Ankit paid 8000 upi ✅'",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 8000 upi ✅",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E196",
+    "name": "Long gibberish does not crash",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "asdfghjklzxcvbnmqwertyuiop asdfghjklzxcvbnm",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E197",
+    "name": "Special chars in message: 'electricity @8400 #march'",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity @8400 #march",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,400"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E198",
+    "name": "Number-only message '8000' does not crash",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "8000",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E199",
+    "name": "Repeat HELP calls work every time",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hi",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "help",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E200",
+    "name": "Unknown message logged but no crash",
+    "category": "system_resilience",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "please do the needful",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "traceback",
+          "exception",
+          "seed",
+          "vps",
+          "database"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E201",
+    "name": "TC-01: ADD_TENANT bare trigger",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add new tenant",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [
+          "Name",
+          "Phone",
+          "Room",
+          "Rent"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E202",
+    "name": "TC-01b: ADD_TENANT with name and phone",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add tenant Rahul Sharma 9876543210",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [
+          "Name",
+          "Room",
+          "Deposit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E203",
+    "name": "TC-01c: ADD_TENANT - warns if tenant already active",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add Ankit Kumar",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "collecting",
+        "reply_must_contain": [
+          "active"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E204",
+    "name": "TC-01d: START_ONBOARDING with name and phone",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "start onboarding Ravi 9001234567",
+        "expected_intent": "START_ONBOARDING",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "9001234567",
+          "WhatsApp"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E205",
+    "name": "TC-04: CHECKOUT by tenant name",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Ankit Kumar",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Confirm",
+          "Ankit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E206",
+    "name": "TC-04b: CHECKOUT by room number",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout room 203",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Confirm"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E207",
+    "name": "TC-04c: RECORD_CHECKOUT checklist start",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "record checkout Ankit",
+        "expected_intent": "RECORD_CHECKOUT",
+        "expected_state": "pending",
+        "reply_must_contain": [
+          "cupboard",
+          "key"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E208",
+    "name": "TC-05: SCHEDULE_CHECKOUT - future date",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Ankit on 30 Jun",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Jun",
+          "active"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E209",
+    "name": "TC-06: CHECKOUT - unknown tenant returns no-match",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Mukesh XYZ 99999",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E210",
+    "name": "TC-07: LOG_VACATION for active tenant",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit on vacation from 15 Apr to 30 Apr",
+        "expected_intent": "LOG_VACATION",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "vacation",
+          "Ankit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E211",
+    "name": "TC-03: UPDATE_CHECKIN - correct checkin date",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit checked in on 10 Jan",
+        "expected_intent": "UPDATE_CHECKIN",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Update",
+          "10 Jan"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E212",
+    "name": "TC-08: NOTICE_GIVEN today (assumed date)",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit gave notice today",
+        "expected_intent": "NOTICE_GIVEN",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "Notice",
+          "Last day"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E213",
+    "name": "TC-08b: NOTICE_GIVEN specific date - late notice forfeits deposit",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit gave notice on 15th March",
+        "expected_intent": "NOTICE_GIVEN",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "deposit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E214",
+    "name": "QUERY_CHECKINS: who checked in this month",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who checked in this month",
+        "expected_intent": "QUERY_CHECKINS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E215",
+    "name": "QUERY_CHECKOUTS: who checked out this month",
+    "category": "tenant_lifecycle",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who checked out this month",
+        "expected_intent": "QUERY_CHECKOUTS",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E221",
+    "name": "TC-09: PAYMENT_LOG - booking advance payment",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 5000 advance upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "5,000",
+          "Ankit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E222",
+    "name": "TC-10: QUERY_TENANT balance after advance paid",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E223",
+    "name": "TC-09b: Pro-rata query for mid-month checkin",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "what is pro rata for Ankit",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E224",
+    "name": "TC-09c: Checkout reply shows prorated settlement",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Ankit today",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "deposit",
+          "Ankit"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E225",
+    "name": "TC-11: RENT_CHANGE - first-month concession 1000",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "give Ankit 1000 discount this month",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "1,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E226",
+    "name": "TC-11b: RENT_CHANGE permanent rent increase",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "change Ankit rent to 16000 from next month",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "16,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E227",
+    "name": "TC-12: ADD_EXPENSE maintenance 5000 paid to plumber",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "maintenance 5000 paid to plumber",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "5,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E228",
+    "name": "TC-12b: ADD_EXPENSE WiFi bill auto-category",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "wifi bill 2500",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "2,500"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E229",
+    "name": "TC-13: PAYMENT_LOG - overpayment above monthly rent",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 20000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "20,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E230",
+    "name": "TC-10b: First month payment after deducting 5000 advance",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit first month 10500 cash after 5000 advance",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "10,500"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E231",
+    "name": "ADD_EXPENSE - electricity bill auto-category",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity 8000",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "8,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E232",
+    "name": "ADD_EXPENSE - cook salary auto-category cash",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "cook salary 12000 cash",
+        "expected_intent": "ADD_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "12,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E233",
+    "name": "QUERY_DUES - filter by specific month",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who has not paid for March",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E234",
+    "name": "REPORT - show rent collected this month",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show rent collected this month",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E235",
+    "name": "QUERY_EXPIRING - upcoming checkout notices",
+    "category": "financial_prorate",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who is leaving this month",
+        "expected_intent": "QUERY_EXPIRING",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E236",
+    "name": "TC-14: Tenant cannot log payment for another tenant",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "Ankit paid 15000",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "logged",
+          "confirmed"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E237",
+    "name": "TC-15: Tenant cannot see all-tenant dues list",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "who has not paid",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E238",
+    "name": "Lead cannot access financial records",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "show me all tenant payments",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "payments",
+          "Rs.",
+          "dues",
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E239",
+    "name": "Lead cannot access WiFi password",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "what is the wifi password",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "password",
+          "ssid",
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E240",
+    "name": "Lead asking room price - allowed (sales path)",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "how much is the rent",
+        "expected_intent": "ROOM_PRICE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E241",
+    "name": "TC-14b: key_user cannot add partner (admin-only)",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "key_user",
+        "input": "add partner 9001234567 Suresh",
+        "expected_intent": "ADD_PARTNER",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "admin"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E242",
+    "name": "TC-15b: Tenant can see own balance (MY_BALANCE)",
+    "category": "security_firewall",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "my balance",
+        "expected_intent": "MY_BALANCE",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E243",
+    "name": "TC-08h: Duplicate payment flagged on re-log",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 15000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "15,000"
+        ],
+        "reply_must_not_contain": [
+          "error"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "Ankit paid 15000 upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "already"
+        ],
+        "reply_must_not_contain": [
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E244",
+    "name": "VOID_PAYMENT flow start by name",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void payment Ankit",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E245",
+    "name": "Checkout date before checkin is blocked",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout Ankit on 1 Jan 2000",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error"
+        ]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "before",
+          "checkin"
+        ],
+        "reply_must_not_contain": [
+          "error"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E246",
+    "name": "ADD_REFUND after checkout - deposit return",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund 10000 to Ankit",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "confirming",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E247",
+    "name": "ADD_REFUND bare - missing name asks for clarification",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "refund 8000",
+        "expected_intent": "ADD_REFUND",
+        "expected_state": "collecting",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E248",
+    "name": "PAYMENT_LOG with explicit period month label",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 15000 for March upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "15,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E249",
+    "name": "PAYMENT_LOG with payment date override",
+    "category": "data_integrity",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Ankit paid 15000 on 5 March upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": [
+          "15,000"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "E250",
+    "name": "TC-16: Unhandled intent logged to PendingLearning",
+    "category": "intent_feedback",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "can I bring my pet iguana to the PG",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "iguana"
+        ]
+      }
+    ]
+  }
+]

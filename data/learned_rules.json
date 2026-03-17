@@ -1,0 +1,16 @@
+[
+  {
+    "pattern": "Raj\\ March\\ 31",
+    "intent": "UPDATE_CHECKIN",
+    "confidence": 0.97,
+    "applies_to": "owner",
+    "active": true
+  },
+  {
+    "pattern": "Raj\\ 31st\\ March",
+    "intent": "SCHEDULE_CHECKOUT",
+    "confidence": 0.97,
+    "applies_to": "owner",
+    "active": true
+  }
+]
