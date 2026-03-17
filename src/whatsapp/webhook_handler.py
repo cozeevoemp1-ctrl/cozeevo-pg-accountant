@@ -273,8 +273,17 @@ async def _download_media(media_id: str, media_mime: Optional[str]) -> Optional[
         "text/csv":        ".csv",
         "application/vnd.ms-excel": ".xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+        # Audio — WhatsApp voice notes come as ogg/opus; Whisper accepts ogg, mp4, m4a, webm
+        "audio/ogg":       ".ogg",
+        "audio/mpeg":      ".mp3",
+        "audio/mp4":       ".m4a",
+        "audio/webm":      ".webm",
+        "audio/wav":       ".wav",
+        "audio/aac":       ".aac",
     }
-    ext      = mime_ext.get(media_mime or "", ".bin")
+    # Handle compound MIME like "audio/ogg; codecs=opus" → match on base part
+    base_mime = (media_mime or "").split(";")[0].strip()
+    ext       = mime_ext.get(base_mime) or mime_ext.get(media_mime or "", ".bin")
     out_path = raw_dir / f"wa_{uuid.uuid4().hex[:8]}{ext}"
     headers  = {"Authorization": f"Bearer {token}"}
 

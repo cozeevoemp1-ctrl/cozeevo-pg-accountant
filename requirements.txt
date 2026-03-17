@@ -65,6 +65,10 @@ cryptography==42.0.8
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
+# LLM / AI
+groq==0.9.0                  # Groq Cloud API — LLM (llama-3.3-70b) + Whisper audio transcription
+langchain-groq==1.1.2        # LangChain wrapper for Groq
+
 # WhatsApp (Meta Cloud API — uses httpx, already listed above)
 
 # n8n/Webhook
