@@ -343,9 +343,9 @@ async def save_memory_node(state: PGState) -> dict:
 # ── Conditional edge ──────────────────────────────────────────────────────────
 
 def route_after_classify(state: PGState) -> str:
-    """Skip agent_executor for pure statements — no DB action needed."""
-    if state["intent_type"] in ("STATEMENT",):
-        return "save_memory"
+    """Skip agent_executor for statements/greetings — no DB action needed, go straight to humanizer."""
+    if state["intent_type"] in ("STATEMENT", "GREETING"):
+        return "humanize_response"
     return "agent_executor"
 
 
