@@ -337,7 +337,7 @@ async def save_memory_node(state: PGState) -> dict:
     """
     if state["intent_type"] in ("STATEMENT", "GREETING") and not state.get("response"):
         return {"response": "", "v1_intent": "STATEMENT", "raw_result": ""}
-    return {}
+    return {"response": state.get("response", "")}
 
 
 # ── Conditional edge ──────────────────────────────────────────────────────────
