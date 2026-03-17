@@ -99,18 +99,25 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         background.add_task(_send_whatsapp, from_number, f"Rejected: #{pid}")
         return {"status": "ok"}
 
-    # -- Download media + transcribe audio if attached ------------------------
+    # -- Handle media ---------------------------------------------------------
     if media_id:
-        file_path = await _download_media(media_id, media_mime)
-        # Voice message: transcribe to text via Groq Whisper
-        if file_path and media_mime and media_mime.startswith("audio/"):
-            transcribed = await _transcribe_audio(file_path)
+        base_mime = (media_mime or "").split(";")[0].strip()
+        if base_mime.startswith("audio/"):
+            # Voice message: stream bytes in memory directly to Whisper — no disk I/O
+            audio_bytes = await _fetch_media_bytes(media_id)
+            if not audio_bytes:
+                logger.warning("[Webhook] Voice download failed — ignoring message")
+                return {"status": "ok"}
+            transcribed = await _transcribe_audio_bytes(audio_bytes, base_mime)
             if transcribed:
                 logger.info(f"[Webhook] Voice transcribed: {transcribed[:80]}")
                 body = transcribed
             else:
                 logger.warning("[Webhook] Voice transcription failed — ignoring message")
                 return {"status": "ok"}
+        else:
+            # Non-audio (PDF, image, etc.) — save to disk for downstream processing
+            await _download_media(media_id, media_mime)
 
     # -- Route through the v2 LangGraph supervisor pipeline -------------------
     try:
@@ -302,32 +309,63 @@ async def _download_media(media_id: str, media_mime: Optional[str]) -> Optional[
         return None
 
 
-# -- Groq Whisper voice transcription -----------------------------------------
+# -- Groq Whisper voice transcription (in-memory, no disk I/O) ----------------
 
-async def _transcribe_audio(file_path: str) -> Optional[str]:
+_MIME_TO_EXT = {
+    "audio/ogg":  ".ogg",
+    "audio/mpeg": ".mp3",
+    "audio/mp4":  ".m4a",
+    "audio/webm": ".webm",
+    "audio/wav":  ".wav",
+    "audio/aac":  ".aac",
+}
+
+
+async def _fetch_media_bytes(media_id: str) -> Optional[bytes]:
+    """Fetch raw media bytes from Meta CDN into memory (no disk write)."""
+    import httpx
+    token = os.getenv("WHATSAPP_TOKEN", "")
+    if not token:
+        return None
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            meta_resp = await client.get(
+                f"https://graph.facebook.com/v18.0/{media_id}", headers=headers
+            )
+            media_url = meta_resp.json()["url"]
+            file_resp = await client.get(media_url, headers=headers)
+        return file_resp.content
+    except Exception as e:
+        logger.error(f"[Webhook] Media fetch failed: {e}")
+        return None
+
+
+async def _transcribe_audio_bytes(audio_bytes: bytes, mime_type: str) -> Optional[str]:
     """
-    Transcribe a voice message using Groq Whisper.
+    Transcribe audio bytes via Groq Whisper — no disk I/O.
     Supports Hindi, English, Hinglish, Telugu, Kannada (auto-detected).
-    Returns transcribed text or None on failure.
     """
     import asyncio
-    from pathlib import Path
+    from io import BytesIO
 
     api_key = os.getenv("GROQ_API_KEY", "")
     if not api_key:
         logger.warning("[Whisper] GROQ_API_KEY not set — cannot transcribe audio")
         return None
 
+    ext = _MIME_TO_EXT.get(mime_type, ".ogg")
+    filename = f"voice{ext}"
+
     def _sync_transcribe() -> str:
         from groq import Groq
         client = Groq(api_key=api_key)
-        with open(file_path, "rb") as f:
-            result = client.audio.transcriptions.create(
-                file=(Path(file_path).name, f),
-                model="whisper-large-v3-turbo",   # fast + multilingual
-                response_format="text",
-                language=None,                     # auto-detect language
-            )
+        result = client.audio.transcriptions.create(
+            file=(filename, BytesIO(audio_bytes)),
+            model="whisper-large-v3-turbo",
+            response_format="text",
+            language=None,   # auto-detect
+        )
         return result if isinstance(result, str) else getattr(result, "text", "")
 
     try:
