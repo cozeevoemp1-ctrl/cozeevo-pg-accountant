@@ -75,6 +75,7 @@ async def handle_owner(
         "NOTICE_GIVEN":       _notice_given,
         "ADD_PARTNER":        _add_partner,
         "REMINDER_SET":       _reminder_prompt,
+        "ROOM_LAYOUT":        _room_layout,
         "QUERY_VACANT_ROOMS": _query_vacant_rooms,
         "QUERY_OCCUPANCY":    _query_occupancy,
         "QUERY_EXPIRING":     _query_expiring,
@@ -1623,6 +1624,80 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         f"Occupancy   : {pct}%\n\n"
         "Say *vacant rooms* to see which rooms are empty."
     )
+
+
+async def _room_layout(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Floor-by-floor room + bed diagram for Thor and Hulk blocks."""
+    from src.database.models import Property
+
+    msg = entities.get("description", "").lower()
+    # Filter to one block if specified
+    only_block = None
+    if "thor" in msg and "hulk" not in msg:
+        only_block = "thor"
+    elif "hulk" in msg and "thor" not in msg:
+        only_block = "hulk"
+
+    # Load properties
+    props_result = await session.execute(
+        select(Property).where(Property.active == True).order_by(Property.name)
+    )
+    properties = props_result.scalars().all()
+    if not properties:
+        return "No properties found."
+
+    _TYPE_ABBR = {"single": "S", "double": "D", "triple": "T", "premium": "P"}
+
+    lines = []
+    grand_rooms = grand_beds = 0
+
+    for prop in properties:
+        block_key = "thor" if "thor" in prop.name.lower() else "hulk"
+        if only_block and block_key != only_block:
+            continue
+
+        # All active non-staff rooms for this property, sorted by floor then room_number
+        rooms_result = await session.execute(
+            select(Room)
+            .where(Room.property_id == prop.id, Room.active == True, Room.is_staff_room == False)
+            .order_by(Room.floor.nullsfirst(), Room.room_number)
+        )
+        rooms = rooms_result.scalars().all()
+        if not rooms:
+            continue
+
+        # Group by floor
+        from collections import defaultdict
+        by_floor: dict = defaultdict(list)
+        for r in rooms:
+            by_floor[r.floor].append(r)
+
+        prop_rooms = len(rooms)
+        prop_beds  = sum(r.max_occupancy or 1 for r in rooms)
+        grand_rooms += prop_rooms
+        grand_beds  += prop_beds
+
+        lines.append(f"*{prop.name}*  ({prop_rooms} rooms · {prop_beds} beds)")
+
+        for floor in sorted(by_floor.keys(), key=lambda f: (f is None, f)):
+            floor_rooms = by_floor[floor]
+            floor_beds  = sum(r.max_occupancy or 1 for r in floor_rooms)
+            floor_label = f"Floor {floor}" if floor is not None else "Ground"
+            room_tags   = "  ".join(
+                f"{r.room_number}[{_TYPE_ABBR.get(r.room_type.value if r.room_type else '', '?')}{r.max_occupancy or 1}]"
+                for r in floor_rooms
+            )
+            lines.append(f"  {floor_label} ({len(floor_rooms)}r/{floor_beds}b): {room_tags}")
+
+        lines.append("")  # blank line between blocks
+
+    if not lines:
+        return "No rooms found for the requested block."
+
+    if not only_block:
+        lines.append(f"*Total: {grand_rooms} rooms · {grand_beds} beds*")
+
+    return "\n".join(lines)
 
 
 # ── Expiring tenancies / upcoming checkouts ───────────────────────────────────
