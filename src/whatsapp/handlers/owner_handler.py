@@ -1772,8 +1772,7 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
             for r in rooms:
                 icon = _ICON.get(r.room_type.value, "⬜")
                 ac = "❄" if r.has_ac else ""
-                beds = r.max_occupancy or 1
-                cells.append(f"{icon}{r.room_number}({beds}b){ac}")
+                cells.append(f"{icon}{r.room_number}{ac}")
             label = "GF" if fl == "G" else f"F{fl}"
             lines.append(f"  {label}  {'  '.join(cells)}")
         lines.append("")
@@ -1782,12 +1781,11 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     bed_line = "  ".join(
         f"{_ICON.get(k,'⬜')}{v}b"
         for k, v in [("single", type_counts["single"]), ("double", type_counts["double"]),
-                     ("sharing", type_counts["sharing"]), ("triple", type_counts["triple"]),
-                     ("premium", type_counts["premium"])]
+                     ("triple", type_counts["triple"]), ("premium", type_counts["premium"])]
         if v
     )
     lines.append(f"*{SEP}*")
-    lines.append(f"🔵Single 🟢Double 🟡Sharing 🟠Triple ⭐Premium")
+    lines.append(f"🔵Single 🟢Double 🟠Triple ⭐Premium")
     lines.append(f"Vacant beds: {bed_line}  = *{vacant_beds} total*")
     return "\n".join(lines)
 
