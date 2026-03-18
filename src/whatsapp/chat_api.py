@@ -283,72 +283,54 @@ async def _process_message_inner(
 
 def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict]:
     """
-    Build a Meta WhatsApp interactive message payload for owner HELP / MORE_MENU.
-    reply_text is used as the body for HELP (already contains the rotating greeting).
-    Returns None if payload cannot be built (e.g. reply too long).
+    Build a Meta WhatsApp interactive list message for owner HELP / MORE_MENU.
+    Both intents show the same full services menu (like HP Gas WhatsApp).
     """
-    # WhatsApp interactive body max = 1024 chars; strip to greeting line only
-    body = reply_text.split("\n\n")[0].strip()[:1024] or "How can I help?"
+    if intent not in ("HELP", "MORE_MENU"):
+        return None
 
-    if intent == "HELP":
-        return {
-            "type": "interactive",
-            "interactive": {
-                "type": "button",
-                "header": {"type": "text", "text": "Artha — Owner"},
-                "body":   {"text": body},
-                "footer": {"text": "getkozzy.com"},
-                "action": {
-                    "buttons": [
-                        {"type": "reply", "reply": {"id": "REPORT",     "title": "Revenue & Report"}},
-                        {"type": "reply", "reply": {"id": "QUERY_DUES", "title": "Who Hasn't Paid?"}},
-                        {"type": "reply", "reply": {"id": "MORE_MENU",  "title": "More Options"}},
-                    ]
-                },
+    # WhatsApp interactive body max = 1024 chars
+    body = reply_text.split("\n\n")[0].strip()[:1024] or "Select a service below."
+
+    return {
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "header": {"type": "text", "text": "Artha — Owner Services"},
+            "body":   {"text": body},
+            "footer": {"text": "Cozeevo Co-living | getkozzy.com"},
+            "action": {
+                "button": "View Services",
+                "sections": [
+                    {
+                        "title": "Finance",
+                        "rows": [
+                            {"id": "PAYMENT_LOG",  "title": "Log Payment",      "description": "Record rent received"},
+                            {"id": "REPORT",       "title": "Revenue Report",    "description": "Monthly income summary"},
+                            {"id": "QUERY_DUES",   "title": "Who Owes",          "description": "Pending dues list"},
+                            {"id": "ADD_EXPENSE",  "title": "Log Expense",       "description": "Electricity, salary, bills"},
+                        ],
+                    },
+                    {
+                        "title": "Tenants",
+                        "rows": [
+                            {"id": "ADD_TENANT",   "title": "Add Tenant",        "description": "New check-in onboarding"},
+                            {"id": "CHECKOUT",     "title": "Checkout",          "description": "Offboard a tenant"},
+                            {"id": "QUERY_TENANT", "title": "Tenant Account",    "description": "Balance & payment history"},
+                            {"id": "ADD_REFUND",   "title": "Refund Deposit",    "description": "Return security deposit"},
+                        ],
+                    },
+                    {
+                        "title": "Property",
+                        "rows": [
+                            {"id": "QUERY_OCCUPANCY",    "title": "Occupancy",   "description": "Beds occupied vs available"},
+                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms","description": "Which rooms are free"},
+                        ],
+                    },
+                ],
             },
-        }
-
-    if intent == "MORE_MENU":
-        return {
-            "type": "interactive",
-            "interactive": {
-                "type": "list",
-                "header": {"type": "text", "text": "Owner Actions"},
-                "body":   {"text": "Select an action:"},
-                "footer": {"text": "Artha"},
-                "action": {
-                    "button": "Open Menu",
-                    "sections": [
-                        {
-                            "title": "Tenants",
-                            "rows": [
-                                {"id": "ADD_TENANT",   "title": "Add New Tenant",  "description": "Start onboarding"},
-                                {"id": "CHECKOUT",     "title": "Record Checkout", "description": "Offboard tenant"},
-                                {"id": "QUERY_TENANT", "title": "Tenant Account",  "description": "Balance & history"},
-                            ],
-                        },
-                        {
-                            "title": "Finance",
-                            "rows": [
-                                {"id": "ADD_EXPENSE",  "title": "Log Expense",    "description": "Electricity, salary..."},
-                                {"id": "PAYMENT_LOG",  "title": "Log Payment",    "description": "Rent received"},
-                                {"id": "ADD_REFUND",   "title": "Refund Deposit", "description": "Return security deposit"},
-                            ],
-                        },
-                        {
-                            "title": "Settings & Info",
-                            "rows": [
-                                {"id": "QUERY_VACANT_ROOMS",  "title": "Vacant Rooms",   "description": "Check availability"},
-                                {"id": "GET_WIFI_PASSWORD",   "title": "WiFi Passwords", "description": "View credentials"},
-                                {"id": "RULES",               "title": "PG Rules",       "description": "House rules"},
-                            ],
-                        },
-                    ],
-                },
-            },
-        }
-
-    return None
+        },
+    }
 
 
 def _learn_from_selection(original_msg: str, intent: str) -> None:
