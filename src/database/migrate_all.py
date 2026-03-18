@@ -213,10 +213,10 @@ async def run_seed(conn: AsyncConnection) -> None:
         INSERT INTO authorized_users (name, phone, role, active)
         VALUES
           ('Kiran',   '7845952289', 'admin',      TRUE),
-          ('Partner', '7358341775', 'power_user', TRUE)
+          ('Partner', '7358341775', 'admin', TRUE)
         ON CONFLICT (phone) DO NOTHING
     """))
-    print("  [ok] authorized_users - admin + power_user")
+    print("  [ok] authorized_users - admin + admin")
 
     # food_plans
     await conn.execute(text("""
@@ -377,6 +377,16 @@ async def show_status(conn: AsyncConnection) -> None:
     print(f"\n  tenants columns ({len(cols)}): {', '.join(cols)}")
 
 
+async def run_promote_partner_to_admin(conn: AsyncConnection) -> None:
+    """Promote 7358341775 (partner) from power_user → admin."""
+    await conn.execute(text("""
+        UPDATE authorized_users
+        SET role = 'admin'
+        WHERE phone = '7358341775' AND role != 'admin'
+    """))
+    print("  [ok] authorized_users - 7358341775 promoted to admin")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -388,6 +398,7 @@ async def main(args: argparse.Namespace) -> None:
         if not args.status:
             await run_schema(conn)
             await run_room_master_fix(conn)
+            await run_promote_partner_to_admin(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()
