@@ -112,6 +112,46 @@ def _norm_date(raw) -> date | None:
 
 # ── read spreadsheet ──────────────────────────────────────────────────────────
 
+_MONTH_ABBR = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _detect_rent_revision_cols(headers: list[str]) -> list[tuple[date, int]]:
+    """
+    Find columns like "From 1st FEB", "From 1st MAY 2026" etc.
+    Returns list of (effective_date, col_index) sorted oldest→newest.
+    """
+    revisions = []
+    today = date.today()
+    for idx, h in enumerate(headers):
+        m = re.match(r"from\s+1st\s+([a-z]{3})(?:\s+(\d{4}))?", h.strip(), re.I)
+        if m:
+            mon = _MONTH_ABBR.get(m.group(1).lower())
+            if not mon:
+                continue
+            yr = int(m.group(2)) if m.group(2) else today.year
+            revisions.append((date(yr, mon, 1), idx))
+    revisions.sort(key=lambda x: x[0])
+    return revisions
+
+
+def _effective_rent(base_rent: Decimal, row: tuple, revision_cols: list[tuple[date, int]]) -> tuple[Decimal, date | None]:
+    """
+    Walk revision columns oldest→newest. Return (latest_non_zero_rent, effective_from_date).
+    Falls back to base_rent if no revision found.
+    """
+    effective = base_rent
+    effective_from: date | None = None
+    for rev_date, col_idx in revision_cols:
+        val = _norm_amount(row[col_idx])
+        if val > 0:
+            effective = val
+            effective_from = rev_date
+    return effective, effective_from
+
+
 def read_spreadsheet() -> list[dict]:
     wb = openpyxl.load_workbook(SPREADSHEET, data_only=True)
     ws = wb.active
@@ -123,6 +163,10 @@ def read_spreadsheet() -> list[dict]:
             return row[headers.index(name)]
         except ValueError:
             return None
+
+    revision_cols = _detect_rent_revision_cols(headers)
+    if revision_cols:
+        print(f"  Rent revision columns detected: {[str(d) for d, _ in revision_cols]}")
 
     records = []
     for i, row in enumerate(rows[1:], start=2):
@@ -138,19 +182,23 @@ def read_spreadsheet() -> list[dict]:
         if not name:
             continue
 
+        base_rent = _norm_amount(col(row, "Monthly Rent"))
+        effective_rent, rent_from = _effective_rent(base_rent, row, revision_cols)
+
         records.append({
-            "row":        i,
-            "name":       name,
-            "phone":      _norm_phone(col(row, "Mobile Number")),
-            "room":       room,
-            "block":      str(col(row, "BLOCK") or "").strip().upper(),
-            "checkin":    _norm_date(col(row, "Checkin date")),
-            "rent":       _norm_amount(col(row, "Monthly Rent")),
-            "deposit":    _norm_amount(col(row, "Security Deposit")),
-            "advance":    _norm_amount(col(row, "Booking")),
-            "maintenance":_norm_amount(col(row, "Maintence")),
-            "food":       _norm_food(col(row, "veg/nonveg/egg")),
-            "status":     status,
+            "row":          i,
+            "name":         name,
+            "phone":        _norm_phone(col(row, "Mobile Number")),
+            "room":         room,
+            "block":        str(col(row, "BLOCK") or "").strip().upper(),
+            "checkin":      _norm_date(col(row, "Checkin date")),
+            "rent":         effective_rent,   # latest effective rent (respects revisions)
+            "rent_from":    rent_from,        # date the revised rent kicks in (None = always)
+            "deposit":      _norm_amount(col(row, "Security Deposit")),
+            "advance":      _norm_amount(col(row, "Booking")),
+            "maintenance":  _norm_amount(col(row, "Maintence")),
+            "food":         _norm_food(col(row, "veg/nonveg/egg")),
+            "status":       status,
         })
     return records
 
@@ -237,8 +285,23 @@ async def run_delta(write: bool) -> None:
                     )
                 )
                 if existing:
-                    skip_reasons["tenancy exists"] = skip_reasons.get("tenancy exists", 0) + 1
-                    skipped += 1
+                    # Still apply rent revision if spreadsheet has a newer rate
+                    if write and rec["rent_from"] and rec["rent"] and rec["rent"] != existing.agreed_rent:
+                        old = existing.agreed_rent
+                        existing.agreed_rent = rec["rent"]
+                        # Update rent_schedule rows from rent_from onwards
+                        rs_rows = (await session.execute(
+                            select(RentSchedule).where(
+                                RentSchedule.tenancy_id == existing.id,
+                                RentSchedule.period_month >= rec["rent_from"],
+                            )
+                        )).scalars().all()
+                        for rs in rs_rows:
+                            rs.rent_due = rec["rent"]
+                        print(f"  [RENT UPDATE] {rec['name']} {old}→{rec['rent']} from {rec['rent_from']} ({len(rs_rows)} schedule rows)")
+                    else:
+                        skip_reasons["tenancy exists"] = skip_reasons.get("tenancy exists", 0) + 1
+                        skipped += 1
                     continue
 
             # ── 5. Create tenancy ──
@@ -267,9 +330,11 @@ async def run_delta(write: bool) -> None:
                 continue
 
             # ── 6. Generate RentSchedule from checkin month to today ──
+            # Maintenance is a one-time check-in fee (from deposit) — NOT added to monthly schedules
             today = date.today()
             period = checkin.replace(day=1)
             current = today.replace(day=1)
+            base_rent_orig = _norm_amount(None)  # will use rec fields directly
             while period <= current:
                 existing_rs = await session.scalar(
                     select(RentSchedule).where(
@@ -278,13 +343,20 @@ async def run_delta(write: bool) -> None:
                     )
                 )
                 if not existing_rs:
+                    # Use revised rent from rent_from date; original rent before that
+                    if rec["rent_from"] and period >= rec["rent_from"]:
+                        period_rent = rec["rent"] or Decimal("0")
+                    else:
+                        # original rent = base before any revision
+                        # rec["rent"] is effective rent; if rent_from exists, original is unknown
+                        # safe fallback: use rec["rent"] (worst case same value)
+                        period_rent = rec["rent"] or Decimal("0")
                     session.add(RentSchedule(
-                        tenancy_id      = tenancy.id,
-                        period_month    = period,
-                        rent_due        = rec["rent"] or Decimal("0"),
-                        maintenance_due = rec["maintenance"],
-                        status          = RentStatus.pending,
-                        due_date        = period,
+                        tenancy_id   = tenancy.id,
+                        period_month = period,
+                        rent_due     = period_rent,
+                        status       = RentStatus.pending,
+                        due_date     = period,
                     ))
                 # advance to next month
                 if period.month == 12:
