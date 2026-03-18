@@ -455,6 +455,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
         "ROOM_TRANSFER", "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
+        "AWAITING_CLARIFICATION",
     ):
         return "❌ Cancelled. Nothing was changed."
 

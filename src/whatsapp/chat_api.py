@@ -148,6 +148,43 @@ async def _process_message_inner(
                 await session.commit()
                 return OutboundReply(reply=re_prompt, intent="AMBIGUOUS", role=ctx.role)
 
+            # ── AWAITING_CLARIFICATION: bot asked follow-up, this is the answer ──
+            if pending.intent == "AWAITING_CLARIFICATION":
+                import json as _jc
+                import re as _re
+                ad = _jc.loads(pending.action_data or "{}")
+                original_intent = ad.get("original_intent", "")
+                waiting_for     = ad.get("waiting_for", "")
+                orig_entities   = dict(ad.get("entities") or {})
+
+                _MONTHS_MAP = {
+                    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+                    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+                    "january": 1, "february": 2, "march": 3, "april": 4,
+                    "june": 6, "july": 7, "august": 8, "september": 9,
+                    "october": 10, "november": 11, "december": 12,
+                }
+                if waiting_for == "month":
+                    found_month = None
+                    for abbr, num in _MONTHS_MAP.items():
+                        if _re.search(r"\b" + abbr + r"\b", message, _re.I):
+                            found_month = num
+                            break
+                    if not found_month:
+                        re_prompt = "Please name a month, e.g. *Jan*, *Feb*, *March*, *April*..."
+                        await _log(session, phone, message, ctx.role, "CLARIFICATION", re_prompt)
+                        await session.commit()
+                        return OutboundReply(reply=re_prompt, intent="CLARIFICATION", role=ctx.role)
+                    orig_entities["month"] = found_month
+                elif waiting_for == "tenant_name":
+                    orig_entities["name"] = message.strip()
+
+                pending.resolved = True
+                clarif_reply = await route(original_intent, orig_entities, ctx, message, session)
+                await _log(session, phone, message, ctx.role, original_intent, clarif_reply)
+                await session.commit()
+                return OutboundReply(reply=clarif_reply, intent=original_intent, role=ctx.role)
+
             resolved_reply = await resolve_pending_action(pending, message, session)
             if resolved_reply:
                 # Prefix "__KEEP_PENDING__" means correction re-prompt — keep pending alive

@@ -1,0 +1,2006 @@
+[
+  {
+    "id": "MT001",
+    "name": "dues for which month — bot asks for clarification",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dues for which month?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month", "Jan"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "march",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["March"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT002",
+    "name": "pending dues with no month — defaults to current month",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pending dues",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT003",
+    "name": "multi-turn: bot asks month → user says feb → sees feb dues",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "which month outstanding?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "feb",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["February"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT004",
+    "name": "multi-turn: bot asks month → user says march 2026",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dues which month?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "march 2026",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["March 2026"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT005",
+    "name": "multi-turn: bot asks month → user says last month → bot re-prompts",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show dues which month?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "last month",
+        "expected_intent": "CLARIFICATION",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month", "Jan"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT006",
+    "name": "which month outstanding — bot asks",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "which month outstanding",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "april",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["April"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT007",
+    "name": "who owes rent this month — direct answer no clarification",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who owes rent this month",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT008",
+    "name": "dues for january — direct, no clarification needed",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dues for january",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["January"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT009",
+    "name": "february dues — direct",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "february dues",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["February"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT010",
+    "name": "show me march dues — direct",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show me march dues",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["March"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT011",
+    "name": "clarification then cancel: bot asks month → user says cancel",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dues for which month?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "cancel",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Cancelled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT012",
+    "name": "dues — defaults to current month",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dues",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT013",
+    "name": "multi-turn: outstanding? → bot asks → user says april",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "outstanding?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "april",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["April"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT014",
+    "name": "multi-turn month clarification in Hinglish: kaunse mahine ka",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kaunse mahine ka dues?",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "clarifying",
+        "reply_must_contain": ["month"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "jan",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["January"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT015",
+    "name": "direct dues feb 2026 → February dues",
+    "category": "multi_turn_clarification",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dues feb 2026",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["February 2026"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT016",
+    "name": "raj paid 13000 — confirm then yes → logged",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000", "Raj"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged", "13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT017",
+    "name": "13000 upi from ankit — confirm then yes",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "13000 upi from ankit",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000", "Ankit", "UPI"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT018",
+    "name": "received 12500 cash from neha — confirm",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "received 12500 cash from neha",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["12,500", "Neha", "Cash"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT019",
+    "name": "payment with date: adnan paid 14500 on 15 march",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "adnan paid 14500 on 15 march",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["14,500", "Adnan"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT020",
+    "name": "partial payment: koushik paid 5000 partial",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "koushik paid 5000 partial",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["5,000", "Koushik"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT021",
+    "name": "payment mode correction mid-confirm: neha paid 13000 → confirm cash → user says upi",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "neha paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000", "Neha"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "upi",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["UPI", "13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT022",
+    "name": "amount correction mid-confirm: paid 12000 → no 13000 → yes",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ankit paid 12000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["12,000", "Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "no 13000",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT023",
+    "name": "cancel payment: confirm → no → cancelled",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Cancelled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT024",
+    "name": "Hindi payment: ankit ne 9000 diya",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ankit ne 9000 diya",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["9,000", "Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT025",
+    "name": "Hinglish: nakul ka payment 13500 kar do",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "nakul ka payment 13500 kar do",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,500", "Nakul"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT026",
+    "name": "payment with year: ankit paid 13000 for january 2026",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ankit paid 13000 for january 2026",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000", "Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT027",
+    "name": "log 14000 from dinesh upi",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "log 14000 from dinesh upi",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["14,000", "Dinesh", "UPI"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT028",
+    "name": "duplicate payment detection scenario",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT029",
+    "name": "overpayment: tenant pays more than due",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj paid 20000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["20,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT030",
+    "name": "payment for future month: raj paid 13000 for april",
+    "category": "payment_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj paid 13000 for april",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000", "April"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT031",
+    "name": "paid plumber 2500 cash — confirm → yes",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid plumber 2500 cash",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["2,500", "plumber"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT032",
+    "name": "electricity bill 8500 upi — confirm → yes",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "electricity bill 8500 upi",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["8,500", "electricity"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT033",
+    "name": "salary 15000 — confirm → yes",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "salary 15000",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["15,000", "salary"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT034",
+    "name": "cancel expense: confirm → no",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "paid electrician 3000",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["3,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Cancelled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT035",
+    "name": "expense with category: internet 1200 gpay",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "internet 1200 gpay",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["1,200", "internet"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT036",
+    "name": "Hindi: bai ka salary 8000 diya cash",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "bai ka salary 8000 diya cash",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["8,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT037",
+    "name": "amount correction mid-flow expense",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "water bill 2000",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["2,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "no 2500",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["2,500"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT038",
+    "name": "water tanker 3500",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "water tanker 3500",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["3,500"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT039",
+    "name": "pest control 4500",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "pest control 4500",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["4,500"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT040",
+    "name": "shorthand expense: 5000 upi electricity",
+    "category": "expense_logging",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "5000 upi electricity",
+        "expected_intent": "EXPENSE_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["5,000", "electricity"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT041",
+    "name": "raj balance — single match shows account",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Raj"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT042",
+    "name": "room 201 balance",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 201 balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["201"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT043",
+    "name": "how much does ankit owe",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how much does ankit owe",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT044",
+    "name": "koushik ka kitna bacha hai",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "koushik ka kitna bacha hai",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Koushik"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT045",
+    "name": "neha payment history",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "neha payment history",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Neha"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT046",
+    "name": "query tenant with partial name — disambiguation",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kumar balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Kumar"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT047",
+    "name": "tenant cleared: ankit paid full",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ankit paid full",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT048",
+    "name": "new tenant query — no existing balance",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "xyz balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["not found"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT049",
+    "name": "room query: who is in 301",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who is in 301",
+        "expected_intent": "ROOM_STATUS",
+        "expected_state": "idle",
+        "reply_must_contain": ["301"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT050",
+    "name": "tenant with multiple months outstanding",
+    "category": "tenant_account",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dinesh balance",
+        "expected_intent": "QUERY_TENANT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Dinesh"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT051",
+    "name": "void last payment from raj → choices → pick 1 → confirm → yes",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void last payment from raj",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Raj"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["void", "confirm"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["voided"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT052",
+    "name": "wrong payment koushik → choices → cancel",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "wrong payment koushik",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Koushik"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "cancel",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Cancelled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT053",
+    "name": "void expense salary → filtered list → pick",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void expense salary",
+        "expected_intent": "VOID_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["salary"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["void", "confirm"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["voided"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT054",
+    "name": "undo electricity expense → picks expense",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "undo electricity expense",
+        "expected_intent": "VOID_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["electricity"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["void", "confirm"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["voided"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT055",
+    "name": "void expense with no keyword → shows last 10 → pick",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void expense",
+        "expected_intent": "VOID_EXPENSE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["expense"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["void", "confirm"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["voided"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT056",
+    "name": "cancel void payment",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "void payment raj",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Raj"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Cancelled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT057",
+    "name": "reverse payment ankit → choices",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "reverse payment ankit",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["void", "confirm"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["voided"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT058",
+    "name": "deposit change: change deposit for neha to 20000 → confirm → yes",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "change deposit for neha to 20000",
+        "expected_intent": "DEPOSIT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["20,000", "Neha"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["updated"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT059",
+    "name": "rent change: update raj rent to 14000 from april",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "update raj rent to 14000 from april",
+        "expected_intent": "RENT_CHANGE",
+        "expected_state": "confirming",
+        "reply_must_contain": ["14,000", "Raj"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["updated"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT060",
+    "name": "void wrong amount entry",
+    "category": "void_correction",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "wrong payment entry ankit",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "1",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "confirming",
+        "reply_must_contain": ["void", "confirm"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["voided"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT061",
+    "name": "transfer raj to room 301 → confirm → yes",
+    "category": "room_transfer",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "transfer raj to room 301",
+        "expected_intent": "ROOM_TRANSFER",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Raj", "301"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["transferred", "301"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT062",
+    "name": "move ankit to 205 → confirm",
+    "category": "room_transfer",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "move ankit to 205",
+        "expected_intent": "ROOM_TRANSFER",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ankit", "205"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["transferred"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT063",
+    "name": "transfer with ambiguous name → picks tenant → destination → confirm",
+    "category": "room_transfer",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "transfer kumar to 405",
+        "expected_intent": "ROOM_TRANSFER",
+        "expected_state": "confirming",
+        "reply_must_contain": ["405"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["transferred"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT064",
+    "name": "transfer to occupied room — should show warning",
+    "category": "room_transfer",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "transfer raj to room 101",
+        "expected_intent": "ROOM_TRANSFER",
+        "expected_state": "confirming",
+        "reply_must_contain": ["101"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT065",
+    "name": "cancel room transfer",
+    "category": "room_transfer",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "transfer ankit to 302",
+        "expected_intent": "ROOM_TRANSFER",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ankit", "302"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "no",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["Cancelled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT066",
+    "name": "occupancy — shows beds/rooms stats",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "occupancy",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["beds", "occupied"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT067",
+    "name": "vacant rooms — shows floor grid",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "vacant rooms",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["vacant"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT068",
+    "name": "how many beds free — shows count",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how many beds free",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["beds"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT069",
+    "name": "vacant in thor — thor only",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "vacant in thor",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["THOR"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT070",
+    "name": "rooms available — vacancy report",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "rooms available",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["vacant"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT071",
+    "name": "how many tenants — count",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "how many tenants",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["tenant"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT072",
+    "name": "who is expiring this month",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "who is expiring this month",
+        "expected_intent": "EXPIRY_LIST",
+        "expected_state": "idle",
+        "reply_must_contain": ["expir"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT073",
+    "name": "upcoming checkouts",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "upcoming checkouts",
+        "expected_intent": "EXPIRY_LIST",
+        "expected_state": "idle",
+        "reply_must_contain": ["checkout"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT074",
+    "name": "checkins this month",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkins this month",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["checkin"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT075",
+    "name": "floor 3 occupancy",
+    "category": "occupancy_analytics",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "floor 3 occupancy",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["floor", "3"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT076",
+    "name": "hi — greeting with menu",
+    "category": "greeting_help",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hi",
+        "expected_intent": "GREETING",
+        "expected_state": "idle",
+        "reply_must_contain": ["Artha"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT077",
+    "name": "help — services menu",
+    "category": "greeting_help",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "help",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": ["payment", "dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT078",
+    "name": "menu — services list",
+    "category": "greeting_help",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "menu",
+        "expected_intent": "HELP",
+        "expected_state": "idle",
+        "reply_must_contain": ["payment", "dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT079",
+    "name": "hello — warm greeting",
+    "category": "greeting_help",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "hello",
+        "expected_intent": "GREETING",
+        "expected_state": "idle",
+        "reply_must_contain": ["hello"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT080",
+    "name": "good morning — greeting",
+    "category": "greeting_help",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "good morning",
+        "expected_intent": "GREETING",
+        "expected_state": "idle",
+        "reply_must_contain": ["morning"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT081",
+    "name": "checkout raj → asks confirmation → confirms",
+    "category": "checkout_checkin",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout raj",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Raj", "checkout"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["checked out"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT082",
+    "name": "schedule checkout for neha 31 march",
+    "category": "checkout_checkin",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "schedule checkout for neha 31 march",
+        "expected_intent": "SCHEDULE_CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Neha", "March"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["scheduled"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT083",
+    "name": "full checkout flow 5-step",
+    "category": "checkout_checkin",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkout ankit",
+        "expected_intent": "CHECKOUT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["checked out"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT084",
+    "name": "add new tenant Ravi Kumar room 405 hulk rent 13000",
+    "category": "checkout_checkin",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "add new tenant Ravi Kumar room 405 hulk rent 13000",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ravi Kumar", "405"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["added"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT085",
+    "name": "checkin ravi kumar",
+    "category": "checkout_checkin",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "checkin ravi kumar",
+        "expected_intent": "ADD_TENANT",
+        "expected_state": "confirming",
+        "reply_must_contain": ["Ravi Kumar"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT086",
+    "name": "kaun se room mein jagah hai — vacant rooms",
+    "category": "hindi_hinglish",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kaun se room mein jagah hai",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["vacant"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT087",
+    "name": "kitna hua is mahine — revenue report",
+    "category": "hindi_hinglish",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kitna hua is mahine",
+        "expected_intent": "REPORT",
+        "expected_state": "idle",
+        "reply_must_contain": ["Rs."],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT088",
+    "name": "kiski dues pending hai — dues list",
+    "category": "hindi_hinglish",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "kiski dues pending hai",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT089",
+    "name": "payment karo raj ka 13000",
+    "category": "hindi_hinglish",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "payment karo raj ka 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000", "Raj"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "yes",
+        "expected_intent": "CONFIRMATION",
+        "expected_state": "idle",
+        "reply_must_contain": ["logged"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT090",
+    "name": "sab ka balance batao",
+    "category": "hindi_hinglish",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "sab ka balance batao",
+        "expected_intent": "QUERY_DUES",
+        "expected_state": "idle",
+        "reply_must_contain": ["dues"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT091",
+    "name": "empty message — graceful response",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "   ",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": ["rephrase"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT092",
+    "name": "unknown intent — asks to rephrase",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "xyzzy frobble quux",
+        "expected_intent": "UNKNOWN",
+        "expected_state": "idle",
+        "reply_must_contain": ["rephrase"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT093",
+    "name": "very long name input — handles gracefully",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "Rajasekharanandakrishnaswamiperumalaiyah paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT094",
+    "name": "special chars in message r@j 13,000!! — works",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "r@j paid 13,000!!",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT095",
+    "name": "amount with comma 13,500 — parsed correctly",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "ankit paid 13,500",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,500", "Ankit"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT096",
+    "name": "room number as amount confusion room 201 paid 13000",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "room 201 paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "201 paid", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT097",
+    "name": "blocked user — skip=True",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "blocked",
+        "input": "dues",
+        "expected_intent": "BLOCKED",
+        "expected_state": "idle",
+        "reply_must_contain": [],
+        "reply_must_not_contain": ["error", "traceback", "exception", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT098",
+    "name": "tenant asking admin question — denied or redirected",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "tenant",
+        "input": "void payment raj",
+        "expected_intent": "VOID_PAYMENT",
+        "expected_state": "idle",
+        "reply_must_contain": ["balance", "payment"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT099",
+    "name": "lead asking room price — room pricing response",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "lead",
+        "input": "what is the room price",
+        "expected_intent": "ROOM_PRICE",
+        "expected_state": "idle",
+        "reply_must_contain": ["Rs.", "rent"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  },
+  {
+    "id": "MT100",
+    "name": "multiple pending cleared by new intent",
+    "category": "edge_cases",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "raj paid 13000",
+        "expected_intent": "PAYMENT_LOG",
+        "expected_state": "confirming",
+        "reply_must_contain": ["13,000"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      },
+      {
+        "role": "admin",
+        "input": "occupancy",
+        "expected_intent": "OCCUPANCY",
+        "expected_state": "idle",
+        "reply_must_contain": ["beds", "occupied"],
+        "reply_must_not_contain": ["error", "traceback", "exception", "None", "undefined", "TypeError", "500"]
+      }
+    ]
+  }
+]

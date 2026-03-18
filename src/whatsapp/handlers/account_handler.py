@@ -620,6 +620,19 @@ async def _calc_outstanding_dues(tenancy_id: int, session: AsyncSession) -> tupl
 async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     today = date.today()
     month_num = entities.get("month")
+    desc = (entities.get("description") or "").lower()
+
+    # If user asked "which month?" rather than specifying one → clarify
+    if not month_num and ("which" in desc or (desc.endswith("?") and not any(
+        m in desc for m in ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
+    ))):
+        await _save_pending(
+            ctx.phone, "AWAITING_CLARIFICATION",
+            {"original_intent": "QUERY_DUES", "waiting_for": "month", "entities": {}},
+            [], session,
+        )
+        return "Which month's dues would you like to see?\n\nReply: *Jan*, *Feb*, *Mar*, *Apr*, *May*..."
+
     if month_num:
         year = entities.get("year") or today.year
         query_month = date(int(year), int(month_num), 1)
