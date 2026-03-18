@@ -1717,18 +1717,19 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
         )
     )).all()}
 
-    total = len(all_rows)
-    vacant = [(r, prop) for r, prop in all_rows if r.id not in occupied_ids]
-    occupied_count = total - len(vacant)
+    total_rooms = len(all_rows)
+    total_beds  = sum(r.max_occupancy or 1 for r, _ in all_rows)
+    vacant      = [(r, prop) for r, prop in all_rows if r.id not in occupied_ids]
+    occupied_rooms = total_rooms - len(vacant)
+    vacant_beds    = sum(r.max_occupancy or 1 for r, _ in vacant)
+    occupied_beds  = total_beds - vacant_beds
 
     if not vacant:
-        return f"🔴 All {total} rooms are currently occupied."
+        return (
+            f"🔴 All {total_rooms} rooms / {total_beds} beds are currently occupied."
+        )
 
     _ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡", "triple": "🟠", "premium": "⭐"}
-
-    def _floor_key(rn: str) -> tuple:
-        rn = rn.upper()
-        return (0, rn) if rn.startswith("G") else (int(rn[0]), rn)
 
     def _floor_label(rn: str) -> str:
         return "G" if rn.upper().startswith("G") else rn[0]
@@ -1736,30 +1737,33 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     # Group by block → floor
     blocks: dict = defaultdict(lambda: defaultdict(list))
     type_counts: dict = defaultdict(int)
-    thor_vacant = hulk_vacant = 0
+    thor_rooms = thor_beds = hulk_rooms = hulk_beds = 0
     for r, prop in vacant:
         block = "THOR" if "THOR" in prop.upper() else "HULK"
         fl = _floor_label(r.room_number)
         blocks[block][fl].append(r)
         type_counts[r.room_type.value] += 1
+        beds = r.max_occupancy or 1
         if block == "THOR":
-            thor_vacant += 1
+            thor_rooms += 1; thor_beds += beds
         else:
-            hulk_vacant += 1
+            hulk_rooms += 1; hulk_beds += beds
 
+    SEP = "─" * 28
     lines = [
-        f"🏠 *Vacant Rooms — {len(vacant)} available  |  {occupied_count} occupied*",
-        f"THOR {thor_vacant} vacant  ·  HULK {hulk_vacant} vacant",
+        f"🛏 *Vacant Beds  — {vacant_beds} free  |  {occupied_beds} occupied*",
+        f"🏠 *Vacant Rooms — {len(vacant)} free  |  {occupied_rooms} occupied*",
+        f"   THOR {thor_rooms}r/{thor_beds}b  ·  HULK {hulk_rooms}r/{hulk_beds}b",
         "",
     ]
 
-    SEP = "─" * 28
     for block in ["THOR", "HULK"]:
         if block not in blocks:
             continue
-        bcount = thor_vacant if block == "THOR" else hulk_vacant
+        br = thor_rooms if block == "THOR" else hulk_rooms
+        bb = thor_beds  if block == "THOR" else hulk_beds
         lines.append(f"*{SEP}*")
-        lines.append(f"🏢 *{block} BLOCK — {bcount} vacant*")
+        lines.append(f"🏢 *{block} — {br} rooms / {bb} beds vacant*")
         floor_keys = sorted(blocks[block].keys(),
                             key=lambda f: (0, f) if f == "G" else (int(f), f))
         for fl in floor_keys:
@@ -1768,14 +1772,15 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
             for r in rooms:
                 icon = _ICON.get(r.room_type.value, "⬜")
                 ac = "❄" if r.has_ac else ""
-                cells.append(f"{icon}{r.room_number}{ac}")
+                beds = r.max_occupancy or 1
+                cells.append(f"{icon}{r.room_number}({beds}b){ac}")
             label = "GF" if fl == "G" else f"F{fl}"
             lines.append(f"  {label}  {'  '.join(cells)}")
         lines.append("")
 
-    # Type summary
-    type_line = "  ".join(
-        f"{_ICON.get(k,'⬜')}{v}"
+    # Bed summary by type
+    bed_line = "  ".join(
+        f"{_ICON.get(k,'⬜')}{v}b"
         for k, v in [("single", type_counts["single"]), ("double", type_counts["double"]),
                      ("sharing", type_counts["sharing"]), ("triple", type_counts["triple"]),
                      ("premium", type_counts["premium"])]
@@ -1783,7 +1788,7 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     )
     lines.append(f"*{SEP}*")
     lines.append(f"🔵Single 🟢Double 🟡Sharing 🟠Triple ⭐Premium")
-    lines.append(f"Available: {type_line}")
+    lines.append(f"Vacant beds: {bed_line}  = *{vacant_beds} total*")
     return "\n".join(lines)
 
 
