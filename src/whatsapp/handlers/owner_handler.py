@@ -1700,7 +1700,7 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     from collections import defaultdict
     from src.database.models import Property
 
-    rows = (await session.execute(
+    all_rows = (await session.execute(
         select(Room, Property.name)
         .join(Property, Property.id == Room.property_id)
         .where(Room.active == True, Room.is_staff_room == False)
@@ -1714,52 +1714,73 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
         )
     )).all()}
 
-    all_count = len(rows)
-    vacant = [(r, prop) for r, prop in rows if r.id not in occupied_ids]
+    total = len(all_rows)
+    vacant = [(r, prop) for r, prop in all_rows if r.id not in occupied_ids]
+    occupied_count = total - len(vacant)
 
     if not vacant:
-        return f"All {all_count} rooms are currently occupied."
+        return f"🔴 All {total} rooms are currently occupied."
 
-    _TYPE_ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡",
-                  "triple": "🟠", "premium": "⭐"}
+    _ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡", "triple": "🟠", "premium": "⭐"}
 
-    def _floor(rn: str) -> str:
+    def _floor_key(rn: str) -> tuple:
         rn = rn.upper()
-        return "Ground" if rn.startswith("G") else f"Floor {rn[0]}"
+        return (0, rn) if rn.startswith("G") else (int(rn[0]), rn)
 
+    def _floor_label(rn: str) -> str:
+        return "G" if rn.upper().startswith("G") else rn[0]
+
+    # Group by block → floor
     blocks: dict = defaultdict(lambda: defaultdict(list))
     type_counts: dict = defaultdict(int)
+    thor_vacant = hulk_vacant = 0
     for r, prop in vacant:
         block = "THOR" if "THOR" in prop.upper() else "HULK"
-        blocks[block][_floor(r.room_number)].append(r)
+        fl = _floor_label(r.room_number)
+        blocks[block][fl].append(r)
         type_counts[r.room_type.value] += 1
+        if block == "THOR":
+            thor_vacant += 1
+        else:
+            hulk_vacant += 1
 
-    lines = [f"*Vacant Rooms — {len(vacant)} of {all_count} available*\n"]
-    floor_order = ["Ground"] + [f"Floor {i}" for i in range(1, 8)]
+    lines = [
+        f"🏠 *Vacant Rooms — {len(vacant)} available  |  {occupied_count} occupied*",
+        f"THOR {thor_vacant} vacant  ·  HULK {hulk_vacant} vacant",
+        "",
+    ]
 
+    SEP = "─" * 28
     for block in ["THOR", "HULK"]:
         if block not in blocks:
             continue
-        lines.append(f"*{block} Block*")
-        for floor in floor_order:
-            if floor not in blocks[block]:
-                continue
-            room_strs = []
-            for r in sorted(blocks[block][floor], key=lambda x: x.room_number):
-                icon = _TYPE_ICON.get(r.room_type.value, "⬜")
+        bcount = thor_vacant if block == "THOR" else hulk_vacant
+        lines.append(f"*{SEP}*")
+        lines.append(f"🏢 *{block} BLOCK — {bcount} vacant*")
+        floor_keys = sorted(blocks[block].keys(),
+                            key=lambda f: (0, f) if f == "G" else (int(f), f))
+        for fl in floor_keys:
+            rooms = sorted(blocks[block][fl], key=lambda x: x.room_number)
+            cells = []
+            for r in rooms:
+                icon = _ICON.get(r.room_type.value, "⬜")
                 ac = "❄" if r.has_ac else ""
-                room_strs.append(f"{icon}{r.room_number}{ac}")
-            lines.append(f"  {floor}: {', '.join(room_strs)}")
+                cells.append(f"{icon}{r.room_number}{ac}")
+            label = "GF" if fl == "G" else f"F{fl}"
+            lines.append(f"  {label}  {'  '.join(cells)}")
         lines.append("")
 
     # Type summary
-    _LABELS = {"single": "Single", "double": "Double", "sharing": "Sharing",
-                "triple": "Triple", "premium": "Premium"}
-    summary = "  ·  ".join(
-        f"{v} {_LABELS.get(k, k)}" for k, v in sorted(type_counts.items()) if v
+    type_line = "  ".join(
+        f"{_ICON.get(k,'⬜')}{v}"
+        for k, v in [("single", type_counts["single"]), ("double", type_counts["double"]),
+                     ("sharing", type_counts["sharing"]), ("triple", type_counts["triple"]),
+                     ("premium", type_counts["premium"])]
+        if v
     )
-    lines.append(f"*Summary:* {summary}")
-    lines.append("🔵Single 🟢Double 🟡Sharing 🟠Triple ⭐Premium ❄AC")
+    lines.append(f"*{SEP}*")
+    lines.append(f"🔵Single 🟢Double 🟡Sharing 🟠Triple ⭐Premium")
+    lines.append(f"Available: {type_line}")
     return "\n".join(lines)
 
 

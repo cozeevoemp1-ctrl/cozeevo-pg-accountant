@@ -475,29 +475,45 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
 # ── Void expense ──────────────────────────────────────────────────────────────
 
 async def _void_expense(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Show last 5 expenses for selection, then void the chosen one."""
+    """Show filterable expense list for voiding. Filter by keyword if provided."""
     from src.database.models import ExpenseCategory
-    rows = (await session.execute(
+
+    keyword = (entities.get("name") or entities.get("description") or "").strip().lower()
+
+    q = (
         select(Expense, ExpenseCategory.name)
         .outerjoin(ExpenseCategory, ExpenseCategory.id == Expense.category_id)
         .where(Expense.is_void == False)
         .order_by(Expense.expense_date.desc(), Expense.id.desc())
-        .limit(5)
-    )).all()
+    )
+    if keyword:
+        q = q.where(
+            func.lower(ExpenseCategory.name).contains(keyword) |
+            func.lower(Expense.description).contains(keyword)
+        )
+
+    rows = (await session.execute(q.limit(10))).all()
 
     if not rows:
-        return "No active expenses found to void."
+        hint = f" matching *{keyword}*" if keyword else ""
+        return (
+            f"No active expenses found{hint}.\n"
+            "Try: *void expense salary* or *void expense electricity*"
+        )
 
-    lines = ["*Recent expenses — which one to void?*\n"]
+    header = f"*Expenses{' matching ' + keyword if keyword else ''} — pick one to void:*\n"
+    lines = [header]
     choices = []
     for i, (exp, cat_name) in enumerate(rows, 1):
-        label = f"{cat_name or 'General'} ₹{int(exp.amount):,} ({exp.expense_date.strftime('%d %b') if exp.expense_date else '?'})"
-        if exp.description:
-            label += f" — {exp.description[:30]}"
+        date_str = exp.expense_date.strftime("%d %b") if exp.expense_date else "?"
+        desc = f" — {exp.description[:25]}" if exp.description else ""
+        label = f"{cat_name or 'General'} ₹{int(exp.amount):,} ({date_str}){desc}"
         lines.append(f"*{i}.* {label}")
         choices.append({"seq": i, "label": label, "expense_id": exp.id})
 
-    lines.append("\nReply *1–5* or *No* to cancel.")
+    n = len(choices)
+    lines.append(f"\nReply *1–{n}* to void · *No* to cancel")
+    lines.append("Or narrow down: *void expense salary*")
     await _save_pending(ctx.phone, "VOID_EXPENSE", {"choices": choices}, choices, session)
     return "\n".join(lines)
 
