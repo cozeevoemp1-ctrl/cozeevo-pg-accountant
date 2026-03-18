@@ -62,6 +62,8 @@ FINANCIAL_INTENTS: frozenset[str] = frozenset({
     "RENT_CHANGE",
     "RENT_DISCOUNT",
     "VOID_PAYMENT",
+    "VOID_EXPENSE",
+    "DEPOSIT_CHANGE",
     "ADD_REFUND",
     "QUERY_REFUNDS",
 })
@@ -85,6 +87,8 @@ async def handle_account(
         "RENT_CHANGE":    _rent_change,
         "RENT_DISCOUNT":  _rent_discount,
         "VOID_PAYMENT":   _void_payment,
+        "VOID_EXPENSE":   _void_expense,
+        "DEPOSIT_CHANGE": _deposit_change,
         "ADD_REFUND":     _add_refund,
         "QUERY_REFUNDS":  _query_refunds,
     }
@@ -466,6 +470,100 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
         f"Rs.{int(payment.amount):,} for {period_str} reversed.\n"
         "Rent schedule updated. Log correct payment if needed."
     )
+
+
+# ── Void expense ──────────────────────────────────────────────────────────────
+
+async def _void_expense(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show last 5 expenses for selection, then void the chosen one."""
+    from src.database.models import ExpenseCategory
+    rows = (await session.execute(
+        select(Expense, ExpenseCategory.name)
+        .outerjoin(ExpenseCategory, ExpenseCategory.id == Expense.category_id)
+        .where(Expense.is_void == False)
+        .order_by(Expense.expense_date.desc(), Expense.id.desc())
+        .limit(5)
+    )).all()
+
+    if not rows:
+        return "No active expenses found to void."
+
+    lines = ["*Recent expenses — which one to void?*\n"]
+    choices = []
+    for i, (exp, cat_name) in enumerate(rows, 1):
+        label = f"{cat_name or 'General'} ₹{int(exp.amount):,} ({exp.expense_date.strftime('%d %b') if exp.expense_date else '?'})"
+        if exp.description:
+            label += f" — {exp.description[:30]}"
+        lines.append(f"*{i}.* {label}")
+        choices.append({"seq": i, "label": label, "expense_id": exp.id})
+
+    lines.append("\nReply *1–5* or *No* to cancel.")
+    await _save_pending(ctx.phone, "VOID_EXPENSE", {"choices": choices}, choices, session)
+    return "\n".join(lines)
+
+
+async def _do_void_expense(expense_id: int, session: AsyncSession) -> str:
+    expense = await session.get(Expense, expense_id)
+    if not expense:
+        return "Expense record not found."
+    expense.is_void = True
+    return f"Expense voided — ₹{int(expense.amount):,} reversed."
+
+
+# ── Deposit change ─────────────────────────────────────────────────────────────
+
+async def _deposit_change(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Change the security deposit amount for a tenant."""
+    name = entities.get("name", "").strip()
+    amount = entities.get("amount")
+
+    if not name:
+        return (
+            "Which tenant's deposit to change?\n"
+            "Say: *change deposit Raj 15000*"
+        )
+
+    rows = await _find_active_tenants_by_name(name, session)
+    if not rows:
+        suggestions = await _find_similar_names(name, session)
+        return _format_no_match_message(name, suggestions)
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(ctx.phone, "DEPOSIT_CHANGE_WHO", {"amount": amount}, choices, session)
+        return _format_choices_message(name, choices, "change their deposit")
+
+    tenant, tenancy, room = rows[0]
+    current = int(tenancy.security_deposit or 0)
+
+    if not amount:
+        await _save_pending(ctx.phone, "DEPOSIT_CHANGE_AMT", {"tenancy_id": tenancy.id, "tenant_name": tenant.name}, [], session)
+        return (
+            f"*{tenant.name}* — Room {room.room_number}\n"
+            f"Current deposit: ₹{current:,}\n\n"
+            "Reply with the new deposit amount:"
+        )
+
+    new_amt = int(amount)
+    choices = [{"seq": 1, "label": "Yes, update"}, {"seq": 2, "label": "No, cancel"}]
+    await _save_pending(
+        ctx.phone, "DEPOSIT_CHANGE",
+        {"tenancy_id": tenancy.id, "tenant_name": tenant.name, "new_amount": new_amt, "old_amount": current},
+        choices, session,
+    )
+    return (
+        f"*Change deposit — {tenant.name}*\n"
+        f"Room {room.room_number}\n"
+        f"Current: ₹{current:,}  →  New: ₹{new_amt:,}\n\n"
+        "Reply *Yes* to confirm or *No* to cancel."
+    )
+
+
+async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str, session: AsyncSession) -> str:
+    tenancy = await session.get(Tenancy, tenancy_id)
+    if not tenancy:
+        return "Tenancy record not found."
+    tenancy.security_deposit = new_amount
+    return f"Deposit updated — *{tenant_name}* ₹{new_amount:,}"
 
 
 # ── Outstanding dues calculator ───────────────────────────────────────────────

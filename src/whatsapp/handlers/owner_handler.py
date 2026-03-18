@@ -76,6 +76,7 @@ async def handle_owner(
         "ADD_PARTNER":        _add_partner,
         "REMINDER_SET":       _reminder_prompt,
         "ROOM_LAYOUT":        _room_layout,
+        "ROOM_TRANSFER":      _room_transfer_prompt,
         "QUERY_VACANT_ROOMS": _query_vacant_rooms,
         "QUERY_OCCUPANCY":    _query_occupancy,
         "QUERY_EXPIRING":     _query_expiring,
@@ -452,7 +453,8 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
     if is_negative(reply_text) and pending.intent in (
         "CHECKOUT", "SCHEDULE_CHECKOUT", "PAYMENT_LOG", "QUERY_TENANT",
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
-        "VOID_PAYMENT", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
+        "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
+        "ROOM_TRANSFER", "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
     ):
         return "❌ Cancelled. Nothing was changed."
 
@@ -677,13 +679,50 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             )
 
     if pending.intent == "VOID_PAYMENT":
-        if chosen.get("seq") == 1:  # Confirm void
+        if chosen.get("seq") == 1:
             return await _do_void_payment(
                 payment_id=action_data["payment_id"],
                 tenant_name=action_data["tenant_name"],
                 session=session,
             )
         return "Void cancelled — payment remains as logged."
+
+    if pending.intent == "VOID_EXPENSE":
+        choices_data = json.loads(pending.choices or "[]")
+        seq = chosen.get("seq")
+        match = next((c for c in choices_data if c["seq"] == seq), None)
+        if match:
+            from src.whatsapp.handlers.account_handler import _do_void_expense
+            return await _do_void_expense(match["expense_id"], session)
+        return "Void cancelled."
+
+    if pending.intent == "DEPOSIT_CHANGE":
+        if is_affirmative(reply_text):
+            from src.whatsapp.handlers.account_handler import _do_deposit_change
+            return await _do_deposit_change(
+                tenancy_id=action_data["tenancy_id"],
+                new_amount=action_data["new_amount"],
+                tenant_name=action_data["tenant_name"],
+                session=session,
+            )
+        return "Deposit change cancelled."
+
+    if pending.intent == "DEPOSIT_CHANGE_AMT":
+        amt_str = reply_text.strip().replace(",", "").replace("₹", "").replace("Rs", "").strip()
+        if amt_str.isdigit():
+            from src.whatsapp.handlers.account_handler import _do_deposit_change
+            return await _do_deposit_change(
+                tenancy_id=action_data["tenancy_id"],
+                new_amount=int(amt_str),
+                tenant_name=action_data["tenant_name"],
+                session=session,
+            )
+        return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
+
+    if pending.intent == "ROOM_TRANSFER":
+        if is_affirmative(reply_text):
+            return await _do_room_transfer(action_data, session)
+        return "Room transfer cancelled."
 
     if pending.intent == "CONFIRM_ADD_TENANT":
         if is_negative(reply_text):
@@ -1571,28 +1610,156 @@ async def _rules(entities: dict, ctx: CallerContext, session: AsyncSession) -> s
 
 # ── Vacant rooms ──────────────────────────────────────────────────────────────
 
+async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Initiate moving a tenant from their current room to a new one."""
+    name   = entities.get("name", "").strip()
+    to_room = entities.get("room", "").strip()
+
+    if not name:
+        return (
+            "Who should be moved and to which room?\n"
+            "Say: *move Raj to room 305*"
+        )
+
+    rows = await _find_active_tenants_by_name(name, session)
+    if not rows:
+        suggestions = await _find_similar_names(name, session)
+        return _format_no_match_message(name, suggestions)
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(ctx.phone, "ROOM_TRANSFER_WHO", {"to_room": to_room}, choices, session)
+        return _format_choices_message(name, choices, "transfer to a new room")
+
+    tenant, tenancy, current_room = rows[0]
+
+    if not to_room:
+        await _save_pending(ctx.phone, "ROOM_TRANSFER_DEST",
+                            {"tenancy_id": tenancy.id, "tenant_name": tenant.name,
+                             "from_room": current_room.room_number}, [], session)
+        return (
+            f"Moving *{tenant.name}* from Room *{current_room.room_number}*.\n\n"
+            "Which room should they move to? (Reply with room number)"
+        )
+
+    new_room = await session.scalar(
+        select(Room).where(Room.room_number == to_room.upper(), Room.active == True)
+    )
+    if not new_room:
+        return f"Room *{to_room}* not found. Check the room number and try again."
+
+    # Check vacancy (no active tenancy in new room)
+    occupied = await session.scalar(
+        select(func.count(Tenancy.id)).where(
+            Tenancy.room_id == new_room.id,
+            Tenancy.status == TenancyStatus.active,
+        )
+    )
+    if occupied:
+        return f"Room *{to_room}* is currently occupied. Choose a vacant room."
+
+    # Fetch current rent
+    rs = await session.scalar(
+        select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy.id,
+            RentSchedule.period_month >= date.today().replace(day=1),
+        ).order_by(RentSchedule.period_month.asc()).limit(1)
+    )
+    current_rent = int(rs.rent_due) if rs else int(tenancy.booking_amount or 0)
+
+    action_data = {
+        "tenancy_id": tenancy.id,
+        "tenant_name": tenant.name,
+        "from_room": current_room.room_number,
+        "to_room_id": new_room.id,
+        "to_room_number": new_room.room_number,
+        "current_rent": current_rent,
+    }
+    await _save_pending(ctx.phone, "ROOM_TRANSFER", action_data, [], session)
+    return (
+        f"*Room Transfer — {tenant.name}*\n"
+        f"From: Room *{current_room.room_number}* ({current_room.room_type.value})\n"
+        f"To:   Room *{new_room.room_number}* ({new_room.room_type.value})\n"
+        f"Current rent: ₹{current_rent:,}/mo\n\n"
+        "Reply *Yes* to confirm, *No* to cancel,\n"
+        "or reply with a new rent amount (e.g. *9000*) to update rent too."
+    )
+
+
+async def _do_room_transfer(action_data: dict, session: AsyncSession) -> str:
+    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+    if not tenancy:
+        return "Tenancy record not found."
+    tenancy.room_id = action_data["to_room_id"]
+    return (
+        f"Room transferred — *{action_data['tenant_name']}*\n"
+        f"Room *{action_data['from_room']}* → Room *{action_data['to_room_number']}*"
+    )
+
+
 async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    result = await session.execute(
-        select(Room).where(Room.active == True, Room.is_staff_room == False)
-        .order_by(Room.room_number)
-    )
-    all_rooms = result.scalars().all()
+    from collections import defaultdict
+    from src.database.models import Property
 
-    # Get rooms with active tenancies
-    occupied_result = await session.execute(
-        select(Tenancy.room_id).where(Tenancy.status == TenancyStatus.active)
-    )
-    occupied_ids = {row[0] for row in occupied_result.all()}
+    rows = (await session.execute(
+        select(Room, Property.name)
+        .join(Property, Property.id == Room.property_id)
+        .where(Room.active == True, Room.is_staff_room == False)
+        .order_by(Property.name, Room.room_number)
+    )).all()
 
-    vacant = [r for r in all_rooms if r.id not in occupied_ids]
+    occupied_ids = {row[0] for row in (await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+            Tenancy.room_id.isnot(None),
+        )
+    )).all()}
+
+    all_count = len(rows)
+    vacant = [(r, prop) for r, prop in rows if r.id not in occupied_ids]
+
     if not vacant:
-        return f"All {len(all_rooms)} rooms are currently occupied."
+        return f"All {all_count} rooms are currently occupied."
 
-    lines = [f"*Vacant Rooms — {len(vacant)} available*\n"]
-    for r in vacant:
-        ac = " (AC)" if r.has_ac else ""
-        bath = " (attached bath)" if r.has_attached_bath else ""
-        lines.append(f"• Room {r.room_number} — {r.room_type.value}{ac}{bath}")
+    _TYPE_ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡",
+                  "triple": "🟠", "premium": "⭐"}
+
+    def _floor(rn: str) -> str:
+        rn = rn.upper()
+        return "Ground" if rn.startswith("G") else f"Floor {rn[0]}"
+
+    blocks: dict = defaultdict(lambda: defaultdict(list))
+    type_counts: dict = defaultdict(int)
+    for r, prop in vacant:
+        block = "THOR" if "THOR" in prop.upper() else "HULK"
+        blocks[block][_floor(r.room_number)].append(r)
+        type_counts[r.room_type.value] += 1
+
+    lines = [f"*Vacant Rooms — {len(vacant)} of {all_count} available*\n"]
+    floor_order = ["Ground"] + [f"Floor {i}" for i in range(1, 8)]
+
+    for block in ["THOR", "HULK"]:
+        if block not in blocks:
+            continue
+        lines.append(f"*{block} Block*")
+        for floor in floor_order:
+            if floor not in blocks[block]:
+                continue
+            room_strs = []
+            for r in sorted(blocks[block][floor], key=lambda x: x.room_number):
+                icon = _TYPE_ICON.get(r.room_type.value, "⬜")
+                ac = "❄" if r.has_ac else ""
+                room_strs.append(f"{icon}{r.room_number}{ac}")
+            lines.append(f"  {floor}: {', '.join(room_strs)}")
+        lines.append("")
+
+    # Type summary
+    _LABELS = {"single": "Single", "double": "Double", "sharing": "Sharing",
+                "triple": "Triple", "premium": "Premium"}
+    summary = "  ·  ".join(
+        f"{v} {_LABELS.get(k, k)}" for k, v in sorted(type_counts.items()) if v
+    )
+    lines.append(f"*Summary:* {summary}")
+    lines.append("🔵Single 🟢Double 🟡Sharing 🟠Triple ⭐Premium ❄AC")
     return "\n".join(lines)
 
 

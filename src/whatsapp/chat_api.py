@@ -314,17 +314,17 @@ def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict
                     {
                         "title": "Tenants",
                         "rows": [
-                            {"id": "ADD_TENANT",   "title": "Add Tenant",        "description": "New check-in onboarding"},
-                            {"id": "CHECKOUT",     "title": "Checkout",          "description": "Offboard a tenant"},
-                            {"id": "QUERY_TENANT", "title": "Tenant Account",    "description": "Balance & payment history"},
-                            {"id": "ADD_REFUND",   "title": "Refund Deposit",    "description": "Return security deposit"},
+                            {"id": "ADD_TENANT",     "title": "Add Tenant",      "description": "New check-in onboarding"},
+                            {"id": "CHECKOUT",       "title": "Checkout",        "description": "Offboard a tenant"},
+                            {"id": "QUERY_TENANT",   "title": "Tenant Account",  "description": "Balance & payment history"},
+                            {"id": "ROOM_TRANSFER",  "title": "Room Transfer",   "description": "Move tenant to another room"},
                         ],
                     },
                     {
-                        "title": "Property",
+                        "title": "Corrections & Property",
                         "rows": [
-                            {"id": "QUERY_OCCUPANCY",    "title": "Occupancy",   "description": "Beds occupied vs available"},
-                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms","description": "Which rooms are free"},
+                            {"id": "VOID_PAYMENT",       "title": "Void Payment",  "description": "Reverse a wrong payment"},
+                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms",  "description": "Which rooms are free by floor"},
                         ],
                     },
                 ],

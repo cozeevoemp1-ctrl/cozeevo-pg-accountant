@@ -80,6 +80,12 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:record checkout|offboard|checkout form|fill checkout|checkout record|handover|keys? (?:returned?|handed?)|mark checkout complete|complete checkout|process checkout|do checkout|finalize checkout|close checkout|checkout process for|start checkout for|begin checkout|checkout\s+process\s+\w+|do\s+\w+\s+checkout|\w+\s+ka\s+checkout|checkout\s+karo|chekout\s+\w+)", re.I), "RECORD_CHECKOUT", 0.95),
     # Void / reverse payment
     (re.compile(r"(?:void|cancel|reverse|undo payment|mark void|failed payment|payment failed|wrong payment|duplicate payment)", re.I), "VOID_PAYMENT", 0.93),
+    # Void / reverse expense
+    (re.compile(r"(?:void expense|cancel expense|reverse expense|undo expense|wrong expense|delete expense|remove expense|expense (?:void|cancel|wrong|mistake|error))", re.I), "VOID_EXPENSE", 0.93),
+    # Room transfer — move tenant from one room to another
+    (re.compile(r"(?:move|shift|transfer|relocate|change room for|room change for|room\s+(?:transfer|change|shift|move))\s+\w+.{0,30}(?:to|into)\s+(?:room\s+)?[\w-]+|(?:move|shift|transfer)\s+(?:room\s+)?[\w-]+\s+to\s+(?:room\s+)?[\w-]+|\w+\s+(?:ko\s+)?(?:room\s+)?[\w-]+\s+(?:mein|me)\s+(?:move|shift|transfer)\s+karo?", re.I), "ROOM_TRANSFER", 0.93),
+    # Deposit change
+    (re.compile(r"(?:change|update|set|modify|correct)\s+deposit|deposit\s+(?:change|update|correction|set|for\s+\w+\s+is|\w+\s+\d{3,})|(?:increase|decrease|hike|reduce)\s+deposit", re.I), "DEPOSIT_CHANGE", 0.91),
     # Send reminder to ALL tenants
     (re.compile(r"(?:send reminder(?:s)? to all|send\s+(?:rent\s+|dues?\s+)?reminders?(?:\s+to\s+all)?$|send\s+all\s+reminders?|remind all|remind everyone|blast reminder|mass reminder|send dues reminder|nudge all|sabko reminder|sabko\s+(?:bhejo|send)|sabko\s+\S+.*?reminder|bulk reminder|remind all tenants?)", re.I), "SEND_REMINDER_ALL", 0.95),
     # ADD_REFUND with amount (has a number → action, not query) — MUST come before QUERY_REFUNDS
