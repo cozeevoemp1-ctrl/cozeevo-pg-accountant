@@ -1708,9 +1708,12 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     )).all()
 
     occupied_ids = {row[0] for row in (await session.execute(
-        select(Tenancy.room_id).where(
+        select(Tenancy.room_id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(
             Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
             Tenancy.room_id.isnot(None),
+            Room.is_staff_room == False,
         )
     )).all()}
 
@@ -1809,7 +1812,9 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         .where(and_(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False))
     ) or 0
     physical_rooms = await session.scalar(
-        select(func.count(func.distinct(Tenancy.room_id))).where(Tenancy.status == TenancyStatus.active)
+        select(func.count(func.distinct(Tenancy.room_id)))
+        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
     ) or 0
 
     # No-shows: booked + assigned a room but not yet arrived (same premium rule)
