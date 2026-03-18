@@ -124,12 +124,12 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
             # Non-audio (PDF, image, etc.) — save to disk for downstream processing
             await _download_media(media_id, media_mime)
 
-    # -- Route through the v2 LangGraph supervisor pipeline -------------------
+    # -- Route through the v1 regex-first pipeline ----------------------------
     try:
         from src.database.db_manager import _session_factory
-        from src.whatsapp.v2.chat_api_v2 import _process_v2_inner, InboundMessage
+        from src.whatsapp.chat_api import process_message, InboundMessage
         async with _session_factory() as session:
-            result = await _process_v2_inner(
+            result = await process_message(
                 body=InboundMessage(phone=from_number, message=body, message_id=None),
                 session=session,
             )
