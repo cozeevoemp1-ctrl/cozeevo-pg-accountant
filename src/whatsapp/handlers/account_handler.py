@@ -618,7 +618,13 @@ async def _calc_outstanding_dues(tenancy_id: int, session: AsyncSession) -> tupl
 # ── Query dues ────────────────────────────────────────────────────────────────
 
 async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    current_month = date.today().replace(day=1)
+    today = date.today()
+    month_num = entities.get("month")
+    if month_num:
+        year = entities.get("year") or today.year
+        query_month = date(int(year), int(month_num), 1)
+    else:
+        query_month = today.replace(day=1)
 
     result = await session.execute(
         select(Tenant.name, RentSchedule.rent_due, RentSchedule.status)
@@ -626,7 +632,7 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
         .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
         .where(
             Tenancy.status == TenancyStatus.active,
-            RentSchedule.period_month == current_month,
+            RentSchedule.period_month == query_month,
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
         )
         .order_by(Tenant.name)
@@ -635,9 +641,9 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
     rows = result.all()
 
     if not rows:
-        return f"All tenants are paid up for {current_month.strftime('%B %Y')}!"
+        return f"All tenants are paid up for {query_month.strftime('%B %Y')}!"
 
-    lines = [f"*Pending dues — {current_month.strftime('%B %Y')}*\n"]
+    lines = [f"*Pending dues — {query_month.strftime('%B %Y')}*\n"]
     total = Decimal("0")
     seen = set()
     for name, rent_due, status in rows:
@@ -736,13 +742,8 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
             "─" * 26,
             f"*Net due: Rs.{int(net_due):,}*",
         ]
-    elif o_rent > 0 or o_maintenance > 0:
-        lines += ["", "*Outstanding dues*"]
-        if o_rent > 0:
-            lines.append(f"Rent due        : Rs.{int(o_rent):,}")
-        if o_maintenance > 0:
-            lines.append(f"Maintenance due : Rs.{int(o_maintenance):,}")
-        lines.append(f"*Total: Rs.{int(o_rent + o_maintenance):,}*")
+    elif o_rent > 0:
+        lines += ["", f"*Rent outstanding: Rs.{int(o_rent):,}*"]
     else:
         lines.append("All dues cleared!")
 
