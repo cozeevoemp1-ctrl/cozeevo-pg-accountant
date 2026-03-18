@@ -1529,23 +1529,16 @@ async def _set_wifi(entities: dict, ctx: CallerContext, session: AsyncSession) -
 
 async def _help(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     header = bot_intro(await is_first_time_today(ctx.phone, session), ctx.name, ctx.role)
+    first = ctx.name.split()[0] if ctx.name else "there"
     return (
         f"{header}"
-        "*Payments:* Raj paid 15000 upi\n"
-        "*Dues:* Who hasn't paid?\n"
-        "*Report:* Monthly report\n"
-        "*Tenant:* Raj balance\n"
-        "*Onboard:* Add tenant Ravi 9876543210\n"
-        "*Checkout:* Checkout Priya\n"
-        "*Expense:* Electricity 4500\n"
-        "*WiFi:* wifi password\n\n"
-        "Tap a button above or just type naturally."
+        f"Pick a service below or just type naturally, {first}. 👇"
     )
 
 
 async def _more_menu(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Triggered when owner taps 'More Options' button — chat_api attaches the list payload."""
-    return "Here are all available actions:"
+    first = ctx.name.split()[0] if ctx.name else "there"
+    return f"Here's everything you can do, {first}. 👇"
 
 
 async def _rules(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:

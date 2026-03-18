@@ -43,11 +43,11 @@ _GREETINGS: dict[str, list[str]] = {
         "✨ Look who's here! {tod}, {name}. What can I do for you?",              # 4 Witty
     ],
     "lead": [
-        "👋 {tod}! Welcome to Kozzy PG — I'm Artha, your virtual guide! 🏠",     # 0 Professional
-        "😊 Hi there! Looking for a great PG? You're in the right place!",        # 1 Minimalist
-        "🎯 Hey! Great timing — let me help you find your perfect room! 🏠",      # 2 Energetic
-        "🤝 {tod}! Finding the right PG can be tough — I'm here to make it easy.",# 3 Supportive
-        "✨ Hello! You just walked into Kozzy PG — virtually at least. Welcome!",  # 4 Witty
+        "👋 {tod}! Welcome to Cozeevo Co-living — I'm Artha, your virtual guide! 🏠",     # 0 Professional
+        "😊 Hi there! Looking for a great PG? You're in the right place!",                 # 1 Minimalist
+        "🎯 Hey! Great timing — let me help you find your perfect room at Cozeevo! 🏠",   # 2 Energetic
+        "🤝 {tod}! Finding the right PG can be tough — I'm here to make it easy.",        # 3 Supportive
+        "✨ Hello! You just walked into Cozeevo Co-living — virtually at least. Welcome!", # 4 Witty
     ],
 }
 
