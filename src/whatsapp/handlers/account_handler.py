@@ -66,6 +66,8 @@ FINANCIAL_INTENTS: frozenset[str] = frozenset({
     "DEPOSIT_CHANGE",
     "ADD_REFUND",
     "QUERY_REFUNDS",
+    "BANK_REPORT",
+    "BANK_DEPOSIT_MATCH",
 })
 
 
@@ -92,6 +94,14 @@ async def handle_account(
         "ADD_REFUND":     _add_refund,
         "QUERY_REFUNDS":  _query_refunds,
     }
+    # Bank analytics — delegated to finance_handler
+    if intent == "BANK_REPORT":
+        from src.whatsapp.handlers.finance_handler import handle_bank_report
+        return await handle_bank_report(entities, ctx, session)
+    if intent == "BANK_DEPOSIT_MATCH":
+        from src.whatsapp.handlers.finance_handler import handle_deposit_match
+        return await handle_deposit_match(entities, ctx, session)
+
     fn = handlers.get(intent, _unknown_financial)
     return await fn(entities, ctx, session)
 

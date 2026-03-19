@@ -995,3 +995,64 @@ class LearnedRule(Base):
         Index("ix_learned_rules_intent",  "intent"),
         Index("ix_learned_rules_active",  "active"),
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LAYER 8 — BANK STATEMENT ANALYTICS  (L2 financial, re-importable)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class BankUpload(Base):
+    """
+    L2 — One row per bank statement PDF uploaded via WhatsApp.
+    Tracks who uploaded it, when, and the date range it covers.
+    """
+    __tablename__ = "bank_uploads"
+
+    id          = Column(Integer, primary_key=True)
+    phone       = Column(String(20), nullable=False)       # uploader's phone
+    file_path   = Column(String(500))                      # saved path on server
+    row_count   = Column(Integer, default=0)               # transactions parsed
+    new_count   = Column(Integer, default=0)               # new (non-duplicate) rows saved
+    from_date   = Column(Date, nullable=True)              # earliest txn date in file
+    to_date     = Column(Date, nullable=True)              # latest txn date in file
+    status      = Column(String(20), default="processed")  # processed | error
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    transactions = relationship("BankTransaction", back_populates="upload")
+
+    __table_args__ = (
+        Index("ix_bank_uploads_phone",   "phone"),
+        Index("ix_bank_uploads_dates",   "from_date", "to_date"),
+    )
+
+
+class BankTransaction(Base):
+    """
+    L2 — Individual transaction rows extracted from bank statement PDFs.
+    Deduplicated by unique_hash (date + amount + description fingerprint).
+    Used for P&L reporting, expense analysis, and deposit matching.
+    """
+    __tablename__ = "bank_transactions"
+
+    id            = Column(Integer, primary_key=True)
+    upload_id     = Column(Integer, ForeignKey("bank_uploads.id"), nullable=True)
+    txn_date      = Column(Date, nullable=False)
+    description   = Column(Text, default="")
+    amount        = Column(Numeric(12, 2), nullable=False)
+    txn_type      = Column(String(10), default="expense")  # "income" | "expense"
+    category      = Column(String(80), default="Other Expenses")
+    sub_category  = Column(String(120), default="")
+    upi_reference = Column(String(120), nullable=True)
+    source        = Column(String(40), default="bank_statement")
+    unique_hash   = Column(String(64), nullable=True)       # SHA-256 dedup fingerprint
+    created_at    = Column(DateTime, default=datetime.utcnow)
+
+    upload = relationship("BankUpload", back_populates="transactions")
+
+    __table_args__ = (
+        Index("ix_btxn_date",       "txn_date"),
+        Index("ix_btxn_type",       "txn_type"),
+        Index("ix_btxn_category",   "category"),
+        Index("ix_btxn_upload",     "upload_id"),
+        UniqueConstraint("unique_hash", name="uq_btxn_hash"),
+    )

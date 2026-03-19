@@ -120,8 +120,12 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
                     "Sorry, I couldn't understand the voice note. Please type your message instead.",
                 )
                 return {"status": "ok"}
+        elif base_mime == "application/pdf":
+            # ── Bank statement PDF upload (admin / power_user only) ───────────
+            background.add_task(_handle_pdf_upload, from_number, media_id, body)
+            return {"status": "ok"}
         else:
-            # Non-audio (PDF, image, etc.) — save to disk for downstream processing
+            # Non-audio (image, etc.) — save to disk for downstream processing
             await _download_media(media_id, media_mime)
 
     # -- Route through the v1 regex-first pipeline ----------------------------
@@ -380,3 +384,40 @@ async def _transcribe_audio_bytes(audio_bytes: bytes, mime_type: str) -> Optiona
     except Exception as e:
         logger.error(f"[Whisper] Transcription error: {e}")
         return None
+
+
+# -- Bank statement PDF upload handler -----------------------------------------
+
+async def _handle_pdf_upload(from_number: str, media_id: str, caption: str):
+    """
+    Background task: download PDF → role-check → parse → save → reply.
+    Only admin / power_user may upload bank statements.
+    """
+    from src.database.db_manager import _session_factory
+    from src.whatsapp.role_service import get_caller_context
+    from src.whatsapp.handlers.finance_handler import handle_bank_upload
+
+    try:
+        async with _session_factory() as session:
+            ctx = await get_caller_context(from_number, session)
+
+        if ctx.role not in ("admin", "power_user"):
+            await _send_whatsapp(
+                from_number,
+                "Bank statement uploads are only available for admins.",
+            )
+            return
+
+        saved_path = await _download_media(media_id, "application/pdf")
+        if not saved_path:
+            await _send_whatsapp(from_number, "Could not download the file. Please try again.")
+            return
+
+        async with _session_factory() as session:
+            reply = await handle_bank_upload(saved_path, from_number, caption, session)
+            await session.commit()
+
+        await _send_whatsapp(from_number, reply)
+
+    except Exception as e:
+        logger.error(f"[PDF Upload] Error for {from_number}: {e}", exc_info=True)

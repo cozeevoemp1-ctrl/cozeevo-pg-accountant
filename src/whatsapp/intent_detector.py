@@ -117,6 +117,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
     # Log vacation / absence for tenant (any name, not hardcoded)
     (re.compile(r"(?:\w+\s+(?:on vacation|going home|on leave|absent|away|out of station|on holiday|chutti)|log vacation|\w+\s+vacation\s+(?:from|for|\d)|going home for|on leave from|will be away|out of station|vacation\s+(?:for\s+)?\d+\s+days?|chutti\s+(?:pe|par|\d+)|din\s+ke\s+liye\s+(?:bahar|ghar)|ghar\s+(?:gaya|gayi|gaye)\b|\w+\s+\d+\s+din\s+bahar\b|\w+\s+not\s+here\b|chutti\s+pe\s+(?:hai|hain|ho)\b|chutti\s+\w+\s+\d+\s+din\b)", re.I), "LOG_VACATION", 0.89),
+    # Bank deposit matching — MUST come before REPORT/P&L catches
+    (re.compile(r"(?:match\s+deposits?|deposit\s+match|check\s+deposits?|identify\s+deposits?|which\s+deposits?|tenant\s+deposits?\s+(?:in\s+bank|matched|verify)|deposit\s+identification|bank\s+deposits?\s+match)", re.I), "BANK_DEPOSIT_MATCH", 0.94),
+    # Bank statement P&L report — MUST come before generic REPORT catch
+    (re.compile(r"(?:bank\s+report|bank\s+statement\s+(?:report|summary|analysis|p&l)|statement\s+report|bank\s+p&l|bank\s+analysis|show\s+bank\s+(?:report|summary|expenses?|income)|analyze\s+bank|bank\s+expense\s+(?:report|summary|breakdown)|income\s+expense\s+report|p&l\s+(?:for|of|report)\b)", re.I), "BANK_REPORT", 0.94),
     # Complaint REGISTER with "report" verb — "report plumbing issue" = file complaint (before REPORT)
     (re.compile(r"^report\s+(?:plumbing|electrical|electric|water|fan|ac|air.?con|pest|toilet|door|window|lift|wifi|internet|issue|problem|complaint|broken|leak|not\s+working)", re.I), "COMPLAINT_REGISTER", 0.93),
     # Report — early catch for "occupancy report", "monthly report" before other patterns grab them
@@ -524,5 +528,15 @@ def _extract_entities(text: str, intent: str) -> dict:
             if re.search(pattern, text, re.I):
                 entities["category"] = cat
                 break
+
+    # Extract year — useful for BANK_REPORT / QUERY_DUES with explicit year
+    if "year" not in entities:
+        year_match = re.search(r"\b(202[4-9]|203\d)\b", text)
+        if year_match:
+            entities["year"] = int(year_match.group(1))
+
+    # Relative time — "last month", "previous month"
+    if re.search(r"\b(?:last|previous|prev)\s+month\b", text, re.I):
+        entities["relative"] = "last_month"
 
     return entities

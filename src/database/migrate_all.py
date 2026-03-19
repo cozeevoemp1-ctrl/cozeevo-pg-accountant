@@ -387,6 +387,62 @@ async def run_promote_partner_to_admin(conn: AsyncConnection) -> None:
     print("  [ok] authorized_users - 7358341775 promoted to admin")
 
 
+async def run_bank_analytics_tables(conn: AsyncConnection) -> None:
+    """Create bank_uploads and bank_transactions tables (idempotent)."""
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS bank_uploads (
+            id          SERIAL PRIMARY KEY,
+            phone       VARCHAR(20) NOT NULL,
+            file_path   VARCHAR(500),
+            row_count   INTEGER DEFAULT 0,
+            new_count   INTEGER DEFAULT 0,
+            from_date   DATE,
+            to_date     DATE,
+            status      VARCHAR(20) DEFAULT 'processed',
+            uploaded_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_bank_uploads_phone
+            ON bank_uploads (phone)
+    """))
+
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS bank_transactions (
+            id            SERIAL PRIMARY KEY,
+            upload_id     INTEGER REFERENCES bank_uploads(id),
+            txn_date      DATE NOT NULL,
+            description   TEXT DEFAULT '',
+            amount        NUMERIC(12,2) NOT NULL,
+            txn_type      VARCHAR(10) DEFAULT 'expense',
+            category      VARCHAR(80) DEFAULT 'Other Expenses',
+            sub_category  VARCHAR(120) DEFAULT '',
+            upi_reference VARCHAR(120),
+            source        VARCHAR(40) DEFAULT 'bank_statement',
+            unique_hash   VARCHAR(64),
+            created_at    TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_btxn_date     ON bank_transactions (txn_date)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_btxn_type     ON bank_transactions (txn_type)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_btxn_category ON bank_transactions (category)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_btxn_upload   ON bank_transactions (upload_id)
+    """))
+    await conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_btxn_hash
+            ON bank_transactions (unique_hash)
+            WHERE unique_hash IS NOT NULL
+    """))
+    print("  [ok] bank_uploads + bank_transactions tables ready")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -399,6 +455,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_schema(conn)
             await run_room_master_fix(conn)
             await run_promote_partner_to_admin(conn)
+            await run_bank_analytics_tables(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()
