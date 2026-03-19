@@ -76,6 +76,7 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     body        = msg_data.get("body", "")
     media_id    = msg_data.get("media_id")
     media_mime  = msg_data.get("media_mime")
+    media_name  = msg_data.get("media_name", "")   # original filename (for type sniffing)
 
     logger.info(f"[Webhook] From={from_number} | Body={body[:80]}")
 
@@ -100,8 +101,20 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         return {"status": "ok"}
 
     # -- Handle media ---------------------------------------------------------
+    _STATEMENT_MIMES = {
+        "application/pdf",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/csv",
+        "text/plain",
+        "application/octet-stream",   # WhatsApp often sends CSV/Excel as this
+    }
+    _STATEMENT_EXTS = {".pdf", ".xlsx", ".xls", ".csv", ".txt"}
+
     if media_id:
         base_mime = (media_mime or "").split(";")[0].strip()
+        fname_ext = ("." + media_name.rsplit(".", 1)[-1].lower()) if "." in media_name else ""
+
         if base_mime.startswith("audio/"):
             # Voice message: stream bytes in memory directly to Whisper — no disk I/O
             audio_bytes = await _fetch_media_bytes(media_id)
@@ -120,15 +133,17 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
                     "Sorry, I couldn't understand the voice note. Please type your message instead.",
                 )
                 return {"status": "ok"}
-        elif base_mime in (
-            "application/pdf",
-            "application/vnd.ms-excel",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "text/csv",
-            "text/plain",
-        ):
+        elif base_mime in _STATEMENT_MIMES or fname_ext in _STATEMENT_EXTS:
             # ── Bank statement PDF / Excel / CSV upload (admin / power_user only)
-            background.add_task(_handle_pdf_upload, from_number, media_id, body, base_mime)
+            # Pass actual filename extension so downloader saves with correct ext
+            effective_mime = base_mime if base_mime != "application/octet-stream" else (
+                {"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                 "xls":  "application/vnd.ms-excel",
+                 "csv":  "text/csv",
+                 "pdf":  "application/pdf",
+                 }.get(fname_ext.lstrip("."), base_mime)
+            )
+            background.add_task(_handle_pdf_upload, from_number, media_id, body, effective_mime)
             return {"status": "ok"}
         else:
             # Non-audio (image, etc.) — save to disk for downstream processing
@@ -207,6 +222,7 @@ def _extract_message(payload: dict) -> Optional[dict]:
             "body":       media_obj.get("caption", ""),
             "media_id":   media_obj.get("id"),
             "media_mime": media_obj.get("mime_type", ""),
+            "media_name": media_obj.get("filename", ""),   # filename WhatsApp sends for documents
         }
     except (KeyError, IndexError):
         return None
