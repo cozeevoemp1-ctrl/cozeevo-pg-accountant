@@ -120,9 +120,15 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
                     "Sorry, I couldn't understand the voice note. Please type your message instead.",
                 )
                 return {"status": "ok"}
-        elif base_mime == "application/pdf":
-            # ── Bank statement PDF upload (admin / power_user only) ───────────
-            background.add_task(_handle_pdf_upload, from_number, media_id, body)
+        elif base_mime in (
+            "application/pdf",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+            "text/plain",
+        ):
+            # ── Bank statement PDF / Excel / CSV upload (admin / power_user only)
+            background.add_task(_handle_pdf_upload, from_number, media_id, body, base_mime)
             return {"status": "ok"}
         else:
             # Non-audio (image, etc.) — save to disk for downstream processing
@@ -388,9 +394,9 @@ async def _transcribe_audio_bytes(audio_bytes: bytes, mime_type: str) -> Optiona
 
 # -- Bank statement PDF upload handler -----------------------------------------
 
-async def _handle_pdf_upload(from_number: str, media_id: str, caption: str):
+async def _handle_pdf_upload(from_number: str, media_id: str, caption: str, mime_type: str = "application/pdf"):
     """
-    Background task: download PDF → role-check → parse → save → reply.
+    Background task: download PDF/Excel/CSV → role-check → parse → save → reply.
     Only admin / power_user may upload bank statements.
     """
     from src.database.db_manager import _session_factory
@@ -408,7 +414,7 @@ async def _handle_pdf_upload(from_number: str, media_id: str, caption: str):
             )
             return
 
-        saved_path = await _download_media(media_id, "application/pdf")
+        saved_path = await _download_media(media_id, mime_type)
         if not saved_path:
             await _send_whatsapp(from_number, "Could not download the file. Please try again.")
             return

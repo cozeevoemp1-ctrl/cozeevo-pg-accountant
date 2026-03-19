@@ -105,6 +105,54 @@ def _txn_hash(txn_date, description: str, amount: float) -> str:
 
 # ── 1. Bank statement upload ───────────────────────────────────────────────────
 
+def _load_dataframe(path: Path):
+    """Load a bank statement file (PDF / Excel / CSV) into a DataFrame."""
+    import pandas as pd
+    suffix = path.suffix.lower()
+
+    if suffix == ".pdf":
+        from scripts.bank_statement_extractor import extract_transactions
+        return extract_transactions(str(path))
+
+    if suffix in (".xlsx", ".xls"):
+        df = pd.read_excel(str(path))
+        # Normalise column names to match PDF extractor output
+        df.columns = [str(c).strip() for c in df.columns]
+        # Try to find date / debit / credit columns by fuzzy name
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if any(k in cl for k in ("transaction date", "txn date", "date", "value date")) and "date" not in col_map:
+                col_map["Transaction Date"] = c
+            if any(k in cl for k in ("withdrawal", "debit", "dr")) and "Withdrawals" not in col_map:
+                col_map["Withdrawals"] = c
+            if any(k in cl for k in ("deposit", "credit", "cr")) and "Deposits" not in col_map:
+                col_map["Deposits"] = c
+            if any(k in cl for k in ("description", "narration", "particulars", "remarks")) and "Description" not in col_map:
+                col_map["Description"] = c
+            if any(k in cl for k in ("ref", "reference", "cheque", "utr")) and "Reference" not in col_map:
+                col_map["Reference"] = c
+        return df.rename(columns={v: k for k, v in col_map.items()})
+
+    if suffix in (".csv", ".txt"):
+        df = pd.read_csv(str(path), encoding="utf-8-sig", on_bad_lines="skip")
+        df.columns = [str(c).strip() for c in df.columns]
+        col_map = {}
+        for c in df.columns:
+            cl = c.lower()
+            if "date" in cl and "date" not in col_map:
+                col_map["Transaction Date"] = c
+            if any(k in cl for k in ("withdrawal", "debit", "dr")) and "Withdrawals" not in col_map:
+                col_map["Withdrawals"] = c
+            if any(k in cl for k in ("deposit", "credit", "cr")) and "Deposits" not in col_map:
+                col_map["Deposits"] = c
+            if any(k in cl for k in ("description", "narration", "particulars")) and "Description" not in col_map:
+                col_map["Description"] = c
+        return df.rename(columns={v: k for k, v in col_map.items()})
+
+    raise ValueError(f"Unsupported file type: {suffix}")
+
+
 async def handle_bank_upload(
     file_path: str,
     phone: str,
@@ -112,27 +160,21 @@ async def handle_bank_upload(
     session: AsyncSession,
 ) -> str:
     """
-    Parse a bank statement PDF, classify transactions, save to DB.
+    Parse a bank statement PDF/Excel/CSV, classify transactions, save to DB.
     Returns a WhatsApp-friendly summary string.
     """
-    try:
-        from scripts.bank_statement_extractor import extract_transactions
-        import pandas as pd
-    except ImportError as e:
-        return f"Bank statement parser not available: {e}"
-
     path = Path(file_path)
     if not path.exists():
         return "Could not find the uploaded file. Please try again."
 
-    # ── Parse PDF ──────────────────────────────────────────────────────────────
+    # ── Parse file ─────────────────────────────────────────────────────────────
     try:
-        df = extract_transactions(str(path))
+        df = _load_dataframe(path)
     except Exception as e:
-        return f"Could not parse the PDF: {e}. Make sure it's a bank statement."
+        return f"Could not parse the file: {e}. Make sure it's a bank statement."
 
     if df is None or df.empty:
-        return "No transactions found in the PDF. Make sure it's a bank statement (not a scanned image)."
+        return "No transactions found. Make sure it's a bank statement (PDF/Excel/CSV)."
 
     # ── Build transaction list ─────────────────────────────────────────────────
     rows_parsed = 0
