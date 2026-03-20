@@ -225,9 +225,8 @@ static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 @app.get("/dashboard")
-async def dashboard_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/static/dashboard.html")
+async def dashboard_page():
+    return FileResponse(str(static_dir / "dashboard.html"))
 
 # ── Pending entity approval API ───────────────────────────────────────────
 
