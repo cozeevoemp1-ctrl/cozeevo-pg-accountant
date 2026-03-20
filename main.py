@@ -33,8 +33,10 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
         path = request.url.path
 
-        # Webhook and health are public — Meta needs to reach them
-        if path.startswith("/webhook") or path == "/healthz" or path == "/":
+        # Webhook, health, and dashboard are public
+        # Dashboard API is token-protected at the endpoint level
+        if (path.startswith("/webhook") or path == "/healthz" or path == "/"
+                or path.startswith("/dashboard") or path.startswith("/api/dashboard")):
             return await call_next(request)
 
         # Everything else (/api/*, /docs, /redoc, /openapi.json) — localhost only
@@ -90,6 +92,9 @@ app.add_middleware(LocalOnlyMiddleware)
 
 from src.whatsapp.webhook_handler import router as whatsapp_router
 app.include_router(whatsapp_router)
+
+from src.api.dashboard_router import router as dashboard_router
+app.include_router(dashboard_router)
 
 from src.whatsapp.chat_api import router as chat_router
 app.include_router(chat_router)
@@ -209,9 +214,20 @@ app.include_router(report_router)
 
 # ── Dashboard file serving ────────────────────────────────────────────────
 
+# Legacy generated-report dashboards
 dashboard_dir = Path(os.getenv("DASHBOARD_DIR", "./dashboards"))
 dashboard_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/dashboard", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboard")
+app.mount("/dashboards", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboards")
+
+# Static assets (source-controlled)
+static_dir = Path("./static")
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+@app.get("/dashboard")
+async def dashboard_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/static/dashboard.html")
 
 # ── Pending entity approval API ───────────────────────────────────────────
 

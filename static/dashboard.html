@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cozeevo — Operations Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { font-family: 'Inter', sans-serif; }
+  .sidebar-link { @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-all cursor-pointer text-sm font-medium; }
+  .sidebar-link.active { @apply bg-indigo-600 text-white; }
+  .kpi-card { @apply bg-white rounded-xl p-5 shadow-sm border border-slate-100; }
+  .badge-income  { @apply inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700; }
+  .badge-expense { @apply inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700; }
+  .page { display: none; }
+  .page.active { display: block; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #f1f5f9; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<!-- Layout -->
+<div class="flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-56 bg-slate-900 flex flex-col flex-shrink-0">
+    <!-- Brand -->
+    <div class="px-5 pt-6 pb-4 border-b border-slate-700">
+      <div class="text-white font-bold text-lg tracking-tight">Cozeevo</div>
+      <div class="text-slate-400 text-xs mt-0.5">Operations Dashboard</div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <a class="sidebar-link active" onclick="showPage('overview')">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Overview
+      </a>
+      <a class="sidebar-link" onclick="showPage('pnl')">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        P&amp;L Report
+      </a>
+      <a class="sidebar-link" onclick="showPage('dues')">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        Dues
+      </a>
+      <a class="sidebar-link" onclick="showPage('transactions')">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        Transactions
+      </a>
+      <a class="sidebar-link" onclick="showPage('deposits')">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Deposits
+      </a>
+    </nav>
+
+    <!-- Month picker -->
+    <div class="px-4 pb-5 border-t border-slate-700 pt-4">
+      <label class="text-slate-400 text-xs font-medium uppercase tracking-wider block mb-2">Month</label>
+      <select id="monthSel" onchange="onMonthChange()" class="w-full bg-slate-800 text-white text-sm rounded-lg px-3 py-2 border border-slate-600 focus:outline-none focus:border-indigo-400">
+      </select>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 overflow-y-auto">
+
+    <!-- Topbar -->
+    <div class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div>
+        <h1 id="pageTitle" class="text-lg font-semibold text-slate-800">Overview</h1>
+        <p id="pageSubtitle" class="text-xs text-slate-500 mt-0.5">Cozeevo Co-living — THOR &amp; HULK</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="bankCoverage" class="text-xs text-slate-400"></div>
+        <button onclick="refreshAll()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- OVERVIEW PAGE -->
+    <div id="page-overview" class="page active p-8">
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <div class="kpi-card col-span-1">
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Occupancy</div>
+          <div id="kpi-occ" class="text-2xl font-bold text-slate-800">—</div>
+          <div id="kpi-occ-sub" class="text-xs text-slate-500 mt-1">beds filled</div>
+        </div>
+        <div class="kpi-card col-span-1">
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Available</div>
+          <div id="kpi-vacant" class="text-2xl font-bold text-emerald-600">—</div>
+          <div class="text-xs text-slate-500 mt-1">vacant beds</div>
+        </div>
+        <div class="kpi-card col-span-1">
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Revenue</div>
+          <div id="kpi-revenue" class="text-2xl font-bold text-emerald-600">—</div>
+          <div class="text-xs text-slate-500 mt-1">this month</div>
+        </div>
+        <div class="kpi-card col-span-1">
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Expenses</div>
+          <div id="kpi-expenses" class="text-2xl font-bold text-red-500">—</div>
+          <div class="text-xs text-slate-500 mt-1">this month</div>
+        </div>
+        <div class="kpi-card col-span-1">
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Net Profit</div>
+          <div id="kpi-net" class="text-2xl font-bold">—</div>
+          <div class="text-xs text-slate-500 mt-1">this month</div>
+        </div>
+        <div class="kpi-card col-span-1">
+          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Dues</div>
+          <div id="kpi-dues" class="text-2xl font-bold text-amber-600">—</div>
+          <div class="text-xs text-slate-500 mt-1">outstanding</div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <!-- P&L Trend -->
+        <div class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="text-sm font-semibold text-slate-700">Income vs Expenses — Last 6 Months</h2>
+          </div>
+          <canvas id="pnlChart" height="200"></canvas>
+        </div>
+
+        <!-- Expense breakdown -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h2 class="text-sm font-semibold text-slate-700 mb-5">Expense Breakdown</h2>
+          <canvas id="expenseDonut" height="220"></canvas>
+          <div id="donutLegend" class="mt-4 space-y-1.5 text-xs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- P&L PAGE -->
+    <div id="page-pnl" class="page p-8">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100">
+          <h2 class="text-sm font-semibold text-slate-700">P&amp;L Report — <span id="pnlMonthLabel">—</span></h2>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+          <!-- Income -->
+          <div class="p-6">
+            <h3 class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-3">Income</h3>
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
+                <th class="text-left pb-2">Category</th>
+                <th class="text-right pb-2">Amount</th>
+              </tr></thead>
+              <tbody id="incomeTable"></tbody>
+              <tfoot><tr class="border-t border-slate-200 font-semibold text-emerald-600">
+                <td class="pt-2">Total Income</td>
+                <td class="text-right pt-2" id="totalIncome">—</td>
+              </tr></tfoot>
+            </table>
+          </div>
+          <!-- Expenses -->
+          <div class="p-6">
+            <h3 class="text-xs font-semibold text-red-500 uppercase tracking-wider mb-3">Expenses</h3>
+            <table class="w-full text-sm">
+              <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
+                <th class="text-left pb-2">Category</th>
+                <th class="text-right pb-2">Amount</th>
+              </tr></thead>
+              <tbody id="expenseTable"></tbody>
+              <tfoot><tr class="border-t border-slate-200 font-semibold text-red-500">
+                <td class="pt-2">Total Expenses</td>
+                <td class="text-right pt-2" id="totalExpenses">—</td>
+              </tr></tfoot>
+            </table>
+          </div>
+        </div>
+        <!-- Net row -->
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+          <span class="font-semibold text-slate-700">Net Profit / Loss</span>
+          <span id="netPnl" class="text-lg font-bold">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DUES PAGE -->
+    <div id="page-dues" class="page p-8">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-slate-700">Outstanding Dues</h2>
+          <span id="duesBadge" class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium"></span>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50">
+            <tr class="text-xs text-slate-500 uppercase tracking-wider">
+              <th class="text-left px-6 py-3">Tenant</th>
+              <th class="text-left px-6 py-3">Room</th>
+              <th class="text-right px-6 py-3">Outstanding</th>
+              <th class="text-right px-6 py-3">Months Pending</th>
+              <th class="text-left px-6 py-3">Last Period</th>
+            </tr>
+          </thead>
+          <tbody id="duesTable" class="divide-y divide-slate-50"></tbody>
+        </table>
+        <div id="duesEmpty" class="px-6 py-10 text-center text-slate-400 text-sm hidden">All dues cleared</div>
+      </div>
+    </div>
+
+    <!-- TRANSACTIONS PAGE -->
+    <div id="page-transactions" class="page p-8">
+      <!-- Filters -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">From</label>
+          <input type="date" id="txnFrom" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">To</label>
+          <input type="date" id="txnTo" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-500 block mb-1">Type</label>
+          <select id="txnType" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400">
+            <option value="">All</option>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+        </div>
+        <button onclick="loadTransactions(1)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-1.5 rounded-lg font-medium transition-colors">Filter</button>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50">
+            <tr class="text-xs text-slate-500 uppercase tracking-wider">
+              <th class="text-left px-5 py-3">Date</th>
+              <th class="text-left px-5 py-3">Description</th>
+              <th class="text-left px-5 py-3">Category</th>
+              <th class="text-right px-5 py-3">Amount</th>
+              <th class="text-left px-5 py-3">Type</th>
+            </tr>
+          </thead>
+          <tbody id="txnTable" class="divide-y divide-slate-50"></tbody>
+        </table>
+        <div id="txnEmpty" class="px-6 py-10 text-center text-slate-400 text-sm hidden">No transactions found</div>
+        <!-- Pagination -->
+        <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span id="txnCount"></span>
+          <div class="flex gap-2">
+            <button id="txnPrev" onclick="txnPage--; loadTransactions(txnPage)" class="px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Prev</button>
+            <button id="txnNext" onclick="txnPage++; loadTransactions(txnPage)" class="px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEPOSITS PAGE -->
+    <div id="page-deposits" class="page p-8">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100">
+          <h2 class="text-sm font-semibold text-slate-700">Security Deposit Matching — Last 90 Days</h2>
+          <p class="text-xs text-slate-400 mt-1">Cross-references bank income against tenant security deposits</p>
+        </div>
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50">
+            <tr class="text-xs text-slate-500 uppercase tracking-wider">
+              <th class="text-left px-6 py-3">Tenant</th>
+              <th class="text-left px-6 py-3">Room</th>
+              <th class="text-left px-6 py-3">Check-in</th>
+              <th class="text-right px-6 py-3">Deposit</th>
+              <th class="text-left px-6 py-3">Status</th>
+              <th class="text-left px-6 py-3">Bank Match</th>
+            </tr>
+          </thead>
+          <tbody id="depositsTable" class="divide-y divide-slate-50"></tbody>
+        </table>
+        <div id="depositsEmpty" class="px-6 py-10 text-center text-slate-400 text-sm hidden">No recent tenancies with deposits</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const params  = new URLSearchParams(location.search);
+const TOKEN   = params.get('token') || '';
+const BASE    = '';   // same origin
+
+let selectedMonth = null, selectedYear = null;
+let pnlChartInst = null, donutInst = null;
+let txnPage = 1;
+
+// ── Month selector ────────────────────────────────────────────────────────────
+function buildMonthOptions() {
+  const sel = document.getElementById('monthSel');
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    let d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const opt = document.createElement('option');
+    opt.value = `${d.getFullYear()}-${d.getMonth()+1}`;
+    opt.textContent = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    sel.appendChild(opt);
+  }
+  selectedMonth = now.getMonth() + 1;
+  selectedYear  = now.getFullYear();
+}
+
+function onMonthChange() {
+  const [y, m] = document.getElementById('monthSel').value.split('-').map(Number);
+  selectedYear  = y;
+  selectedMonth = m;
+  refreshAll();
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(path, extra = '') {
+  const sep = path.includes('?') ? '&' : '?';
+  const url = `${BASE}${path}${sep}token=${TOKEN}${extra}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`API ${r.status}: ${url}`);
+  return r.json();
+}
+
+function fmt(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 100000) return `₹${(n/100000).toFixed(1)}L`;
+  if (abs >= 1000)   return `₹${Math.round(n/1000)}K`;
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+}
+
+function fmtFull(n) {
+  if (n == null) return '—';
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+}
+
+// ── Page navigation ───────────────────────────────────────────────────────────
+const pageTitles = {
+  overview: 'Overview', pnl: 'P&L Report',
+  dues: 'Dues', transactions: 'Transactions', deposits: 'Deposits',
+};
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.sidebar-link').forEach(a => {
+    if (a.getAttribute('onclick')?.includes(name)) a.classList.add('active');
+  });
+  document.getElementById('pageTitle').textContent = pageTitles[name] || name;
+
+  if (name === 'pnl')          loadPnlPage();
+  if (name === 'dues')         loadDues();
+  if (name === 'transactions') loadTransactions(1);
+  if (name === 'deposits')     loadDeposits();
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+async function loadKpis() {
+  try {
+    const d = await api(`/api/dashboard/kpis?month=${selectedMonth}&year=${selectedYear}`);
+    const occ = d.occupancy;
+    document.getElementById('kpi-occ').textContent     = `${occ.pct}%`;
+    document.getElementById('kpi-occ-sub').textContent  = `${occ.beds_occupied} / ${occ.beds_total} beds`;
+    document.getElementById('kpi-vacant').textContent   = occ.beds_vacant;
+    document.getElementById('kpi-revenue').textContent  = fmt(d.revenue);
+    document.getElementById('kpi-expenses').textContent = fmt(d.expenses);
+    const netEl = document.getElementById('kpi-net');
+    netEl.textContent  = fmt(d.net);
+    netEl.className    = `text-2xl font-bold ${d.net >= 0 ? 'text-emerald-600' : 'text-red-500'}`;
+    document.getElementById('kpi-dues').textContent     = fmt(d.dues_outstanding);
+    if (d.bank_coverage) {
+      document.getElementById('bankCoverage').textContent = `Bank data up to ${d.bank_coverage}`;
+    }
+  } catch(e) { console.error('KPI load error', e); }
+}
+
+async function loadPnlChart() {
+  try {
+    const data = await api('/api/dashboard/pnl_trend?months=6');
+    const labels  = data.map(d => d.label);
+    const incomes = data.map(d => d.income);
+    const exps    = data.map(d => d.expense);
+
+    if (pnlChartInst) pnlChartInst.destroy();
+    pnlChartInst = new Chart(document.getElementById('pnlChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Income',   data: incomes, backgroundColor: '#10b981', borderRadius: 4 },
+          { label: 'Expenses', data: exps,    backgroundColor: '#f87171', borderRadius: 4 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { font: { size: 11, family: 'Inter' }, boxWidth: 12 } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, callback: v => v >= 1e5 ? `₹${(v/1e5).toFixed(1)}L` : `₹${(v/1000).toFixed(0)}K` } },
+        },
+      },
+    });
+  } catch(e) { console.error('PnL chart error', e); }
+}
+
+const DONUT_COLORS = ['#6366f1','#f59e0b','#10b981','#f87171','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#a78bfa'];
+
+async function loadDonut() {
+  try {
+    const data = await api(`/api/dashboard/expense_breakdown?month=${selectedMonth}&year=${selectedYear}`);
+    if (!data.length) return;
+    const top = data.slice(0, 10);
+    const labels = top.map(d => d.category);
+    const values = top.map(d => d.amount);
+
+    if (donutInst) donutInst.destroy();
+    donutInst = new Chart(document.getElementById('expenseDonut'), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data: values, backgroundColor: DONUT_COLORS, borderWidth: 0, hoverOffset: 4 }] },
+      options: {
+        responsive: true, cutout: '65%',
+        plugins: { legend: { display: false } },
+      },
+    });
+
+    const total = values.reduce((a, b) => a + b, 0);
+    document.getElementById('donutLegend').innerHTML = top.map((d, i) =>
+      `<div class="flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <div class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${DONUT_COLORS[i]}"></div>
+          <span class="text-slate-600 truncate max-w-[130px]">${d.category}</span>
+        </div>
+        <span class="text-slate-700 font-medium ml-2">${Math.round(d.amount/total*100)}%</span>
+      </div>`
+    ).join('');
+  } catch(e) { console.error('Donut error', e); }
+}
+
+// ── P&L page ──────────────────────────────────────────────────────────────────
+async function loadPnlPage() {
+  try {
+    const monthName = new Date(selectedYear, selectedMonth - 1, 1)
+      .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    document.getElementById('pnlMonthLabel').textContent = monthName;
+
+    const breakdown = await api(`/api/dashboard/expense_breakdown?month=${selectedMonth}&year=${selectedYear}`);
+    const kpis      = await api(`/api/dashboard/kpis?month=${selectedMonth}&year=${selectedYear}`);
+
+    // Income rows (from kpis we only have total; show single row for now)
+    document.getElementById('incomeTable').innerHTML =
+      `<tr><td class="py-1.5 text-slate-700">Bank Credits (all)</td><td class="text-right text-emerald-600 font-medium">${fmtFull(kpis.revenue)}</td></tr>`;
+    document.getElementById('totalIncome').textContent = fmtFull(kpis.revenue);
+
+    // Expense rows
+    const expRows = breakdown.map(d =>
+      `<tr><td class="py-1.5 text-slate-700">${d.category}</td><td class="text-right text-slate-700">${fmtFull(d.amount)}</td></tr>`
+    ).join('');
+    document.getElementById('expenseTable').innerHTML = expRows || '<tr><td colspan="2" class="py-4 text-slate-400 text-center">No data</td></tr>';
+    document.getElementById('totalExpenses').textContent = fmtFull(kpis.expenses);
+
+    const netEl = document.getElementById('netPnl');
+    netEl.textContent = fmtFull(kpis.net);
+    netEl.className   = `text-lg font-bold ${kpis.net >= 0 ? 'text-emerald-600' : 'text-red-500'}`;
+  } catch(e) { console.error('P&L page error', e); }
+}
+
+// ── Dues ──────────────────────────────────────────────────────────────────────
+async function loadDues() {
+  try {
+    const data = await api('/api/dashboard/dues');
+    const tbody = document.getElementById('duesTable');
+    document.getElementById('duesEmpty').classList.toggle('hidden', data.length > 0);
+    document.getElementById('duesBadge').textContent = `${data.length} tenants`;
+
+    tbody.innerHTML = data.map(d => `
+      <tr class="hover:bg-slate-50">
+        <td class="px-6 py-3 font-medium text-slate-800">${d.tenant}</td>
+        <td class="px-6 py-3 text-slate-600">${d.room}</td>
+        <td class="px-6 py-3 text-right font-semibold text-red-600">${fmtFull(d.outstanding)}</td>
+        <td class="px-6 py-3 text-right text-slate-600">${d.months_pending}</td>
+        <td class="px-6 py-3 text-slate-500">${d.latest_period}</td>
+      </tr>`).join('');
+  } catch(e) { console.error('Dues error', e); }
+}
+
+// ── Transactions ──────────────────────────────────────────────────────────────
+async function loadTransactions(page) {
+  try {
+    txnPage = page || 1;
+    const from = document.getElementById('txnFrom').value;
+    const to   = document.getElementById('txnTo').value;
+    const type = document.getElementById('txnType').value;
+    const extra = `&page=${txnPage}&per_page=50`
+      + (from ? `&from_date=${from}` : '')
+      + (to   ? `&to_date=${to}`     : '')
+      + (type ? `&txn_type=${type}`  : '');
+
+    const data  = await api('/api/dashboard/transactions', extra);
+    const tbody = document.getElementById('txnTable');
+    const empty = document.getElementById('txnEmpty');
+
+    empty.classList.toggle('hidden', data.items.length > 0);
+    document.getElementById('txnCount').textContent =
+      `Showing ${(txnPage-1)*50+1}–${Math.min(txnPage*50, data.total)} of ${data.total}`;
+    document.getElementById('txnPrev').disabled = txnPage <= 1;
+    document.getElementById('txnNext').disabled = txnPage * 50 >= data.total;
+
+    tbody.innerHTML = data.items.map(r => `
+      <tr class="hover:bg-slate-50">
+        <td class="px-5 py-2.5 text-slate-500 text-xs whitespace-nowrap">${r.date}</td>
+        <td class="px-5 py-2.5 text-slate-700 max-w-xs truncate" title="${r.description}">${r.description}</td>
+        <td class="px-5 py-2.5 text-slate-500 text-xs">${r.category}</td>
+        <td class="px-5 py-2.5 text-right font-medium ${r.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}">${fmtFull(r.amount)}</td>
+        <td class="px-5 py-2.5"><span class="${r.type === 'income' ? 'badge-income' : 'badge-expense'}">${r.type}</span></td>
+      </tr>`).join('');
+  } catch(e) { console.error('Transactions error', e); }
+}
+
+// ── Deposits ──────────────────────────────────────────────────────────────────
+async function loadDeposits() {
+  try {
+    const data  = await api('/api/dashboard/deposits');
+    const tbody = document.getElementById('depositsTable');
+    document.getElementById('depositsEmpty').classList.toggle('hidden', data.length > 0);
+
+    tbody.innerHTML = data.map(d => `
+      <tr class="hover:bg-slate-50">
+        <td class="px-6 py-3 font-medium text-slate-800">${d.tenant}</td>
+        <td class="px-6 py-3 text-slate-600">${d.room}</td>
+        <td class="px-6 py-3 text-slate-500 text-xs">${d.checkin}</td>
+        <td class="px-6 py-3 text-right font-medium text-slate-700">${fmtFull(d.deposit)}</td>
+        <td class="px-6 py-3">
+          ${d.matched
+            ? '<span class="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">Matched</span>'
+            : '<span class="inline-flex items-center gap-1 text-xs text-red-700 bg-red-50 px-2 py-0.5 rounded-full font-medium">Not found</span>'}
+        </td>
+        <td class="px-6 py-3 text-xs text-slate-500">
+          ${d.matched ? `${d.bank_date} — ${fmtFull(d.bank_amt)}` : '—'}
+        </td>
+      </tr>`).join('');
+  } catch(e) { console.error('Deposits error', e); }
+}
+
+// ── Init & refresh ────────────────────────────────────────────────────────────
+function setDefaultTxnDates() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  document.getElementById('txnFrom').value = new Date(y, m, 1).toISOString().slice(0, 10);
+  document.getElementById('txnTo').value   = now.toISOString().slice(0, 10);
+}
+
+async function refreshAll() {
+  await Promise.all([loadKpis(), loadPnlChart(), loadDonut()]);
+}
+
+buildMonthOptions();
+setDefaultTxnDates();
+refreshAll();
+</script>
+</body>
+</html>
