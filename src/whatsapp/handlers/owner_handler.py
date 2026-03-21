@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Expense, ExpenseCategory,
-    Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, Property, Refund, RefundStatus,
+    Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, PgContact, Property, Refund, RefundStatus,
     RentSchedule, RentStatus, Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
 from src.whatsapp.role_service import CallerContext, _normalize as _normalize_phone
@@ -91,6 +91,7 @@ async def handle_owner(
         "SET_WIFI":           _set_wifi,
         "COMPLAINT_REGISTER": _owner_complaint_register,
         "GET_TENANT_NOTES":   _get_tenant_notes,
+        "QUERY_CONTACTS":     _query_contacts,
         "RULES":              _rules,
         "HELP":               _help,
         "MORE_MENU":          _more_menu,
@@ -2139,6 +2140,85 @@ async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSe
         f"*{t.name}* — Room {room_obj.room_number}\n"
         f"Agreed terms:\n{notes}"
     )
+
+
+async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    Owner/staff asks: "plumber contact", "show electricians", "all vendors", "who do we use for wifi"
+    Queries pg_contacts table, optionally filtered by category keyword from the message.
+    """
+    raw = entities.get("raw_text", "").lower()
+
+    # Map common keywords to DB category values
+    CATEGORY_MAP = {
+        "plumber": ["plumber"],
+        "plumbing": ["plumber"],
+        "electrician": ["electrician"],
+        "electrical": ["electrician"],
+        "carpenter": ["carpenter"],
+        "painter": ["painting"],
+        "painting": ["painting"],
+        "wifi": ["internet"],
+        "internet": ["internet"],
+        "gas": ["food_supply"],
+        "diesel": ["facility"],
+        "generator": ["facility"],
+        "cleaner": ["facility"],
+        "housekeep": ["facility"],
+        "manpower": ["facility"],
+        "security": ["security"],
+        "cctv": ["security"],
+        "lift": ["facility"],
+        "water": ["plumber", "facility"],
+        "furniture": ["furniture"],
+        "chair": ["furniture"],
+        "mattress": ["furniture"],
+        "gym": ["gym_sports"],
+        "signage": ["design"],
+        "plant": ["decor"],
+        "vendor": None,  # show all
+        "supplier": None,
+        "contact": None,
+        "all": None,
+    }
+
+    # Find which category keyword matches
+    matched_cats = None
+    for kw, cats in CATEGORY_MAP.items():
+        if kw in raw:
+            matched_cats = cats
+            break
+
+    # Build query
+    stmt = select(PgContact).where(PgContact.property == "Whitefield")
+    if matched_cats:
+        stmt = stmt.where(PgContact.category.in_(matched_cats))
+    stmt = stmt.order_by(PgContact.category, PgContact.name)
+
+    result = await session.execute(stmt)
+    contacts = result.scalars().all()
+
+    if not contacts:
+        return "No contacts found for that category. Try: *plumber contact*, *show electricians*, *all vendors*"
+
+    # Group by category
+    grouped: dict[str, list] = {}
+    for c in contacts:
+        cat = (c.category or "other").replace("_", " ").title()
+        grouped.setdefault(cat, []).append(c)
+
+    lines = [f"*Contacts* ({len(contacts)} found)\n"]
+    for cat, items in grouped.items():
+        lines.append(f"\n*{cat}*")
+        for c in items:
+            phone_str = f" — {c.phone}" if c.phone else ""
+            desc = f" ({c.contact_for})" if c.contact_for else ""
+            lines.append(f"  {c.name or 'Unknown'}{phone_str}{desc}")
+
+    if len(contacts) > 30:
+        lines.append(f"\n_Showing all {len(contacts)}. Filter with: plumber contact, electrician number, etc._")
+
+    return "\n".join(lines)
 
 
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:

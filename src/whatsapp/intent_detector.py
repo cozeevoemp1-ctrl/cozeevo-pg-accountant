@@ -115,6 +115,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|expense\s+(?:summary|breakdown|analysis)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
     (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
+    # QUERY_CONTACTS — vendor/supplier/service contact lookup
+    (re.compile(r"(?:(?:give|get|show|find|list|who\s+is)\s+(?:me\s+)?(?:the\s+)?(?:our\s+)?(?:plumber|electrician|carpenter|painter|vendor|supplier|contact|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\b|(?:plumber|electrician|carpenter|painter|vendor|supplier|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\s+(?:contact|number|phone|details?|vendor|guy)\b|(?:all|list|show)\s+(?:contacts?|vendors?|suppliers?)\b|vendor\s+(?:list|directory|contacts?)|contacts?\s+(?:list|for|of)\b|who\s+(?:do|did)\s+we\s+(?:call|use)\s+for\s+\w+|who\s+is\s+(?:the|our)\s+\w+\s+(?:vendor|supplier|guy|contact))", re.I), "QUERY_CONTACTS", 0.93),
     # Log vacation / absence for tenant (any name, not hardcoded)
     (re.compile(r"(?:\w+\s+(?:on vacation|going home|on leave|absent|away|out of station|on holiday|chutti)|log vacation|\w+\s+vacation\s+(?:from|for|\d)|going home for|on leave from|will be away|out of station|vacation\s+(?:for\s+)?\d+\s+days?|chutti\s+(?:pe|par|\d+)|din\s+ke\s+liye\s+(?:bahar|ghar)|ghar\s+(?:gaya|gayi|gaye)\b|\w+\s+\d+\s+din\s+bahar\b|\w+\s+not\s+here\b|chutti\s+pe\s+(?:hai|hain|ho)\b|chutti\s+\w+\s+\d+\s+din\b)", re.I), "LOG_VACATION", 0.89),
     # Bank deposit matching — MUST come before REPORT/P&L catches
@@ -364,6 +366,7 @@ _INTENT_LABELS: dict[str, str] = {
     "ADD_EXPENSE":       "Record expense",
     "QUERY_DUES":        "Check who owes dues",
     "QUERY_TENANT":      "View tenant details",
+    "QUERY_CONTACTS":    "Look up vendor/supplier contacts",
 }
 
 
@@ -374,7 +377,7 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
     "ADD_TENANT", "CHECKOUT", "RECORD_CHECKOUT", "START_ONBOARDING",
     "PAYMENT_LOG", "ADD_EXPENSE", "ADD_REFUND",
     "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
-    "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS",
+    "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CONTACTS",
     "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
     "COMPLAINT_REGISTER", "RULES", "HELP", "MORE_MENU",
 })
