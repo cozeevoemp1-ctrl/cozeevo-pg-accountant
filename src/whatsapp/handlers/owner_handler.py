@@ -2144,108 +2144,102 @@ async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSe
 
 async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """
-    Owner/staff asks: "plumber contact", "show electricians", "all vendors", "who do we use for wifi"
-    Queries pg_contacts table, filtered by category keyword extracted from the message.
+    Owner/staff asks for any contact — searches across all fields in pg_contacts.
+    "plumber contact", "Ibrahim number", "who does wifi", "cot vendor", "all contacts"
     """
     raw = entities.get("_raw_message", "").lower()
 
-    # Map keywords in user message → DB category values
-    # Order matters: specific keywords first, generic ("vendor"/"all") last
-    CATEGORY_MAP = [
-        ("plumb",       ["plumber"]),
-        ("electric",    ["electrician"]),
-        ("carpenter",   ["carpenter"]),
-        ("paint",       ["painting"]),
-        ("wifi",        ["internet"]),
-        ("internet",    ["internet"]),
-        ("diesel",      ["facility"]),
-        ("generator",   ["facility"]),
-        ("clean",       ["facility"]),
-        ("housekeep",   ["facility"]),
-        ("manpower",    ["facility"]),
-        ("security",    ["security"]),
-        ("cctv",        ["security"]),
-        ("camera",      ["security"]),
-        ("lift",        ["facility"]),
-        ("water",       ["plumber", "facility"]),
-        ("furniture",   ["furniture"]),
-        ("chair",       ["furniture"]),
-        ("mattress",    ["furniture"]),
-        ("cot",         ["furniture"]),
-        ("wardrobe",    ["furniture", "carpenter"]),
-        ("gym",         ["gym_sports"]),
-        ("sport",       ["gym_sports"]),
-        ("signage",     ["design"]),
-        ("sign",        ["design"]),
-        ("plant",       ["decor"]),
-        ("gas",         ["food_supply"]),
-        ("food",        ["food_supply"]),
-        ("kitchen",     ["food_supply"]),
-        ("garbage",     ["facility"]),
-        ("tanker",      ["facility"]),
-        ("marketing",   ["marketing"]),
-        ("police",      ["government"]),
-        ("bbmp",        ["government"]),
-    ]
+    # Strip noise words to extract the actual search term
+    _NOISE = {
+        "give", "get", "show", "find", "list", "me", "the", "our", "a", "an",
+        "who", "is", "are", "was", "do", "did", "we", "use", "for", "of",
+        "contact", "contacts", "number", "phone", "details", "detail",
+        "vendor", "vendors", "supplier", "suppliers", "guy", "person",
+        "all", "every", "each",
+    }
+    words = re.findall(r"[a-z]+", raw)
+    search_terms = [w for w in words if w not in _NOISE and len(w) > 1]
 
-    # Find which category keyword matches
-    matched_cats = None
-    matched_label = None
-    for kw, cats in CATEGORY_MAP:
-        if kw in raw:
-            matched_cats = cats
-            matched_label = kw
-            break
+    # If nothing meaningful left, show all
+    show_all = not search_terms
 
-    # Build query
-    stmt = select(PgContact).where(PgContact.property == "Whitefield")
-    if matched_cats:
-        stmt = stmt.where(PgContact.category.in_(matched_cats))
-    stmt = stmt.order_by(PgContact.category, PgContact.name)
+    if show_all:
+        result = await session.execute(
+            select(PgContact)
+            .where(PgContact.property == "Whitefield")
+            .order_by(PgContact.category, PgContact.name)
+        )
+    else:
+        # Search each term across name, category, contact_for, comments
+        from sqlalchemy import or_
+        conditions = []
+        for term in search_terms:
+            like = f"%{term}%"
+            conditions.append(or_(
+                func.lower(PgContact.name).like(like),
+                func.lower(PgContact.category).like(like),
+                func.lower(PgContact.contact_for).like(like),
+                func.lower(PgContact.comments).like(like),
+            ))
+        # All search terms must match (AND) for tighter results
+        result = await session.execute(
+            select(PgContact)
+            .where(PgContact.property == "Whitefield")
+            .where(and_(*conditions))
+            .order_by(PgContact.category, PgContact.name)
+        )
 
-    result = await session.execute(stmt)
     contacts = result.scalars().all()
 
+    if not contacts and search_terms:
+        # Retry with OR (any term matches) for broader results
+        conditions = []
+        for term in search_terms:
+            like = f"%{term}%"
+            conditions.append(or_(
+                func.lower(PgContact.name).like(like),
+                func.lower(PgContact.category).like(like),
+                func.lower(PgContact.contact_for).like(like),
+                func.lower(PgContact.comments).like(like),
+            ))
+        result = await session.execute(
+            select(PgContact)
+            .where(PgContact.property == "Whitefield")
+            .where(or_(*conditions))
+            .order_by(PgContact.category, PgContact.name)
+        )
+        contacts = result.scalars().all()
+
     if not contacts:
-        return "No contacts found for that category.\nTry: *plumber contact*, *electrician number*, *all vendors*"
+        return f"No contacts found for *{' '.join(search_terms)}*.\nTry: *plumber contact*, *Ibrahim number*, *all vendors*"
 
     def _clean_phone(p: str | None) -> str:
         if not p:
             return ""
-        # Remove trailing .0 from float-stored phones
-        p = re.sub(r"\.0$", "", p.strip())
-        return p
+        return re.sub(r"\.0$", "", p.strip())
 
-    # Format output — clean, readable
-    cat_label = (matched_label or "All").title()
-    lines = [f"*{cat_label} Contacts* ({len(contacts)})\n"]
+    label = " ".join(search_terms).title() if search_terms else "All"
+    lines = [f"*{label} Contacts* ({len(contacts)})\n"]
 
     for c in contacts:
         phone = _clean_phone(c.phone)
         name = c.name or "Unknown"
-        # Line 1: Name + Phone
         line = f"*{name}*"
         if phone:
             line += f" — {phone}"
         lines.append(line)
-        # Line 2: What they do (indented)
         if c.contact_for:
-            # Truncate long descriptions for WhatsApp readability
             desc = c.contact_for
             if len(desc) > 80:
                 desc = desc[:77] + "..."
             lines.append(f"  _{desc}_")
-        # Line 3: Payment info if exists
         if c.amount_paid or c.remaining:
             paid_str = f"Paid: {c.amount_paid:,.0f}" if c.amount_paid else ""
             rem_str = f"Remaining: {c.remaining}" if c.remaining else ""
             parts = [p for p in [paid_str, rem_str] if p]
             if parts:
                 lines.append(f"  {' | '.join(parts)}")
-        lines.append("")  # blank line between contacts
-
-    if not matched_cats:
-        lines.append("_Filter by category: plumber contact, electrician number, wifi vendor, etc._")
+        lines.append("")
 
     return "\n".join(lines)
 
