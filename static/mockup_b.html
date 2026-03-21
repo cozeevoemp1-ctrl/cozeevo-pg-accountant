@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Concept B — Morning Brief</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --wa-green: #25D366;
+    --wa-dark: #128C7E;
+    --bg: #f0f2f5;
+    --white: #ffffff;
+    --text: #111b21;
+    --sub: #667781;
+    --border: #e9edef;
+    --red: #e53935;
+    --amber: #f59e0b;
+    --blue: #3b82f6;
+    --tab-h: 60px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* Header */
+  .header { background:var(--wa-dark); padding:52px 16px 16px; color:#fff; }
+  .header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .header-title { font-size:20px; font-weight:600; }
+  .header-icons { display:flex; gap:20px; }
+  .header-icons svg { width:20px; height:20px; opacity:.9; }
+  .greeting-card { background:rgba(255,255,255,.12); backdrop-filter:blur(8px); border-radius:14px; padding:14px 16px; margin-top:12px; }
+  .greeting-text { font-size:16px; font-weight:500; }
+  .greeting-sub { font-size:12px; margin-top:3px; opacity:.75; }
+
+  /* Snapshot strip */
+  .snap-strip { background:var(--white); padding:16px; display:flex; gap:0; border-bottom:1px solid var(--border); }
+  .snap-item { flex:1; text-align:center; padding:0 6px; }
+  .snap-item:not(:last-child) { border-right:1px solid var(--border); }
+  .snap-val { font-size:18px; font-weight:700; }
+  .snap-label { font-size:10px; color:var(--sub); margin-top:2px; }
+
+  /* Content */
+  .content { padding: 10px 0 calc(var(--tab-h) + 16px); }
+
+  /* Section chat-style header */
+  .chat-section-label { text-align:center; margin:16px 0 8px; }
+  .chat-section-label span { background:var(--border); color:var(--sub); font-size:11px; padding:3px 12px; border-radius:99px; }
+
+  /* Message bubble cards */
+  .msg-wrap { padding:3px 12px; }
+  .msg { background:var(--white); border-radius:8px; padding:12px 14px; box-shadow:0 1px 1px rgba(0,0,0,.08); position:relative; }
+  .msg::before { content:''; position:absolute; left:-6px; top:10px; width:0; height:0; border-top:6px solid transparent; border-bottom:0 solid transparent; border-right:6px solid var(--white); }
+  .msg-title { font-size:14px; font-weight:600; color:var(--text); }
+  .msg-body { font-size:13px; color:var(--sub); margin-top:4px; line-height:1.5; }
+  .msg-time { font-size:11px; color:#aebac1; text-align:right; margin-top:6px; }
+  .msg-action { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { font-size:12px; color:var(--wa-dark); border:1px solid var(--border); border-radius:99px; padding:5px 12px; font-weight:500; }
+
+  /* Due pills row */
+  .due-scroll { display:flex; gap:8px; padding:4px 12px 8px; overflow-x:auto; scrollbar-width:none; }
+  .due-scroll::-webkit-scrollbar { display:none; }
+  .due-pill { background:var(--white); border:1px solid var(--border); border-radius:12px; padding:10px 14px; min-width:140px; flex-shrink:0; box-shadow:0 1px 1px rgba(0,0,0,.05); }
+  .due-pill-name { font-size:13px; font-weight:600; }
+  .due-pill-room { font-size:11px; color:var(--sub); margin-top:1px; }
+  .due-pill-amt { font-size:14px; font-weight:700; color:var(--red); margin-top:6px; }
+  .due-pill-tag { font-size:10px; color:var(--sub); }
+
+  /* Chart card */
+  .chart-msg { background:var(--white); border-radius:8px; padding:14px; box-shadow:0 1px 1px rgba(0,0,0,.08); margin:3px 12px; }
+  .chart-msg-title { font-size:13px; font-weight:600; margin-bottom:12px; }
+
+  /* Timeline */
+  .timeline { padding:0 12px; }
+  .tl-item { display:flex; gap:10px; padding:8px 0; }
+  .tl-dot-wrap { display:flex; flex-direction:column; align-items:center; width:32px; flex-shrink:0; }
+  .tl-dot { width:12px; height:12px; border-radius:50%; margin-top:3px; }
+  .tl-line { flex:1; width:2px; background:var(--border); margin-top:4px; }
+  .tl-content { flex:1; padding-bottom:12px; }
+  .tl-time { font-size:10px; color:var(--sub); margin-bottom:2px; }
+  .tl-text { font-size:13px; font-weight:500; }
+  .tl-sub { font-size:12px; color:var(--sub); margin-top:2px; }
+
+  /* Bottom tabs */
+  .tab-bar { position:fixed; bottom:0; left:0; right:0; height:var(--tab-h); background:var(--white); border-top:1px solid var(--border); display:flex; z-index:100; }
+  .tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; cursor:pointer; color:var(--sub); font-size:10px; }
+  .tab.active { color:var(--wa-dark); }
+  .tab svg { width:22px; height:22px; }
+  .tab-dot { width:4px; height:4px; border-radius:50%; background:var(--wa-green); display:none; }
+  .tab.badge .tab-dot { display:block; }
+
+  /* P&L summary bar */
+  .pnl-bar-wrap { margin:3px 12px; background:var(--white); border-radius:8px; padding:14px; box-shadow:0 1px 1px rgba(0,0,0,.08); }
+  .pnl-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); }
+  .pnl-row:last-child { border:none; }
+  .pnl-key { font-size:13px; color:var(--sub); }
+  .pnl-val { font-size:14px; font-weight:700; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <div class="header-title">Cozeevo</div>
+    <div class="header-icons">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+    </div>
+  </div>
+  <div class="greeting-card">
+    <div class="greeting-text">Good morning, Kiran 👋</div>
+    <div class="greeting-sub">Saturday, 21 Mar 2026 · Cozeevo Co-living</div>
+  </div>
+</div>
+
+<!-- Today snapshot strip -->
+<div class="snap-strip">
+  <div class="snap-item">
+    <div class="snap-val" style="color:#25D366">74%</div>
+    <div class="snap-label">Occupancy</div>
+  </div>
+  <div class="snap-item">
+    <div class="snap-val" style="color:#e53935">15</div>
+    <div class="snap-label">Dues</div>
+  </div>
+  <div class="snap-item">
+    <div class="snap-val" style="color:#f59e0b">3</div>
+    <div class="snap-label">Checkouts</div>
+  </div>
+  <div class="snap-item">
+    <div class="snap-val" style="color:#3b82f6">₹18.4L</div>
+    <div class="snap-label">Mar Revenue</div>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="chat-section-label"><span>TODAY — SAT 21 MARCH</span></div>
+
+  <!-- Dues alert bubble -->
+  <div class="msg-wrap">
+    <div class="msg">
+      <div class="msg-title">⚠️ 15 tenants owe rent</div>
+      <div class="msg-body">Total outstanding: <strong>₹2,34,500</strong> for March 2026. 4 tenants are 2+ months overdue.</div>
+      <div class="msg-action">
+        <div class="chip">View all dues</div>
+        <div class="chip">Send reminders</div>
+      </div>
+      <div class="msg-time">Now · Artha</div>
+    </div>
+  </div>
+
+  <!-- Due pills -->
+  <div class="due-scroll">
+    <div class="due-pill">
+      <div class="due-pill-name">Jatin</div>
+      <div class="due-pill-room">Room 412 · HULK</div>
+      <div class="due-pill-amt">₹50,000</div>
+      <div class="due-pill-tag">2 months</div>
+    </div>
+    <div class="due-pill">
+      <div class="due-pill-name">Sumedha</div>
+      <div class="due-pill-room">Room G01 · THOR</div>
+      <div class="due-pill-amt">₹20,800</div>
+      <div class="due-pill-tag">1 month</div>
+    </div>
+    <div class="due-pill">
+      <div class="due-pill-name">Hardik</div>
+      <div class="due-pill-room">Room 524 · HULK</div>
+      <div class="due-pill-amt">₹28,000</div>
+      <div class="due-pill-tag">1 month</div>
+    </div>
+    <div class="due-pill">
+      <div class="due-pill-name">Ashish Das</div>
+      <div class="due-pill-room">Room 121 · HULK</div>
+      <div class="due-pill-amt">₹13,000</div>
+      <div class="due-pill-tag">1 month</div>
+    </div>
+  </div>
+
+  <!-- Checkouts bubble -->
+  <div class="msg-wrap">
+    <div class="msg">
+      <div class="msg-title">📦 3 checkouts today</div>
+      <div class="msg-body">
+        Akshay Gupta — Room 219<br>
+        Hafiz Khan — Room 308<br>
+        Siva Kumar — Room G07
+      </div>
+      <div class="msg-action">
+        <div class="chip">Process checkouts</div>
+      </div>
+      <div class="msg-time">9:00 AM · Artha</div>
+    </div>
+  </div>
+
+  <!-- Move-ins bubble -->
+  <div class="msg-wrap">
+    <div class="msg">
+      <div class="msg-title">🏠 2 move-ins tomorrow</div>
+      <div class="msg-body">Ankush and Pratik are booked for Room 517 (HULK) arriving Sunday 22 Mar.</div>
+      <div class="msg-action">
+        <div class="chip">View details</div>
+      </div>
+      <div class="msg-time">9:00 AM · Artha</div>
+    </div>
+  </div>
+
+  <div class="chat-section-label"><span>MARCH 2026 FINANCE</span></div>
+
+  <!-- P&L summary -->
+  <div class="pnl-bar-wrap">
+    <div class="pnl-row">
+      <div class="pnl-key">Revenue collected</div>
+      <div class="pnl-val" style="color:#25D366">₹18,40,000</div>
+    </div>
+    <div class="pnl-row">
+      <div class="pnl-key">Expenses</div>
+      <div class="pnl-val" style="color:#e53935">₹4,20,000</div>
+    </div>
+    <div class="pnl-row">
+      <div class="pnl-key">Net profit</div>
+      <div class="pnl-val" style="color:#128C7E">₹14,20,000</div>
+    </div>
+    <div class="pnl-row">
+      <div class="pnl-key">Outstanding dues</div>
+      <div class="pnl-val" style="color:#f59e0b">₹2,34,500</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-msg">
+    <div class="chart-msg-title">Income vs Expenses — Last 6 Months</div>
+    <canvas id="pnlChart" height="160"></canvas>
+  </div>
+
+  <div class="chat-section-label"><span>TODAY'S ACTIVITY</span></div>
+
+  <!-- Timeline -->
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot" style="background:#25D366"></div>
+        <div class="tl-line"></div>
+      </div>
+      <div class="tl-content">
+        <div class="tl-time">8:42 AM</div>
+        <div class="tl-text">Raj Kumar paid ₹14,000</div>
+        <div class="tl-sub">Room 305 · UPI · March rent</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot" style="background:#25D366"></div>
+        <div class="tl-line"></div>
+      </div>
+      <div class="tl-content">
+        <div class="tl-time">9:15 AM</div>
+        <div class="tl-text">Priya paid ₹13,500</div>
+        <div class="tl-sub">Room 412 · Cash · March rent</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot" style="background:#f59e0b"></div>
+        <div class="tl-line"></div>
+      </div>
+      <div class="tl-content">
+        <div class="tl-time">10:00 AM</div>
+        <div class="tl-text">Complaint logged — Room 308</div>
+        <div class="tl-sub">Leaking tap in bathroom</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot-wrap">
+        <div class="tl-dot" style="background:#e53935"></div>
+      </div>
+      <div class="tl-content">
+        <div class="tl-time">11:30 AM</div>
+        <div class="tl-text">Plumber expense ₹1,200</div>
+        <div class="tl-sub">Paid cash · Plumbing category</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Bottom tabs -->
+<div class="tab-bar">
+  <div class="tab active">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    Home
+    <div class="tab-dot"></div>
+  </div>
+  <div class="tab badge">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    Dues
+    <div class="tab-dot"></div>
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    Finance
+    <div class="tab-dot"></div>
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    Rooms
+    <div class="tab-dot"></div>
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+    Profile
+    <div class="tab-dot"></div>
+  </div>
+</div>
+
+<script>
+new Chart(document.getElementById('pnlChart'),{
+  type:'line',
+  data:{
+    labels:['Oct','Nov','Dec','Jan','Feb','Mar'],
+    datasets:[
+      {label:'Income', data:[1520000,1680000,1720000,1800000,1750000,1840000], borderColor:'#25D366', backgroundColor:'rgba(37,211,102,.1)', tension:.4, fill:true, borderWidth:2, pointRadius:3},
+      {label:'Expenses', data:[380000,420000,510000,390000,440000,420000], borderColor:'#e53935', backgroundColor:'rgba(229,57,53,.05)', tension:.4, fill:true, borderWidth:2, pointRadius:3},
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#667781',font:{size:10},boxWidth:10}}},
+    scales:{
+      x:{grid:{display:false},ticks:{color:'#667781',font:{size:10}}},
+      y:{grid:{color:'#e9edef'},ticks:{color:'#667781',font:{size:10},callback:v=>v>=1e5?`₹${(v/1e5).toFixed(1)}L`:`₹${(v/1000).toFixed(0)}K`}}
+    }
+  }
+});
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');};
+});
+</script>
+</body>
+</html>

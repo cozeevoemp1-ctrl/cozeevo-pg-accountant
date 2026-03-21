@@ -17,6 +17,10 @@ from __future__ import annotations
 # Empty keywords list = catch-all (used as last rule in the list).
 
 EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
+    # ── NON-OPERATING — must be FIRST so loan names don't match other rules ──
+    ("Non-Operating",        "Loan Repayment (Bharathi)",    ["bharathi prabhakaran"]),
+    ("Non-Operating",        "Unknown Transfer (shalu)",     ["shalu.pravi"]),
+
     # ── PROPERTY RENT ─────────────────────────────────────────────────────────
     ("Property Rent",        "Vakkal Sravani",               ["vakkal", "sravani"]),
     ("Property Rent",        "R Suma",                       ["r suma", "rsuma"]),
@@ -25,11 +29,21 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Property Rent",        "Other Rent Payments",          ["jan rent","feb rent","mar rent","rent pay"]),
 
     # ── ELECTRICITY ───────────────────────────────────────────────────────────
-    ("Electricity",          "BESCOM Bill",                  ["bescom","besco"]),
+    ("Electricity",          "BESCOM Bill",                  ["bescom","besco","eb bill","eb payment"," eb "]),
+
+    # ── WATER ─────────────────────────────────────────────────────────────────
+    ("Water",                "BWSSB (Govt Supply)",          ["bwssb","bwssb bill","bwssb payment"]),
+    ("Water",                "Water Tanker",                 ["water tanker","tanker","water lorry","water supply","water vendor"]),
+    ("Water",                "Water Bill / Charges",         ["water bill","water charge","water tax"]),
+    ("Water",                "Water Barrels / Drums",        ["barrels","water barrel","water drum"]),
+
+    # ── IT & SOFTWARE ─────────────────────────────────────────────────────────
+    ("IT & Software",        "Hostinger (VPS Hosting)",      ["hostinger","hostingerpteltd"]),
+    ("IT & Software",        "Think Straight (Software)",    ["think straight","thinkstraight"]),
+    ("IT & Software",        "KIPINN (Software/ISP)",        ["kipinn","kipnn","kipi nn","kipin"]),
 
     # ── INTERNET & WIFI ───────────────────────────────────────────────────────
     ("Internet & WiFi",      "Airwire Broadband",            ["airwire"]),
-    ("Internet & WiFi",      "KIPINN (ISP)",                 ["kipinn","kipnn","kipi nn","kipin"]),
     ("Internet & WiFi",      "WiFi Vendor",                  ["wifi","wi-fi","broadband"]),
 
     # ── FURNITURE & FITTINGS ──────────────────────────────────────────────────
@@ -41,12 +55,14 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Furniture & Fittings", "Usha Trading (TV/Equipment)",  ["usha trading","usha t rading"]),
     ("Furniture & Fittings", "Cot Placement / Labour",       ["cot placement","cot place","cot plac","jubair"]),
     ("Furniture & Fittings", "Porter / Delivery",            ["porter fee","porter","bed frames porter"]),
+    ("Furniture & Fittings", "Wardrobes",                    ["wardrobe","mahinmeman7705","sungle wardrobe"]),
+    ("Furniture & Fittings", "3-Sharing Beds",               ["3 sharing bed","9035767529"]),
     ("Furniture & Fittings", "Other Furniture / Fittings",   ["furniture","refurbish","3d bo","laughing bud"]),
 
     # ── FOOD & GROCERIES ──────────────────────────────────────────────────────
     ("Food & Groceries",     "Grocery - Virani Trading",     ["virani"]),
     ("Food & Groceries",     "Food Supplies - Vyapar",       ["vyapar"]),
-    ("Food & Groceries",     "Gas Cylinders (DRP Ent.)",     ["cylinder","lpg","drp enterprise","9880707836"]),
+    ("Food & Groceries",     "Gas Cylinders (DRP Ent.)",     ["cylinder","lpg","drp enterprise","9880707836","gas advance"]),
     ("Food & Groceries",     "Chicken / Meat",               ["chicken","biryani","meat","q858145123","paytmqr6li6zl","paytmqr6wro5d","paytmqr6pxr4","q213610007","q494874704","q457756301","q236290371","q067427224"]),
     ("Food & Groceries",     "Eggs",                         ["eggs","egg trays","9900343230"]),
     ("Food & Groceries",     "Vegetables & Greens",          ["vegetable","veggies","veggie","greens","tomato","chilli","cucumber","lemon","coriander","pudina","paneer","curd","vangi"]),
@@ -66,7 +82,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Fuel & Diesel",        "Petrol / Fuel",                ["petrol","fuel"]),
 
     # ── STAFF & LABOUR ────────────────────────────────────────────────────────
-    ("Staff & Labour",       "Salary - Arjun (NEFT)",        ["joshi arjun","net-neft-yes","yesob6021"]),
+    ("Staff & Labour",       "Salary - Arjun (NEFT)",        ["joshi arjun","yesob6021"]),
     ("Staff & Labour",       "Salary - Arjun (UPI batches)", ["arjun"]),
     ("Staff & Labour",       "Salary - Phiros / Phirose",    ["phiros","phirose"]),
     ("Staff & Labour",       "Salary - Lokesh",              ["lokesh"]),
@@ -81,7 +97,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "WorkIndia (Recruitment)",      ["workindia","work india"]),
     ("Staff & Labour",       "Staff - kn.ravikumar",         ["kn.ravikumar","ravikumar80"]),
     ("Staff & Labour",       "Staff - sachindivya",          ["sachindivya"]),
-    ("Staff & Labour",       "Housekeeping / Cleaning Staff",["housekeep","salamtajamul","sarojrout","dilliprout","swamisarang","manisha","9398545495","9611622637","9071242117","8837062479"]),
+    ("Staff & Labour",       "Housekeeping / Cleaning Staff",["housekeep","salamtajamul","sarojrout","dilliprout","swamisarang","manisha","9398545495","9611622637","9071242117","8837062479","imranaaazmi58","rabhasoma4"]),
     ("Staff & Labour",       "Urban Company (Cleaning Svc)", ["urbancompany","urban company"]),
     ("Staff & Labour",       "Labour / Helpers",             ["helper","labour","kshitij","vivek"]),
     ("Staff & Labour",       "Staff - 9880401360 (Regular)", ["9880401360"]),
@@ -102,6 +118,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Marketing",            "Logo T-shirts",                ["logo tshirt","logo t-shirt","tshirt"]),
     ("Marketing",            "Ad Board / Sun Boards",        ["9845068141","sun board","sunboard"]),
     ("Marketing",            "Flyers / Banners",             ["flyers","flyer","banner","flags"]),
+    ("Marketing",            "FindMyPG Listing",             ["find my pg","findmypg"]),
     ("Marketing",            "Marketing / Promotions",       ["marketing","advertisement"]),
 
     # ── CLEANING & HOUSEKEEPING SUPPLIES ──────────────────────────────────────
@@ -112,6 +129,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Cleaning Supplies",    "AdBlue (DG Exhaust Fluid)",    ["adblue","ad blu"]),
 
     # ── SHOPPING & SUPPLIES ───────────────────────────────────────────────────
+    ("Furniture & Fittings", "Elgis Fitness — Gym CAPEX",     ["elgis"]),
     ("Shopping & Supplies",  "Amazon",                       ["amazon"]),
     ("Shopping & Supplies",  "Flipkart",                     ["flipkart"]),
     ("Shopping & Supplies",  "BharatPE (POS Payments)",      ["bharatpe","bharat pe"]),
@@ -131,6 +149,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     # ── BANK CHARGES ──────────────────────────────────────────────────────────
     ("Bank Charges",         "Debit Card Fee",               ["debit card replacement","card replace"]),
     ("Bank Charges",         "Bank Transfer / IMPS / NEFT",  ["imps","rtgs","neft","yib-neft","net-neft"]),
+
+    # ── NON-OPERATING (defined at top of file now) ────────────────────────────
 
     # ── UNCLASSIFIED (catch-all) ───────────────────────────────────────────────
     ("Other Expenses",       "Misc UPI Payments",            []),

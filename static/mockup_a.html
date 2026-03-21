@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Concept A — Command Center</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #141928;
+    --border: #1e2740;
+    --accent: #6366f1;
+    --accent2: #818cf8;
+    --green: #10b981;
+    --red: #f87171;
+    --amber: #f59e0b;
+    --text: #f1f5f9;
+    --muted: #64748b;
+    --sub: #94a3b8;
+    --tab-h: 64px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* Top bar */
+  .topbar { padding: 52px 20px 16px; background: linear-gradient(180deg,#1a1f35 0%, var(--bg) 100%); }
+  .topbar-row { display:flex; align-items:center; justify-content:space-between; }
+  .prop-badge { display:flex; gap:6px; }
+  .prop-pill { font-size:11px; font-weight:600; padding:4px 10px; border-radius:99px; border:1px solid var(--border); color:var(--sub); cursor:pointer; transition:.15s; }
+  .prop-pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .avatar { width:36px; height:36px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; }
+  .greeting { margin-top:18px; }
+  .greeting-sub { font-size:12px; color:var(--muted); }
+  .greeting-main { font-size:22px; font-weight:700; margin-top:2px; letter-spacing:-.3px; }
+  .date-line { font-size:11px; color:var(--muted); margin-top:4px; }
+
+  /* Hero occupancy ring */
+  .hero { padding: 24px 20px; display:flex; gap:20px; align-items:center; }
+  .ring-wrap { position:relative; width:110px; height:110px; flex-shrink:0; }
+  .ring-wrap canvas { position:absolute; top:0; left:0; }
+  .ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring-pct { font-size:24px; font-weight:800; }
+  .ring-label { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-top:1px; }
+  .hero-stats { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .hero-stat { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+  .hero-stat-val { font-size:18px; font-weight:700; }
+  .hero-stat-label { font-size:10px; color:var(--muted); margin-top:2px; }
+
+  /* Tabs */
+  .tab-bar { position:fixed; bottom:0; left:0; right:0; height:var(--tab-h); background:var(--surface); border-top:1px solid var(--border); display:flex; z-index:100; padding-bottom: env(safe-area-inset-bottom, 0); }
+  .tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; padding:8px 4px; transition:.15s; color:var(--muted); font-size:10px; font-weight:500; }
+  .tab.active { color:var(--accent2); }
+  .tab svg { width:22px; height:22px; }
+
+  /* Scrollable content */
+  .content { padding-bottom:calc(var(--tab-h) + 20px); }
+
+  /* Section header */
+  .section-hd { display:flex; align-items:center; justify-content:space-between; padding:0 20px; margin: 20px 0 12px; }
+  .section-title { font-size:13px; font-weight:600; color:var(--sub); text-transform:uppercase; letter-spacing:.5px; }
+  .section-link { font-size:12px; color:var(--accent2); }
+
+  /* KPI scroll row */
+  .kpi-scroll { display:flex; gap:10px; padding:0 20px; overflow-x:auto; scrollbar-width:none; padding-bottom:4px; }
+  .kpi-scroll::-webkit-scrollbar { display:none; }
+  .kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; min-width:130px; flex-shrink:0; }
+  .kpi-icon { font-size:20px; margin-bottom:8px; }
+  .kpi-val { font-size:20px; font-weight:800; }
+  .kpi-label { font-size:10px; color:var(--muted); margin-top:2px; }
+  .kpi-card.green { border-color:rgba(16,185,129,.25); background:rgba(16,185,129,.07); }
+  .kpi-card.red { border-color:rgba(248,113,113,.25); background:rgba(248,113,113,.07); }
+  .kpi-card.amber { border-color:rgba(245,158,11,.25); background:rgba(245,158,11,.07); }
+  .kpi-card.indigo { border-color:rgba(99,102,241,.25); background:rgba(99,102,241,.07); }
+
+  /* Chart card */
+  .chart-card { margin:0 20px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px; }
+  .chart-title { font-size:13px; font-weight:600; margin-bottom:14px; }
+
+  /* Alert cards */
+  .alert-list { display:flex; flex-direction:column; gap:8px; padding:0 20px; }
+  .alert { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; display:flex; align-items:center; gap:12px; }
+  .alert-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .alert-dot.red { background:var(--red); box-shadow:0 0 6px rgba(248,113,113,.5); }
+  .alert-dot.amber { background:var(--amber); box-shadow:0 0 6px rgba(245,158,11,.5); }
+  .alert-dot.green { background:var(--green); box-shadow:0 0 6px rgba(16,185,129,.5); }
+  .alert-text { flex:1; }
+  .alert-main { font-size:13px; font-weight:500; }
+  .alert-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+  .alert-action { font-size:11px; color:var(--accent2); font-weight:600; }
+
+  /* Dues list */
+  .dues-list { display:flex; flex-direction:column; gap:1px; margin:0 20px; border-radius:14px; overflow:hidden; border:1px solid var(--border); }
+  .dues-row { background:var(--surface); padding:14px; display:flex; align-items:center; justify-content:space-between; }
+  .dues-row:not(:last-child) { border-bottom:1px solid var(--border); }
+  .dues-name { font-size:13px; font-weight:500; }
+  .dues-room { font-size:11px; color:var(--muted); margin-top:2px; }
+  .dues-amt { font-size:14px; font-weight:700; color:var(--red); }
+  .dues-months { font-size:10px; color:var(--muted); text-align:right; margin-top:2px; }
+
+  /* page switching */
+  .page { display:none; }
+  .page.active { display:block; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="prop-badge">
+      <div class="prop-pill active">ALL</div>
+      <div class="prop-pill">THOR</div>
+      <div class="prop-pill">HULK</div>
+    </div>
+    <div class="avatar">K</div>
+  </div>
+  <div class="greeting">
+    <div class="greeting-sub">Good morning</div>
+    <div class="greeting-main">Kiran 👋</div>
+    <div class="date-line">Saturday, 21 March 2026 • Cozeevo Co-living</div>
+  </div>
+</div>
+
+<!-- Hero ring -->
+<div class="hero">
+  <div class="ring-wrap">
+    <canvas id="occRing"></canvas>
+    <div class="ring-center">
+      <div class="ring-pct">74%</div>
+      <div class="ring-label">Occupied</div>
+    </div>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-stat-val" style="color:var(--green)">226</div>
+      <div class="hero-stat-label">Beds filled</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-val" style="color:var(--amber)">79</div>
+      <div class="hero-stat-label">Vacant</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-val">305</div>
+      <div class="hero-stat-label">Total beds</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-stat-val" style="color:var(--accent2)">11</div>
+      <div class="hero-stat-label">No-shows</div>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Alerts -->
+  <div class="section-hd"><span class="section-title">Action Needed</span></div>
+  <div class="alert-list">
+    <div class="alert">
+      <div class="alert-dot red"></div>
+      <div class="alert-text">
+        <div class="alert-main">15 tenants owe March rent</div>
+        <div class="alert-sub">Total outstanding: ₹2,34,500</div>
+      </div>
+      <div class="alert-action">View →</div>
+    </div>
+    <div class="alert">
+      <div class="alert-dot amber"></div>
+      <div class="alert-text">
+        <div class="alert-main">3 checkouts today</div>
+        <div class="alert-sub">Akshay 219 · Hafiz 308 · Siva G07</div>
+      </div>
+      <div class="alert-action">View →</div>
+    </div>
+    <div class="alert">
+      <div class="alert-dot green"></div>
+      <div class="alert-text">
+        <div class="alert-main">2 move-ins tomorrow</div>
+        <div class="alert-sub">Ankush 517 · Pratik 517</div>
+      </div>
+      <div class="alert-action">View →</div>
+    </div>
+  </div>
+
+  <!-- KPI scroll -->
+  <div class="section-hd"><span class="section-title">March 2026</span><span class="section-link">P&amp;L →</span></div>
+  <div class="kpi-scroll">
+    <div class="kpi-card green">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-val" style="color:var(--green)">₹18.4L</div>
+      <div class="kpi-label">Revenue</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon">💸</div>
+      <div class="kpi-val" style="color:var(--red)">₹8.1L</div>
+      <div class="kpi-label">Expenses</div>
+    </div>
+    <div class="kpi-card indigo">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-val" style="color:var(--accent2)">₹10.3L</div>
+      <div class="kpi-label">Net Profit</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-val" style="color:var(--amber)">₹2.3L</div>
+      <div class="kpi-label">Dues</div>
+    </div>
+  </div>
+
+  <!-- P&L Chart -->
+  <div class="section-hd"><span class="section-title">6-Month Trend</span></div>
+  <div class="chart-card">
+    <div class="chart-title">Income vs Expenses</div>
+    <canvas id="pnlBar" height="160"></canvas>
+  </div>
+
+  <!-- Dues -->
+  <div class="section-hd"><span class="section-title">Top Dues</span><span class="section-link">See all 15 →</span></div>
+  <div class="dues-list">
+    <div class="dues-row">
+      <div><div class="dues-name">Jatin</div><div class="dues-room">Room 412 — HULK</div></div>
+      <div><div class="dues-amt">₹50,000</div><div class="dues-months">2 months</div></div>
+    </div>
+    <div class="dues-row">
+      <div><div class="dues-name">Hardik Rohilla</div><div class="dues-room">Room 524 — HULK</div></div>
+      <div><div class="dues-amt">₹28,000</div><div class="dues-months">1 month</div></div>
+    </div>
+    <div class="dues-row">
+      <div><div class="dues-name">Ashish Das</div><div class="dues-room">Room 121 — HULK</div></div>
+      <div><div class="dues-amt">₹13,000</div><div class="dues-months">1 month</div></div>
+    </div>
+    <div class="dues-row">
+      <div><div class="dues-name">Sumedha</div><div class="dues-room">Room G01 — THOR</div></div>
+      <div><div class="dues-amt">₹20,800</div><div class="dues-months">1 month</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Bottom tab bar -->
+<div class="tab-bar">
+  <div class="tab active">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    Home
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    Finance
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    Dues
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    Rooms
+  </div>
+  <div class="tab">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+    More
+  </div>
+</div>
+
+<script>
+// Occupancy ring
+new Chart(document.getElementById('occRing'), {
+  type:'doughnut',
+  data:{ datasets:[{ data:[74,26], backgroundColor:['#6366f1','#1e2740'], borderWidth:0, circumference:360 }] },
+  options:{ cutout:'72%', plugins:{legend:{display:false}}, animation:{duration:800} }
+});
+
+// P&L bar
+new Chart(document.getElementById('pnlBar'),{
+  type:'bar',
+  data:{
+    labels:['Oct','Nov','Dec','Jan','Feb','Mar'],
+    datasets:[
+      {label:'Income', data:[1520000,1680000,1720000,1800000,1750000,1840000], backgroundColor:'rgba(16,185,129,.7)', borderRadius:6},
+      {label:'Expenses', data:[380000,420000,510000,390000,440000,420000], backgroundColor:'rgba(248,113,113,.7)', borderRadius:6},
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:10}}},
+    scales:{
+      x:{grid:{display:false},ticks:{color:'#64748b',font:{size:10}}},
+      y:{grid:{color:'#1e2740'},ticks:{color:'#64748b',font:{size:10},callback:v=>v>=1e5?`₹${(v/1e5).toFixed(1)}L`:`₹${(v/1000).toFixed(0)}K`}}
+    }
+  }
+});
+
+// Tab switching (visual only for mockup)
+document.querySelectorAll('.tab').forEach((t,i)=>{
+  t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');};
+});
+document.querySelectorAll('.prop-pill').forEach(p=>{
+  p.onclick=()=>{document.querySelectorAll('.prop-pill').forEach(x=>x.classList.remove('active'));p.classList.add('active');};
+});
+</script>
+</body>
+</html>

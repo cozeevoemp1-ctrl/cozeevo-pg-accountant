@@ -148,7 +148,8 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
 
     if len(rows) == 0:
         suggestions = await _find_similar_names(name, session) if name else []
-        return _format_no_match_message(name or room, suggestions)
+        base = _format_no_match_message(name or room, suggestions)
+        return base + f"\n\n_(Amount to log: Rs.{int(amount):,} {(mode or 'cash').upper()})_"
 
     period_month_str = period_month.isoformat()
 

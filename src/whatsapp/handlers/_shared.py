@@ -31,7 +31,7 @@ _GREETINGS: dict[str, list[str]] = {
     "owner": [
         "👋 {tod}, {name}! Dashboard is ready — what are we working on today?",   # 0 Professional
         "⚡ {name}! Artha here. What do you need?",                                # 1 Minimalist
-        "🚀 Hey {name}! It's {dow} — let's crush it together.",                   # 2 Energetic
+        "🚀 Hey {name}! Artha here — it's {dow}, let's crush it!",               # 2 Energetic
         "🏠 {tod}, {name}! Your property is in good hands. How can I help?",      # 3 Supportive
         "🤖 {name}! Artha reporting for duty. First order of business?",           # 4 Witty
     ],

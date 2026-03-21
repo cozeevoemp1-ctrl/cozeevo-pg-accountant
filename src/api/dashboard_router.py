@@ -33,6 +33,19 @@ from src.database.models import (
     RentSchedule, RentStatus, Payment,
 )
 
+# Subquery: total payments per (tenancy_id, period_month)
+def _paid_subquery():
+    return (
+        select(
+            Payment.tenancy_id,
+            Payment.period_month,
+            func.sum(Payment.amount).label("paid"),
+        )
+        .where(Payment.is_void == False)
+        .group_by(Payment.tenancy_id, Payment.period_month)
+        .subquery()
+    )
+
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 # ── Token auth ────────────────────────────────────────────────────────────────
@@ -81,22 +94,21 @@ async def get_kpis(
     from_date, to_date = _month_range(m, y)
 
     # ── Occupancy ─────────────────────────────────────────────────────────────
-    total_beds = await session.scalar(
-        select(func.sum(Room.max_occupancy))
-        .where(Room.is_staff_room == False)
-    ) or 0
+    # Total is hardcoded: rooms table has duplicate/junk rows from imports.
+    # Canonical count from BRAIN.md: THOR 145 + HULK 160 = 305 revenue beds.
+    TOTAL_BEDS = 305
 
     occupied_beds = await session.scalar(
-        select(func.sum(Room.max_occupancy))
-        .join(Tenancy, Tenancy.room_id == Room.id)
+        select(func.count(Tenancy.id))
+        .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
             Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
         )
     ) or 0
 
-    vacant_beds = int(total_beds) - int(occupied_beds)
-    occ_pct     = round(int(occupied_beds) / max(int(total_beds), 1) * 100, 1)
+    vacant_beds = TOTAL_BEDS - int(occupied_beds)
+    occ_pct     = round(int(occupied_beds) / TOTAL_BEDS * 100, 1)
 
     # ── Bank P&L for the month ─────────────────────────────────────────────
     bank_rows = (await session.execute(
@@ -110,8 +122,16 @@ async def get_kpis(
     net      = revenue - expenses
 
     # ── Dues outstanding ───────────────────────────────────────────────────
+    _paid_sq = _paid_subquery()
     dues_outstanding = await session.scalar(
-        select(func.sum(RentSchedule.rent_due + RentSchedule.maintenance_due - RentSchedule.amount_paid))
+        select(func.sum(
+            RentSchedule.rent_due + RentSchedule.maintenance_due + RentSchedule.adjustment
+            - func.coalesce(_paid_sq.c.paid, 0)
+        ))
+        .outerjoin(_paid_sq, and_(
+            _paid_sq.c.tenancy_id  == RentSchedule.tenancy_id,
+            _paid_sq.c.period_month == RentSchedule.period_month,
+        ))
         .where(
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
             RentSchedule.period_month <= to_date,
@@ -132,7 +152,7 @@ async def get_kpis(
     return {
         "month": m, "year": y,
         "occupancy": {
-            "beds_total":    int(total_beds),
+            "beds_total":    TOTAL_BEDS,
             "beds_occupied": int(occupied_beds),
             "beds_vacant":   vacant_beds,
             "pct":           occ_pct,
@@ -212,27 +232,35 @@ async def get_dues(
 ):
     today = date.today()
 
+    paid_sq = _paid_subquery()
+    _outstanding = (
+        RentSchedule.rent_due + RentSchedule.maintenance_due + RentSchedule.adjustment
+        - func.coalesce(paid_sq.c.paid, 0)
+    )
+
     rows = (await session.execute(
         select(
             Tenant.name,
             Room.room_number,
-            func.sum(
-                RentSchedule.rent_due + RentSchedule.maintenance_due - RentSchedule.amount_paid
-            ).label("outstanding"),
+            func.sum(_outstanding).label("outstanding"),
             func.count(RentSchedule.id).label("months_pending"),
             func.max(RentSchedule.period_month).label("latest_period"),
         )
         .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
         .join(Tenant,  Tenant.id  == Tenancy.tenant_id)
         .join(Room,    Room.id    == Tenancy.room_id)
+        .outerjoin(paid_sq, and_(
+            paid_sq.c.tenancy_id   == RentSchedule.tenancy_id,
+            paid_sq.c.period_month == RentSchedule.period_month,
+        ))
         .where(
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
             RentSchedule.period_month <= today,
             Tenancy.status == TenancyStatus.active,
         )
         .group_by(Tenant.name, Room.room_number)
-        .having(func.sum(RentSchedule.rent_due + RentSchedule.maintenance_due - RentSchedule.amount_paid) > 0)
-        .order_by(func.sum(RentSchedule.rent_due + RentSchedule.maintenance_due - RentSchedule.amount_paid).desc())
+        .having(func.sum(_outstanding) > 0)
+        .order_by(func.sum(_outstanding).desc())
     )).all()
 
     return [
@@ -316,14 +344,14 @@ async def get_deposits(
 
     # Recent tenancies with security deposit
     tenancy_rows = (await session.execute(
-        select(Tenant.name, Room.room_number, Tenancy.security_deposit, Tenancy.check_in_date)
+        select(Tenant.name, Room.room_number, Tenancy.security_deposit, Tenancy.checkin_date)
         .join(Tenant, Tenant.id == Tenancy.tenant_id)
         .join(Room,   Room.id   == Tenancy.room_id)
         .where(
             Tenancy.security_deposit > 0,
-            Tenancy.check_in_date >= thirty_ago,
+            Tenancy.checkin_date >= thirty_ago,
         )
-        .order_by(Tenancy.check_in_date.desc())
+        .order_by(Tenancy.checkin_date.desc())
         .limit(30)
     )).all()
 

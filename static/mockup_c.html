@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Cozeevo — Property Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:        #080810;
+  --bg2:       #0f0f1a;
+  --card:      #13131e;
+  --card2:     #1a1a28;
+  --border:    rgba(255,255,255,0.06);
+  --green:     #22c55e;
+  --green-dim: #22c55e22;
+  --red:       #ef4444;
+  --amber:     #f59e0b;
+  --blue:      #3b82f6;
+  --purple:    #a855f7;
+  --cyan:      #06b6d4;
+  --text:      #f1f5f9;
+  --muted:     #6b7280;
+  --muted2:    #374151;
+  --tab-h:     64px;
+  --hdr-h:     56px;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; background:var(--bg); color:var(--text); font-family:'Outfit',sans-serif; overflow:hidden; }
+
+/* ── HEADER ── */
+header {
+  position:fixed; top:0; left:0; right:0; height:var(--hdr-h);
+  background:rgba(8,8,16,0.9); backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px; z-index:200;
+}
+.logo { display:flex; align-items:center; gap:8px; font-weight:800; font-size:18px; letter-spacing:-0.5px; }
+.logo-dot { width:8px; height:8px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); }
+.month-pill {
+  display:flex; align-items:center; gap:6px;
+  background:var(--card2); border:1px solid var(--border);
+  border-radius:20px; padding:6px 12px; font-size:13px; font-weight:500; color:var(--muted);
+  cursor:pointer; user-select:none;
+}
+.month-pill span { color:var(--text); }
+
+/* ── SCROLL AREA ── */
+main {
+  position:fixed; top:var(--hdr-h); bottom:var(--tab-h); left:0; right:0;
+  overflow-y:auto; overflow-x:hidden; background:var(--bg);
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+main::-webkit-scrollbar { display:none; }
+
+/* ── TABS ── */
+.tab-content { display:none; padding:16px 16px calc(env(safe-area-inset-bottom) + 12px); }
+.tab-content.active { display:block; animation:fadeUp 0.2s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── BOTTOM TAB BAR ── */
+nav.tabs {
+  position:fixed; bottom:0; left:0; right:0; height:var(--tab-h);
+  background:rgba(8,8,16,0.95); backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  display:flex; align-items:stretch;
+  padding-bottom:env(safe-area-inset-bottom);
+  z-index:200;
+}
+.tab-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; background:none; border:none; color:var(--muted); cursor:pointer;
+  font-family:'Outfit',sans-serif; font-size:10px; font-weight:500;
+  transition:color 0.15s; position:relative; -webkit-tap-highlight-color:transparent;
+}
+.tab-btn svg { width:20px; height:20px; stroke-width:1.75; }
+.tab-btn.active { color:var(--green); }
+.tab-btn.active::before {
+  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:28px; height:2px; background:var(--green); border-radius:0 0 4px 4px;
+  box-shadow:0 0 8px var(--green);
+}
+
+/* ── BASE CARD ── */
+.card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:16px; margin-bottom:12px;
+}
+
+/* ── SECTION HEADER ── */
+.sh { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding-top:2px; }
+.sh-title { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; }
+.sh-link { font-size:12px; color:var(--green); font-weight:500; cursor:pointer; }
+
+/* ── CHIP ── */
+.chip {
+  display:inline-block; font-size:10px; font-weight:600;
+  padding:2px 7px; border-radius:20px; letter-spacing:0.2px;
+}
+.chip-g { background:var(--green-dim); color:var(--green); }
+.chip-r { background:#ef444422; color:var(--red); }
+.chip-a { background:#f59e0b22; color:var(--amber); }
+.chip-b { background:#3b82f622; color:var(--blue); }
+.chip-m { background:var(--card2); color:var(--muted); }
+
+/* ────────────────────────────────────────────
+   OVERVIEW
+──────────────────────────────────────────── */
+
+/* Occupancy Ring Card */
+.occ-card {
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:18px 16px; margin-bottom:12px;
+  display:grid; grid-template-columns:auto 1fr; gap:18px; align-items:center;
+}
+.ring-wrap { position:relative; width:110px; height:110px; flex-shrink:0; }
+.ring-wrap svg { transform:rotate(-90deg); }
+.ring-center {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.ring-pct { font-size:28px; font-weight:800; line-height:1; }
+.ring-sub { font-size:10px; color:var(--muted); margin-top:2px; }
+.occ-right { display:flex; flex-direction:column; gap:12px; }
+.occ-prop-name { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:4px; }
+.bar-row { display:flex; align-items:center; gap:8px; }
+.bar-track { flex:1; height:6px; background:var(--card2); border-radius:3px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:3px; transition:width 1s cubic-bezier(.4,0,.2,1); }
+.bar-nums { font-size:11px; color:var(--muted); white-space:nowrap; }
+.occ-total { font-size:11px; color:var(--muted); line-height:1.5; }
+
+/* Three P&L pills */
+.pnl-pills { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px; }
+.pill {
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:12px 10px; position:relative; overflow:hidden;
+}
+.pill::after {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse at 80% 0%, var(--pill-glow,transparent) 0%, transparent 70%);
+  opacity:0.12; pointer-events:none;
+}
+.pill.green { --pill-glow:#22c55e; }
+.pill.red   { --pill-glow:#ef4444; }
+.pill.blue  { --pill-glow:#3b82f6; }
+.pill-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+.pill-val   { font-size:15px; font-weight:700; margin-top:3px; line-height:1; }
+
+/* Dues alert */
+.dues-alert {
+  background:linear-gradient(135deg, #1a1a28 0%, #0f0f1a 100%);
+  border:1px solid #f59e0b30; border-radius:16px;
+  padding:16px 18px; margin-bottom:12px;
+  display:flex; align-items:center; justify-content:space-between;
+  box-shadow:0 0 30px #f59e0b08;
+}
+.dues-alert-left .label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.7px; margin-bottom:4px; }
+.dues-alert-left .big   { font-size:32px; font-weight:800; color:var(--amber); line-height:1; }
+.dues-alert-left .sub   { font-size:12px; color:var(--muted); margin-top:4px; }
+.dues-icon-wrap {
+  width:52px; height:52px; border-radius:14px;
+  background:#f59e0b18; border:1px solid #f59e0b30;
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+}
+
+/* Property split */
+.prop-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.prop-card {
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:14px; overflow:hidden;
+}
+.prop-badge {
+  display:inline-block; font-size:9px; font-weight:700; letter-spacing:1px;
+  padding:2px 8px; border-radius:20px; text-transform:uppercase; margin-bottom:8px;
+}
+.prop-badge.thor { background:#22c55e18; color:var(--green); }
+.prop-badge.hulk { background:#3b82f618; color:var(--blue); }
+.prop-beds { font-size:22px; font-weight:800; line-height:1; }
+.prop-beds span { font-size:14px; font-weight:400; color:var(--muted); }
+.prop-pct { font-size:12px; font-weight:600; margin-top:3px; }
+.mini-bar { margin-top:10px; height:3px; background:var(--card2); border-radius:2px; overflow:hidden; }
+.mini-fill { height:100%; border-radius:2px; }
+
+/* Quick stats list */
+.stat-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 0; border-bottom:1px solid var(--border);
+}
+.stat-row:last-child { border-bottom:none; }
+.stat-key { font-size:13px; color:var(--muted); }
+.stat-val { font-size:13px; font-weight:600; }
+
+/* ────────────────────────────────────────────
+   DUES
+──────────────────────────────────────────── */
+.dues-summary-card {
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:18px; margin-bottom:12px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.dues-total-val { font-size:30px; font-weight:800; color:var(--amber); line-height:1; }
+.dues-total-label { font-size:11px; color:var(--muted); margin-top:3px; }
+
+.dues-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+.dues-row:last-child { border-bottom:none; }
+.avatar {
+  width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; flex-shrink:0;
+}
+.dues-info { flex:1; min-width:0; }
+.dues-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dues-room { font-size:11px; color:var(--muted); margin-top:1px; }
+.dues-right { text-align:right; }
+.dues-amt   { font-size:15px; font-weight:700; color:var(--amber); }
+.dues-mo    { font-size:10px; color:var(--muted); margin-top:2px; }
+
+/* ────────────────────────────────────────────
+   P&L
+──────────────────────────────────────────── */
+.pnl-three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+.pnl-stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; text-align:center; }
+.pnl-stat-val   { font-size:16px; font-weight:700; }
+.pnl-stat-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:3px; }
+
+.chart-wrap { position:relative; width:100%; }
+
+/* ────────────────────────────────────────────
+   EXPENSES
+──────────────────────────────────────────── */
+.exp-row { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+.exp-row:last-child { border-bottom:none; }
+.exp-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.exp-name { flex:1; font-size:13px; font-weight:500; }
+.exp-bar-bg { width:72px; height:4px; background:var(--card2); border-radius:2px; overflow:hidden; }
+.exp-bar    { height:100%; border-radius:2px; }
+.exp-pct    { font-size:10px; color:var(--muted); min-width:30px; text-align:right; }
+.exp-amt    { font-size:12px; font-weight:600; min-width:62px; text-align:right; }
+
+/* ────────────────────────────────────────────
+   TRANSACTIONS
+──────────────────────────────────────────── */
+.txn-date-hdr {
+  font-size:10px; font-weight:700; color:var(--muted);
+  text-transform:uppercase; letter-spacing:0.8px;
+  padding:10px 0 4px;
+}
+.txn-row { display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
+.txn-row:last-child { border-bottom:none; }
+.txn-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.txn-info  { flex:1; min-width:0; }
+.txn-desc  { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.txn-cat   { font-size:11px; color:var(--muted); margin-top:1px; }
+.txn-amt   { font-size:14px; font-weight:700; }
+.txn-amt.exp { color:var(--red); }
+.txn-amt.inc { color:var(--green); }
+
+.filter-row { display:flex; gap:8px; margin-bottom:14px; }
+
+@media(min-width:600px){
+  .tab-content { max-width:500px; margin:0 auto; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Cozeevo
+  </div>
+  <div class="month-pill">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span>Mar 2026</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════ OVERVIEW ══════════ -->
+<div class="tab-content active" id="tab-overview">
+
+  <!-- Occupancy Ring -->
+  <div class="occ-card">
+    <div class="ring-wrap">
+      <svg width="110" height="110" viewBox="0 0 110 110">
+        <!-- circumference of r=46 = 2π×46 ≈ 289.03 -->
+        <circle cx="55" cy="55" r="46" fill="none" stroke="#1a1a28" stroke-width="10"/>
+        <circle cx="55" cy="55" r="46" fill="none" stroke="#22c55e" stroke-width="10"
+          stroke-dasharray="289.03"
+          stroke-dashoffset="75.4"
+          stroke-linecap="round"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-pct">74%</div>
+        <div class="ring-sub">occupied</div>
+      </div>
+    </div>
+    <div class="occ-right">
+      <div>
+        <div class="occ-prop-name">THOR</div>
+        <div class="bar-row">
+          <div class="bar-track"><div class="bar-fill" style="width:75.9%;background:var(--green);"></div></div>
+          <div class="bar-nums">110 / 145</div>
+        </div>
+      </div>
+      <div>
+        <div class="occ-prop-name">HULK</div>
+        <div class="bar-row">
+          <div class="bar-track"><div class="bar-fill" style="width:72.5%;background:var(--blue);"></div></div>
+          <div class="bar-nums">116 / 160</div>
+        </div>
+      </div>
+      <div class="occ-total">226 occ · 79 vacant<br>305 total beds</div>
+    </div>
+  </div>
+
+  <!-- Revenue / Expenses / Net -->
+  <div class="pnl-pills">
+    <div class="pill green">
+      <div class="pill-label">Revenue</div>
+      <div class="pill-val" style="color:var(--green);">₹18.4L</div>
+    </div>
+    <div class="pill red">
+      <div class="pill-label">Expenses</div>
+      <div class="pill-val" style="color:var(--red);">₹8.2L</div>
+    </div>
+    <div class="pill blue">
+      <div class="pill-label">Net</div>
+      <div class="pill-val" style="color:var(--blue);">₹10.2L</div>
+    </div>
+  </div>
+
+  <!-- Dues Alert -->
+  <div class="dues-alert">
+    <div class="dues-alert-left">
+      <div class="label">Dues Outstanding</div>
+      <div class="big">₹13.6L</div>
+      <div class="sub">59 tenants · action needed</div>
+    </div>
+    <div class="dues-icon-wrap">⚠️</div>
+  </div>
+
+  <!-- Property split -->
+  <div class="sh"><div class="sh-title">Properties</div></div>
+  <div class="prop-grid">
+    <div class="prop-card">
+      <div class="prop-badge thor">THOR</div>
+      <div class="prop-beds">110<span> / 145</span></div>
+      <div class="prop-pct" style="color:var(--green);">75.9% full</div>
+      <div class="mini-bar"><div class="mini-fill" style="width:75.9%;background:var(--green);"></div></div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-badge hulk">HULK</div>
+      <div class="prop-beds">116<span> / 160</span></div>
+      <div class="prop-pct" style="color:var(--blue);">72.5% full</div>
+      <div class="mini-bar"><div class="mini-fill" style="width:72.5%;background:var(--blue);"></div></div>
+    </div>
+  </div>
+
+  <!-- Quick stats -->
+  <div class="sh" style="margin-top:4px;"><div class="sh-title">Quick Stats</div></div>
+  <div class="card">
+    <div class="stat-row"><span class="stat-key">Avg Rent / Bed</span><span class="stat-val">₹8,142</span></div>
+    <div class="stat-row"><span class="stat-key">Ops Cost / Bed</span><span class="stat-val">₹3,628</span></div>
+    <div class="stat-row"><span class="stat-key">Operating Margin</span><span class="stat-val" style="color:var(--green);">55.4%</span></div>
+    <div class="stat-row"><span class="stat-key">Bank Data Up To</span><span class="stat-val" style="color:var(--amber);">31 Jan 2026 ⚠</span></div>
+  </div>
+</div>
+
+<!-- ══════════ DUES ══════════ -->
+<div class="tab-content" id="tab-dues">
+
+  <div class="dues-summary-card">
+    <div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:4px;">Total Outstanding</div>
+      <div class="dues-total-val">₹13,56,690</div>
+      <div class="dues-total-label">59 tenants · Mar 2026</div>
+    </div>
+    <div class="chip chip-a" style="padding:8px 14px;font-size:12px;">59 tenants</div>
+  </div>
+
+  <div class="sh"><div class="sh-title">Top Defaulters</div><div class="sh-link">View all →</div></div>
+
+  <div class="card">
+    <div class="dues-row">
+      <div class="avatar" style="background:#ef444420;color:var(--red);">KK</div>
+      <div class="dues-info">
+        <div class="dues-name">Krish Kumar</div>
+        <div class="dues-room">Room 512 · HULK</div>
+      </div>
+      <div class="dues-right">
+        <div class="dues-amt">₹87,000</div>
+        <div class="dues-mo">3 mo &nbsp;<span class="chip chip-r">critical</span></div>
+      </div>
+    </div>
+    <div class="dues-row">
+      <div class="avatar" style="background:#f59e0b20;color:var(--amber);">AS</div>
+      <div class="dues-info">
+        <div class="dues-name">Amit Sharma</div>
+        <div class="dues-room">Room 314 · THOR</div>
+      </div>
+      <div class="dues-right">
+        <div class="dues-amt">₹72,000</div>
+        <div class="dues-mo">2 mo &nbsp;<span class="chip chip-a">overdue</span></div>
+      </div>
+    </div>
+    <div class="dues-row">
+      <div class="avatar" style="background:#a855f720;color:var(--purple);">PN</div>
+      <div class="dues-info">
+        <div class="dues-name">Priya Nair</div>
+        <div class="dues-room">Room 221 · HULK</div>
+      </div>
+      <div class="dues-right">
+        <div class="dues-amt">₹65,000</div>
+        <div class="dues-mo">2 mo &nbsp;<span class="chip chip-a">overdue</span></div>
+      </div>
+    </div>
+    <div class="dues-row">
+      <div class="avatar" style="background:#3b82f620;color:var(--blue);">RV</div>
+      <div class="dues-info">
+        <div class="dues-name">Rahul Verma</div>
+        <div class="dues-room">Room 408 · THOR</div>
+      </div>
+      <div class="dues-right">
+        <div class="dues-amt">₹58,500</div>
+        <div class="dues-mo">2 mo &nbsp;<span class="chip chip-a">overdue</span></div>
+      </div>
+    </div>
+    <div class="dues-row">
+      <div class="avatar" style="background:#22c55e20;color:var(--green);">SG</div>
+      <div class="dues-info">
+        <div class="dues-name">Sneha Gupta</div>
+        <div class="dues-room">Room 103 · THOR</div>
+      </div>
+      <div class="dues-right">
+        <div class="dues-amt">₹52,000</div>
+        <div class="dues-mo">2 mo &nbsp;<span class="chip chip-m">pending</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;padding:10px 0;font-size:12px;color:var(--muted);">Showing 5 of 59 tenants with dues</div>
+</div>
+
+<!-- ══════════ P&L ══════════ -->
+<div class="tab-content" id="tab-pnl">
+
+  <div class="pnl-three">
+    <div class="pnl-stat">
+      <div class="pnl-stat-val" style="color:var(--green);">₹18.4L</div>
+      <div class="pnl-stat-label">Revenue</div>
+    </div>
+    <div class="pnl-stat">
+      <div class="pnl-stat-val" style="color:var(--red);">₹8.2L</div>
+      <div class="pnl-stat-label">Expenses</div>
+    </div>
+    <div class="pnl-stat">
+      <div class="pnl-stat-val" style="color:var(--blue);">₹10.2L</div>
+      <div class="pnl-stat-label">Net</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:14px;">4-Month Trend</div>
+    <div class="chart-wrap" style="height:200px;">
+      <canvas id="pnlChart"></canvas>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;margin-top:14px;justify-content:center;">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:var(--green);"></div>Revenue</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:var(--red);"></div>Expenses</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:var(--blue);"></div>Net</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:12px;">Mar 2026 Breakdown</div>
+    <div class="stat-row"><span class="stat-key">Gross Revenue</span><span class="stat-val" style="color:var(--green);">+₹18,40,000</span></div>
+    <div class="stat-row"><span class="stat-key">Total Expenses</span><span class="stat-val" style="color:var(--red);">−₹8,20,000</span></div>
+    <div class="stat-row"><span class="stat-key">Net Profit</span><span class="stat-val" style="color:var(--blue);">₹10,20,000</span></div>
+    <div class="stat-row"><span class="stat-key">Margin</span><span class="stat-val" style="color:var(--green);">55.4%</span></div>
+  </div>
+</div>
+
+<!-- ══════════ EXPENSES ══════════ -->
+<div class="tab-content" id="tab-expenses">
+
+  <div class="card">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.7px;margin-bottom:14px;">Mar 2026 — ₹8,20,000 total</div>
+    <div class="chart-wrap" style="height:210px;">
+      <canvas id="expChart"></canvas>
+    </div>
+  </div>
+
+  <div class="sh" style="margin-top:4px;"><div class="sh-title">Category Breakdown</div></div>
+  <div class="card">
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#f59e0b;"></div>
+      <div class="exp-name">Staff Salaries</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:100%;background:#f59e0b;"></div></div>
+      <div class="exp-pct">27.4%</div>
+      <div class="exp-amt">₹2,25,000</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#10b981;"></div>
+      <div class="exp-name">Food &amp; Groceries</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:80%;background:#10b981;"></div></div>
+      <div class="exp-pct">21.9%</div>
+      <div class="exp-amt">₹1,80,000</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#6366f1;"></div>
+      <div class="exp-name">Electricity (BESCOM)</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:60%;background:#6366f1;"></div></div>
+      <div class="exp-pct">16.5%</div>
+      <div class="exp-amt">₹1,35,000</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#ef4444;"></div>
+      <div class="exp-name">Diesel / Generator</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:42%;background:#ef4444;"></div></div>
+      <div class="exp-pct">11.6%</div>
+      <div class="exp-amt">₹95,000</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#a855f7;"></div>
+      <div class="exp-name">Property Rent</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:38%;background:#a855f7;"></div></div>
+      <div class="exp-pct">10.4%</div>
+      <div class="exp-amt">₹85,000</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#06b6d4;"></div>
+      <div class="exp-name">Internet (Airwire ×4)</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:25%;background:#06b6d4;"></div></div>
+      <div class="exp-pct">6.9%</div>
+      <div class="exp-amt">₹56,584</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:#3b82f6;"></div>
+      <div class="exp-name">Water</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:11%;background:#3b82f6;"></div></div>
+      <div class="exp-pct">3.0%</div>
+      <div class="exp-amt">₹25,000</div>
+    </div>
+    <div class="exp-row">
+      <div class="exp-dot" style="background:var(--muted2);"></div>
+      <div class="exp-name">Other / Misc</div>
+      <div class="exp-bar-bg"><div class="exp-bar" style="width:8%;background:var(--muted2);"></div></div>
+      <div class="exp-pct">2.2%</div>
+      <div class="exp-amt">₹18,000</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ TRANSACTIONS ══════════ -->
+<div class="tab-content" id="tab-txns">
+  <div class="filter-row">
+    <div class="chip chip-g" style="padding:6px 14px;font-size:11px;cursor:pointer;">All</div>
+    <div class="chip chip-m" style="padding:6px 14px;font-size:11px;cursor:pointer;">Expense</div>
+    <div class="chip chip-m" style="padding:6px 14px;font-size:11px;cursor:pointer;">Income</div>
+  </div>
+
+  <div class="card">
+    <div class="txn-date-hdr">20 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#6366f120;">⚡</div>
+      <div class="txn-info"><div class="txn-desc">BESCOM Bill Payment</div><div class="txn-cat">Electricity</div></div>
+      <div class="txn-amt exp">−₹1,35,420</div>
+    </div>
+
+    <div class="txn-date-hdr">19 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#ef444420;">⛽</div>
+      <div class="txn-info"><div class="txn-desc">deepu.1222 — Diesel</div><div class="txn-cat">Diesel / Generator</div></div>
+      <div class="txn-amt exp">−₹48,000</div>
+    </div>
+
+    <div class="txn-date-hdr">18 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#10b98120;">🍽️</div>
+      <div class="txn-info"><div class="txn-desc">Raj Hospitality — Food</div><div class="txn-cat">Food &amp; Groceries</div></div>
+      <div class="txn-amt exp">−₹62,000</div>
+    </div>
+
+    <div class="txn-date-hdr">17 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#f59e0b20;">👥</div>
+      <div class="txn-info"><div class="txn-desc">Staff Salaries — March</div><div class="txn-cat">Staff Salaries</div></div>
+      <div class="txn-amt exp">−₹2,25,000</div>
+    </div>
+
+    <div class="txn-date-hdr">15 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#37415120;">❓</div>
+      <div class="txn-info"><div class="txn-desc">shalu.pravi</div><div class="txn-cat" style="color:var(--amber);">Unclassified · needs review</div></div>
+      <div class="txn-amt exp">−₹40,000</div>
+    </div>
+
+    <div class="txn-date-hdr">13 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#3b82f620;">💧</div>
+      <div class="txn-info"><div class="txn-desc">Water Barrels</div><div class="txn-cat">Water</div></div>
+      <div class="txn-amt exp">−₹8,000</div>
+    </div>
+
+    <div class="txn-date-hdr">12 Mar 2026</div>
+    <div class="txn-row">
+      <div class="txn-icon" style="background:#06b6d420;">📡</div>
+      <div class="txn-info"><div class="txn-desc">Airwire Internet ×4</div><div class="txn-cat">Internet</div></div>
+      <div class="txn-amt exp">−₹56,584</div>
+    </div>
+  </div>
+  <div style="text-align:center;padding:12px 0;font-size:12px;color:var(--muted);">Upload Feb &amp; Mar bank statements via WhatsApp to sync live data</div>
+</div>
+
+</main>
+
+<!-- BOTTOM TABS -->
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('overview',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Overview
+  </button>
+  <button class="tab-btn" onclick="switchTab('dues',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    Dues
+  </button>
+  <button class="tab-btn" onclick="switchTab('pnl',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    P&amp;L
+  </button>
+  <button class="tab-btn" onclick="switchTab('expenses',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    Expenses
+  </button>
+  <button class="tab-btn" onclick="switchTab('txns',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    Transactions
+  </button>
+</nav>
+
+<script>
+// ── Chart defaults ─────────────────────────────────────────────────────────
+Chart.defaults.color = '#6b7280';
+Chart.defaults.font.family = "'Outfit', sans-serif";
+Chart.defaults.font.size = 11;
+
+const chartsInit = new Set();
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  document.querySelector('main').scrollTop = 0;
+  if (id === 'pnl'      && !chartsInit.has('pnl'))  { initPnl(); chartsInit.add('pnl'); }
+  if (id === 'expenses' && !chartsInit.has('exp'))  { initExp(); chartsInit.add('exp'); }
+}
+
+// ── P&L Bar Chart ──────────────────────────────────────────────────────────
+function initPnl() {
+  new Chart(document.getElementById('pnlChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Dec 25', 'Jan 26', 'Feb 26', 'Mar 26'],
+      datasets: [
+        { label:'Revenue', data:[1620000,1710000,1780000,1840000], backgroundColor:'#22c55e40', borderColor:'#22c55e', borderWidth:1.5, borderRadius:6 },
+        { label:'Expenses', data:[910000,880000,840000,820000],    backgroundColor:'#ef444440', borderColor:'#ef4444', borderWidth:1.5, borderRadius:6 },
+        { label:'Net',      data:[710000,830000,940000,1020000],   backgroundColor:'#3b82f640', borderColor:'#3b82f6', borderWidth:1.5, borderRadius:6 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{ display:false },
+        tooltip:{ backgroundColor:'#1a1a28', borderColor:'#ffffff15', borderWidth:1,
+          callbacks:{ label: c => ' ₹' + (c.raw/100000).toFixed(1) + 'L' }
+        }
+      },
+      scales:{
+        x:{ grid:{ color:'#ffffff08' }, ticks:{ color:'#6b7280' } },
+        y:{ grid:{ color:'#ffffff08' }, ticks:{ color:'#6b7280', callback: v => '₹'+(v/100000).toFixed(0)+'L' } }
+      }
+    }
+  });
+}
+
+// ── Expense Donut ──────────────────────────────────────────────────────────
+function initExp() {
+  new Chart(document.getElementById('expChart'), {
+    type: 'doughnut',
+    data: {
+      labels:['Staff','Food','Electricity','Diesel','Rent','Internet','Water','Other'],
+      datasets:[{ data:[225000,180000,135000,95000,85000,57000,25000,18000],
+        backgroundColor:['#f59e0b','#10b981','#6366f1','#ef4444','#a855f7','#06b6d4','#3b82f6','#374151'],
+        borderWidth:0, hoverOffset:6 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'68%',
+      plugins:{
+        legend:{
+          position:'right',
+          labels:{ boxWidth:9, boxHeight:9, padding:9, color:'#9ca3af', font:{ size:10 },
+            generateLabels: chart => chart.data.labels.map((lbl,i)=>({
+              text: lbl + ' ' + Math.round(chart.data.datasets[0].data[i]/820000*100) + '%',
+              fillStyle: chart.data.datasets[0].backgroundColor[i],
+              index:i
+            }))
+          }
+        },
+        tooltip:{ backgroundColor:'#1a1a28', borderColor:'#ffffff15', borderWidth:1,
+          callbacks:{ label: c => ' ₹'+(c.raw/1000).toFixed(0)+'K' }
+        }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>

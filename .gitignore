@@ -60,3 +60,13 @@ workflows/n8n/*.json
 # OS
 .DS_Store
 Thumbs.db
+
+# WhatsApp media exports (too large for git)
+data/whatsapp_chats/**/*.mp4
+data/whatsapp_chats/**/*.opus
+data/whatsapp_chats/**/*.webp
+data/whatsapp_chats/**/*.vcf
+data/whatsapp_chats/**/*.pdf
+data/whatsapp_chats/**/*.docx
+data/whatsapp_chats/**/*.xlsx
+data/whatsapp_chats/**/*.pdf

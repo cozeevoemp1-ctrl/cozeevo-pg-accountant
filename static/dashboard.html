@@ -1,562 +1,727 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cozeevo — Operations Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Cozeevo — Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-  * { font-family: 'Inter', sans-serif; }
-  .sidebar-link { @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-all cursor-pointer text-sm font-medium; }
-  .sidebar-link.active { @apply bg-indigo-600 text-white; }
-  .kpi-card { @apply bg-white rounded-xl p-5 shadow-sm border border-slate-100; }
-  .badge-income  { @apply inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700; }
-  .badge-expense { @apply inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700; }
-  .page { display: none; }
-  .page.active { display: block; }
-  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #f1f5f9; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  :root {
+    --bg: #f8fafc;
+    --white: #fff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --sub: #64748b;
+    --muted: #94a3b8;
+    --blue: #2563eb;
+    --blue-bg: #eff6ff;
+    --green: #16a34a;
+    --green-bg: #f0fdf4;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --amber: #d97706;
+    --amber-bg: #fffbeb;
+    --thor: #7c3aed;
+    --hulk: #059669;
+    --tab-h: 58px;
+    --header-h: 108px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+
+  /* ── Login ───────────────────────────────────────────────────────────────── */
+  #login-screen{position:fixed;inset:0;background:var(--white);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+  .login-logo{font-size:28px;font-weight:800;letter-spacing:-.5px;color:var(--text);}
+  .login-sub{font-size:13px;color:var(--sub);margin-top:4px;}
+  .login-box{margin-top:40px;width:100%;max-width:320px;}
+  .login-label{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
+  .login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;font-family:'Inter',sans-serif;outline:none;transition:.15s;}
+  .login-input:focus{border-color:var(--blue);}
+  .login-btn{width:100%;margin-top:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
+  .login-err{font-size:12px;color:var(--red);margin-top:8px;text-align:center;min-height:16px;}
+
+  /* ── App shell ───────────────────────────────────────────────────────────── */
+  #app{display:none;flex-direction:column;height:100%;}
+  #app.visible{display:flex;}
+
+  /* ── Header ─────────────────────────────────────────────────────────────── */
+  .header{background:var(--white);border-bottom:1px solid var(--border);padding:44px 14px 0;flex-shrink:0;}
+  .header-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;}
+  .brand{display:flex;flex-direction:column;}
+  .brand-name{font-size:17px;font-weight:800;letter-spacing:-.3px;}
+  .brand-sub{font-size:11px;color:var(--sub);margin-top:1px;}
+  .header-right{display:flex;align-items:center;gap:8px;}
+  .month-sel{font-size:12px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);background:var(--bg);font-family:'Inter',sans-serif;max-width:130px;}
+  .refresh-btn{background:var(--blue);color:#fff;border:none;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;font-family:'Inter',sans-serif;cursor:pointer;display:flex;align-items:center;gap:4px;}
+  .refresh-btn.spinning svg{animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ── Property tabs ───────────────────────────────────────────────────────── */
+  .prop-tabs{display:flex;}
+  .prop-tab{flex:1;text-align:center;padding:9px 6px;font-size:13px;font-weight:600;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;transition:.15s;}
+  .prop-tab[data-prop="all"].sel{color:var(--blue);border-color:var(--blue);}
+  .prop-tab[data-prop="thor"].sel{color:var(--thor);border-color:var(--thor);}
+  .prop-tab[data-prop="hulk"].sel{color:var(--hulk);border-color:var(--hulk);}
+
+  /* ── Scroll area ─────────────────────────────────────────────────────────── */
+  .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + 8px);}
+
+  /* ── KPI grid ────────────────────────────────────────────────────────────── */
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 12px 4px;}
+  .kpi{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:12px;}
+  .kpi-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+  .kpi-val{font-size:22px;font-weight:800;line-height:1;}
+  .kpi-delta{font-size:11px;color:var(--muted);margin-top:4px;}
+  .kpi-delta.up{color:var(--green);}
+  .kpi-delta.dn{color:var(--red);}
+
+  /* ── Property comparison ─────────────────────────────────────────────────── */
+  .prop-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 12px 0;}
+  .prop-card{border-radius:12px;padding:12px;}
+  .prop-card.thor{background:linear-gradient(135deg,#ede9fe,#ddd6fe);border:1px solid #c4b5fd;}
+  .prop-card.hulk{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border:1px solid #6ee7b7;}
+  .pc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .pc-name{font-size:12px;font-weight:700;}
+  .pc-name.thor{color:var(--thor);}
+  .pc-name.hulk{color:var(--hulk);}
+  .pc-badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;color:#fff;}
+  .pc-badge.thor{background:var(--thor);}
+  .pc-badge.hulk{background:var(--hulk);}
+  .pc-stat{display:flex;justify-content:space-between;margin-top:4px;}
+  .pc-key{font-size:11px;color:var(--sub);}
+  .pc-val{font-size:12px;font-weight:700;}
+
+  /* ── View switcher ───────────────────────────────────────────────────────── */
+  .view-switcher{display:flex;gap:6px;padding:12px 12px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+  .view-switcher::-webkit-scrollbar{display:none;}
+  .view-btn{font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px solid var(--border);color:var(--sub);background:var(--white);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Inter',sans-serif;}
+  .view-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+  /* ── View panels ─────────────────────────────────────────────────────────── */
+  .view-panel{display:none;padding:0 12px;}
+  .view-panel.active{display:block;}
+
+  /* ── Cards ───────────────────────────────────────────────────────────────── */
+  .card{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px;}
+  .card-header{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .card-title{font-size:13px;font-weight:600;}
+  .badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;}
+  .badge-red{background:var(--red-bg);color:var(--red);}
+  .badge-green{background:var(--green-bg);color:var(--green);}
+  .badge-amber{background:var(--amber-bg);color:var(--amber);}
+  .badge-blue{background:var(--blue-bg);color:var(--blue);}
+  .badge-muted{background:#f1f5f9;color:var(--sub);}
+
+  /* ── Tables ──────────────────────────────────────────────────────────────── */
+  table{width:100%;border-collapse:collapse;}
+  th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--border);}
+  td{font-size:12px;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border:none;}
+  .td-primary{font-weight:600;color:var(--text);}
+  .td-secondary{font-size:11px;color:var(--sub);margin-top:1px;}
+  .td-right{text-align:right;}
+  .td-num{font-weight:700;}
+  .status-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;}
+  .pill-red{background:var(--red-bg);color:var(--red);}
+  .pill-green{background:var(--green-bg);color:var(--green);}
+  .pill-amber{background:var(--amber-bg);color:var(--amber);}
+  .pill-blue{background:var(--blue-bg);color:var(--blue);}
+  .pill-muted{background:#f1f5f9;color:var(--sub);}
+  .empty-state{text-align:center;padding:32px 16px;color:var(--muted);font-size:13px;}
+
+  /* ── Chart container ─────────────────────────────────────────────────────── */
+  .chart-wrap{padding:14px;position:relative;}
+  .chart-wrap canvas{max-height:180px;}
+  .chart-title{font-size:12px;font-weight:600;color:var(--sub);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;}
+
+  /* ── P&L summary ─────────────────────────────────────────────────────────── */
+  .pnl-rows{padding:4px 0;}
+  .pnl-row{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);}
+  .pnl-row:last-child{border:none;}
+  .pnl-key{font-size:13px;color:var(--sub);}
+  .pnl-val{font-size:14px;font-weight:700;}
+  .pnl-row.total{background:#f8fafc;}
+  .pnl-row.total .pnl-key{color:var(--text);font-weight:600;}
+
+  /* ── Pagination ──────────────────────────────────────────────────────────── */
+  .pager{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--border);font-size:12px;color:var(--sub);}
+  .pager-btn{border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;}
+  .pager-btn:disabled{opacity:.4;cursor:default;}
+
+  /* ── Bottom tabs ─────────────────────────────────────────────────────────── */
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--tab-h);background:var(--white);border-top:1px solid var(--border);display:flex;z-index:50;}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:500;}
+  .tab.active{color:var(--blue);}
+  .tab svg{width:20px;height:20px;}
+
+  /* ── Loading skeleton ────────────────────────────────────────────────────── */
+  .skel{background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:6px;color:transparent;}
+  @keyframes shimmer{to{background-position:-200% 0;}}
+
+  /* desktop ≥ 640px */
+  @media(min-width:640px){
+    .header{padding-top:16px;}
+    .kpi-grid{grid-template-columns:repeat(4,1fr);}
+    .prop-compare{grid-template-columns:1fr 1fr;}
+  }
 </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body>
 
-<!-- Layout -->
-<div class="flex h-screen overflow-hidden">
+<!-- ── Login screen ─────────────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-logo">Cozeevo</div>
+  <div class="login-sub">Operations Dashboard</div>
+  <div class="login-box">
+    <div class="login-label">Access token</div>
+    <input id="pin-input" class="login-input" type="password" placeholder="Enter dashboard token" autocomplete="current-password"/>
+    <button class="login-btn" onclick="tryLogin()">Open Dashboard</button>
+    <div id="login-err" class="login-err"></div>
+  </div>
+</div>
 
-  <!-- Sidebar -->
-  <aside class="w-56 bg-slate-900 flex flex-col flex-shrink-0">
-    <!-- Brand -->
-    <div class="px-5 pt-6 pb-4 border-b border-slate-700">
-      <div class="text-white font-bold text-lg tracking-tight">Cozeevo</div>
-      <div class="text-slate-400 text-xs mt-0.5">Operations Dashboard</div>
-    </div>
+<!-- ── App ──────────────────────────────────────────────────────────────────── -->
+<div id="app">
 
-    <!-- Nav -->
-    <nav class="flex-1 px-3 py-4 space-y-1">
-      <a class="sidebar-link active" onclick="showPage('overview')">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-        Overview
-      </a>
-      <a class="sidebar-link" onclick="showPage('pnl')">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        P&amp;L Report
-      </a>
-      <a class="sidebar-link" onclick="showPage('dues')">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        Dues
-      </a>
-      <a class="sidebar-link" onclick="showPage('transactions')">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-        Transactions
-      </a>
-      <a class="sidebar-link" onclick="showPage('deposits')">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        Deposits
-      </a>
-    </nav>
-
-    <!-- Month picker -->
-    <div class="px-4 pb-5 border-t border-slate-700 pt-4">
-      <label class="text-slate-400 text-xs font-medium uppercase tracking-wider block mb-2">Month</label>
-      <select id="monthSel" onchange="onMonthChange()" class="w-full bg-slate-800 text-white text-sm rounded-lg px-3 py-2 border border-slate-600 focus:outline-none focus:border-indigo-400">
-      </select>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <main class="flex-1 overflow-y-auto">
-
-    <!-- Topbar -->
-    <div class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
-      <div>
-        <h1 id="pageTitle" class="text-lg font-semibold text-slate-800">Overview</h1>
-        <p id="pageSubtitle" class="text-xs text-slate-500 mt-0.5">Cozeevo Co-living — THOR &amp; HULK</p>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-name">Cozeevo Co-living</div>
+        <div class="brand-sub" id="dateLabel">—</div>
       </div>
-      <div class="flex items-center gap-3">
-        <div id="bankCoverage" class="text-xs text-slate-400"></div>
-        <button onclick="refreshAll()" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+      <div class="header-right">
+        <select id="monthSel" class="month-sel" onchange="onMonthChange()"></select>
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshAll()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           Refresh
         </button>
       </div>
     </div>
+    <!-- Property tabs -->
+    <div class="prop-tabs">
+      <div class="prop-tab sel" data-prop="all" onclick="setProp('all',this)">All</div>
+      <div class="prop-tab" data-prop="thor" onclick="setProp('thor',this)">THOR</div>
+      <div class="prop-tab" data-prop="hulk" onclick="setProp('hulk',this)">HULK</div>
+    </div>
+  </div>
 
-    <!-- OVERVIEW PAGE -->
-    <div id="page-overview" class="page active p-8">
-      <!-- KPI Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        <div class="kpi-card col-span-1">
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Occupancy</div>
-          <div id="kpi-occ" class="text-2xl font-bold text-slate-800">—</div>
-          <div id="kpi-occ-sub" class="text-xs text-slate-500 mt-1">beds filled</div>
-        </div>
-        <div class="kpi-card col-span-1">
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Available</div>
-          <div id="kpi-vacant" class="text-2xl font-bold text-emerald-600">—</div>
-          <div class="text-xs text-slate-500 mt-1">vacant beds</div>
-        </div>
-        <div class="kpi-card col-span-1">
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Revenue</div>
-          <div id="kpi-revenue" class="text-2xl font-bold text-emerald-600">—</div>
-          <div class="text-xs text-slate-500 mt-1">this month</div>
-        </div>
-        <div class="kpi-card col-span-1">
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Expenses</div>
-          <div id="kpi-expenses" class="text-2xl font-bold text-red-500">—</div>
-          <div class="text-xs text-slate-500 mt-1">this month</div>
-        </div>
-        <div class="kpi-card col-span-1">
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Net Profit</div>
-          <div id="kpi-net" class="text-2xl font-bold">—</div>
-          <div class="text-xs text-slate-500 mt-1">this month</div>
-        </div>
-        <div class="kpi-card col-span-1">
-          <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Dues</div>
-          <div id="kpi-dues" class="text-2xl font-bold text-amber-600">—</div>
-          <div class="text-xs text-slate-500 mt-1">outstanding</div>
-        </div>
+  <!-- Scroll area -->
+  <div class="scroll-area">
+
+    <!-- KPI grid -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Occupancy</div>
+        <div class="kpi-val" id="kOcc" style="color:var(--blue)">—</div>
+        <div class="kpi-delta" id="kOccSub">beds</div>
       </div>
-
-      <!-- Charts row -->
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <!-- P&L Trend -->
-        <div class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-          <div class="flex items-center justify-between mb-5">
-            <h2 class="text-sm font-semibold text-slate-700">Income vs Expenses — Last 6 Months</h2>
-          </div>
-          <canvas id="pnlChart" height="200"></canvas>
-        </div>
-
-        <!-- Expense breakdown -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-          <h2 class="text-sm font-semibold text-slate-700 mb-5">Expense Breakdown</h2>
-          <canvas id="expenseDonut" height="220"></canvas>
-          <div id="donutLegend" class="mt-4 space-y-1.5 text-xs"></div>
-        </div>
+      <div class="kpi">
+        <div class="kpi-label">Net Profit</div>
+        <div class="kpi-val" id="kNet">—</div>
+        <div class="kpi-delta" id="kNetSub">this month</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Revenue</div>
+        <div class="kpi-val" id="kRev" style="color:var(--green)">—</div>
+        <div class="kpi-delta" id="kRevSub">collected</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Dues</div>
+        <div class="kpi-val" id="kDues" style="color:var(--amber)">—</div>
+        <div class="kpi-delta" id="kDuesSub">outstanding</div>
       </div>
     </div>
 
-    <!-- P&L PAGE -->
-    <div id="page-pnl" class="page p-8">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100">
-          <h2 class="text-sm font-semibold text-slate-700">P&amp;L Report — <span id="pnlMonthLabel">—</span></h2>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-          <!-- Income -->
-          <div class="p-6">
-            <h3 class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-3">Income</h3>
-            <table class="w-full text-sm">
-              <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
-                <th class="text-left pb-2">Category</th>
-                <th class="text-right pb-2">Amount</th>
-              </tr></thead>
-              <tbody id="incomeTable"></tbody>
-              <tfoot><tr class="border-t border-slate-200 font-semibold text-emerald-600">
-                <td class="pt-2">Total Income</td>
-                <td class="text-right pt-2" id="totalIncome">—</td>
-              </tr></tfoot>
-            </table>
-          </div>
-          <!-- Expenses -->
-          <div class="p-6">
-            <h3 class="text-xs font-semibold text-red-500 uppercase tracking-wider mb-3">Expenses</h3>
-            <table class="w-full text-sm">
-              <thead><tr class="text-xs text-slate-400 border-b border-slate-100">
-                <th class="text-left pb-2">Category</th>
-                <th class="text-right pb-2">Amount</th>
-              </tr></thead>
-              <tbody id="expenseTable"></tbody>
-              <tfoot><tr class="border-t border-slate-200 font-semibold text-red-500">
-                <td class="pt-2">Total Expenses</td>
-                <td class="text-right pt-2" id="totalExpenses">—</td>
-              </tr></tfoot>
-            </table>
-          </div>
-        </div>
-        <!-- Net row -->
-        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-          <span class="font-semibold text-slate-700">Net Profit / Loss</span>
-          <span id="netPnl" class="text-lg font-bold">—</span>
-        </div>
+    <!-- Property cards -->
+    <div class="prop-compare" id="propCompare">
+      <div class="prop-card thor">
+        <div class="pc-header"><div class="pc-name thor">THOR</div><div class="pc-badge thor" id="pcThorOcc">—%</div></div>
+        <div class="pc-stat"><div class="pc-key">Beds</div><div class="pc-val" id="pcThorBeds">—</div></div>
+        <div class="pc-stat"><div class="pc-key">Revenue</div><div class="pc-val" id="pcThorRev">—</div></div>
+      </div>
+      <div class="prop-card hulk">
+        <div class="pc-header"><div class="pc-name hulk">HULK</div><div class="pc-badge hulk" id="pcHulkOcc">—%</div></div>
+        <div class="pc-stat"><div class="pc-key">Beds</div><div class="pc-val" id="pcHulkBeds">—</div></div>
+        <div class="pc-stat"><div class="pc-key">Revenue</div><div class="pc-val" id="pcHulkRev">—</div></div>
       </div>
     </div>
 
-    <!-- DUES PAGE -->
-    <div id="page-dues" class="page p-8">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-slate-700">Outstanding Dues</h2>
-          <span id="duesBadge" class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium"></span>
+    <!-- View switcher -->
+    <div class="view-switcher">
+      <button class="view-btn active" onclick="setView('dues',this)">Dues</button>
+      <button class="view-btn" onclick="setView('pnl',this)">P&amp;L</button>
+      <button class="view-btn" onclick="setView('expenses',this)">Expenses</button>
+      <button class="view-btn" onclick="setView('transactions',this)">Transactions</button>
+      <button class="view-btn" onclick="setView('deposits',this)">Deposits</button>
+    </div>
+
+    <!-- ── DUES VIEW ─────────────────────────────────────────────────────────── -->
+    <div id="view-dues" class="view-panel active">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Outstanding Dues</div>
+          <div class="badge badge-red" id="duesBadge">—</div>
         </div>
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50">
-            <tr class="text-xs text-slate-500 uppercase tracking-wider">
-              <th class="text-left px-6 py-3">Tenant</th>
-              <th class="text-left px-6 py-3">Room</th>
-              <th class="text-right px-6 py-3">Outstanding</th>
-              <th class="text-right px-6 py-3">Months Pending</th>
-              <th class="text-left px-6 py-3">Last Period</th>
-            </tr>
-          </thead>
-          <tbody id="duesTable" class="divide-y divide-slate-50"></tbody>
+        <table>
+          <thead><tr><th>Tenant</th><th>Room</th><th class="td-right">Amount</th><th class="td-right">Months</th></tr></thead>
+          <tbody id="duesBody"></tbody>
         </table>
-        <div id="duesEmpty" class="px-6 py-10 text-center text-slate-400 text-sm hidden">All dues cleared</div>
+        <div id="duesEmpty" class="empty-state" style="display:none">All dues cleared</div>
       </div>
     </div>
 
-    <!-- TRANSACTIONS PAGE -->
-    <div id="page-transactions" class="page p-8">
+    <!-- ── P&L VIEW ──────────────────────────────────────────────────────────── -->
+    <div id="view-pnl" class="view-panel">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Income vs Expenses</div><div class="badge badge-muted">6 months</div></div>
+        <div class="chart-wrap">
+          <canvas id="pnlChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">P&amp;L — <span id="pnlMonthLabel">—</span></div>
+          <div class="badge badge-green" id="pnlNetBadge">—</div>
+        </div>
+        <div class="pnl-rows" id="pnlRows"></div>
+      </div>
+    </div>
+
+    <!-- ── EXPENSES VIEW ─────────────────────────────────────────────────────── -->
+    <div id="view-expenses" class="view-panel">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Expense Breakdown</div><div class="badge badge-muted" id="expMonthLabel">—</div></div>
+        <div class="chart-wrap">
+          <canvas id="donutChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Category</th><th class="td-right">Amount</th><th class="td-right">Share</th></tr></thead>
+          <tbody id="expBody"></tbody>
+        </table>
+        <div id="expEmpty" class="empty-state" style="display:none">No expense data</div>
+      </div>
+    </div>
+
+    <!-- ── TRANSACTIONS VIEW ─────────────────────────────────────────────────── -->
+    <div id="view-transactions" class="view-panel">
       <!-- Filters -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label class="text-xs text-slate-500 block mb-1">From</label>
-          <input type="date" id="txnFrom" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400" />
+      <div class="card" style="padding:12px;margin-bottom:8px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1;min-width:100px;">
+            <div style="font-size:10px;color:var(--sub);margin-bottom:4px;font-weight:600;">FROM</div>
+            <input type="date" id="txnFrom" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif;"/>
+          </div>
+          <div style="flex:1;min-width:100px;">
+            <div style="font-size:10px;color:var(--sub);margin-bottom:4px;font-weight:600;">TO</div>
+            <input type="date" id="txnTo" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif;"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--sub);margin-bottom:4px;font-weight:600;">TYPE</div>
+            <select id="txnType" style="border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif;">
+              <option value="">All</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+          </div>
+          <button onclick="loadTxn(1)" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">Filter</button>
         </div>
-        <div>
-          <label class="text-xs text-slate-500 block mb-1">To</label>
-          <input type="date" id="txnTo" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400" />
-        </div>
-        <div>
-          <label class="text-xs text-slate-500 block mb-1">Type</label>
-          <select id="txnType" class="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-indigo-400">
-            <option value="">All</option>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
-          </select>
-        </div>
-        <button onclick="loadTransactions(1)" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-1.5 rounded-lg font-medium transition-colors">Filter</button>
       </div>
-
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50">
-            <tr class="text-xs text-slate-500 uppercase tracking-wider">
-              <th class="text-left px-5 py-3">Date</th>
-              <th class="text-left px-5 py-3">Description</th>
-              <th class="text-left px-5 py-3">Category</th>
-              <th class="text-right px-5 py-3">Amount</th>
-              <th class="text-left px-5 py-3">Type</th>
-            </tr>
-          </thead>
-          <tbody id="txnTable" class="divide-y divide-slate-50"></tbody>
+      <div class="card">
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th class="td-right">Amount</th></tr></thead>
+          <tbody id="txnBody"></tbody>
         </table>
-        <div id="txnEmpty" class="px-6 py-10 text-center text-slate-400 text-sm hidden">No transactions found</div>
-        <!-- Pagination -->
-        <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span id="txnCount"></span>
-          <div class="flex gap-2">
-            <button id="txnPrev" onclick="txnPage--; loadTransactions(txnPage)" class="px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Prev</button>
-            <button id="txnNext" onclick="txnPage++; loadTransactions(txnPage)" class="px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 disabled:opacity-40">Next</button>
+        <div id="txnEmpty" class="empty-state" style="display:none">No transactions</div>
+        <div class="pager">
+          <span id="txnCount" style="font-size:11px;"></span>
+          <div style="display:flex;gap:6px;">
+            <button class="pager-btn" id="txnPrev" onclick="loadTxn(txnPage-1)">Prev</button>
+            <button class="pager-btn" id="txnNext" onclick="loadTxn(txnPage+1)">Next</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- DEPOSITS PAGE -->
-    <div id="page-deposits" class="page p-8">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-100">
-          <h2 class="text-sm font-semibold text-slate-700">Security Deposit Matching — Last 90 Days</h2>
-          <p class="text-xs text-slate-400 mt-1">Cross-references bank income against tenant security deposits</p>
-        </div>
-        <table class="w-full text-sm">
-          <thead class="bg-slate-50">
-            <tr class="text-xs text-slate-500 uppercase tracking-wider">
-              <th class="text-left px-6 py-3">Tenant</th>
-              <th class="text-left px-6 py-3">Room</th>
-              <th class="text-left px-6 py-3">Check-in</th>
-              <th class="text-right px-6 py-3">Deposit</th>
-              <th class="text-left px-6 py-3">Status</th>
-              <th class="text-left px-6 py-3">Bank Match</th>
-            </tr>
-          </thead>
-          <tbody id="depositsTable" class="divide-y divide-slate-50"></tbody>
+    <!-- ── DEPOSITS VIEW ─────────────────────────────────────────────────────── -->
+    <div id="view-deposits" class="view-panel">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Deposit Matching</div><div class="badge badge-muted">Last 90 days</div></div>
+        <table>
+          <thead><tr><th>Tenant</th><th>Room</th><th class="td-right">Deposit</th><th class="td-right">Status</th></tr></thead>
+          <tbody id="depositBody"></tbody>
         </table>
-        <div id="depositsEmpty" class="px-6 py-10 text-center text-slate-400 text-sm hidden">No recent tenancies with deposits</div>
+        <div id="depositEmpty" class="empty-state" style="display:none">No recent tenancies</div>
       </div>
     </div>
 
-  </main>
+  </div><!-- end scroll-area -->
+
+</div><!-- end app -->
+
+<!-- Bottom tab bar -->
+<div class="tab-bar" id="tabBar" style="display:none;">
+  <div class="tab active" onclick="tabClick(0,'dues',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    Dues
+  </div>
+  <div class="tab" onclick="tabClick(1,'pnl',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    P&amp;L
+  </div>
+  <div class="tab" onclick="tabClick(2,'expenses',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2"/></svg>
+    Expenses
+  </div>
+  <div class="tab" onclick="tabClick(3,'transactions',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+    Txns
+  </div>
+  <div class="tab" onclick="tabClick(4,'deposits',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    Deposits
+  </div>
 </div>
 
 <script>
-// ── Config ────────────────────────────────────────────────────────────────────
-const params  = new URLSearchParams(location.search);
-const TOKEN   = params.get('token') || '';
-const BASE    = '';   // same origin
+// ── State ──────────────────────────────────────────────────────────────────
+let TOKEN = sessionStorage.getItem('cz_token') || '';
+let selMonth, selYear, selProp = 'all';
+let pnlChart = null, donutChart = null;
+let txnPage = 1, txnTotal = 0;
+let loadedViews = new Set();
 
-let selectedMonth = null, selectedYear = null;
-let pnlChartInst = null, donutInst = null;
-let txnPage = 1;
+// ── Formatters ─────────────────────────────────────────────────────────────
+const fmtL  = n => n == null ? '—' : Math.abs(n) >= 100000 ? `₹${(n/100000).toFixed(1)}L` : Math.abs(n) >= 1000 ? `₹${Math.round(n/1000)}K` : `₹${Math.round(n).toLocaleString('en-IN')}`;
+const fmtFull = n => n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}`;
+const sign = n => n >= 0 ? '+' : '';
 
-// ── Month selector ────────────────────────────────────────────────────────────
-function buildMonthOptions() {
-  const sel = document.getElementById('monthSel');
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    let d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const opt = document.createElement('option');
-    opt.value = `${d.getFullYear()}-${d.getMonth()+1}`;
-    opt.textContent = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    sel.appendChild(opt);
+// ── Login ──────────────────────────────────────────────────────────────────
+async function tryLogin() {
+  const val = document.getElementById('pin-input').value.trim();
+  if (!val) { document.getElementById('login-err').textContent = 'Enter the dashboard token.'; return; }
+  // Verify by hitting kpis endpoint
+  try {
+    const r = await fetch(`/api/dashboard/kpis?token=${encodeURIComponent(val)}`);
+    if (r.status === 403) { document.getElementById('login-err').textContent = 'Invalid token. Try again.'; return; }
+    TOKEN = val;
+    sessionStorage.setItem('cz_token', val);
+    showApp();
+  } catch(e) {
+    document.getElementById('login-err').textContent = 'Could not reach server.';
   }
-  selectedMonth = now.getMonth() + 1;
-  selectedYear  = now.getFullYear();
+}
+document.getElementById('pin-input').addEventListener('keydown', e => { if(e.key==='Enter') tryLogin(); });
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('tabBar').style.display = 'flex';
+  init();
 }
 
-function onMonthChange() {
-  const [y, m] = document.getElementById('monthSel').value.split('-').map(Number);
-  selectedYear  = y;
-  selectedMonth = m;
-  refreshAll();
-}
+// ── Token from URL (WhatsApp magic link) ──────────────────────────────────
+(function() {
+  const p = new URLSearchParams(location.search);
+  const t = p.get('token');
+  if (t) { TOKEN = t; sessionStorage.setItem('cz_token', t); showApp(); }
+  else if (TOKEN) { showApp(); }
+})();
 
-// ── API helpers ───────────────────────────────────────────────────────────────
-async function api(path, extra = '') {
+// ── API ────────────────────────────────────────────────────────────────────
+async function api(path, extra='') {
   const sep = path.includes('?') ? '&' : '?';
-  const url = `${BASE}${path}${sep}token=${TOKEN}${extra}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`API ${r.status}: ${url}`);
+  const r = await fetch(`${path}${sep}token=${encodeURIComponent(TOKEN)}${extra}`);
+  if (r.status === 403) { sessionStorage.removeItem('cz_token'); location.reload(); }
+  if (!r.ok) throw new Error(`${r.status}`);
   return r.json();
 }
 
-function fmt(n) {
-  if (n == null) return '—';
-  const abs = Math.abs(n);
-  if (abs >= 100000) return `₹${(n/100000).toFixed(1)}L`;
-  if (abs >= 1000)   return `₹${Math.round(n/1000)}K`;
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+// ── Month picker ───────────────────────────────────────────────────────────
+function buildMonths() {
+  const sel = document.getElementById('monthSel');
+  const now = new Date();
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const opt = document.createElement('option');
+    opt.value = `${d.getFullYear()}-${d.getMonth()+1}`;
+    opt.textContent = d.toLocaleDateString('en-IN', {month:'short', year:'numeric'});
+    sel.appendChild(opt);
+  }
+  selMonth = now.getMonth() + 1;
+  selYear  = now.getFullYear();
+}
+function onMonthChange() {
+  const [y, m] = document.getElementById('monthSel').value.split('-').map(Number);
+  selYear = y; selMonth = m;
+  loadedViews.clear();
+  refreshAll();
 }
 
-function fmtFull(n) {
-  if (n == null) return '—';
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+// ── Property tab ───────────────────────────────────────────────────────────
+function setProp(prop, el) {
+  selProp = prop;
+  document.querySelectorAll('.prop-tab').forEach(t => { t.className = 'prop-tab'; });
+  el.classList.add('sel');
+  // THOR/HULK split: future — currently shows all data
 }
 
-// ── Page navigation ───────────────────────────────────────────────────────────
-const pageTitles = {
-  overview: 'Overview', pnl: 'P&L Report',
-  dues: 'Dues', transactions: 'Transactions', deposits: 'Deposits',
-};
-function showPage(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.sidebar-link').forEach(a => a.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  document.querySelectorAll('.sidebar-link').forEach(a => {
-    if (a.getAttribute('onclick')?.includes(name)) a.classList.add('active');
-  });
-  document.getElementById('pageTitle').textContent = pageTitles[name] || name;
-
-  if (name === 'pnl')          loadPnlPage();
+// ── View switching ─────────────────────────────────────────────────────────
+function setView(name, el) {
+  document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (!loadedViews.has(name)) { loadedViews.add(name); loadView(name); }
+}
+function tabClick(i, view, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  // sync view-btn
+  const btns = document.querySelectorAll('.view-btn');
+  if (btns[i]) { document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active')); btns[i].classList.add('active'); }
+  document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  if (!loadedViews.has(view)) { loadedViews.add(view); loadView(view); }
+}
+function loadView(name) {
   if (name === 'dues')         loadDues();
-  if (name === 'transactions') loadTransactions(1);
+  if (name === 'pnl')          Promise.all([loadPnlChart(), loadPnlTable()]);
+  if (name === 'expenses')     loadExpenses();
+  if (name === 'transactions') loadTxn(1);
   if (name === 'deposits')     loadDeposits();
 }
 
-// ── Overview ──────────────────────────────────────────────────────────────────
+// ── KPIs ───────────────────────────────────────────────────────────────────
 async function loadKpis() {
   try {
-    const d = await api(`/api/dashboard/kpis?month=${selectedMonth}&year=${selectedYear}`);
+    const d = await api(`/api/dashboard/kpis?month=${selMonth}&year=${selYear}`);
     const occ = d.occupancy;
-    document.getElementById('kpi-occ').textContent     = `${occ.pct}%`;
-    document.getElementById('kpi-occ-sub').textContent  = `${occ.beds_occupied} / ${occ.beds_total} beds`;
-    document.getElementById('kpi-vacant').textContent   = occ.beds_vacant;
-    document.getElementById('kpi-revenue').textContent  = fmt(d.revenue);
-    document.getElementById('kpi-expenses').textContent = fmt(d.expenses);
-    const netEl = document.getElementById('kpi-net');
-    netEl.textContent  = fmt(d.net);
-    netEl.className    = `text-2xl font-bold ${d.net >= 0 ? 'text-emerald-600' : 'text-red-500'}`;
-    document.getElementById('kpi-dues').textContent     = fmt(d.dues_outstanding);
-    if (d.bank_coverage) {
-      document.getElementById('bankCoverage').textContent = `Bank data up to ${d.bank_coverage}`;
-    }
-  } catch(e) { console.error('KPI load error', e); }
+    document.getElementById('kOcc').textContent     = `${occ.pct}%`;
+    document.getElementById('kOccSub').textContent  = `${occ.beds_occupied} / ${occ.beds_total} beds`;
+    const netEl = document.getElementById('kNet');
+    netEl.textContent = fmtL(d.net);
+    netEl.style.color = d.net >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('kRev').textContent     = fmtL(d.revenue);
+    document.getElementById('kRevSub').textContent  = `vs expenses ${fmtL(d.expenses)}`;
+    document.getElementById('kDues').textContent    = fmtL(d.dues_outstanding);
+    // Property cards — approximation (no per-building API yet)
+    const thorBeds = 145, hulkBeds = 160;
+    const thorOcc  = Math.round(occ.beds_occupied * (145/305));
+    const hulkOcc  = occ.beds_occupied - thorOcc;
+    document.getElementById('pcThorOcc').textContent  = `${Math.round(thorOcc/thorBeds*100)}%`;
+    document.getElementById('pcThorBeds').textContent = `${thorOcc} / ${thorBeds}`;
+    document.getElementById('pcThorRev').textContent  = fmtL(d.revenue * 145/305);
+    document.getElementById('pcHulkOcc').textContent  = `${Math.round(hulkOcc/hulkBeds*100)}%`;
+    document.getElementById('pcHulkBeds').textContent = `${hulkOcc} / ${hulkBeds}`;
+    document.getElementById('pcHulkRev').textContent  = fmtL(d.revenue * 160/305);
+    // date label
+    document.getElementById('dateLabel').textContent =
+      new Date(selYear, selMonth-1, 1).toLocaleDateString('en-IN',{month:'long',year:'numeric'}) + ' · Live';
+    if (d.bank_coverage)
+      document.getElementById('dateLabel').textContent += ` · Bank to ${d.bank_coverage}`;
+  } catch(e) { console.error('KPI', e); }
 }
 
+// ── Dues ───────────────────────────────────────────────────────────────────
+async function loadDues() {
+  const tbody = document.getElementById('duesBody');
+  tbody.innerHTML = '<tr><td colspan="4" class="skel" style="height:36px"></td></tr>'.repeat(4);
+  try {
+    const data = await api('/api/dashboard/dues');
+    document.getElementById('duesBadge').textContent = `${data.length} tenants`;
+    document.getElementById('duesEmpty').style.display = data.length ? 'none' : 'block';
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td><div class="td-primary">${r.tenant}</div></td>
+        <td><div style="font-size:12px">${r.room}</div></td>
+        <td class="td-right td-num" style="color:var(--red)">${fmtFull(r.outstanding)}</td>
+        <td class="td-right"><span class="status-pill ${r.months_pending>1?'pill-red':'pill-amber'}">${r.months_pending}mo</span></td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error loading dues</td></tr>`; }
+}
+
+// ── P&L chart ──────────────────────────────────────────────────────────────
 async function loadPnlChart() {
   try {
     const data = await api('/api/dashboard/pnl_trend?months=6');
-    const labels  = data.map(d => d.label);
-    const incomes = data.map(d => d.income);
-    const exps    = data.map(d => d.expense);
-
-    if (pnlChartInst) pnlChartInst.destroy();
-    pnlChartInst = new Chart(document.getElementById('pnlChart'), {
+    if (pnlChart) pnlChart.destroy();
+    pnlChart = new Chart(document.getElementById('pnlChart'), {
       type: 'bar',
       data: {
-        labels,
+        labels: data.map(d=>d.label),
         datasets: [
-          { label: 'Income',   data: incomes, backgroundColor: '#10b981', borderRadius: 4 },
-          { label: 'Expenses', data: exps,    backgroundColor: '#f87171', borderRadius: 4 },
-        ],
+          {label:'Income',   data:data.map(d=>d.income),  backgroundColor:'#16a34a', borderRadius:5, borderSkipped:false},
+          {label:'Expenses', data:data.map(d=>d.expense), backgroundColor:'#dc2626', borderRadius:5, borderSkipped:false},
+        ]
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { font: { size: 11, family: 'Inter' }, boxWidth: 12 } } },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, callback: v => v >= 1e5 ? `₹${(v/1e5).toFixed(1)}L` : `₹${(v/1000).toFixed(0)}K` } },
-        },
-      },
+        responsive:true, maintainAspectRatio:true, aspectRatio:2,
+        plugins:{legend:{labels:{color:'#64748b',font:{size:10,family:'Inter'},boxWidth:10,padding:12}}},
+        scales:{
+          x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:10,family:'Inter'}}},
+          y:{grid:{color:'#f1f5f9'},ticks:{color:'#94a3b8',font:{size:10,family:'Inter'},callback:v=>fmtL(v)}}
+        }
+      }
     });
-  } catch(e) { console.error('PnL chart error', e); }
+  } catch(e) { console.error('PnL chart', e); }
 }
 
-const DONUT_COLORS = ['#6366f1','#f59e0b','#10b981','#f87171','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4','#a78bfa'];
-
-async function loadDonut() {
+async function loadPnlTable() {
   try {
-    const data = await api(`/api/dashboard/expense_breakdown?month=${selectedMonth}&year=${selectedYear}`);
-    if (!data.length) return;
+    const [kpis, breakdown] = await Promise.all([
+      api(`/api/dashboard/kpis?month=${selMonth}&year=${selYear}`),
+      api(`/api/dashboard/expense_breakdown?month=${selMonth}&year=${selYear}`)
+    ]);
+    const label = new Date(selYear, selMonth-1, 1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+    document.getElementById('pnlMonthLabel').textContent = label;
+    const net = kpis.net;
+    document.getElementById('pnlNetBadge').textContent = fmtFull(net);
+    document.getElementById('pnlNetBadge').className = `badge ${net>=0?'badge-green':'badge-red'}`;
+
+    const rows = [
+      `<div class="pnl-row"><div class="pnl-key">Revenue (bank credits)</div><div class="pnl-val" style="color:var(--green)">${fmtFull(kpis.revenue)}</div></div>`,
+      `<div class="pnl-row" style="background:#fef2f2"><div class="pnl-key" style="font-size:11px;font-weight:600;color:var(--muted)">EXPENSES</div><div class="pnl-val" style="color:var(--red)">${fmtFull(kpis.expenses)}</div></div>`,
+      ...breakdown.map(r => `<div class="pnl-row"><div class="pnl-key" style="padding-left:8px">${r.category}</div><div class="pnl-val">${fmtFull(r.amount)}</div></div>`),
+      `<div class="pnl-row total"><div class="pnl-key">Net Profit / Loss</div><div class="pnl-val" style="color:${net>=0?'var(--green)':'var(--red)'};font-size:16px">${fmtFull(net)}</div></div>`,
+    ];
+    document.getElementById('pnlRows').innerHTML = rows.join('');
+  } catch(e) { console.error('PnL table', e); }
+}
+
+// ── Expenses ───────────────────────────────────────────────────────────────
+const DONUT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#dc2626','#14b8a6','#a78bfa','#84cc16','#f97316'];
+
+async function loadExpenses() {
+  try {
+    const data = await api(`/api/dashboard/expense_breakdown?month=${selMonth}&year=${selYear}`);
+    const label = new Date(selYear, selMonth-1, 1).toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+    document.getElementById('expMonthLabel').textContent = label;
     const top = data.slice(0, 10);
-    const labels = top.map(d => d.category);
-    const values = top.map(d => d.amount);
+    const total = top.reduce((s,r) => s + r.amount, 0);
 
-    if (donutInst) donutInst.destroy();
-    donutInst = new Chart(document.getElementById('expenseDonut'), {
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(document.getElementById('donutChart'), {
       type: 'doughnut',
-      data: { labels, datasets: [{ data: values, backgroundColor: DONUT_COLORS, borderWidth: 0, hoverOffset: 4 }] },
-      options: {
-        responsive: true, cutout: '65%',
-        plugins: { legend: { display: false } },
+      data: {
+        labels: top.map(r=>r.category),
+        datasets: [{ data:top.map(r=>r.amount), backgroundColor:DONUT_COLORS, borderWidth:0, hoverOffset:4 }]
       },
+      options: {
+        responsive:true, maintainAspectRatio:true, aspectRatio:1.6, cutout:'60%',
+        plugins:{
+          legend:{position:'right',labels:{color:'#64748b',font:{size:10,family:'Inter'},boxWidth:10,padding:8}}
+        }
+      }
     });
 
-    const total = values.reduce((a, b) => a + b, 0);
-    document.getElementById('donutLegend').innerHTML = top.map((d, i) =>
-      `<div class="flex items-center justify-between">
-        <div class="flex items-center gap-1.5">
-          <div class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${DONUT_COLORS[i]}"></div>
-          <span class="text-slate-600 truncate max-w-[130px]">${d.category}</span>
-        </div>
-        <span class="text-slate-700 font-medium ml-2">${Math.round(d.amount/total*100)}%</span>
-      </div>`
-    ).join('');
-  } catch(e) { console.error('Donut error', e); }
-}
-
-// ── P&L page ──────────────────────────────────────────────────────────────────
-async function loadPnlPage() {
-  try {
-    const monthName = new Date(selectedYear, selectedMonth - 1, 1)
-      .toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    document.getElementById('pnlMonthLabel').textContent = monthName;
-
-    const breakdown = await api(`/api/dashboard/expense_breakdown?month=${selectedMonth}&year=${selectedYear}`);
-    const kpis      = await api(`/api/dashboard/kpis?month=${selectedMonth}&year=${selectedYear}`);
-
-    // Income rows (from kpis we only have total; show single row for now)
-    document.getElementById('incomeTable').innerHTML =
-      `<tr><td class="py-1.5 text-slate-700">Bank Credits (all)</td><td class="text-right text-emerald-600 font-medium">${fmtFull(kpis.revenue)}</td></tr>`;
-    document.getElementById('totalIncome').textContent = fmtFull(kpis.revenue);
-
-    // Expense rows
-    const expRows = breakdown.map(d =>
-      `<tr><td class="py-1.5 text-slate-700">${d.category}</td><td class="text-right text-slate-700">${fmtFull(d.amount)}</td></tr>`
-    ).join('');
-    document.getElementById('expenseTable').innerHTML = expRows || '<tr><td colspan="2" class="py-4 text-slate-400 text-center">No data</td></tr>';
-    document.getElementById('totalExpenses').textContent = fmtFull(kpis.expenses);
-
-    const netEl = document.getElementById('netPnl');
-    netEl.textContent = fmtFull(kpis.net);
-    netEl.className   = `text-lg font-bold ${kpis.net >= 0 ? 'text-emerald-600' : 'text-red-500'}`;
-  } catch(e) { console.error('P&L page error', e); }
-}
-
-// ── Dues ──────────────────────────────────────────────────────────────────────
-async function loadDues() {
-  try {
-    const data = await api('/api/dashboard/dues');
-    const tbody = document.getElementById('duesTable');
-    document.getElementById('duesEmpty').classList.toggle('hidden', data.length > 0);
-    document.getElementById('duesBadge').textContent = `${data.length} tenants`;
-
-    tbody.innerHTML = data.map(d => `
-      <tr class="hover:bg-slate-50">
-        <td class="px-6 py-3 font-medium text-slate-800">${d.tenant}</td>
-        <td class="px-6 py-3 text-slate-600">${d.room}</td>
-        <td class="px-6 py-3 text-right font-semibold text-red-600">${fmtFull(d.outstanding)}</td>
-        <td class="px-6 py-3 text-right text-slate-600">${d.months_pending}</td>
-        <td class="px-6 py-3 text-slate-500">${d.latest_period}</td>
+    const tbody = document.getElementById('expBody');
+    document.getElementById('expEmpty').style.display = top.length ? 'none' : 'block';
+    tbody.innerHTML = top.map((r,i) => `
+      <tr>
+        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DONUT_COLORS[i]};margin-right:6px"></span>${r.category}</td>
+        <td class="td-right td-num">${fmtFull(r.amount)}</td>
+        <td class="td-right" style="color:var(--sub)">${Math.round(r.amount/total*100)}%</td>
       </tr>`).join('');
-  } catch(e) { console.error('Dues error', e); }
+  } catch(e) { console.error('Expenses', e); }
 }
 
-// ── Transactions ──────────────────────────────────────────────────────────────
-async function loadTransactions(page) {
+// ── Transactions ───────────────────────────────────────────────────────────
+async function loadTxn(page) {
+  txnPage = Math.max(1, page);
+  const from = document.getElementById('txnFrom').value;
+  const to   = document.getElementById('txnTo').value;
+  const type = document.getElementById('txnType').value;
+  const extra = `&page=${txnPage}&per_page=30`
+    + (from ? `&from_date=${from}` : '')
+    + (to   ? `&to_date=${to}` : '')
+    + (type ? `&txn_type=${type}` : '');
+
+  const tbody = document.getElementById('txnBody');
+  tbody.innerHTML = '<tr><td colspan="3" class="skel" style="height:36px"></td></tr>'.repeat(5);
+
   try {
-    txnPage = page || 1;
-    const from = document.getElementById('txnFrom').value;
-    const to   = document.getElementById('txnTo').value;
-    const type = document.getElementById('txnType').value;
-    const extra = `&page=${txnPage}&per_page=50`
-      + (from ? `&from_date=${from}` : '')
-      + (to   ? `&to_date=${to}`     : '')
-      + (type ? `&txn_type=${type}`  : '');
-
-    const data  = await api('/api/dashboard/transactions', extra);
-    const tbody = document.getElementById('txnTable');
-    const empty = document.getElementById('txnEmpty');
-
-    empty.classList.toggle('hidden', data.items.length > 0);
-    document.getElementById('txnCount').textContent =
-      `Showing ${(txnPage-1)*50+1}–${Math.min(txnPage*50, data.total)} of ${data.total}`;
+    const data = await api('/api/dashboard/transactions', extra);
+    txnTotal = data.total;
+    document.getElementById('txnEmpty').style.display = data.items.length ? 'none' : 'block';
+    document.getElementById('txnCount').textContent = `${(txnPage-1)*30+1}–${Math.min(txnPage*30, txnTotal)} of ${txnTotal}`;
     document.getElementById('txnPrev').disabled = txnPage <= 1;
-    document.getElementById('txnNext').disabled = txnPage * 50 >= data.total;
-
+    document.getElementById('txnNext').disabled = txnPage * 30 >= txnTotal;
     tbody.innerHTML = data.items.map(r => `
-      <tr class="hover:bg-slate-50">
-        <td class="px-5 py-2.5 text-slate-500 text-xs whitespace-nowrap">${r.date}</td>
-        <td class="px-5 py-2.5 text-slate-700 max-w-xs truncate" title="${r.description}">${r.description}</td>
-        <td class="px-5 py-2.5 text-slate-500 text-xs">${r.category}</td>
-        <td class="px-5 py-2.5 text-right font-medium ${r.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}">${fmtFull(r.amount)}</td>
-        <td class="px-5 py-2.5"><span class="${r.type === 'income' ? 'badge-income' : 'badge-expense'}">${r.type}</span></td>
+      <tr>
+        <td style="font-size:11px;color:var(--sub);white-space:nowrap">${r.date}</td>
+        <td>
+          <div class="td-primary" style="font-size:12px">${r.description}</div>
+          <div style="font-size:10px;color:var(--muted)">${r.category}</div>
+        </td>
+        <td class="td-right td-num" style="color:${r.type==='income'?'var(--green)':'var(--text)'}">
+          ${r.type==='income'?'+':'−'}${fmtFull(r.amount)}
+        </td>
       </tr>`).join('');
-  } catch(e) { console.error('Transactions error', e); }
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Error loading</td></tr>`; }
 }
 
-// ── Deposits ──────────────────────────────────────────────────────────────────
+// ── Deposits ───────────────────────────────────────────────────────────────
 async function loadDeposits() {
+  const tbody = document.getElementById('depositBody');
+  tbody.innerHTML = '<tr><td colspan="4" class="skel" style="height:36px"></td></tr>'.repeat(4);
   try {
-    const data  = await api('/api/dashboard/deposits');
-    const tbody = document.getElementById('depositsTable');
-    document.getElementById('depositsEmpty').classList.toggle('hidden', data.length > 0);
-
-    tbody.innerHTML = data.map(d => `
-      <tr class="hover:bg-slate-50">
-        <td class="px-6 py-3 font-medium text-slate-800">${d.tenant}</td>
-        <td class="px-6 py-3 text-slate-600">${d.room}</td>
-        <td class="px-6 py-3 text-slate-500 text-xs">${d.checkin}</td>
-        <td class="px-6 py-3 text-right font-medium text-slate-700">${fmtFull(d.deposit)}</td>
-        <td class="px-6 py-3">
-          ${d.matched
-            ? '<span class="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-medium">Matched</span>'
-            : '<span class="inline-flex items-center gap-1 text-xs text-red-700 bg-red-50 px-2 py-0.5 rounded-full font-medium">Not found</span>'}
+    const data = await api('/api/dashboard/deposits');
+    document.getElementById('depositEmpty').style.display = data.length ? 'none' : 'block';
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td>
+          <div class="td-primary">${r.tenant}</div>
+          <div style="font-size:10px;color:var(--muted)">${r.checkin}</div>
         </td>
-        <td class="px-6 py-3 text-xs text-slate-500">
-          ${d.matched ? `${d.bank_date} — ${fmtFull(d.bank_amt)}` : '—'}
+        <td style="font-size:12px">${r.room}</td>
+        <td class="td-right td-num">${fmtFull(r.deposit)}</td>
+        <td class="td-right">
+          ${r.matched
+            ? `<span class="status-pill pill-green">Matched</span>`
+            : `<span class="status-pill pill-red">Missing</span>`}
         </td>
       </tr>`).join('');
-  } catch(e) { console.error('Deposits error', e); }
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error loading</td></tr>`; }
 }
 
-// ── Init & refresh ────────────────────────────────────────────────────────────
-function setDefaultTxnDates() {
+// ── Defaults ───────────────────────────────────────────────────────────────
+function setTxnDefaults() {
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  document.getElementById('txnFrom').value = new Date(y, m, 1).toISOString().slice(0, 10);
-  document.getElementById('txnTo').value   = now.toISOString().slice(0, 10);
+  document.getElementById('txnFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  document.getElementById('txnTo').value   = now.toISOString().slice(0,10);
 }
 
+// ── Refresh ────────────────────────────────────────────────────────────────
 async function refreshAll() {
-  await Promise.all([loadKpis(), loadPnlChart(), loadDonut()]);
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  loadedViews.clear();
+  try {
+    await loadKpis();
+    // reload whichever view is active
+    const active = document.querySelector('.view-panel.active');
+    if (active) { const name = active.id.replace('view-',''); loadedViews.add(name); loadView(name); }
+  } finally {
+    btn.classList.remove('spinning');
+  }
 }
 
-buildMonthOptions();
-setDefaultTxnDates();
-refreshAll();
+// ── Init ───────────────────────────────────────────────────────────────────
+function init() {
+  buildMonths();
+  setTxnDefaults();
+  const now = new Date();
+  selMonth = now.getMonth() + 1;
+  selYear  = now.getFullYear();
+  loadedViews.add('dues');
+  Promise.all([loadKpis(), loadDues()]);
+}
 </script>
 </body>
 </html>
