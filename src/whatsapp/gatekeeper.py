@@ -34,6 +34,9 @@ async def route(
     message: str,
     session: AsyncSession,
 ) -> str:
+    # Stash raw message in entities so handlers can access it without signature change
+    entities.setdefault("_raw_message", message)
+
     if ctx.role in OWNER_ROLES:
         if intent in FINANCIAL_INTENTS:
             return await handle_account(intent, entities, ctx, session)

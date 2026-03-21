@@ -2145,48 +2145,56 @@ async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSe
 async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """
     Owner/staff asks: "plumber contact", "show electricians", "all vendors", "who do we use for wifi"
-    Queries pg_contacts table, optionally filtered by category keyword from the message.
+    Queries pg_contacts table, filtered by category keyword extracted from the message.
     """
-    raw = entities.get("raw_text", "").lower()
+    raw = entities.get("_raw_message", "").lower()
 
-    # Map common keywords to DB category values
-    CATEGORY_MAP = {
-        "plumber": ["plumber"],
-        "plumbing": ["plumber"],
-        "electrician": ["electrician"],
-        "electrical": ["electrician"],
-        "carpenter": ["carpenter"],
-        "painter": ["painting"],
-        "painting": ["painting"],
-        "wifi": ["internet"],
-        "internet": ["internet"],
-        "gas": ["food_supply"],
-        "diesel": ["facility"],
-        "generator": ["facility"],
-        "cleaner": ["facility"],
-        "housekeep": ["facility"],
-        "manpower": ["facility"],
-        "security": ["security"],
-        "cctv": ["security"],
-        "lift": ["facility"],
-        "water": ["plumber", "facility"],
-        "furniture": ["furniture"],
-        "chair": ["furniture"],
-        "mattress": ["furniture"],
-        "gym": ["gym_sports"],
-        "signage": ["design"],
-        "plant": ["decor"],
-        "vendor": None,  # show all
-        "supplier": None,
-        "contact": None,
-        "all": None,
-    }
+    # Map keywords in user message → DB category values
+    # Order matters: specific keywords first, generic ("vendor"/"all") last
+    CATEGORY_MAP = [
+        ("plumb",       ["plumber"]),
+        ("electric",    ["electrician"]),
+        ("carpenter",   ["carpenter"]),
+        ("paint",       ["painting"]),
+        ("wifi",        ["internet"]),
+        ("internet",    ["internet"]),
+        ("diesel",      ["facility"]),
+        ("generator",   ["facility"]),
+        ("clean",       ["facility"]),
+        ("housekeep",   ["facility"]),
+        ("manpower",    ["facility"]),
+        ("security",    ["security"]),
+        ("cctv",        ["security"]),
+        ("camera",      ["security"]),
+        ("lift",        ["facility"]),
+        ("water",       ["plumber", "facility"]),
+        ("furniture",   ["furniture"]),
+        ("chair",       ["furniture"]),
+        ("mattress",    ["furniture"]),
+        ("cot",         ["furniture"]),
+        ("wardrobe",    ["furniture", "carpenter"]),
+        ("gym",         ["gym_sports"]),
+        ("sport",       ["gym_sports"]),
+        ("signage",     ["design"]),
+        ("sign",        ["design"]),
+        ("plant",       ["decor"]),
+        ("gas",         ["food_supply"]),
+        ("food",        ["food_supply"]),
+        ("kitchen",     ["food_supply"]),
+        ("garbage",     ["facility"]),
+        ("tanker",      ["facility"]),
+        ("marketing",   ["marketing"]),
+        ("police",      ["government"]),
+        ("bbmp",        ["government"]),
+    ]
 
     # Find which category keyword matches
     matched_cats = None
-    for kw, cats in CATEGORY_MAP.items():
+    matched_label = None
+    for kw, cats in CATEGORY_MAP:
         if kw in raw:
             matched_cats = cats
+            matched_label = kw
             break
 
     # Build query
@@ -2199,24 +2207,45 @@ async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSess
     contacts = result.scalars().all()
 
     if not contacts:
-        return "No contacts found for that category. Try: *plumber contact*, *show electricians*, *all vendors*"
+        return "No contacts found for that category.\nTry: *plumber contact*, *electrician number*, *all vendors*"
 
-    # Group by category
-    grouped: dict[str, list] = {}
+    def _clean_phone(p: str | None) -> str:
+        if not p:
+            return ""
+        # Remove trailing .0 from float-stored phones
+        p = re.sub(r"\.0$", "", p.strip())
+        return p
+
+    # Format output — clean, readable
+    cat_label = (matched_label or "All").title()
+    lines = [f"*{cat_label} Contacts* ({len(contacts)})\n"]
+
     for c in contacts:
-        cat = (c.category or "other").replace("_", " ").title()
-        grouped.setdefault(cat, []).append(c)
+        phone = _clean_phone(c.phone)
+        name = c.name or "Unknown"
+        # Line 1: Name + Phone
+        line = f"*{name}*"
+        if phone:
+            line += f" — {phone}"
+        lines.append(line)
+        # Line 2: What they do (indented)
+        if c.contact_for:
+            # Truncate long descriptions for WhatsApp readability
+            desc = c.contact_for
+            if len(desc) > 80:
+                desc = desc[:77] + "..."
+            lines.append(f"  _{desc}_")
+        # Line 3: Payment info if exists
+        if c.amount_paid or c.remaining:
+            paid_str = f"Paid: {c.amount_paid:,.0f}" if c.amount_paid else ""
+            rem_str = f"Remaining: {c.remaining}" if c.remaining else ""
+            parts = [p for p in [paid_str, rem_str] if p]
+            if parts:
+                lines.append(f"  {' | '.join(parts)}")
+        lines.append("")  # blank line between contacts
 
-    lines = [f"*Contacts* ({len(contacts)} found)\n"]
-    for cat, items in grouped.items():
-        lines.append(f"\n*{cat}*")
-        for c in items:
-            phone_str = f" — {c.phone}" if c.phone else ""
-            desc = f" ({c.contact_for})" if c.contact_for else ""
-            lines.append(f"  {c.name or 'Unknown'}{phone_str}{desc}")
-
-    if len(contacts) > 30:
-        lines.append(f"\n_Showing all {len(contacts)}. Filter with: plumber contact, electrician number, etc._")
+    if not matched_cats:
+        lines.append("_Filter by category: plumber contact, electrician number, wifi vendor, etc._")
 
     return "\n".join(lines)
 
