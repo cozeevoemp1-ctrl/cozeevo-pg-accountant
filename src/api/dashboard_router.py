@@ -121,7 +121,9 @@ async def get_kpis(
     expenses = next((float(r.total) for r in bank_rows if r.txn_type == "expense"), 0.0)
     net      = revenue - expenses
 
-    # ── Dues outstanding ───────────────────────────────────────────────────
+    # ── Dues outstanding — only the selected month, only prior check-ins ──────
+    # Exclude same-month check-ins (they haven't had time to pay yet).
+    # Use period_month == from_date (not <=) so we show THIS month's dues only.
     _paid_sq = _paid_subquery()
     dues_outstanding = await session.scalar(
         select(func.sum(
@@ -135,9 +137,9 @@ async def get_kpis(
         ))
         .where(
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-            RentSchedule.period_month <= to_date,
+            RentSchedule.period_month == from_date,
             Tenancy.status == TenancyStatus.active,
-            Tenancy.checkin_date <= to_date,
+            Tenancy.checkin_date < from_date,
         )
     ) or 0
 
@@ -238,7 +240,7 @@ async def get_dues(
     today = date.today()
     m = month or today.month
     y = year  or today.year
-    _, to_date = _month_range(m, y)
+    from_date, _ = _month_range(m, y)
 
     paid_sq = _paid_subquery()
     _outstanding = (
@@ -263,9 +265,9 @@ async def get_dues(
         ))
         .where(
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-            RentSchedule.period_month <= to_date,
+            RentSchedule.period_month == from_date,
             Tenancy.status == TenancyStatus.active,
-            Tenancy.checkin_date <= to_date,
+            Tenancy.checkin_date < from_date,
         )
         .group_by(Tenant.name, Room.room_number)
         .having(func.sum(_outstanding) > 0)
