@@ -533,7 +533,7 @@ async function loadDues() {
   const tbody = document.getElementById('duesBody');
   tbody.innerHTML = '<tr><td colspan="4" class="skel" style="height:36px"></td></tr>'.repeat(4);
   try {
-    const data = await api('/api/dashboard/dues');
+    const data = await api(`/api/dashboard/dues?month=${selMonth}&year=${selYear}`);
     document.getElementById('duesBadge').textContent = `${data.length} tenants`;
     document.getElementById('duesEmpty').style.display = data.length ? 'none' : 'block';
     tbody.innerHTML = data.map(r => `

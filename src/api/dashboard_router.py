@@ -128,6 +128,7 @@ async def get_kpis(
             RentSchedule.rent_due + RentSchedule.maintenance_due + RentSchedule.adjustment
             - func.coalesce(_paid_sq.c.paid, 0)
         ))
+        .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
         .outerjoin(_paid_sq, and_(
             _paid_sq.c.tenancy_id  == RentSchedule.tenancy_id,
             _paid_sq.c.period_month == RentSchedule.period_month,
@@ -135,6 +136,8 @@ async def get_kpis(
         .where(
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
             RentSchedule.period_month <= to_date,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= to_date,
         )
     ) or 0
 
@@ -227,10 +230,15 @@ async def get_expense_breakdown(
 
 @router.get("/dues")
 async def get_dues(
+    month: int = Query(default=None),
+    year:  int = Query(default=None),
     _=Depends(_auth),
     session: AsyncSession = Depends(get_db_session),
 ):
     today = date.today()
+    m = month or today.month
+    y = year  or today.year
+    _, to_date = _month_range(m, y)
 
     paid_sq = _paid_subquery()
     _outstanding = (
@@ -255,8 +263,9 @@ async def get_dues(
         ))
         .where(
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-            RentSchedule.period_month <= today,
+            RentSchedule.period_month <= to_date,
             Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= to_date,
         )
         .group_by(Tenant.name, Room.room_number)
         .having(func.sum(_outstanding) > 0)

@@ -650,12 +650,18 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
     else:
         query_month = today.replace(day=1)
 
+    query_month_last = date(
+        query_month.year, query_month.month,
+        calendar.monthrange(query_month.year, query_month.month)[1],
+    )
+
     result = await session.execute(
         select(Tenant.name, RentSchedule.rent_due, RentSchedule.status)
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
         .where(
             Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= query_month_last,
             RentSchedule.period_month == query_month,
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
         )
@@ -1078,15 +1084,28 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
         )
     ) or Decimal("0")
 
+    # Last day of the target month — used to exclude future/no-show check-ins
+    last_day = date(
+        current_month.year, current_month.month,
+        calendar.monthrange(current_month.year, current_month.month)[1],
+    )
+
     pending = await session.scalar(
-        select(func.sum(RentSchedule.rent_due)).where(
+        select(func.sum(RentSchedule.rent_due))
+        .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+        .where(
             RentSchedule.period_month == current_month,
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= last_day,
         )
     ) or Decimal("0")
 
     active_tenants = await session.scalar(
-        select(func.count(Tenancy.id)).where(Tenancy.status == TenancyStatus.active)
+        select(func.count(Tenancy.id)).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= last_day,
+        )
     ) or 0
 
     return (
