@@ -29,7 +29,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.db_manager import get_db_session
 from src.database.models import (
     BankTransaction, BankUpload,
-    Room, Tenancy, TenancyStatus, Tenant,
+    Complaint, ComplaintStatus,
+    Property, Room, Tenancy, TenancyStatus, Tenant,
     RentSchedule, RentStatus, Payment,
 )
 
@@ -143,6 +144,92 @@ async def get_kpis(
         )
     ) or 0
 
+    # ── Property-level occupancy ─────────────────────────────────────────
+    PROP_BEDS = {}  # property_id -> total beds (canonical from BRAIN.md)
+    props = (await session.execute(select(Property.id, Property.name))).all()
+    for p in props:
+        pname = (p.name or "").upper()
+        if "THOR" in pname:
+            PROP_BEDS[p.id] = {"name": "THOR", "total": 145}
+        elif "HULK" in pname:
+            PROP_BEDS[p.id] = {"name": "HULK", "total": 160}
+
+    prop_occ_rows = (await session.execute(
+        select(Room.property_id, func.count(Tenancy.id).label("occupied"))
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(
+            Room.is_staff_room == False,
+            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+        )
+        .group_by(Room.property_id)
+    )).all()
+
+    properties = []
+    for row in prop_occ_rows:
+        info = PROP_BEDS.get(row.property_id)
+        if not info:
+            continue
+        occ = int(row.occupied)
+        tot = info["total"]
+        properties.append({
+            "name": info["name"],
+            "occupied": occ,
+            "total": tot,
+            "vacant": tot - occ,
+            "pct": round(occ / tot * 100, 1),
+        })
+
+    # ── At a glance stats ─────────────────────────────────────────────────
+    # New check-ins this month
+    new_checkins = await session.scalar(
+        select(func.count(Tenancy.id))
+        .where(
+            Tenancy.checkin_date >= from_date,
+            Tenancy.checkin_date <= to_date,
+        )
+    ) or 0
+
+    # Checkouts this month
+    checkouts = await session.scalar(
+        select(func.count(Tenancy.id))
+        .where(
+            Tenancy.checkout_date >= from_date,
+            Tenancy.checkout_date <= to_date,
+        )
+    ) or 0
+
+    # Open complaints
+    open_complaints = await session.scalar(
+        select(func.count(Complaint.id))
+        .where(Complaint.status == ComplaintStatus.open)
+    ) or 0
+
+    # Avg rent per bed (from active rent_schedule for this month)
+    avg_rent = await session.scalar(
+        select(func.avg(RentSchedule.rent_due))
+        .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+        .where(
+            RentSchedule.period_month == from_date,
+            Tenancy.status == TenancyStatus.active,
+        )
+    )
+    avg_rent = round(float(avg_rent)) if avg_rent else 0
+
+    # Collection rate: paid / (paid + outstanding) for this month
+    total_due_month = await session.scalar(
+        select(func.sum(RentSchedule.rent_due + RentSchedule.maintenance_due + RentSchedule.adjustment))
+        .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+        .where(
+            RentSchedule.period_month == from_date,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date < from_date,
+        )
+    ) or 0
+    total_due_f = float(total_due_month)
+    dues_f = float(dues_outstanding)
+    collected = total_due_f - dues_f
+    collection_pct = round(collected / total_due_f * 100) if total_due_f > 0 else 0
+
     # ── Bank data coverage ─────────────────────────────────────────────────
     last_upload = (await session.execute(
         select(BankUpload.uploaded_at, BankUpload.to_date)
@@ -162,10 +249,18 @@ async def get_kpis(
             "beds_vacant":   vacant_beds,
             "pct":           occ_pct,
         },
+        "properties":       properties,
         "revenue":          round(revenue),
         "expenses":         round(expenses),
         "net":              round(net),
         "dues_outstanding": round(float(dues_outstanding)),
+        "at_a_glance": {
+            "new_checkins":     int(new_checkins),
+            "checkouts":        int(checkouts),
+            "open_complaints":  int(open_complaints),
+            "avg_rent":         avg_rent,
+            "collection_pct":   collection_pct,
+        },
         "bank_coverage":    bank_coverage,
     }
 

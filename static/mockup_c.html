@@ -65,6 +65,19 @@ header {
 .brand {
   display:flex; align-items:center; gap:10px;
 }
+.wordmark {
+  display:flex; align-items:baseline; gap:0;
+  font-family:'Syne',sans-serif; font-size:22px; font-weight:800;
+  letter-spacing:1.5px; line-height:1; text-transform:uppercase;
+}
+.wm-t { color:#FE129D; }
+.wm-icon { display:inline-flex; align-items:center; margin:0 -1px; position:relative; top:2px; }
+.wm-sub {
+  font-family:'DM Sans',sans-serif; font-size:8px; font-weight:500;
+  color:var(--t3); letter-spacing:2px; text-transform:uppercase;
+  margin-top:2px;
+}
+.wm-wrap { display:flex; flex-direction:column; align-items:flex-start; }
 .brand-gem {
   width:32px; height:32px; border-radius:9px;
   background:linear-gradient(140deg,#22c55e 0%,#0e7a35 100%);
@@ -497,13 +510,11 @@ nav {
 <!-- ═══════════════════ HEADER ═══════════════════ -->
 <header>
   <div class="brand">
-    <div class="brand-gem">
-      <svg viewBox="0 0 16 16"><polyline points="2,11 6,5 10,8 14,3"/></svg>
+    <div class="wm-wrap">
+      <div class="wordmark"><span class="wm-t">COZEE</span><span class="wm-icon"><svg width="18" height="20" viewBox="0 0 18 20" fill="none"><circle cx="9" cy="4.5" r="3.5" fill="#07B0ED"/><path d="M9 19C9 19 1 13.5 1 9.5C1 7.2 3 5.8 5.2 6.5C6.8 7 8 8.2 9 9.2C10 8.2 11.2 7 12.8 6.5C15 5.8 17 7.2 17 9.5C17 13.5 9 19 9 19Z" fill="url(#hg)"/><defs><linearGradient id="hg" x1="1" y1="6" x2="17" y2="19" gradientUnits="userSpaceOnUse"><stop stop-color="#818cf8"/><stop offset="1" stop-color="#c026d3"/></linearGradient></defs></svg></span><span class="wm-t">O</span></div>
+      <div class="wm-sub">Where Comfort Meets Care</div>
     </div>
-    <div>
-      <div class="brand-name">Coze<b>evo</b></div>
-    </div>
-    <div class="live-dot" style="margin-left:4px"></div>
+    <div class="live-dot" style="margin-left:6px"></div>
   </div>
   <div class="month-chip" onclick="nextMonth()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -580,25 +591,25 @@ nav {
   <div class="fin-row">
     <div class="fin-card g">
       <div class="fin-label">Revenue</div>
-      <div class="fin-val g">₹18.4L</div>
-      <div class="fin-delta"><b>↑ 7%</b> vs Feb</div>
+      <div class="fin-val g" id="fRevVal">—</div>
+      <div class="fin-delta" id="fRevDelta"></div>
     </div>
     <div class="fin-card r">
       <div class="fin-label">Expenses</div>
-      <div class="fin-val r">₹8.2L</div>
-      <div class="fin-delta" style="color:var(--r)">↑ 2.5% vs Feb</div>
+      <div class="fin-val r" id="fExpVal">—</div>
+      <div class="fin-delta" id="fExpDelta" style="color:var(--r)"></div>
     </div>
   </div>
   <div class="fin-row" style="margin-top:-2px">
     <div class="fin-card b">
       <div class="fin-label">Net P&L</div>
-      <div class="fin-val b">₹10.2L</div>
-      <div class="fin-delta"><b>↑ 11%</b> vs Feb</div>
+      <div class="fin-val b" id="fNetVal">—</div>
+      <div class="fin-delta" id="fNetDelta"></div>
     </div>
     <div class="fin-card a" style="cursor:pointer" onclick="showTab('dues')">
       <div class="fin-label">Dues</div>
-      <div class="fin-val a">₹13.6L</div>
-      <div class="fin-delta" style="color:var(--a)">59 tenants</div>
+      <div class="fin-val a" id="fDuesVal">—</div>
+      <div class="fin-delta" id="fDuesDelta" style="color:var(--a)"></div>
     </div>
   </div>
 
@@ -721,38 +732,7 @@ nav {
         <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t2);font-weight:600"><div style="width:10px;height:3px;border-radius:2px;background:var(--r)"></div>Exp</div>
       </div>
     </div>
-    <div class="trend-item">
-      <div class="trend-mo">Dec</div>
-      <div class="trend-bars">
-        <div class="tb-rev" style="width:83%"></div>
-        <div class="tb-exp" style="width:87%"></div>
-      </div>
-      <div class="trend-net">+₹8.1L</div>
-    </div>
-    <div class="trend-item">
-      <div class="trend-mo">Jan</div>
-      <div class="trend-bars">
-        <div class="tb-rev" style="width:91%"></div>
-        <div class="tb-exp" style="width:95%"></div>
-      </div>
-      <div class="trend-net">+₹9.0L</div>
-    </div>
-    <div class="trend-item">
-      <div class="trend-mo">Feb</div>
-      <div class="trend-bars">
-        <div class="tb-rev" style="width:93%"></div>
-        <div class="tb-exp" style="width:98%"></div>
-      </div>
-      <div class="trend-net">+₹9.2L</div>
-    </div>
-    <div class="trend-item" style="background:var(--bg2)">
-      <div class="trend-mo" style="color:var(--g)">Mar</div>
-      <div class="trend-bars">
-        <div class="tb-rev" style="width:100%;box-shadow:0 0 6px #22c55e80"></div>
-        <div class="tb-exp" style="width:100%"></div>
-      </div>
-      <div class="trend-net" style="color:var(--g)">+₹10.2L</div>
-    </div>
+    <div id="trend-items"></div>
   </div>
 </div>
 
@@ -767,114 +747,22 @@ nav {
     <div class="donut-wrap">
       <canvas id="expChart" height="190"></canvas>
       <div class="donut-center">
-        <div class="donut-total">₹8.2L</div>
+        <div class="donut-total" id="expTotal">—</div>
         <div class="donut-lbl">Total</div>
       </div>
     </div>
-    <div class="exp-grid">
-      <div class="exp-li"><div class="exp-sq" style="background:#fb4163"></div><span class="exp-n">Maintenance</span><span class="exp-pct">26%</span></div>
-      <div class="exp-li"><div class="exp-sq" style="background:#f59e0b"></div><span class="exp-n">Utilities</span><span class="exp-pct">22%</span></div>
-      <div class="exp-li"><div class="exp-sq" style="background:#6ea8fe"></div><span class="exp-n">Staff</span><span class="exp-pct">20%</span></div>
-      <div class="exp-li"><div class="exp-sq" style="background:#b794f4"></div><span class="exp-n">Housekeeping</span><span class="exp-pct">15%</span></div>
-      <div class="exp-li"><div class="exp-sq" style="background:#34d399"></div><span class="exp-n">Internet</span><span class="exp-pct">4%</span></div>
-      <div class="exp-li"><div class="exp-sq" style="background:#44445a"></div><span class="exp-n">Other</span><span class="exp-pct">13%</span></div>
-    </div>
+    <div class="exp-grid" id="expLegend"></div>
   </div>
 
   <div class="cd">
     <div style="padding:12px 16px;border-bottom:1px solid var(--rim2)"><span class="sec-lbl">Line Items</span></div>
-    <div class="ex-row">
-      <div class="ex-ico" style="background:#fb416314">🔧</div>
-      <div class="ex-info"><div class="ex-name">Maintenance & Repairs</div><div class="ex-sub">Plumbing · AC service · Electricals</div></div>
-      <div class="ex-right"><div class="ex-amt" style="color:var(--r)">₹2.13L</div><div class="ex-bar"><div class="ex-fill" style="width:100%;background:var(--r)"></div></div></div>
-    </div>
-    <div class="ex-row">
-      <div class="ex-ico" style="background:#f59e0b14">⚡</div>
-      <div class="ex-info"><div class="ex-name">Utilities</div><div class="ex-sub">BESCOM · Water · Gas</div></div>
-      <div class="ex-right"><div class="ex-amt" style="color:var(--a)">₹1.80L</div><div class="ex-bar"><div class="ex-fill" style="width:85%;background:var(--a)"></div></div></div>
-    </div>
-    <div class="ex-row">
-      <div class="ex-ico" style="background:#6ea8fe14">👷</div>
-      <div class="ex-info"><div class="ex-name">Staff Salaries</div><div class="ex-sub">Warden · Security · Admin</div></div>
-      <div class="ex-right"><div class="ex-amt" style="color:var(--b)">₹1.60L</div><div class="ex-bar"><div class="ex-fill" style="width:75%;background:var(--b)"></div></div></div>
-    </div>
-    <div class="ex-row">
-      <div class="ex-ico" style="background:#b794f414">🧹</div>
-      <div class="ex-info"><div class="ex-name">Housekeeping</div><div class="ex-sub">Virani Cleaning Services</div></div>
-      <div class="ex-right"><div class="ex-amt" style="color:var(--p)">₹1.20L</div><div class="ex-bar"><div class="ex-fill" style="width:56%;background:var(--p)"></div></div></div>
-    </div>
-    <div class="ex-row">
-      <div class="ex-ico" style="background:#34d39914">🌐</div>
-      <div class="ex-info"><div class="ex-name">WiFi / Internet</div><div class="ex-sub">KIPINN Networks</div></div>
-      <div class="ex-right"><div class="ex-amt" style="color:var(--cy)">₹0.28L</div><div class="ex-bar"><div class="ex-fill" style="width:13%;background:var(--cy)"></div></div></div>
-    </div>
-    <div class="ex-row">
-      <div class="ex-ico" style="background:#44445a22">📦</div>
-      <div class="ex-info"><div class="ex-name">Other</div><div class="ex-sub">Miscellaneous expenses</div></div>
-      <div class="ex-right"><div class="ex-amt" style="color:var(--t3)">₹1.19L</div><div class="ex-bar"><div class="ex-fill" style="width:56%;background:var(--t3)"></div></div></div>
-    </div>
+    <div id="expLineItems"></div>
   </div>
 </div>
 
 <!-- ══════ TRANSACTIONS PANE ══════ -->
 <div class="pane" id="p-txn">
-
-  <div class="txn-dg">Mar 18–22, 2026</div>
-  <div class="cd" style="margin-bottom:10px">
-    <div class="tx-row">
-      <div class="tx-ico tx-in">💵</div>
-      <div class="tx-info"><div class="tx-name">Rahul Sharma</div><div class="tx-desc">Rent · Room 312 THOR · UPI</div></div>
-      <div class="tx-right"><div class="tx-amt tx-in-amt">+₹8,500</div><div class="tx-date">Mar 20</div></div>
-    </div>
-    <div class="tx-row">
-      <div class="tx-ico tx-out">⚡</div>
-      <div class="tx-info"><div class="tx-name">BESCOM</div><div class="tx-desc">Electricity · THOR + HULK combined</div></div>
-      <div class="tx-right"><div class="tx-amt tx-out-amt">−₹1,24,000</div><div class="tx-date">Mar 19</div></div>
-    </div>
-    <div class="tx-row">
-      <div class="tx-ico tx-in">💵</div>
-      <div class="tx-info"><div class="tx-name">Aditya Kumar</div><div class="tx-desc">Rent · Room 115 THOR · UPI</div></div>
-      <div class="tx-right"><div class="tx-amt tx-in-amt">+₹9,500</div><div class="tx-date">Mar 18</div></div>
-    </div>
-  </div>
-
-  <div class="txn-dg">Mar 14–17, 2026</div>
-  <div class="cd" style="margin-bottom:10px">
-    <div class="tx-row">
-      <div class="tx-ico tx-out">🧹</div>
-      <div class="tx-info"><div class="tx-name">Virani Cleaning</div><div class="tx-desc">Housekeeping · Monthly · Bank transfer</div></div>
-      <div class="tx-right"><div class="tx-amt tx-out-amt">−₹45,000</div><div class="tx-date">Mar 17</div></div>
-    </div>
-    <div class="tx-row">
-      <div class="tx-ico tx-in">💵</div>
-      <div class="tx-info"><div class="tx-name">Prasad Vadlamani</div><div class="tx-desc">Rent · Room 218 HULK · UPI</div></div>
-      <div class="tx-right"><div class="tx-amt tx-in-amt">+₹11,000</div><div class="tx-date">Mar 15</div></div>
-    </div>
-    <div class="tx-row">
-      <div class="tx-ico tx-out">🌐</div>
-      <div class="tx-info"><div class="tx-name">KIPINN Networks</div><div class="tx-desc">WiFi infrastructure · Monthly</div></div>
-      <div class="tx-right"><div class="tx-amt tx-out-amt">−₹28,000</div><div class="tx-date">Mar 14</div></div>
-    </div>
-  </div>
-
-  <div class="txn-dg">Mar 1–13, 2026</div>
-  <div class="cd">
-    <div class="tx-row">
-      <div class="tx-ico tx-in">🏦</div>
-      <div class="tx-info"><div class="tx-name">Batch Rent Collection</div><div class="tx-desc">19 tenants · UPI + Cash · Mar 1–10</div></div>
-      <div class="tx-right"><div class="tx-amt tx-in-amt">+₹2,14,600</div><div class="tx-date">Mar 1–10</div></div>
-    </div>
-    <div class="tx-row">
-      <div class="tx-ico tx-out">👷</div>
-      <div class="tx-info"><div class="tx-name">Staff Salaries</div><div class="tx-desc">Warden + Security · Feb payout</div></div>
-      <div class="tx-right"><div class="tx-amt tx-out-amt">−₹1,60,000</div><div class="tx-date">Mar 5</div></div>
-    </div>
-    <div class="tx-row">
-      <div class="tx-ico tx-in">🏠</div>
-      <div class="tx-info"><div class="tx-name">Deposit — Arjun Sumanth</div><div class="tx-desc">New check-in · Room 523 HULK</div></div>
-      <div class="tx-right"><div class="tx-amt tx-in-amt">+₹20,000</div><div class="tx-date">Mar 3</div></div>
-    </div>
-  </div>
+  <div id="txnContent"></div>
 </div>
 
 </main>
@@ -920,6 +808,26 @@ nav {
 </nav>
 
 <script>
+// ── CONFIG ─────────────────────────────────────
+const API = '/api/dashboard';
+const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+function q(p) { return `${API}/${p}?token=${TOKEN}`; }
+function fmt(v) {
+  if (v >= 100000) return '₹' + (v/100000).toFixed(1) + 'L';
+  if (v >= 1000) return '₹' + (v/1000).toFixed(1) + 'K';
+  return '₹' + v;
+}
+function fmtFull(v) {
+  return '₹' + v.toLocaleString('en-IN');
+}
+const COLORS = ['#fb4163','#f59e0b','#6ea8fe','#b794f4','#34d399','#ff6b9d','#44445a'];
+const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ── STATE ──────────────────────────────────────
+let curMonth = new Date().getMonth() + 1; // 1-12
+let curYear = new Date().getFullYear();
+let pnlChart = null, expChart = null;
+
 // ── tab logic ──────────────────────────────────
 const PANES = ['ov','dues','pnl','exp','txn'];
 function showTab(id) {
@@ -927,109 +835,356 @@ function showTab(id) {
     document.getElementById('p-'+p).classList.toggle('on', p===id);
     document.getElementById('nb-'+p).classList.toggle('on', p===id);
   });
-  if (id==='pnl' && !window._pnl) buildPnl();
-  if (id==='exp' && !window._exp) buildExp();
+  if (id==='pnl') loadPnl();
+  if (id==='exp') loadExpenses();
+  if (id==='txn') loadTxns();
 }
 
 // ── month picker ───────────────────────────────
-const MONS = ['Jan 2026','Feb 2026','Mar 2026'];
-let mi = 2;
+function updateMonthLabel() {
+  document.getElementById('mLabel').textContent = MON_NAMES[curMonth-1] + ' ' + curYear;
+}
 function nextMonth() {
-  mi = (mi+1)%MONS.length;
-  document.getElementById('mLabel').textContent = MONS[mi];
+  curMonth--;
+  if (curMonth < 1) { curMonth = 12; curYear--; }
+  updateMonthLabel();
+  loadAll();
 }
 
-// ── P&L chart ──────────────────────────────────
-function buildPnl() {
-  window._pnl = true;
-  const ctx = document.getElementById('pnlChart').getContext('2d');
-  const font = { family:'DM Sans, sans-serif', size:10, weight:'600' };
+// ── LOAD ALL ───────────────────────────────────
+function loadAll() {
+  loadKpis();
+  loadDues();
+  loadPnl();
+  loadExpenses();
+  loadTxns();
+}
 
-  new Chart(ctx, {
-    type:'bar',
-    data:{
-      labels:['Dec','Jan','Feb','Mar'],
-      datasets:[
-        {
-          label:'Revenue',
-          data:[1520,1680,1720,1840],
-          backgroundColor: ctx => {
-            const g = ctx.chart.ctx.createLinearGradient(0,0,0,200);
-            g.addColorStop(0,'#22c55e');
-            g.addColorStop(1,'#22c55e60');
-            return g;
-          },
-          borderRadius:6, borderSkipped:false,
-          barPercentage:0.38, categoryPercentage:0.9,
-        },
-        {
-          label:'Expenses',
-          data:[710,780,800,820],
-          backgroundColor: ctx => {
-            const g = ctx.chart.ctx.createLinearGradient(0,0,0,200);
-            g.addColorStop(0,'#fb4163');
-            g.addColorStop(1,'#fb416360');
-            return g;
-          },
-          borderRadius:6, borderSkipped:false,
-          barPercentage:0.38, categoryPercentage:0.9,
-        }
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{
-          position:'top', align:'end',
-          labels:{ color:'#8888a8', font, boxWidth:10, boxHeight:10, borderRadius:3, useBorderRadius:true, padding:10 }
-        },
-        tooltip:{
-          backgroundColor:'#141420', borderColor:'rgba(255,255,255,0.08)', borderWidth:1,
-          titleColor:'#eeeef8', bodyColor:'#8888a8', padding:10,
-          callbacks:{ label: c => ` ₹${(c.raw/100).toFixed(1)}L` }
-        }
-      },
-      scales:{
-        x:{ grid:{display:false}, ticks:{color:'#44445a', font} },
-        y:{
-          grid:{ color:'rgba(255,255,255,0.04)', drawBorder:false },
-          border:{ dash:[4,4], display:false },
-          ticks:{ color:'#44445a', font, callback:v=>'₹'+(v/100)+'L' }
-        }
+// ── KPIs (Overview) ────────────────────────────
+async function loadKpis() {
+  try {
+    const r = await fetch(q('kpis') + `&month=${curMonth}&year=${curYear}`);
+    const d = await r.json();
+    const occ = d.occupancy || {};
+    const pct = Math.round(occ.pct || 0);
+    const occupied = occ.beds_occupied || 0;
+    const total = occ.beds_total || 305;
+    const vacant = occ.beds_vacant || (total - occupied);
+
+    // Occupancy hero
+    document.querySelector('.occ-num').textContent = pct;
+    document.querySelector('.occ-label').innerHTML = `Occupancy · <b>${occupied}</b> of ${total} beds`;
+    document.querySelector('.occ-arc-beds').textContent = occupied;
+
+    // Arc gauge: stroke-dashoffset = circumference * (1 - pct/100)
+    const circ = 188.5;
+    const arcEl = document.querySelectorAll('.occ-hero circle')[2];
+    if (arcEl) arcEl.setAttribute('stroke-dashoffset', circ * (1 - pct/100));
+
+    // Month tags
+    const mTag = MON_NAMES[curMonth-1] + ' ' + curYear;
+    document.querySelectorAll('.tag-d').forEach(el => el.textContent = mTag);
+
+    // Finance cards
+    const rev = d.revenue || 0;
+    const exp = d.expenses || 0;
+    const net = d.net || 0;
+    const dues = d.dues_outstanding || 0;
+    document.getElementById('fRevVal').textContent = fmt(rev);
+    document.getElementById('fExpVal').textContent = fmt(exp);
+    document.getElementById('fNetVal').textContent = fmt(net);
+    document.getElementById('fDuesVal').textContent = fmt(dues);
+
+    // Dues count from at_a_glance collection data
+    const g = d.at_a_glance || {};
+
+    // Fetch previous month for deltas
+    let pm = curMonth - 1, py = curYear;
+    if (pm < 1) { pm = 12; py--; }
+    try {
+      const pr = await fetch(q('kpis') + `&month=${pm}&year=${py}`);
+      const pd = await pr.json();
+      const prevMo = MON_NAMES[pm-1];
+      function deltaHtml(cur, prev, color) {
+        if (!prev) return '';
+        const d = prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
+        const arrow = d >= 0 ? '↑' : '↓';
+        return `<b>${arrow} ${Math.abs(d)}%</b> vs ${prevMo}`;
       }
+      document.getElementById('fRevDelta').innerHTML = deltaHtml(rev, pd.revenue, 'g');
+      document.getElementById('fExpDelta').innerHTML = deltaHtml(exp, pd.expenses, 'r');
+      document.getElementById('fNetDelta').innerHTML = deltaHtml(net, pd.net, 'b');
+    } catch(e) {}
+
+    // Dues delta: show tenant count
+    document.getElementById('fDuesDelta').textContent = (d.at_a_glance?.collection_pct || 0) + '% collected';
+
+    // Status tag
+    const statusTag = document.querySelector('.tag-g, .tag-a, .tag-r');
+    if (statusTag) {
+      if (pct >= 70) { statusTag.textContent = '● On track'; statusTag.className = 'tag tag-g'; }
+      else if (pct >= 50) { statusTag.textContent = '● Moderate'; statusTag.className = 'tag tag-a'; }
+      else { statusTag.textContent = '● Low'; statusTag.className = 'tag tag-r'; }
     }
-  });
+
+    // Property-level occupancy (THOR / HULK)
+    const props = d.properties || [];
+    const propCells = document.querySelectorAll('.prop-cell');
+    props.forEach((p, i) => {
+      if (!propCells[i]) return;
+      const cell = propCells[i];
+      cell.querySelector('.prop-name').textContent = p.name;
+      cell.querySelector('.prop-big').innerHTML = `${p.occupied}<span>/${p.total}</span>`;
+      cell.querySelector('.prop-sub').textContent = `${p.pct}% · ${p.vacant} vacant`;
+      cell.querySelector('.prop-fill').style.width = p.pct + '%';
+    });
+
+    // At a glance (g declared above)
+    const qsRows = document.querySelectorAll('.qs-row');
+    if (qsRows.length >= 5) {
+      qsRows[0].querySelector('.qs-v').textContent = g.new_checkins || 0;
+      qsRows[1].querySelector('.qs-v').textContent = g.checkouts || 0;
+      qsRows[2].querySelector('.qs-v').textContent = g.open_complaints || 0;
+      qsRows[3].querySelector('.qs-v').textContent = g.avg_rent ? fmtFull(g.avg_rent) : '—';
+      qsRows[4].querySelector('.qs-v').textContent = (g.collection_pct || 0) + '%';
+    }
+  } catch(e) { console.error('KPIs error:', e); }
 }
 
-// ── Expense donut ──────────────────────────────
-function buildExp() {
-  window._exp = true;
-  const ctx = document.getElementById('expChart').getContext('2d');
-  new Chart(ctx,{
-    type:'doughnut',
-    data:{
-      labels:['Maintenance','Utilities','Staff','Housekeeping','Internet','Other'],
-      datasets:[{
-        data:[213,180,160,120,28,119],
-        backgroundColor:['#fb4163','#f59e0b','#6ea8fe','#b794f4','#34d399','#44445a'],
-        borderWidth:0, hoverOffset:8, borderRadius:5
-      }]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:true, cutout:'68%',
-      plugins:{
-        legend:{ display:false },
-        tooltip:{
-          backgroundColor:'#141420', borderColor:'rgba(255,255,255,0.08)', borderWidth:1,
-          titleColor:'#eeeef8', bodyColor:'#8888a8', padding:10,
-          callbacks:{
-            label: c => ` ₹${(c.raw/100).toFixed(2)}L (${Math.round(c.raw/820*100)}%)`
+// ── DUES ───────────────────────────────────────
+async function loadDues() {
+  try {
+    const r = await fetch(q('dues') + `&month=${curMonth}&year=${curYear}`);
+    const list = await r.json();
+    const total = list.reduce((s,t) => s + (t.outstanding || 0), 0);
+    const count = list.length;
+
+    // Dues hero
+    const mTag = MON_NAMES[curMonth-1] + ' ' + curYear;
+    document.querySelector('.dues-hero-val').textContent = fmtFull(total);
+    const avg = count > 0 ? Math.round(total / count) : 0;
+    document.querySelector('.dues-hero-top div:first-child div:first-child').textContent = `Outstanding · ${mTag}`;
+    document.querySelector('.dues-hero-top div:first-child div:nth-child(3)').textContent = `Average ${fmtFull(avg)} per tenant`;
+    document.querySelector('.tag-a').textContent = count + ' tenants';
+
+    // Segment bar
+    const kpiR = await fetch(q('kpis') + `&month=${curMonth}&year=${curYear}`);
+    const kpiD = await kpiR.json();
+    const rev = kpiD.revenue || 1;
+    const collPct = Math.max(0, Math.min(100, Math.round((rev / (rev + total)) * 100)));
+    const duePct = 100 - collPct;
+    document.querySelector('.seg-fill:first-child').style.width = collPct + '%';
+    document.querySelector('.seg-fill:last-child').style.width = duePct + '%';
+    document.querySelector('.seg-legend').innerHTML = `
+      <div class="seg-item"><div class="seg-dot" style="background:var(--g)"></div>Paid ${collPct}%</div>
+      <div class="seg-item"><div class="seg-dot" style="background:var(--a)"></div>Pending ${duePct}%</div>`;
+    const segLabels = document.querySelector('.dues-hero .seg-bar').previousElementSibling;
+    if (segLabels) segLabels.innerHTML = `<span>Collected ${fmt(rev)}</span><span style="color:var(--a)">Due ${fmt(total)}</span>`;
+
+    // Tenant rows
+    const container = document.querySelector('#p-dues .cd');
+    const top5 = list.slice(0, 5);
+    const rowColors = ['#22c55e','#6ea8fe','#b794f4','#f59e0b','#34d399'];
+    let html = `<div style="padding:12px 16px;border-bottom:1px solid var(--rim2);display:flex;justify-content:space-between;align-items:center">
+      <span class="sec-lbl">Highest Due</span>
+      <span class="tag tag-d">${Math.min(5,count)} of ${count}</span>
+    </div>`;
+    top5.forEach((t,i) => {
+      const initials = (t.tenant || 'XX').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const c = rowColors[i % rowColors.length];
+      html += `<div class="t-row">
+        <div class="ava" style="background:${c}12;color:${c}">${initials}</div>
+        <div class="t-info"><div class="t-name">${t.tenant}</div><div class="t-room">Room ${t.room} · ${t.latest_period || ''}</div></div>
+        <div class="t-right"><div class="t-amt">${fmtFull(t.outstanding)}</div><div class="t-since">${t.months_pending || 1}mo</div></div>
+      </div>`;
+    });
+    if (count > 5) html += `<div class="t-more">+ ${count - 5} more</div>`;
+    container.innerHTML = html;
+  } catch(e) { console.error('Dues error:', e); }
+}
+
+// ── P&L CHART ──────────────────────────────────
+async function loadPnl() {
+  try {
+    const r = await fetch(q('pnl_trend') + '&months=4');
+    const data = await r.json();
+    const labels = data.map(d => d.label.split(' ')[0]);
+    const incData = data.map(d => Math.round(d.income / 1000));
+    const expData = data.map(d => Math.round(d.expense / 1000));
+
+    // Update stat cards
+    const latest = data[data.length - 1] || {};
+    const prev = data[data.length - 2] || {};
+    document.querySelector('.pnl-stat:nth-child(1) .pnl-stat-v').textContent = fmt(latest.income || 0);
+    document.querySelector('.pnl-stat:nth-child(2) .pnl-stat-v').textContent = fmt(latest.expense || 0);
+    document.querySelector('.pnl-stat:nth-child(3) .pnl-stat-v').textContent = fmt(latest.net || 0);
+
+    // Delta %
+    function delta(cur, prv) {
+      if (!prv) return '';
+      const d = Math.round(((cur - prv) / Math.abs(prv)) * 100);
+      return d >= 0 ? `↑ ${d}%` : `↓ ${Math.abs(d)}%`;
+    }
+    document.querySelector('.pnl-stat:nth-child(1) .pnl-stat-d').textContent = delta(latest.income, prev.income);
+    document.querySelector('.pnl-stat:nth-child(2) .pnl-stat-d').textContent = delta(latest.expense, prev.expense);
+    document.querySelector('.pnl-stat:nth-child(3) .pnl-stat-d').textContent = delta(latest.net, prev.net);
+
+    // Trend bar items
+    const trendEl = document.getElementById('trend-items');
+    if (trendEl) {
+      const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
+      const curLabel = MON_NAMES[curMonth-1];
+      trendEl.innerHTML = data.map(d => {
+        const mo = d.label.split(' ')[0];
+        const isCur = mo === curLabel;
+        const revW = Math.round(d.income / maxVal * 100);
+        const expW = Math.round(d.expense / maxVal * 100);
+        const netSign = d.net >= 0 ? '+' : '-';
+        return `<div class="trend-item"${isCur ? ' style="background:var(--bg2)"' : ''}>
+          <div class="trend-mo"${isCur ? ' style="color:var(--g)"' : ''}>${mo}</div>
+          <div class="trend-bars">
+            <div class="tb-rev" style="width:${revW || 1}%${isCur ? ';box-shadow:0 0 6px #22c55e80' : ''}"></div>
+            <div class="tb-exp" style="width:${expW || 1}%"></div>
+          </div>
+          <div class="trend-net"${isCur ? ' style="color:var(--g)"' : ''}>${netSign}${fmt(Math.abs(d.net))}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Chart
+    const ctx = document.getElementById('pnlChart').getContext('2d');
+    const font = { family:'DM Sans, sans-serif', size:10, weight:'600' };
+    if (pnlChart) pnlChart.destroy();
+    pnlChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels,
+        datasets:[
+          {
+            label:'Revenue', data:incData,
+            backgroundColor: c => { const g=c.chart.ctx.createLinearGradient(0,0,0,200); g.addColorStop(0,'#22c55e'); g.addColorStop(1,'#22c55e60'); return g; },
+            borderRadius:6, borderSkipped:false, barPercentage:0.38, categoryPercentage:0.9,
+          },
+          {
+            label:'Expenses', data:expData,
+            backgroundColor: c => { const g=c.chart.ctx.createLinearGradient(0,0,0,200); g.addColorStop(0,'#fb4163'); g.addColorStop(1,'#fb416360'); return g; },
+            borderRadius:6, borderSkipped:false, barPercentage:0.38, categoryPercentage:0.9,
           }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ position:'top', align:'end', labels:{ color:'#8888a8', font, boxWidth:10, boxHeight:10, borderRadius:3, useBorderRadius:true, padding:10 } },
+          tooltip:{ backgroundColor:'#141420', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#eeeef8', bodyColor:'#8888a8', padding:10,
+            callbacks:{ label: c => ` ₹${(c.raw/100).toFixed(1)}L` } }
+        },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'#44445a', font} },
+          y:{ grid:{ color:'rgba(255,255,255,0.04)', drawBorder:false }, border:{ dash:[4,4], display:false },
+            ticks:{ color:'#44445a', font, callback:v=>'₹'+(v/100)+'L' } }
         }
       }
-    }
-  });
+    });
+  } catch(e) { console.error('P&L error:', e); }
 }
+
+// ── EXPENSES DONUT ─────────────────────────────
+async function loadExpenses() {
+  try {
+    const r = await fetch(q('expense_breakdown') + `&month=${curMonth}&year=${curYear}`);
+    const data = await r.json();
+    const labels = data.map(d => d.category);
+    const values = data.map(d => Math.round(d.amount / 1000));
+    const total = data.reduce((s,d) => s + d.amount, 0);
+
+    // Update donut center total
+    document.getElementById('expTotal').textContent = fmt(total);
+
+    // Update legend grid
+    const legendEl = document.getElementById('expLegend');
+    if (legendEl) {
+      legendEl.innerHTML = data.slice(0,6).map((d,i) => {
+        const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
+        return `<div class="exp-li"><div class="exp-sq" style="background:${COLORS[i % COLORS.length]}"></div><span class="exp-n">${d.category}</span><span class="exp-pct">${pct}%</span></div>`;
+      }).join('');
+    }
+
+    // Update line items
+    const itemsEl = document.getElementById('expLineItems');
+    if (itemsEl) {
+      const maxAmt = data.length > 0 ? data[0].amount : 1;
+      itemsEl.innerHTML = data.slice(0,8).map((d,i) => {
+        const c = COLORS[i % COLORS.length];
+        return `<div class="ex-row">
+          <div class="ex-ico" style="background:${c}14">📊</div>
+          <div class="ex-info"><div class="ex-name">${d.category}</div></div>
+          <div class="ex-right"><div class="ex-amt" style="color:${c}">${fmt(d.amount)}</div><div class="ex-bar"><div class="ex-fill" style="width:${Math.round(d.amount/maxAmt*100)}%;background:${c}"></div></div></div>
+        </div>`;
+      }).join('');
+      if (data.length === 0) itemsEl.innerHTML = '<div style="padding:30px 16px;text-align:center;color:var(--t3)">No expense data for this month</div>';
+    }
+
+    // Chart
+    const ctx = document.getElementById('expChart').getContext('2d');
+    if (expChart) expChart.destroy();
+    expChart = new Chart(ctx,{
+      type:'doughnut',
+      data:{
+        labels,
+        datasets:[{
+          data:values,
+          backgroundColor: COLORS.slice(0, labels.length),
+          borderWidth:0, hoverOffset:8, borderRadius:5
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:true, cutout:'68%',
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ backgroundColor:'#141420', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#eeeef8', bodyColor:'#8888a8', padding:10,
+            callbacks:{ label: c => ` ₹${(c.raw/100).toFixed(2)}L (${Math.round(c.raw/values.reduce((a,b)=>a+b,1)*100)}%)` } }
+        }
+      }
+    });
+  } catch(e) { console.error('Expenses error:', e); }
+}
+
+// ── TRANSACTIONS ───────────────────────────────
+async function loadTxns() {
+  try {
+    const from = `${curYear}-${String(curMonth).padStart(2,'0')}-01`;
+    const lastDay = new Date(curYear, curMonth, 0).getDate();
+    const to = `${curYear}-${String(curMonth).padStart(2,'0')}-${lastDay}`;
+    const r = await fetch(q('transactions') + `&from_date=${from}&to_date=${to}&per_page=20`);
+    const d = await r.json();
+    const items = d.items || [];
+    let html = '';
+    let lastDate = '';
+    items.forEach(tx => {
+      const date = tx.date || '';
+      if (date !== lastDate) {
+        html += `<div class="tx-date-hdr">${date}</div>`;
+        lastDate = date;
+      }
+      const isIn = tx.type === 'income';
+      const icon = isIn ? '💰' : '📤';
+      const amtClass = isIn ? 'tx-in-amt' : 'tx-out-amt';
+      const sign = isIn ? '+' : '−';
+      html += `<div class="tx-row">
+        <div class="tx-ico ${isIn ? 'tx-in' : 'tx-out'}">${icon}</div>
+        <div class="tx-info"><div class="tx-name">${tx.description || 'Transaction'}</div><div class="tx-desc">${tx.category || ''}</div></div>
+        <div class="tx-right"><div class="tx-amt ${amtClass}">${sign}${fmtFull(Math.abs(tx.amount))}</div><div class="tx-date">${date}</div></div>
+      </div>`;
+    });
+    if (items.length === 0) html = '<div style="padding:40px 16px;text-align:center;color:var(--t3)">No transactions for this month</div>';
+    document.getElementById('txnContent').innerHTML = html;
+  } catch(e) { console.error('Txns error:', e); }
+}
+
+// ── INIT ───────────────────────────────────────
+updateMonthLabel();
+loadAll();
 </script>
 </body>
 </html>

@@ -36,7 +36,8 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
         # Webhook, health, and dashboard are public
         # Dashboard API is token-protected at the endpoint level
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
-                or path.startswith("/dashboard") or path.startswith("/api/dashboard")):
+                or path.startswith("/dashboard") or path.startswith("/api/dashboard")
+                or path.startswith("/static")):
             return await call_next(request)
 
         # Everything else (/api/*, /docs, /redoc, /openapi.json) — localhost only
