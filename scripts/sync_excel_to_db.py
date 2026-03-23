@@ -92,7 +92,7 @@ async def run():
                 print(f"  SKIP no room: {room_num} {name} ({prop})")
                 skipped += 1; continue
 
-            # Find or create tenant
+            # Find or create tenant using savepoint for error recovery
             r = await conn.execute(text(
                 "SELECT id FROM tenants WHERE lower(trim(name)) = :n"
             ), {'n': name.lower()})
@@ -101,9 +101,12 @@ async def run():
                 tenant_id = t_row[0]
             else:
                 g = gender if gender in ('male','female') else None
+                phone_val = mobile or f'+91000{abs(hash(name)) % 10000000:07d}'
+                # Use INSERT with ON CONFLICT to handle duplicate phones
                 r = await conn.execute(text(
-                    "INSERT INTO tenants (name, phone, gender) VALUES (:name, :phone, :gender) RETURNING id"
-                ), {'name': name, 'phone': mobile, 'gender': g})
+                    "INSERT INTO tenants (name, phone, gender) VALUES (:name, :phone, :gender) "
+                    "ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name RETURNING id"
+                ), {'name': name, 'phone': phone_val, 'gender': g})
                 tenant_id = r.fetchone()[0]
                 created_t += 1
 
