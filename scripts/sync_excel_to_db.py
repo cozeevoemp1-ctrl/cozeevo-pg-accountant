@@ -78,8 +78,14 @@ async def run():
 
             prop = block if block in ['THOR','HULK'] else 'THOR'
             room_id = room_lookup.get((room_num, prop))
+            # If not found in stated block, try the other building
+            if not room_id:
+                other = 'HULK' if prop == 'THOR' else 'THOR'
+                room_id = room_lookup.get((room_num, other))
+                if room_id:
+                    prop = other  # Excel BLOCK was wrong
             if room_num == '523/219':
-                room_id = room_lookup.get(('523', prop)) or room_lookup.get(('219', prop))
+                room_id = room_lookup.get(('523', 'HULK')) or room_lookup.get(('219', 'HULK')) or room_lookup.get(('523', 'THOR')) or room_lookup.get(('219', 'THOR'))
             if room_num == 'May':
                 skipped += 1; continue
             if not room_id:
