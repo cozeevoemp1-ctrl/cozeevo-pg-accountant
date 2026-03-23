@@ -1808,11 +1808,12 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
     ) or 0
 
     # Physical beds occupied:
-    #   - Non-premium: 1 tenancy = 1 bed
-    #   - Premium: 1 tenancy = 2 beds (person reserves the whole room)
+    #   - Premium tenancy: 1 person occupies full room (max_occupancy beds)
+    #   - Regular tenancy: 1 person = 1 bed
+    #   Premium is on Tenancy.sharing_type, NOT Room.room_type
     physical_beds = await session.scalar(
         select(func.sum(
-            sa_case((Room.room_type == "premium", 2), else_=1)
+            sa_case((Tenancy.sharing_type == "premium", Room.max_occupancy), else_=1)
         )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
         .where(and_(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False))
     ) or 0
@@ -1822,11 +1823,10 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
     ) or 0
 
-    # No-shows: booked + assigned a room but not yet arrived (same premium rule)
+    # No-shows: booked + assigned a room but not yet arrived
     noshow_beds = await session.scalar(
-        select(func.sum(
-            sa_case((Room.room_type == "premium", 2), else_=1)
-        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        select(func.count(Tenancy.id))
+        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
         .where(and_(
             Tenancy.status == TenancyStatus.no_show,
             Tenancy.room_id.isnot(None),
