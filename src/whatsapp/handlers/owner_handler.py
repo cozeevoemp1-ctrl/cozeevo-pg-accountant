@@ -1823,10 +1823,11 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
     ) or 0
 
-    # No-shows: booked + assigned a room but not yet arrived
+    # No-shows: booked + assigned a room but not yet arrived (same premium rule)
     noshow_beds = await session.scalar(
-        select(func.count(Tenancy.id))
-        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        select(func.sum(
+            sa_case((Tenancy.sharing_type == "premium", Room.max_occupancy), else_=1)
+        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
         .where(and_(
             Tenancy.status == TenancyStatus.no_show,
             Tenancy.room_id.isnot(None),

@@ -297,9 +297,16 @@ async def get_kpis(
         .where(Room.is_staff_room == False, Tenancy.status == TenancyStatus.no_show,
                Tenancy.checkin_date <= to_date)
     ) or 0
+    noshow_premium = await session.scalar(
+        select(func.count(Tenancy.id))
+        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(Room.is_staff_room == False, Tenancy.status == TenancyStatus.no_show,
+               Tenancy.sharing_type == "premium", Tenancy.checkin_date <= to_date)
+    ) or 0
     regular_people = int(active_people) - int(premium_people)
     active_beds = regular_people + int(premium_people) * 2
-    noshow_beds = int(noshow_people)
+    noshow_regular = int(noshow_people) - int(noshow_premium)
+    noshow_beds = noshow_regular + int(noshow_premium) * 2
 
     return {
         "month": m, "year": y,
