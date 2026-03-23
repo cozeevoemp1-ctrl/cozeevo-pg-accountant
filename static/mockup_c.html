@@ -122,9 +122,10 @@ body { background:#0d1321; }
           <span class="text-[10px] font-medium uppercase tracking-widest text-on-surface-variant">Occupancy</span>
           <div class="mt-1 flex items-baseline gap-1">
             <span id="occBeds" class="font-headline text-lg font-bold">—</span>
-            <span class="text-xs text-on-surface-variant">of <span id="occTotal">305</span> beds</span>
+            <span class="text-xs text-on-surface-variant">of <span id="occTotal">291</span> beds</span>
           </div>
-          <div class="mt-2 flex gap-2">
+          <div class="mt-1 text-[10px] text-on-surface-variant" id="occBreakdown"></div>
+          <div class="mt-1.5 flex gap-2">
             <span id="occStatus" class="text-[10px] bg-secondary/15 text-secondary px-2.5 py-0.5 rounded-full font-bold">● On track</span>
             <span id="occMonth" class="text-[10px] bg-surface-container-highest px-2.5 py-0.5 rounded-full text-on-surface-variant">—</span>
           </div>
@@ -491,6 +492,16 @@ async function loadKpis() {
     document.getElementById('occBeds').textContent = occupied;
     document.getElementById('occTotal').textContent = total;
     document.getElementById('occMonth').textContent = MON[curMonth-1] + ' ' + curYear;
+
+    // Checked-in + no-show breakdown
+    const checkedIn = occ.checked_in || 0;
+    const premium = occ.premium || 0;
+    const noShow = occ.no_show || 0;
+    const activeBeds = occ.active_beds || occupied;
+    const bkdn = document.getElementById('occBreakdown');
+    if (checkedIn > 0) {
+      bkdn.innerHTML = `${checkedIn} checked-in` + (premium > 0 ? ` (${premium} premium)` : '') + (noShow > 0 ? ` \u00B7 ${noShow} no-show` : '');
+    }
 
     // Status tag
     const statusEl = document.getElementById('occStatus');

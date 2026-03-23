@@ -109,16 +109,36 @@ Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
 ## Occupancy Calculation Rules
 
 ```
-Total Capacity     = 305 beds (from L0 master, not from tenancy count)
-Occupied Beds      = COUNT(active tenancies) for rooms in revenue set
-                     (1 tenancy = 1 bed, regardless of room type)
+Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 291)
+                     Calculated dynamically from rooms table, never hardcoded.
+
+Occupied Beds      = SUM(
+                       IF sharing_type = 'premium' THEN room.max_occupancy  -- full room
+                       ELSE 1                                                -- 1 bed per person
+                     )
+                     Only count tenancies with sharing_type = 'premium' as multi-bed.
+                     A person alone in a double room WITHOUT premium booking = 1 bed.
+
 Vacant Beds        = Total Capacity - Occupied Beds
 Occupancy %        = Occupied Beds / Total Capacity x 100
 
 For a specific month M:
   Occupied = tenancies WHERE checkin_date <= last_day(M)
              AND (status = active OR checkout_date >= first_day(M))
+
+Reporting format:
+  Checked-in:  X people (Y regular + Z premium)
+  Active beds: (Y × 1) + (Z × room.max_occupancy)
+  No-show:     N people (N beds reserved)  ← shown separately
+  Total beds held: active beds + no-show
 ```
+
+### Premium Booking Rule
+- Premium = tenant **explicitly booked and paid** for the full room at premium rate
+- It is a **tenancy attribute** (`sharing_type = 'premium'`), NOT a room attribute
+- 1 person in a double room who did NOT book premium = `sharing_type = 'double'`, 1 bed occupied
+- Only `sharing_type = 'premium'` triggers the multi-bed count
+- A room can have premium tenant today and double-sharing tenants tomorrow
 
 ---
 

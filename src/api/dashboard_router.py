@@ -278,6 +278,29 @@ async def get_kpis(
     if last_upload and last_upload.to_date:
         bank_coverage = last_upload.to_date.strftime("%d %b %Y")
 
+    # ── Active vs no-show breakdown ──────────────────────────────────────────
+    active_people = await session.scalar(
+        select(func.count(Tenancy.id))
+        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(Room.is_staff_room == False, Tenancy.status == TenancyStatus.active,
+               Tenancy.checkin_date <= to_date)
+    ) or 0
+    premium_people = await session.scalar(
+        select(func.count(Tenancy.id))
+        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(Room.is_staff_room == False, Tenancy.status == TenancyStatus.active,
+               Tenancy.sharing_type == "premium", Tenancy.checkin_date <= to_date)
+    ) or 0
+    noshow_people = await session.scalar(
+        select(func.count(Tenancy.id))
+        .select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
+        .where(Room.is_staff_room == False, Tenancy.status == TenancyStatus.no_show,
+               Tenancy.checkin_date <= to_date)
+    ) or 0
+    regular_people = int(active_people) - int(premium_people)
+    active_beds = regular_people + int(premium_people) * 2
+    noshow_beds = int(noshow_people)
+
     return {
         "month": m, "year": y,
         "occupancy": {
@@ -285,6 +308,11 @@ async def get_kpis(
             "beds_occupied": int(occupied_beds),
             "beds_vacant":   vacant_beds,
             "pct":           occ_pct,
+            "checked_in":    int(active_people),
+            "premium":       int(premium_people),
+            "active_beds":   active_beds,
+            "no_show":       int(noshow_people),
+            "no_show_beds":  noshow_beds,
         },
         "properties":       properties,
         "revenue":          round(revenue),
