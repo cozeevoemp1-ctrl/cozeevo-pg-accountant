@@ -443,6 +443,139 @@ async def run_bank_analytics_tables(conn: AsyncConnection) -> None:
     print("  [ok] bank_uploads + bank_transactions tables ready")
 
 
+async def run_room_cleanup_2026_03_23(conn: AsyncConnection) -> None:
+    """
+    Room cleanup migration (2026-03-23). Idempotent — safe to re-run.
+
+    1. Delete junk rooms (no real rooms, import artifacts)
+    2. Fix HULK corner rooms to max_occupancy=1 (single beds)
+    3. Fix staff room assignments (114→HULK, 702→THOR, 618→staff)
+    4. Ensure room 702 exists for THOR as staff room
+    """
+    print("\n== Room cleanup (2026-03-23) ==")
+
+    # ── 1. Delete junk rooms ─────────────────────────────────────────────────
+    # These are import artifacts / typos, not real rooms.
+    # First nullify tenancy room_id references, then delete.
+    # 702 excluded from HULK junk — handled separately (moved to THOR).
+    thor_junk = "('113','117','308/118','414','42','DAILY','G13','G14','121','122','11','21','31','41','51','219')"
+    hulk_junk = "('12','22','32','62','308','May','504')"
+
+    # Nullify tenancy references to junk rooms so we can delete them
+    for prop, junk in [('THOR', thor_junk), ('HULK', hulk_junk)]:
+        await conn.execute(text(f"""
+            UPDATE tenancies SET room_id = NULL
+            WHERE room_id IN (
+                SELECT id FROM rooms
+                WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%{prop}%' LIMIT 1)
+                  AND room_number IN {junk}
+            )
+        """))
+
+    r = await conn.execute(text(f"""
+        DELETE FROM rooms
+        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
+          AND room_number IN {thor_junk}
+    """))
+    print(f"  [ok] THOR junk rooms deleted: {r.rowcount}")
+
+    r = await conn.execute(text(f"""
+        DELETE FROM rooms
+        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
+          AND room_number IN {hulk_junk}
+    """))
+    print(f"  [ok] HULK junk rooms deleted: {r.rowcount}")
+
+    # ── 2. Fix HULK corner rooms to max_occupancy=1 ─────────────────────────
+    hulk_corners = "('113','124','213','224','313','324','413','424','513','524','613','624')"
+    r = await conn.execute(text(f"""
+        UPDATE rooms SET max_occupancy = 1
+        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
+          AND room_number IN {hulk_corners}
+          AND max_occupancy IS DISTINCT FROM 1
+    """))
+    print(f"  [ok] HULK corner rooms set to max_occupancy=1: {r.rowcount} updated")
+
+    # ── 3. Fix staff room assignments ────────────────────────────────────────
+
+    # Room 114: move to HULK property and mark as staff
+    r = await conn.execute(text("""
+        UPDATE rooms
+        SET property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1),
+            is_staff_room = TRUE
+        WHERE room_number = '114'
+          AND property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
+    """))
+    print(f"  [ok] Room 114 moved THOR→HULK + staff: {r.rowcount} updated")
+
+    # If 114 already belongs to HULK, just ensure staff flag
+    r = await conn.execute(text("""
+        UPDATE rooms SET is_staff_room = TRUE
+        WHERE room_number = '114'
+          AND property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
+          AND is_staff_room IS DISTINCT FROM TRUE
+    """))
+    if r.rowcount:
+        print(f"  [ok] Room 114 (HULK) staff flag set: {r.rowcount}")
+
+    # Room 618 (HULK): mark as staff
+    r = await conn.execute(text("""
+        UPDATE rooms SET is_staff_room = TRUE
+        WHERE room_number = '618'
+          AND property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
+          AND is_staff_room IS DISTINCT FROM TRUE
+    """))
+    print(f"  [ok] Room 618 (HULK) staff flag set: {r.rowcount} updated")
+
+    # Room 702: ensure it's THOR + staff. First try moving from HULK if it exists there.
+    r = await conn.execute(text("""
+        UPDATE rooms
+        SET property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1),
+            is_staff_room = TRUE
+        WHERE room_number = '702'
+          AND property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
+    """))
+    if r.rowcount:
+        print(f"  [ok] Room 702 moved HULK→THOR + staff: {r.rowcount}")
+
+    # Ensure 702 is staff if already in THOR
+    r = await conn.execute(text("""
+        UPDATE rooms SET is_staff_room = TRUE
+        WHERE room_number = '702'
+          AND property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
+          AND is_staff_room IS DISTINCT FROM TRUE
+    """))
+    if r.rowcount:
+        print(f"  [ok] Room 702 (THOR) staff flag set: {r.rowcount}")
+
+    # ── 4. Ensure room 702 exists for THOR ───────────────────────────────────
+    r = await conn.execute(text("""
+        INSERT INTO rooms (property_id, room_number, floor, max_occupancy, is_staff_room)
+        SELECT
+            (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1),
+            '702', 7, 1, TRUE
+        WHERE NOT EXISTS (
+            SELECT 1 FROM rooms
+            WHERE room_number = '702'
+              AND property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
+        )
+    """))
+    if r.rowcount:
+        print(f"  [ok] Room 702 (THOR) created as staff room")
+    else:
+        print(f"  [skip] Room 702 (THOR) already exists")
+
+    # ── 5. Correct old staff room list from previous migration ───────────────
+    # Previous migration marked 114 as THOR staff and 702 as HULK staff.
+    # Remove 114 from THOR staff list (it's now HULK).
+    # 701 should be THOR staff (unchanged).
+    # Unmark any rooms that shouldn't be staff:
+    # THOR staff: G05, G06, 107, 108, 701
+    # HULK staff: G12, 114, 618
+
+    print("  [done] Room cleanup complete")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -456,6 +589,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_room_master_fix(conn)
             await run_promote_partner_to_admin(conn)
             await run_bank_analytics_tables(conn)
+            await run_room_cleanup_2026_03_23(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()

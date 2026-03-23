@@ -95,21 +95,30 @@ async def get_kpis(
     from_date, to_date = _month_range(m, y)
 
     # ── Occupancy ─────────────────────────────────────────────────────────────
-    # Total is hardcoded: rooms table has duplicate/junk rows from imports.
-    # Canonical count from BRAIN.md: THOR 145 + HULK 160 = 305 revenue beds.
-    TOTAL_BEDS = 305
+    # Dynamic total from rooms table (excluding staff rooms).
+    TOTAL_BEDS = await session.scalar(
+        select(func.coalesce(func.sum(Room.max_occupancy), 0))
+        .where(Room.is_staff_room == False)
+    ) or 0
+    TOTAL_BEDS = int(TOTAL_BEDS)
 
+    # Count tenancies that were active during the selected month:
+    # checked in before end of month AND (still active OR checked out after start of month)
     occupied_beds = await session.scalar(
         select(func.count(Tenancy.id))
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
-            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+            Tenancy.checkin_date <= to_date,
+            or_(
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                Tenancy.checkout_date >= from_date,
+            ),
         )
     ) or 0
 
     vacant_beds = TOTAL_BEDS - int(occupied_beds)
-    occ_pct     = round(int(occupied_beds) / TOTAL_BEDS * 100, 1)
+    occ_pct     = round(int(occupied_beds) / TOTAL_BEDS * 100, 1) if TOTAL_BEDS > 0 else 0
 
     # ── Bank P&L for the month ─────────────────────────────────────────────
     bank_rows = (await session.execute(
@@ -145,21 +154,33 @@ async def get_kpis(
     ) or 0
 
     # ── Property-level occupancy ─────────────────────────────────────────
-    PROP_BEDS = {}  # property_id -> total beds (canonical from BRAIN.md)
-    props = (await session.execute(select(Property.id, Property.name))).all()
-    for p in props:
-        pname = (p.name or "").upper()
-        if "THOR" in pname:
-            PROP_BEDS[p.id] = {"name": "THOR", "total": 145}
-        elif "HULK" in pname:
-            PROP_BEDS[p.id] = {"name": "HULK", "total": 160}
+    # Dynamic per-property bed totals from rooms table (excluding staff rooms).
+    PROP_BEDS = {}
+    prop_bed_rows = (await session.execute(
+        select(
+            Room.property_id,
+            Property.name,
+            func.coalesce(func.sum(Room.max_occupancy), 0).label("total_beds"),
+        )
+        .join(Property, Property.id == Room.property_id)
+        .where(Room.is_staff_room == False)
+        .group_by(Room.property_id, Property.name)
+    )).all()
+    for row in prop_bed_rows:
+        pname = (row.name or "").upper()
+        short = "THOR" if "THOR" in pname else ("HULK" if "HULK" in pname else row.name)
+        PROP_BEDS[row.property_id] = {"name": short, "total": int(row.total_beds)}
 
     prop_occ_rows = (await session.execute(
         select(Room.property_id, func.count(Tenancy.id).label("occupied"))
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
-            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+            Tenancy.checkin_date <= to_date,
+            or_(
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                Tenancy.checkout_date >= from_date,
+            ),
         )
         .group_by(Room.property_id)
     )).all()

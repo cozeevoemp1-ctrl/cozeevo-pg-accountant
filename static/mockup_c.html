@@ -1,866 +1,479 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Cozeevo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>Cozeevo Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface": "#0d1321",
+        "surface-dim": "#080e1c",
+        "surface-container": "#191f2e",
+        "surface-container-low": "#151b29",
+        "surface-container-high": "#242a39",
+        "surface-container-highest": "#2f3544",
+        "surface-variant": "#2f3544",
+        "on-surface": "#dde2f6",
+        "on-surface-variant": "#c5c5d4",
+        "outline": "#8f909e",
+        "outline-variant": "#454652",
+        "primary": "#c3c0ff",
+        "on-primary": "#1d00a5",
+        "primary-container": "#493fdf",
+        "on-primary-container": "#d0cdff",
+        "secondary": "#4edea3",
+        "on-secondary": "#003824",
+        "secondary-container": "#00a572",
+        "tertiary": "#b9c8de",
+        "error": "#ffb4ab",
+        "error-container": "#93000a",
+        "on-error": "#690005",
+        "on-error-container": "#ffdad6",
+      },
+      fontFamily: { "headline": ["Manrope"], "body": ["Inter"] },
+    },
+  },
+}
+</script>
 <style>
-/* ── RESET & ROOT ─────────────────────────────── */
-:root {
-  --bg:    #08080f;
-  --bg2:   #0d0d16;
-  --c1:    #141420;
-  --c2:    #1b1b2a;
-  --c3:    #232334;
-  --rim:   rgba(255,255,255,0.06);
-  --rim2:  rgba(255,255,255,0.03);
-  --g:     #22c55e;
-  --g2:    #16a34a;
-  --g-glow:#22c55e;
-  --r:     #fb4163;
-  --a:     #f59e0b;
-  --b:     #6ea8fe;
-  --p:     #b794f4;
-  --cy:    #34d399;
-  --t1:    #eeeef8;
-  --t2:    #8888a8;
-  --t3:    #44445a;
-  --tab:   62px;
-  --hdr:   56px;
-}
-*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-html { height:100%; }
-body {
-  height:100dvh; background:var(--bg); color:var(--t1);
-  font-family:'DM Sans',sans-serif; overflow:hidden;
-  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
-}
-.num { font-family:'JetBrains Mono',monospace; }
-.hd  { font-family:'Syne',sans-serif; }
-
-/* ── SCROLLBAR ─────────────────────────────────── */
-::-webkit-scrollbar { display:none; }
-
-/* ── GLOW UTILITY ──────────────────────────────── */
-.glow-g { box-shadow:0 0 24px #22c55e30; }
-.glow-a { box-shadow:0 0 24px #f59e0b30; }
-
-/* ══════════════════════════════════════
-   HEADER
-══════════════════════════════════════ */
-header {
-  position:fixed; inset:0 0 auto;
-  height:var(--hdr);
-  background:rgba(8,8,15,0.85);
-  backdrop-filter:blur(32px) saturate(180%);
-  -webkit-backdrop-filter:blur(32px) saturate(180%);
-  border-bottom:1px solid var(--rim);
-  display:flex; align-items:center; justify-content:space-between;
-  padding:0 18px; z-index:400;
-}
-.brand {
-  display:flex; align-items:center; gap:10px;
-}
-.wordmark {
-  display:flex; align-items:baseline; gap:0;
-  font-family:'Syne',sans-serif; font-size:22px; font-weight:800;
-  letter-spacing:1.5px; line-height:1; text-transform:uppercase;
-}
-.wm-t { color:#FE129D; }
-.wm-icon { display:inline-flex; align-items:center; margin:0 -1px; position:relative; top:2px; }
-.wm-sub {
-  font-family:'DM Sans',sans-serif; font-size:8px; font-weight:500;
-  color:var(--t3); letter-spacing:2px; text-transform:uppercase;
-  margin-top:2px;
-}
-.wm-wrap { display:flex; flex-direction:column; align-items:flex-start; }
-.brand-gem {
-  width:32px; height:32px; border-radius:9px;
-  background:linear-gradient(140deg,#22c55e 0%,#0e7a35 100%);
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:0 0 20px #22c55e50, inset 0 1px 0 rgba(255,255,255,0.2);
-  position:relative; overflow:hidden;
-}
-.brand-gem::after {
-  content:''; position:absolute; inset:0;
-  background:linear-gradient(135deg,rgba(255,255,255,0.15) 0%,transparent 60%);
-}
-.brand-gem svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:2.2; stroke-linecap:round; }
-.brand-name { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; letter-spacing:-0.5px; }
-.brand-name b { color:var(--g); }
-.live-dot {
-  width:6px; height:6px; border-radius:50%; background:var(--g);
-  box-shadow:0 0 8px var(--g);
-  animation:pulse 2s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity:1; transform:scale(1); }
-  50%      { opacity:0.5; transform:scale(0.8); }
-}
-.month-chip {
-  display:flex; align-items:center; gap:6px;
-  background:var(--c2); border:1px solid var(--rim);
-  border-radius:99px; padding:6px 12px;
-  font-size:12px; font-weight:600; color:var(--t1);
-  cursor:pointer; user-select:none;
-  transition:background 0.15s;
-}
-.month-chip:active { background:var(--c3); }
-.month-chip .arr { color:var(--t3); font-size:10px; }
-
-/* ══════════════════════════════════════
-   MAIN SCROLL
-══════════════════════════════════════ */
-main {
-  position:fixed;
-  top:var(--hdr); bottom:var(--tab);
-  left:0; right:0;
-  overflow-y:auto; scroll-behavior:smooth;
-  -webkit-overflow-scrolling:touch;
-}
-.pane { display:none; padding:16px 14px calc(env(safe-area-inset-bottom)+16px); }
-.pane.on {
-  display:block;
-  animation:rise 0.22s cubic-bezier(.16,1,.3,1);
-}
-@keyframes rise {
-  from { opacity:0; transform:translateY(10px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-
-/* ══════════════════════════════════════
-   BOTTOM NAV
-══════════════════════════════════════ */
-nav {
-  position:fixed; inset:auto 0 0;
-  height:var(--tab);
-  background:rgba(8,8,15,0.92);
-  backdrop-filter:blur(32px);
-  -webkit-backdrop-filter:blur(32px);
-  border-top:1px solid var(--rim);
-  display:flex; align-items:center;
-  padding-bottom:env(safe-area-inset-bottom);
-  z-index:400;
-}
-.nb {
-  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:3px; background:none; border:none; cursor:pointer;
-  font-family:'DM Sans',sans-serif; font-size:9.5px; font-weight:600;
-  color:var(--t3); letter-spacing:0.3px;
-  transition:color 0.2s; -webkit-tap-highlight-color:transparent;
-  position:relative; padding:4px 0;
-}
-.nb svg { width:20px; height:20px; stroke-width:1.7; transition:transform 0.2s; }
-.nb.on { color:var(--g); }
-.nb.on svg { transform:scale(1.12); }
-.nb.on::before {
-  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
-  width:32px; height:2.5px;
-  background:linear-gradient(90deg, transparent, var(--g), transparent);
-  border-radius:0 0 3px 3px;
-  box-shadow:0 2px 12px var(--g);
-}
-
-/* ══════════════════════════════════════
-   SHARED COMPONENTS
-══════════════════════════════════════ */
-/* Section label */
-.sec-lbl {
-  font-size:9.5px; font-weight:700; color:var(--t3);
-  text-transform:uppercase; letter-spacing:1.2px;
-}
-/* Divider */
-.div { height:1px; background:var(--rim2); margin:0; }
-
-/* Card base */
-.cd {
-  background:var(--c1);
-  border:1px solid var(--rim);
-  border-radius:18px;
-  overflow:hidden;
-}
-.cd-p { padding:16px; }
-
-/* Tag/badge */
-.tag {
-  display:inline-flex; align-items:center; gap:3px;
-  font-size:9px; font-weight:700;
-  padding:3px 8px; border-radius:99px;
-  letter-spacing:0.4px; text-transform:uppercase;
-}
-.tag-g  { background:#22c55e14; color:var(--g); border:1px solid #22c55e20; }
-.tag-r  { background:#fb416314; color:var(--r); border:1px solid #fb416320; }
-.tag-a  { background:#f59e0b14; color:var(--a); border:1px solid #f59e0b20; }
-.tag-b  { background:#6ea8fe14; color:var(--b); border:1px solid #6ea8fe20; }
-.tag-p  { background:#b794f414; color:var(--p); border:1px solid #b794f420; }
-.tag-d  { background:var(--c2);  color:var(--t2); border:1px solid var(--rim); }
-
-/* Row separator */
-.sep { border-bottom:1px solid var(--rim2); }
-
-/* ══════════════════════════════════════
-   OVERVIEW
-══════════════════════════════════════ */
-
-/* Occupancy hero */
-.occ-hero {
-  background:var(--c1);
-  border:1px solid var(--rim);
-  border-radius:22px;
-  padding:0;
-  overflow:hidden;
-  margin-bottom:12px;
-  position:relative;
-}
-.occ-hero::before {
-  content:''; position:absolute;
-  top:-60px; right:-60px;
-  width:200px; height:200px;
-  background:radial-gradient(circle, #22c55e22 0%, transparent 70%);
-  pointer-events:none;
-}
-.occ-top-band {
-  padding:20px 18px 16px;
-  display:flex; align-items:flex-start; justify-content:space-between;
-}
-.occ-big {
-  display:flex; align-items:baseline; gap:2px;
-}
-.occ-num {
-  font-family:'Syne',sans-serif; font-size:64px;
-  font-weight:800; line-height:1; letter-spacing:-3px;
-  background:linear-gradient(135deg, #22c55e 0%, #86efac 100%);
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text;
-}
-.occ-sym {
-  font-family:'Syne',sans-serif; font-size:28px; font-weight:800;
-  color:var(--g); opacity:0.6; line-height:1.4;
-}
-.occ-label { font-size:12px; color:var(--t2); margin-top:4px; }
-.occ-label b { color:var(--t1); font-weight:700; }
-
-/* Arc gauge */
-.occ-arc-wrap { position:relative; width:80px; height:80px; }
-.occ-arc-wrap svg { transform:rotate(-130deg); }
-.occ-arc-inner {
-  position:absolute; inset:0;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-}
-.occ-arc-beds { font-size:10px; font-weight:700; color:var(--t1); line-height:1; font-family:'JetBrains Mono',monospace; }
-.occ-arc-lbl  { font-size:8px; color:var(--t3); margin-top:1px; font-weight:600; }
-
-/* Property bars */
-.occ-props {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:1px; background:var(--rim2);
-  border-top:1px solid var(--rim2);
-}
-.prop-cell {
-  background:var(--bg2); padding:14px 14px;
-}
-.prop-name {
-  font-size:10px; font-weight:800; letter-spacing:1.2px;
-  text-transform:uppercase; margin-bottom:6px;
-}
-.prop-name.t { color:var(--g); }
-.prop-name.h { color:var(--b); }
-.prop-big { font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; line-height:1; }
-.prop-big span { font-size:12px; font-weight:400; color:var(--t3); }
-.prop-sub { font-size:11px; color:var(--t2); margin-top:2px; margin-bottom:8px; }
-.prop-track { height:4px; background:var(--c3); border-radius:2px; overflow:hidden; }
-.prop-fill  { height:100%; border-radius:2px; transition:width 1.2s cubic-bezier(.16,1,.3,1); }
-
-/* Finance row */
-.fin-row {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:10px; margin-bottom:12px;
-}
-.fin-card {
-  background:var(--c1); border:1px solid var(--rim);
-  border-radius:18px; padding:16px;
-  position:relative; overflow:hidden;
-}
-.fin-card::after {
-  content:''; position:absolute; bottom:-20px; right:-20px;
-  width:80px; height:80px; border-radius:50%;
-  background:radial-gradient(circle, var(--gc,transparent) 0%, transparent 70%);
-  opacity:0.2; pointer-events:none;
-}
-.fin-card.g { --gc:#22c55e; border-color:#22c55e12; }
-.fin-card.r { --gc:#fb4163; border-color:#fb416312; }
-.fin-card.b { --gc:#6ea8fe; }
-.fin-card.a { --gc:#f59e0b; }
-.fin-label { font-size:9.5px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:0.9px; }
-.fin-val {
-  font-family:'JetBrains Mono',monospace;
-  font-size:22px; font-weight:700; margin-top:6px; line-height:1;
-  letter-spacing:-0.5px;
-}
-.fin-val.g { color:var(--g); }
-.fin-val.r { color:var(--r); }
-.fin-val.b { color:var(--b); }
-.fin-val.a { color:var(--a); }
-.fin-delta { font-size:10px; color:var(--t3); margin-top:5px; font-weight:600; }
-.fin-delta b { color:var(--g); }
-
-/* Dues alert */
-.dues-alert {
-  background:linear-gradient(135deg, #1e1400 0%, var(--c1) 60%);
-  border:1px solid #f59e0b25;
-  border-radius:18px; padding:18px;
-  display:flex; gap:16px; align-items:center;
-  margin-bottom:12px;
-  position:relative; overflow:hidden;
-  cursor:pointer;
-}
-.dues-alert::before {
-  content:''; position:absolute; top:-30px; left:-30px;
-  width:120px; height:120px; border-radius:50%;
-  background:radial-gradient(circle, #f59e0b15 0%, transparent 70%);
-  pointer-events:none;
-}
-.dues-icon-box {
-  width:52px; height:52px; border-radius:14px;
-  background:#f59e0b12; border:1px solid #f59e0b22;
-  display:flex; align-items:center; justify-content:center;
-  font-size:22px; flex-shrink:0;
-}
-.dues-alert-body { flex:1; min-width:0; }
-.dues-alert-lbl { font-size:10px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:0.9px; }
-.dues-alert-val {
-  font-family:'JetBrains Mono',monospace;
-  font-size:28px; font-weight:700; color:var(--a);
-  line-height:1.1; letter-spacing:-1px; margin-top:3px;
-}
-.dues-alert-sub { font-size:11px; color:var(--t3); margin-top:3px; }
-.dues-alert-arr { color:var(--t3); flex-shrink:0; }
-
-/* Quick stats */
-.qs-row {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:11px 16px; border-bottom:1px solid var(--rim2);
-}
-.qs-row:last-child { border-bottom:none; }
-.qs-k { font-size:13px; color:var(--t2); }
-.qs-v { font-size:13px; font-weight:700; }
-
-/* ══════════════════════════════════════
-   DUES TAB
-══════════════════════════════════════ */
-.dues-hero {
-  background:var(--c1); border:1px solid var(--rim);
-  border-radius:22px; padding:20px 18px; margin-bottom:12px;
-  position:relative; overflow:hidden;
-}
-.dues-hero::before {
-  content:''; position:absolute; top:-40px; right:-40px;
-  width:160px; height:160px; border-radius:50%;
-  background:radial-gradient(circle, #f59e0b18 0%, transparent 70%);
-  pointer-events:none;
-}
-.dues-hero-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; }
-.dues-hero-val {
-  font-family:'Syne',sans-serif;
-  font-size:40px; font-weight:800; color:var(--a);
-  letter-spacing:-1.5px; line-height:1;
-}
-.dues-hero-sub { font-size:12px; color:var(--t2); margin-top:5px; }
-.dues-stat-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-
-/* Segment bar */
-.seg-bar { height:6px; background:var(--c3); border-radius:3px; overflow:hidden; display:flex; margin-bottom:6px; }
-.seg-fill { height:100%; }
-.seg-legend { display:flex; gap:14px; }
-.seg-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--t2); font-weight:600; }
-.seg-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
-
-/* Tenant row */
-.t-row {
-  display:flex; align-items:center; gap:12px;
-  padding:13px 16px; border-bottom:1px solid var(--rim2);
-  transition:background 0.1s;
-}
-.t-row:last-child { border-bottom:none; }
-.t-row:active { background:var(--c2); }
-.ava {
-  width:40px; height:40px; border-radius:12px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:12px; font-weight:700; flex-shrink:0;
-  font-family:'JetBrains Mono',monospace;
-}
-.t-info { flex:1; min-width:0; }
-.t-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.t-room { font-size:11px; color:var(--t3); margin-top:2px; }
-.t-right { text-align:right; flex-shrink:0; }
-.t-amt { font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--a); }
-.t-since { font-size:10px; color:var(--t3); margin-top:2px; }
-.t-more {
-  text-align:center; padding:13px;
-  font-size:12px; color:var(--t2); font-weight:600;
-}
-.t-more span { color:var(--g); }
-
-/* ══════════════════════════════════════
-   P&L TAB
-══════════════════════════════════════ */
-.pnl-trio { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px; }
-.pnl-stat {
-  background:var(--c1); border:1px solid var(--rim);
-  border-radius:16px; padding:14px 12px; text-align:center;
-}
-.pnl-stat-v { font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; }
-.pnl-stat-l { font-size:9px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:0.8px; margin-top:4px; }
-.pnl-stat-d { font-size:10px; color:var(--t3); margin-top:3px; font-weight:600; }
-
-.chart-cd { background:var(--c1); border:1px solid var(--rim); border-radius:18px; padding:16px; margin-bottom:12px; }
-.chart-cd-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-
-/* Trend list */
-.trend-item {
-  display:flex; align-items:center; gap:10px;
-  padding:10px 16px; border-bottom:1px solid var(--rim2);
-}
-.trend-item:last-child { border-bottom:none; }
-.trend-mo { font-size:11px; font-weight:700; color:var(--t2); min-width:30px; }
-.trend-bars { flex:1; display:flex; flex-direction:column; gap:3px; }
-.tb-rev, .tb-exp { height:5px; border-radius:3px; }
-.tb-rev { background:var(--g); }
-.tb-exp { background:var(--r); }
-.trend-net { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; color:var(--g); min-width:52px; text-align:right; }
-
-/* ══════════════════════════════════════
-   EXPENSES TAB
-══════════════════════════════════════ */
-.exp-donut-cd {
-  background:var(--c1); border:1px solid var(--rim);
-  border-radius:18px; padding:16px; margin-bottom:12px;
-}
-.donut-wrap { position:relative; max-width:190px; margin:10px auto 16px; }
-.donut-center {
-  position:absolute; inset:0;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-}
-.donut-total { font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:700; }
-.donut-lbl { font-size:9px; font-weight:700; color:var(--t3); text-transform:uppercase; letter-spacing:0.8px; margin-top:2px; }
-.exp-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; }
-.exp-li { display:flex; align-items:center; gap:7px; padding:3px 0; }
-.exp-sq { width:9px; height:9px; border-radius:3px; flex-shrink:0; }
-.exp-n { font-size:11px; color:var(--t2); flex:1; font-weight:500; }
-.exp-pct { font-size:10px; color:var(--t3); font-weight:700; }
-
-/* Expense rows */
-.ex-row {
-  display:flex; align-items:center; gap:12px;
-  padding:13px 16px; border-bottom:1px solid var(--rim2);
-}
-.ex-row:last-child { border-bottom:none; }
-.ex-ico {
-  width:38px; height:38px; border-radius:11px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:18px; flex-shrink:0;
-}
-.ex-info { flex:1; }
-.ex-name { font-size:13px; font-weight:600; }
-.ex-sub  { font-size:10px; color:var(--t3); margin-top:2px; }
-.ex-right { text-align:right; }
-.ex-amt  { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; }
-.ex-bar  { width:48px; height:3px; background:var(--c3); border-radius:2px; margin-top:5px; margin-left:auto; overflow:hidden; }
-.ex-fill { height:100%; border-radius:2px; }
-
-/* ══════════════════════════════════════
-   TRANSACTIONS TAB
-══════════════════════════════════════ */
-.txn-dg {
-  font-size:9.5px; font-weight:700; color:var(--t3);
-  text-transform:uppercase; letter-spacing:1px;
-  padding:12px 16px 6px;
-}
-.tx-row {
-  display:flex; align-items:center; gap:12px;
-  padding:13px 16px; border-bottom:1px solid var(--rim2);
-  transition:background 0.1s;
-}
-.tx-row:last-child { border-bottom:none; }
-.tx-row:active { background:var(--c2); }
-.tx-ico {
-  width:40px; height:40px; border-radius:12px;
-  display:flex; align-items:center; justify-content:center;
-  font-size:17px; flex-shrink:0;
-}
-.tx-in  { background:#22c55e10; }
-.tx-out { background:#fb416310; }
-.tx-info { flex:1; min-width:0; }
-.tx-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tx-desc { font-size:10px; color:var(--t3); margin-top:2px; }
-.tx-right { text-align:right; flex-shrink:0; }
-.tx-amt { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; }
-.tx-in-amt  { color:var(--g); }
-.tx-out-amt { color:var(--r); }
-.tx-date { font-size:10px; color:var(--t3); margin-top:2px; }
+body { background:#0d1321; }
+.material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; }
+.no-scrollbar::-webkit-scrollbar { display:none; }
+.no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+.glass-nav { backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); }
+.occ-ring { transition: stroke-dashoffset 1s ease-out; }
+.pane { display:none; }
+.pane.on { display:block; }
+.month-pill.active { background:#4edea3; color:#003824; box-shadow:0 4px 16px rgba(78,222,163,0.15); }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.fade-up { animation: fadeUp 0.4s ease-out both; }
+.fade-up-1 { animation-delay: 0.05s; }
+.fade-up-2 { animation-delay: 0.1s; }
+.fade-up-3 { animation-delay: 0.15s; }
+.fade-up-4 { animation-delay: 0.2s; }
+.expense-bar { transition: width 0.8s ease-out; }
 </style>
 </head>
-<body>
 
-<!-- ═══════════════════ HEADER ═══════════════════ -->
-<header>
-  <div class="brand">
-    <div class="wm-wrap">
-      <div class="wordmark"><span class="wm-t">COZEE</span><span class="wm-icon"><svg width="18" height="20" viewBox="0 0 18 20" fill="none"><circle cx="9" cy="4.5" r="3.5" fill="#07B0ED"/><path d="M9 19C9 19 1 13.5 1 9.5C1 7.2 3 5.8 5.2 6.5C6.8 7 8 8.2 9 9.2C10 8.2 11.2 7 12.8 6.5C15 5.8 17 7.2 17 9.5C17 13.5 9 19 9 19Z" fill="url(#hg)"/><defs><linearGradient id="hg" x1="1" y1="6" x2="17" y2="19" gradientUnits="userSpaceOnUse"><stop stop-color="#818cf8"/><stop offset="1" stop-color="#c026d3"/></linearGradient></defs></svg></span><span class="wm-t">O</span></div>
-      <div class="wm-sub">Where Comfort Meets Care</div>
+<body class="font-body text-on-surface antialiased overflow-x-hidden">
+
+<!-- ═══ TOP HEADER ═══ -->
+<header class="fixed top-0 w-full z-50 bg-surface/95 glass-nav">
+  <div class="flex justify-between items-center px-5 py-3.5">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center">
+        <span class="font-headline font-extrabold text-sm text-on-primary-container">C</span>
+      </div>
+      <div>
+        <h1 class="font-headline font-bold text-[15px] tracking-tight text-on-surface leading-tight">Cozeevo</h1>
+        <p class="text-[10px] text-on-surface-variant leading-tight">Co-living Dashboard</p>
+      </div>
     </div>
-    <div class="live-dot" style="margin-left:6px"></div>
-  </div>
-  <div class="month-chip" onclick="nextMonth()">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    <span id="mLabel" style="font-size:13px;font-weight:700">Mar 2026</span>
-    <span class="arr">▾</span>
+    <div class="flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
+      <span class="text-[10px] font-medium text-secondary">LIVE</span>
+    </div>
   </div>
 </header>
 
-<!-- ═══════════════════ MAIN ═══════════════════ -->
-<main>
+<!-- ═══ MAIN ═══ -->
+<main class="mt-[60px] mb-[80px] overflow-y-auto" style="height:calc(100dvh - 140px)">
 
-<!-- ══════ OVERVIEW PANE ══════ -->
-<div class="pane on" id="p-ov">
-
-  <!-- Occupancy Hero -->
-  <div class="occ-hero">
-    <div class="occ-top-band">
-      <div>
-        <div class="occ-big">
-          <div class="occ-num hd">74</div>
-          <div class="occ-sym">%</div>
-        </div>
-        <div class="occ-label">Occupancy · <b>226</b> of 305 beds</div>
-        <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
-          <span class="tag tag-g">● On track</span>
-          <span class="tag tag-d">Mar 2026</span>
-        </div>
-      </div>
-      <div class="occ-arc-wrap">
-        <svg width="80" height="80" viewBox="0 0 80 80">
-          <circle cx="40" cy="40" r="30" fill="none" stroke="#1b1b2a" stroke-width="9" stroke-dasharray="188.5" stroke-linecap="round"/>
-          <circle cx="40" cy="40" r="30" fill="none" stroke="#1b1b2a" stroke-width="9"
-            stroke-dasharray="188.5" stroke-dashoffset="47" stroke-linecap="round" opacity="0.4"/>
-          <circle cx="40" cy="40" r="30" fill="none"
-            stroke="url(#gArc)" stroke-width="9"
-            stroke-dasharray="188.5" stroke-dashoffset="49"
-            stroke-linecap="round"
-            style="filter:drop-shadow(0 0 8px #22c55e80)"/>
-          <defs>
-            <linearGradient id="gArc" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#22c55e"/>
-              <stop offset="100%" stop-color="#86efac"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="occ-arc-inner">
-          <div class="occ-arc-beds">226</div>
-          <div class="occ-arc-lbl">beds</div>
-        </div>
-      </div>
+  <!-- Block Filter + Month Selector -->
+  <div class="px-4 pt-4 pb-2 space-y-3">
+    <!-- Property pills -->
+    <div class="flex gap-2 p-1 bg-surface-dim rounded-full w-fit">
+      <button id="pill-all" onclick="setProperty('all')" class="px-6 py-1.5 rounded-full font-headline font-bold text-xs transition-all bg-primary text-on-primary">All</button>
+      <button id="pill-thor" onclick="setProperty('thor')" class="px-6 py-1.5 rounded-full font-headline font-bold text-xs transition-all text-on-surface-variant hover:text-on-surface">Thor</button>
+      <button id="pill-hulk" onclick="setProperty('hulk')" class="px-6 py-1.5 rounded-full font-headline font-bold text-xs transition-all text-on-surface-variant hover:text-on-surface">Hulk</button>
     </div>
+    <!-- Month scroller -->
+    <div class="flex gap-2 overflow-x-auto no-scrollbar py-1 px-1" id="monthScroller"></div>
+  </div>
 
-    <div class="occ-props">
-      <div class="prop-cell">
-        <div class="prop-name t">THOR</div>
-        <div class="prop-big">110<span>/145</span></div>
-        <div class="prop-sub">75.9% · 35 vacant</div>
-        <div class="prop-track">
-          <div class="prop-fill" style="width:75.9%;background:linear-gradient(90deg,var(--g),#4ade80)"></div>
+  <!-- PANES -->
+
+  <!-- ═══ DASHBOARD PANE ═══ -->
+  <div class="pane on px-4 space-y-4 pb-6" id="p-dash">
+
+    <!-- Occupancy Bento -->
+    <section class="grid grid-cols-2 gap-3 fade-up">
+      <!-- Occupancy Ring -->
+      <div class="col-span-2 bg-surface-container-low rounded-[1.5rem] p-5 flex items-center gap-5">
+        <div class="relative flex-shrink-0">
+          <svg class="w-28 h-28 transform -rotate-90" viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="transparent" stroke="#2f3544" stroke-width="7" opacity="0.4"/>
+            <circle id="occRing" class="occ-ring" cx="64" cy="64" r="56" fill="transparent" stroke="#4edea3" stroke-width="7" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span id="occPct" class="font-headline text-3xl font-extrabold text-on-surface">—</span>
+            <span class="text-[9px] text-on-surface-variant">%</span>
+          </div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <span class="text-[10px] font-medium uppercase tracking-widest text-on-surface-variant">Occupancy</span>
+          <div class="mt-1 flex items-baseline gap-1">
+            <span id="occBeds" class="font-headline text-lg font-bold">—</span>
+            <span class="text-xs text-on-surface-variant">of <span id="occTotal">305</span> beds</span>
+          </div>
+          <div class="mt-2 flex gap-2">
+            <span id="occStatus" class="text-[10px] bg-secondary/15 text-secondary px-2.5 py-0.5 rounded-full font-bold">● On track</span>
+            <span id="occMonth" class="text-[10px] bg-surface-container-highest px-2.5 py-0.5 rounded-full text-on-surface-variant">—</span>
+          </div>
         </div>
       </div>
-      <div class="prop-cell" style="border-left:1px solid var(--rim2)">
-        <div class="prop-name h">HULK</div>
-        <div class="prop-big">116<span>/160</span></div>
-        <div class="prop-sub">72.5% · 44 vacant</div>
-        <div class="prop-track">
-          <div class="prop-fill" style="width:72.5%;background:linear-gradient(90deg,var(--b),#93c5fd)"></div>
+
+      <!-- Property Cards -->
+      <div class="bg-surface-container-high rounded-2xl p-4 fade-up fade-up-1" id="propThor">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">THOR</span>
+        <div class="mt-1 font-headline text-xl font-bold"><span id="thorOcc">—</span><span class="text-sm text-on-surface-variant font-normal">/<span id="thorTotal">145</span></span></div>
+        <div class="text-[10px] text-on-surface-variant mt-0.5" id="thorSub">—</div>
+        <div class="mt-2 h-1.5 bg-surface-variant rounded-full overflow-hidden">
+          <div id="thorBar" class="h-full bg-secondary rounded-full transition-all duration-700" style="width:0%"></div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Finance 2x2 -->
-  <div class="fin-row">
-    <div class="fin-card g">
-      <div class="fin-label">Revenue</div>
-      <div class="fin-val g" id="fRevVal">—</div>
-      <div class="fin-delta" id="fRevDelta"></div>
-    </div>
-    <div class="fin-card r">
-      <div class="fin-label">Expenses</div>
-      <div class="fin-val r" id="fExpVal">—</div>
-      <div class="fin-delta" id="fExpDelta" style="color:var(--r)"></div>
-    </div>
-  </div>
-  <div class="fin-row" style="margin-top:-2px">
-    <div class="fin-card b">
-      <div class="fin-label">Net P&L</div>
-      <div class="fin-val b" id="fNetVal">—</div>
-      <div class="fin-delta" id="fNetDelta"></div>
-    </div>
-    <div class="fin-card a" style="cursor:pointer" onclick="showTab('dues')">
-      <div class="fin-label">Dues</div>
-      <div class="fin-val a" id="fDuesVal">—</div>
-      <div class="fin-delta" id="fDuesDelta" style="color:var(--a)"></div>
-    </div>
-  </div>
-
-  <!-- Quick stats -->
-  <div class="cd" style="margin-top:12px">
-    <div style="padding:12px 16px 0;display:flex;align-items:center;justify-content:space-between">
-      <span class="sec-lbl">At a glance</span>
-      <span class="tag tag-d">Mar 2026</span>
-    </div>
-    <div style="height:10px"></div>
-    <div class="qs-row"><span class="qs-k">New check-ins</span><span class="qs-v" style="color:var(--g)">23</span></div>
-    <div class="qs-row"><span class="qs-k">Check-outs</span><span class="qs-v" style="color:var(--r)">8</span></div>
-    <div class="qs-row"><span class="qs-k">Open complaints</span><span class="qs-v" style="color:var(--a)">5</span></div>
-    <div class="qs-row"><span class="qs-k">Avg rent / bed</span><span class="qs-v num">₹8,143</span></div>
-    <div class="qs-row"><span class="qs-k">Collection rate</span><span class="qs-v" style="color:var(--g)">82%</span></div>
-  </div>
-
-</div>
-
-<!-- ══════ DUES PANE ══════ -->
-<div class="pane" id="p-dues">
-
-  <div class="dues-hero">
-    <div class="dues-hero-top">
-      <div>
-        <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Outstanding · Mar 2026</div>
-        <div class="dues-hero-val">₹13,62,400</div>
-        <div style="font-size:12px;color:var(--t2);margin-top:4px">Average ₹23,091 per tenant</div>
+      <div class="bg-surface-container-high rounded-2xl p-4 fade-up fade-up-2" id="propHulk">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">HULK</span>
+        <div class="mt-1 font-headline text-xl font-bold"><span id="hulkOcc">—</span><span class="text-sm text-on-surface-variant font-normal">/<span id="hulkTotal">160</span></span></div>
+        <div class="text-[10px] text-on-surface-variant mt-0.5" id="hulkSub">—</div>
+        <div class="mt-2 h-1.5 bg-surface-variant rounded-full overflow-hidden">
+          <div id="hulkBar" class="h-full bg-primary rounded-full transition-all duration-700" style="width:0%"></div>
+        </div>
       </div>
-      <div style="text-align:right">
-        <div class="tag tag-a" style="font-size:10px">59 tenants</div>
-        <div style="margin-top:6px;font-size:11px;color:var(--t3)">of 226 active</div>
+    </section>
+
+    <!-- Vacancy + Check-ins/outs -->
+    <section class="fade-up fade-up-2">
+      <div class="bg-surface-container-high rounded-2xl p-4 flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant">Vacancy</span>
+          <div class="font-headline text-2xl font-bold mt-0.5" id="vacCount">—</div>
+          <div class="flex gap-1.5 mt-1.5 flex-wrap" id="vacRooms"></div>
+        </div>
+        <span class="material-symbols-outlined text-on-surface-variant/30 text-4xl">bed</span>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-2 gap-3 fade-up fade-up-3">
+      <div class="bg-surface-container-low rounded-2xl p-4">
+        <span class="text-[10px] font-medium uppercase text-on-surface-variant">Check-ins</span>
+        <div class="font-headline text-xl font-bold text-secondary mt-1" id="checkins">—</div>
+      </div>
+      <div class="bg-surface-container-low rounded-2xl p-4">
+        <span class="text-[10px] font-medium uppercase text-on-surface-variant">Check-outs</span>
+        <div class="font-headline text-xl font-bold text-primary mt-1" id="checkouts">—</div>
+      </div>
+    </section>
+
+    <!-- KPI Ticker -->
+    <section class="flex gap-3 overflow-x-auto no-scrollbar pb-1 fade-up fade-up-3">
+      <div class="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-surface-container rounded-2xl">
+        <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+          <span class="material-symbols-outlined text-primary text-lg">sync_alt</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-medium uppercase text-on-surface-variant">Avg Rent/Bed</span>
+          <div class="font-headline text-base font-bold" id="avgRent">—</div>
+        </div>
+      </div>
+      <div class="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-surface-container rounded-2xl border-l-2 border-error">
+        <div class="w-9 h-9 rounded-full bg-error/10 flex items-center justify-center">
+          <span class="material-symbols-outlined text-error text-lg">report</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-medium uppercase text-on-surface-variant">Complaints</span>
+          <div class="font-headline text-base font-bold" id="complaints">—</div>
+        </div>
+      </div>
+      <div class="flex-shrink-0 flex items-center gap-3 px-5 py-3 bg-surface-container rounded-2xl">
+        <div class="w-9 h-9 rounded-full bg-secondary/10 flex items-center justify-center">
+          <span class="material-symbols-outlined text-secondary text-lg">trending_up</span>
+        </div>
+        <div>
+          <span class="text-[10px] font-medium uppercase text-on-surface-variant">Collection</span>
+          <div class="font-headline text-base font-bold" id="collectionPct">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Financial Health Hero -->
+    <section class="fade-up fade-up-4">
+      <div class="flex justify-between items-end px-1 mb-3">
+        <div>
+          <h2 class="font-headline text-xl font-bold tracking-tight">Financial Health</h2>
+          <p class="text-[10px] text-on-surface-variant">Current Billing Cycle</p>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] font-bold text-secondary uppercase tracking-widest">Collection</span>
+          <div id="collHero" class="font-headline text-lg font-extrabold text-secondary">—</div>
+        </div>
+      </div>
+
+      <div class="bg-gradient-to-br from-primary-container to-surface-container-highest rounded-[1.8rem] p-6 shadow-2xl overflow-hidden relative">
+        <div class="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl"></div>
+        <div class="relative z-10 flex justify-between items-start">
+          <div>
+            <span class="text-[10px] font-medium uppercase tracking-widest opacity-70">Total Collection</span>
+            <div id="totalCollection" class="font-headline text-3xl font-extrabold mt-1">—</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] opacity-70 mb-1">AVG RENT / BED</div>
+            <div id="avgRentHero" class="font-headline font-bold text-base">—</div>
+          </div>
+        </div>
+        <div class="mt-6 grid grid-cols-2 gap-3">
+          <div class="bg-white/10 backdrop-blur-md rounded-xl p-3">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="material-symbols-outlined text-sm">qr_code</span>
+              <span id="upiPct" class="text-[10px] font-bold">— UPI</span>
+            </div>
+            <div class="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div id="upiBar" class="h-full bg-white/60 transition-all duration-700" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="bg-white/10 backdrop-blur-md rounded-xl p-3">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="material-symbols-outlined text-sm">payments</span>
+              <span id="cashPct" class="text-[10px] font-bold">— Cash</span>
+            </div>
+            <div class="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div id="cashBar" class="h-full bg-white/60 transition-all duration-700" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- P&L + Dues Grid -->
+    <section class="grid grid-cols-2 gap-3 fade-up fade-up-4">
+      <div class="bg-surface-container-low rounded-2xl p-5">
+        <span class="text-[10px] font-medium text-on-surface-variant uppercase mb-3 block">P&L Status</span>
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between text-[10px] mb-1">
+              <span class="text-on-surface-variant">Revenue</span>
+              <span id="revVal" class="font-bold">—</span>
+            </div>
+            <div class="h-1 bg-surface-variant rounded-full"><div id="revBar" class="h-full bg-secondary rounded-full transition-all duration-700" style="width:0%"></div></div>
+          </div>
+          <div>
+            <div class="flex justify-between text-[10px] mb-1">
+              <span class="text-on-surface-variant">Expenses</span>
+              <span id="expVal" class="font-bold">—</span>
+            </div>
+            <div class="h-1 bg-surface-variant rounded-full"><div id="expBar" class="h-full bg-primary rounded-full transition-all duration-700" style="width:0%"></div></div>
+          </div>
+          <div class="pt-2 border-t border-outline-variant/10">
+            <span class="text-[10px] text-on-surface-variant">Net PNL</span>
+            <div id="netVal" class="font-headline font-bold text-secondary text-lg">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-surface-container-low rounded-2xl p-5 relative overflow-hidden cursor-pointer" onclick="showTab('dues')">
+        <div class="absolute top-0 right-0 p-3">
+          <span class="material-symbols-outlined text-error/30">event_busy</span>
+        </div>
+        <span class="text-[10px] font-medium text-on-surface-variant uppercase mb-3 block">Outstanding Dues</span>
+        <div id="duesTotal" class="font-headline text-xl font-bold text-error mb-3">—</div>
+        <div id="duesPreview" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- Expense Breakdown -->
+    <section class="bg-surface-container-low rounded-[1.5rem] p-5 fade-up fade-up-4">
+      <h3 class="font-headline text-base font-bold mb-4">Expense Breakdown</h3>
+      <div id="expenseBreakdown" class="space-y-4"></div>
+    </section>
+  </div>
+
+  <!-- ═══ DUES PANE ═══ -->
+  <div class="pane px-4 space-y-4 pb-6" id="p-dues">
+    <div class="bg-gradient-to-br from-error-container/30 to-surface-container rounded-[1.5rem] p-5">
+      <span class="text-[10px] font-medium uppercase tracking-widest text-on-surface-variant">Outstanding</span>
+      <div id="duesHeroVal" class="font-headline text-3xl font-extrabold text-error mt-1">—</div>
+      <div id="duesHeroCount" class="text-[10px] text-on-surface-variant mt-1">— tenants</div>
+    </div>
+    <div id="duesList" class="space-y-2"></div>
+  </div>
+
+  <!-- ═══ P&L PANE ═══ -->
+  <div class="pane px-4 space-y-4 pb-6" id="p-pnl">
+    <div class="grid grid-cols-3 gap-2">
+      <div class="bg-surface-container-low rounded-xl p-3 text-center">
+        <span class="text-[9px] text-on-surface-variant uppercase">Revenue</span>
+        <div id="pnlRev" class="font-headline font-bold text-secondary text-sm mt-1">—</div>
+        <div id="pnlRevD" class="text-[9px] text-on-surface-variant mt-0.5"></div>
+      </div>
+      <div class="bg-surface-container-low rounded-xl p-3 text-center">
+        <span class="text-[9px] text-on-surface-variant uppercase">Expenses</span>
+        <div id="pnlExp" class="font-headline font-bold text-error text-sm mt-1">—</div>
+        <div id="pnlExpD" class="text-[9px] text-on-surface-variant mt-0.5"></div>
+      </div>
+      <div class="bg-surface-container-low rounded-xl p-3 text-center">
+        <span class="text-[9px] text-on-surface-variant uppercase">Net</span>
+        <div id="pnlNet" class="font-headline font-bold text-primary text-sm mt-1">—</div>
+        <div id="pnlNetD" class="text-[9px] text-on-surface-variant mt-0.5"></div>
       </div>
     </div>
-    <!-- Segment bar: paid vs due -->
-    <div style="margin-bottom:5px;font-size:10px;color:var(--t2);display:flex;justify-content:space-between;font-weight:600">
-      <span>Collected ₹64.4L</span><span style="color:var(--a)">Due ₹13.6L</span>
+    <div class="bg-surface-container-low rounded-2xl p-4">
+      <canvas id="pnlChart" height="200"></canvas>
     </div>
-    <div class="seg-bar">
-      <div class="seg-fill" style="width:82%;background:linear-gradient(90deg,var(--g),#4ade80)"></div>
-      <div class="seg-fill" style="width:18%;background:var(--a)"></div>
-    </div>
-    <div class="seg-legend">
-      <div class="seg-item"><div class="seg-dot" style="background:var(--g)"></div>Paid 82%</div>
-      <div class="seg-item"><div class="seg-dot" style="background:var(--a)"></div>Pending 18%</div>
-    </div>
+    <div id="pnlTrend" class="space-y-1"></div>
   </div>
 
-  <div class="cd">
-    <div style="padding:12px 16px;border-bottom:1px solid var(--rim2);display:flex;justify-content:space-between;align-items:center">
-      <span class="sec-lbl">Highest Due</span>
-      <span class="tag tag-d">5 of 59</span>
-    </div>
-
-    <div class="t-row">
-      <div class="ava" style="background:#22c55e12;color:var(--g)">RS</div>
-      <div class="t-info"><div class="t-name">Rahul Sharma</div><div class="t-room">Room 312 · THOR · Active since Jan</div></div>
-      <div class="t-right"><div class="t-amt">₹12,500</div><div class="t-since">Since Feb</div></div>
-    </div>
-    <div class="t-row">
-      <div class="ava" style="background:#6ea8fe12;color:var(--b)">PN</div>
-      <div class="t-info"><div class="t-name">Priya Nair</div><div class="t-room">Room 204 · HULK · Active since Oct</div></div>
-      <div class="t-right"><div class="t-amt">₹10,800</div><div class="t-since">Mar 2026</div></div>
-    </div>
-    <div class="t-row">
-      <div class="ava" style="background:#b794f412;color:var(--p)">AK</div>
-      <div class="t-info"><div class="t-name">Aditya Kumar</div><div class="t-room">Room 115 · THOR · Active since Nov</div></div>
-      <div class="t-right"><div class="t-amt">₹9,500</div><div class="t-since">Mar 2026</div></div>
-    </div>
-    <div class="t-row">
-      <div class="ava" style="background:#f59e0b12;color:var(--a)">SP</div>
-      <div class="t-info"><div class="t-name">Sneha Patel</div><div class="t-room">Room 423 · HULK · Active since Sep</div></div>
-      <div class="t-right"><div class="t-amt">₹8,200</div><div class="t-since">Mar 2026</div></div>
-    </div>
-    <div class="t-row">
-      <div class="ava" style="background:#34d39912;color:var(--cy)">VS</div>
-      <div class="t-info"><div class="t-name">Vikram Singh</div><div class="t-room">Room 301 · THOR · Active since Dec</div></div>
-      <div class="t-right"><div class="t-amt">₹7,800</div><div class="t-since">Mar 2026</div></div>
-    </div>
-    <div class="t-more">+ 54 more &nbsp;·&nbsp; <span>Send all reminders →</span></div>
-  </div>
-</div>
-
-<!-- ══════ P&L PANE ══════ -->
-<div class="pane" id="p-pnl">
-
-  <div class="pnl-trio">
-    <div class="pnl-stat">
-      <div class="pnl-stat-v" style="color:var(--g)">₹18.4L</div>
-      <div class="pnl-stat-l">Revenue</div>
-      <div class="pnl-stat-d" style="color:var(--g)">↑ 7%</div>
-    </div>
-    <div class="pnl-stat">
-      <div class="pnl-stat-v" style="color:var(--r)">₹8.2L</div>
-      <div class="pnl-stat-l">Expenses</div>
-      <div class="pnl-stat-d" style="color:var(--r)">↑ 2.5%</div>
-    </div>
-    <div class="pnl-stat">
-      <div class="pnl-stat-v" style="color:var(--b)">₹10.2L</div>
-      <div class="pnl-stat-l">Net</div>
-      <div class="pnl-stat-d" style="color:var(--g)">↑ 11%</div>
-    </div>
-  </div>
-
-  <div class="chart-cd">
-    <div class="chart-cd-hdr">
-      <span class="sec-lbl">Revenue vs Expenses</span>
-      <span class="tag tag-d">4 months</span>
-    </div>
-    <div style="position:relative;height:200px">
-      <canvas id="pnlChart"></canvas>
-    </div>
-  </div>
-
-  <div class="cd">
-    <div style="padding:12px 16px;border-bottom:1px solid var(--rim2);display:flex;justify-content:space-between">
-      <span class="sec-lbl">Monthly Trend</span>
-      <div style="display:flex;gap:12px;align-items:center">
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t2);font-weight:600"><div style="width:10px;height:3px;border-radius:2px;background:var(--g)"></div>Rev</div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t2);font-weight:600"><div style="width:10px;height:3px;border-radius:2px;background:var(--r)"></div>Exp</div>
+  <!-- ═══ EXPENSES PANE ═══ -->
+  <div class="pane px-4 space-y-4 pb-6" id="p-exp">
+    <div class="bg-surface-container-low rounded-2xl p-4 flex items-center gap-4">
+      <div class="relative flex-shrink-0">
+        <canvas id="expChart" width="120" height="120"></canvas>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <span id="expChartTotal" class="font-headline font-bold text-sm">—</span>
+        </div>
       </div>
+      <div id="expLegend" class="flex-1 space-y-1.5"></div>
     </div>
-    <div id="trend-items"></div>
-  </div>
-</div>
-
-<!-- ══════ EXPENSES PANE ══════ -->
-<div class="pane" id="p-exp">
-
-  <div class="exp-donut-cd">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-      <span class="sec-lbl">Breakdown</span>
-      <span class="tag tag-d">Mar 2026</span>
-    </div>
-    <div class="donut-wrap">
-      <canvas id="expChart" height="190"></canvas>
-      <div class="donut-center">
-        <div class="donut-total" id="expTotal">—</div>
-        <div class="donut-lbl">Total</div>
-      </div>
-    </div>
-    <div class="exp-grid" id="expLegend"></div>
+    <div id="expLineItems" class="space-y-2"></div>
   </div>
 
-  <div class="cd">
-    <div style="padding:12px 16px;border-bottom:1px solid var(--rim2)"><span class="sec-lbl">Line Items</span></div>
-    <div id="expLineItems"></div>
+  <!-- ═══ TRANSACTIONS PANE ═══ -->
+  <div class="pane px-4 space-y-2 pb-6" id="p-txn">
+    <div id="txnContent"></div>
   </div>
-</div>
-
-<!-- ══════ TRANSACTIONS PANE ══════ -->
-<div class="pane" id="p-txn">
-  <div id="txnContent"></div>
-</div>
 
 </main>
 
-<!-- ═══════════════════ NAV ═══════════════════ -->
-<nav>
-  <button class="nb on" id="nb-ov" onclick="showTab('ov')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/>
-      <rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>
-    </svg>
-    Overview
+<!-- ═══ BOTTOM NAV ═══ -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-3 pb-5 pt-2 bg-surface/60 glass-nav z-50 rounded-t-2xl border-t border-on-surface/5">
+  <button onclick="showTab('dash')" id="nb-dash" class="nb active flex flex-col items-center px-4 py-1.5 rounded-xl transition-all">
+    <span class="material-symbols-outlined text-xl mb-0.5">dashboard</span>
+    <span class="text-[10px] font-medium uppercase tracking-wider">Dashboard</span>
   </button>
-  <button class="nb" id="nb-dues" onclick="showTab('dues')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
-      <path d="M12 6v6l4 2"/>
-    </svg>
-    Dues
+  <button onclick="showTab('dues')" id="nb-dues" class="nb flex flex-col items-center px-4 py-1.5 rounded-xl transition-all">
+    <span class="material-symbols-outlined text-xl mb-0.5">payments</span>
+    <span class="text-[10px] font-medium uppercase tracking-wider">Dues</span>
   </button>
-  <button class="nb" id="nb-pnl" onclick="showTab('pnl')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-      <polyline points="17 7 22 7 22 12"/>
-    </svg>
-    P&amp;L
+  <button onclick="showTab('pnl')" id="nb-pnl" class="nb flex flex-col items-center px-4 py-1.5 rounded-xl transition-all">
+    <span class="material-symbols-outlined text-xl mb-0.5">bar_chart</span>
+    <span class="text-[10px] font-medium uppercase tracking-wider">P&L</span>
   </button>
-  <button class="nb" id="nb-exp" onclick="showTab('exp')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <path d="M12 8v4l3 3"/>
-    </svg>
-    Expenses
+  <button onclick="showTab('exp')" id="nb-exp" class="nb flex flex-col items-center px-4 py-1.5 rounded-xl transition-all">
+    <span class="material-symbols-outlined text-xl mb-0.5">pie_chart</span>
+    <span class="text-[10px] font-medium uppercase tracking-wider">Expenses</span>
   </button>
-  <button class="nb" id="nb-txn" onclick="showTab('txn')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-      <line x1="8" y1="18" x2="21" y2="18"/>
-      <circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>
-    </svg>
-    Txns
+  <button onclick="showTab('txn')" id="nb-txn" class="nb flex flex-col items-center px-4 py-1.5 rounded-xl transition-all">
+    <span class="material-symbols-outlined text-xl mb-0.5">receipt_long</span>
+    <span class="text-[10px] font-medium uppercase tracking-wider">Txns</span>
   </button>
 </nav>
 
+<style>
+.nb { color: #c5c5d4; }
+.nb.active { background: rgba(195,192,255,0.1); color: #c3c0ff; }
+.nb.active .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
+</style>
+
 <script>
-// ── CONFIG ─────────────────────────────────────
+// ══════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════
 const API = '/api/dashboard';
-const TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
 function q(p) { return `${API}/${p}?token=${TOKEN}`; }
 function fmt(v) {
-  if (v >= 100000) return '₹' + (v/100000).toFixed(1) + 'L';
-  if (v >= 1000) return '₹' + (v/1000).toFixed(1) + 'K';
-  return '₹' + v;
+  if (v >= 100000) return '\u20B9' + (v/100000).toFixed(1) + 'L';
+  if (v >= 1000) return '\u20B9' + (v/1000).toFixed(1) + 'K';
+  return '\u20B9' + v;
 }
-function fmtFull(v) {
-  return '₹' + v.toLocaleString('en-IN');
-}
-const COLORS = ['#fb4163','#f59e0b','#6ea8fe','#b794f4','#34d399','#ff6b9d','#44445a'];
-const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtFull(v) { return '\u20B9' + v.toLocaleString('en-IN'); }
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const COLORS = ['#c3c0ff','#4edea3','#ffb4ab','#b9c8de','#f59e0b','#34d399','#ff6b9d'];
 
-// ── STATE ──────────────────────────────────────
-let curMonth = new Date().getMonth() + 1; // 1-12
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let curMonth = new Date().getMonth() + 1;
 let curYear = new Date().getFullYear();
+let curProp = 'all';
 let pnlChart = null, expChart = null;
 
-// ── tab logic ──────────────────────────────────
-const PANES = ['ov','dues','pnl','exp','txn'];
+// ══════════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════════
+const PANES = ['dash','dues','pnl','exp','txn'];
 function showTab(id) {
   PANES.forEach(p => {
-    document.getElementById('p-'+p).classList.toggle('on', p===id);
-    document.getElementById('nb-'+p).classList.toggle('on', p===id);
+    const pane = document.getElementById('p-'+p);
+    const btn = document.getElementById('nb-'+p);
+    if (pane) pane.classList.toggle('on', p===id);
+    if (btn) { btn.classList.toggle('active', p===id); }
   });
   if (id==='pnl') loadPnl();
   if (id==='exp') loadExpenses();
   if (id==='txn') loadTxns();
 }
 
-// ── month picker ───────────────────────────────
-function updateMonthLabel() {
-  document.getElementById('mLabel').textContent = MON_NAMES[curMonth-1] + ' ' + curYear;
-}
-function nextMonth() {
-  curMonth--;
-  if (curMonth < 1) { curMonth = 12; curYear--; }
-  updateMonthLabel();
+// ══════════════════════════════════════════════
+// PROPERTY FILTER
+// ══════════════════════════════════════════════
+function setProperty(p) {
+  curProp = p;
+  ['all','thor','hulk'].forEach(id => {
+    const el = document.getElementById('pill-'+id);
+    if (id===p) { el.className = 'px-6 py-1.5 rounded-full font-headline font-bold text-xs transition-all bg-primary text-on-primary'; }
+    else { el.className = 'px-6 py-1.5 rounded-full font-headline font-bold text-xs transition-all text-on-surface-variant hover:text-on-surface'; }
+  });
   loadAll();
 }
 
-// ── LOAD ALL ───────────────────────────────────
+// ══════════════════════════════════════════════
+// MONTH SCROLLER
+// ══════════════════════════════════════════════
+function buildMonths() {
+  const el = document.getElementById('monthScroller');
+  // Always show Oct 2025 through current month (full range of data)
+  const now = new Date();
+  const endM = now.getMonth() + 1, endY = now.getFullYear();
+  const months = [];
+  let m = 10, y = 2025; // data starts Oct 2025
+  while (y < endY || (y === endY && m <= endM)) {
+    months.push({m, y});
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  let html = '';
+  months.forEach(({m,y}) => {
+    const active = m === curMonth && y === curYear;
+    const label = MON[m-1] + (y !== endY ? " '" + String(y).slice(2) : '');
+    html += `<button onclick="pickMonth(${m},${y})" class="month-pill flex-shrink-0 px-5 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${active ? 'active' : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface border border-outline-variant/10'}">${label}</button>`;
+  });
+  el.innerHTML = html;
+  setTimeout(() => { const a = el.querySelector('.active'); if(a) a.scrollIntoView({inline:'center',behavior:'smooth'}); }, 100);
+}
+function pickMonth(m,y) {
+  curMonth = m; curYear = y;
+  buildMonths();
+  loadAll();
+}
+
+// ══════════════════════════════════════════════
+// LOAD ALL
+// ══════════════════════════════════════════════
 function loadAll() {
   loadKpis();
   loadDues();
-  loadPnl();
-  loadExpenses();
-  loadTxns();
 }
 
-// ── KPIs (Overview) ────────────────────────────
+// ══════════════════════════════════════════════
+// KPIs
+// ══════════════════════════════════════════════
 async function loadKpis() {
   try {
     const r = await fetch(q('kpis') + `&month=${curMonth}&year=${curYear}`);
@@ -869,321 +482,299 @@ async function loadKpis() {
     const pct = Math.round(occ.pct || 0);
     const occupied = occ.beds_occupied || 0;
     const total = occ.beds_total || 305;
-    const vacant = occ.beds_vacant || (total - occupied);
+    const vacant = total - occupied;
 
-    // Occupancy hero
-    document.querySelector('.occ-num').textContent = pct;
-    document.querySelector('.occ-label').innerHTML = `Occupancy · <b>${occupied}</b> of ${total} beds`;
-    document.querySelector('.occ-arc-beds').textContent = occupied;
+    // Occupancy ring
+    const circ = 351.86;
+    document.getElementById('occRing').setAttribute('stroke-dashoffset', circ * (1 - pct/100));
+    document.getElementById('occPct').textContent = pct;
+    document.getElementById('occBeds').textContent = occupied;
+    document.getElementById('occTotal').textContent = total;
+    document.getElementById('occMonth').textContent = MON[curMonth-1] + ' ' + curYear;
 
-    // Arc gauge: stroke-dashoffset = circumference * (1 - pct/100)
-    const circ = 188.5;
-    const arcEl = document.querySelectorAll('.occ-hero circle')[2];
-    if (arcEl) arcEl.setAttribute('stroke-dashoffset', circ * (1 - pct/100));
+    // Status tag
+    const statusEl = document.getElementById('occStatus');
+    if (pct >= 70) { statusEl.textContent = '\u25CF On track'; statusEl.className = 'text-[10px] bg-secondary/15 text-secondary px-2.5 py-0.5 rounded-full font-bold'; }
+    else if (pct >= 50) { statusEl.textContent = '\u25CF Moderate'; statusEl.className = 'text-[10px] bg-amber-500/15 text-amber-400 px-2.5 py-0.5 rounded-full font-bold'; }
+    else { statusEl.textContent = '\u25CF Low'; statusEl.className = 'text-[10px] bg-error/15 text-error px-2.5 py-0.5 rounded-full font-bold'; }
 
-    // Month tags
-    const mTag = MON_NAMES[curMonth-1] + ' ' + curYear;
-    document.querySelectorAll('.tag-d').forEach(el => el.textContent = mTag);
+    // Property cards
+    const props = d.properties || [];
+    props.forEach(p => {
+      const id = p.name.toLowerCase();
+      const occEl = document.getElementById(id+'Occ');
+      const totEl = document.getElementById(id+'Total');
+      const subEl = document.getElementById(id+'Sub');
+      const barEl = document.getElementById(id+'Bar');
+      if (occEl) occEl.textContent = p.occupied;
+      if (totEl) totEl.textContent = p.total;
+      if (subEl) subEl.textContent = `${p.pct}% \u00B7 ${p.vacant} vacant`;
+      if (barEl) barEl.style.width = p.pct + '%';
+    });
+
+    // Vacancy
+    document.getElementById('vacCount').textContent = vacant;
+    // Room tags (show first few vacant rooms if available)
+    const vacRooms = document.getElementById('vacRooms');
+    vacRooms.innerHTML = `<span class="text-[10px] text-on-surface-variant">${vacant} beds across properties</span>`;
+
+    // At a glance
+    const g = d.at_a_glance || {};
+    document.getElementById('checkins').textContent = g.new_checkins || 0;
+    document.getElementById('checkouts').textContent = g.checkouts || 0;
+    document.getElementById('complaints').textContent = g.open_complaints || 0;
+    document.getElementById('avgRent').textContent = g.avg_rent ? fmtFull(g.avg_rent) : '\u2014';
+    document.getElementById('avgRentHero').textContent = g.avg_rent ? fmt(g.avg_rent) : '\u2014';
+    document.getElementById('collectionPct').textContent = (g.collection_pct || 0) + '%';
+    document.getElementById('collHero').textContent = (g.collection_pct || 0) + '%';
 
     // Finance cards
     const rev = d.revenue || 0;
     const exp = d.expenses || 0;
     const net = d.net || 0;
     const dues = d.dues_outstanding || 0;
-    document.getElementById('fRevVal').textContent = fmt(rev);
-    document.getElementById('fExpVal').textContent = fmt(exp);
-    document.getElementById('fNetVal').textContent = fmt(net);
-    document.getElementById('fDuesVal').textContent = fmt(dues);
 
-    // Dues count from at_a_glance collection data
-    const g = d.at_a_glance || {};
+    document.getElementById('totalCollection').textContent = fmt(rev);
+    document.getElementById('revVal').textContent = fmt(rev);
+    document.getElementById('expVal').textContent = fmt(exp);
+    document.getElementById('netVal').textContent = (net >= 0 ? '+' : '') + fmt(net);
+    document.getElementById('netVal').className = 'font-headline font-bold text-lg ' + (net >= 0 ? 'text-secondary' : 'text-error');
+    document.getElementById('duesTotal').textContent = fmt(dues);
 
-    // Fetch previous month for deltas
-    let pm = curMonth - 1, py = curYear;
-    if (pm < 1) { pm = 12; py--; }
-    try {
-      const pr = await fetch(q('kpis') + `&month=${pm}&year=${py}`);
-      const pd = await pr.json();
-      const prevMo = MON_NAMES[pm-1];
-      function deltaHtml(cur, prev, color) {
-        if (!prev) return '';
-        const d = prev > 0 ? Math.round(((cur - prev) / prev) * 100) : 0;
-        const arrow = d >= 0 ? '↑' : '↓';
-        return `<b>${arrow} ${Math.abs(d)}%</b> vs ${prevMo}`;
-      }
-      document.getElementById('fRevDelta').innerHTML = deltaHtml(rev, pd.revenue, 'g');
-      document.getElementById('fExpDelta').innerHTML = deltaHtml(exp, pd.expenses, 'r');
-      document.getElementById('fNetDelta').innerHTML = deltaHtml(net, pd.net, 'b');
-    } catch(e) {}
+    // Revenue/expense bars (relative to each other)
+    const maxFin = Math.max(rev, exp, 1);
+    document.getElementById('revBar').style.width = (rev/maxFin*100) + '%';
+    document.getElementById('expBar').style.width = (exp/maxFin*100) + '%';
 
-    // Dues delta: show tenant count
-    document.getElementById('fDuesDelta').textContent = (d.at_a_glance?.collection_pct || 0) + '% collected';
+    // UPI/Cash split (placeholder — actual data from bank txns)
+    const upiPct = 72, cashPct = 28;
+    document.getElementById('upiPct').textContent = upiPct + '% UPI';
+    document.getElementById('cashPct').textContent = cashPct + '% Cash';
+    document.getElementById('upiBar').style.width = upiPct + '%';
+    document.getElementById('cashBar').style.width = cashPct + '%';
 
-    // Status tag
-    const statusTag = document.querySelector('.tag-g, .tag-a, .tag-r');
-    if (statusTag) {
-      if (pct >= 70) { statusTag.textContent = '● On track'; statusTag.className = 'tag tag-g'; }
-      else if (pct >= 50) { statusTag.textContent = '● Moderate'; statusTag.className = 'tag tag-a'; }
-      else { statusTag.textContent = '● Low'; statusTag.className = 'tag tag-r'; }
-    }
+    // Load expense breakdown for dashboard
+    loadExpenseBreakdown();
 
-    // Property-level occupancy (THOR / HULK)
-    const props = d.properties || [];
-    const propCells = document.querySelectorAll('.prop-cell');
-    props.forEach((p, i) => {
-      if (!propCells[i]) return;
-      const cell = propCells[i];
-      cell.querySelector('.prop-name').textContent = p.name;
-      cell.querySelector('.prop-big').innerHTML = `${p.occupied}<span>/${p.total}</span>`;
-      cell.querySelector('.prop-sub').textContent = `${p.pct}% · ${p.vacant} vacant`;
-      cell.querySelector('.prop-fill').style.width = p.pct + '%';
-    });
-
-    // At a glance (g declared above)
-    const qsRows = document.querySelectorAll('.qs-row');
-    if (qsRows.length >= 5) {
-      qsRows[0].querySelector('.qs-v').textContent = g.new_checkins || 0;
-      qsRows[1].querySelector('.qs-v').textContent = g.checkouts || 0;
-      qsRows[2].querySelector('.qs-v').textContent = g.open_complaints || 0;
-      qsRows[3].querySelector('.qs-v').textContent = g.avg_rent ? fmtFull(g.avg_rent) : '—';
-      qsRows[4].querySelector('.qs-v').textContent = (g.collection_pct || 0) + '%';
-    }
-  } catch(e) { console.error('KPIs error:', e); }
+  } catch(e) { console.error('KPIs:', e); }
 }
 
-// ── DUES ───────────────────────────────────────
+// ══════════════════════════════════════════════
+// EXPENSE BREAKDOWN (dashboard card)
+// ══════════════════════════════════════════════
+async function loadExpenseBreakdown() {
+  try {
+    const r = await fetch(q('expense_breakdown') + `&month=${curMonth}&year=${curYear}`);
+    const data = await r.json();
+    if (!data.length) {
+      document.getElementById('expenseBreakdown').innerHTML = '<p class="text-xs text-on-surface-variant text-center py-4">No data</p>';
+      return;
+    }
+    const maxAmt = data[0].amount;
+    const catColors = { 'Food & Groceries':'#4edea3', 'Staff & Labour':'#c3c0ff', 'Fuel & Diesel':'#f59e0b', 'Property Rent':'#b9c8de', 'Electricity':'#ffb4ab', 'Internet & WiFi':'#34d399' };
+
+    let html = '';
+    // Top 2 with full bars
+    data.slice(0,2).forEach((d,i) => {
+      const c = catColors[d.category] || COLORS[i];
+      const pct = Math.round(d.amount / maxAmt * 100);
+      html += `<div>
+        <div class="flex justify-between items-center mb-1.5">
+          <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${c}"></span><span class="text-xs font-medium">${d.category}</span></div>
+          <span class="text-xs font-bold">${fmt(d.amount)}</span>
+        </div>
+        <div class="h-1.5 bg-surface-variant rounded-full overflow-hidden"><div class="h-full rounded-full expense-bar" style="width:${pct}%;background:${c}"></div></div>
+      </div>`;
+    });
+    // Rest as compact grid
+    if (data.length > 2) {
+      html += '<div class="grid grid-cols-3 gap-4 pt-3 border-t border-outline-variant/10">';
+      data.slice(2,5).forEach((d,i) => {
+        html += `<div><span class="block text-[9px] text-on-surface-variant uppercase mb-1">${d.category.split(' ')[0]}</span><span class="font-headline font-bold text-sm">${fmt(d.amount)}</span></div>`;
+      });
+      html += '</div>';
+    }
+    document.getElementById('expenseBreakdown').innerHTML = html;
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════
+// DUES
+// ══════════════════════════════════════════════
 async function loadDues() {
   try {
     const r = await fetch(q('dues') + `&month=${curMonth}&year=${curYear}`);
     const list = await r.json();
-    const total = list.reduce((s,t) => s + (t.outstanding || 0), 0);
-    const count = list.length;
+    const total = list.reduce((s,t) => s + (t.outstanding||0), 0);
 
-    // Dues hero
-    const mTag = MON_NAMES[curMonth-1] + ' ' + curYear;
-    document.querySelector('.dues-hero-val').textContent = fmtFull(total);
-    const avg = count > 0 ? Math.round(total / count) : 0;
-    document.querySelector('.dues-hero-top div:first-child div:first-child').textContent = `Outstanding · ${mTag}`;
-    document.querySelector('.dues-hero-top div:first-child div:nth-child(3)').textContent = `Average ${fmtFull(avg)} per tenant`;
-    document.querySelector('.tag-a').textContent = count + ' tenants';
+    // Dashboard preview
+    document.getElementById('duesTotal').textContent = fmt(total);
+    const preview = document.getElementById('duesPreview');
+    preview.innerHTML = list.slice(0,2).map(t =>
+      `<div class="flex justify-between text-[10px]"><span class="text-on-surface-variant truncate mr-2">${t.tenant}</span><span class="font-bold">${fmt(t.outstanding)}</span></div>`
+    ).join('') + (list.length > 2 ? `<div class="text-[9px] text-primary text-center pt-1">${list.length - 2} more</div>` : '');
 
-    // Segment bar
-    const kpiR = await fetch(q('kpis') + `&month=${curMonth}&year=${curYear}`);
-    const kpiD = await kpiR.json();
-    const rev = kpiD.revenue || 1;
-    const collPct = Math.max(0, Math.min(100, Math.round((rev / (rev + total)) * 100)));
-    const duePct = 100 - collPct;
-    document.querySelector('.seg-fill:first-child').style.width = collPct + '%';
-    document.querySelector('.seg-fill:last-child').style.width = duePct + '%';
-    document.querySelector('.seg-legend').innerHTML = `
-      <div class="seg-item"><div class="seg-dot" style="background:var(--g)"></div>Paid ${collPct}%</div>
-      <div class="seg-item"><div class="seg-dot" style="background:var(--a)"></div>Pending ${duePct}%</div>`;
-    const segLabels = document.querySelector('.dues-hero .seg-bar').previousElementSibling;
-    if (segLabels) segLabels.innerHTML = `<span>Collected ${fmt(rev)}</span><span style="color:var(--a)">Due ${fmt(total)}</span>`;
+    // Dues pane
+    document.getElementById('duesHeroVal').textContent = fmtFull(total);
+    document.getElementById('duesHeroCount').textContent = list.length + ' tenants';
 
-    // Tenant rows
-    const container = document.querySelector('#p-dues .cd');
-    const top5 = list.slice(0, 5);
-    const rowColors = ['#22c55e','#6ea8fe','#b794f4','#f59e0b','#34d399'];
-    let html = `<div style="padding:12px 16px;border-bottom:1px solid var(--rim2);display:flex;justify-content:space-between;align-items:center">
-      <span class="sec-lbl">Highest Due</span>
-      <span class="tag tag-d">${Math.min(5,count)} of ${count}</span>
-    </div>`;
-    top5.forEach((t,i) => {
-      const initials = (t.tenant || 'XX').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      const c = rowColors[i % rowColors.length];
-      html += `<div class="t-row">
-        <div class="ava" style="background:${c}12;color:${c}">${initials}</div>
-        <div class="t-info"><div class="t-name">${t.tenant}</div><div class="t-room">Room ${t.room} · ${t.latest_period || ''}</div></div>
-        <div class="t-right"><div class="t-amt">${fmtFull(t.outstanding)}</div><div class="t-since">${t.months_pending || 1}mo</div></div>
+    const colors = ['#4edea3','#c3c0ff','#b9c8de','#f59e0b','#ffb4ab'];
+    document.getElementById('duesList').innerHTML = list.map((t,i) => {
+      const init = (t.tenant||'XX').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const c = colors[i % colors.length];
+      return `<div class="flex items-center gap-3 bg-surface-container-low rounded-xl px-4 py-3">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold" style="background:${c}15;color:${c}">${init}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium truncate">${t.tenant}</div>
+          <div class="text-[10px] text-on-surface-variant">Room ${t.room} \u00B7 ${t.latest_period||''}</div>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <div class="text-sm font-bold">${fmtFull(t.outstanding)}</div>
+          <div class="text-[10px] text-on-surface-variant">${t.months_pending||1}mo</div>
+        </div>
       </div>`;
-    });
-    if (count > 5) html += `<div class="t-more">+ ${count - 5} more</div>`;
-    container.innerHTML = html;
-  } catch(e) { console.error('Dues error:', e); }
+    }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">No outstanding dues</p>';
+
+  } catch(e) { console.error('Dues:', e); }
 }
 
-// ── P&L CHART ──────────────────────────────────
+// ══════════════════════════════════════════════
+// P&L CHART
+// ══════════════════════════════════════════════
 async function loadPnl() {
   try {
     const r = await fetch(q('pnl_trend') + '&months=4');
     const data = await r.json();
-    const labels = data.map(d => d.label.split(' ')[0]);
-    const incData = data.map(d => Math.round(d.income / 1000));
-    const expData = data.map(d => Math.round(d.expense / 1000));
 
-    // Update stat cards
-    const latest = data[data.length - 1] || {};
-    const prev = data[data.length - 2] || {};
-    document.querySelector('.pnl-stat:nth-child(1) .pnl-stat-v').textContent = fmt(latest.income || 0);
-    document.querySelector('.pnl-stat:nth-child(2) .pnl-stat-v').textContent = fmt(latest.expense || 0);
-    document.querySelector('.pnl-stat:nth-child(3) .pnl-stat-v').textContent = fmt(latest.net || 0);
+    const latest = data[data.length-1] || {};
+    const prev = data[data.length-2] || {};
+    document.getElementById('pnlRev').textContent = fmt(latest.income||0);
+    document.getElementById('pnlExp').textContent = fmt(latest.expense||0);
+    document.getElementById('pnlNet').textContent = fmt(latest.net||0);
 
-    // Delta %
-    function delta(cur, prv) {
-      if (!prv) return '';
-      const d = Math.round(((cur - prv) / Math.abs(prv)) * 100);
-      return d >= 0 ? `↑ ${d}%` : `↓ ${Math.abs(d)}%`;
-    }
-    document.querySelector('.pnl-stat:nth-child(1) .pnl-stat-d').textContent = delta(latest.income, prev.income);
-    document.querySelector('.pnl-stat:nth-child(2) .pnl-stat-d').textContent = delta(latest.expense, prev.expense);
-    document.querySelector('.pnl-stat:nth-child(3) .pnl-stat-d').textContent = delta(latest.net, prev.net);
+    function delta(c,p) { if(!p) return ''; const d=Math.round(((c-p)/Math.abs(p||1))*100); return d>=0?'\u2191 '+d+'%':'\u2193 '+Math.abs(d)+'%'; }
+    document.getElementById('pnlRevD').textContent = delta(latest.income,prev.income);
+    document.getElementById('pnlExpD').textContent = delta(latest.expense,prev.expense);
+    document.getElementById('pnlNetD').textContent = delta(latest.net,prev.net);
 
-    // Trend bar items
-    const trendEl = document.getElementById('trend-items');
-    if (trendEl) {
-      const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
-      const curLabel = MON_NAMES[curMonth-1];
-      trendEl.innerHTML = data.map(d => {
-        const mo = d.label.split(' ')[0];
-        const isCur = mo === curLabel;
-        const revW = Math.round(d.income / maxVal * 100);
-        const expW = Math.round(d.expense / maxVal * 100);
-        const netSign = d.net >= 0 ? '+' : '-';
-        return `<div class="trend-item"${isCur ? ' style="background:var(--bg2)"' : ''}>
-          <div class="trend-mo"${isCur ? ' style="color:var(--g)"' : ''}>${mo}</div>
-          <div class="trend-bars">
-            <div class="tb-rev" style="width:${revW || 1}%${isCur ? ';box-shadow:0 0 6px #22c55e80' : ''}"></div>
-            <div class="tb-exp" style="width:${expW || 1}%"></div>
+    // Trend rows
+    const maxVal = Math.max(...data.map(d=>Math.max(d.income||0,d.expense||0)),1);
+    document.getElementById('pnlTrend').innerHTML = data.map(d => {
+      const mo = d.label.split(' ')[0];
+      const isCur = mo === MON[curMonth-1];
+      const revW = Math.round((d.income||0)/maxVal*100);
+      const expW = Math.round((d.expense||0)/maxVal*100);
+      return `<div class="p-3 rounded-xl ${isCur?'bg-surface-container-high':''}">
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold w-8 ${isCur?'text-secondary':''}">${mo}</span>
+          <div class="flex-1 space-y-1">
+            <div class="h-1 bg-surface-variant rounded-full overflow-hidden"><div class="h-full bg-secondary rounded-full" style="width:${revW}%"></div></div>
+            <div class="h-1 bg-surface-variant rounded-full overflow-hidden"><div class="h-full bg-error rounded-full" style="width:${expW}%"></div></div>
           </div>
-          <div class="trend-net"${isCur ? ' style="color:var(--g)"' : ''}>${netSign}${fmt(Math.abs(d.net))}</div>
-        </div>`;
-      }).join('');
-    }
+          <span class="text-xs font-bold w-14 text-right ${(d.net||0)>=0?'text-secondary':'text-error'}">${(d.net||0)>=0?'+':''}${fmt(Math.abs(d.net||0))}</span>
+        </div>
+      </div>`;
+    }).join('');
 
     // Chart
     const ctx = document.getElementById('pnlChart').getContext('2d');
-    const font = { family:'DM Sans, sans-serif', size:10, weight:'600' };
     if (pnlChart) pnlChart.destroy();
     pnlChart = new Chart(ctx, {
       type:'bar',
       data:{
-        labels,
+        labels: data.map(d=>d.label.split(' ')[0]),
         datasets:[
-          {
-            label:'Revenue', data:incData,
-            backgroundColor: c => { const g=c.chart.ctx.createLinearGradient(0,0,0,200); g.addColorStop(0,'#22c55e'); g.addColorStop(1,'#22c55e60'); return g; },
-            borderRadius:6, borderSkipped:false, barPercentage:0.38, categoryPercentage:0.9,
-          },
-          {
-            label:'Expenses', data:expData,
-            backgroundColor: c => { const g=c.chart.ctx.createLinearGradient(0,0,0,200); g.addColorStop(0,'#fb4163'); g.addColorStop(1,'#fb416360'); return g; },
-            borderRadius:6, borderSkipped:false, barPercentage:0.38, categoryPercentage:0.9,
-          }
+          { label:'Revenue', data:data.map(d=>Math.round((d.income||0)/1000)), backgroundColor:'#4edea3', borderRadius:6, barPercentage:0.35, categoryPercentage:0.9 },
+          { label:'Expenses', data:data.map(d=>Math.round((d.expense||0)/1000)), backgroundColor:'#ffb4ab', borderRadius:6, barPercentage:0.35, categoryPercentage:0.9 }
         ]
       },
       options:{
         responsive:true, maintainAspectRatio:false,
-        plugins:{
-          legend:{ position:'top', align:'end', labels:{ color:'#8888a8', font, boxWidth:10, boxHeight:10, borderRadius:3, useBorderRadius:true, padding:10 } },
-          tooltip:{ backgroundColor:'#141420', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#eeeef8', bodyColor:'#8888a8', padding:10,
-            callbacks:{ label: c => ` ₹${(c.raw/100).toFixed(1)}L` } }
-        },
-        scales:{
-          x:{ grid:{display:false}, ticks:{color:'#44445a', font} },
-          y:{ grid:{ color:'rgba(255,255,255,0.04)', drawBorder:false }, border:{ dash:[4,4], display:false },
-            ticks:{ color:'#44445a', font, callback:v=>'₹'+(v/100)+'L' } }
-        }
+        plugins:{ legend:{ position:'top', align:'end', labels:{ color:'#8f909e', font:{family:'Inter',size:10}, boxWidth:8, boxHeight:8, borderRadius:2, useBorderRadius:true } },
+          tooltip:{ backgroundColor:'#191f2e', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#dde2f6', bodyColor:'#c5c5d4', callbacks:{ label:c=>' \u20B9'+(c.raw/100).toFixed(1)+'L' } } },
+        scales:{ x:{ grid:{display:false}, ticks:{color:'#454652',font:{family:'Inter',size:10}} }, y:{ grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false}, ticks:{color:'#454652',font:{family:'Inter',size:10},callback:v=>'\u20B9'+(v/100)+'L'} } }
       }
     });
-  } catch(e) { console.error('P&L error:', e); }
+  } catch(e) { console.error('P&L:', e); }
 }
 
-// ── EXPENSES DONUT ─────────────────────────────
+// ══════════════════════════════════════════════
+// EXPENSES DONUT
+// ══════════════════════════════════════════════
 async function loadExpenses() {
   try {
     const r = await fetch(q('expense_breakdown') + `&month=${curMonth}&year=${curYear}`);
     const data = await r.json();
-    const labels = data.map(d => d.category);
-    const values = data.map(d => Math.round(d.amount / 1000));
-    const total = data.reduce((s,d) => s + d.amount, 0);
+    const total = data.reduce((s,d)=>s+d.amount,0);
 
-    // Update donut center total
-    document.getElementById('expTotal').textContent = fmt(total);
+    document.getElementById('expChartTotal').textContent = fmt(total);
 
-    // Update legend grid
-    const legendEl = document.getElementById('expLegend');
-    if (legendEl) {
-      legendEl.innerHTML = data.slice(0,6).map((d,i) => {
-        const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
-        return `<div class="exp-li"><div class="exp-sq" style="background:${COLORS[i % COLORS.length]}"></div><span class="exp-n">${d.category}</span><span class="exp-pct">${pct}%</span></div>`;
-      }).join('');
-    }
+    // Legend
+    document.getElementById('expLegend').innerHTML = data.slice(0,6).map((d,i) => {
+      const pct = total > 0 ? Math.round(d.amount/total*100) : 0;
+      return `<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${COLORS[i]}"></span><span class="text-[10px] flex-1 truncate">${d.category}</span><span class="text-[10px] font-bold">${pct}%</span></div>`;
+    }).join('');
 
-    // Update line items
-    const itemsEl = document.getElementById('expLineItems');
-    if (itemsEl) {
-      const maxAmt = data.length > 0 ? data[0].amount : 1;
-      itemsEl.innerHTML = data.slice(0,8).map((d,i) => {
-        const c = COLORS[i % COLORS.length];
-        return `<div class="ex-row">
-          <div class="ex-ico" style="background:${c}14">📊</div>
-          <div class="ex-info"><div class="ex-name">${d.category}</div></div>
-          <div class="ex-right"><div class="ex-amt" style="color:${c}">${fmt(d.amount)}</div><div class="ex-bar"><div class="ex-fill" style="width:${Math.round(d.amount/maxAmt*100)}%;background:${c}"></div></div></div>
-        </div>`;
-      }).join('');
-      if (data.length === 0) itemsEl.innerHTML = '<div style="padding:30px 16px;text-align:center;color:var(--t3)">No expense data for this month</div>';
-    }
+    // Line items
+    const maxAmt = data.length ? data[0].amount : 1;
+    document.getElementById('expLineItems').innerHTML = data.slice(0,8).map((d,i) => {
+      const c = COLORS[i%COLORS.length];
+      return `<div class="flex items-center gap-3 bg-surface-container-low rounded-xl px-4 py-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:${c}15"><span class="material-symbols-outlined text-sm" style="color:${c}">receipt</span></div>
+        <div class="flex-1 min-w-0"><div class="text-xs font-medium">${d.category}</div><div class="h-1 bg-surface-variant rounded-full mt-1 overflow-hidden"><div class="h-full rounded-full" style="width:${Math.round(d.amount/maxAmt*100)}%;background:${c}"></div></div></div>
+        <span class="text-xs font-bold flex-shrink-0" style="color:${c}">${fmt(d.amount)}</span>
+      </div>`;
+    }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">No data</p>';
 
     // Chart
     const ctx = document.getElementById('expChart').getContext('2d');
     if (expChart) expChart.destroy();
-    expChart = new Chart(ctx,{
+    expChart = new Chart(ctx, {
       type:'doughnut',
-      data:{
-        labels,
-        datasets:[{
-          data:values,
-          backgroundColor: COLORS.slice(0, labels.length),
-          borderWidth:0, hoverOffset:8, borderRadius:5
-        }]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:true, cutout:'68%',
-        plugins:{
-          legend:{ display:false },
-          tooltip:{ backgroundColor:'#141420', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#eeeef8', bodyColor:'#8888a8', padding:10,
-            callbacks:{ label: c => ` ₹${(c.raw/100).toFixed(2)}L (${Math.round(c.raw/values.reduce((a,b)=>a+b,1)*100)}%)` } }
-        }
-      }
+      data:{ labels:data.map(d=>d.category), datasets:[{ data:data.map(d=>Math.round(d.amount/1000)), backgroundColor:COLORS.slice(0,data.length), borderWidth:0, hoverOffset:6, borderRadius:4 }] },
+      options:{ responsive:true, maintainAspectRatio:true, cutout:'68%', plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#191f2e', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#dde2f6', bodyColor:'#c5c5d4', callbacks:{ label:c=>' \u20B9'+(c.raw/100).toFixed(2)+'L' } } } }
     });
-  } catch(e) { console.error('Expenses error:', e); }
+  } catch(e) { console.error('Expenses:', e); }
 }
 
-// ── TRANSACTIONS ───────────────────────────────
+// ══════════════════════════════════════════════
+// TRANSACTIONS
+// ══════════════════════════════════════════════
 async function loadTxns() {
   try {
     const from = `${curYear}-${String(curMonth).padStart(2,'0')}-01`;
-    const lastDay = new Date(curYear, curMonth, 0).getDate();
-    const to = `${curYear}-${String(curMonth).padStart(2,'0')}-${lastDay}`;
+    const last = new Date(curYear, curMonth, 0).getDate();
+    const to = `${curYear}-${String(curMonth).padStart(2,'0')}-${last}`;
     const r = await fetch(q('transactions') + `&from_date=${from}&to_date=${to}&per_page=20`);
     const d = await r.json();
     const items = d.items || [];
-    let html = '';
-    let lastDate = '';
+    let html = '', lastDate = '';
     items.forEach(tx => {
-      const date = tx.date || '';
-      if (date !== lastDate) {
-        html += `<div class="tx-date-hdr">${date}</div>`;
-        lastDate = date;
+      if (tx.date !== lastDate) {
+        html += `<div class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider pt-4 pb-1 px-1">${tx.date}</div>`;
+        lastDate = tx.date;
       }
       const isIn = tx.type === 'income';
-      const icon = isIn ? '💰' : '📤';
-      const amtClass = isIn ? 'tx-in-amt' : 'tx-out-amt';
-      const sign = isIn ? '+' : '−';
-      html += `<div class="tx-row">
-        <div class="tx-ico ${isIn ? 'tx-in' : 'tx-out'}">${icon}</div>
-        <div class="tx-info"><div class="tx-name">${tx.description || 'Transaction'}</div><div class="tx-desc">${tx.category || ''}</div></div>
-        <div class="tx-right"><div class="tx-amt ${amtClass}">${sign}${fmtFull(Math.abs(tx.amount))}</div><div class="tx-date">${date}</div></div>
+      html += `<div class="flex items-center gap-3 bg-surface-container-low rounded-xl px-4 py-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center ${isIn?'bg-secondary/10':'bg-error/10'}">
+          <span class="material-symbols-outlined text-sm ${isIn?'text-secondary':'text-error'}">${isIn?'south_west':'north_east'}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium truncate">${tx.description||'Transaction'}</div>
+          <div class="text-[10px] text-on-surface-variant">${tx.category||''}</div>
+        </div>
+        <span class="text-xs font-bold flex-shrink-0 ${isIn?'text-secondary':'text-error'}">${isIn?'+':'\u2212'}${fmtFull(Math.abs(tx.amount))}</span>
       </div>`;
     });
-    if (items.length === 0) html = '<div style="padding:40px 16px;text-align:center;color:var(--t3)">No transactions for this month</div>';
+    if (!items.length) html = '<p class="text-center text-on-surface-variant text-sm py-8">No transactions</p>';
     document.getElementById('txnContent').innerHTML = html;
-  } catch(e) { console.error('Txns error:', e); }
+  } catch(e) { console.error('Txns:', e); }
 }
 
-// ── INIT ───────────────────────────────────────
-updateMonthLabel();
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+buildMonths();
 loadAll();
 </script>
 </body>

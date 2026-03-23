@@ -1,0 +1,153 @@
+# Cozeevo Master Data (L0)
+
+> **Owner-controlled. Changes only when physical layout or staff allocation changes.**
+> This is NOT transactional data. Do not derive from Excel snapshots.
+
+---
+
+## Data Pyramid
+
+```
+L0 — MASTER DATA (this file)
+    Physical rooms, buildings, staff rooms, bed counts
+    Changes: only when owner adds/removes rooms or reassigns staff rooms
+    Source of truth: owner confirmation
+
+L1 — OPERATIONAL DATA (Supabase tables)
+    Tenants, tenancies (who is in which room), rent amounts, deposits
+    Changes: on every check-in, check-out, rent revision
+    Source of truth: Supabase DB (imported from Excel snapshots)
+
+L2 — FINANCIAL DATA (bank statements + payments table)
+    Payments received, expenses paid, bank transactions
+    Changes: daily (every UPI/cash payment, every expense)
+    Source of truth: bank statement Excel + Supabase payments table
+
+L3 — DERIVED / REPORTS (calculated, never stored)
+    Occupancy %, collection rate, P&L, dues outstanding
+    Changes: recalculated on every query
+    Source of truth: computed from L0 + L1 + L2
+```
+
+**Rule:** Higher layers never override lower layers. If L3 (report) conflicts with L0 (master), L0 wins.
+
+---
+
+## Buildings
+
+| Property | Floors | Rooms/Floor | Floor 7 | Ground | Total Rooms |
+|---|---|---|---|---|---|
+| Cozeevo THOR | G + 1-6 + 7 | 12 (x01-x12) | 701, 702 | G01-G10 | **84** |
+| Cozeevo HULK | G + 1-6 | 12 (x13-x24) | none | G11-G20 | **82** |
+| **Total** | | | | | **166** (9 staff, 157 revenue) |
+
+### Room Numbering Convention
+- THOR: `{floor}{01-12}` — e.g. 101, 212, 312, 601
+- HULK: `{floor}{13-24}` — e.g. 113, 224, 324, 624
+- Ground: THOR = G01-G10, HULK = G11-G20
+- Floor 7: THOR only = 701, 702
+
+---
+
+## Staff Rooms (excluded from revenue)
+
+| Room | Property | Beds | Notes |
+|---|---|---|---|
+| G05 | THOR | 3 | Staff quarters |
+| G06 | THOR | 2 | Staff quarters |
+| 107 | THOR | 2 | Staff quarters |
+| 108 | THOR | 2 | Staff quarters |
+| 701 | THOR | 1 | Staff quarters (floor 7) |
+| 702 | THOR | 1 | Staff quarters (floor 7) |
+| G12 | HULK | 3 | Staff quarters |
+| 114 | HULK | 2 | Staff quarters |
+| 618 | HULK | 2 | Staff quarters |
+
+**Total staff rooms: 9** (THOR 6 + HULK 3)
+
+---
+
+## Revenue Rooms & Beds
+
+| Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
+|---|---|---|---|---|---|
+| THOR | 78 | 14 | 61 | 3 | **145** |
+| HULK | 79 | 14 | 63 | 2 | **146** |
+| **Total** | **157** | **28** | **124** | **5** | **291** |
+
+### Bed Count Formula
+```
+Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
+                   = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
+                   = 28 + 248 + 15
+                   = 291
+```
+
+### Corner Room Rule (applies to BOTH buildings)
+- First room on each floor (x01 THOR / x13 HULK) = **single** (1 bed)
+- Last room on each floor (x12 THOR / x24 HULK) = **single** (1 bed)
+- Ground floor first (G01 THOR / G11 HULK) = **single** (1 bed)
+- Ground floor last (G10 THOR / G20 HULK) = **single** (1 bed)
+- Floor 7: 702 (THOR only) = **single** (1 bed)
+
+---
+
+## Premium — NOT a Room Type
+
+"Premium" is an **operational status**, not a physical room attribute.
+- A premium occupancy means 1 tenant is living alone in a double/triple room
+- The room physically still has 2 or 3 beds
+- Premium status is tracked on the **tenancy**, not the room
+- A room can be premium this month and double-sharing next month
+- For occupancy calculation: 1 premium tenant = 1 occupied bed (NOT 2)
+- For revenue: premium tenant pays a higher rent (covers the empty bed)
+
+**Never hardcode a room as "premium" in the rooms table.**
+
+---
+
+## Occupancy Calculation Rules
+
+```
+Total Capacity     = 305 beds (from L0 master, not from tenancy count)
+Occupied Beds      = COUNT(active tenancies) for rooms in revenue set
+                     (1 tenancy = 1 bed, regardless of room type)
+Vacant Beds        = Total Capacity - Occupied Beds
+Occupancy %        = Occupied Beds / Total Capacity x 100
+
+For a specific month M:
+  Occupied = tenancies WHERE checkin_date <= last_day(M)
+             AND (status = active OR checkout_date >= first_day(M))
+```
+
+---
+
+## THOR Room Layout (79 revenue + 5 staff = 84)
+
+| Floor | Rooms | Count | Sharing Types |
+|---|---|---|---|
+| G | G01-G10 | 10 | G01=1, G02-G04=2, **G05=staff**, **G06=staff**, G07-G09=3, G10=1 |
+| 1 | 101-112 | 12 | 101=1, 102-106=2, **107=staff**, **108=staff**, 109-111=2, 112=1 |
+| 2 | 201-212 | 12 | 201=1, 202-211=2, 212=1 |
+| 3 | 301-312 | 12 | 301=1, 302-311=2, 312=1 |
+| 4 | 401-412 | 12 | 401=1, 402-411=2, 412=1 |
+| 5 | 501-512 | 12 | 501=1, 502-511=2, 512=1 |
+| 6 | 601-612 | 12 | 601=1, 602-611=2, 612=1 |
+| 7 | 701-702 | 2 | **701=staff**, 702=1 |
+
+## HULK Room Layout (79 revenue + 3 staff = 82)
+
+| Floor | Rooms | Count | Sharing Types |
+|---|---|---|---|
+| G | G11-G20 | 10 | G11=1, **G12=staff**, G13-G14=3, G15-G19=2, G20=1 |
+| 1 | 113-124 | 12 | 113=1, **114=staff**, 115-123=2, 124=1 |
+| 2 | 213-224 | 12 | 213=1, 214-223=2, 224=1 |
+| 3 | 313-324 | 12 | 313=1, 314-323=2, 324=1 |
+| 4 | 413-424 | 12 | 413=1, 414-423=2, 424=1 |
+| 5 | 513-524 | 12 | 513=1, 514-523=2, 524=1 |
+| 6 | 613-624 | 12 | 613=1, 614-617=2, **618=staff**, 619-623=2, 624=1 |
+
+---
+
+## Changelog
+- 2026-03-23: Initial master data created from owner confirmation
