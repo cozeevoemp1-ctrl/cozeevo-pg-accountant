@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, case, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.db_manager import get_db_session
@@ -102,10 +102,17 @@ async def get_kpis(
     ) or 0
     TOTAL_BEDS = int(TOTAL_BEDS)
 
-    # Count tenancies that were active during the selected month:
-    # checked in before end of month AND (still active OR checked out after start of month)
+    # Count occupied beds during the selected month.
+    # Premium tenancy = 1 person occupying all beds in the room (max_occupancy).
+    # Regular tenancy = 1 bed per person.
     occupied_beds = await session.scalar(
-        select(func.count(Tenancy.id))
+        select(func.coalesce(func.sum(
+            case(
+                (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                else_=literal_column("1"),
+            )
+        ), 0))
+        .select_from(Tenancy)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
@@ -172,7 +179,16 @@ async def get_kpis(
         PROP_BEDS[row.property_id] = {"name": short, "total": int(row.total_beds)}
 
     prop_occ_rows = (await session.execute(
-        select(Room.property_id, func.count(Tenancy.id).label("occupied"))
+        select(
+            Room.property_id,
+            func.coalesce(func.sum(
+                case(
+                    (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                    else_=literal_column("1"),
+                )
+            ), 0).label("occupied"),
+        )
+        .select_from(Tenancy)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,

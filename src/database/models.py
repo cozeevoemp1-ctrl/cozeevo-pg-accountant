@@ -95,6 +95,13 @@ class UserRole(str, enum.Enum):
     end_user   = "end_user"    # Tenants (read-only) + Leads (enquiry only)
 
 class RoomType(str, enum.Enum):
+    """Physical room type — based on number of beds in the room."""
+    single  = "single"
+    double  = "double"
+    triple  = "triple"
+
+class SharingType(str, enum.Enum):
+    """Tenancy sharing type — how the tenant uses the room. Premium = 1 person in a multi-bed room."""
     single  = "single"
     double  = "double"
     triple  = "triple"
@@ -359,6 +366,7 @@ class Tenancy(Base):
     tenant_id           = Column(Integer, ForeignKey("tenants.id"), nullable=False)
     room_id             = Column(Integer, ForeignKey("rooms.id"), nullable=False)
     stay_type           = Column(Enum(StayType), nullable=False, default=StayType.monthly)
+    sharing_type        = Column(Enum(SharingType), nullable=True)   # how tenant uses room; premium = occupies all beds
     status              = Column(Enum(TenancyStatus), nullable=False, default=TenancyStatus.active)
     checkin_date        = Column(Date, nullable=False)
     checkout_date       = Column(Date)              # NULL if still active

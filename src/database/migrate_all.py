@@ -576,6 +576,38 @@ async def run_room_cleanup_2026_03_23(conn: AsyncConnection) -> None:
     print("  [done] Room cleanup complete")
 
 
+async def run_sharing_type_column(conn: AsyncConnection) -> None:
+    """Add sharing_type column to tenancies + create SharingType enum. Idempotent."""
+    print("\n== Sharing type column (2026-03-23) ==")
+
+    # Create enum type if not exists
+    await conn.execute(text("""
+        DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sharingtype') THEN
+                CREATE TYPE sharingtype AS ENUM ('single','double','triple','premium');
+            END IF;
+        END $$;
+    """))
+
+    # Add column if not exists
+    await conn.execute(text("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'tenancies' AND column_name = 'sharing_type'
+            ) THEN
+                ALTER TABLE tenancies ADD COLUMN sharing_type sharingtype;
+            END IF;
+        END $$;
+    """))
+    print("  [ok] sharing_type column ready")
+
+    # Remove 'premium' from roomtype enum if it exists (premium is tenancy attribute, not room)
+    # Don't alter existing enum — just note that new rooms should only use single/double/triple
+
+    print("  [done] Sharing type migration complete")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -590,6 +622,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_promote_partner_to_admin(conn)
             await run_bank_analytics_tables(conn)
             await run_room_cleanup_2026_03_23(conn)
+            await run_sharing_type_column(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()
