@@ -90,6 +90,8 @@ async def handle_owner(
         "GET_WIFI_PASSWORD":  _get_wifi_password,
         "SET_WIFI":           _set_wifi,
         "COMPLAINT_REGISTER": _owner_complaint_register,
+        "COMPLAINT_UPDATE":   _complaint_update,
+        "QUERY_COMPLAINTS":   _query_complaints,
         "GET_TENANT_NOTES":   _get_tenant_notes,
         "QUERY_CONTACTS":     _query_contacts,
         "RULES":              _rules,
@@ -2507,11 +2509,22 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
             "Duplicate not created."
         )
 
+    # Generate ticket ID: CMP-YYYYMMDD-NNN
+    today_str = date.today().strftime("%Y%m%d")
+    count_result = await session.scalar(
+        select(func.count(Complaint.id)).where(
+            func.date(Complaint.created_at) == date.today()
+        )
+    )
+    seq = (count_result or 0) + 1
+    ticket_id = f"CMP-{today_str}-{seq:03d}"
+
     complaint = Complaint(
         tenancy_id=tenancy.id,
         category=category,
         description=description or f"Issue reported by owner for room {room_num}",
         status=ComplaintStatus.open,
+        notes=ticket_id,  # store ticket ID in notes field
     )
     session.add(complaint)
 
@@ -2526,10 +2539,122 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
 
     return (
         f"*Complaint Logged — Room {room_num}*\n"
+        f"Ticket: {ticket_id}\n"
         f"Category: {cat_label}\n"
         f"Status: Open\n"
         f"Issue: {description}"
     )
+
+
+# ── Complaint update / query ───────────────────────────────────────────────────
+
+async def _complaint_update(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    Resolve / close a complaint by ticket ID or complaint DB id.
+    Usage: "resolve CMP-20260324-001" or "complaint solved 3" or "close complaint"
+    """
+    description = entities.get("description", "").strip()
+
+    # Extract ticket ID (CMP-YYYYMMDD-NNN) or bare number from description
+    ticket_ref: str = ""
+    cmp_id: Optional[int] = None
+
+    import re as _re
+    m_ticket = _re.search(r"CMP[-\s]?\d{8}[-\s]?\d{3}", description, _re.I)
+    m_num    = _re.search(r"\b(\d+)\b", description)
+
+    if m_ticket:
+        ticket_ref = m_ticket.group(0).replace(" ", "-").upper()
+    elif m_num:
+        cmp_id = int(m_num.group(1))
+
+    # Look up the complaint
+    complaint: Optional[Complaint] = None
+    if ticket_ref:
+        result = await session.execute(
+            select(Complaint).where(Complaint.notes == ticket_ref)
+        )
+        complaint = result.scalars().first()
+    if complaint is None and cmp_id:
+        complaint = await session.get(Complaint, cmp_id)
+    if complaint is None:
+        # Try to find most recent open complaint if no ID given
+        if not ticket_ref and not cmp_id:
+            result = await session.execute(
+                select(Complaint)
+                .where(Complaint.status.in_([ComplaintStatus.open, ComplaintStatus.in_progress]))
+                .order_by(Complaint.created_at.desc())
+                .limit(1)
+            )
+            complaint = result.scalars().first()
+
+    if complaint is None:
+        return (
+            "No matching complaint found.\n"
+            "Use: *resolve CMP-YYYYMMDD-NNN* or *resolve complaint [number]*"
+        )
+
+    # Fetch room info for the reply
+    tenancy = await session.get(Tenancy, complaint.tenancy_id)
+    room_num = ""
+    if tenancy and tenancy.room_id:
+        room = await session.get(Room, tenancy.room_id)
+        room_num = room.room_number if room else ""
+
+    ticket_label = complaint.notes or f"#{complaint.id}"
+    complaint.status      = ComplaintStatus.resolved
+    complaint.resolved_at = datetime.utcnow()
+    complaint.resolved_by = ctx.phone
+
+    return (
+        f"*Complaint Resolved*\n"
+        f"Ticket: {ticket_label}\n"
+        f"Room: {room_num or 'N/A'}\n"
+        f"Issue: {complaint.description}\n"
+        f"Resolved by: {ctx.name or ctx.phone}"
+    )
+
+
+async def _query_complaints(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    List open/pending complaints.
+    Usage: "show complaints", "open complaints", "complaint list"
+    """
+    result = await session.execute(
+        select(Complaint, Tenancy, Room)
+        .join(Tenancy, Tenancy.id == Complaint.tenancy_id)
+        .outerjoin(Room, Room.id == Tenancy.room_id)
+        .where(Complaint.status.in_([ComplaintStatus.open, ComplaintStatus.in_progress]))
+        .order_by(Complaint.created_at.asc())
+    )
+    rows = result.all()
+
+    if not rows:
+        return "No open complaints. All clear!"
+
+    cat_label = {
+        ComplaintCategory.plumbing:    "Plumbing",
+        ComplaintCategory.electricity: "Electricity",
+        ComplaintCategory.wifi:        "Wi-Fi",
+        ComplaintCategory.food:        "Food / Mess",
+        ComplaintCategory.furniture:   "Furniture / Room",
+        ComplaintCategory.other:       "Other",
+    }
+
+    lines = [f"*Open Complaints ({len(rows)})*\n"]
+    for complaint, tenancy, room in rows:
+        ticket = complaint.notes or f"#{complaint.id}"
+        room_str = room.room_number if room else "?"
+        cat = cat_label.get(complaint.category, "Other")
+        age_days = (datetime.utcnow() - complaint.created_at).days if complaint.created_at else 0
+        age_str = f"{age_days}d ago" if age_days else "today"
+        lines.append(f"• *{ticket}* — Room {room_str} | {cat} | {age_str}")
+        if complaint.description:
+            short_desc = complaint.description[:60] + ("…" if len(complaint.description) > 60 else "")
+            lines.append(f"  {short_desc}")
+
+    lines.append(f"\nTo resolve: *resolve CMP-YYYYMMDD-NNN*")
+    return "\n".join(lines)
 
 
 # ── Self-Learning: !learn command ─────────────────────────────────────────────

@@ -608,6 +608,15 @@ async def run_sharing_type_column(conn: AsyncConnection) -> None:
     print("  [done] Sharing type migration complete")
 
 
+async def _add_receptionist_role(conn: AsyncConnection) -> None:
+    """Add 'receptionist' value to the user_role PostgreSQL enum (idempotent)."""
+    print("\n== Receptionist role (2026-03-24) ==")
+    await conn.execute(text(
+        "ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'receptionist'"
+    ))
+    print("  [ok] user_role enum now includes 'receptionist'")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -623,6 +632,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_bank_analytics_tables(conn)
             await run_room_cleanup_2026_03_23(conn)
             await run_sharing_type_column(conn)
+            await _add_receptionist_role(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()

@@ -11,6 +11,7 @@ Routing rules:
   admin / power_user / key_user
     + financial intent  → AccountWorker  (account_handler)
     + operational intent → OwnerWorker   (owner_handler)
+  receptionist         → OwnerWorker / AccountWorker (restricted allowlist only)
   tenant               → TenantWorker   (tenant_handler)
   lead / unknown       → LeadWorker     (lead_handler)
 """
@@ -26,6 +27,36 @@ from src.whatsapp.role_service import CallerContext
 
 OWNER_ROLES: frozenset[str] = frozenset({"admin", "power_user", "key_user"})
 
+# Intents the receptionist role is allowed to use.
+# Blocked from: REPORT, BANK_REPORT, BANK_DEPOSIT_MATCH, ADD_TENANT, REMOVE_TENANT,
+#               CHECKOUT, RENT_CHANGE, ADD_EXPENSE, ADD_PARTNER, VOID_PAYMENT,
+#               VOID_EXPENSE, ADD_REFUND, QUERY_REFUNDS, DEPOSIT_CHANGE, and all
+#               destructive/financial-summary intents.
+RECEPTIONIST_ALLOWED: frozenset[str] = frozenset({
+    # Complaints
+    "COMPLAINT_REGISTER",
+    "COMPLAINT_UPDATE",
+    "QUERY_COMPLAINTS",
+    # Payments (log only — no voids, no reports)
+    "PAYMENT_LOG",
+    # Dues (view only)
+    "QUERY_DUES",
+    # Occupancy / vacancy
+    "QUERY_OCCUPANCY",
+    "QUERY_VACANCY",
+    "QUERY_VACANT_ROOMS",
+    # Tenant info (read-only)
+    "QUERY_TENANT",
+    "ROOM_STATUS",
+    # Contacts (read-only)
+    "QUERY_CONTACTS",
+    # General
+    "HELP",
+    "MORE_MENU",
+    "GREETING",
+    "UNKNOWN",
+})
+
 
 async def route(
     intent: str,
@@ -38,6 +69,16 @@ async def route(
     entities.setdefault("_raw_message", message)
 
     if ctx.role in OWNER_ROLES:
+        if intent in FINANCIAL_INTENTS:
+            return await handle_account(intent, entities, ctx, session)
+        else:
+            return await handle_owner(intent, entities, ctx, session)
+    elif ctx.role == "receptionist":
+        if intent not in RECEPTIONIST_ALLOWED:
+            return (
+                "Sorry, that action requires owner-level access.\n"
+                "Type *help* to see what you can do."
+            )
         if intent in FINANCIAL_INTENTS:
             return await handle_account(intent, entities, ctx, session)
         else:

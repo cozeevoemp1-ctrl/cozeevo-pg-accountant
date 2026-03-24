@@ -89,10 +89,11 @@ Base = declarative_base()
 # ── Enums ──────────────────────────────────────────────────────────────────
 
 class UserRole(str, enum.Enum):
-    admin      = "admin"       # Kiran — controls code, manages authorized_users
-    power_user = "power_user"  # Partner owners — full WhatsApp bot access
-    key_user   = "key_user"    # Staff — scoped to assigned tenants
-    end_user   = "end_user"    # Tenants (read-only) + Leads (enquiry only)
+    admin        = "admin"        # Kiran — controls code, manages authorized_users
+    power_user   = "power_user"   # Partner owners — full WhatsApp bot access
+    key_user     = "key_user"     # Staff — scoped to assigned tenants
+    receptionist = "receptionist" # Front-desk — complaints, payments, dues, occupancy (no financials)
+    end_user     = "end_user"     # Tenants (read-only) + Leads (enquiry only)
 
 class RoomType(str, enum.Enum):
     """Physical room type — based on number of beds in the room."""

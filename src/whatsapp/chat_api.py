@@ -116,7 +116,7 @@ async def _process_message_inner(
             return OutboundReply(reply=reply, intent="ONBOARDING", role=ctx.role)
 
     # ── 2b. Check pending disambiguation (owner) or complaint follow-up (tenant) ──
-    if ctx.role in ("admin", "power_user", "key_user"):
+    if ctx.role in ("admin", "power_user", "key_user", "receptionist"):
         pending = await _get_active_pending(ctx.phone, session)
         if pending:
             # ── Intent-ambiguity resolution (e.g. "Raj 31st March" → checkin or checkout?) ──

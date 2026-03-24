@@ -220,6 +220,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:set\s+wifi|update\s+wifi|change\s+wifi|wifi\s+(?:ssid|network|password)\s+\w+|set\s+(?:floor|common)\s+wifi)", re.I), "SET_WIFI", 0.95),
     (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
     (re.compile(r"(?:what.?s?\s+(?:the\s+)?wifi|whats?\s+(?:the\s+)?wifi|wifi\s+(?:ka\s+)?password|password\s+(?:for\s+)?wifi)", re.I), "GET_WIFI_PASSWORD", 0.95),
+    # Complaint update / resolve — "resolve CMP001", "close complaint 3", "mark resolved"
+    (re.compile(r"(?:resolve\s+(?:complaint\s+)?(?:CMP[-\d]+|\d+)|complaint\s+(?:solved?|done|fixed|closed?|resolved?)\s*(?:CMP[-\d]+|\d+)?|close\s+complaint\s*(?:CMP[-\d]+|\d+)?|mark\s+(?:complaint\s+)?(?:resolved?|done|fixed|closed?)\s*(?:CMP[-\d]+|\d+)?|fix(?:ed)?\s+complaint\s*(?:CMP[-\d]+|\d+)?)", re.I), "COMPLAINT_UPDATE", 0.94),
+    # Complaint query — "show complaints", "pending complaints", "open complaints"
+    (re.compile(r"(?:show\s+(?:all\s+)?complaints?|open\s+complaints?|pending\s+complaints?|complaint\s+list|list\s+(?:all\s+)?complaints?|unresolved\s+complaints?|complaints?\s+(?:status|summary|pending|open|list)|how\s+many\s+complaints?)", re.I), "QUERY_COMPLAINTS", 0.93),
     # Complaint / maintenance — owner can log for a room
     (re.compile(r"(?:complaint|complain|issue|problem|not working|broken|leak(?:ing)?\b|fix|tap|flush|bulb|fan|switch|slow net|food (?:complaint|bad|issue|quality)|bed sheet|mattress|pillow|chair|table|shelf|almirah|\bAC\b|air.?condition|toilet|blocked|door\s*lock|kharab\b|pest\b|wifi\s+(?:not|issue|problem|broken|slow)|internet\s+(?:not|issue|problem|down|slow))", re.I), "COMPLAINT_REGISTER", 0.88),
     # PG rules & regulations
@@ -379,7 +383,16 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
     "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
     "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CONTACTS",
     "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
-    "COMPLAINT_REGISTER", "RULES", "HELP", "MORE_MENU",
+    "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
+    "RULES", "HELP", "MORE_MENU",
+})
+
+# Subset of _OWNER_DIRECT that receptionist can use via button taps
+_RECEPTIONIST_DIRECT: frozenset[str] = frozenset({
+    "PAYMENT_LOG", "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS",
+    "QUERY_OCCUPANCY", "QUERY_CONTACTS",
+    "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
+    "HELP", "MORE_MENU",
 })
 _TENANT_DIRECT: frozenset[str] = frozenset({
     "MY_BALANCE", "MY_PAYMENTS", "MY_DETAILS", "REQUEST_RECEIPT",
@@ -401,25 +414,28 @@ def detect_intent(text: str, role: str) -> IntentResult:
     upper = text.upper()
     if role in ("admin", "power_user", "key_user") and upper in _OWNER_DIRECT:
         return IntentResult(intent=upper, confidence=0.99)
+    if role == "receptionist" and upper in _RECEPTIONIST_DIRECT:
+        return IntentResult(intent=upper, confidence=0.99)
     if role == "tenant" and upper in _TENANT_DIRECT:
         return IntentResult(intent=upper, confidence=0.99)
     if role == "lead" and upper in _LEAD_DIRECT:
         return IntentResult(intent=upper, confidence=0.99)
 
-    if role in ("admin", "power_user", "key_user"):
+    if role in ("admin", "power_user", "key_user", "receptionist"):
         rules = _OWNER_RULES
-        # Check ambiguous patterns first (before main rules)
-        for amb_pattern, amb_intents, amb_labels in _AMBIGUOUS_OWNER:
-            if amb_pattern.search(text):
-                entities = _extract_entities(text, amb_intents[0])
-                entities["alternatives"] = amb_intents
-                entities["alt_labels"]   = amb_labels
-                return IntentResult(
-                    intent="AMBIGUOUS",
-                    confidence=0.5,
-                    entities=entities,
-                    alternatives=amb_intents,
-                )
+        # Check ambiguous patterns first (before main rules) — only for full owner roles
+        if role in ("admin", "power_user", "key_user"):
+            for amb_pattern, amb_intents, amb_labels in _AMBIGUOUS_OWNER:
+                if amb_pattern.search(text):
+                    entities = _extract_entities(text, amb_intents[0])
+                    entities["alternatives"] = amb_intents
+                    entities["alt_labels"]   = amb_labels
+                    return IntentResult(
+                        intent="AMBIGUOUS",
+                        confidence=0.5,
+                        entities=entities,
+                        alternatives=amb_intents,
+                    )
     elif role == "tenant":
         rules = _TENANT_RULES
     elif role == "lead":
@@ -435,7 +451,7 @@ def detect_intent(text: str, role: str) -> IntentResult:
     # ── Learned rules (admin-taught via !learn command) ───────────────────────
     for pattern, intent, conf, applies_to in _load_learned_rules():
         if applies_to not in ("all", role) and applies_to != "owner" or (
-            applies_to == "owner" and role not in ("admin", "power_user", "key_user")
+            applies_to == "owner" and role not in ("admin", "power_user", "key_user", "receptionist")
         ):
             continue
         if pattern.search(text):

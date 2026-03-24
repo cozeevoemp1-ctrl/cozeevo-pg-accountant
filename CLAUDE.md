@@ -7,6 +7,7 @@ Stack: FastAPI + Supabase (PostgreSQL) + Groq (llama-3.3-70b) + Meta WhatsApp Cl
 Live on Hostinger VPS (187.127.130.194), domain api.getkozzy.com.
 
 ## Core rules
+- **`docs/REPORTING.md` is the SINGLE SOURCE OF TRUTH for ALL financial logic** — refer to it before any financial report, calculation, or query. If you forget a formula, READ IT. Don't ask Kiran to re-explain.
 - **Never hard-delete financial records** — use `is_void = True`
 - **Regex handles 97% of intents** — no AI cost for common messages
 - **AI (Groq) only for** ambiguous intents, lead chat, unknown merchant classification
