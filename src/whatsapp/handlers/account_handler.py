@@ -371,16 +371,26 @@ async def _do_log_payment_by_ids(
                 month=period_month.month,
                 rent_due=float(effective_due),
             )
-            if gs_result.get("warning"):
-                import logging as _logging
-                _logging.getLogger(__name__).warning("GSheets: %s", gs_result["warning"])
-                gsheets_note = f"\n⚠️ Sheet not updated: {gs_result['warning']}"
-            elif gs_result.get("error"):
+            if gs_result.get("error"):
                 import logging as _logging
                 _logging.getLogger(__name__).warning("GSheets: %s", gs_result["error"])
                 gsheets_note = f"\n⚠️ Sheet not updated: {gs_result['error']}"
-            else:
-                gsheets_note = "\n📋 Google Sheet updated."
+            elif gs_result.get("success"):
+                sheet_month = gs_result.get("month", period_month.month)
+                month_names = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun"}
+                ml = month_names.get(sheet_month, f"M{sheet_month}")
+                rent = gs_result.get("rent_due", 0)
+                total = gs_result.get("total_paid", 0)
+                parts = [f"Sheet updated ({ml})"]
+                if rent > 0:
+                    parts.append(f"Rs.{int(total):,}/{int(rent):,}")
+                overpay = gs_result.get("overpayment", 0)
+                if overpay and overpay > 0:
+                    parts.append(f"OVERPAID +Rs.{int(overpay):,}")
+                warning = gs_result.get("warning")
+                if warning:
+                    parts.append(warning)
+                gsheets_note = "\n" + " | ".join(parts)
         except Exception as e:
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
