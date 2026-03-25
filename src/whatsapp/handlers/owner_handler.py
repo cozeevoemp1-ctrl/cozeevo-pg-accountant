@@ -2422,6 +2422,7 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
 _OWNER_COMPLAINT_KEYWORDS: dict[str, str] = {
     "leak": "plumbing", "tap": "plumbing", "flush": "plumbing", "drain": "plumbing",
     "pipe": "plumbing", "water": "plumbing", "geyser": "plumbing", "shower": "plumbing",
+    "toilet": "plumbing", "commode": "plumbing", "basin": "plumbing", "sink": "plumbing",
     "bulb": "electricity", "fan": "electricity", "switch": "electricity",
     "light": "electricity", "mcb": "electricity", "socket": "electricity",
     "power": "electricity", "current": "electricity",
@@ -2576,7 +2577,23 @@ async def _complaint_update(entities: dict, ctx: CallerContext, session: AsyncSe
         )
         complaint = result.scalars().first()
     if complaint is None and cmp_id:
+        # First try as DB id
         complaint = await session.get(Complaint, cmp_id)
+        # If not found by DB id, try as room number
+        if complaint is None:
+            room_num_str = str(cmp_id)
+            result = await session.execute(
+                select(Complaint)
+                .join(Tenancy, Complaint.tenancy_id == Tenancy.id)
+                .join(Room, Tenancy.room_id == Room.id)
+                .where(
+                    Room.room_number == room_num_str,
+                    Complaint.status.in_([ComplaintStatus.open, ComplaintStatus.in_progress]),
+                )
+                .order_by(Complaint.created_at.desc())
+                .limit(1)
+            )
+            complaint = result.scalars().first()
     if complaint is None:
         # Try to find most recent open complaint if no ID given
         if not ticket_ref and not cmp_id:

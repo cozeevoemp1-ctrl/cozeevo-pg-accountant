@@ -357,6 +357,35 @@ async def _do_log_payment_by_ids(
     status_str = "Paid ✅" if rs and rs.status == RentStatus.paid else "Partial ⏳"
     room_obj = await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room_obj.room_number})" if room_obj else ""
+
+    # ── Google Sheets write-back (fire-and-forget) ────────────────────────────
+    gsheets_note = ""
+    if room_obj:
+        try:
+            from src.integrations.gsheets import update_payment as gsheets_update
+            gs_result = await gsheets_update(
+                room_number=room_obj.room_number,
+                tenant_name=tenant.name,
+                amount=float(amount_dec),
+                method=mode,
+                month=period_month.month,
+                rent_due=float(effective_due),
+            )
+            if gs_result.get("warning"):
+                import logging as _logging
+                _logging.getLogger(__name__).warning("GSheets: %s", gs_result["warning"])
+                gsheets_note = f"\n⚠️ Sheet not updated: {gs_result['warning']}"
+            elif gs_result.get("error"):
+                import logging as _logging
+                _logging.getLogger(__name__).warning("GSheets: %s", gs_result["error"])
+                gsheets_note = f"\n⚠️ Sheet not updated: {gs_result['error']}"
+            else:
+                gsheets_note = "\n📋 Google Sheet updated."
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
+            # Don't block the payment response on sheet errors
+
     return (
         f"*Payment logged — {tenant.name}{room_label}*\n"
         f"Amount: Rs.{int(amount_dec):,} ({mode.upper()})\n"
@@ -365,6 +394,7 @@ async def _do_log_payment_by_ids(
         f"{underpayment_note}"
         f"{wrong_month_note}"
         f"{overpayment_pending}"
+        f"{gsheets_note}"
     )
 
 

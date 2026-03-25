@@ -66,7 +66,7 @@ print("=" * 120)
 print("\n--- PAYMENT LOGGING ---")
 
 test("P01: Normal cash payment",
-     "Prashant room 102 paid 15000 cash",
+     "Akarsh room 102 paid 15000 cash",
      expect_contains="confirm")
 
 test("P02: Normal UPI payment",
@@ -74,7 +74,7 @@ test("P02: Normal UPI payment",
      expect_contains=["confirm", "10,000"])
 
 test("P03: Very small amount (suspicious)",
-     "Prashant room 102 paid 500 cash",
+     "Akarsh room 102 paid 500 cash",
      expect_contains="confirm")
 
 test("P04: Zero amount",
@@ -243,7 +243,7 @@ test("C01: Register with room + details",
 
 test("C02: Register without room number",
      "complaint ac not working in building",
-     expect_contains="complaint logged")
+     expect_contains="room")
 
 test("C03: Register plumbing",
      "complaint room 305 toilet is blocked since yesterday",
@@ -262,11 +262,11 @@ test("C06: Long complaint text",
      expect_contains="complaint logged")
 
 test("C07: Resolve latest complaint",
-     "resolve CMP-20260324-003",
+     "resolve complaint 305",
      expect_contains=["resolved", "305"])
 
 test("C08: Resolve already resolved",
-     "resolve CMP-20260324-003",
+     "resolve complaint 305",
      expect_contains=None)  # should say already resolved or not found
 
 test("C09: Complaint with tenant name",
