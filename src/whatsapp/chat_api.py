@@ -333,7 +333,7 @@ def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict
         "type": "interactive",
         "interactive": {
             "type": "list",
-            "header": {"type": "text", "text": "Artha — Owner Services"},
+            "header": {"type": "text", "text": "Cozeevo Help Desk"},
             "body":   {"text": body},
             "footer": {"text": "Cozeevo Co-living | getkozzy.com"},
             "action": {

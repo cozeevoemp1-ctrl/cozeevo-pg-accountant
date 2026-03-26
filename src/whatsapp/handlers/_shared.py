@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus, WhatsappLog
 
-BOT_NAME = "Artha"
+BOT_NAME = "Cozeevo Help Desk"
 _IST_OFFSET = timedelta(hours=5, minutes=30)
 
 _DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -29,25 +29,25 @@ _DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Su
 # {name} = first name, {tod} = time of day, {dow} = day of week
 _GREETINGS: dict[str, list[str]] = {
     "owner": [
-        "👋 {tod}, {name}! Artha here — dashboard is ready, what are we working on today?",  # 0 Professional
-        "⚡ {name}! Artha here. What do you need?",                                # 1 Minimalist
-        "🚀 Hey {name}! Artha here — it's {dow}, let's crush it!",               # 2 Energetic
-        "🏠 {tod}, {name}! Artha here — your property is in good hands. How can I help?",  # 3 Supportive
-        "🤖 {name}! Artha reporting for duty. First order of business?",           # 4 Witty
+        "👋 {tod}, {name}! Cozeevo Help Desk — dashboard is ready, what are we working on today?",  # 0 Professional
+        "⚡ {name}! Cozeevo Help Desk. What do you need?",                                # 1 Minimalist
+        "🚀 Hey {name}! Cozeevo Help Desk — it's {dow}, let's crush it!",               # 2 Energetic
+        "🏠 {tod}, {name}! Cozeevo Help Desk — your property is in good hands. How can I help?",  # 3 Supportive
+        "🤖 {name}! Cozeevo Help Desk at your service. First order of business?",           # 4 Witty
     ],
     "tenant": [
-        "👋 {tod}, {name}! Artha here — how can I help you today?",               # 0 Professional
-        "😊 Hi {name}! Artha here. Good to hear from you.",                        # 1 Minimalist
-        "🎉 Hey {name}! Artha here — happy {dow}, what's up?",                   # 2 Energetic
-        "🏡 {tod}, {name}! Artha here — hope you're comfortable and settling in well.",  # 3 Supportive
-        "✨ Look who's here! Artha at your service, {name}. What can I do for you?",     # 4 Witty
+        "👋 {tod}, {name}! Cozeevo Help Desk — how can I help you today?",               # 0 Professional
+        "😊 Hi {name}! Cozeevo Help Desk. Good to hear from you.",                        # 1 Minimalist
+        "🎉 Hey {name}! Cozeevo Help Desk — happy {dow}, what's up?",                   # 2 Energetic
+        "🏡 {tod}, {name}! Cozeevo Help Desk — hope you're comfortable and settling in well.",  # 3 Supportive
+        "✨ Look who's here! Cozeevo Help Desk at your service, {name}. What can I do for you?",     # 4 Witty
     ],
     "lead": [
-        "👋 {tod}! Welcome to Cozeevo Co-living — I'm Artha, your virtual guide! 🏠",     # 0 Professional
-        "😊 Hi there! I'm Artha — looking for a great PG? You're in the right place!",    # 1 Minimalist
-        "🎯 Hey! I'm Artha — let me help you find your perfect room at Cozeevo! 🏠",     # 2 Energetic
-        "🤝 {tod}! I'm Artha — finding the right PG can be tough, I'm here to make it easy.", # 3 Supportive
-        "✨ Hello! I'm Artha — welcome to Cozeevo Co-living! Let me show you around.",    # 4 Witty
+        "👋 {tod}! Welcome to Cozeevo Co-living — Welcome to Cozeevo Help Desk, your virtual guide! 🏠",     # 0 Professional
+        "😊 Hi there! Welcome to Cozeevo Help Desk — looking for a great PG? You're in the right place!",    # 1 Minimalist
+        "🎯 Hey! Welcome to Cozeevo Help Desk — let me help you find your perfect room at Cozeevo! 🏠",     # 2 Energetic
+        "🤝 {tod}! Welcome to Cozeevo Help Desk — finding the right PG can be tough, I'm here to make it easy.", # 3 Supportive
+        "✨ Hello! Welcome to Cozeevo Help Desk — welcome to Cozeevo Co-living! Let me show you around.",    # 4 Witty
     ],
 }
 
