@@ -31,7 +31,7 @@ from sqlalchemy.orm import selectinload
 from src.database.models import (
     Expense, Payment, PaymentFor, PaymentMode,
     PendingAction, Refund, RefundStatus, RentSchedule, RentStatus,
-    Room, Tenant, Tenancy, TenancyStatus,
+    Room, SharingType, Tenant, Tenancy, TenancyStatus,
 )
 from src.whatsapp.role_service import CallerContext
 from src.database.validators import check_tenancy_active
@@ -1218,9 +1218,31 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
         )
     ) or 0
 
+    # Premium tenants occupy 2 beds
+    premium_count = await session.scalar(
+        select(func.count(Tenancy.id)).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.sharing_type == SharingType.premium,
+            Tenancy.checkin_date <= last_day,
+        )
+    ) or 0
+
+    no_show = await session.scalar(
+        select(func.count(Tenancy.id)).where(
+            Tenancy.status == TenancyStatus.no_show,
+            Tenancy.checkin_date <= last_day,
+        )
+    ) or 0
+
+    regular = active_tenants - premium_count
+    active_beds = regular + (premium_count * 2)
+    total_beds = 291
+
     return (
         f"*Monthly Report — {current_month.strftime('%B %Y')}*\n\n"
-        f"Active tenants: {active_tenants}\n"
+        f"Checked-in: {active_beds} beds ({regular} regular + {premium_count} premium)\n"
+        f"No-show: {no_show} beds reserved\n"
+        f"Vacant: {total_beds - active_beds - no_show} beds\n\n"
         f"Rent collected: Rs.{int(collected):,}\n"
         f"  • Cash: Rs.{int(cash_collected):,}\n"
         f"  • UPI:  Rs.{int(upi_collected):,}\n"
