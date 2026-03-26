@@ -2966,7 +2966,8 @@ async def _activity_log(entities: dict, ctx: CallerContext, session: AsyncSessio
             c.resolved_at = datetime.utcnow()
             c.resolved_by = ctx.phone
             ticket = c.notes or f"#{c.id}"
-            resolved_tickets.append(ticket)
+            short_desc = (c.description or "")[:30].strip()
+            resolved_tickets.append((ticket, room, short_desc))
             entry.linked_id = c.id
             entry.linked_type = "complaint"
 
@@ -2980,8 +2981,9 @@ async def _activity_log(entities: dict, ctx: CallerContext, session: AsyncSessio
         parts.append(f"Amount: ₹{int(amount):,}")
     if prop:
         parts.append(f"Property: {prop}")
-    if resolved_tickets:
-        parts.append(f"\n✅ *Auto-resolved {len(resolved_tickets)} complaint(s):* {', '.join(resolved_tickets)}")
+    for ticket, rm, desc in resolved_tickets:
+        issue_short = desc if desc else "issue"
+        parts.append(f"\n✅ *Complaint closed!* Room {rm} {issue_short} ({ticket}) sorted.")
     return "\n".join(parts)
 
 
