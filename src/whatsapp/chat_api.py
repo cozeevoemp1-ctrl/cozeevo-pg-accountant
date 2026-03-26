@@ -335,7 +335,7 @@ def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict
             "type": "list",
             "header": {"type": "text", "text": "Cozeevo Help Desk"},
             "body":   {"text": body},
-            "footer": {"text": "Cozeevo Co-living | getkozzy.com"},
+            "footer": {"text": "Cozeevo Co-living"},
             "action": {
                 "button": "View Services",
                 "sections": [
