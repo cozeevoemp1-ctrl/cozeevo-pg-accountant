@@ -2915,6 +2915,61 @@ async def _activity_log(entities: dict, ctx: CallerContext, session: AsyncSessio
     session.add(entry)
     await session.flush()
 
+    # Auto-resolve matching open complaints if activity has a room
+    resolved_tickets = []
+    if room and log_type in (ActivityLogType.maintenance, ActivityLogType.utility, ActivityLogType.purchase):
+        # Map activity keywords to complaint categories
+        cat_map = {
+            "plumb": ComplaintCategory.plumbing,
+            "leak": ComplaintCategory.plumbing,
+            "tap": ComplaintCategory.plumbing,
+            "drain": ComplaintCategory.plumbing,
+            "flush": ComplaintCategory.plumbing,
+            "pipe": ComplaintCategory.plumbing,
+            "water": ComplaintCategory.plumbing,
+            "electri": ComplaintCategory.electricity,
+            "fan": ComplaintCategory.electricity,
+            "bulb": ComplaintCategory.electricity,
+            "switch": ComplaintCategory.electricity,
+            "mcb": ComplaintCategory.electricity,
+            "wifi": ComplaintCategory.wifi,
+            "internet": ComplaintCategory.wifi,
+            "food": ComplaintCategory.food,
+            "mess": ComplaintCategory.food,
+            "chair": ComplaintCategory.furniture,
+            "bed": ComplaintCategory.furniture,
+            "mattress": ComplaintCategory.furniture,
+            "table": ComplaintCategory.furniture,
+        }
+        # Find which complaint categories match the activity description
+        desc_lower = description.lower()
+        matching_cats = set()
+        for keyword, cat in cat_map.items():
+            if keyword in desc_lower:
+                matching_cats.add(cat)
+
+        # Find open complaints for this room
+        open_complaints_q = (
+            select(Complaint)
+            .join(Tenancy, Tenancy.id == Complaint.tenancy_id)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(Room.room_number == room, Complaint.status == ComplaintStatus.open)
+        )
+        if matching_cats:
+            open_complaints_q = open_complaints_q.where(Complaint.category.in_(matching_cats))
+
+        result = await session.execute(open_complaints_q)
+        open_complaints = result.scalars().all()
+
+        for c in open_complaints:
+            c.status = ComplaintStatus.resolved
+            c.resolved_at = datetime.utcnow()
+            c.resolved_by = ctx.phone
+            ticket = c.notes or f"#{c.id}"
+            resolved_tickets.append(ticket)
+            entry.linked_id = c.id
+            entry.linked_type = "complaint"
+
     icon = _TYPE_ICONS.get(log_type, "📝")
     parts = [f"{icon} *Activity logged*"]
     parts.append(f"Type: {log_type.value}")
@@ -2925,6 +2980,8 @@ async def _activity_log(entities: dict, ctx: CallerContext, session: AsyncSessio
         parts.append(f"Amount: ₹{int(amount):,}")
     if prop:
         parts.append(f"Property: {prop}")
+    if resolved_tickets:
+        parts.append(f"\n✅ *Auto-resolved {len(resolved_tickets)} complaint(s):* {', '.join(resolved_tickets)}")
     return "\n".join(parts)
 
 
