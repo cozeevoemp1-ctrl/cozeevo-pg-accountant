@@ -208,14 +208,14 @@ async def run():
 
                 if cash > 0:
                     await conn.execute(text("""
-                        INSERT INTO payments (tenancy_id, amount, payment_mode, payment_date, period_month, for_type, notes)
-                        VALUES (:tid, :amt, 'cash', :dt, :pm, 'rent', :pl)
+                        INSERT INTO payments (tenancy_id, amount, payment_mode, payment_date, period_month, for_type, is_void, notes)
+                        VALUES (:tid, :amt, 'cash', :dt, :pm, 'rent', false, :pl)
                     """), {'tid': tenancy_id, 'amt': cash, 'dt': pay_date, 'pm': pay_date.replace(day=1), 'pl': label})
                     stats['payments'] += 1
                 if upi > 0:
                     await conn.execute(text("""
-                        INSERT INTO payments (tenancy_id, amount, payment_mode, payment_date, period_month, for_type, notes)
-                        VALUES (:tid, :amt, 'upi', :dt, :pm, 'rent', :pl)
+                        INSERT INTO payments (tenancy_id, amount, payment_mode, payment_date, period_month, for_type, is_void, notes)
+                        VALUES (:tid, :amt, 'upi', :dt, :pm, 'rent', false, :pl)
                     """), {'tid': tenancy_id, 'amt': upi, 'dt': pay_date, 'pm': pay_date.replace(day=1), 'pl': label})
                     stats['payments'] += 1
 

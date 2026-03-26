@@ -24,14 +24,19 @@ from pydantic import BaseModel
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import logging
+import re as _re
+
 from src.database.db_manager import get_db_session as get_session
-from src.database.models import PendingAction, PendingLearning, WhatsappLog, MessageDirection, CallerRole
+from src.database.models import PendingAction, PendingLearning, WhatsappLog, MessageDirection, CallerRole, ChatMessage
 from src.whatsapp.role_service import get_caller_context
 from src.whatsapp.intent_detector import detect_intent, IntentResult, _extract_entities, _INTENT_LABELS
 from src.whatsapp.gatekeeper import route
 from src.whatsapp.handlers.owner_handler import resolve_pending_action, handle_learn_command
 from src.whatsapp.handlers.tenant_handler import get_active_onboarding, handle_onboarding_step, resolve_tenant_complaint
 from src.llm_gateway.claude_client import get_claude_client
+
+_chat_logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
 
@@ -93,6 +98,12 @@ async def _process_message_inner(
         await _log(session, phone, message, "blocked", "BLOCKED", None)
         await session.commit()
         return OutboundReply(reply="", intent="BLOCKED", role="blocked", skip=True)
+
+    # ── 1b. Load chat context for this phone ──────────────────────────────
+    try:
+        chat_context = await _load_chat_context(phone, session)
+    except Exception:
+        chat_context = ""
 
     # ── 2a. Check active onboarding session (tenant role) ────────────────
     if ctx.role == "tenant" and ctx.tenant_id:
@@ -212,6 +223,29 @@ async def _process_message_inner(
     intent_result = detect_intent(message, ctx.role)
     intent = intent_result.intent
 
+    # ── 3a. Follow-up detection: pronoun-style messages referencing last turn ──
+    if intent == "UNKNOWN" and chat_context:
+        followup = _detect_followup_context(message, chat_context)
+        if followup:
+            # Re-route as QUERY_TENANT with room/name from last bot response
+            followup_entities = _extract_entities(message, "QUERY_TENANT")
+            if "room" in followup and "room" not in followup_entities:
+                followup_entities["room"] = followup["room"]
+            if "name" in followup and "name" not in followup_entities:
+                followup_entities["name"] = followup["name"]
+            followup_entities["_chat_context"] = chat_context
+            followup_entities["description"] = message
+            intent_result = IntentResult(
+                intent="QUERY_TENANT",
+                confidence=0.85,
+                entities=followup_entities,
+            )
+            intent = "QUERY_TENANT"
+            _chat_logger.info(
+                "Follow-up detected for %s: re-routed to QUERY_TENANT with %s",
+                phone, {k: v for k, v in followup.items()},
+            )
+
     if intent == "UNKNOWN":
         try:
             ai = get_claude_client()
@@ -299,6 +333,10 @@ async def _process_message_inner(
     # Always include raw message so handlers (e.g. complaint) can use it
     if "description" not in intent_result.entities or not intent_result.entities["description"]:
         intent_result.entities["description"] = message
+
+    # Inject chat context so handlers can use it (AI calls, unknown handlers)
+    if chat_context:
+        intent_result.entities["_chat_context"] = chat_context
 
     reply = await route(intent, intent_result.entities, ctx, message, session)
 
@@ -390,6 +428,112 @@ def _learn_from_selection(original_msg: str, intent: str) -> None:
     rules_path.write_text(json.dumps(rules, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+# ── Chat history helpers ──────────────────────────────────────────────────────
+
+async def _save_chat_message(
+    session: AsyncSession,
+    phone: str,
+    direction: str,
+    message: str,
+    intent: Optional[str] = None,
+    role: Optional[str] = None,
+) -> None:
+    """Save a single chat message (inbound or outbound) to chat_messages table."""
+    session.add(ChatMessage(
+        phone=phone,
+        direction=direction,
+        message=message[:4000] if message else "",
+        intent=intent,
+        role=role,
+        created_at=datetime.utcnow(),
+    ))
+
+
+async def _load_chat_context(phone: str, session: AsyncSession, limit: int = 5) -> str:
+    """
+    Load last N messages for this phone, format as context string.
+    Returns empty string if no history.
+    """
+    from sqlalchemy import desc
+    rows = (await session.execute(
+        select(ChatMessage)
+        .where(ChatMessage.phone == phone)
+        .order_by(desc(ChatMessage.created_at))
+        .limit(limit)
+    )).scalars().all()
+
+    if not rows:
+        return ""
+
+    # Rows are newest-first; reverse for chronological display
+    rows = list(reversed(rows))
+    lines = []
+    for row in rows:
+        prefix = "You" if row.direction == "inbound" else "Bot"
+        # Truncate long messages for context
+        text = (row.message or "")[:200]
+        if len(row.message or "") > 200:
+            text += "..."
+        lines.append(f"{prefix}: {text}")
+
+    return "[Recent context]\n" + "\n".join(lines)
+
+
+# ── Follow-up detection ──────────────────────────────────────────────────────
+
+# Patterns that suggest a pronoun-style follow-up referencing the last conversation
+_FOLLOWUP_PATTERNS = _re.compile(
+    r"^(?:how much|what about|tell me more|details|more details|his |her |their |"
+    r"when did|how many|since when|what.?s his|what.?s her|"
+    r"payment history|payments?|balance|dues|rent|"
+    r"and (?:his|her|their)|also |"
+    r"(?:uska|uski|unka|unki|kitna|kab se)\b)",
+    _re.I,
+)
+
+# Extract room number or tenant name from a bot response
+_ROOM_IN_RESPONSE = _re.compile(r"\b(?:Room|room)\s+([\w-]+)\b")
+_NAME_IN_RESPONSE = _re.compile(r"(?:Occupant|Tenant|Name)s?:\s*\*?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)")
+
+
+def _detect_followup_context(message: str, chat_context: str) -> Optional[dict]:
+    """
+    If the message looks like a follow-up and the last bot message mentions
+    a room/tenant, return dict with extracted room/name for re-routing.
+    Returns None if not a follow-up.
+    """
+    if not chat_context:
+        return None
+    if not _FOLLOWUP_PATTERNS.search(message):
+        return None
+
+    # Find the last bot message in context
+    last_bot_msg = ""
+    for line in chat_context.split("\n"):
+        if line.startswith("Bot: "):
+            last_bot_msg = line[5:]
+
+    if not last_bot_msg:
+        return None
+
+    result = {}
+
+    # Try to extract room number from last bot response
+    room_match = _ROOM_IN_RESPONSE.search(last_bot_msg)
+    if room_match:
+        result["room"] = room_match.group(1)
+
+    # Try to extract tenant name from last bot response
+    name_match = _NAME_IN_RESPONSE.search(last_bot_msg)
+    if name_match:
+        result["name"] = name_match.group(1)
+
+    # Only return if we found something to reference
+    if result:
+        return result
+    return None
+
+
 async def _get_active_pending(phone: str, session: AsyncSession) -> Optional[PendingAction]:
     """Return the most recent unresolved pending action for this phone, if not expired."""
     return await session.scalar(
@@ -438,3 +582,11 @@ async def _log(
             intent=intent,
             created_at=datetime.utcnow(),
         ))
+
+    # ── Also save to chat_messages for context loading ────────────────────
+    try:
+        await _save_chat_message(session, phone, "inbound", message, intent=intent, role=role)
+        if reply:
+            await _save_chat_message(session, phone, "outbound", reply, intent=intent, role=role)
+    except Exception:
+        _chat_logger.debug("Failed to save chat_message for %s (table may not exist yet)", phone)

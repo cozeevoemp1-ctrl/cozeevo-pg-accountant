@@ -1081,6 +1081,28 @@ class ActivityLog(Base):
     )
 
 
+class ChatMessage(Base):
+    """
+    L0 — Full chat history for every WhatsApp conversation.
+    Stores both inbound (user) and outbound (bot) messages with metadata.
+    Used for: loading recent context, follow-up detection, analytics.
+    Never deleted.
+    """
+    __tablename__ = "chat_messages"
+
+    id         = Column(Integer, primary_key=True)
+    phone      = Column(String(30), nullable=False, index=True)
+    direction  = Column(String(10), nullable=False)   # "inbound" or "outbound"
+    message    = Column(Text, nullable=False)
+    intent     = Column(String(60), nullable=True)     # detected intent for inbound
+    role       = Column(String(20), nullable=True)     # admin/power_user/tenant/lead
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_chat_messages_phone_created", "phone", "created_at"),
+    )
+
+
 class BankTransaction(Base):
     """
     L2 — Individual transaction rows extracted from bank statement PDFs.

@@ -662,6 +662,31 @@ async def run_activity_log_table(conn: AsyncConnection) -> None:
     print("  [ok] activity_log table ready")
 
 
+async def run_chat_messages_table(conn: AsyncConnection) -> None:
+    """Create chat_messages table for full conversation history (idempotent). Added 2026-03-26."""
+    print("\n== Chat messages table (2026-03-26) ==")
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id         SERIAL PRIMARY KEY,
+            phone      VARCHAR(30) NOT NULL,
+            direction  VARCHAR(10) NOT NULL,
+            message    TEXT NOT NULL,
+            intent     VARCHAR(60),
+            role       VARCHAR(20),
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_chat_messages_phone
+            ON chat_messages (phone)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_chat_messages_phone_created
+            ON chat_messages (phone, created_at DESC)
+    """))
+    print("  [ok] chat_messages table ready")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -679,6 +704,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_sharing_type_column(conn)
             await _add_receptionist_role(conn)
             await run_activity_log_table(conn)
+            await run_chat_messages_table(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()
