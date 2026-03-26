@@ -62,8 +62,10 @@ WORKSHEET_NAME = "History"
 # ── Column mapping per month ──────────────────────────────────────────────────
 # month_number -> (rent_status_col, cash_col, upi_col)  — all 0-indexed
 MONTH_COLUMNS: dict[int, tuple[int, int, int]] = {
-    2: (25, 28, 29),   # FEB: rent_status=col25, cash=col28, upi=col29
-    3: (26, 31, 32),   # MARCH: rent_status=col26, cash=col31, upi=col32
+    12: (20, 23, 24),  # DEC: rent_status=col20, cash=col23("until jan Cash"), upi=col24
+    1:  (21, 23, 24),  # JAN: rent_status=col21, cash=col23("until jan Cash"), upi=col24
+    2:  (25, 28, 29),  # FEB: rent_status=col25, cash=col28, upi=col29
+    3:  (26, 31, 32),  # MARCH: rent_status=col26, cash=col31, upi=col32
 }
 
 # Rent columns (0-indexed): Monthly Rent, From 1st FEB, From 1st May

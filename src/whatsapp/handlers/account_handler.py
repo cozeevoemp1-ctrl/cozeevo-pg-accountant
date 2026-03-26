@@ -765,6 +765,9 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
     if not tenant or not tenancy:
         return "Tenant record not found."
 
+    room_obj = await session.get(Room, tenancy.room_id)
+    room_label = room_obj.room_number if room_obj else "?"
+
     current_month = date.today().replace(day=1)
     rs = await session.scalar(
         select(RentSchedule).where(
@@ -776,14 +779,20 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
     status_str = rs.status.value.upper() if rs else "No record"
     o_rent, o_maintenance = await _calc_outstanding_dues(tenancy.id, session)
 
+    sharing_label = tenancy.sharing_type.value if tenancy.sharing_type else ""
     lines = [
         f"*{tenant.name}*",
         f"Phone: {tenant.phone}",
+        f"Room: {room_label}" + (f" ({sharing_label})" if sharing_label else ""),
         f"Room rent: Rs.{int(tenancy.agreed_rent or 0):,}/month",
         f"Security deposit: Rs.{int(tenancy.security_deposit or 0):,}",
         f"Checkin: {tenancy.checkin_date.strftime('%d %b %Y')}",
         f"This month ({current_month.strftime('%b %Y')}): {status_str}",
     ]
+
+    # Notes / comments
+    if tenancy.notes:
+        lines += ["", f"Notes: {tenancy.notes}"]
 
     # Booking advance — show check-in due calculation
     booking_amount = tenancy.booking_amount or Decimal("0")
@@ -816,6 +825,67 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
         lines += ["", f"*Rent outstanding: Rs.{int(o_rent):,}*"]
     else:
         lines.append("All dues cleared!")
+
+    # ── Month-on-month payment history ────────────────────────────────────────
+    all_rs_result = await session.execute(
+        select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy.id,
+        ).order_by(RentSchedule.period_month)
+    )
+    all_rs = all_rs_result.scalars().all()
+
+    if all_rs:
+        history_lines = ["", "*Payment History:*"]
+        month_names = {
+            1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+            7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec",
+        }
+        for sched in all_rs:
+            rent_due = (sched.rent_due or Decimal("0")) + (sched.adjustment or Decimal("0"))
+            m_label = month_names.get(sched.period_month.month, "?")
+
+            # Get payments for this month grouped by mode
+            payments_result = await session.execute(
+                select(Payment).where(
+                    Payment.tenancy_id == tenancy.id,
+                    Payment.period_month == sched.period_month,
+                    Payment.is_void == False,
+                )
+            )
+            payments = payments_result.scalars().all()
+            total_paid = sum(p.amount for p in payments) or Decimal("0")
+
+            # Build payment breakdown by mode
+            by_mode: dict[str, Decimal] = {}
+            for p in payments:
+                mode_key = p.payment_mode.value.capitalize() if p.payment_mode else "Other"
+                by_mode[mode_key] = by_mode.get(mode_key, Decimal("0")) + p.amount
+
+            # Status label
+            if sched.status == RentStatus.paid:
+                status_tag = "PAID"
+            elif sched.status == RentStatus.partial:
+                remaining = max(Decimal("0"), rent_due - total_paid)
+                status_tag = f"PARTIAL (due Rs.{int(remaining):,})"
+            elif sched.status == RentStatus.waived:
+                status_tag = "WAIVED"
+            elif sched.status in (RentStatus.na, RentStatus.exit):
+                status_tag = sched.status.value.upper()
+            else:
+                status_tag = "PENDING"
+
+            # Format mode breakdown
+            if by_mode:
+                mode_parts = [f"{mode} Rs.{int(amt):,}" for mode, amt in by_mode.items()]
+                mode_str = " (" + " + ".join(mode_parts) + ")"
+            else:
+                mode_str = ""
+
+            history_lines.append(
+                f"  {m_label}: Rs.{int(rent_due):,} — {status_tag}{mode_str}"
+            )
+
+        lines += history_lines
 
     return "\n".join(lines)
 
