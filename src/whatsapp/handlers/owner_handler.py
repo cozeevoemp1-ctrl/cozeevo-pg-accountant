@@ -2510,7 +2510,15 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
             "Duplicate not created."
         )
 
-    # Generate ticket ID: CMP-YYYYMMDD-NNN
+    # Generate ticket ID: XXX-YYYYMMDD-NNN (3-letter category prefix)
+    cat_prefix = {
+        ComplaintCategory.plumbing:    "PLU",
+        ComplaintCategory.electricity: "ELE",
+        ComplaintCategory.wifi:        "WIF",
+        ComplaintCategory.food:        "FOD",
+        ComplaintCategory.furniture:   "FUR",
+        ComplaintCategory.other:       "OTH",
+    }.get(category, "OTH")
     today_str = date.today().strftime("%Y%m%d")
     count_result = await session.scalar(
         select(func.count(Complaint.id)).where(
@@ -2518,7 +2526,7 @@ async def _owner_complaint_register(entities: dict, ctx: CallerContext, session:
         )
     )
     seq = (count_result or 0) + 1
-    ticket_id = f"CMP-{today_str}-{seq:03d}"
+    ticket_id = f"{cat_prefix}-{today_str}-{seq:03d}"
 
     complaint = Complaint(
         tenancy_id=tenancy.id,
@@ -2561,7 +2569,7 @@ async def _complaint_update(entities: dict, ctx: CallerContext, session: AsyncSe
     cmp_id: Optional[int] = None
 
     import re as _re
-    m_ticket = _re.search(r"CMP[-\s]?\d{8}[-\s]?\d{3}", description, _re.I)
+    m_ticket = _re.search(r"[A-Z]{3}[-\s]?\d{8}[-\s]?\d{3}", description, _re.I)
     m_num    = _re.search(r"\b(\d+)\b", description)
 
     if m_ticket:
@@ -2608,7 +2616,7 @@ async def _complaint_update(entities: dict, ctx: CallerContext, session: AsyncSe
     if complaint is None:
         return (
             "No matching complaint found.\n"
-            "Use: *resolve CMP-YYYYMMDD-NNN* or *resolve complaint [number]*"
+            "Use: *resolve XXX-YYYYMMDD-NNN* or *resolve complaint [number]*"
         )
 
     # Fetch room info for the reply
@@ -2670,7 +2678,7 @@ async def _query_complaints(entities: dict, ctx: CallerContext, session: AsyncSe
             short_desc = complaint.description[:60] + ("…" if len(complaint.description) > 60 else "")
             lines.append(f"  {short_desc}")
 
-    lines.append(f"\nTo resolve: *resolve CMP-YYYYMMDD-NNN*")
+    lines.append(f"\nTo resolve: *resolve XXX-YYYYMMDD-NNN*")
     return "\n".join(lines)
 
 
