@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cozeevo Help Desk — Service Map</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #08080f;
+  --bg-card: rgba(255,255,255,0.04);
+  --bg-card-hover: rgba(255,255,255,0.07);
+  --border: rgba(255,255,255,0.08);
+  --border-glow: rgba(34,197,94,0.25);
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.15);
+  --pink: #fe129d;
+  --yellow: #eab308;
+  --yellow-dim: rgba(234,179,8,0.15);
+  --gray: #6b7280;
+  --gray-dim: rgba(107,114,128,0.15);
+  --text: #f1f1f1;
+  --text-dim: #9ca3af;
+  --text-muted: #6b7280;
+  --radius: 14px;
+  --radius-sm: 10px;
+}
+
+html { font-size: 16px; }
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* Layout */
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Header */
+header {
+  padding: 40px 0 28px;
+  text-align: center;
+  position: relative;
+}
+header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+.logo {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: var(--pink);
+  text-transform: uppercase;
+}
+.subtitle {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-top: 6px;
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 24px 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border-radius: 100px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  user-select: none;
+  white-space: nowrap;
+}
+.tab:hover { border-color: rgba(255,255,255,0.15); color: var(--text); }
+.tab.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #000;
+}
+
+/* Tab content */
+.tab-content {
+  display: none;
+  animation: fadeSlideIn 0.35s ease;
+}
+.tab-content.active { display: block; }
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Group */
+.group {
+  margin-bottom: 28px;
+}
+.group-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+/* Service Card */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(34,197,94,0.0), rgba(34,197,94,0.0));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  transition: background 0.3s ease;
+  pointer-events: none;
+}
+.card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(34,197,94,0.2);
+  transform: translateY(-1px);
+}
+.card:hover::before {
+  background: linear-gradient(135deg, rgba(34,197,94,0.3), rgba(34,197,94,0.05));
+}
+.card.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.card.locked:hover {
+  transform: none;
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+.card.locked::before { display: none; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.card-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  flex: 1;
+}
+.card-lock {
+  font-size: 0.78rem;
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Status badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  flex-shrink: 0;
+}
+.badge-live {
+  background: var(--green-dim);
+  color: var(--green);
+}
+.badge-live .dot {
+  width: 6px; height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse 2s ease infinite;
+}
+.badge-progress {
+  background: var(--yellow-dim);
+  color: var(--yellow);
+}
+.badge-progress .dot {
+  width: 6px; height: 6px;
+  background: var(--yellow);
+  border-radius: 50%;
+}
+.badge-planned {
+  background: var(--gray-dim);
+  color: var(--gray);
+}
+.badge-planned .dot {
+  width: 6px; height: 6px;
+  background: var(--gray);
+  border-radius: 50%;
+}
+.badge-locked {
+  background: rgba(107,114,128,0.1);
+  color: var(--gray);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.card-example {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(34,197,94,0.06);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--green);
+  font-family: 'DM Sans', monospace;
+  border-left: 2px solid rgba(34,197,94,0.3);
+}
+.card-desc {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* Expandable conversation */
+.card-expand {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease;
+  opacity: 0;
+}
+.card.expanded .card-expand {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.wa-chat {
+  margin-top: 14px;
+  padding: 14px;
+  background: #0b1410;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(34,197,94,0.1);
+}
+.wa-chat-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.wa-msg {
+  max-width: 85%;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  position: relative;
+}
+.wa-msg-user {
+  align-self: flex-end;
+  background: #005c4b;
+  color: #e8f5e9;
+  border-bottom-right-radius: 4px;
+}
+.wa-msg-bot {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.wa-msg-time {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.35);
+  text-align: right;
+  margin-top: 3px;
+}
+
+/* Chevron */
+.chevron {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+  color: var(--text-muted);
+}
+.card.expanded .chevron { transform: rotate(180deg); }
+
+/* Bottom Section */
+.bottom-section {
+  padding: 12px 0 32px;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+.bottom-section .group-title { margin-top: 16px; }
+.integration-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 10px;
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+}
+.integration-card:hover {
+  border-color: rgba(254,18,157,0.25);
+}
+.integration-icon {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+.integration-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.integration-desc {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 28px 0 40px;
+  border-top: 1px solid var(--border);
+}
+.footer-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.footer-count {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 6px;
+  font-weight: 600;
+}
+.footer-count span {
+  color: var(--green);
+}
+
+/* Desktop */
+@media (min-width: 600px) {
+  .container { max-width: 520px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">COZEEVO</div>
+    <div class="subtitle">Help Desk &mdash; Service Map</div>
+  </header>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="admin">Admin</div>
+    <div class="tab" data-tab="receptionist">Receptionist</div>
+    <div class="tab" data-tab="tenant">Tenant</div>
+    <div class="tab" data-tab="lead">Lead</div>
+  </div>
+
+  <div id="tab-panels"></div>
+
+  <div class="bottom-section">
+    <div class="group-title">Integrations</div>
+    <div class="integration-card">
+      <div class="integration-icon">&#9632;</div>
+      <div class="integration-name">Web Dashboard</div>
+      <div class="integration-desc">Real-time KPIs, occupancy heatmap, financial reports, tenant directory, and complaint tracker. Responsive Material Design 3 interface.</div>
+      <div style="margin-top:10px"><span class="badge badge-live"><span class="dot"></span>LIVE</span></div>
+    </div>
+    <div class="integration-card">
+      <div class="integration-icon">&#9638;</div>
+      <div class="integration-name">Google Sheets Integration</div>
+      <div class="integration-desc">Auto write-back of payment logs, rent schedules, and occupancy data to Google Sheets for traditional reporting and owner review.</div>
+      <div style="margin-top:10px"><span class="badge badge-live"><span class="dot"></span>LIVE</span></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-text">Powered by Cozeevo Co-living</div>
+    <div class="footer-count"><span id="service-count">0</span> services mapped</div>
+  </footer>
+</div>
+
+<script>
+const DATA = {
+  admin: [
+    {
+      group: "Financial",
+      services: [
+        {
+          name: "Log Payment",
+          example: "room 102 paid 15000 upi",
+          desc: "Record rent or deposit payments against a room. Supports UPI, cash, and bank transfer modes.",
+          status: "live",
+          chat: [
+            { from: "user", text: "room 102 paid 15000 upi" },
+            { from: "bot", text: "Payment logged.\n\nTenant: Rahul Sharma\nRoom: 102 (THOR)\nAmount: Rs.15,000\nMode: UPI\nDate: 26 Mar 2026\n\nReceipt #PAY-20260326-047" }
+          ]
+        },
+        {
+          name: "Query Dues",
+          example: "dues",
+          desc: "Get outstanding dues for current month across all active tenants, grouped by property.",
+          status: "live",
+          chat: [
+            { from: "user", text: "dues" },
+            { from: "bot", text: "Dues for March 2026\n\nTHOR: Rs.2,45,000 (14 tenants)\nHULK: Rs.2,10,000 (11 tenants)\n\nTotal: Rs.4,55,000 from 25 tenants" }
+          ]
+        },
+        {
+          name: "Void Payment",
+          example: "void payment 123",
+          desc: "Soft-delete a payment by marking it as void. Original record preserved for audit trail.",
+          status: "live",
+          chat: [
+            { from: "user", text: "void payment 47" },
+            { from: "bot", text: "Payment #PAY-047 voided.\n\nTenant: Rahul Sharma\nAmount: Rs.15,000\nOriginal date: 26 Mar 2026\n\nDues recalculated." }
+          ]
+        },
+        {
+          name: "Monthly Report",
+          example: "report march",
+          desc: "Full monthly financial summary including collections, expenses, net revenue, and occupancy stats.",
+          status: "live",
+          chat: [
+            { from: "user", text: "report march" },
+            { from: "bot", text: "MARCH 2026 REPORT\n\nCollections: Rs.35,45,362\n  Cash: Rs.10,07,220\n  UPI: Rs.25,38,142\n\nExpenses: Rs.8,12,400\nNet: Rs.27,32,962\n\nOccupancy: 247/291 beds (84.9%)" }
+          ]
+        },
+        {
+          name: "Bank Report",
+          example: "bank report march",
+          desc: "Upload bank statement PDF via WhatsApp. Auto-parsed, classified by vendor, and saved to DB.",
+          status: "live",
+          chat: [
+            { from: "user", text: "bank report march" },
+            { from: "bot", text: "Bank Statement \u2014 March 2026\n\nTotal Credits: Rs.38,52,100\nTotal Debits: Rs.12,45,800\n\nTop categories:\n  Rent deposits: Rs.35,45,362\n  Utilities: Rs.2,84,500\n  Maintenance: Rs.1,42,000" }
+          ]
+        },
+        {
+          name: "Add Expense",
+          example: "expense 5000 plumbing",
+          desc: "Log an operational expense with amount, category, and optional notes.",
+          status: "live",
+          chat: [
+            { from: "user", text: "expense 5000 plumbing" },
+            { from: "bot", text: "Expense logged.\n\nAmount: Rs.5,000\nCategory: Plumbing\nDate: 26 Mar 2026\nRef: EXP-20260326-012" }
+          ]
+        }
+      ]
+    },
+    {
+      group: "Tenant Management",
+      services: [
+        {
+          name: "Add Tenant",
+          example: "add tenant Rahul room 305",
+          desc: "Onboard a new tenant with room assignment, rent schedule creation, and deposit tracking.",
+          status: "live",
+          chat: [
+            { from: "user", text: "add tenant Rahul room 305" },
+            { from: "bot", text: "Tenant added.\n\nName: Rahul\nRoom: 305 (THOR)\nSharing: Triple\nRent: Rs.8,500/month\nCheck-in: 26 Mar 2026\n\nDeposit pending: Rs.8,500" }
+          ]
+        },
+        {
+          name: "Checkout",
+          example: "checkout room 204",
+          desc: "Process tenant checkout with deposit settlement, pending dues calculation, and record archival.",
+          status: "live",
+          chat: [
+            { from: "user", text: "checkout room 204" },
+            { from: "bot", text: "Checkout processed.\n\nTenant: Vishal Reddy\nRoom: 204 (THOR)\nStay: 4 months 12 days\n\nDeposit: Rs.9,000\nPending dues: Rs.0\nRefund: Rs.9,000" }
+          ]
+        },
+        {
+          name: "Rent Change",
+          example: "rent change room 102 to 16000",
+          desc: "Update monthly rent for a tenancy. Creates new rent schedule entry from next billing cycle.",
+          status: "progress",
+          chat: [
+            { from: "user", text: "rent change room 102 to 16000" },
+            { from: "bot", text: "Rent updated.\n\nTenant: Rahul Sharma\nRoom: 102 (THOR)\nOld rent: Rs.15,000\nNew rent: Rs.16,000\nEffective from: 1 Apr 2026" }
+          ]
+        },
+        {
+          name: "Room Query",
+          example: "room 102",
+          desc: "Get current occupants, sharing type, rent details, and payment status for any room.",
+          status: "live",
+          chat: [
+            { from: "user", text: "room 102" },
+            { from: "bot", text: "Room 102 \u2014 THOR, Floor 1\nType: Double sharing\n\nBed A: Rahul Sharma\n  Rent: Rs.15,000 | Dues: Rs.0\nBed B: Vacant\n\nDeposits: Rs.15,000 held" }
+          ]
+        },
+        {
+          name: "Tenant Search",
+          example: "Prashant details",
+          desc: "Fuzzy search tenants by name. Returns room, rent, payment history, and balance details.",
+          status: "live",
+          chat: [
+            { from: "user", text: "Prashant details" },
+            { from: "bot", text: "Prashant Kumar\nRoom: 412 (HULK)\nSharing: Triple\nRent: Rs.8,500/month\nCheck-in: 15 Jan 2026\n\nPaid till: March 2026\nBalance: Rs.0\nDeposit: Rs.8,500 held" }
+          ]
+        }
+      ]
+    },
+    {
+      group: "Operations",
+      services: [
+        {
+          name: "Occupancy",
+          example: "occupancy",
+          desc: "Current occupancy rates for both properties with floor-wise breakdown.",
+          status: "live",
+          chat: [
+            { from: "user", text: "occupancy" },
+            { from: "bot", text: "Occupancy \u2014 26 Mar 2026\n\nTHOR: 121/145 beds (83.4%)\nHULK: 126/146 beds (86.3%)\n\nTotal: 247/291 beds (84.9%)\nVacant: 44 beds" }
+          ]
+        },
+        {
+          name: "Vacant Rooms",
+          example: "vacant rooms",
+          desc: "List all rooms with available beds, grouped by property and floor.",
+          status: "live",
+          chat: [
+            { from: "user", text: "vacant rooms" },
+            { from: "bot", text: "Vacant beds \u2014 44 total\n\nTHOR (24 beds):\n  F1: 101(1), 103(2)\n  F3: 301(1), 304(2)\n  ...\n\nHULK (20 beds):\n  F2: 201(1), 213(1)\n  F4: 401(2), 424(1)\n  ..." }
+          ]
+        },
+        {
+          name: "Log Complaint",
+          example: "complaint room 204 fan",
+          desc: "Register a maintenance complaint with room, category, and auto-generated ticket ID.",
+          status: "live",
+          chat: [
+            { from: "user", text: "complaint room 204 fan not working" },
+            { from: "bot", text: "Complaint registered.\n\nTicket: PLU-20260326-001\nRoom: 204 (THOR)\nCategory: Electrical\nIssue: Fan not working\nStatus: Open" }
+          ]
+        },
+        {
+          name: "Resolve Complaint",
+          example: "resolve PLU-20260326-001",
+          desc: "Mark a complaint ticket as resolved with optional resolution notes.",
+          status: "live",
+          chat: [
+            { from: "user", text: "resolve PLU-20260326-001" },
+            { from: "bot", text: "Complaint resolved.\n\nTicket: PLU-20260326-001\nRoom: 204 (THOR)\nIssue: Fan not working\nResolved: 26 Mar 2026\nDuration: 4 hours" }
+          ]
+        },
+        {
+          name: "Activity Log",
+          example: "log water tanker paid 5000",
+          desc: "Quick-log any operational activity or ad-hoc expense for daily tracking.",
+          status: "live",
+          chat: [
+            { from: "user", text: "log water tanker paid 5000" },
+            { from: "bot", text: "Activity logged.\n\nEntry: Water tanker \u2014 Rs.5,000\nDate: 26 Mar 2026\nLogged by: Admin" }
+          ]
+        },
+        {
+          name: "Query Activity",
+          example: "activity today",
+          desc: "Review all logged activities for a given date or date range.",
+          status: "live",
+          chat: [
+            { from: "user", text: "activity today" },
+            { from: "bot", text: "Activity \u2014 26 Mar 2026\n\n1. Payment: Rahul Rs.15,000 (UPI)\n2. Expense: Plumbing Rs.5,000\n3. Water tanker Rs.5,000\n4. Checkout: Vishal, Room 204\n\n4 entries total" }
+          ]
+        },
+        {
+          name: "Contacts",
+          example: "contacts plumber",
+          desc: "Look up vendor and service provider contacts from the saved directory.",
+          status: "progress",
+          chat: [
+            { from: "user", text: "contacts plumber" },
+            { from: "bot", text: "Plumber contacts:\n\n1. Raju \u2014 9876543210\n   Area: General plumbing\n2. Krishna \u2014 9876543211\n   Area: Pipeline & tank" }
+          ]
+        }
+      ]
+    }
+  ],
+  receptionist: [
+    {
+      group: "Financial",
+      services: [
+        {
+          name: "Log Payment",
+          example: "room 102 paid 15000 upi",
+          desc: "Record rent or deposit payments against a room. Supports UPI, cash, and bank transfer modes.",
+          status: "live",
+          chat: [
+            { from: "user", text: "room 102 paid 15000 upi" },
+            { from: "bot", text: "Payment logged.\n\nTenant: Rahul Sharma\nRoom: 102 (THOR)\nAmount: Rs.15,000\nMode: UPI\nDate: 26 Mar 2026\n\nReceipt #PAY-20260326-047" }
+          ]
+        },
+        {
+          name: "Query Dues",
+          example: "dues",
+          desc: "Get outstanding dues for current month across all active tenants.",
+          status: "live",
+          chat: [
+            { from: "user", text: "dues" },
+            { from: "bot", text: "Dues for March 2026\n\nTHOR: Rs.2,45,000 (14 tenants)\nHULK: Rs.2,10,000 (11 tenants)\n\nTotal: Rs.4,55,000 from 25 tenants" }
+          ]
+        },
+        {
+          name: "Void Payment",
+          example: "void payment 123",
+          desc: "Soft-delete a payment by marking it as void. Original record preserved for audit trail.",
+          status: "live",
+          chat: [
+            { from: "user", text: "void payment 47" },
+            { from: "bot", text: "Payment #PAY-047 voided.\n\nTenant: Rahul Sharma\nAmount: Rs.15,000\nOriginal date: 26 Mar 2026\n\nDues recalculated." }
+          ]
+        },
+        {
+          name: "Monthly Report",
+          example: "report march",
+          desc: "Full monthly financial summary. Restricted to admin role.",
+          status: "locked",
+          chat: []
+        },
+        {
+          name: "Bank Report",
+          example: "bank report march",
+          desc: "Bank statement upload and analysis. Restricted to admin role.",
+          status: "locked",
+          chat: []
+        },
+        {
+          name: "Add Expense",
+          example: "expense 5000 plumbing",
+          desc: "Log an operational expense with amount, category, and optional notes.",
+          status: "live",
+          chat: [
+            { from: "user", text: "expense 5000 plumbing" },
+            { from: "bot", text: "Expense logged.\n\nAmount: Rs.5,000\nCategory: Plumbing\nDate: 26 Mar 2026\nRef: EXP-20260326-012" }
+          ]
+        }
+      ]
+    },
+    {
+      group: "Tenant Management",
+      services: [
+        {
+          name: "Add Tenant",
+          example: "add tenant Rahul room 305",
+          desc: "Onboard a new tenant with room assignment, rent schedule creation, and deposit tracking.",
+          status: "live",
+          chat: [
+            { from: "user", text: "add tenant Rahul room 305" },
+            { from: "bot", text: "Tenant added.\n\nName: Rahul\nRoom: 305 (THOR)\nSharing: Triple\nRent: Rs.8,500/month\nCheck-in: 26 Mar 2026\n\nDeposit pending: Rs.8,500" }
+          ]
+        },
+        {
+          name: "Checkout",
+          example: "checkout room 204",
+          desc: "Process tenant checkout with deposit settlement and pending dues calculation.",
+          status: "live",
+          chat: [
+            { from: "user", text: "checkout room 204" },
+            { from: "bot", text: "Checkout processed.\n\nTenant: Vishal Reddy\nRoom: 204 (THOR)\nStay: 4 months 12 days\n\nDeposit: Rs.9,000\nPending dues: Rs.0\nRefund: Rs.9,000" }
+          ]
+        },
+        {
+          name: "Room Query",
+          example: "room 102",
+          desc: "Get current occupants, sharing type, rent details, and payment status for any room.",
+          status: "live",
+          chat: [
+            { from: "user", text: "room 102" },
+            { from: "bot", text: "Room 102 \u2014 THOR, Floor 1\nType: Double sharing\n\nBed A: Rahul Sharma\n  Rent: Rs.15,000 | Dues: Rs.0\nBed B: Vacant" }
+          ]
+        },
+        {
+          name: "Tenant Search",
+          example: "Prashant details",
+          desc: "Fuzzy search tenants by name. Returns room, rent, and balance details.",
+          status: "live",
+          chat: [
+            { from: "user", text: "Prashant details" },
+            { from: "bot", text: "Prashant Kumar\nRoom: 412 (HULK)\nSharing: Triple\nRent: Rs.8,500/month\nCheck-in: 15 Jan 2026\n\nPaid till: March 2026\nBalance: Rs.0" }
+          ]
+        }
+      ]
+    },
+    {
+      group: "Operations",
+      services: [
+        {
+          name: "Occupancy",
+          example: "occupancy",
+          desc: "Current occupancy rates for both properties.",
+          status: "live",
+          chat: [
+            { from: "user", text: "occupancy" },
+            { from: "bot", text: "Occupancy \u2014 26 Mar 2026\n\nTHOR: 121/145 beds (83.4%)\nHULK: 126/146 beds (86.3%)\n\nTotal: 247/291 beds (84.9%)" }
+          ]
+        },
+        {
+          name: "Vacant Rooms",
+          example: "vacant rooms",
+          desc: "List all rooms with available beds.",
+          status: "live",
+          chat: [
+            { from: "user", text: "vacant rooms" },
+            { from: "bot", text: "Vacant beds \u2014 44 total\n\nTHOR (24 beds):\n  F1: 101(1), 103(2)\n  ...\n\nHULK (20 beds):\n  F2: 201(1), 213(1)\n  ..." }
+          ]
+        },
+        {
+          name: "Log Complaint",
+          example: "complaint room 204 fan",
+          desc: "Register a maintenance complaint with room, category, and auto-generated ticket ID.",
+          status: "live",
+          chat: [
+            { from: "user", text: "complaint room 204 fan" },
+            { from: "bot", text: "Complaint registered.\n\nTicket: PLU-20260326-001\nRoom: 204 (THOR)\nCategory: Electrical\nIssue: Fan not working\nStatus: Open" }
+          ]
+        },
+        {
+          name: "Resolve Complaint",
+          example: "resolve PLU-20260326-001",
+          desc: "Mark a complaint ticket as resolved.",
+          status: "live",
+          chat: [
+            { from: "user", text: "resolve PLU-20260326-001" },
+            { from: "bot", text: "Complaint resolved.\n\nTicket: PLU-20260326-001\nRoom: 204\nResolved: 26 Mar 2026" }
+          ]
+        },
+        {
+          name: "Activity Log",
+          example: "log water tanker paid 5000",
+          desc: "Quick-log any operational activity for daily tracking.",
+          status: "live",
+          chat: [
+            { from: "user", text: "log water tanker paid 5000" },
+            { from: "bot", text: "Activity logged.\n\nEntry: Water tanker \u2014 Rs.5,000\nDate: 26 Mar 2026" }
+          ]
+        },
+        {
+          name: "Query Activity",
+          example: "activity today",
+          desc: "Review all logged activities for a given date.",
+          status: "live",
+          chat: [
+            { from: "user", text: "activity today" },
+            { from: "bot", text: "Activity \u2014 26 Mar 2026\n\n1. Payment: Rahul Rs.15,000\n2. Expense: Plumbing Rs.5,000\n3. Water tanker Rs.5,000\n\n3 entries total" }
+          ]
+        },
+        {
+          name: "Contacts",
+          example: "contacts plumber",
+          desc: "Look up vendor and service provider contacts.",
+          status: "progress",
+          chat: [
+            { from: "user", text: "contacts plumber" },
+            { from: "bot", text: "Plumber contacts:\n\n1. Raju \u2014 9876543210\n2. Krishna \u2014 9876543211" }
+          ]
+        }
+      ]
+    }
+  ],
+  tenant: [
+    {
+      group: "Self-Service",
+      services: [
+        {
+          name: "My Balance",
+          example: "my balance",
+          desc: "Check your current outstanding balance, next due date, and payment history summary.",
+          status: "live",
+          chat: [
+            { from: "user", text: "my balance" },
+            { from: "bot", text: "Hi Rahul,\n\nRoom: 102 (THOR)\nRent: Rs.15,000/month\n\nMarch 2026: PAID\nNext due: 1 Apr 2026\nOutstanding: Rs.0" }
+          ]
+        },
+        {
+          name: "My Payments",
+          example: "my payments",
+          desc: "View your complete payment history with dates, amounts, and receipt numbers.",
+          status: "live",
+          chat: [
+            { from: "user", text: "my payments" },
+            { from: "bot", text: "Your payments, Rahul:\n\n1. 26 Mar \u2014 Rs.15,000 (UPI) #047\n2. 28 Feb \u2014 Rs.15,000 (UPI) #031\n3. 30 Jan \u2014 Rs.15,000 (Cash) #018\n\nTotal paid: Rs.45,000" }
+          ]
+        },
+        {
+          name: "WiFi Password",
+          example: "wifi password",
+          desc: "Get the current WiFi network name and password for your property.",
+          status: "live",
+          chat: [
+            { from: "user", text: "wifi password" },
+            { from: "bot", text: "WiFi for THOR:\n\nNetwork: Cozeevo-THOR-5G\nPassword: cozeevo@2026\n\nHaving issues? Contact reception." }
+          ]
+        },
+        {
+          name: "Raise Complaint",
+          example: "complaint fan not working",
+          desc: "Report a maintenance issue from your room. Auto-assigned to your room number.",
+          status: "live",
+          chat: [
+            { from: "user", text: "complaint fan not working" },
+            { from: "bot", text: "Complaint registered.\n\nTicket: PLU-20260326-002\nRoom: 102 (auto-detected)\nIssue: Fan not working\n\nOur team will resolve this within 24 hours." }
+          ]
+        }
+      ]
+    }
+  ],
+  lead: [
+    {
+      group: "Enquiry",
+      services: [
+        {
+          name: "Room Prices",
+          example: "price",
+          desc: "Get current monthly rent rates for all sharing types across both properties.",
+          status: "live",
+          chat: [
+            { from: "user", text: "What are the prices?" },
+            { from: "bot", text: "Cozeevo Co-living \u2014 Monthly Rent\n\nSingle occupancy: Rs.15,000\nDouble sharing: Rs.9,500\nTriple sharing: Rs.8,500\n\nIncludes: WiFi, housekeeping, power backup, water.\nSecurity deposit: 1 month rent." }
+          ]
+        },
+        {
+          name: "Availability",
+          example: "available rooms",
+          desc: "Check current room availability across both properties with move-in dates.",
+          status: "live",
+          chat: [
+            { from: "user", text: "Any rooms available?" },
+            { from: "bot", text: "Yes! We have availability:\n\nTHOR (Marathahalli):\n  Double sharing: 12 beds\n  Triple sharing: 8 beds\n\nHULK (Marathahalli):\n  Double sharing: 10 beds\n  Triple sharing: 14 beds\n\nImmediate move-in available." }
+          ]
+        },
+        {
+          name: "Room Types",
+          example: "single/double/triple",
+          desc: "Detailed comparison of room types with amenities and pricing.",
+          status: "live",
+          chat: [
+            { from: "user", text: "What room types do you have?" },
+            { from: "bot", text: "We offer 3 room types:\n\nSingle \u2014 Rs.15,000/mo\n  Private room, attached bathroom\n\nDouble \u2014 Rs.9,500/mo\n  2 beds, attached bathroom\n\nTriple \u2014 Rs.8,500/mo\n  3 beds, attached bathroom\n\nAll rooms: AC, WiFi, housekeeping, power backup." }
+          ]
+        },
+        {
+          name: "Book Visit",
+          example: "visit",
+          desc: "Schedule a property visit with date and time preference.",
+          status: "live",
+          chat: [
+            { from: "user", text: "Can I visit tomorrow?" },
+            { from: "bot", text: "Of course! I have scheduled a visit for you.\n\nDate: 27 Mar 2026\nTime: 10:00 AM \u2013 6:00 PM\nLocation: Cozeevo THOR, Marathahalli\n\nOur team will be ready to show you around. See you there!" }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+// Count total unique services
+let totalServices = 0;
+Object.values(DATA).forEach(groups => {
+  groups.forEach(g => { totalServices += g.services.length; });
+});
+// Subtract duplicates between admin/receptionist (approx)
+const uniqueCount = DATA.admin.reduce((s, g) => s + g.services.length, 0)
+  + DATA.tenant[0].services.length
+  + DATA.lead[0].services.length;
+
+function renderBadge(status) {
+  if (status === 'live') return '<span class="badge badge-live"><span class="dot"></span>LIVE</span>';
+  if (status === 'progress') return '<span class="badge badge-progress"><span class="dot"></span>IN PROGRESS</span>';
+  if (status === 'planned') return '<span class="badge badge-planned"><span class="dot"></span>PLANNED</span>';
+  if (status === 'locked') return '<span class="badge badge-locked"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> LOCKED</span>';
+  return '';
+}
+
+function chevronSVG() {
+  return '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+}
+
+function renderChat(messages) {
+  if (!messages || messages.length === 0) return '';
+  let html = '<div class="wa-chat"><div class="wa-chat-label">Conversation Preview</div>';
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  messages.forEach(m => {
+    const cls = m.from === 'user' ? 'wa-msg-user' : 'wa-msg-bot';
+    const lines = m.text.replace(/\n/g, '<br>');
+    html += `<div class="wa-msg ${cls}">${lines}<div class="wa-msg-time">${timeStr}</div></div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderTab(tabKey) {
+  const groups = DATA[tabKey];
+  let html = '';
+  groups.forEach(g => {
+    html += `<div class="group"><div class="group-title">${g.group}</div>`;
+    g.services.forEach((s, i) => {
+      const isLocked = s.status === 'locked';
+      const cardClass = isLocked ? 'card locked' : 'card';
+      const expandContent = !isLocked ? `<div class="card-expand">${renderChat(s.chat)}</div>` : '';
+      html += `
+        <div class="${cardClass}" ${!isLocked ? 'onclick="toggleCard(this)"' : ''}>
+          <div class="card-header">
+            <div class="card-name">${s.name}</div>
+            ${renderBadge(s.status)}
+            ${!isLocked ? chevronSVG() : ''}
+          </div>
+          <div class="card-example">${s.example}</div>
+          <div class="card-desc">${s.desc}</div>
+          ${expandContent}
+        </div>`;
+    });
+    html += '</div>';
+  });
+  return html;
+}
+
+function toggleCard(el) {
+  const wasExpanded = el.classList.contains('expanded');
+  // Close all cards in same tab
+  el.closest('.tab-content').querySelectorAll('.card.expanded').forEach(c => c.classList.remove('expanded'));
+  if (!wasExpanded) el.classList.add('expanded');
+}
+
+// Build panels
+const panelsEl = document.getElementById('tab-panels');
+['admin','receptionist','tenant','lead'].forEach(key => {
+  const div = document.createElement('div');
+  div.className = 'tab-content' + (key === 'admin' ? ' active' : '');
+  div.id = 'panel-' + key;
+  div.innerHTML = renderTab(key);
+  panelsEl.appendChild(div);
+});
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// Service count
+document.getElementById('service-count').textContent = uniqueCount;
+</script>
+</body>
+</html>
