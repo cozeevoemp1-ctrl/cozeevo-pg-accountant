@@ -2793,11 +2793,25 @@ def _make_dedup_hash(date_str: str, phone: str, description: str) -> str:
 def _detect_activity_type(text: str) -> ActivityLogType:
     """Detect activity type from keywords in description."""
     t = text.lower()
-    # Purchase BEFORE delivery — "bought supplies" = purchase, not delivery
-    if re.search(r"\b(?:bought|purchased|paid\s+for|cost|spent|charged)\b", t):
+    # Purchase — "paid 5000", "bought supplies", "spent 2000"
+    if re.search(r"\b(?:bought|purchased|paid|cost|spent|charged)\b", t):
         return ActivityLogType.purchase
-    if re.search(r"\b(?:received|delivered|got\s+\d|shipment|supply|supplies)\b", t):
+    # Staff — joined, left, vacation, salary, advance
+    if re.search(r"\b(?:staff|employee|joined|resigned|left\s+job|vacation|leave|salary|advance|overtime|new\s+hire|fired|terminated)\b", t):
+        return ActivityLogType.staff
+    # Visitor — owner visit, guest, inspection
+    if re.search(r"\b(?:visit|visitor|owner\s+came|inspection|guest|inspector|auditor|came\s+to\s+check)\b", t):
+        return ActivityLogType.visitor
+    # Utility — water tanker, electricity, gas, internet, bill
+    if re.search(r"\b(?:water\s+tanker|tanker|electricity|power\s+cut|gas\s+cylinder|gas\s+bill|internet\s+bill|wifi\s+bill|bescom|bwssb)\b", t):
+        return ActivityLogType.utility
+    # Supply — groceries, cleaning items, kitchen
+    if re.search(r"\b(?:groceries|grocery|cleaning\s+items|kitchen\s+supplies|vegetables|provisions|ration|detergent|soap)\b", t):
+        return ActivityLogType.supply
+    # Delivery — received, delivered, shipment
+    if re.search(r"\b(?:received|delivered|got\s+\d|shipment)\b", t):
         return ActivityLogType.delivery
+    # Maintenance — fixed, repaired, plumber, electrician
     if re.search(r"\b(?:fixed|repaired|repair|plumber|electrician|carpenter|painter|maintenance|replaced|serviced)\b", t):
         return ActivityLogType.maintenance
     return ActivityLogType.note
@@ -2851,6 +2865,10 @@ _TYPE_ICONS = {
     ActivityLogType.delivery:    "📦",
     ActivityLogType.purchase:    "💰",
     ActivityLogType.maintenance: "🔧",
+    ActivityLogType.utility:     "🚰",
+    ActivityLogType.supply:      "🛒",
+    ActivityLogType.staff:       "👷",
+    ActivityLogType.visitor:     "🏢",
     ActivityLogType.payment:     "💳",
     ActivityLogType.complaint:   "⚠️",
     ActivityLogType.checkout:    "🚪",

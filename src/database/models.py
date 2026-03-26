@@ -1039,6 +1039,10 @@ class ActivityLogType(str, enum.Enum):
     delivery    = "delivery"      # supplies received
     purchase    = "purchase"      # something bought + paid
     maintenance = "maintenance"   # repair/fix work
+    utility     = "utility"       # water tanker, electricity, gas, internet
+    supply      = "supply"        # groceries, cleaning items, kitchen supplies
+    staff       = "staff"         # staff joined, left, vacation, salary, advance
+    visitor     = "visitor"       # owner visit, guest, inspection
     payment     = "payment"       # auto-linked from payment handler
     complaint   = "complaint"     # auto-linked from complaint handler
     checkout    = "checkout"      # auto-linked from checkout handler
