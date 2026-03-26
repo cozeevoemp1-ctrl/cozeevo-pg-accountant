@@ -97,6 +97,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:refund|return deposit|give back deposit|deposit back|repay deposit|disburse deposit|pay\s*back\s+deposit|deposit\s+wapas|wapas\s+karo\b)", re.I), "ADD_REFUND", 0.92),
     # Floor plan / room layout — "thor floor plan", "hulk layout", "room diagram"
     (re.compile(r"(?:floor\s*plan|room\s*layout|room\s*diagram|block\s*layout|layout\s*of\s*(?:thor|hulk)|(?:thor|hulk)\s*(?:layout|diagram|floors?|rooms?|beds?)|beds?\s*per\s*floor|rooms?\s*per\s*floor|show\s*(?:me\s*)?(?:all\s*)?(?:thor|hulk|block)\s*rooms?)", re.I), "ROOM_LAYOUT", 0.95),
+    # Activity query — "activity today", "show activity", "activity log today", "activity this week"
+    (re.compile(r"(?:activity\s+(?:log\s+)?(?:today|yesterday|this\s+week|last\s+\d+\s+days?|room\s+[\w-]+)|show\s+activit(?:y|ies)|activit(?:y|ies)\s+(?:today|yesterday|this\s+week|log)|^activit(?:y|ies)$|^activity\s+log$)", re.I), "QUERY_ACTIVITY", 0.94),
+    # Activity log — "log ...", "note ...", "log received ...", "log delivered ...", bare "log"
+    (re.compile(r"(?:^log\s*$|^log\s+\S|^note\s+\S|^activity\s+log\s+\S|^logged?\s+(?:received|delivered|got|bought|purchased|fixed|repaired|plumber|electrician|water|generator)|^received\s+\d+\s+\w+|^delivered\s+\d+\s+\w+)", re.I), "ACTIVITY_LOG", 0.93),
     # Room status — who's in / status of a specific room (incl bare "room 205" and "room X details")
     (re.compile(r"(?:who(?:'?s| is)(?: living| staying)? in room|room\s+[\w-]+\s+(?:who|occupant|tenant|person|status|details?)|who (?:lives?|stays?|is living|is staying) in|status\s+of\s+room\s+[\w-]+|is\s+room\s+[\w-]+\s+(?:occupied|free|vacant|empty|available)|room\s+[\w-]+\s+occupied|^room\s+[\d\w-]+\s*$)", re.I), "ROOM_STATUS", 0.94),
     # Vacant rooms
@@ -384,6 +388,7 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
     "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CONTACTS",
     "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
     "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
+    "ACTIVITY_LOG", "QUERY_ACTIVITY",
     "RULES", "HELP", "MORE_MENU",
 })
 
@@ -392,6 +397,7 @@ _RECEPTIONIST_DIRECT: frozenset[str] = frozenset({
     "PAYMENT_LOG", "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS",
     "QUERY_OCCUPANCY", "QUERY_CONTACTS",
     "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
+    "ACTIVITY_LOG", "QUERY_ACTIVITY",
     "HELP", "MORE_MENU",
 })
 _TENANT_DIRECT: frozenset[str] = frozenset({

@@ -1035,6 +1035,48 @@ class BankUpload(Base):
     )
 
 
+class ActivityLogType(str, enum.Enum):
+    delivery    = "delivery"      # supplies received
+    purchase    = "purchase"      # something bought + paid
+    maintenance = "maintenance"   # repair/fix work
+    payment     = "payment"       # auto-linked from payment handler
+    complaint   = "complaint"     # auto-linked from complaint handler
+    checkout    = "checkout"      # auto-linked from checkout handler
+    note        = "note"          # general observation
+
+
+class ActivityLog(Base):
+    """
+    L3 — Activity log for PG operations.
+    Tracks deliveries, purchases, maintenance, notes, and auto-linked events.
+    Deduplicated by dedup_hash (date + phone + normalized description).
+    """
+    __tablename__ = "activity_log"
+
+    id           = Column(Integer, primary_key=True)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    logged_by    = Column(String(30), nullable=False)     # phone number
+    log_type     = Column(Enum(ActivityLogType), default=ActivityLogType.note)
+    room         = Column(String(20), nullable=True)
+    tenant_name  = Column(String(120), nullable=True)
+    description  = Column(Text, nullable=False)
+    amount       = Column(Numeric(12, 2), nullable=True)  # only if payment involved
+    media_url    = Column(String(500), nullable=True)      # photo/receipt URL
+    source       = Column(String(20), default="whatsapp")  # whatsapp | dashboard | system
+    linked_id    = Column(Integer, nullable=True)          # FK to payment/complaint/etc
+    linked_type  = Column(String(30), nullable=True)       # "payment", "complaint", "expense"
+    property_name = Column(String(120), nullable=True)     # THOR or HULK
+    dedup_hash   = Column(String(64), nullable=True)       # SHA-256 prevent duplicates
+
+    __table_args__ = (
+        Index("ix_activity_log_created", "created_at"),
+        Index("ix_activity_log_logged_by", "logged_by"),
+        Index("ix_activity_log_type", "log_type"),
+        Index("ix_activity_log_room", "room"),
+        UniqueConstraint("dedup_hash", name="uq_activity_log_dedup"),
+    )
+
+
 class BankTransaction(Base):
     """
     L2 — Individual transaction rows extracted from bank statement PDFs.

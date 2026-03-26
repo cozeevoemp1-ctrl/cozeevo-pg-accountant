@@ -11,8 +11,10 @@ Disambiguation flow:
 from __future__ import annotations
 
 import calendar
+import hashlib
 import json
 import re
+import string
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -22,6 +24,7 @@ from sqlalchemy import select, and_, or_, func, case as sa_case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
+    ActivityLog, ActivityLogType,
     AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Expense, ExpenseCategory,
     Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, PgContact, Property, Refund, RefundStatus,
     RentSchedule, RentStatus, Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
@@ -94,6 +97,8 @@ async def handle_owner(
         "QUERY_COMPLAINTS":   _query_complaints,
         "GET_TENANT_NOTES":   _get_tenant_notes,
         "QUERY_CONTACTS":     _query_contacts,
+        "ACTIVITY_LOG":       _activity_log,
+        "QUERY_ACTIVITY":     _query_activity,
         "RULES":              _rules,
         "HELP":               _help,
         "MORE_MENU":          _more_menu,
@@ -2762,3 +2767,209 @@ async def handle_learn_command(message: str, ctx: CallerContext, session: AsyncS
         f"→ *{intent_name}* (confidence: 0.87)\n\n"
         f"No restart needed — active immediately."
     )
+
+
+# ── Activity Log ─────────────────────────────────────────────────────────────
+
+def _normalize_description(desc: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace — for dedup hash."""
+    desc = desc.lower().strip()
+    desc = desc.translate(str.maketrans("", "", string.punctuation))
+    desc = re.sub(r"\s+", " ", desc).strip()
+    # Remove trailing filler words that don't change meaning
+    for filler in ("today", "now", "just now"):
+        if desc.endswith(filler):
+            desc = desc[: -len(filler)].strip()
+    return desc
+
+
+def _make_dedup_hash(date_str: str, phone: str, description: str) -> str:
+    """SHA-256 of date + phone + normalized description."""
+    norm = _normalize_description(description)
+    raw = f"{date_str}|{phone}|{norm}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _detect_activity_type(text: str) -> ActivityLogType:
+    """Detect activity type from keywords in description."""
+    t = text.lower()
+    # Purchase BEFORE delivery — "bought supplies" = purchase, not delivery
+    if re.search(r"\b(?:bought|purchased|paid\s+for|cost|spent|charged)\b", t):
+        return ActivityLogType.purchase
+    if re.search(r"\b(?:received|delivered|got\s+\d|shipment|supply|supplies)\b", t):
+        return ActivityLogType.delivery
+    if re.search(r"\b(?:fixed|repaired|repair|plumber|electrician|carpenter|painter|maintenance|replaced|serviced)\b", t):
+        return ActivityLogType.maintenance
+    return ActivityLogType.note
+
+
+def _extract_activity_amount(text: str) -> Optional[float]:
+    """
+    Extract amount only when a payment keyword is nearby.
+    "paid 5000" -> 5000.  "5000 liters" -> None.
+    """
+    # Amount after payment keyword: "paid 5000", "cost 2500", "charged 3000", "spent 1500"
+    m = re.search(
+        r"\b(?:paid|cost|charged|spent|bought\s+for|total\s+paid)\s+(?:rs\.?\s*)?(\d[\d,]*)",
+        text, re.I,
+    )
+    if m:
+        return float(m.group(1).replace(",", ""))
+    # "total 25000" at end-ish
+    m = re.search(r"\btotal\s+(?:rs\.?\s*)?(\d[\d,]*)\b", text, re.I)
+    if m:
+        return float(m.group(1).replace(",", ""))
+    return None
+
+
+def _extract_activity_room(text: str) -> Optional[str]:
+    """Extract room number from activity text."""
+    m = re.search(r"\broom\s+([\w-]+)", text, re.I)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _extract_activity_property(text: str) -> Optional[str]:
+    """Extract THOR or HULK from text."""
+    if re.search(r"\bthor\b", text, re.I):
+        return "THOR"
+    if re.search(r"\bhulk\b", text, re.I):
+        return "HULK"
+    return None
+
+
+def _extract_activity_description(raw_message: str) -> str:
+    """Strip the command prefix ('log', 'note', 'activity log') to get the description."""
+    desc = raw_message.strip()
+    # Remove leading command words
+    desc = re.sub(r"^(?:activity\s+log\s+|log\s+|note\s+)", "", desc, flags=re.I).strip()
+    return desc
+
+
+_TYPE_ICONS = {
+    ActivityLogType.delivery:    "📦",
+    ActivityLogType.purchase:    "💰",
+    ActivityLogType.maintenance: "🔧",
+    ActivityLogType.payment:     "💳",
+    ActivityLogType.complaint:   "⚠️",
+    ActivityLogType.checkout:    "🚪",
+    ActivityLogType.note:        "📝",
+}
+
+
+async def _activity_log(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Log an activity entry."""
+    raw = entities.get("_raw_message", "")
+    description = _extract_activity_description(raw)
+
+    if not description or len(description.strip()) < 2:
+        return "Please provide a description. Example:\n*log water tanker came today*"
+
+    today_str = date.today().isoformat()
+    phone = ctx.phone.lstrip("+")
+
+    # Dedup check
+    dedup = _make_dedup_hash(today_str, phone, description)
+    existing = await session.execute(
+        select(ActivityLog).where(ActivityLog.dedup_hash == dedup)
+    )
+    dup = existing.scalar_one_or_none()
+    if dup:
+        dup_time = dup.created_at.strftime("%I:%M %p") if dup.created_at else "earlier"
+        return f"This activity was already logged at {dup_time} by {dup.logged_by}."
+
+    log_type = _detect_activity_type(description)
+    amount = _extract_activity_amount(description)
+    room = _extract_activity_room(description) or entities.get("room")
+    prop = _extract_activity_property(description)
+
+    entry = ActivityLog(
+        logged_by=phone,
+        log_type=log_type,
+        room=room,
+        description=description,
+        amount=amount,
+        property_name=prop,
+        source="whatsapp",
+        dedup_hash=dedup,
+    )
+    session.add(entry)
+    await session.flush()
+
+    icon = _TYPE_ICONS.get(log_type, "📝")
+    parts = [f"{icon} *Activity logged*"]
+    parts.append(f"Type: {log_type.value}")
+    parts.append(f"Description: {description}")
+    if room:
+        parts.append(f"Room: {room}")
+    if amount:
+        parts.append(f"Amount: ₹{int(amount):,}")
+    if prop:
+        parts.append(f"Property: {prop}")
+    return "\n".join(parts)
+
+
+async def _query_activity(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Query activity log entries."""
+    raw = entities.get("_raw_message", "").lower().strip()
+    today = date.today()
+
+    # Determine date range
+    from_dt = datetime(today.year, today.month, today.day, 0, 0, 0)
+    to_dt = datetime(today.year, today.month, today.day, 23, 59, 59)
+    label = "today"
+
+    if "yesterday" in raw:
+        yesterday = today - timedelta(days=1)
+        from_dt = datetime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0)
+        to_dt = datetime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59)
+        label = "yesterday"
+    elif "this week" in raw or "week" in raw:
+        week_start = today - timedelta(days=today.weekday())
+        from_dt = datetime(week_start.year, week_start.month, week_start.day, 0, 0, 0)
+        label = "this week"
+    elif re.search(r"last\s+(\d+)\s+days?", raw):
+        m = re.search(r"last\s+(\d+)\s+days?", raw)
+        days = int(m.group(1))
+        start = today - timedelta(days=days)
+        from_dt = datetime(start.year, start.month, start.day, 0, 0, 0)
+        label = f"last {days} days"
+
+    # Build query
+    q = select(ActivityLog).where(
+        and_(
+            ActivityLog.created_at >= from_dt,
+            ActivityLog.created_at <= to_dt,
+        )
+    )
+
+    # Room filter
+    room_filter = None
+    rm = re.search(r"room\s+([\w-]+)", raw, re.I)
+    if rm:
+        room_filter = rm.group(1)
+        q = q.where(ActivityLog.room == room_filter)
+        label += f" (room {room_filter})"
+
+    q = q.order_by(ActivityLog.created_at.desc())
+    result = await session.execute(q)
+    entries = result.scalars().all()
+
+    if not entries:
+        return f"No activity logged {label}."
+
+    lines = [f"*Activity log — {label}* ({len(entries)} entries)\n"]
+    for e in entries:
+        icon = _TYPE_ICONS.get(e.log_type, "📝") if e.log_type else "📝"
+        time_str = e.created_at.strftime("%I:%M %p") if e.created_at else ""
+        who = e.logged_by or "?"
+        line = f"{icon} {time_str} — {e.description}"
+        if e.amount:
+            line += f" (₹{int(e.amount):,})"
+        if e.room:
+            line += f" [Room {e.room}]"
+        line += f" — by {who}"
+        lines.append(line)
+
+    return "\n".join(lines)

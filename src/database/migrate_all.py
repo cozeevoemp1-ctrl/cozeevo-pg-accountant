@@ -617,6 +617,51 @@ async def _add_receptionist_role(conn: AsyncConnection) -> None:
     print("  [ok] user_role enum now includes 'receptionist'")
 
 
+async def run_activity_log_table(conn: AsyncConnection) -> None:
+    """Create activity_log table (idempotent). Added 2026-03-26."""
+    print("\n== Activity log table (2026-03-26) ==")
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS activity_log (
+            id            SERIAL PRIMARY KEY,
+            created_at    TIMESTAMP DEFAULT NOW(),
+            logged_by     VARCHAR(30) NOT NULL,
+            log_type      VARCHAR(20) DEFAULT 'note',
+            room          VARCHAR(20),
+            tenant_name   VARCHAR(120),
+            description   TEXT NOT NULL,
+            amount        NUMERIC(12,2),
+            media_url     VARCHAR(500),
+            source        VARCHAR(20) DEFAULT 'whatsapp',
+            linked_id     INTEGER,
+            linked_type   VARCHAR(30),
+            property_name VARCHAR(120),
+            dedup_hash    VARCHAR(64)
+        )
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_activity_log_created
+            ON activity_log (created_at)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_activity_log_logged_by
+            ON activity_log (logged_by)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_activity_log_type
+            ON activity_log (log_type)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_activity_log_room
+            ON activity_log (room)
+    """))
+    await conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_activity_log_dedup
+            ON activity_log (dedup_hash)
+            WHERE dedup_hash IS NOT NULL
+    """))
+    print("  [ok] activity_log table ready")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -633,6 +678,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_room_cleanup_2026_03_23(conn)
             await run_sharing_type_column(conn)
             await _add_receptionist_role(conn)
+            await run_activity_log_table(conn)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()
