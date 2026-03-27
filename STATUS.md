@@ -1,6 +1,6 @@
 # Cozeevo Help Desk — Project Status
 
-> Updated: 2026-03-26
+> Updated: 2026-03-27
 > Read this FIRST at the start of every session.
 
 ## What's Working (Live on VPS after deploy)
@@ -40,7 +40,8 @@
 - Payment write-back: auto-detect month, overpayment check, Dec/Jan/Feb/Mar columns
 
 ## Known Bugs
-- **Monthly report shows Rs.0 collected** — payment query uses wrong column/filter vs imported data. NEEDS FIX.
+- ~~Monthly report Rs.0~~ — FIXED (is_void was NULL, now false; commit b17327b)
+- ~~No-show count wrong (9 instead of 22)~~ — FIXED (removed checkin_date filter; commit pending)
 - **Prabhakaran (9444296681) can't access bot** — messages don't reach webhook. Likely messaging wrong number or WhatsApp issue.
 - **Golden suite: 86/100** — 14 failing (mostly test-env issues with tenant/lead phone numbers, not code bugs)
 
@@ -48,17 +49,18 @@
 - Room layout: THOR G01-G10 + floors 1-6 (x01-x12) + 701,702 = 84 rooms
 - Room layout: HULK G11-G20 + floors 1-6 (x13-x24) = 82 rooms
 - Staff rooms: THOR (G05,G06,107,108,701) + HULK (G12,114,618) = 8 rooms
-- Revenue beds: THOR 147 + HULK 146 = 291 (corner rooms=single, middle=double, G07-G09/G13-G14=triple)
+- Revenue beds: THOR 145 + HULK 146 = 291 (corner rooms=single, middle=double, G07-G09/G13-G14=triple)
 - Premium = tenancy attribute (1 person books full double room = 2 beds occupied)
 - Occupancy: regular x1 + premium x2. No-show shown separately.
 - Dues scoping: checkin_date < month_start, only current month's rent_schedule
 
 ## Pending Tasks
-1. **Fix monthly report Rs.0 bug** — payment import used period_month as date, report may query differently
-2. **VPS deploy** — `cd /opt/pg-accountant && git pull && python3 -m src.database.migrate_all && systemctl restart pg-accountant`
-3. **Daily Basis sheet integration** — day-stay customers sheet
-4. **P&L reclassification** — Nov 2025 has 4 unanswered questions, Dec-Mar still to review
-5. **Unclassified bank vendors** — arunphilip25, tpasha638, M036TPQEK, akhilreddy007420, volipi.l, ksshyamreddy
+1. ~~Fix monthly report Rs.0 bug~~ — DONE
+2. ~~Fix no-show count~~ — DONE (removed checkin_date filter from no-show queries)
+3. **VPS deploy** — `cd /opt/pg-accountant && git pull && python3 -m src.database.migrate_all && systemctl restart pg-accountant`
+4. **Daily Basis sheet integration** — day-stay customers sheet
+5. **P&L reclassification** — Nov 2025 has 4 unanswered questions, Dec-Mar still to review
+6. **Unclassified bank vendors** — arunphilip25, tpasha638, M036TPQEK, akhilreddy007420, volipi.l, ksshyamreddy
 
 ## File Map
 - `src/whatsapp/chat_api.py` — webhook, chat history, follow-up detection

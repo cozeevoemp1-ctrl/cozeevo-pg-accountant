@@ -1230,7 +1230,6 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
     no_show = await session.scalar(
         select(func.count(Tenancy.id)).where(
             Tenancy.status == TenancyStatus.no_show,
-            Tenancy.checkin_date <= last_day,
         )
     ) or 0
 
