@@ -340,6 +340,12 @@ async def _process_message_inner(
 
     reply = await route(intent, intent_result.entities, ctx, message, session)
 
+    # ── 4a. No reply = bot disabled for this role (tenant/lead) ───────────
+    if reply is None:
+        await _log(session, phone, message, ctx.role, intent, None)
+        await session.commit()
+        return OutboundReply(reply="", intent=intent, role=ctx.role, skip=True)
+
     # ── 4b. Attach interactive payload for menu intents ───────────────────
     interactive_payload = None
     if intent in ("HELP", "MORE_MENU") and ctx.role in ("admin", "power_user", "key_user"):

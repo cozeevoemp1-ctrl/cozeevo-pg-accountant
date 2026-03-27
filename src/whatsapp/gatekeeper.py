@@ -42,7 +42,7 @@ async def route(
     ctx: CallerContext,
     message: str,
     session: AsyncSession,
-) -> str:
+) -> str | None:
     # Stash raw message in entities so handlers can access it without signature change
     entities.setdefault("_raw_message", message)
 
@@ -62,7 +62,8 @@ async def route(
         else:
             return await handle_owner(intent, entities, ctx, session)
     elif ctx.role == "tenant":
-        return await handle_tenant(intent, entities, ctx, session)
+        # Tenant auto-reply disabled — handle manually
+        return None
     else:
-        # lead / unknown phone — conversational sales handling
-        return await handle_lead(intent, message, ctx, session)
+        # Lead / unknown phone — auto-reply disabled, handle manually
+        return None
