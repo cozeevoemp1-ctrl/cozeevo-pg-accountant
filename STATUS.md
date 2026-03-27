@@ -1,6 +1,6 @@
 # Cozeevo Help Desk — Project Status
 
-> Updated: 2026-03-27
+> Updated: 2026-03-27 (session 2)
 > Read this FIRST at the start of every session.
 
 ## What's Working (Live on VPS after deploy)
@@ -41,9 +41,11 @@
 
 ## Known Bugs
 - ~~Monthly report Rs.0~~ — FIXED (is_void was NULL, now false; commit b17327b)
-- ~~No-show count wrong (9 instead of 22)~~ — FIXED (removed checkin_date filter; commit pending)
+- ~~No-show count wrong (9 instead of 22)~~ — FIXED (commit 950a994)
+- **Tenant/lead auto-reply disabled** (commit 6a3618f) — bot silent for non-authorized users, messages still logged
 - **Prabhakaran (9444296681) can't access bot** — messages don't reach webhook. Likely messaging wrong number or WhatsApp issue.
 - **Golden suite: 86/100** — 14 failing (mostly test-env issues with tenant/lead phone numbers, not code bugs)
+- **WhatsApp number migration on hold** — 8548884455 stays on WhatsApp Business app, bot stays on test number
 
 ## Master Data Rules (LOCKED)
 - Room layout: THOR G01-G10 + floors 1-6 (x01-x12) + 701,702 = 84 rooms

@@ -1,0 +1,328 @@
+# BUSINESS_LOGIC.md — PG Accountant Financial & Operational Rules
+
+Complete documentation of all business logic, calculations, and decision rules used by the PG Accountant system.
+
+---
+
+## 1. OCCUPANCY CALCULATION
+
+### 1.1 Total Bed Capacity (Dynamic)
+
+**File:** `src/api/dashboard_router.py:99-102`, `src/whatsapp/handlers/owner_handler.py:1808-1810`
+
+Total beds are calculated dynamically from the rooms table, never hardcoded:
+
+```sql
+TOTAL_BEDS = SUM(max_occupancy) WHERE is_staff_room = False
+```
+
+**Current totals (as of 2026-03-23):**
+- THOR: 145 beds (78 revenue rooms)
+- HULK: 146 beds (79 revenue rooms)
+- **Total: 291 beds**
+
+Staff rooms excluded: THOR (G05, G06, 107, 108, 701, 702) + HULK (G12, 114, 618)
+
+### 1.2 Occupied Beds Calculation
+
+**Files:** `src/api/dashboard_router.py:108-125`, `src/whatsapp/handlers/owner_handler.py:1821-1826`
+
+**Key Rule:** Premium tenancy = 1 person occupies ALL beds in the room (max_occupancy). Regular tenancy = 1 person = 1 bed.
+
+```python
+occupied_beds = SUM(
+    CASE
+        WHEN Tenancy.sharing_type == 'premium' THEN Room.max_occupancy
+        ELSE 1
+    END
+)
+WHERE Room.is_staff_room = False
+  AND Tenancy.status IN (active, no_show)
+  AND Tenancy.checkin_date <= month_end
+```
+
+### 1.3 No-Show Beds
+
+**File:** `src/api/dashboard_router.py:294-304`, `src/whatsapp/handlers/owner_handler.py:1834-1843`
+
+No-show = booked but not yet arrived. Count ALL no-shows regardless of checkin_date (includes future bookings).
+
+```python
+noshow_beds = SUM(
+    CASE
+        WHEN Tenancy.sharing_type == 'premium' THEN Room.max_occupancy
+        ELSE 1
+    END
+)
+WHERE Tenancy.status = 'no_show'
+  AND Room.is_staff_room = False
+```
+
+### 1.4 Vacant Beds
+
+```
+vacant_beds = TOTAL_BEDS - occupied_beds - noshow_beds
+```
+
+### 1.5 Occupancy Percentage
+
+```
+occupancy_pct = ROUND(occupied_beds / TOTAL_BEDS * 100, 1)
+```
+
+### 1.6 Premium Tenancy Definition
+
+- Premium is an **operational status on Tenancy**, NOT a physical room attribute
+- A premium tenant occupies the ENTIRE room alone and pays premium rent
+- Room can switch between premium and regular sharing across months
+- For occupancy: 1 premium tenant in a double room = 2 beds occupied
+- For occupancy: 1 regular tenant in a double room = 1 bed occupied
+- SQL field: `Tenancy.sharing_type = 'premium'` (enum SharingType)
+
+### 1.7 Monthly Occupancy Report
+
+**File:** `src/whatsapp/handlers/account_handler.py:1221-1238`
+
+```python
+active_tenants = COUNT(Tenancy WHERE status = active AND checkin_date <= last_day_of_month)
+premium_count = COUNT(Tenancy WHERE status = active AND sharing_type = 'premium' AND checkin_date <= last_day_of_month)
+no_show = COUNT(Tenancy WHERE status = 'no_show')  # no date filter
+regular = active_tenants - premium_count
+active_beds = regular + (premium_count * 2)
+```
+
+**Output:**
+```
+Checked-in: {active_beds} beds ({regular} regular + {premium_count} premium)
+No-show: {no_show} beds reserved
+Vacant: {291 - active_beds - no_show} beds
+```
+
+---
+
+## 2. DUES SCOPING RULE (LOCKED)
+
+**Files:** `docs/REPORTING.md:105-135`, `src/api/dashboard_router.py:145-161`, `src/whatsapp/handlers/account_handler.py:671-728`
+
+### 2.1 Three Conditions (All Required)
+
+1. **Active status**: `Tenancy.status == TenancyStatus.active`
+   - Excludes: no_show, exited, cancelled
+
+2. **Checked in before month start** (strict less-than): `Tenancy.checkin_date < date(Y, M, 1)`
+   - New arrivals in month M haven't had time to pay yet -- not overdue, just arrived
+
+3. **This month's rent schedule only**: `RentSchedule.period_month == date(Y, M, 1)`
+   - Never cumulative across months
+
+### 2.2 Outstanding Dues Formula
+
+```python
+paid = SUM(Payment.amount WHERE tenancy_id = T AND period_month = M AND is_void = False)
+effective_due = RentSchedule.rent_due + RentSchedule.adjustment
+outstanding = effective_due - paid
+IF outstanding > 0: include in dues list
+```
+
+### 2.3 Applied In (4 Locations)
+
+1. `dashboard_router.py:145-161` -- KPI dues_outstanding
+2. `dashboard_router.py:432-437` -- /api/dashboard/dues endpoint
+3. `account_handler.py:1203-1212` -- _report() function
+4. `account_handler.py:698-710` -- _query_dues() function
+
+**Test:** `tests/test_dues_month_scope.py` -- 10/10 passing
+
+---
+
+## 3. PAYMENT PROCESSING
+
+**File:** `src/whatsapp/handlers/account_handler.py:195-408`
+
+### 3.1 Flow
+
+1. Identify tenant (fuzzy search by name or room)
+2. Resolve period month (parse from message or default to current)
+3. Check duplicate (24-hour window, same tenancy+amount+month)
+4. Create Payment record (is_void=False)
+5. Update RentSchedule status (pending → paid/partial)
+6. Google Sheets write-back (fire-and-forget)
+
+### 3.2 RentSchedule Status Update
+
+```python
+total_paid = SUM(Payment.amount WHERE tenancy_id, period_month, is_void=False)
+effective_due = RentSchedule.rent_due + RentSchedule.adjustment
+
+IF total_paid >= effective_due: status = paid
+ELSE IF total_paid > 0: status = partial
+ELSE: status = pending
+```
+
+### 3.3 Overpayment (threshold Rs.10)
+
+```python
+extra = total_paid - effective_due
+IF extra > 10:
+    Show choices: [1. Advance for next month, 2. Add to deposit, 3. Ask tenant]
+```
+
+### 3.4 Duplicate Detection
+
+24-hour window: same (tenancy_id, amount, period_month, is_void=False). If found, ask user to confirm.
+
+---
+
+## 4. RENT CHANGES
+
+**File:** `src/whatsapp/handlers/account_handler.py:893-1107`
+
+### 4.1 Permanent Rent Change
+
+Updates `tenancy.agreed_rent` + current and future `RentSchedule.rent_due` rows.
+
+### 4.2 One-Time Rent Change
+
+Updates only the target month's `RentSchedule.rent_due`. `tenancy.agreed_rent` stays unchanged -- next month reverts.
+
+### 4.3 Rent Discount / Concession
+
+Creates negative `RentSchedule.adjustment`:
+```python
+effective_due = rent_due + adjustment  # adjustment is negative for discounts
+```
+
+---
+
+## 5. VOID / REFUND
+
+**File:** `src/whatsapp/handlers/account_handler.py:411-499`
+
+### Golden Rule: NEVER delete payment records. Use `is_void = True`.
+
+After voiding, recalculate RentSchedule status from remaining non-void payments.
+
+### Refund
+
+Separate from void -- for exiting tenants. Recorded in Refund table with status (pending/approved/paid).
+
+---
+
+## 6. CHECKOUT & SETTLEMENT
+
+**File:** `src/whatsapp/handlers/owner_handler.py:818-902`
+
+### 6.1 Notice Period
+
+- Notice by 5th of month → deposit refundable
+- Notice after 5th → deposit forfeited + extra month charged
+
+### 6.2 Proration (rounds DOWN)
+
+```python
+days_in_month = calendar.monthrange(year, month)[1]
+prorated_rent = INT(agreed_rent * days_stayed / days_in_month)
+```
+
+### 6.3 Settlement
+
+```python
+net_refund = deposit - outstanding_rent - outstanding_maintenance - damages
+```
+
+---
+
+## 7. EXPENSE CLASSIFICATION (P&L)
+
+**File:** `src/rules/pnl_classify.py`
+
+### 7.1 Algorithm
+
+First keyword match wins. **Order matters -- Non-Operating MUST be first.**
+
+```python
+for category, subcategory, keywords in rules:
+    for keyword in keywords:
+        if keyword in description.lower():
+            return category, subcategory
+```
+
+### 7.2 Categories (18 expense + 5 income)
+
+| # | Category | Examples |
+|---|----------|----------|
+| 1 | Non-Operating | bharathi prabhakaran, shalu.pravi |
+| 2 | Property Rent | vakkal, sravani, r suma |
+| 3 | Electricity | bescom, eb bill |
+| 4 | Water | bwssb, water tanker |
+| 5 | IT & Software | hostinger, kipinn |
+| 6 | Internet & WiFi | airwire, broadband |
+| 7 | Furniture & Fittings | wakefit, grace trader (CAPEX) |
+| 8 | Food & Groceries | virani, zepto, chicken |
+| 9 | Fuel & Diesel | dg rent, petrol |
+| 10 | Staff & Labour | salary, arjun, housekeeping |
+| 11 | Govt & Regulatory | bbmp, gst |
+| 12 | Tenant Deposit Refund | refund, exit refund |
+| 13 | Marketing | logo tshirt, sunboard |
+| 14 | Cleaning Supplies | garbage, phenyl |
+| 15 | Shopping & Supplies | amazon, flipkart |
+| 16 | Maintenance & Repairs | plumbing, electrician |
+| 17 | Bank Charges | debit card, imps charges |
+| 18 | Other Expenses | catch-all |
+
+### 7.3 Bank Statement Deduplication
+
+SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement is safe.
+
+---
+
+## 8. BILLING RULES
+
+- **Maintenance = one-time check-in fee from deposit, NEVER monthly**
+- Excel rent columns `From 1st FEB` etc. = rent revision from that date
+- **Proration always rounds DOWN** -- tenant pays less, not more
+
+---
+
+## 9. KEY CONSTANTS
+
+| Constant | Value | Notes |
+|----------|-------|-------|
+| TOTAL_BEDS | 291 | Dynamic from rooms table |
+| NOTICE_BY_DAY | 5 | Deposit eligibility cutoff |
+| OVERPAYMENT_NOISE_RS | 10 | Payment rounding tolerance |
+| DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection window |
+| DEPOSIT_MATCH_TOLERANCE | 10% | Bank deposit matching |
+| DEPOSIT_MATCH_DAYS | 45 | Bank deposit matching window |
+
+---
+
+## 10. GOLDEN RULES
+
+1. **NEVER hard-delete financial records** -- use `is_void = True`
+2. **Dues are THIS MONTH ONLY** -- never cumulative
+3. **Exclude same-month check-ins from dues** -- `checkin_date < month_start`
+4. **No-show count has NO date filter** -- all no-shows counted
+5. **Bank statement is P&L source of truth** -- not Supabase payments table
+6. **Payments table is dues source of truth** -- not bank statement
+7. **Classification order matters** -- Non-Operating must be FIRST
+8. **Proration rounds DOWN** -- tenant pays less
+9. **Maintenance = one-time, NEVER monthly**
+10. **Premium is tenancy status, not room type**
+11. **Total beds = dynamic from rooms table** -- never hardcode
+
+---
+
+## 11. WHERE EACH CALCULATION LIVES
+
+| Calculation | Primary Location | Also In |
+|---|---|---|
+| Occupancy % | `dashboard_router.py:108-128` | `owner_handler.py:1821-1826` |
+| Dues Outstanding | `dashboard_router.py:145-161` | `account_handler.py:671-728` |
+| Collection Rate | `dashboard_router.py:255-268` | -- |
+| Monthly Report | `account_handler.py:1157-1249` | -- |
+| Rent Change | `account_handler.py:893-1107` | -- |
+| Checkout Settlement | `owner_handler.py:818-902` | -- |
+| Payment Log | `account_handler.py:195-408` | -- |
+| Void Payment | `account_handler.py:411-499` | -- |
+| Expense Classification | `pnl_classify.py:19-157` | -- |
