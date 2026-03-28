@@ -207,6 +207,37 @@ def _find_tenant_tab(room_number: str, tenant_name: str) -> Optional[tuple[gspre
     return None
 
 
+def _get_prev_month_info(room_number: str, tenant_name: str) -> dict:
+    """Check previous month tab for tenant's balance + notes. Returns {balance, notes, tab}."""
+    from datetime import date as _d
+    t = _d.today()
+    prev_m = t.month - 1
+    prev_y = t.year
+    if prev_m < 1:
+        prev_m, prev_y = 12, prev_y - 1
+
+    prev_tab = _month_tab_for(prev_m, prev_y)
+    try:
+        ws = _get_worksheet_sync(prev_tab)
+        found = _find_row_in_monthly(ws, room_number, tenant_name)
+        if found:
+            _, row_data = found
+            # Detect format
+            all_vals = ws.get_all_values()
+            hdr = all_vals[3] if len(all_vals) > 3 else []
+            is_new = "phone" in str(hdr[2] if len(hdr) > 2 else "").lower()
+            bal_col = 9 if is_new else 8
+            notes_col = 14 if is_new else 12
+            return {
+                "balance": _safe_parse_numeric(_cell(row_data, bal_col)),
+                "notes": _cell(row_data, notes_col),
+                "tab": prev_tab,
+            }
+    except Exception:
+        pass
+    return {"balance": 0, "notes": "", "tab": ""}
+
+
 def _cell(row_data: list[str], col: int) -> str:
     """Safe access to a row's column value."""
     return row_data[col].strip() if col < len(row_data) else ""
@@ -389,6 +420,13 @@ def _update_payment_sync(
     result["rent_due"] = rent_due
     result["total_paid"] = new_total_paid
     result["balance"] = new_balance
+
+    # Check previous month dues + notes
+    prev_info = _get_prev_month_info(room_number, tenant_name)
+    if prev_info["balance"] > 0:
+        result["prev_dues"] = prev_info["balance"]
+        result["prev_notes"] = prev_info["notes"]
+        result["prev_tab"] = prev_info["tab"]
 
     if new_balance < 0:
         result["overpayment"] = abs(new_balance)

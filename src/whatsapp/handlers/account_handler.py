@@ -391,6 +391,14 @@ async def _do_log_payment_by_ids(
                 if warning:
                     parts.append(warning)
                 gsheets_note = "\n" + " | ".join(parts)
+                # Previous month dues reminder
+                prev_dues = gs_result.get("prev_dues", 0)
+                if prev_dues and prev_dues > 0:
+                    prev_tab = gs_result.get("prev_tab", "")
+                    prev_notes = gs_result.get("prev_notes", "")
+                    gsheets_note += f"\n⚠️ *Previous dues: Rs.{int(prev_dues):,}* ({prev_tab})"
+                    if prev_notes:
+                        gsheets_note += f"\nPrev notes: {prev_notes[:100]}"
         except Exception as e:
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
