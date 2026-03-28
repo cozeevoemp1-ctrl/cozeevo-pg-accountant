@@ -478,6 +478,130 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
 
         return None  # Unrecognised step
 
+    # ── Step-by-step Add Tenant flow ─────────────────────────────────────────
+    if pending.intent == "ADD_TENANT_STEP":
+        ans = reply_text.strip()
+        step = action_data.get("step", "")
+
+        # Cancel detection
+        if ans.lower() in ("cancel", "no", "stop", "start over", "abort"):
+            return "Cancelled. Tenant not added."
+
+        if step == "ask_name":
+            if not ans or ans[0].isdigit():
+                return "__KEEP_PENDING__Please enter the *tenant's full name*:"
+            action_data["name"] = ans
+            action_data["step"] = "ask_phone"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Phone number?* (10 digits)"
+
+        if step == "ask_phone":
+            phone_clean = re.sub(r"[^0-9]", "", ans)
+            if len(phone_clean) > 10:
+                phone_clean = phone_clean[-10:]
+            if len(phone_clean) != 10:
+                return f"__KEEP_PENDING__Need 10 digits, got {len(phone_clean)}. *Phone number?*"
+            action_data["phone"] = phone_clean
+            action_data["step"] = "ask_room"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Room number?*"
+
+        if step == "ask_room":
+            room_str = re.sub(r"[^0-9a-zA-Z\-]", "", ans)
+            room_row = await session.scalar(select(Room).where(Room.room_number.ilike(room_str)))
+            if not room_row:
+                return f"__KEEP_PENDING__Room *{room_str}* not found. Try again:"
+            action_data["room_id"] = room_row.id
+            action_data["room_number"] = room_row.room_number
+            action_data["building"] = ""
+            # Get building from room's property
+            if room_row.property_id:
+                prop = await session.get(Property, room_row.property_id) if hasattr(Room, 'property_id') else None
+                if prop:
+                    action_data["building"] = prop.name or ""
+            action_data["floor"] = str(room_row.floor or "")
+            action_data["sharing"] = room_row.room_type or ""
+            action_data["step"] = "ask_rent"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return f"Room *{room_row.room_number}* ({room_row.room_type or 'unknown'} sharing)\n\n*Monthly rent?* (number)"
+
+        if step == "ask_rent":
+            rent = _parse_amount_field(ans)
+            if rent <= 0:
+                return "__KEEP_PENDING__Enter a valid rent amount (e.g. 13500):"
+            action_data["rent"] = rent
+            action_data["step"] = "ask_deposit"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Security deposit?* (number, or *skip*)"
+
+        if step == "ask_deposit":
+            action_data["deposit"] = _parse_amount_field(ans)
+            action_data["step"] = "ask_maintenance"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Maintenance fee?* (number, or *skip*)"
+
+        if step == "ask_maintenance":
+            action_data["maintenance"] = _parse_amount_field(ans)
+            action_data["step"] = "ask_checkin"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Check-in date?* (e.g. 29 March or 29/03/2026)"
+
+        if step == "ask_checkin":
+            from src.whatsapp.intent_detector import _extract_date_entity
+            checkin_iso = _extract_date_entity(ans)
+            if not checkin_iso:
+                return "__KEEP_PENDING__Couldn't parse that date. Try: *29 March* or *29/03/2026*"
+            action_data["checkin_date"] = checkin_iso
+            action_data["step"] = "confirm"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+
+            checkin_date = date.fromisoformat(checkin_iso)
+            rent = int(action_data.get("rent", 0))
+            deposit = int(action_data.get("deposit", 0))
+            maint = int(action_data.get("maintenance", 0))
+
+            return (
+                f"*Confirm New Tenant?*\n\n"
+                f"Name: {action_data['name']}\n"
+                f"Phone: {action_data['phone']}\n"
+                f"Room: {action_data['room_number']}\n"
+                f"Rent: Rs.{rent:,}/month\n"
+                f"Deposit: Rs.{deposit:,}\n"
+                + (f"Maintenance: Rs.{maint:,}\n" if maint > 0 else "")
+                + f"Check-in: {checkin_date.strftime('%d %b %Y')}\n\n"
+                "Reply *yes* to save or *no* to cancel."
+            )
+
+        if step == "confirm":
+            if ans.lower() in ("yes", "y", "confirm", "save", "ok", "done"):
+                # Create tenant via _do_add_tenant
+                form_data = {
+                    "name": action_data["name"],
+                    "phone": action_data["phone"],
+                    "room_id": action_data["room_id"],
+                    "room_number": action_data["room_number"],
+                    "base_rent": action_data["rent"],
+                    "deposit": action_data.get("deposit", 0),
+                    "advance": 0,
+                    "maintenance": action_data.get("maintenance", 0),
+                    "checkin_date": action_data["checkin_date"],
+                    "food_pref": "none",
+                    "discount": {},
+                    "existing_tenant_id": None,
+                    "building": action_data.get("building", ""),
+                    "sharing": action_data.get("sharing", ""),
+                }
+                result = await _do_add_tenant(form_data, session)
+                return result
+            else:
+                return "Cancelled. Tenant not added."
+
+        return None
+
+    if pending.intent == "ADD_TENANT_INCOMPLETE":
+        # Legacy — clear and re-prompt
+        return "Please send *add tenant* to start the checkin form."
+
     # ── Correction: user provides a new amount for RENT_CHANGE ───────────────
     if pending.intent == "RENT_CHANGE" and not reply_text.rstrip(".").isdigit():
         _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
@@ -1320,46 +1444,14 @@ async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncS
             msg = "\n".join(rebuilt_lines)
         return await _process_tenant_form(msg, ctx, session)
 
-    # ── Show blank form template ───────────────────────────────────────────
-    phone = entities.get("phone", "").strip()
-    if phone:
-        ok, reason = await check_no_active_tenancy(phone, session)
-        if not ok:
-            return reason
-
-    name = entities.get("name", "").strip()
-    reentry_note = ""
-    if name:
-        rows = await _find_active_tenants_by_name(name, session)
-        if rows:
-            tenant, tenancy, room_obj = rows[0]
-            reentry_note = (
-                f"\n⚠️ *{tenant.name}* already has an active tenancy in Room {room_obj.room_number}.\n"
-                "If this is a room change, first checkout the old room then add new.\n"
-            )
-        else:
-            past = await session.scalar(select(Tenant).where(Tenant.name.ilike(f"%{name}%")))
-            if past:
-                reentry_note = (
-                    f"\n📋 *{past.name}* has a previous record in the system.\n"
-                    "A *new tenancy* will be created — existing payment history is preserved.\n"
-                )
-
-    return (
-        f"*New tenant check-in*{reentry_note}\n"
-        "Please send all details:\n\n"
-        "Name: [full name]\n"
-        "Phone: [mobile number]\n"
-        "Room: [room number]\n"
-        "Rent: [monthly amount]\n"
-        "Discount: [e.g. 6400 until May / 20% off 2 months / skip]\n"
-        "Deposit: [security deposit]\n"
-        "Advance: [amount paid at booking / skip]\n"
-        "Maintenance: [monthly fee / skip]\n"
-        "Checkin: [DD/MM/YYYY]\n"
-        "Food: [veg/non-veg/egg/none]\n\n"
-        "I'll confirm before saving."
-    )
+    # ── Start step-by-step flow ────────────────────────────────────────────
+    action_data = {"step": "ask_name"}
+    session.add(PendingAction(
+        phone=ctx.phone, intent="ADD_TENANT_STEP",
+        action_data=json.dumps(action_data), choices=json.dumps([]),
+        expires_at=datetime.utcnow() + timedelta(minutes=30),
+    ))
+    return "*New tenant check-in*\n\nLet's go step by step.\n\n*Tenant's full name?*"
 
 
 async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSession) -> str:
