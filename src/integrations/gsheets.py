@@ -477,8 +477,10 @@ def _add_tenant_sync(
             "",                # 13: Notice Date
             "",                # 14: Expected Exit
         ]
-        tenants_ws.append_row(tenants_row, value_input_option="USER_ENTERED")
-        result["tenants_row"] = len(tenants_ws.get_all_values())
+        t_data = tenants_ws.get_all_values()
+        t_next = len(t_data) + 1
+        tenants_ws.update(values=[tenants_row], range_name=f"A{t_next}", value_input_option="USER_ENTERED")
+        result["tenants_row"] = t_next
         logger.info("GSheets: added tenant %s to TENANTS tab at row %d", name, result["tenants_row"])
 
         # -- Monthly tab (use checkin month, not current month) --
@@ -517,8 +519,10 @@ def _add_tenant_sync(
                 agreed_rent, "", "", 0, agreed_rent, "UNPAID",
                 checkin, "", "", 0, 0,
             ]
-        monthly_ws.append_row(monthly_row, value_input_option="USER_ENTERED")
-        result["monthly_row"] = len(monthly_ws.get_all_values())
+        # Use update (not append_row) because filters block append
+        next_row = len(all_vals) + 1
+        monthly_ws.update(values=[monthly_row], range_name=f"A{next_row}", value_input_option="USER_ENTERED")
+        result["monthly_row"] = next_row
         result["success"] = True
         logger.info(
             "GSheets: added tenant %s to monthly tab '%s' at row %d",
