@@ -651,7 +651,8 @@ async def _calc_outstanding_dues(tenancy_id: int, session: AsyncSession) -> tupl
     outstanding_maintenance = Decimal("0")
 
     for rs in pending_schedules_result.scalars().all():
-        paid_for_month = await session.scalar(
+        # Rent: due minus already paid
+        paid_rent = await session.scalar(
             select(func.sum(Payment.amount)).where(
                 Payment.tenancy_id == tenancy_id,
                 Payment.period_month == rs.period_month,
@@ -660,8 +661,19 @@ async def _calc_outstanding_dues(tenancy_id: int, session: AsyncSession) -> tupl
             )
         ) or Decimal("0")
         effective_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
-        outstanding_rent += max(Decimal("0"), effective_due - paid_for_month)
-        outstanding_maintenance += rs.maintenance_due or Decimal("0")
+        outstanding_rent += max(Decimal("0"), effective_due - paid_rent)
+
+        # Maintenance: due minus already paid
+        paid_maint = await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.tenancy_id == tenancy_id,
+                Payment.period_month == rs.period_month,
+                Payment.for_type == PaymentFor.maintenance,
+                Payment.is_void == False,
+            )
+        ) or Decimal("0")
+        maint_due = rs.maintenance_due or Decimal("0")
+        outstanding_maintenance += max(Decimal("0"), maint_due - paid_maint)
 
     return outstanding_rent, outstanding_maintenance
 
