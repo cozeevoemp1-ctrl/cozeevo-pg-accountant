@@ -609,12 +609,16 @@ async def run_sharing_type_column(conn: AsyncConnection) -> None:
 
 
 async def _add_receptionist_role(conn: AsyncConnection) -> None:
-    """Add 'receptionist' value to the user_role PostgreSQL enum (idempotent)."""
+    """Add 'receptionist' value to the user_role PostgreSQL enum (idempotent).
+    Skips gracefully if user_role is not a Postgres ENUM (e.g. VARCHAR column)."""
     print("\n== Receptionist role (2026-03-24) ==")
-    await conn.execute(text(
-        "ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'receptionist'"
-    ))
-    print("  [ok] user_role enum now includes 'receptionist'")
+    try:
+        await conn.execute(text(
+            "ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'receptionist'"
+        ))
+        print("  [ok] user_role enum now includes 'receptionist'")
+    except Exception:
+        print("  [skip] user_role type not found — role stored as text, no migration needed")
 
 
 async def run_activity_log_table(conn: AsyncConnection) -> None:
