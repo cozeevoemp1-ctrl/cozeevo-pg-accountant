@@ -859,16 +859,9 @@ async def _do_checkout(
             f"\n✅ Notice was on time ({tenancy.notice_date.strftime('%d %b')}) — deposit eligible for refund."
         )
 
-    # Proration: always by days for checkout
-    days_in_month = calendar.monthrange(checkout_date_val.year, checkout_date_val.month)[1]
-    days_stayed = checkout_date_val.day
+    # No proration at checkout — full month rent charged regardless of exit date
+    # Proration only applies at checkin (first month)
     prorate_note = ""
-    if tenancy.agreed_rent:
-        prorated = int(tenancy.agreed_rent * days_stayed / days_in_month)
-        prorate_note = (
-            f"\nDays in {checkout_date_val.strftime('%b')}: {days_stayed}/{days_in_month} "
-            f"= prorated rent: Rs.{prorated:,}"
-        )
 
     # ── Settlement summary ─────────────────────────────────────────────────────
     deposit = tenancy.security_deposit or Decimal("0")
