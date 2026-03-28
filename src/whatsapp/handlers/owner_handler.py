@@ -1182,10 +1182,22 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         tenant, tenancy, room_obj = rows[0]
         tenancy.notice_date = notice_date_val
         tenancy.expected_checkout = last_day
+
+        # Google Sheets write-back
+        gsheets_note = ""
+        try:
+            from src.integrations.gsheets import record_notice as gsheets_notice
+            gs_r = await gsheets_notice(room_obj.room_number, tenant.name, notice_date_val.strftime("%d/%m/%Y"))
+            if gs_r.get("success"):
+                gsheets_note = "\nSheet updated"
+        except Exception:
+            pass
+
         return (
             f"*Notice recorded — {tenant.name}* (Room {room_obj.room_number})\n"
-            f"Notice date: {notice_date_val.strftime('%d %b %Y')}{assumed_note}\n\n"
-            f"{deposit_note}"
+            f"Notice date: {notice_date_val.strftime('%d %b %Y')}{assumed_note}\n"
+            f"Expected exit: {last_day.strftime('%d %b %Y')}\n\n"
+            f"{deposit_note}{gsheets_note}"
         )
 
     choices = _make_choices(rows)
