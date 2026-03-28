@@ -481,8 +481,15 @@ def _add_tenant_sync(
         result["tenants_row"] = len(tenants_ws.get_all_values())
         logger.info("GSheets: added tenant %s to TENANTS tab at row %d", name, result["tenants_row"])
 
-        # -- Monthly tab --
-        tab_name = _current_month_tab()
+        # -- Monthly tab (use checkin month, not current month) --
+        checkin_month, checkin_year = None, None
+        if checkin:
+            from src.whatsapp.intent_detector import _extract_date_entity
+            iso = _extract_date_entity(checkin)
+            if iso:
+                parts = iso.split("-")
+                checkin_year, checkin_month = int(parts[0]), int(parts[1])
+        tab_name = _month_tab_for(checkin_month, checkin_year) if checkin_month else _current_month_tab()
         result["monthly_tab"] = tab_name
         try:
             monthly_ws = _get_worksheet_sync(tab_name)
@@ -492,24 +499,24 @@ def _add_tenant_sync(
             logger.warning("GSheets: %s", result["error"])
             return result
 
-        monthly_row = [
-            room_number,       # 0: Room
-            name,              # 1: Name
-            phone,             # 2: Phone
-            building,          # 3: Building
-            sharing,           # 4: Sharing
-            agreed_rent,       # 5: Rent Due
-            "",                # 6: Cash
-            "",                # 7: UPI
-            0,                 # 8: Total Paid
-            agreed_rent,       # 9: Balance (= rent due initially)
-            "UNPAID",          # 10: Status
-            checkin,           # 11: Check-in
-            "",                # 12: Notice Date
-            "",                # 13: Event
-            "",                # 14: Notes
-            0,                 # 15: Prev Due
-        ]
+        # Detect old vs new format
+        all_vals = monthly_ws.get_all_values()
+        header_row = all_vals[3] if len(all_vals) > 3 else []
+        is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
+
+        if is_new:
+            monthly_row = [
+                room_number, name, phone, building, sharing,
+                agreed_rent, "", "", 0, agreed_rent, "UNPAID",
+                checkin, "", "", "", 0,
+            ]
+        else:
+            # Old format: no Phone column (15 cols)
+            monthly_row = [
+                room_number, name, building, sharing,
+                agreed_rent, "", "", 0, agreed_rent, "UNPAID",
+                checkin, "", "", 0, 0,
+            ]
         monthly_ws.append_row(monthly_row, value_input_option="USER_ENTERED")
         result["monthly_row"] = len(monthly_ws.get_all_values())
         result["success"] = True

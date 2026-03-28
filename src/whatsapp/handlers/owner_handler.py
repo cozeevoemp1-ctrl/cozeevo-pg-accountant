@@ -1725,9 +1725,13 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         room_obj = await session.get(Room, room_id)
         if room_obj:
             from src.integrations.gsheets import add_tenant as gsheets_add
+            # Get building from property
             building = data.get("building", "")
+            if not building and room_obj.property_id:
+                prop = await session.get(Property, room_obj.property_id)
+                building = prop.name if prop else ""
             floor_val = str(room_obj.floor or "")
-            sharing = data.get("sharing", room_obj.room_type or "")
+            sharing = data.get("sharing", "") or room_obj.room_type or ""
             gs_r = await gsheets_add(
                 room_number=room_number, name=name, phone=phone,
                 gender=data.get("gender", ""), building=building,
@@ -1738,6 +1742,9 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             )
             if gs_r.get("success"):
                 gsheets_note = "\nSheet updated"
+            elif gs_r.get("error"):
+                import logging as _log
+                _log.getLogger(__name__).warning("GSheets add_tenant: %s", gs_r["error"])
     except Exception as e:
         import logging as _log
         _log.getLogger(__name__).error("GSheets add_tenant failed: %s", e)
