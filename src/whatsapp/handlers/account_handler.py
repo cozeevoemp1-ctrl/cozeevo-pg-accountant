@@ -369,7 +369,7 @@ async def _do_log_payment_by_ids(
                 amount=float(amount_dec),
                 method=mode,
                 month=period_month.month,
-                rent_due=float(effective_due),
+                year=period_month.year,
             )
             if gs_result.get("error"):
                 import logging as _logging

@@ -890,6 +890,23 @@ async def _do_checkout(
         settlement_lines.append(f"*Tenant still owes: Rs.{int(abs(net)):,}*")
     settlement_summary = "\n".join(settlement_lines)
 
+    # ── Google Sheets write-back (fire-and-forget) ──
+    gsheets_note = ""
+    room_obj = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+    if room_obj:
+        try:
+            from src.integrations.gsheets import record_checkout as gsheets_checkout
+            notice_str = tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None
+            gs_r = await gsheets_checkout(room_obj.room_number, tenant_name, notice_str)
+            if gs_r.get("success"):
+                gsheets_note = "\nSheet updated: EXIT"
+            elif gs_r.get("error"):
+                import logging as _log
+                _log.getLogger(__name__).warning("GSheets checkout: %s", gs_r["error"])
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).error("GSheets checkout failed: %s", e)
+
     return (
         f"*Checkout recorded — {tenant_name}*\n"
         f"Date: {checkout_date_val.strftime('%d %b %Y')}"
@@ -899,6 +916,7 @@ async def _do_checkout(
         "Next steps:\n"
         "1. Collect room keys\n"
         "2. Process deposit refund → *refund [amount] to [Name]*"
+        f"{gsheets_note}"
     )
 
 
@@ -1450,6 +1468,29 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             notes        = "Booking advance at check-in",
         ))
 
+    # ── Google Sheets write-back (fire-and-forget) ──
+    gsheets_note = ""
+    try:
+        room_obj = await session.get(Room, room_id)
+        if room_obj:
+            from src.integrations.gsheets import add_tenant as gsheets_add
+            building = data.get("building", "")
+            floor_val = str(room_obj.floor or "")
+            sharing = data.get("sharing", room_obj.room_type or "")
+            gs_r = await gsheets_add(
+                room_number=room_number, name=name, phone=phone,
+                gender=data.get("gender", ""), building=building,
+                floor=floor_val, sharing=sharing,
+                checkin=checkin_date.strftime("%d/%m/%Y"),
+                agreed_rent=float(base_rent), deposit=float(deposit),
+                booking=float(advance), maintenance=float(maintenance),
+            )
+            if gs_r.get("success"):
+                gsheets_note = "\nSheet updated"
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).error("GSheets add_tenant failed: %s", e)
+
     return (
         f"*Tenant saved — {name}* ✅\n\n"
         f"Room: {room_number}\n"
@@ -1458,6 +1499,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         f"Checkin: {checkin_date.strftime('%d %b %Y')}\n"
         + (f"Advance logged: Rs.{int(advance):,}\n" if advance > 0 else "")
         + "Rent schedule created."
+        + gsheets_note
     )
 
 
