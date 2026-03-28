@@ -249,13 +249,25 @@ def main():
                 has_payment = cash > 0 or upi > 0
 
             # Who appears in this month?
-            has_status = st and st not in ('', 'EXIT')
-            is_active = t['status'] in ('Active', 'No-show')
-            checked_in = t['checkin'] and t['checkin'] <= me
+            # Rules:
+            # - NO SHOW in rent status = "not here yet", skip UNLESS actual no-show
+            # - EXIT: only show in FIRST month it appears, not repeated
+            # - PAID/PARTIAL/UNPAID/ADVANCE: always show
+            actual_noshow = (st == 'NO SHOW' and t['status'] == 'No-show')
+            is_meaningful = st in ('PAID', 'PARTIAL', 'UNPAID', 'ADVANCE') or actual_noshow
 
-            if not (has_payment or has_status or (is_active and checked_in)):
-                continue
-            if st == 'EXIT' and not has_payment:
+            # EXIT: only include if this is the first month with EXIT
+            if st == 'EXIT':
+                prev_months = {'dec_st': None, 'jan_st': 'dec_st', 'feb_st': 'jan_st', 'mar_st': 'feb_st'}
+                prev_key = prev_months.get(stk)
+                prev_st = t.get(prev_key, '') if prev_key else ''
+                if prev_st == 'EXIT':
+                    # Previous month already had EXIT, skip this month
+                    pass
+                else:
+                    is_meaningful = True
+
+            if not (has_payment or is_meaningful):
                 continue
 
             total_paid = cash + upi
