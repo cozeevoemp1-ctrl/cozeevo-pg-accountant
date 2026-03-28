@@ -183,6 +183,30 @@ def _safe_parse_numeric(cell_value: str) -> float:
         return 0.0
 
 
+def _find_tenant_tab(room_number: str, tenant_name: str) -> Optional[tuple[gspread.Worksheet, str, int, list[str]]]:
+    """Find tenant across current + adjacent month tabs. Returns (ws, tab_name, row, row_data) or None."""
+    from datetime import date as _d
+    t = _d.today()
+    # Search order: current month, next month, prev month
+    months_to_try = []
+    for offset in [0, 1, -1, 2]:
+        m = t.month + offset
+        y = t.year
+        if m > 12: m, y = m - 12, y + 1
+        if m < 1: m, y = m + 12, y - 1
+        months_to_try.append(_month_tab_for(m, y))
+
+    for tab_name in months_to_try:
+        try:
+            ws = _get_worksheet_sync(tab_name)
+            found = _find_row_in_monthly(ws, room_number, tenant_name)
+            if found:
+                return (ws, tab_name, found[0], found[1])
+        except Exception:
+            continue
+    return None
+
+
 def _cell(row_data: list[str], col: int) -> str:
     """Safe access to a row's column value."""
     return row_data[col].strip() if col < len(row_data) else ""
@@ -554,19 +578,16 @@ def _record_checkout_sync(
         "error": None,
     }
 
-    tab_name = _current_month_tab()
-    result["tab"] = tab_name
-
     try:
-        # -- Monthly tab --
-        ws = _get_worksheet_sync(tab_name)
-        found = _find_row_in_monthly(ws, room_number, tenant_name)
-        if found is None:
-            result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
+        # -- Monthly tab (search current + adjacent months) --
+        tenant_tab = _find_tenant_tab(room_number, tenant_name)
+        if tenant_tab is None:
+            result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
             logger.warning("GSheets: %s", result["error"])
             return result
 
-        row, row_data = found
+        ws, tab_name, row, row_data = tenant_tab
+        result["tab"] = tab_name
         result["row"] = row
 
         batch = [
@@ -642,17 +663,17 @@ def _record_notice_sync(
         "error": None,
     }
 
-    tab_name = _current_month_tab()
-    result["tab"] = tab_name
-
     try:
-        # -- Monthly tab --
-        ws = _get_worksheet_sync(tab_name)
-        found = _find_row_in_monthly(ws, room_number, tenant_name)
-        if found is None:
-            result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
+        # -- Monthly tab (search current + adjacent months) --
+        tenant_tab = _find_tenant_tab(room_number, tenant_name)
+        if tenant_tab is None:
+            result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
             logger.warning("GSheets: %s", result["error"])
             return result
+
+        ws, tab_name, _row, _row_data = tenant_tab
+        result["tab"] = tab_name
+        found = (_row, _row_data)
 
         row, _ = found
         result["row"] = row
