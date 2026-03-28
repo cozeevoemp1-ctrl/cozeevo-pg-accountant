@@ -184,24 +184,24 @@ def main():
     gc = gspread.authorize(creds)
     sp = gc.open_by_key(NEW_SHEET)
 
-    # ── TENANTS tab ──────────────────────────────────────────────────────
-    ws_t = get_ws(sp, "TENANTS", 300, 18)
+    # ── TENANTS tab (DB-aligned: tenants + tenancies + rooms) ────────────
+    ws_t = get_ws(sp, "TENANTS", 300, 17)
     t_headers = ["Room", "Name", "Phone", "Gender", "Building", "Floor",
-                 "Sharing", "Check-in", "Status", "Monthly Rent", "Current Rent",
-                 "Deposit", "Booking", "Maintenance", "Staff", "Comments",
-                 "Refund Status", "Refund Amount"]
+                 "Sharing", "Check-in", "Status", "Agreed Rent",
+                 "Deposit", "Booking", "Maintenance",
+                 "Notice Date", "Expected Exit", "Checkout Date", "Refund Status"]
     t_rows = [[
         t['room'], t['name'], t['phone'], t['gender'], t['block'], t['floor'],
-        t['sharing'], t['checkin_raw'], t['status'], t['rent_monthly'], t['current_rent'],
-        t['deposit'], t['booking'], t['maintenance'], t['staff'], t['comment'],
-        t['refund_status'], t['refund_amount'],
+        t['sharing'], t['checkin_raw'], t['status'], t['current_rent'],
+        t['deposit'], t['booking'], t['maintenance'],
+        '', '', '', t['refund_status'],
     ] for t in tenants]
 
     ws_t.update(values=[t_headers] + t_rows, range_name="A1", value_input_option="USER_ENTERED")
-    ws_t.format("A1:R1", {"textFormat": {"bold": True},
+    ws_t.format("A1:Q1", {"textFormat": {"bold": True},
                            "backgroundColor": {"red": 0.85, "green": 0.95, "blue": 0.85}})
     ws_t.freeze(rows=1)
-    try: ws_t.set_basic_filter(f"A1:R{1 + len(t_rows)}")
+    try: ws_t.set_basic_filter(f"A1:Q{1 + len(t_rows)}")
     except: pass
     print(f"  TENANTS: {len(t_rows)} rows")
     time.sleep(8)

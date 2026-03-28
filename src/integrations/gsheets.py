@@ -1,35 +1,34 @@
 """
 src/integrations/gsheets.py
 ============================
-Google Sheets write-back for Cozeevo PG payments.
+Google Sheets integration for Cozeevo PG — NEW sheet format (v2).
 
-Writes to the "History" sheet whenever a payment is logged via WhatsApp.
-Columns referenced (0-indexed):
-  [0]  Room No
-  [1]  Name
-  [9]  Monthly Rent
-  [10] From 1st FEB (rent revision)
-  [11] From 1st May (rent revision)
-  [12] Sharing
-  [14] Comments
-  [16] IN/OUT
-  [17] BLOCK
-  [25] FEB RENT (status)
-  [26] MARCH RENT (status)
-  [28] FEB Cash
-  [29] FEB UPI
-  [31] March Cash
-  [32] March UPI
+Sheet ID: 1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw
 
-Design decisions:
-  - Uses gspread (sync lib) wrapped in asyncio.to_thread for async compat
-  - Caches the worksheet handle for 5 minutes (avoids re-auth on every payment)
-  - ADD to existing numeric values (never replace)
-  - Skips update if cell contains non-numeric text (logs warning)
+TENANTS tab (master data) columns (0-indexed):
+  [0] Room, [1] Name, [2] Phone, [3] Gender, [4] Building, [5] Floor,
+  [6] Sharing, [7] Check-in, [8] Status, [9] Agreed Rent, [10] Deposit,
+  [11] Booking, [12] Maintenance, [13] Notice Date, [14] Expected Exit
+
+Monthly tab (e.g. "APRIL 2026") columns (0-indexed):
+  [0] Room, [1] Name, [2] Phone, [3] Building, [4] Sharing, [5] Rent Due,
+  [6] Cash, [7] UPI, [8] Total Paid, [9] Balance, [10] Status,
+  [11] Check-in, [12] Notice Date, [13] Event, [14] Notes, [15] Prev Due
+
+Monthly tab row layout:
+  Row 1: Month title (merged)
+  Row 2: Summary (auto-updated by Apps Script)
+  Row 3: Summary continued
+  Row 4: Headers
+  Row 5+: Tenant data
+
+Design:
+  - gspread (sync) wrapped in asyncio.to_thread for async compat
+  - Worksheet handles cached for 5 minutes
+  - Row lookup: room_number (col 0) exact match + tenant_name (col 1) fuzzy
+  - Payments: ADD to existing value, never replace
   - Batch updates via worksheet.batch_update() to minimize API calls
-  - Auto-detects month: applies to oldest unpaid month first
-  - Overpayment check: warns if total paid > rent due
-  - Comments: appends new entries, preserves existing
+  - Fire-and-forget from bot (errors logged, not raised to user)
 """
 from __future__ import annotations
 
@@ -38,57 +37,87 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, date
+from typing import Any, Optional
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 logger = logging.getLogger(__name__)
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+# -- Configuration ------------------------------------------------------------
 
 SHEET_ID = os.getenv(
     "GSHEETS_SHEET_ID",
-    "1T4YE7RK2eIZRg330kaOaNb5-8o8kJbxpDzK_7MfoyiA",
+    "1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw",
 )
 CREDENTIALS_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "credentials",
     "gsheets_service_account.json",
 )
-WORKSHEET_NAME = "History"
 
-# ── Column mapping per month ──────────────────────────────────────────────────
-# month_number -> (rent_status_col, cash_col, upi_col)  — all 0-indexed
-MONTH_COLUMNS: dict[int, tuple[int, int, int]] = {
-    12: (20, 23, 24),  # DEC: rent_status=col20, cash=col23("until jan Cash"), upi=col24
-    1:  (21, 23, 24),  # JAN: rent_status=col21, cash=col23("until jan Cash"), upi=col24
-    2:  (25, 28, 29),  # FEB: rent_status=col25, cash=col28, upi=col29
-    3:  (26, 31, 32),  # MARCH: rent_status=col26, cash=col31, upi=col32
-}
+MONTH_NAMES = [
+    "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+    "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
+]
 
-# Rent columns (0-indexed): Monthly Rent, From 1st FEB, From 1st May
-RENT_COL = 9
-RENT_FEB_COL = 10
-RENT_MAY_COL = 11
+# -- Monthly tab column indices (0-indexed) ------------------------------------
 
-COMMENTS_COL = 14  # 0-indexed
+M_ROOM = 0
+M_NAME = 1
+M_PHONE = 2
+M_BUILDING = 3
+M_SHARING = 4
+M_RENT_DUE = 5
+M_CASH = 6
+M_UPI = 7
+M_TOTAL_PAID = 8
+M_BALANCE = 9
+M_STATUS = 10
+M_CHECKIN = 11
+M_NOTICE_DATE = 12
+M_EVENT = 13
+M_NOTES = 14
+M_PREV_DUE = 15
 
-# ── Worksheet cache ───────────────────────────────────────────────────────────
+# -- TENANTS tab column indices (0-indexed) ------------------------------------
 
-_ws_cache: Optional[gspread.Worksheet] = None
-_ws_cache_time: float = 0
+T_ROOM = 0
+T_NAME = 1
+T_PHONE = 2
+T_GENDER = 3
+T_BUILDING = 4
+T_FLOOR = 5
+T_SHARING = 6
+T_CHECKIN = 7
+T_STATUS = 8
+T_AGREED_RENT = 9
+T_DEPOSIT = 10
+T_BOOKING = 11
+T_MAINTENANCE = 12
+T_NOTICE_DATE = 13
+T_EXPECTED_EXIT = 14
+T_CHECKOUT_DATE = 15
+T_REFUND_STATUS = 16
+
+MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
+
+# -- Spreadsheet + worksheet cache --------------------------------------------
+
+_spreadsheet_cache: Optional[gspread.Spreadsheet] = None
+_spreadsheet_cache_time: float = 0
+_ws_cache: dict[str, tuple[gspread.Worksheet, float]] = {}
 _CACHE_TTL = 300  # 5 minutes
 
 
-def _get_worksheet_sync() -> gspread.Worksheet:
-    """Return authorized gspread worksheet, with 5-min cache."""
-    global _ws_cache, _ws_cache_time
+def _get_spreadsheet_sync() -> gspread.Spreadsheet:
+    """Return authorized gspread Spreadsheet handle, cached for 5 min."""
+    global _spreadsheet_cache, _spreadsheet_cache_time
 
     now = time.time()
-    if _ws_cache is not None and (now - _ws_cache_time) < _CACHE_TTL:
-        return _ws_cache
+    if _spreadsheet_cache is not None and (now - _spreadsheet_cache_time) < _CACHE_TTL:
+        return _spreadsheet_cache
 
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -96,58 +125,107 @@ def _get_worksheet_sync() -> gspread.Worksheet:
     ]
     creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=scopes)
     gc = gspread.authorize(creds)
-    spreadsheet = gc.open_by_key(SHEET_ID)
-    ws = spreadsheet.worksheet(WORKSHEET_NAME)
+    ss = gc.open_by_key(SHEET_ID)
 
-    _ws_cache = ws
-    _ws_cache_time = now
-    logger.info("GSheets: authorized and cached worksheet '%s'", WORKSHEET_NAME)
+    _spreadsheet_cache = ss
+    _spreadsheet_cache_time = now
+    logger.info("GSheets: authorized and cached spreadsheet")
+    return ss
+
+
+def _get_worksheet_sync(tab_name: str) -> gspread.Worksheet:
+    """Return a worksheet by tab name, cached for 5 min."""
+    now = time.time()
+    if tab_name in _ws_cache:
+        ws, cached_at = _ws_cache[tab_name]
+        if (now - cached_at) < _CACHE_TTL:
+            return ws
+
+    ss = _get_spreadsheet_sync()
+    ws = ss.worksheet(tab_name)
+    _ws_cache[tab_name] = (ws, now)
+    logger.info("GSheets: cached worksheet '%s'", tab_name)
     return ws
 
 
-async def get_sheet() -> gspread.Worksheet:
-    """Async wrapper — returns authorized History worksheet."""
-    return await asyncio.to_thread(_get_worksheet_sync)
+def _current_month_tab() -> str:
+    """Return the tab name for the current month, e.g. 'APRIL 2026'."""
+    today = date.today()
+    return f"{MONTH_NAMES[today.month - 1]} {today.year}"
 
 
-# ── Row lookup ────────────────────────────────────────────────────────────────
-
-def _find_row_sync(
-    ws: gspread.Worksheet,
-    room_number: str,
-    tenant_name: str,
-) -> Optional[int]:
-    """
-    Find the 1-based row index matching Room No + tenant Name.
-    Returns None if not found.
-    """
-    all_values = ws.get_all_values()
-    room_clean = room_number.strip().upper()
-    name_lower = tenant_name.strip().lower()
-
-    for i, row in enumerate(all_values):
-        if i == 0:
-            continue
-        cell_room = (row[0] if len(row) > 0 else "").strip().upper()
-        cell_name = (row[1] if len(row) > 1 else "").strip().lower()
-
-        if cell_room != room_clean:
-            continue
-
-        if name_lower in cell_name or cell_name in name_lower:
-            return i + 1  # gspread uses 1-based rows
-
-    return None
+def _month_tab_for(month: int, year: int) -> str:
+    """Return tab name for a specific month/year."""
+    return f"{MONTH_NAMES[month - 1]} {year}"
 
 
-def _find_row_with_data(
+# -- Helpers -------------------------------------------------------------------
+
+_NUMERIC_RE = re.compile(r"^[\d,.\s]*$")
+
+
+def _parse_numeric(cell_value: str) -> float:
+    """Parse a numeric cell. Returns 0.0 for empty/blank. Raises ValueError for text."""
+    val = cell_value.strip()
+    if not val:
+        return 0.0
+    if _NUMERIC_RE.match(val):
+        cleaned = val.replace(",", "").replace(" ", "")
+        return float(cleaned) if cleaned else 0.0
+    raise ValueError(f"Non-numeric cell: '{val}'")
+
+
+def _safe_parse_numeric(cell_value: str) -> float:
+    """Like _parse_numeric but returns 0.0 instead of raising."""
+    try:
+        return _parse_numeric(cell_value)
+    except ValueError:
+        return 0.0
+
+
+def _cell(row_data: list[str], col: int) -> str:
+    """Safe access to a row's column value."""
+    return row_data[col].strip() if col < len(row_data) else ""
+
+
+def _find_row_in_monthly(
     ws: gspread.Worksheet,
     room_number: str,
     tenant_name: str,
 ) -> Optional[tuple[int, list[str]]]:
     """
-    Find the 1-based row index AND return the full row data.
-    Returns (row_index, row_data) or None.
+    Find tenant row in a monthly tab.
+    Returns (1-based row index, row data list) or None.
+    Skips rows 1-4 (title/summary/headers). Data starts at row 5.
+    """
+    all_values = ws.get_all_values()
+    room_clean = room_number.strip().upper()
+    name_lower = tenant_name.strip().lower()
+
+    for i, row in enumerate(all_values):
+        if i < 4:  # skip rows 1-4 (0-indexed: 0-3)
+            continue
+        cell_room = _cell(row, M_ROOM).upper()
+        cell_name = _cell(row, M_NAME).lower()
+
+        if cell_room != room_clean:
+            continue
+
+        # Fuzzy name match: substring in either direction
+        if name_lower in cell_name or cell_name in name_lower:
+            return (i + 1, row)  # gspread uses 1-based rows
+
+    return None
+
+
+def _find_row_in_tenants(
+    ws: gspread.Worksheet,
+    room_number: str,
+    tenant_name: str,
+) -> Optional[tuple[int, list[str]]]:
+    """
+    Find tenant row in the TENANTS master tab.
+    Returns (1-based row index, row data list) or None.
     """
     all_values = ws.get_all_values()
     room_clean = room_number.strip().upper()
@@ -155,9 +233,9 @@ def _find_row_with_data(
 
     for i, row in enumerate(all_values):
         if i == 0:
-            continue
-        cell_room = (row[0] if len(row) > 0 else "").strip().upper()
-        cell_name = (row[1] if len(row) > 1 else "").strip().lower()
+            continue  # skip header
+        cell_room = _cell(row, T_ROOM).upper()
+        cell_name = _cell(row, T_NAME).lower()
 
         if cell_room != room_clean:
             continue
@@ -168,209 +246,178 @@ def _find_row_with_data(
     return None
 
 
-# ── Cell value helpers ────────────────────────────────────────────────────────
-
-_NUMERIC_RE = re.compile(r"^[\d,.\s]*$")
-
-
-def _parse_numeric_cell(cell_value: str) -> Optional[float]:
-    """
-    Parse a cell that should contain a number.
-    Returns None if the cell has non-numeric text.
-    Empty cells return 0.
-    """
-    val = cell_value.strip()
-    if not val:
-        return 0.0
-    if _NUMERIC_RE.match(val):
-        cleaned = val.replace(",", "").replace(" ", "")
-        try:
-            return float(cleaned)
-        except ValueError:
-            return None
-    return None
-
-
-def _get_rent_due(row_data: list[str]) -> float:
-    """
-    Get current rent from row data.
-    Priority: From 1st May > From 1st FEB > Monthly Rent
-    """
-    for col in [RENT_MAY_COL, RENT_FEB_COL, RENT_COL]:
-        if col < len(row_data):
-            val = _parse_numeric_cell(row_data[col])
-            if val and val > 0:
-                return val
-    return 0.0
-
-
-def _get_month_status(row_data: list[str], month: int) -> str:
-    """Get the rent status text for a given month from row data."""
-    if month not in MONTH_COLUMNS:
-        return ""
-    status_col = MONTH_COLUMNS[month][0]
-    if status_col < len(row_data):
-        return row_data[status_col].strip().upper()
-    return ""
-
-
-def _rent_status_label(total_paid: float, rent_due: float) -> str:
-    """Determine rent status string for the sheet."""
-    if rent_due <= 0:
-        return "PAID" if total_paid > 0 else "NOT PAID"
-    if total_paid >= rent_due:
-        return "PAID"
-    if total_paid > 0:
-        return "PARTIALLY PAID"
-    return "NOT PAID"
-
-
-def _detect_month(row_data: list[str]) -> Optional[int]:
-    """
-    Auto-detect which month to apply payment to.
-    Logic: apply to oldest unpaid month first.
-    Returns month number (2=Feb, 3=Mar) or None if all paid.
-    """
-    for month in sorted(MONTH_COLUMNS.keys()):
-        status = _get_month_status(row_data, month)
-        if status in ("NO SHOW", "EXIT", "CANCELLED", ""):
-            continue  # skip months where tenant wasn't present
-        if status in ("NOT PAID", "PARTIALLY PAID"):
-            return month
-    # All months are PAID — default to current month (for advance payments)
-    now = datetime.now()
-    return now.month if now.month in MONTH_COLUMNS else max(MONTH_COLUMNS.keys())
-
-
-# ── Core update function ─────────────────────────────────────────────────────
+# -- Core functions (sync) -----------------------------------------------------
 
 def _update_payment_sync(
     room_number: str,
     tenant_name: str,
     amount: float,
     method: str,
-    month: Optional[int],
-    rent_due: float,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
 ) -> dict:
     """
-    Synchronous payment update. Returns a result dict with status info.
+    Update payment in the monthly tab. ADDs amount to Cash or UPI column.
+    Returns result dict.
     """
-    result = {
+    # Input validation
+    if not amount or amount <= 0:
+        return {"success": False, "error": "Amount must be positive", "row": None, "tab": None,
+                "rent_due": 0, "total_paid": 0, "balance": 0, "overpayment": 0, "warning": None}
+    if method not in ("cash", "upi"):
+        return {"success": False, "error": f"Invalid method '{method}', must be 'cash' or 'upi'",
+                "row": None, "tab": None, "rent_due": 0, "total_paid": 0, "balance": 0,
+                "overpayment": 0, "warning": None}
+
+    today = date.today()
+    if month is None:
+        month = today.month
+    if year is None:
+        year = today.year
+
+    tab_name = _month_tab_for(month, year)
+
+    result: dict[str, Any] = {
         "success": False,
         "row": None,
-        "month": month,
+        "tab": tab_name,
         "rent_due": 0.0,
         "total_paid": 0.0,
+        "balance": 0.0,
         "overpayment": 0.0,
         "warning": None,
         "error": None,
     }
 
     try:
-        ws = _get_worksheet_sync()
+        ws = _get_worksheet_sync(tab_name)
+    except gspread.exceptions.WorksheetNotFound:
+        result["error"] = f"Tab '{tab_name}' not found in sheet"
+        logger.error("GSheets: %s", result["error"])
+        return result
     except Exception as e:
-        result["error"] = f"Sheet auth failed: {e}"
-        logger.error("GSheets auth error: %s", e)
+        result["error"] = f"Sheet auth/access failed: {e}"
+        logger.error("GSheets: %s", result["error"])
         return result
 
-    # Find the row with full data
-    found = _find_row_with_data(ws, room_number, tenant_name)
+    # Read ALL data once (avoid multiple API calls)
+    all_vals = ws.get_all_values()
+
+    # Find row
+    room_clean = room_number.strip().upper()
+    name_lower = tenant_name.strip().lower()
+    found = None
+    for i in range(4, len(all_vals)):  # skip rows 0-3 (title/summary/headers)
+        r_data = all_vals[i]
+        if not r_data or not r_data[0]:
+            continue
+        cell_room = str(r_data[0]).strip().upper()
+        cell_name = str(r_data[1]).strip().lower() if len(r_data) > 1 else ""
+        if cell_room == room_clean and (name_lower in cell_name or cell_name in name_lower):
+            found = (i + 1, r_data)  # 1-based row
+            break
+
     if found is None:
-        result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
+        result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
         logger.warning("GSheets: %s", result["error"])
         return result
 
     row, row_data = found
     result["row"] = row
 
-    # Get rent from sheet (not from DB — sheet is source of truth)
-    sheet_rent = _get_rent_due(row_data)
-    if sheet_rent > 0:
-        rent_due = sheet_rent
-    result["rent_due"] = rent_due
+    # Detect old vs new column layout
+    header_row = all_vals[3] if len(all_vals) > 3 else []
+    is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
 
-    # Auto-detect month if not specified
-    if month is None or month == 0:
-        month = _detect_month(row_data)
-    result["month"] = month
+    if is_new:
+        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
+            M_CASH, M_UPI, M_RENT_DUE, M_PREV_DUE, M_TOTAL_PAID, M_BALANCE, M_STATUS, M_NOTES)
+    else:
+        # Old format: no Phone column, everything shifted -1
+        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
+            5, 6, 4, 15, 7, 8, 9, 12)
 
-    if month not in MONTH_COLUMNS:
-        result["error"] = f"Month {month} not configured in MONTH_COLUMNS"
-        return result
+    # Determine target column
+    method_lower = method.lower()
+    target_col = col_cash if method_lower == "cash" else col_upi
+    other_col = col_upi if method_lower == "cash" else col_cash
 
-    rent_status_col, cash_col, upi_col = MONTH_COLUMNS[month]
-    target_col = cash_col if method.lower() == "cash" else upi_col
-    other_col = upi_col if method.lower() == "cash" else cash_col
-
-    # Read current values from row_data (already fetched)
-    target_cell_val = row_data[target_col] if target_col < len(row_data) else ""
-    other_cell_val = row_data[other_col] if other_col < len(row_data) else ""
-    comments_val = row_data[COMMENTS_COL] if COMMENTS_COL < len(row_data) else ""
-
-    # Parse the target cell
-    existing = _parse_numeric_cell(target_cell_val)
-    if existing is None:
+    # Parse existing values
+    try:
+        existing_target = _parse_numeric(_cell(row_data, target_col))
+    except ValueError:
         result["warning"] = (
-            f"Cell contains text: '{target_cell_val[:40]}' — cannot add to it. "
+            f"Cell contains text: '{_cell(row_data, target_col)[:40]}' — cannot add. "
             f"Please update manually."
         )
         logger.warning("GSheets: %s", result["warning"])
         return result
 
-    # Parse the other payment column
-    other_amount = _parse_numeric_cell(other_cell_val)
-    if other_amount is None:
-        other_amount = 0.0
+    existing_other = _safe_parse_numeric(_cell(row_data, other_col))
+    rent_due = _safe_parse_numeric(_cell(row_data, col_rent))
+    prev_due = _safe_parse_numeric(_cell(row_data, col_prev))
 
-    new_value = existing + amount
-    total_paid_all = new_value + other_amount
-    result["total_paid"] = total_paid_all
+    new_target = existing_target + amount
+    new_total_paid = new_target + existing_other
+    total_due = rent_due + prev_due
+    new_balance = total_due - new_total_paid
 
-    # Check overpayment
-    if rent_due > 0 and total_paid_all > rent_due:
-        overpayment = total_paid_all - rent_due
-        result["overpayment"] = overpayment
+    result["rent_due"] = rent_due
+    result["total_paid"] = new_total_paid
+    result["balance"] = new_balance
+
+    if new_balance < 0:
+        result["overpayment"] = abs(new_balance)
         result["warning"] = (
-            f"Overpayment: total Rs.{int(total_paid_all):,} vs rent Rs.{int(rent_due):,} "
-            f"(+Rs.{int(overpayment):,} extra)"
+            f"Overpayment: total Rs.{int(new_total_paid):,} vs due Rs.{int(total_due):,} "
+            f"(+Rs.{int(abs(new_balance)):,} extra)"
         )
 
-    new_status = _rent_status_label(total_paid_all, rent_due)
+    # Determine status
+    if new_total_paid >= total_due and total_due > 0:
+        new_status = "PAID"
+    elif new_total_paid > 0:
+        new_status = "PARTIAL"
+    else:
+        new_status = _cell(row_data, col_st) or "UNPAID"
 
-    # Build timestamp comment (append to existing)
+    # Build notes append
     ts = datetime.now().strftime("%d-%b %H:%M")
     method_upper = method.upper()
-    month_names = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun"}
-    month_label = month_names.get(month, f"M{month}")
-    new_comment_line = f"[{ts}] Rs.{int(amount):,} {method_upper} for {month_label}"
+    note_entry = f"[{ts}] Rs.{int(amount):,} {method_upper}"
+    existing_notes = _cell(row_data, col_notes)
+    updated_notes = f"{existing_notes} | {note_entry}" if existing_notes else note_entry
 
-    if comments_val.strip():
-        updated_comments = f"{comments_val} | {new_comment_line}"
-    else:
-        updated_comments = new_comment_line
-
-    # Batch update: payment cell + rent status + comments
+    # Batch update: target payment col, Total Paid, Balance, Status, Notes
     try:
-        batch_updates = [
+        batch = [
             {
                 "range": gspread.utils.rowcol_to_a1(row, target_col + 1),
-                "values": [[new_value]],
+                "values": [[new_target]],
             },
             {
-                "range": gspread.utils.rowcol_to_a1(row, rent_status_col + 1),
+                "range": gspread.utils.rowcol_to_a1(row, col_tp + 1),
+                "values": [[new_total_paid]],
+            },
+            {
+                "range": gspread.utils.rowcol_to_a1(row, col_bal + 1),
+                "values": [[new_balance]],
+            },
+            {
+                "range": gspread.utils.rowcol_to_a1(row, col_st + 1),
                 "values": [[new_status]],
             },
             {
-                "range": gspread.utils.rowcol_to_a1(row, COMMENTS_COL + 1),
-                "values": [[updated_comments]],
+                "range": gspread.utils.rowcol_to_a1(row, col_notes + 1),
+                "values": [[updated_notes]],
             },
         ]
-        ws.batch_update(batch_updates, value_input_option="USER_ENTERED")
+        ws.batch_update(batch, value_input_option="USER_ENTERED")
         result["success"] = True
         logger.info(
-            "GSheets: row %d — Room %s / %s — Rs.%s %s %s → total %s/%s, status=%s",
-            row, room_number, tenant_name, int(amount), method_upper,
-            month_label, int(total_paid_all), int(rent_due), new_status,
+            "GSheets: row %d in %s — Room %s / %s — Rs.%s %s → total %s/%s, balance=%s, status=%s",
+            row, tab_name, room_number, tenant_name, int(amount), method_upper,
+            int(new_total_paid), int(total_due), int(new_balance), new_status,
         )
     except Exception as e:
         result["error"] = f"Batch update failed: {e}"
@@ -379,122 +426,345 @@ def _update_payment_sync(
     return result
 
 
+def _add_tenant_sync(
+    room_number: str,
+    name: str,
+    phone: str,
+    gender: str,
+    building: str,
+    floor: str,
+    sharing: str,
+    checkin: str,
+    agreed_rent: float,
+    deposit: float,
+    booking: float,
+    maintenance: float,
+) -> dict:
+    """
+    Add tenant to TENANTS master tab AND current monthly tab.
+    Returns result dict.
+    """
+    result: dict[str, Any] = {
+        "success": False,
+        "tenants_row": None,
+        "monthly_row": None,
+        "monthly_tab": None,
+        "error": None,
+    }
+
+    # Input validation
+    if not room_number or not name or not phone:
+        result["error"] = "Room, name, and phone are required"
+        return result
+
+    try:
+        # -- TENANTS tab --
+        tenants_ws = _get_worksheet_sync("TENANTS")
+        tenants_row = [
+            room_number,       # 0: Room
+            name,              # 1: Name
+            phone,             # 2: Phone
+            gender,            # 3: Gender
+            building,          # 4: Building
+            floor,             # 5: Floor
+            sharing,           # 6: Sharing
+            checkin,           # 7: Check-in
+            "ACTIVE",          # 8: Status
+            agreed_rent,       # 9: Agreed Rent
+            deposit,           # 10: Deposit
+            booking,           # 11: Booking
+            maintenance,       # 12: Maintenance
+            "",                # 13: Notice Date
+            "",                # 14: Expected Exit
+        ]
+        tenants_ws.append_row(tenants_row, value_input_option="USER_ENTERED")
+        result["tenants_row"] = len(tenants_ws.get_all_values())
+        logger.info("GSheets: added tenant %s to TENANTS tab at row %d", name, result["tenants_row"])
+
+        # -- Monthly tab --
+        tab_name = _current_month_tab()
+        result["monthly_tab"] = tab_name
+        try:
+            monthly_ws = _get_worksheet_sync(tab_name)
+        except gspread.exceptions.WorksheetNotFound:
+            result["error"] = f"Monthly tab '{tab_name}' not found — added to TENANTS only"
+            result["success"] = True  # partial success
+            logger.warning("GSheets: %s", result["error"])
+            return result
+
+        monthly_row = [
+            room_number,       # 0: Room
+            name,              # 1: Name
+            phone,             # 2: Phone
+            building,          # 3: Building
+            sharing,           # 4: Sharing
+            agreed_rent,       # 5: Rent Due
+            "",                # 6: Cash
+            "",                # 7: UPI
+            0,                 # 8: Total Paid
+            agreed_rent,       # 9: Balance (= rent due initially)
+            "UNPAID",          # 10: Status
+            checkin,           # 11: Check-in
+            "",                # 12: Notice Date
+            "",                # 13: Event
+            "",                # 14: Notes
+            0,                 # 15: Prev Due
+        ]
+        monthly_ws.append_row(monthly_row, value_input_option="USER_ENTERED")
+        result["monthly_row"] = len(monthly_ws.get_all_values())
+        result["success"] = True
+        logger.info(
+            "GSheets: added tenant %s to monthly tab '%s' at row %d",
+            name, tab_name, result["monthly_row"],
+        )
+
+    except Exception as e:
+        result["error"] = f"Add tenant failed: {e}"
+        logger.error("GSheets add_tenant error: %s", e)
+
+    return result
+
+
+def _record_checkout_sync(
+    room_number: str,
+    tenant_name: str,
+    notice_date: Optional[str] = None,
+) -> dict:
+    """
+    Mark tenant as EXIT in the current monthly tab.
+    Updates Event col to 'EXIT', Status col to 'EXIT'.
+    Optionally sets Notice Date.
+    Also updates TENANTS tab Status to 'EXIT'.
+    """
+    result: dict[str, Any] = {
+        "success": False,
+        "row": None,
+        "tab": None,
+        "error": None,
+    }
+
+    tab_name = _current_month_tab()
+    result["tab"] = tab_name
+
+    try:
+        # -- Monthly tab --
+        ws = _get_worksheet_sync(tab_name)
+        found = _find_row_in_monthly(ws, room_number, tenant_name)
+        if found is None:
+            result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
+            logger.warning("GSheets: %s", result["error"])
+            return result
+
+        row, row_data = found
+        result["row"] = row
+
+        batch = [
+            {
+                "range": gspread.utils.rowcol_to_a1(row, M_EVENT + 1),
+                "values": [["EXIT"]],
+            },
+            {
+                "range": gspread.utils.rowcol_to_a1(row, M_STATUS + 1),
+                "values": [["EXIT"]],
+            },
+        ]
+        if notice_date:
+            batch.append({
+                "range": gspread.utils.rowcol_to_a1(row, M_NOTICE_DATE + 1),
+                "values": [[notice_date]],
+            })
+
+        ws.batch_update(batch, value_input_option="USER_ENTERED")
+        logger.info(
+            "GSheets: checkout Room %s / %s in %s at row %d",
+            room_number, tenant_name, tab_name, row,
+        )
+
+        # -- TENANTS tab --
+        try:
+            tenants_ws = _get_worksheet_sync("TENANTS")
+            t_found = _find_row_in_tenants(tenants_ws, room_number, tenant_name)
+            if t_found:
+                t_row, _ = t_found
+                today_str = datetime.now().strftime("%d/%m/%Y")
+                t_batch = [
+                    {
+                        "range": gspread.utils.rowcol_to_a1(t_row, T_STATUS + 1),
+                        "values": [["Exited"]],
+                    },
+                    {
+                        "range": gspread.utils.rowcol_to_a1(t_row, T_CHECKOUT_DATE + 1),
+                        "values": [[today_str]],
+                    },
+                ]
+                if notice_date:
+                    t_batch.append({
+                        "range": gspread.utils.rowcol_to_a1(t_row, T_NOTICE_DATE + 1),
+                        "values": [[notice_date]],
+                    })
+                tenants_ws.batch_update(t_batch, value_input_option="USER_ENTERED")
+                logger.info("GSheets: updated TENANTS tab status to EXIT for %s", tenant_name)
+        except Exception as e:
+            logger.warning("GSheets: TENANTS tab update failed (checkout still recorded): %s", e)
+
+        result["success"] = True
+
+    except Exception as e:
+        result["error"] = f"Checkout failed: {e}"
+        logger.error("GSheets record_checkout error: %s", e)
+
+    return result
+
+
+def _record_notice_sync(
+    room_number: str,
+    tenant_name: str,
+    notice_date: str,
+) -> dict:
+    """
+    Update Notice Date column in current monthly tab and TENANTS tab.
+    """
+    result: dict[str, Any] = {
+        "success": False,
+        "row": None,
+        "tab": None,
+        "error": None,
+    }
+
+    tab_name = _current_month_tab()
+    result["tab"] = tab_name
+
+    try:
+        # -- Monthly tab --
+        ws = _get_worksheet_sync(tab_name)
+        found = _find_row_in_monthly(ws, room_number, tenant_name)
+        if found is None:
+            result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
+            logger.warning("GSheets: %s", result["error"])
+            return result
+
+        row, _ = found
+        result["row"] = row
+
+        ws.batch_update(
+            [{"range": gspread.utils.rowcol_to_a1(row, M_NOTICE_DATE + 1), "values": [[notice_date]]}],
+            value_input_option="USER_ENTERED",
+        )
+        logger.info(
+            "GSheets: notice date %s for Room %s / %s in %s at row %d",
+            notice_date, room_number, tenant_name, tab_name, row,
+        )
+
+        # -- TENANTS tab --
+        try:
+            tenants_ws = _get_worksheet_sync("TENANTS")
+            t_found = _find_row_in_tenants(tenants_ws, room_number, tenant_name)
+            if t_found:
+                t_row, _ = t_found
+                tenants_ws.batch_update(
+                    [{"range": gspread.utils.rowcol_to_a1(t_row, T_NOTICE_DATE + 1), "values": [[notice_date]]}],
+                    value_input_option="USER_ENTERED",
+                )
+                logger.info("GSheets: updated TENANTS tab notice date for %s", tenant_name)
+        except Exception as e:
+            logger.warning("GSheets: TENANTS tab notice update failed: %s", e)
+
+        result["success"] = True
+
+    except Exception as e:
+        result["error"] = f"Record notice failed: {e}"
+        logger.error("GSheets record_notice error: %s", e)
+
+    return result
+
+
+# -- Async wrappers (public API) -----------------------------------------------
+
 async def update_payment(
     room_number: str,
     tenant_name: str,
     amount: float,
     method: str,
     month: Optional[int] = None,
-    rent_due: float = 0.0,
+    year: Optional[int] = None,
 ) -> dict:
     """
-    Async entry point — updates Google Sheet after a payment is logged.
+    Async entry point — update payment in Google Sheet monthly tab.
 
     Args:
         room_number: e.g. "102"
-        tenant_name: tenant name from DB
-        amount: payment amount (float)
+        tenant_name: tenant name for row lookup
+        amount: payment amount
         method: "cash" or "upi"
-        month: month number (2=Feb, 3=Mar). None = auto-detect oldest unpaid
-        rent_due: fallback rent (used only if sheet has no rent data)
+        month: month number (1-12). None = current month
+        year: year. None = current year
 
-    Returns dict with keys: success, row, month, rent_due, total_paid, overpayment, warning, error
+    Returns dict: success, row, tab, rent_due, total_paid, balance, overpayment, warning, error
     """
     return await asyncio.to_thread(
-        _update_payment_sync,
-        room_number,
-        tenant_name,
-        amount,
-        method,
-        month,
-        rent_due,
+        _update_payment_sync, room_number, tenant_name, amount, method, month, year,
     )
 
 
-async def add_comment(room_number: str, tenant_name: str, comment: str) -> dict:
+async def add_tenant(
+    room_number: str,
+    name: str,
+    phone: str,
+    gender: str,
+    building: str,
+    floor: str,
+    sharing: str,
+    checkin: str,
+    agreed_rent: float,
+    deposit: float,
+    booking: float,
+    maintenance: float,
+) -> dict:
     """
-    Append a comment to the Comments column for a tenant row.
-    Returns dict with keys: success, row, error
+    Async entry point — add tenant to TENANTS tab + current monthly tab.
+
+    Returns dict: success, tenants_row, monthly_row, monthly_tab, error
     """
-    result = {"success": False, "row": None, "error": None}
-
-    def _do():
-        try:
-            ws = _get_worksheet_sync()
-        except Exception as e:
-            result["error"] = f"Sheet auth failed: {e}"
-            return
-
-        found = _find_row_with_data(ws, room_number, tenant_name)
-        if found is None:
-            result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
-            return
-
-        row, row_data = found
-        result["row"] = row
-        try:
-            existing = row_data[COMMENTS_COL] if COMMENTS_COL < len(row_data) else ""
-            ts = datetime.now().strftime("%d-%b %H:%M")
-            new_line = f"[{ts}] {comment}"
-            updated = f"{existing} | {new_line}" if existing.strip() else new_line
-            ws.update_acell(
-                gspread.utils.rowcol_to_a1(row, COMMENTS_COL + 1),
-                updated,
-            )
-            result["success"] = True
-        except Exception as e:
-            result["error"] = f"Comment update failed: {e}"
-
-    await asyncio.to_thread(_do)
-    return result
+    return await asyncio.to_thread(
+        _add_tenant_sync, room_number, name, phone, gender, building, floor,
+        sharing, checkin, agreed_rent, deposit, booking, maintenance,
+    )
 
 
-async def get_tenant_dues(room_number: str, tenant_name: str) -> dict:
+async def record_checkout(
+    room_number: str,
+    tenant_name: str,
+    notice_date: Optional[str] = None,
+) -> dict:
     """
-    Get month-by-month dues breakdown for a tenant from the sheet.
-    Returns dict with: success, rent_due, months (list of {month, status, cash, upi, total_paid, due})
+    Async entry point — mark tenant as EXIT in monthly tab + TENANTS tab.
+
+    Returns dict: success, row, tab, error
     """
-    result = {"success": False, "rent_due": 0, "months": [], "error": None}
+    return await asyncio.to_thread(
+        _record_checkout_sync, room_number, tenant_name, notice_date,
+    )
 
-    def _do():
-        try:
-            ws = _get_worksheet_sync()
-        except Exception as e:
-            result["error"] = f"Sheet auth failed: {e}"
-            return
 
-        found = _find_row_with_data(ws, room_number, tenant_name)
-        if found is None:
-            result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
-            return
+async def record_notice(
+    room_number: str,
+    tenant_name: str,
+    notice_date: str,
+) -> dict:
+    """
+    Async entry point — update Notice Date in monthly tab + TENANTS tab.
 
-        row, row_data = found
-        rent_due = _get_rent_due(row_data)
-        result["rent_due"] = rent_due
-        month_names = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May"}
+    Returns dict: success, row, tab, error
+    """
+    return await asyncio.to_thread(
+        _record_notice_sync, room_number, tenant_name, notice_date,
+    )
 
-        for month in sorted(MONTH_COLUMNS.keys()):
-            status = _get_month_status(row_data, month)
-            if status in ("NO SHOW", "EXIT", "CANCELLED", ""):
-                continue
 
-            rent_status_col, cash_col, upi_col = MONTH_COLUMNS[month]
-            cash = _parse_numeric_cell(row_data[cash_col] if cash_col < len(row_data) else "") or 0
-            upi = _parse_numeric_cell(row_data[upi_col] if upi_col < len(row_data) else "") or 0
-            total_paid = cash + upi
-            due = max(0, rent_due - total_paid)
+# -- Convenience: get sheet for direct access ----------------------------------
 
-            result["months"].append({
-                "month": month,
-                "month_name": month_names.get(month, f"M{month}"),
-                "status": status,
-                "cash": cash,
-                "upi": upi,
-                "total_paid": total_paid,
-                "due": due,
-            })
-
-        result["success"] = True
-
-    await asyncio.to_thread(_do)
-    return result
+async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:
+    """Async wrapper — returns worksheet by tab name (default: current month)."""
+    if tab_name is None:
+        tab_name = _current_month_tab()
+    return await asyncio.to_thread(_get_worksheet_sync, tab_name)

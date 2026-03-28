@@ -1,26 +1,26 @@
 /**
- * Cozeevo Operations — Google Apps Script v3
+ * Cozeevo Operations — Google Apps Script v4
  * ============================================
  * Paste into: Extensions > Apps Script
  * Run setupTriggers() once.
  *
- * COLUMN LAYOUT (monthly tabs, row 5+):
- *   A=Room, B=Name, C=Building, D=Sharing, E=Rent Due,
- *   F=Cash Paid, G=UPI Paid, H=Total Paid, I=Balance,
- *   J=Status, K=Check-in, L=Event, M=Notes,
- *   N=Chandra, O=Lakshmi
+ * FEATURES:
+ *   - Month dropdown on dashboard — switch between any month
+ *   - Auto-refresh on edit (any monthly tab or TENANTS)
+ *   - Deposit total from TENANTS tab (Active tenants only)
+ *   - THOR vs HULK comparison per selected month
+ *   - Month-on-month trend table
  *
- * ROW LAYOUT:
- *   1: Title (month name)
- *   2: Occupancy summary (auto-updated)
- *   3: Financial summary (auto-updated)
- *   4: Headers
- *   5+: Tenant data
+ * COLUMN LAYOUT (monthly tabs, row 5+, DB-aligned):
+ *   A=Room, B=Name, C=Phone, D=Building, E=Sharing, F=Rent Due,
+ *   G=Cash, H=UPI, I=Total Paid, J=Balance, K=Status,
+ *   L=Check-in, M=Notice Date, N=Event, O=Notes, P=Prev Due
  */
 
 const TOTAL_BEDS = 291;
-const MONTH_NAMES = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"];
+const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/;
+const DROPDOWN_CELL = "E1";  // Where the month picker lives on DASHBOARD
 
 // ── TRIGGERS & MENU ─────────────────────────────────────────────────────────
 
@@ -43,17 +43,24 @@ function onOpen() {
 
 function onSheetEdit(e) {
   try {
-    const name = e.source.getActiveSheet().getName();
-    if (MONTH_TAB_RE.test(name)) {
-      updateMonthSummary(e.source.getActiveSheet());
+    const sheet = e.source.getActiveSheet();
+    const name = sheet.getName();
+    if (name === "DASHBOARD") {
+      // Dropdown changed — redraw dashboard content (not the dropdown itself)
+      const cell = sheet.getActiveCell();
+      if (cell.getA1Notation() === DROPDOWN_CELL) {
+        refreshDashboardContent_();
+      }
+    } else if (MONTH_TAB_RE.test(name)) {
+      updateMonthSummary(sheet);
       refreshDashboard();
     } else if (name === "TENANTS") {
       refreshDashboard();
     }
-  } catch (err) {}
+  } catch (err) { }
 }
 
-// ── READ MONTHLY TAB (row-by-row, no header parsing) ────────────────────────
+// ── HELPERS ─────────────────────────────────────────────────────────────────
 
 function pn(val) {
   if (!val) return 0;
@@ -61,12 +68,42 @@ function pn(val) {
   return isNaN(n) ? 0 : n;
 }
 
+function getMonthTabs_() {
+  const ss = SpreadsheetApp.getActive();
+  const tabs = [];
+  ss.getSheets().forEach(s => {
+    if (MONTH_TAB_RE.test(s.getName())) {
+      const p = s.getName().split(" ");
+      tabs.push({ name: s.getName(), sheet: s, sort: parseInt(p[1]) * 100 + MONTH_NAMES.indexOf(p[0]) });
+    }
+  });
+  tabs.sort((a, b) => a.sort - b.sort);
+  return tabs;
+}
+
+function getTotalDeposit_() {
+  const ss = SpreadsheetApp.getActive();
+  const tenants = ss.getSheetByName("TENANTS");
+  if (!tenants) return 0;
+  const data = tenants.getDataRange().getValues();
+  // TENANTS: 0=Room,1=Name,...,8=Status,...,11=Deposit
+  let total = 0;
+  for (let i = 1; i < data.length; i++) {
+    const status = String(data[i][8]).trim();
+    if (status === "Active") {
+      total += pn(data[i][11]);
+    }
+  }
+  return total;
+}
+
+// ── READ MONTHLY TAB ────────────────────────────────────────────────────────
+
 function readMonthData(sheet) {
   const data = sheet.getDataRange().getValues();
   const r = {
     tenants: 0, beds: 0, regular: 0, premium: 0, noshow: 0,
     cash: 0, upi: 0, balance: 0, rentExpected: 0,
-    chandra: 0, lakshmi: 0,
     paid: 0, partial: 0, unpaid: 0,
     newCheckins: 0, exits: 0,
     thorBeds: 0, hulkBeds: 0, thorTenants: 0, hulkTenants: 0,
@@ -75,43 +112,44 @@ function readMonthData(sheet) {
   };
   if (data.length < 5) return r;
 
+  // Detect column layout: new format has Phone in col 2 (header row check)
+  const headers = data.length > 3 ? data[3] : [];
+  const isNew = String(headers[2] || "").toUpperCase().includes("PHONE");
+  // Old: A=Room,B=Name,C=Building,D=Sharing,E=Rent,F=Cash,G=UPI,H=TotalPaid,I=Balance,J=Status,K=Checkin,L=Event,M=Notes,N=Chandra,O=Lakshmi
+  // New: A=Room,B=Name,C=Phone,D=Building,E=Sharing,F=Rent,G=Cash,H=UPI,I=TotalPaid,J=Balance,K=Status,L=Checkin,M=Notice,N=Event,O=Notes,P=PrevDue
+  const C = isNew
+    ? { building: 3, sharing: 4, rent: 5, cash: 6, upi: 7, bal: 9, status: 10, event: 13 }
+    : { building: 2, sharing: 3, rent: 4, cash: 5, upi: 6, bal: 8, status: 9, event: 11 };
+
   for (let i = 4; i < data.length; i++) {
     const row = data[i];
     if (!row[0] || !row[1]) continue;
 
-    const building = String(row[2]).toUpperCase().trim();
-    const sharing = String(row[3]).toLowerCase().trim();
-    const rentDue = pn(row[4]);
-    const cash = pn(row[5]);
-    const upi = pn(row[6]);
-    const bal = pn(row[8]);
-    const status = String(row[9]).toUpperCase().trim();
-    const event = String(row[11]).toUpperCase().trim();
-    const chandra = pn(row[13]);  // Column N
-    const lakshmi = pn(row[14]);  // Column O
+    const building = String(row[C.building]).toUpperCase().trim();
+    const sharing = String(row[C.sharing]).toLowerCase().trim();
+    const rentDue = pn(row[C.rent]);
+    const cash = pn(row[C.cash]);
+    const upi = pn(row[C.upi]);
+    const bal = pn(row[C.bal]);
+    const status = String(row[C.status]).toUpperCase().trim();
+    const event = String(row[C.event]).toUpperCase().trim();
 
     r.tenants++;
     r.cash += cash;
     r.upi += upi;
     r.balance += bal;
     r.rentExpected += rentDue;
-    r.chandra += chandra;
-    r.lakshmi += lakshmi;
 
-    // Building split
     if (building === "THOR") { r.thorRent += rentDue; r.thorCash += cash; r.thorUpi += upi; }
     else { r.hulkRent += rentDue; r.hulkCash += cash; r.hulkUpi += upi; }
 
-    // Payment status
     if (status === "PAID") r.paid++;
     else if (status === "PARTIAL") r.partial++;
     else if (status === "UNPAID") r.unpaid++;
 
-    // Events
     if (event.includes("NEW CHECK-IN")) r.newCheckins++;
     if (event.includes("EXITED") || status === "EXIT") r.exits++;
 
-    // Occupancy: count beds for active tenants (not EXIT, not pure NO-SHOW)
     if (status === "EXIT") continue;
     if (event === "NO-SHOW" || status === "NO SHOW") { r.noshow++; continue; }
 
@@ -136,183 +174,155 @@ function refreshDashboard() {
   dash.clear();
   dash.setTabColor("#1565C0");
 
-  // Collect all monthly tabs sorted
-  const tabs = [];
-  ss.getSheets().forEach(s => {
-    if (MONTH_TAB_RE.test(s.getName())) {
-      const p = s.getName().split(" ");
-      tabs.push({ name: s.getName(), sheet: s, sort: parseInt(p[1]) * 100 + MONTH_NAMES.indexOf(p[0]) });
-    }
-  });
-  tabs.sort((a, b) => a.sort - b.sort);
+  const tabs = getMonthTabs_();
   if (tabs.length === 0) { dash.getRange("A1").setValue("No monthly tabs found."); return; }
 
-  const latest = tabs[tabs.length - 1];
-  const d = readMonthData(latest.sheet);
+  // Title row with dropdown
+  dash.getRange("A1:D1").merge().setValue("COZEEVO DASHBOARD")
+    .setFontSize(16).setFontWeight("bold").setFontColor("#1565C0").setBackground("#F5F5F5")
+    .setVerticalAlignment("middle");
+
+  // Month dropdown in E1
+  const tabNames = tabs.map(t => t.name);
+  const latest = tabs[tabs.length - 1].name;
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(tabNames, true)
+    .setAllowInvalid(false)
+    .build();
+  dash.getRange(DROPDOWN_CELL).setDataValidation(rule).setValue(latest)
+    .setFontSize(14).setFontWeight("bold").setFontColor("#FFFFFF").setBackground("#1565C0")
+    .setHorizontalAlignment("center");
+
+  // Column widths
+  [200, 150, 30, 200, 150].forEach((w, i) => dash.setColumnWidth(i + 1, w));
+
+  // Now draw the content
+  refreshDashboardContent_();
+}
+
+function refreshDashboardContent_() {
+  const ss = SpreadsheetApp.getActive();
+  const dash = ss.getSheetByName("DASHBOARD");
+  if (!dash) return;
+
+  const tabs = getMonthTabs_();
+  if (tabs.length === 0) return;
+
+  // Read selected month from dropdown
+  const selected = String(dash.getRange(DROPDOWN_CELL).getValue()).trim();
+  const tab = tabs.find(t => t.name === selected) || tabs[tabs.length - 1];
+  const d = readMonthData(tab.sheet);
   const collected = d.cash + d.upi;
   const vacant = TOTAL_BEDS - d.beds - d.noshow;
-  const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(1);
-  const collPct = d.rentExpected > 0 ? (collected / d.rentExpected * 100).toFixed(1) : "0";
+  const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(0);
+  const deposit = getTotalDeposit_();
 
-  let row = 1;
+  // Clear content below row 1 (keep title + dropdown)
+  if (dash.getMaxRows() > 1) {
+    dash.getRange(2, 1, dash.getMaxRows() - 1, 5).clear();
+  }
 
-  // ── HEADER ──
-  dash.getRange(row, 1, 1, 8).merge().setValue("COZEEVO OPERATIONS DASHBOARD")
-    .setFontSize(18).setFontWeight("bold").setFontColor("#1565C0").setBackground("#F5F5F5");
-  row += 2;
+  let r = 3;  // Start after title row + blank row
 
-  // ── CURRENT MONTH BADGE ──
-  dash.getRange(row, 1, 1, 8).merge().setValue("  " + latest.name)
-    .setFontSize(14).setFontWeight("bold").setBackground("#1565C0").setFontColor("#FFFFFF");
-  row += 2;
+  // ── OCCUPANCY + COLLECTED ──
+  dash.getRange(r, 1).setValue("Occupancy").setFontSize(10).setFontColor("#666666");
+  dash.getRange(r, 2).setValue(d.beds + " / " + TOTAL_BEDS + " (" + occPct + "%)")
+    .setFontSize(14).setFontWeight("bold").setFontColor("#1565C0");
+  dash.getRange(r, 4).setValue("Collected").setFontSize(10).setFontColor("#666666");
+  dash.getRange(r, 5).setValue(collected).setFontSize(14).setFontWeight("bold").setFontColor("#2E7D32")
+    .setNumberFormat("#,##0");
+  r++;
+  dash.getRange(r, 1).setValue(d.regular + " reg + " + d.premium + " prem")
+    .setFontSize(9).setFontColor("#999999");
+  dash.getRange(r, 2).setValue(d.noshow + " no-show | " + vacant + " vacant")
+    .setFontSize(9).setFontColor("#999999");
+  dash.getRange(r, 4).setValue("Outstanding").setFontSize(10).setFontColor("#666666");
+  dash.getRange(r, 5).setValue(d.balance).setFontSize(14).setFontWeight("bold")
+    .setFontColor(d.balance > 0 ? "#D32F2F" : "#2E7D32").setNumberFormat("#,##0");
+  r += 2;
 
-  // ── OCCUPANCY CARD (A) ──
-  const occStart = row;
-  dash.getRange(row, 1, 1, 3).merge().setValue("OCCUPANCY").setFontWeight("bold").setFontSize(11)
-    .setBackground("#E3F2FD").setFontColor("#1565C0");
-  row++;
-  const occRows = [
-    ["Revenue Beds", TOTAL_BEDS, ""],
-    ["Checked-in", d.beds, d.regular + " reg + " + d.premium + " premium"],
-    ["No-show", d.noshow, "booked, not arrived"],
-    ["Vacant", vacant, ""],
-    ["Occupancy", occPct + "%", ""],
+  // ── COLLECTIONS + STATUS ──
+  const sectBg = "#F5F5F5";
+  dash.getRange(r, 1, 1, 2).merge().setValue("COLLECTIONS")
+    .setFontWeight("bold").setFontSize(10).setBackground("#E8F5E9").setFontColor("#2E7D32");
+  dash.getRange(r, 4, 1, 2).merge().setValue("STATUS")
+    .setFontWeight("bold").setFontSize(10).setBackground("#FFF3E0").setFontColor("#E65100");
+  r++;
+  const rows1 = [
+    ["Cash", d.cash, "", "Paid", d.paid],
+    ["UPI", d.upi, "", "Partial", d.partial],
+    ["Total Collected", collected, "", "Unpaid", d.unpaid],
+    ["Deposit (all active)", deposit, "", "Exits", d.exits],
+    ["", "", "", "New check-ins", d.newCheckins],
   ];
-  dash.getRange(row, 1, occRows.length, 3).setValues(occRows);
-  dash.getRange(row, 2, occRows.length, 1).setFontWeight("bold").setHorizontalAlignment("right");
-  dash.getRange(row + 4, 2).setNumberFormat("@");  // Force text for percentage
-  dash.getRange(row, 3, occRows.length, 1).setFontColor("#666666").setFontSize(9);
-  row += occRows.length;
-  dash.getRange(occStart, 1, row - occStart, 3)
-    .setBorder(true, true, true, true, false, false, "#BBDEFB", SpreadsheetApp.BorderStyle.SOLID);
-
-  // ── COLLECTIONS CARD (E) ──
-  const collStart = occStart;
-  let cr = collStart;
-  dash.getRange(cr, 5, 1, 3).merge().setValue("COLLECTIONS").setFontWeight("bold").setFontSize(11)
-    .setBackground("#E8F5E9").setFontColor("#2E7D32");
-  cr++;
-  const collRows = [
-    ["Cash", d.cash, ""],
-    ["UPI", d.upi, ""],
-    ["Total Collected", collected, collPct + "%"],
-    ["", "", ""],
-    ["", "", ""],
-  ];
-  dash.getRange(cr, 5, collRows.length, 3).setValues(collRows);
-  dash.getRange(cr, 6, collRows.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
-  dash.getRange(cr, 7, collRows.length, 1).setFontColor("#666666").setFontSize(9);
-  dash.getRange(collStart, 5, row - collStart, 3)
-    .setBorder(true, true, true, true, false, false, "#C8E6C9", SpreadsheetApp.BorderStyle.SOLID);
-
-  row += 1;
-
-  // ── PAYMENT STATUS + MOVEMENT ROW ──
-  const psStart = row;
-  dash.getRange(row, 1, 1, 3).merge().setValue("PAYMENT STATUS").setFontWeight("bold").setFontSize(11)
-    .setBackground("#FFF3E0").setFontColor("#E65100");
-  dash.getRange(row, 5, 1, 3).merge().setValue("MOVEMENT").setFontWeight("bold").setFontSize(11)
-    .setBackground("#F3E5F5").setFontColor("#6A1B9A");
-  row++;
-  const psRows = [
-    ["Paid", d.paid, ""],
-    ["Partial", d.partial, ""],
-    ["Unpaid", d.unpaid, ""],
-  ];
-  dash.getRange(row, 1, 3, 3).setValues(psRows);
-  dash.getRange(row, 2, 3, 1).setFontWeight("bold").setHorizontalAlignment("right");
-  dash.getRange(row, 1, 1, 3).setBackground("#E8F5E9");
-  dash.getRange(row + 1, 1, 1, 3).setBackground("#FFF8E1");
-  dash.getRange(row + 2, 1, 1, 3).setBackground("#FFEBEE");
-
-  const mvRows = [
-    ["New Check-ins", d.newCheckins, ""],
-    ["Exits", d.exits, ""],
-    ["No-show", d.noshow, ""],
-  ];
-  dash.getRange(row, 5, 3, 3).setValues(mvRows);
-  dash.getRange(row, 6, 3, 1).setFontWeight("bold").setHorizontalAlignment("right");
-
-  dash.getRange(psStart, 1, 4, 3).setBorder(true, true, true, true, false, false, "#FFE0B2", SpreadsheetApp.BorderStyle.SOLID);
-  dash.getRange(psStart, 5, 4, 3).setBorder(true, true, true, true, false, false, "#E1BEE7", SpreadsheetApp.BorderStyle.SOLID);
-  row += 4;
-
-  // ── OUTSTANDING / DUES ──
-  const outStart = row;
-  dash.getRange(row, 1, 1, 3).merge().setValue("OUTSTANDING").setFontWeight("bold").setFontSize(11)
-    .setBackground("#FCE4EC").setFontColor("#C62828");
-  row++;
-  const outRows = [
-    ["Tenant Dues", d.balance, "from Balance column"],
-    ["Chandra (collected)", d.chandra, "not in Cash totals"],
-    ["Lakshmi (collected)", d.lakshmi, "not in Cash totals"],
-  ];
-  dash.getRange(row, 1, outRows.length, 3).setValues(outRows);
-  dash.getRange(row, 2, outRows.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
-  dash.getRange(row, 3, outRows.length, 1).setFontColor("#666666").setFontSize(9);
-  if (d.balance > 0) dash.getRange(row, 2).setFontColor("#D32F2F");
-  dash.getRange(outStart, 1, outRows.length + 1, 3)
-    .setBorder(true, true, true, true, false, false, "#F8BBD0", SpreadsheetApp.BorderStyle.SOLID);
-  row += outRows.length + 1;
+  dash.getRange(r, 1, rows1.length, 5).setValues(rows1);
+  dash.getRange(r, 1, rows1.length, 1).setFontColor("#333333");
+  dash.getRange(r, 2, rows1.length, 1).setNumberFormat("#,##0").setFontWeight("bold")
+    .setHorizontalAlignment("right").setFontColor("#333333");
+  dash.getRange(r, 4, rows1.length, 1).setFontColor("#333333");
+  dash.getRange(r, 5, rows1.length, 1).setFontWeight("bold").setHorizontalAlignment("right");
+  // Color status rows
+  dash.getRange(r, 4, 1, 2).setBackground("#E8F5E9");      // Paid - green
+  dash.getRange(r + 1, 4, 1, 2).setBackground("#FFF8E1");   // Partial - yellow
+  dash.getRange(r + 2, 4, 1, 2).setBackground("#FFEBEE");   // Unpaid - red
+  // Alternating bg for collections
+  for (let i = 0; i < rows1.length; i++) {
+    dash.getRange(r + i, 1, 1, 2).setBackground(i % 2 === 0 ? "#FFFFFF" : sectBg);
+  }
+  r += rows1.length + 1;
 
   // ── THOR vs HULK ──
-  dash.getRange(row, 1, 1, 8).merge().setValue("THOR vs HULK COMPARISON").setFontWeight("bold").setFontSize(12)
-    .setBackground("#ECEFF1").setFontColor("#37474F");
-  row++;
-  const thHeaders = ["", "THOR", "HULK", "TOTAL"];
-  dash.getRange(row, 1, 1, 4).setValues([thHeaders]).setFontWeight("bold").setBackground("#CFD8DC");
-  row++;
-  const thorCollected = d.thorCash + d.thorUpi;
-  const hulkCollected = d.hulkCash + d.hulkUpi;
-  const thRows = [
-    ["Beds Occupied", d.thorBeds, d.hulkBeds, d.beds],
-    ["Tenants", d.thorTenants, d.hulkTenants, d.thorTenants + d.hulkTenants],
-    ["Rent Expected", d.thorRent, d.hulkRent, d.rentExpected],
-    ["Cash", d.thorCash, d.hulkCash, d.cash],
-    ["UPI", d.thorUpi, d.hulkUpi, d.upi],
-    ["Total Collected", thorCollected, hulkCollected, collected],
+  dash.getRange(r, 1, 1, 5).merge().setValue("THOR vs HULK")
+    .setFontWeight("bold").setFontSize(10).setBackground("#ECEFF1").setFontColor("#37474F");
+  r++;
+  const thorColl = d.thorCash + d.thorUpi;
+  const hulkColl = d.hulkCash + d.hulkUpi;
+  dash.getRange(r, 1, 1, 5).setValues([["", "THOR", "", "HULK", ""]])
+    .setFontWeight("bold").setBackground("#CFD8DC").setHorizontalAlignment("center");
+  r++;
+  const thData = [
+    ["Beds", d.thorBeds, "", d.hulkBeds, ""],
+    ["Tenants", d.thorTenants, "", d.hulkTenants, ""],
+    ["Collected", thorColl, "", hulkColl, ""],
   ];
-  dash.getRange(row, 1, thRows.length, 4).setValues(thRows);
-  dash.getRange(row, 2, thRows.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right");
-  for (let i = 0; i < thRows.length; i++) {
-    dash.getRange(row + i, 1, 1, 4).setBackground(i % 2 === 0 ? "#FFFFFF" : "#FAFAFA");
+  dash.getRange(r, 1, thData.length, 5).setValues(thData);
+  dash.getRange(r, 2, thData.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
+  dash.getRange(r, 4, thData.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
+  for (let i = 0; i < thData.length; i++) {
+    dash.getRange(r + i, 1, 1, 5).setBackground(i % 2 === 0 ? "#FFFFFF" : sectBg);
   }
-  dash.getRange(row - 1, 1, thRows.length + 1, 4)
-    .setBorder(true, true, true, true, true, true, "#B0BEC5", SpreadsheetApp.BorderStyle.SOLID);
-  row += thRows.length + 1;
+  r += thData.length + 1;
 
   // ── MONTH-ON-MONTH ──
-  dash.getRange(row, 1, 1, 8).merge().setValue("MONTH-ON-MONTH TREND").setFontWeight("bold").setFontSize(12)
-    .setBackground("#E8EAF6").setFontColor("#283593");
-  row++;
-  const momH = ["Month", "Tenants", "Beds", "Cash", "UPI", "Collected", "Dues", "Chandra"];
-  dash.getRange(row, 1, 1, 8).setValues([momH]).setFontWeight("bold").setBackground("#C5CAE9");
-  row++;
-
+  dash.getRange(r, 1, 1, 5).merge().setValue("MONTH-ON-MONTH")
+    .setFontWeight("bold").setFontSize(10).setBackground("#E8EAF6").setFontColor("#283593");
+  r++;
+  dash.getRange(r, 1, 1, 5).setValues([["Month", "Beds", "Collected", "Dues", "Paid%"]])
+    .setFontWeight("bold").setBackground("#C5CAE9").setHorizontalAlignment("center");
+  r++;
   const momRows = [];
   tabs.forEach(t => {
     const md = readMonthData(t.sheet);
     const mc = md.cash + md.upi;
-    momRows.push([t.name, md.tenants, md.beds, md.cash, md.upi, mc, md.balance, md.chandra]);
+    const paidPct = md.rentExpected > 0 ? Math.round(mc / md.rentExpected * 100) + "%" : "—";
+    momRows.push([t.name, md.beds, mc, md.balance, paidPct]);
   });
-
   if (momRows.length > 0) {
-    dash.getRange(row, 1, momRows.length, 8).setValues(momRows);
-    dash.getRange(row, 2, momRows.length, 7).setNumberFormat("#,##0").setHorizontalAlignment("right");
+    dash.getRange(r, 1, momRows.length, 5).setValues(momRows);
+    dash.getRange(r, 2, momRows.length, 4).setNumberFormat("#,##0").setHorizontalAlignment("right");
     for (let i = 0; i < momRows.length; i++) {
-      dash.getRange(row + i, 1, 1, 8).setBackground(i % 2 === 0 ? "#FFFFFF" : "#F5F5F5");
+      const bg = (momRows[i][0] === tab.name) ? "#BBDEFB" : (i % 2 === 0 ? "#FFFFFF" : sectBg);
+      dash.getRange(r + i, 1, 1, 5).setBackground(bg);
     }
   }
-  row += momRows.length + 1;
+  r += momRows.length + 1;
 
   // ── FOOTER ──
-  dash.getRange(row, 1).setValue("Updated: " + new Date().toLocaleString("en-IN"))
+  dash.getRange(r, 1, 1, 5).merge()
+    .setValue("Auto-updates on edit | Select month above | " + new Date().toLocaleString("en-IN"))
     .setFontColor("#9E9E9E").setFontSize(9);
 
-  // ── Column widths ──
-  [160, 120, 120, 20, 160, 120, 120, 100].forEach((w, i) => dash.setColumnWidth(i + 1, w));
-
-  SpreadsheetApp.getActive().toast("Dashboard refreshed!", "Done", 2);
+  SpreadsheetApp.getActive().toast("Showing: " + tab.name, "Dashboard", 2);
 }
 
 // ── UPDATE MONTH SUMMARY (called on edit) ───────────────────────────────────
@@ -322,39 +332,75 @@ function updateMonthSummary(sheet) {
   const collected = d.cash + d.upi;
   const vacant = TOTAL_BEDS - d.beds - d.noshow;
   const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(1);
-  const collPct = d.rentExpected > 0 ? (collected / d.rentExpected * 100).toFixed(1) : "0";
 
-  sheet.getRange("A2:O2").setValues([[
-    "Occupancy", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
-    "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
-    "Cash", d.cash, "UPI", d.upi, "Total", collected,
-    "Bal: " + d.balance, "Chandra: " + d.chandra, "Lakshmi: " + d.lakshmi, ""
-  ]]);
-  sheet.getRange("A3:O3").setValues([[
-    "New check-ins", d.newCheckins, "Exits", d.exits,
-    "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
-    "", "", "", "", "", "", "", ""
-  ]]);
+  // Detect column layout
+  const hdr = sheet.getRange("A4:P4").getValues()[0];
+  const isNew = String(hdr[2] || "").toUpperCase().includes("PHONE");
 
-  // Recalculate Total Paid, Balance, Status for each data row
-  // BUT preserve EXIT / NO SHOW / ADVANCE / CANCELLED statuses
+  // Summary rows — clean formatting, no grids
+  const lastCol = isNew ? "P" : "O";
+
+  // Row 2: Occupancy + Collections
+  const r2 = isNew
+    ? ["Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
+       "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
+       "Cash", d.cash, "UPI", d.upi, "Total", collected,
+       "Bal: " + d.balance, "", "", "", ""]
+    : ["Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
+       "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
+       "Cash", d.cash, "UPI", d.upi, "Total", collected,
+       "Bal: " + d.balance, "", "", ""];
+  sheet.getRange("A2:" + lastCol + "2").setValues([r2]);
+
+  // Row 3: Status + Movement
+  const r3 = isNew
+    ? ["THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)", "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
+       "New: " + d.newCheckins, "Exit: " + d.exits, "",
+       "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
+       "", "", "", "", "", "", "", ""]
+    : ["THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)", "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
+       "New: " + d.newCheckins, "Exit: " + d.exits, "",
+       "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
+       "", "", "", "", "", "", ""];
+  sheet.getRange("A3:" + lastCol + "3").setValues([r3]);
+
+  // Format rows 1-3: bold, smaller font, no gridlines
+  sheet.getRange("A2:" + lastCol + "3").setFontSize(9).setFontWeight("bold")
+    .setFontColor("#444444").setBackground("#F8F9FA")
+    .setBorder(false, false, false, false, false, false);
+  // Number formatting for financial cells in row 2
+  if (isNew) {
+    sheet.getRange("G2").setNumberFormat("#,##0");
+    sheet.getRange("I2").setNumberFormat("#,##0");
+    sheet.getRange("K2").setNumberFormat("#,##0");
+  } else {
+    sheet.getRange("G2").setNumberFormat("#,##0");
+    sheet.getRange("I2").setNumberFormat("#,##0");
+    sheet.getRange("K2").setNumberFormat("#,##0");
+  }
+
+  // Recalculate Total Paid, Balance, Status per row
   const data = sheet.getDataRange().getValues();
+  // Column indices
+  const ci = isNew
+    ? { rent: 5, cash: 6, upi: 7, tp: 8, bal: 9, st: 10, prevDue: 15 }
+    : { rent: 4, cash: 5, upi: 6, tp: 7, bal: 8, st: 9, prevDue: 15 };
+
   for (let i = 4; i < data.length; i++) {
     if (!data[i][0]) continue;
-    const curSt = String(data[i][9]).toUpperCase().trim();
-
-    // Don't touch rows with special statuses
+    const curSt = String(data[i][ci.st]).toUpperCase().trim();
     if (curSt === "EXIT" || curSt === "NO SHOW" || curSt === "ADVANCE" || curSt === "CANCELLED") continue;
 
-    const cash = pn(data[i][5]);
-    const upi = pn(data[i][6]);
-    const rent = pn(data[i][4]);
+    const cash = pn(data[i][ci.cash]);
+    const upi = pn(data[i][ci.upi]);
+    const rent = pn(data[i][ci.rent]);
+    const prevDue = pn(data[i][ci.prevDue]);
     const tp = cash + upi;
-    const bal = rent - tp;
-    const st = bal <= 0 ? "PAID" : (tp > 0 ? "PARTIAL" : "UNPAID");
-    sheet.getRange(i + 1, 8).setValue(tp);
-    sheet.getRange(i + 1, 9).setValue(bal);
-    sheet.getRange(i + 1, 10).setValue(st);
+    const bal = rent + prevDue - tp;
+    const st = (tp === 0) ? "UNPAID" : (bal <= 0 ? "PAID" : "PARTIAL");
+    sheet.getRange(i + 1, ci.tp + 1).setValue(tp);
+    sheet.getRange(i + 1, ci.bal + 1).setValue(bal);
+    sheet.getRange(i + 1, ci.st + 1).setValue(st);
   }
 }
 
@@ -384,31 +430,52 @@ function createMonthTab(tabName, monthIdx, year) {
   const tenants = ss.getSheetByName("TENANTS");
   if (!tenants) { SpreadsheetApp.getUi().alert("TENANTS tab not found!"); return; }
 
+  // ── Find previous month tab to get dues + notes ──
+  const prevIdx = monthIdx === 0 ? 11 : monthIdx - 1;
+  const prevYear = monthIdx === 0 ? year - 1 : year;
+  const prevTab = MONTH_NAMES[prevIdx] + " " + prevYear;
+  const prevSheet = ss.getSheetByName(prevTab);
+
+  // Build lookup: tenant name → {balance} from previous month
+  const prevData = {};
+  if (prevSheet) {
+    const pData = prevSheet.getDataRange().getValues();
+    const hdr = pData.length > 3 ? pData[3] : [];
+    const balCol = String(hdr[2] || "").toUpperCase().includes("PHONE") ? 9 : 8;  // new vs old format
+    const startRow = pData.length > 4 ? 4 : 1;
+    for (let i = startRow; i < pData.length; i++) {
+      const name = String(pData[i][1]).trim();
+      if (!name) continue;
+      prevData[name] = { balance: pn(pData[i][balCol]) };
+    }
+  }
+
   const tData = tenants.getDataRange().getValues();
   const sheet = ss.insertSheet(tabName);
 
-  const headers = ["Room", "Name", "Building", "Sharing", "Rent Due",
-    "Cash Paid", "UPI Paid", "Total Paid", "Balance", "Status",
-    "Check-in", "Event", "Notes", "Chandra", "Lakshmi"];
+  // 16 columns: A-P (DB-aligned)
+  const headers = ["Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
+    "Cash", "UPI", "Total Paid", "Balance", "Status",
+    "Check-in", "Notice Date", "Event", "Notes", "Prev Due"];
 
   sheet.getRange("A1").setValue(tabName);
-  sheet.getRange("A1:O1").merge().setFontSize(13).setFontWeight("bold");
-  sheet.getRange("A2:O2").setValues([["Occupancy","","","","","Rent Expected",0,"Collected",0,"Outstanding",0,"","","",""]]);
-  sheet.getRange("A3:O3").setValues([["New check-ins",0,"Exits",0,"","","","","","","","","","",""]]);
-  sheet.getRange("A4:O4").setValues([headers]).setFontWeight("bold").setBackground("#D6EAF8");
+  sheet.getRange("A1:P1").merge().setFontSize(13).setFontWeight("bold");
+  sheet.getRange("A2:P2").setValues([["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
+  sheet.getRange("A3:P3").setValues([["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
+  sheet.getRange("A4:P4").setValues([headers]).setFontWeight("bold").setBackground("#D6EAF8");
 
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
   const mStart = new Date(year, monthIdx, 1);
   const mEnd = new Date(year, monthIdx, daysInMonth);
 
-  // TENANTS cols: 0=Room,1=Name,2=Phone,3=Gender,4=Building,5=Floor,6=Sharing,7=Checkin,8=Status,9=MonthlyRent,10=CurrentRent
+  // TENANTS: 0=Room,1=Name,2=Phone,3=Gender,4=Building,5=Floor,6=Sharing,7=Checkin,8=Status,9=AgreedRent,10=Deposit,...,13=NoticeDate
   const rows = [];
   for (let i = 1; i < tData.length; i++) {
     const t = tData[i];
     const status = String(t[8]).trim();
     if (status !== "Active" && status !== "No-show") continue;
 
-    const rent = pn(t[10]) || pn(t[9]);
+    const rent = pn(t[9]);  // Agreed Rent
     let rentDue = rent;
     let event = "";
 
@@ -421,25 +488,51 @@ function createMonthTab(tabName, monthIdx, year) {
     }
     if (status === "No-show" && (!checkin || checkin > mEnd)) continue;
 
-    rows.push([t[0], t[1], t[4], t[6], rentDue, 0, 0, 0, rentDue, "UNPAID", t[7], event, "", 0, 0]);
+    const name = String(t[1]).trim();
+    const prev = prevData[name] || { balance: 0 };
+    const prevDue = prev.balance > 0 ? prev.balance : 0;
+    const totalDue = rentDue + prevDue;
+    const noticeDate = String(t[13] || "").trim();  // Notice Date from TENANTS
+
+    rows.push([
+      t[0], t[1], t[2],          // A: Room, B: Name, C: Phone
+      t[4], t[6],                 // D: Building, E: Sharing
+      rentDue,                    // F: Rent Due
+      0, 0, 0,                   // G: Cash, H: UPI, I: Total Paid
+      totalDue,                   // J: Balance = rent + prevDue
+      "UNPAID",                   // K: Status
+      t[7],                       // L: Check-in
+      noticeDate,                 // M: Notice Date
+      event,                      // N: Event
+      "",                         // O: Notes
+      prevDue,                    // P: Prev Due
+    ]);
   }
 
-  if (rows.length > 0) sheet.getRange(5, 1, rows.length, 15).setValues(rows);
+  if (rows.length > 0) sheet.getRange(5, 1, rows.length, 16).setValues(rows);
 
-  // Format
   sheet.setFrozenRows(4);
-  sheet.getRange("E5:I" + (4 + rows.length)).setNumberFormat("#,##0");
+  sheet.getRange("F5:J" + (4 + rows.length)).setNumberFormat("#,##0");
+  sheet.getRange("P5:P" + (4 + rows.length)).setNumberFormat("#,##0");
 
-  // Conditional formatting
-  const sRange = sheet.getRange("J5:J" + (4 + rows.length));
+  // Conditional formatting for Status (col K)
+  const sRange = sheet.getRange("K5:K" + (4 + rows.length));
   sheet.setConditionalFormatRules([
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("PAID").setBackground("#D5F5E3").setFontColor("#1E8449").setRanges([sRange]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("PARTIAL").setBackground("#FEF9E7").setFontColor("#B7950B").setRanges([sRange]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("UNPAID").setBackground("#FDEDEC").setFontColor("#CB4335").setRanges([sRange]).build(),
   ]);
 
-  sheet.getRange("A4:O" + (4 + rows.length)).createFilter();
-  [70,180,70,80,100,100,100,100,100,80,100,120,200,80,80].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  // Highlight Prev Due > 0 in red (col P)
+  const pRange = sheet.getRange("P5:P" + (4 + rows.length));
+  const existingRules = sheet.getConditionalFormatRules();
+  existingRules.push(
+    SpreadsheetApp.newConditionalFormatRule().whenNumberGreaterThan(0).setBackground("#FFEBEE").setFontColor("#D32F2F").setRanges([pRange]).build()
+  );
+  sheet.setConditionalFormatRules(existingRules);
+
+  sheet.getRange("A4:P" + (4 + rows.length)).createFilter();
+  [70, 180, 120, 70, 80, 90, 90, 90, 90, 90, 80, 100, 100, 100, 200, 90].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
 
   updateMonthSummary(sheet);
 }
@@ -451,8 +544,8 @@ function parseDate_(val) {
   for (const f of fmts) {
     const m = s.match(f);
     if (m) {
-      if (m[1].length === 4) return new Date(+m[1], +m[2]-1, +m[3]);
-      else return new Date(+m[3], +m[2]-1, +m[1]);
+      if (m[1].length === 4) return new Date(+m[1], +m[2] - 1, +m[3]);
+      else return new Date(+m[3], +m[2] - 1, +m[1]);
     }
   }
   const d = new Date(val);
@@ -478,8 +571,8 @@ function validateTotals() {
       sumUpi += pn(data[i][6]);
     }
 
-    const hRent = pn(data[1][6]);  // Row 2, col G
-    const hColl = pn(data[1][8]);  // Row 2, col I
+    const hRent = pn(data[1][6]);
+    const hColl = pn(data[1][8]);
     const calc = sumCash + sumUpi;
 
     if (Math.abs(hRent - sumRent) > 1) issues.push(sheet.getName() + ": Rent header " + hRent + " != rows " + sumRent);
