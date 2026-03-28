@@ -1183,16 +1183,83 @@ _MONTHS_MAP = {
 
 
 def _get_ff(text: str, field: str) -> str:
-    """Extract value from 'Field: value' in multi-line form text."""
-    m = re.search(rf"^{field}\s*:\s*(.+?)$", text, re.I | re.M)
-    return m.group(1).strip() if m else ""
+    """Extract value from 'Field: value' or 'Field value' in multi-line form text."""
+    # Try "Field: value" first
+    m = re.search(rf"^{field}\s*[:=]\s*(.+?)$", text, re.I | re.M)
+    if m:
+        return m.group(1).strip()
+    # Try "Field value" (no colon, just space)
+    m = re.search(rf"^{field}\s+(.+?)$", text, re.I | re.M)
+    if m:
+        return m.group(1).strip()
+    return ""
 
 
 def _is_form_submission(text: str) -> bool:
-    """Return True if message looks like a filled ADD_TENANT form (≥3 key fields present)."""
-    keys = ["name", "phone", "room", "rent", "deposit", "checkin", "food"]
-    matches = sum(1 for k in keys if re.search(rf"^{k}\s*:", text, re.I | re.M))
-    return matches >= 3
+    """Return True if message looks like a filled ADD_TENANT form."""
+    # Check for label:value format (≥3 fields)
+    keys = ["name", "phone", "room", "rent", "deposit", "checkin", "check.?in", "food",
+            "discount", "advance", "maintenance", "maintence"]
+    matches = sum(1 for k in keys if re.search(rf"^{k}\s*[:\s]", text, re.I | re.M))
+    if matches >= 3:
+        return True
+    # Check for positional format: ≥5 lines, first line is text (name),
+    # second line is digits (phone), third line is short digits (room)
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+    if len(lines) >= 5:
+        has_name = bool(lines[0]) and not lines[0][0].isdigit()
+        has_phone = bool(re.match(r"^\d{7,12}$", lines[1])) if len(lines) > 1 else False
+        has_room = bool(re.match(r"^\d{1,4}$", lines[2])) if len(lines) > 2 else False
+        if has_name and has_phone and has_room:
+            return True
+    return False
+
+
+def _parse_positional_form(text: str) -> dict:
+    """Parse a line-by-line form without labels into field dict."""
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+    result = {}
+    if len(lines) < 5:
+        return result
+
+    result["name"] = lines[0]
+    result["phone"] = lines[1]
+    result["room"] = lines[2]
+
+    # Remaining lines: match by content
+    for line in lines[3:]:
+        ll = line.lower().strip()
+        # Discount
+        if re.match(r"discount\s", ll, re.I):
+            result["discount"] = re.sub(r"^discount\s*:?\s*", "", line, flags=re.I).strip()
+        elif "until" in ll or "% off" in ll:
+            result.setdefault("discount", line)
+            # Also might contain rent: "11500 until June from July 12500"
+            rent_m = re.match(r"(\d[\d,]+)", line)
+            if rent_m and "rent" not in result:
+                result["rent"] = line
+        # Advance
+        elif re.match(r"advance\s", ll, re.I):
+            result["advance"] = re.sub(r"^advance\s*:?\s*", "", line, flags=re.I).strip()
+        # Maintenance
+        elif re.match(r"maint", ll, re.I):
+            result["maintenance"] = re.sub(r"^(?:maintenance|maintence)\s*:?\s*", "", line, flags=re.I).strip()
+        # Deposit
+        elif re.match(r"deposit\s", ll, re.I):
+            result["deposit"] = re.sub(r"^deposit\s*:?\s*", "", line, flags=re.I).strip()
+        # Checkin
+        elif re.match(r"check\s*in", ll, re.I):
+            result["checkin"] = re.sub(r"^check\s*in\s*:?\s*", "", line, flags=re.I).strip()
+        # Food
+        elif ll in ("veg", "non veg", "non-veg", "egg", "none", "nonveg"):
+            result["food"] = line
+        elif re.match(r"food\s", ll, re.I):
+            result["food"] = re.sub(r"^food\s*:?\s*", "", line, flags=re.I).strip()
+        # Pure number = rent (if not yet assigned)
+        elif re.match(r"^\d[\d,]*$", ll) and "rent" not in result:
+            result["rent"] = line
+
+    return result
 
 
 def _parse_discount_field(s: str, base_rent: float) -> dict:
@@ -1235,6 +1302,22 @@ async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncS
 
     # ── Detect filled form submission ──────────────────────────────────────
     if _is_form_submission(msg):
+        # Check if positional (no labels) — convert to labeled format
+        pos = _parse_positional_form(msg)
+        if pos and pos.get("name") and pos.get("phone") and pos.get("room"):
+            # Rebuild as labeled form for _process_tenant_form
+            rebuilt_lines = []
+            rebuilt_lines.append(f"Name: {pos.get('name', '')}")
+            rebuilt_lines.append(f"Phone: {pos.get('phone', '')}")
+            rebuilt_lines.append(f"Room: {pos.get('room', '')}")
+            rebuilt_lines.append(f"Rent: {pos.get('rent', 'skip')}")
+            rebuilt_lines.append(f"Discount: {pos.get('discount', 'skip')}")
+            rebuilt_lines.append(f"Deposit: {pos.get('deposit', 'skip')}")
+            rebuilt_lines.append(f"Advance: {pos.get('advance', 'skip')}")
+            rebuilt_lines.append(f"Maintenance: {pos.get('maintenance', 'skip')}")
+            rebuilt_lines.append(f"Checkin: {pos.get('checkin', '')}")
+            rebuilt_lines.append(f"Food: {pos.get('food', 'none')}")
+            msg = "\n".join(rebuilt_lines)
         return await _process_tenant_form(msg, ctx, session)
 
     # ── Show blank form template ───────────────────────────────────────────
