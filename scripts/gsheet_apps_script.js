@@ -1,5 +1,5 @@
 /**
- * Cozeevo Operations — Google Apps Script v2
+ * Cozeevo Operations — Google Apps Script v3
  * ============================================
  * Paste into: Extensions > Apps Script
  * Run setupTriggers() once.
@@ -7,7 +7,8 @@
  * COLUMN LAYOUT (monthly tabs, row 5+):
  *   A=Room, B=Name, C=Building, D=Sharing, E=Rent Due,
  *   F=Cash Paid, G=UPI Paid, H=Total Paid, I=Balance,
- *   J=Status, K=Check-in, L=Event, M=Notes
+ *   J=Status, K=Check-in, L=Event, M=Notes,
+ *   N=Chandra, O=Lakshmi
  *
  * ROW LAYOUT:
  *   1: Title (month name)
@@ -64,10 +65,12 @@ function readMonthData(sheet) {
   const data = sheet.getDataRange().getValues();
   const r = {
     tenants: 0, beds: 0, regular: 0, premium: 0, noshow: 0,
-    cash: 0, upi: 0, rentExpected: 0,
+    cash: 0, upi: 0, balance: 0, rentExpected: 0,
+    chandra: 0, lakshmi: 0,
     paid: 0, partial: 0, unpaid: 0,
     newCheckins: 0, exits: 0,
-    thorBeds: 0, hulkBeds: 0, thorRent: 0, hulkRent: 0,
+    thorBeds: 0, hulkBeds: 0, thorTenants: 0, hulkTenants: 0,
+    thorRent: 0, hulkRent: 0,
     thorCash: 0, hulkCash: 0, thorUpi: 0, hulkUpi: 0,
   };
   if (data.length < 5) return r;
@@ -81,13 +84,19 @@ function readMonthData(sheet) {
     const rentDue = pn(row[4]);
     const cash = pn(row[5]);
     const upi = pn(row[6]);
+    const bal = pn(row[8]);
     const status = String(row[9]).toUpperCase().trim();
     const event = String(row[11]).toUpperCase().trim();
+    const chandra = pn(row[13]);  // Column N
+    const lakshmi = pn(row[14]);  // Column O
 
     r.tenants++;
     r.cash += cash;
     r.upi += upi;
+    r.balance += bal;
     r.rentExpected += rentDue;
+    r.chandra += chandra;
+    r.lakshmi += lakshmi;
 
     // Building split
     if (building === "THOR") { r.thorRent += rentDue; r.thorCash += cash; r.thorUpi += upi; }
@@ -111,8 +120,8 @@ function readMonthData(sheet) {
     if (sharing === "premium") r.premium++;
     else r.regular++;
 
-    if (building === "THOR") r.thorBeds += bedCount;
-    else r.hulkBeds += bedCount;
+    if (building === "THOR") { r.thorBeds += bedCount; r.thorTenants++; }
+    else { r.hulkBeds += bedCount; r.hulkTenants++; }
   }
 
   return r;
@@ -141,7 +150,6 @@ function refreshDashboard() {
   const latest = tabs[tabs.length - 1];
   const d = readMonthData(latest.sheet);
   const collected = d.cash + d.upi;
-  const outstanding = d.rentExpected - collected;
   const vacant = TOTAL_BEDS - d.beds - d.noshow;
   const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(1);
   const collPct = d.rentExpected > 0 ? (collected / d.rentExpected * 100).toFixed(1) : "0";
@@ -171,7 +179,8 @@ function refreshDashboard() {
     ["Occupancy", occPct + "%", ""],
   ];
   dash.getRange(row, 1, occRows.length, 3).setValues(occRows);
-  dash.getRange(row, 2, occRows.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
+  dash.getRange(row, 2, occRows.length, 1).setFontWeight("bold").setHorizontalAlignment("right");
+  dash.getRange(row + 4, 2).setNumberFormat("@");  // Force text for percentage
   dash.getRange(row, 3, occRows.length, 1).setFontColor("#666666").setFontSize(9);
   row += occRows.length;
   dash.getRange(occStart, 1, row - occStart, 3)
@@ -184,21 +193,15 @@ function refreshDashboard() {
     .setBackground("#E8F5E9").setFontColor("#2E7D32");
   cr++;
   const collRows = [
-    ["Rent Expected", d.rentExpected, ""],
-    ["Collected", collected, collPct + "%"],
-    ["  Cash", d.cash, ""],
-    ["  UPI", d.upi, ""],
-    ["Outstanding", outstanding, outstanding < 0 ? "overpaid" : ""],
+    ["Cash", d.cash, ""],
+    ["UPI", d.upi, ""],
+    ["Total Collected", collected, collPct + "%"],
+    ["", "", ""],
+    ["", "", ""],
   ];
   dash.getRange(cr, 5, collRows.length, 3).setValues(collRows);
   dash.getRange(cr, 6, collRows.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
   dash.getRange(cr, 7, collRows.length, 1).setFontColor("#666666").setFontSize(9);
-  // Highlight outstanding red if positive
-  if (outstanding > 0) {
-    dash.getRange(cr + 4, 6).setFontColor("#D32F2F");
-  } else {
-    dash.getRange(cr + 4, 6).setFontColor("#2E7D32");
-  }
   dash.getRange(collStart, 5, row - collStart, 3)
     .setBorder(true, true, true, true, false, false, "#C8E6C9", SpreadsheetApp.BorderStyle.SOLID);
 
@@ -218,10 +221,9 @@ function refreshDashboard() {
   ];
   dash.getRange(row, 1, 3, 3).setValues(psRows);
   dash.getRange(row, 2, 3, 1).setFontWeight("bold").setHorizontalAlignment("right");
-  // Colors
-  dash.getRange(row, 1, 1, 3).setBackground("#E8F5E9");      // paid
-  dash.getRange(row + 1, 1, 1, 3).setBackground("#FFF8E1");   // partial
-  dash.getRange(row + 2, 1, 1, 3).setBackground("#FFEBEE");   // unpaid
+  dash.getRange(row, 1, 1, 3).setBackground("#E8F5E9");
+  dash.getRange(row + 1, 1, 1, 3).setBackground("#FFF8E1");
+  dash.getRange(row + 2, 1, 1, 3).setBackground("#FFEBEE");
 
   const mvRows = [
     ["New Check-ins", d.newCheckins, ""],
@@ -235,6 +237,24 @@ function refreshDashboard() {
   dash.getRange(psStart, 5, 4, 3).setBorder(true, true, true, true, false, false, "#E1BEE7", SpreadsheetApp.BorderStyle.SOLID);
   row += 4;
 
+  // ── OUTSTANDING / DUES ──
+  const outStart = row;
+  dash.getRange(row, 1, 1, 3).merge().setValue("OUTSTANDING").setFontWeight("bold").setFontSize(11)
+    .setBackground("#FCE4EC").setFontColor("#C62828");
+  row++;
+  const outRows = [
+    ["Tenant Dues", d.balance, "from Balance column"],
+    ["Chandra (collected)", d.chandra, "not in Cash totals"],
+    ["Lakshmi (collected)", d.lakshmi, "not in Cash totals"],
+  ];
+  dash.getRange(row, 1, outRows.length, 3).setValues(outRows);
+  dash.getRange(row, 2, outRows.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
+  dash.getRange(row, 3, outRows.length, 1).setFontColor("#666666").setFontSize(9);
+  if (d.balance > 0) dash.getRange(row, 2).setFontColor("#D32F2F");
+  dash.getRange(outStart, 1, outRows.length + 1, 3)
+    .setBorder(true, true, true, true, false, false, "#F8BBD0", SpreadsheetApp.BorderStyle.SOLID);
+  row += outRows.length + 1;
+
   // ── THOR vs HULK ──
   dash.getRange(row, 1, 1, 8).merge().setValue("THOR vs HULK COMPARISON").setFontWeight("bold").setFontSize(12)
     .setBackground("#ECEFF1").setFontColor("#37474F");
@@ -246,15 +266,14 @@ function refreshDashboard() {
   const hulkCollected = d.hulkCash + d.hulkUpi;
   const thRows = [
     ["Beds Occupied", d.thorBeds, d.hulkBeds, d.beds],
+    ["Tenants", d.thorTenants, d.hulkTenants, d.thorTenants + d.hulkTenants],
     ["Rent Expected", d.thorRent, d.hulkRent, d.rentExpected],
     ["Cash", d.thorCash, d.hulkCash, d.cash],
     ["UPI", d.thorUpi, d.hulkUpi, d.upi],
     ["Total Collected", thorCollected, hulkCollected, collected],
-    ["Outstanding", d.thorRent - thorCollected, d.hulkRent - hulkCollected, outstanding],
   ];
   dash.getRange(row, 1, thRows.length, 4).setValues(thRows);
   dash.getRange(row, 2, thRows.length, 3).setNumberFormat("#,##0").setHorizontalAlignment("right");
-  // Alternating rows
   for (let i = 0; i < thRows.length; i++) {
     dash.getRange(row + i, 1, 1, 4).setBackground(i % 2 === 0 ? "#FFFFFF" : "#FAFAFA");
   }
@@ -266,7 +285,7 @@ function refreshDashboard() {
   dash.getRange(row, 1, 1, 8).merge().setValue("MONTH-ON-MONTH TREND").setFontWeight("bold").setFontSize(12)
     .setBackground("#E8EAF6").setFontColor("#283593");
   row++;
-  const momH = ["Month", "Tenants", "Beds", "Cash", "UPI", "Collected", "Outstanding", "Coll %"];
+  const momH = ["Month", "Tenants", "Beds", "Cash", "UPI", "Collected", "Dues", "Chandra"];
   dash.getRange(row, 1, 1, 8).setValues([momH]).setFontWeight("bold").setBackground("#C5CAE9");
   row++;
 
@@ -274,15 +293,12 @@ function refreshDashboard() {
   tabs.forEach(t => {
     const md = readMonthData(t.sheet);
     const mc = md.cash + md.upi;
-    const mo = md.rentExpected - mc;
-    const mp = md.rentExpected > 0 ? (mc / md.rentExpected * 100).toFixed(1) + "%" : "0%";
-    momRows.push([t.name, md.tenants, md.beds, md.cash, md.upi, mc, mo, mp]);
+    momRows.push([t.name, md.tenants, md.beds, md.cash, md.upi, mc, md.balance, md.chandra]);
   });
 
   if (momRows.length > 0) {
     dash.getRange(row, 1, momRows.length, 8).setValues(momRows);
-    dash.getRange(row, 2, momRows.length, 6).setNumberFormat("#,##0").setHorizontalAlignment("right");
-    dash.getRange(row, 8, momRows.length, 1).setHorizontalAlignment("right");
+    dash.getRange(row, 2, momRows.length, 7).setNumberFormat("#,##0").setHorizontalAlignment("right");
     for (let i = 0; i < momRows.length; i++) {
       dash.getRange(row + i, 1, 1, 8).setBackground(i % 2 === 0 ? "#FFFFFF" : "#F5F5F5");
     }
@@ -292,21 +308,9 @@ function refreshDashboard() {
   // ── FOOTER ──
   dash.getRange(row, 1).setValue("Updated: " + new Date().toLocaleString("en-IN"))
     .setFontColor("#9E9E9E").setFontSize(9);
-  row += 2;
-  const guide = [
-    ["HOW IT WORKS"],
-    ["  Collect rent via WhatsApp OR edit Cash/UPI cells in monthly tabs"],
-    ["  Dashboard auto-refreshes on every edit"],
-    ["  New month tab created on the 1st (or Cozeevo menu > Create Next Month)"],
-    ["  Filter monthly tabs by Building (C), Status (J), or Event (L)"],
-    ["  TENANTS tab = master data — never delete, only change Status"],
-  ];
-  dash.getRange(row, 1, guide.length, 1).setValues(guide);
-  dash.getRange(row, 1).setFontWeight("bold").setFontSize(10).setBackground("#F5F5F5");
-  dash.getRange(row + 1, 1, guide.length - 1, 1).setFontColor("#757575").setFontSize(9);
 
   // ── Column widths ──
-  [160, 110, 110, 20, 160, 110, 110, 100].forEach((w, i) => dash.setColumnWidth(i + 1, w));
+  [160, 120, 120, 20, 160, 120, 120, 100].forEach((w, i) => dash.setColumnWidth(i + 1, w));
 
   SpreadsheetApp.getActive().toast("Dashboard refreshed!", "Done", 2);
 }
@@ -316,25 +320,32 @@ function refreshDashboard() {
 function updateMonthSummary(sheet) {
   const d = readMonthData(sheet);
   const collected = d.cash + d.upi;
-  const outstanding = d.rentExpected - collected;
   const vacant = TOTAL_BEDS - d.beds - d.noshow;
   const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(1);
   const collPct = d.rentExpected > 0 ? (collected / d.rentExpected * 100).toFixed(1) : "0";
 
-  sheet.getRange("A2:L2").setValues([[
+  sheet.getRange("A2:O2").setValues([[
     "Occupancy", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
     "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
-    "Rent Expected", d.rentExpected, "Collected", collected, "Outstanding", outstanding,
-    "Coll: " + collPct + "%"
+    "Cash", d.cash, "UPI", d.upi, "Total", collected,
+    "Bal: " + d.balance, "Chandra: " + d.chandra, "Lakshmi: " + d.lakshmi, ""
   ]]);
-  sheet.getRange("A3:L3").setValues([[
-    "New check-ins", d.newCheckins, "Exits", d.exits, "", "", "", "", "", "", "", ""
+  sheet.getRange("A3:O3").setValues([[
+    "New check-ins", d.newCheckins, "Exits", d.exits,
+    "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
+    "", "", "", "", "", "", "", ""
   ]]);
 
-  // Recalculate Total Paid, Balance, Status for each row
+  // Recalculate Total Paid, Balance, Status for each data row
+  // BUT preserve EXIT / NO SHOW / ADVANCE / CANCELLED statuses
   const data = sheet.getDataRange().getValues();
   for (let i = 4; i < data.length; i++) {
     if (!data[i][0]) continue;
+    const curSt = String(data[i][9]).toUpperCase().trim();
+
+    // Don't touch rows with special statuses
+    if (curSt === "EXIT" || curSt === "NO SHOW" || curSt === "ADVANCE" || curSt === "CANCELLED") continue;
+
     const cash = pn(data[i][5]);
     const upi = pn(data[i][6]);
     const rent = pn(data[i][4]);
@@ -377,13 +388,14 @@ function createMonthTab(tabName, monthIdx, year) {
   const sheet = ss.insertSheet(tabName);
 
   const headers = ["Room", "Name", "Building", "Sharing", "Rent Due",
-    "Cash Paid", "UPI Paid", "Total Paid", "Balance", "Status", "Check-in", "Event", "Notes"];
+    "Cash Paid", "UPI Paid", "Total Paid", "Balance", "Status",
+    "Check-in", "Event", "Notes", "Chandra", "Lakshmi"];
 
   sheet.getRange("A1").setValue(tabName);
-  sheet.getRange("A1:M1").merge().setFontSize(13).setFontWeight("bold");
-  sheet.getRange("A2:L2").setValues([["Occupancy","","","","","Rent Expected",0,"Collected",0,"Outstanding",0,""]]);
-  sheet.getRange("A3:L3").setValues([["New check-ins",0,"Exits",0,"","","","","","","",""]]);
-  sheet.getRange("A4:M4").setValues([headers]).setFontWeight("bold").setBackground("#D6EAF8");
+  sheet.getRange("A1:O1").merge().setFontSize(13).setFontWeight("bold");
+  sheet.getRange("A2:O2").setValues([["Occupancy","","","","","Rent Expected",0,"Collected",0,"Outstanding",0,"","","",""]]);
+  sheet.getRange("A3:O3").setValues([["New check-ins",0,"Exits",0,"","","","","","","","","","",""]]);
+  sheet.getRange("A4:O4").setValues([headers]).setFontWeight("bold").setBackground("#D6EAF8");
 
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
   const mStart = new Date(year, monthIdx, 1);
@@ -409,10 +421,10 @@ function createMonthTab(tabName, monthIdx, year) {
     }
     if (status === "No-show" && (!checkin || checkin > mEnd)) continue;
 
-    rows.push([t[0], t[1], t[4], t[6], rentDue, 0, 0, 0, rentDue, "UNPAID", t[7], event, ""]);
+    rows.push([t[0], t[1], t[4], t[6], rentDue, 0, 0, 0, rentDue, "UNPAID", t[7], event, "", 0, 0]);
   }
 
-  if (rows.length > 0) sheet.getRange(5, 1, rows.length, 13).setValues(rows);
+  if (rows.length > 0) sheet.getRange(5, 1, rows.length, 15).setValues(rows);
 
   // Format
   sheet.setFrozenRows(4);
@@ -426,8 +438,8 @@ function createMonthTab(tabName, monthIdx, year) {
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo("UNPAID").setBackground("#FDEDEC").setFontColor("#CB4335").setRanges([sRange]).build(),
   ]);
 
-  sheet.getRange("A4:M" + (4 + rows.length)).createFilter();
-  [70,180,70,80,100,100,100,100,100,80,100,120,200].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  sheet.getRange("A4:O" + (4 + rows.length)).createFilter();
+  [70,180,70,80,100,100,100,100,100,80,100,120,200,80,80].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
 
   updateMonthSummary(sheet);
 }
@@ -466,8 +478,8 @@ function validateTotals() {
       sumUpi += pn(data[i][6]);
     }
 
-    const hRent = pn(data[2][6]);
-    const hColl = pn(data[2][8]);
+    const hRent = pn(data[1][6]);  // Row 2, col G
+    const hColl = pn(data[1][8]);  // Row 2, col I
     const calc = sumCash + sumUpi;
 
     if (Math.abs(hRent - sumRent) > 1) issues.push(sheet.getName() + ": Rent header " + hRent + " != rows " + sumRent);
