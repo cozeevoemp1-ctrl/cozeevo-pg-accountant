@@ -1295,15 +1295,29 @@ async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSessi
     food_s     = _get_ff(msg, "food").lower()
 
     errors = []
-    if not name:    errors.append("Name is missing")
-    if not phone_raw: errors.append("Phone is missing")
-    if not room_str:  errors.append("Room number is missing")
-    if not rent_str:  errors.append("Rent amount is missing")
-    if not checkin_s: errors.append("Checkin date is missing")
+    if not name:    errors.append("Name")
+    if not phone_raw: errors.append("Phone")
+    if not room_str:  errors.append("Room number")
+    if not rent_str:  errors.append("Rent amount")
+    if not checkin_s: errors.append("Checkin date")
     if errors:
-        return ("⚠️ *Form incomplete*\n\n"
+        # Save partial data so context is held
+        partial = {
+            "step": "collect_missing", "missing": errors,
+            "name": name, "phone_raw": phone_raw, "room_str": room_str,
+            "rent_str": rent_str, "discount_s": discount_s, "deposit_s": deposit_s,
+            "advance_s": advance_s, "maint_s": maint_s, "checkin_s": checkin_s,
+            "food_s": food_s, "original_msg": msg,
+        }
+        session.add(PendingAction(
+            phone=ctx.phone, intent="ADD_TENANT_INCOMPLETE",
+            action_data=json.dumps(partial), choices=json.dumps([]),
+            expires_at=datetime.utcnow() + timedelta(minutes=15),
+        ))
+        return ("*Missing info:*\n"
                 + "\n".join(f"• {e}" for e in errors)
-                + "\n\nPlease resend the complete form.")
+                + "\n\nPlease send the missing details (e.g. just type the value).\n"
+                + "Or send *cancel* to start over.")
 
     # Normalise phone
     phone = _normalize_phone(phone_raw)

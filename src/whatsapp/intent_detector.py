@@ -338,8 +338,8 @@ def _extract_date_entity(text: str) -> Optional[str]:
             year = int(m.group(3)) if m.group(3) else None
             return _build(int(m.group(2)), month_num, year)
 
-    # DD/MM/YYYY or DD-MM-YYYY
-    m = re.search(r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b", text)
+    # DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    m = re.search(r"\b(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})\b", text)
     if m:
         day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if year < 100:
