@@ -126,12 +126,23 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
     )
     pending_rows = result.scalars().all()
 
+    # Deposit status line (shared by both paths below)
+    deposit_line = None
+    if tenancy.security_deposit and tenancy.security_deposit > 0:
+        _dep = int(tenancy.security_deposit)
+        _dep_paid = int(tenancy.booking_amount or 0)
+        _dep_remaining = _dep - _dep_paid
+        if _dep_remaining > 0:
+            deposit_line = f"Deposit: Rs.{_dep:,} (Paid: Rs.{_dep_paid:,} | Due: Rs.{_dep_remaining:,})"
+        else:
+            deposit_line = f"Deposit: Rs.{_dep:,} (Fully paid)"
+
     if not pending_rows:
-        return (
-            "*Your Balance*\n\n"
-            "No pending dues. You're all clear! ✓\n\n"
-            "For payment receipts, say: *my payments*"
-        )
+        parts = ["*Your Balance*\n", "No pending dues. You're all clear! ✓"]
+        if deposit_line:
+            parts.append(f"\n{deposit_line}")
+        parts.append("\nFor payment receipts, say: *my payments*")
+        return "\n".join(parts)
 
     lines = ["*Your Outstanding Dues*\n"]
     total_due = Decimal("0")
@@ -152,6 +163,8 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
         )
 
     lines.append(f"\n*Total due: Rs.{int(total_due):,}*")
+    if deposit_line:
+        lines.append(f"\n{deposit_line}")
     lines.append("\nFor payment receipts, say: *my payments*")
     return "\n".join(lines)
 

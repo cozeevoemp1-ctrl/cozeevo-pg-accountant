@@ -809,12 +809,25 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
     o_rent, o_maintenance = await _calc_outstanding_dues(tenancy.id, session)
 
     sharing_label = tenancy.sharing_type.value if tenancy.sharing_type else ""
+
+    # Deposit gap line
+    if tenancy.security_deposit and tenancy.security_deposit > 0:
+        _dep = int(tenancy.security_deposit)
+        _dep_paid = int(tenancy.booking_amount or 0)
+        _dep_remaining = _dep - _dep_paid
+        if _dep_remaining > 0:
+            deposit_line = f"Deposit: Rs.{_dep:,} (Paid: Rs.{_dep_paid:,} | *Due: Rs.{_dep_remaining:,}*)"
+        else:
+            deposit_line = f"Deposit: Rs.{_dep:,} (Fully paid)"
+    else:
+        deposit_line = "Security deposit: Rs.0"
+
     lines = [
         f"*{tenant.name}*",
         f"Phone: {tenant.phone}",
         f"Room: {room_label}" + (f" ({sharing_label})" if sharing_label else ""),
         f"Room rent: Rs.{int(tenancy.agreed_rent or 0):,}/month",
-        f"Security deposit: Rs.{int(tenancy.security_deposit or 0):,}",
+        deposit_line,
         f"Checkin: {tenancy.checkin_date.strftime('%d %b %Y')}",
         f"This month ({current_month.strftime('%b %Y')}): {status_str}",
     ]
