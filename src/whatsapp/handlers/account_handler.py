@@ -1161,23 +1161,35 @@ async def _add_expense_prompt(entities: dict, ctx: CallerContext, session: Async
             "Reply *Yes* to confirm or *No* to cancel."
         )
 
-    if amount:
-        return (
-            f"Log expense of ₹{int(amount):,}?\n\n"
-            "Choose category:\n"
-            "1. Electricity  2. Water  3. Internet\n"
-            "4. Salary       5. Maintenance  6. Groceries\n"
-            "7. Other\n\n"
-            "Reply: *expense [category] [amount]*\n"
-            "e.g. *expense electricity 4500*"
+    if amount and not category:
+        # Have amount but no category — start step-by-step from category
+        await _save_pending(
+            ctx.phone, "LOG_EXPENSE_STEP",
+            {"step": "ask_category", "amount": amount, "description": description},
+            [], session,
         )
+        return (
+            f"*Expense: Rs.{int(amount):,}*\n\n"
+            "*Category?*\n"
+            "1. Electricity  2. Water  3. Internet\n"
+            "4. Salary  5. Maintenance  6. Groceries\n"
+            "7. Other\n\n"
+            "Reply with number or name."
+        )
+
+    # No amount, no category — full step-by-step
+    await _save_pending(
+        ctx.phone, "LOG_EXPENSE_STEP",
+        {"step": "ask_category", "description": description},
+        [], session,
+    )
     return (
-        "*Log an expense*\n\n"
-        "Format: *expense [type] [amount]*\n"
-        "Examples:\n"
-        "• expense electricity 4500\n"
-        "• expense salary Lokesh 12000\n"
-        "• expense maintenance 2000 plumber"
+        "*Log Expense*\n\n"
+        "*Category?*\n"
+        "1. Electricity  2. Water  3. Internet\n"
+        "4. Salary  5. Maintenance  6. Groceries\n"
+        "7. Other\n\n"
+        "Reply with number or name."
     )
 
 

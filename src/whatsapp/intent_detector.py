@@ -99,6 +99,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:floor\s*plan|room\s*layout|room\s*diagram|block\s*layout|layout\s*of\s*(?:thor|hulk)|(?:thor|hulk)\s*(?:layout|diagram|floors?|rooms?|beds?)|beds?\s*per\s*floor|rooms?\s*per\s*floor|show\s*(?:me\s*)?(?:all\s*)?(?:thor|hulk|block)\s*rooms?)", re.I), "ROOM_LAYOUT", 0.95),
     # Activity query — "activity today", "show activity", "activity log today", "activity this week"
     (re.compile(r"(?:activity\s+(?:log\s+)?(?:today|yesterday|this\s+week|last\s+\d+\s+days?|room\s+[\w-]+)|show\s+activit(?:y|ies)|activit(?:y|ies)\s+(?:today|yesterday|this\s+week|log)|^activit(?:y|ies)$|^activity\s+log$)", re.I), "QUERY_ACTIVITY", 0.94),
+    # Log expense — step-by-step form (must be BEFORE ACTIVITY_LOG which catches "log ...")
+    (re.compile(r"^(?:log\s+(?:an?\s+)?expense|add\s+(?:an?\s+)?expense|record\s+expense|new\s+expense)\s*$", re.I), "ADD_EXPENSE", 0.95),
+    # Bulk reminder — (must be BEFORE QUERY_DUES which catches "unpaid")
+    (re.compile(r"^(?:remind\s+(?:all\s+)?unpaid|remind\s+(?:all\s+)?defaulters?|send\s+(?:dues?\s+)?reminder(?:s)?(?:\s+to\s+all)?|reminder\s+(?:to\s+)?all|bulk\s+reminder|remind\s+all)\s*$", re.I), "SEND_REMINDER_ALL", 0.95),
     # Activity log — "log ...", "note ...", "log received ...", "log delivered ...", bare "log"
     (re.compile(r"(?:^log\s*$|^log\s+\S|^note\s+\S|^activity\s+log\s+\S|^logged?\s+(?:received|delivered|got|bought|purchased|fixed|repaired|plumber|electrician|water|generator)|^received\s+\d+\s+\w+|^delivered\s+\d+\s+\w+)", re.I), "ACTIVITY_LOG", 0.93),
     # Room status — who's in / status of a specific room (incl bare "room 205" and "room X details")
@@ -241,6 +245,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"^(?:electricity|water\s*bill|internet|maintenance|food|groceries?|cleaning|plumbing|pest\s*(?:control)?|generator|security|supplies|housekeeping|repairs?|diesel|salary)\s+[\d,k]+\s*$", re.I), "ADD_EXPENSE", 0.92),
     # Collect rent — step-by-step form trigger (no amount/name)
     (re.compile(r"^(?:collect\s+rent|rent\s+collect(?:ion)?|log\s+(?:a\s+)?payment|record\s+payment|payment\s+log)\s*$", re.I), "PAYMENT_LOG", 0.93),
+    # (log expense + bulk reminder rules moved earlier — before ACTIVITY_LOG/QUERY_DUES)
     # Payment log — before HELP so "Hi sir Raj paid 15000" doesn't become HELP
     (re.compile(r"(?:p[ai]{2,3}d?|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
     (re.compile(r"\d[\d,k]+\s*(?:paid|p[ai]{2,3}d?|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),

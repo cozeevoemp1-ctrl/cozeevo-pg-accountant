@@ -543,7 +543,7 @@ def _detect_mid_flow_breakout(message: str, pending_intent: str) -> Optional[str
     # Check if message matches a clear new intent (high confidence, different from pending)
     # Only check for multi-step flows (ADD_TENANT_STEP, RECORD_CHECKOUT) where user
     # might abandon mid-flow to do something else
-    if pending_intent in ("ADD_TENANT_STEP", "RECORD_CHECKOUT", "CONFIRM_PAYMENT_LOG", "COLLECT_RENT_STEP"):
+    if pending_intent in ("ADD_TENANT_STEP", "RECORD_CHECKOUT", "CONFIRM_PAYMENT_LOG", "COLLECT_RENT_STEP", "LOG_EXPENSE_STEP"):
         probe = detect_intent(message, "admin")
         if (
             probe.intent in _NEW_INTENT_TRIGGERS

@@ -129,12 +129,15 @@ def _get_spreadsheet_sync() -> gspread.Spreadsheet:
 
     _spreadsheet_cache = ss
     _spreadsheet_cache_time = now
-    logger.info("GSheets: authorized and cached spreadsheet")
+    # Clear worksheet cache — old ws objects belong to the previous spreadsheet handle
+    _ws_cache.clear()
+    logger.info("GSheets: authorized and cached spreadsheet (ws cache cleared)")
     return ss
 
 
 def _get_worksheet_sync(tab_name: str) -> gspread.Worksheet:
-    """Return a worksheet by tab name, cached for 5 min."""
+    """Return a worksheet by tab name, cached for 5 min. Retries once on auth failure."""
+    global _spreadsheet_cache, _spreadsheet_cache_time
     now = time.time()
     if tab_name in _ws_cache:
         ws, cached_at = _ws_cache[tab_name]
@@ -142,7 +145,17 @@ def _get_worksheet_sync(tab_name: str) -> gspread.Worksheet:
             return ws
 
     ss = _get_spreadsheet_sync()
-    ws = ss.worksheet(tab_name)
+    try:
+        ws = ss.worksheet(tab_name)
+    except gspread.exceptions.APIError:
+        # Auth may have expired mid-cache — force re-auth and retry
+        logger.warning("GSheets: API error for '%s', forcing re-auth", tab_name)
+        _spreadsheet_cache = None
+        _spreadsheet_cache_time = 0
+        _ws_cache.clear()
+        ss = _get_spreadsheet_sync()
+        ws = ss.worksheet(tab_name)  # let this raise if still failing
+
     _ws_cache[tab_name] = (ws, now)
     logger.info("GSheets: cached worksheet '%s'", tab_name)
     return ws

@@ -740,6 +740,108 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
 
         return None
 
+    if pending.intent == "LOG_EXPENSE_STEP":
+        ans = reply_text.strip()
+        step = action_data.get("step", "")
+
+        if ans.lower() in ("cancel", "no", "stop", "abort"):
+            return "Cancelled. No expense logged."
+
+        _EXPENSE_CATEGORIES = {
+            "1": "electricity", "2": "water", "3": "internet",
+            "4": "salary", "5": "maintenance", "6": "groceries", "7": "other",
+            "electricity": "electricity", "water": "water", "internet": "internet",
+            "salary": "salary", "maintenance": "maintenance", "groceries": "groceries",
+            "other": "other", "food": "groceries", "wifi": "internet", "eb": "electricity",
+            "electric": "electricity", "plumber": "maintenance", "repair": "maintenance",
+            "cleaning": "maintenance", "diesel": "maintenance", "generator": "maintenance",
+            "pest": "maintenance", "security": "salary",
+        }
+
+        if step == "ask_category":
+            cat = _EXPENSE_CATEGORIES.get(ans.lower().strip())
+            if not cat:
+                return (
+                    "__KEEP_PENDING__Pick a category:\n"
+                    "1. Electricity  2. Water  3. Internet\n"
+                    "4. Salary  5. Maintenance  6. Groceries\n"
+                    "7. Other"
+                )
+            action_data["category"] = cat
+            if action_data.get("amount"):
+                # Already have amount — skip to description
+                action_data["step"] = "ask_description"
+                await _save_pending(pending.phone, "LOG_EXPENSE_STEP", action_data, [], session)
+                return f"*{cat.capitalize()}* — Rs.{int(action_data['amount']):,}\n\n*Description?* (or *skip*)"
+
+            action_data["step"] = "ask_amount"
+            await _save_pending(pending.phone, "LOG_EXPENSE_STEP", action_data, [], session)
+            return f"*{cat.capitalize()}*\n\n*Amount?* (number)"
+
+        if step == "ask_amount":
+            amt = _parse_amount_field(ans)
+            if amt <= 0:
+                if not re.search(r"\d", ans):
+                    return "__KEEP_PENDING__Enter a *number* for the amount (e.g. 4500):"
+                return "__KEEP_PENDING__Amount must be greater than 0. *Amount?*"
+            action_data["amount"] = amt
+            action_data["step"] = "ask_description"
+            await _save_pending(pending.phone, "LOG_EXPENSE_STEP", action_data, [], session)
+            return f"*{action_data['category'].capitalize()}* — Rs.{int(amt):,}\n\n*Description?* (e.g. 'March bill' or *skip*)"
+
+        if step == "ask_description":
+            desc = ans if ans.lower() not in ("skip", "none", "no", "nil", "-") else ""
+            action_data["final_description"] = desc
+            action_data["step"] = "confirm"
+            await _save_pending(pending.phone, "LOG_EXPENSE_STEP", action_data, [], session)
+
+            cat = action_data["category"].capitalize()
+            amt = int(action_data["amount"])
+            desc_line = f"\nDescription: {desc}" if desc else ""
+
+            return (
+                f"*Confirm Expense?*\n\n"
+                f"Category: {cat}\n"
+                f"Amount: Rs.{amt:,}"
+                f"{desc_line}\n\n"
+                "Reply *yes* to save or *no* to cancel."
+            )
+
+        if step == "confirm":
+            if ans.lower() in ("yes", "y", "confirm", "save", "ok", "done"):
+                cat = action_data["category"]
+                amt = Decimal(str(action_data["amount"]))
+                desc = action_data.get("final_description", "") or action_data.get("description", "")
+
+                # Find or create expense category
+                cat_row = await session.scalar(
+                    select(ExpenseCategory).where(ExpenseCategory.name.ilike(cat))
+                )
+                if not cat_row:
+                    cat_row = ExpenseCategory(name=cat)
+                    session.add(cat_row)
+                    await session.flush()
+
+                expense = Expense(
+                    category_id=cat_row.id,
+                    amount=amt,
+                    expense_date=date.today(),
+                    description=desc[:500] if desc else f"{cat} expense",
+                    recorded_by=pending.phone,
+                )
+                session.add(expense)
+
+                return (
+                    f"*Expense logged* ✅\n\n"
+                    f"Category: {cat.capitalize()}\n"
+                    f"Amount: Rs.{int(amt):,}\n"
+                    + (f"Description: {desc}\n" if desc else "")
+                    + f"Date: {date.today().strftime('%d %b %Y')}"
+                )
+            return "Cancelled. No expense logged."
+
+        return None
+
     if pending.intent == "ADD_TENANT_INCOMPLETE":
         # Legacy — clear and re-prompt
         return "Please send *add tenant* to start the checkin form."
@@ -761,13 +863,105 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     f"{_options}"
                 )
 
+    # ── Room Transfer step-by-step (before cancel/chosen_idx checks) ─────────
+    if pending.intent == "ROOM_TRANSFER" and action_data.get("step"):
+        step = action_data.get("step", "confirm")
+        ans = reply_text.strip()
+
+        if is_negative(reply_text):
+            return "Room transfer cancelled."
+
+        if step == "confirm":
+            if ans == "1":
+                action_data["new_rent"] = action_data["current_rent"]
+                action_data["step"] = "ask_deposit"
+                await _save_pending(pending.phone, "ROOM_TRANSFER", action_data, [], session)
+                deposit = int(action_data.get("current_deposit", 0))
+                return (
+                    f"Rent stays *Rs.{int(action_data['current_rent']):,}*\n\n"
+                    f"*Additional deposit needed?*\n"
+                    f"Current deposit: Rs.{deposit:,}\n"
+                    "(enter amount, or *skip* if no change)"
+                )
+            if ans == "2":
+                action_data["step"] = "ask_new_rent"
+                await _save_pending(pending.phone, "ROOM_TRANSFER", action_data, [], session)
+                return "*New rent amount?* (number)"
+            return "__KEEP_PENDING__Reply *1* to keep current rent or *2* to enter new amount."
+
+        if step == "ask_new_rent":
+            new_rent = _parse_amount_field(ans)
+            if new_rent <= 0:
+                return "__KEEP_PENDING__Enter a valid rent amount (e.g. 15000):"
+            action_data["new_rent"] = new_rent
+            action_data["step"] = "ask_deposit"
+            await _save_pending(pending.phone, "ROOM_TRANSFER", action_data, [], session)
+            deposit = int(action_data.get("current_deposit", 0))
+            return (
+                f"New rent: *Rs.{int(new_rent):,}*\n\n"
+                f"*Additional deposit needed?*\n"
+                f"Current deposit: Rs.{deposit:,}\n"
+                "(enter amount, or *skip* if no change)"
+            )
+
+        if step == "ask_deposit":
+            extra_deposit = _parse_amount_field(ans)
+            action_data["extra_deposit"] = extra_deposit
+            action_data["step"] = "final_confirm"
+            await _save_pending(pending.phone, "ROOM_TRANSFER", action_data, [], session)
+
+            new_rent = int(action_data.get("new_rent", action_data["current_rent"]))
+            rent_changed = new_rent != action_data["current_rent"]
+            deposit_line = f"\nAdditional deposit: Rs.{int(extra_deposit):,}" if extra_deposit > 0 else ""
+
+            return (
+                f"*Confirm Room Transfer?*\n\n"
+                f"Tenant: {action_data['tenant_name']}\n"
+                f"Room: {action_data['from_room']} → {action_data['to_room_number']}\n"
+                + (f"Rent: Rs.{int(action_data['current_rent']):,} → Rs.{new_rent:,}\n" if rent_changed else f"Rent: Rs.{new_rent:,} (no change)\n")
+                + deposit_line
+                + "\n\nReply *yes* to confirm or *no* to cancel."
+            )
+
+        if step == "final_confirm":
+            if is_affirmative(reply_text):
+                new_rent = action_data.get("new_rent")
+                extra_deposit = action_data.get("extra_deposit", 0)
+                result = await _do_room_transfer(action_data, session)
+
+                if new_rent and new_rent != action_data["current_rent"]:
+                    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+                    if tenancy:
+                        tenancy.agreed_rent = Decimal(str(new_rent))
+                        current_period = date.today().replace(day=1)
+                        rs = await session.scalar(
+                            select(RentSchedule).where(
+                                RentSchedule.tenancy_id == tenancy.id,
+                                RentSchedule.period_month == current_period,
+                            )
+                        )
+                        if rs:
+                            rs.rent_due = Decimal(str(new_rent))
+                        result += f"\nRent updated to Rs.{int(new_rent):,}"
+
+                if extra_deposit > 0:
+                    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+                    if tenancy:
+                        tenancy.security_deposit = (tenancy.security_deposit or 0) + Decimal(str(extra_deposit))
+                        result += f"\nDeposit increased by Rs.{int(extra_deposit):,}"
+
+                return result
+            return "Room transfer cancelled."
+
+        return None
+
     # ── Cancel any pending confirmation with "no" ─────────────────────────────
 
     if is_negative(reply_text) and pending.intent in (
         "CHECKOUT", "SCHEDULE_CHECKOUT", "PAYMENT_LOG", "QUERY_TENANT",
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
-        "ROOM_TRANSFER", "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
+        "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
         "AWAITING_CLARIFICATION",
     ):
         return "❌ Cancelled. Nothing was changed."
@@ -1082,10 +1276,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             )
         return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
 
-    if pending.intent == "ROOM_TRANSFER":
-        if is_affirmative(reply_text):
-            return await _do_room_transfer(action_data, session)
-        return "Room transfer cancelled."
+    # (ROOM_TRANSFER step-by-step handled earlier, before cancel/chosen_idx checks)
 
     if pending.intent == "CONFIRM_ADD_TENANT":
         if is_negative(reply_text):
@@ -2105,6 +2296,13 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
     name   = entities.get("name", "").strip()
     to_room = entities.get("room", "").strip()
 
+    # Fallback: "transfer Arjun to 307" → room parsed as amount, extract via regex
+    if not to_room:
+        desc = entities.get("description", "") or entities.get("_raw_message", "")
+        _to_match = re.search(r"(?:to|->|→)\s*(?:room\s*)?(\d{2,4}[A-Za-z]?)", desc, re.I)
+        if _to_match:
+            to_room = _to_match.group(1)
+
     if not name:
         return (
             "Who should be moved and to which room?\n"
@@ -2156,6 +2354,7 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
     )
     current_rent = int(rs.rent_due) if rs else int(tenancy.booking_amount or 0)
 
+    current_deposit = int(tenancy.security_deposit or 0)
     action_data = {
         "tenancy_id": tenancy.id,
         "tenant_name": tenant.name,
@@ -2163,15 +2362,19 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
         "to_room_id": new_room.id,
         "to_room_number": new_room.room_number,
         "current_rent": current_rent,
+        "current_deposit": current_deposit,
+        "step": "confirm",
     }
     await _save_pending(ctx.phone, "ROOM_TRANSFER", action_data, [], session)
     return (
         f"*Room Transfer — {tenant.name}*\n"
-        f"From: Room *{current_room.room_number}* ({current_room.room_type.value})\n"
-        f"To:   Room *{new_room.room_number}* ({new_room.room_type.value})\n"
-        f"Current rent: ₹{current_rent:,}/mo\n\n"
-        "Reply *Yes* to confirm, *No* to cancel,\n"
-        "or reply with a new rent amount (e.g. *9000*) to update rent too."
+        f"From: Room *{current_room.room_number}*\n"
+        f"To:   Room *{new_room.room_number}*\n"
+        f"Current rent: Rs.{current_rent:,}/mo\n\n"
+        "*Rent for new room?*\n"
+        f"*1.* Keep current (Rs.{current_rent:,})\n"
+        "*2.* Enter new amount\n\n"
+        "or *no* to cancel."
     )
 
 
