@@ -1,29 +1,28 @@
 """
-Excel → Supabase import script.
-Reads 'Cozeevo Monthly stay (2).xlsx' and populates all tables.
+Excel → Supabase full import (drop/reload).
 
-Run: python -m src.database.excel_import
+Uses scripts/clean_and_load.py as the SINGLE parser (no duplication).
+Reads parsed records and writes to DB tables:
+  tenants, tenancies, rent_schedule, payments.
 
-What it imports:
-  - Sheet 'History'    → monthly stay tenants, tenancies, rent_schedule, payments
-  - Sheet 'Daily Basis'→ short-stay tenancies
+Prerequisites:
+  - L0 tables (rooms, properties, staff, food_plans) must exist (run seed.py)
+  - Run `python -m src.database.wipe_imported --confirm` first to clear L1+L2
 
-Order:
-  1. staff           (from Assigned Staff column)
-  2. rooms           (from Room No + BLOCK columns)
-  3. tenants         (deduplicated by phone)
-  4. tenancies       (one per tenant-room-checkin row)
-  5. rent_schedule   (one per tenancy per month tracked)
-  6. payments        (from PAID month columns with Cash/UPI amounts)
+Usage:
+  python -m src.database.excel_import                 # dry run
+  python -m src.database.excel_import --write          # actually import
 """
+from __future__ import annotations
+
+import argparse
 import asyncio
 import os
 import re
-import unicodedata
-from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+import sys
+from datetime import date
+from decimal import Decimal
 
-import openpyxl
 from dotenv import load_dotenv
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -31,514 +30,356 @@ from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 
-from src.database.models import (
-    AuthorizedUser, Expense, ExpenseCategory, FoodPlan, Payment,
-    PaymentFor, PaymentMode, Property, RateCard, RefundStatus,
-    RentSchedule, RentStatus, Room, RoomType, Staff, StayType,
-    Tenancy, TenancyStatus, Tenant, UserRole,
+# Add project root to path so we can import from scripts/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+
+from scripts.clean_and_load import read_history, sn, clean_num  # noqa: E402 — single parser
+from src.database.models import (  # noqa: E402
+    Payment, PaymentFor, PaymentMode,
+    Property, RentSchedule, RentStatus, Room,
+    Staff, Tenancy, TenancyStatus, Tenant,
 )
 
 DATABASE_URL = os.environ["DATABASE_URL"]
-EXCEL_PATH   = "Cozeevo Monthly stay (3).xlsx"
 
-# ── Month columns in the History sheet ──────────────────────────────────────
-# (col_index, period_date, cash_col_index, upi_col_index)
-# Dec has no separate cash/UPI columns — the "until jan Cash/UPI" cols (23,24)
-# are cumulative for Dec+Jan combined, so we attribute them to January only.
+# ── Month payment config ─────────────────────────────────────────────────────
+# Maps parsed record keys → (period, cash_key, upi_key)
 MONTH_COLS = [
-    (20, date(2025, 12, 1), None, None),  # DEC RENT — status only, no payment amounts
-    (21, date(2026,  1, 1), 23,   24),    # JAN RENT — "until jan Cash/UPI" (cols 23,24)
-    (25, date(2026,  2, 1), 28,   29),    # FEB RENT, FEB Cash, FEB UPI
-    (26, date(2026,  3, 1), 31,   32),    # MARCH RENT, March Cash, March UPI
+    ("dec_st", date(2025, 12, 1), None,       None),
+    ("jan_st", date(2026,  1, 1), "jan_cash", "jan_upi"),
+    ("feb_st", date(2026,  2, 1), "feb_cash", "feb_upi"),
+    ("mar_st", date(2026,  3, 1), "mar_cash", "mar_upi"),
 ]
 
-# ── Normalization helpers ────────────────────────────────────────────────────
 
-def clean_str(v) -> str:
-    if v is None:
+# ── DB-specific normalization (not in parser) ────────────────────────────────
+
+def _norm_phone(raw: str) -> str:
+    """Normalize phone to +91XXXXXXXXXX for DB storage."""
+    if not raw:
         return ""
-    return str(v).strip()
+    digits = re.sub(r'\D', '', raw)
+    if digits.startswith('91') and len(digits) == 12:
+        digits = digits[2:]
+    if len(digits) == 10 and digits[0] in '6789':
+        return f"+91{digits}"
+    return ""
 
-def norm_name(v) -> str:
-    return clean_str(v).title()
 
-def clean_phone(v) -> str:
-    """Normalize phone to +91XXXXXXXXXX format."""
-    if not v:
-        return ""
-    s = re.sub(r"[^0-9]", "", str(v))
-    if len(s) == 10:
-        return f"+91{s}"
-    if len(s) == 12 and s.startswith("91"):
-        return f"+{s}"
-    if len(s) > 10:
-        return f"+{s}"
-    return s
+def _norm_gender(raw: str) -> str:
+    return 'female' if str(raw).strip().lower() == 'female' else 'male'
 
-def to_decimal(v, default=Decimal("0")) -> Decimal:
-    """Extract first number from messy cell values like '3102/2400' or '903*10=...'"""
-    if v is None:
-        return default
-    if isinstance(v, (int, float)):
-        return Decimal(str(v)).quantize(Decimal("0.01"))
-    s = str(v).strip()
-    if not s or s in ("-", "–", "NA", "na"):
-        return default
-    # Extract first integer/decimal sequence
-    m = re.search(r"[\d]+(?:\.\d+)?", s)
-    if m:
-        try:
-            return Decimal(m.group()).quantize(Decimal("0.01"))
-        except InvalidOperation:
-            pass
-    return default
 
-def norm_room_type(v) -> RoomType:
-    s = clean_str(v).lower()
-    if "premium" in s:
-        return RoomType.premium
-    if "triple" in s:
-        return RoomType.triple
-    if "double" in s:
-        return RoomType.double
-    return RoomType.single
+def _norm_food(raw: str) -> str:
+    if not raw:
+        return ''
+    s = str(raw).strip().lower()
+    if 'non' in s:
+        return 'non-veg'
+    if 'egg' in s:
+        return 'egg'
+    if 'veg' in s:
+        return 'veg'
+    return ''
 
-def norm_status(v) -> TenancyStatus:
-    s = clean_str(v).upper()
-    if s == "CHECKIN":
-        return TenancyStatus.active
-    if s == "EXIT":
-        return TenancyStatus.exited
-    if s == "CANCELLED":
-        return TenancyStatus.cancelled
-    return TenancyStatus.no_show
 
-def norm_rent_status(v) -> RentStatus:
-    s = clean_str(v).upper()
-    if s == "PAID":
+def _status_to_enum(status_str: str) -> TenancyStatus:
+    return {
+        'Active':    TenancyStatus.active,
+        'Exited':    TenancyStatus.exited,
+        'No-show':   TenancyStatus.no_show,
+        'Cancelled': TenancyStatus.cancelled,
+    }.get(status_str, TenancyStatus.active)
+
+
+def _rent_status_to_enum(st: str) -> RentStatus:
+    if st == 'PAID':
         return RentStatus.paid
-    if "PARTIAL" in s:
+    if st == 'PARTIAL':
         return RentStatus.partial
-    if s in ("EXIT", "VACATE"):
+    if st in ('EXIT', 'EXITED'):
         return RentStatus.exit
-    if s in ("NO SHOW", "NOSHOW"):
+    if st in ('NO SHOW', 'CANCELLED'):
         return RentStatus.na
-    if s in ("CANCELLED", "CANCEL"):
-        return RentStatus.na
-    return RentStatus.na
+    return RentStatus.pending
 
-def norm_staff_name(v) -> str:
-    """Deduplicate staff names: lokesh lk → Lokesh, kiran → Kiran."""
-    if not v:
-        return ""
-    s = clean_str(v).strip().title()
-    # Merge known variants
-    mappings = {
-        "Lokesh Lk": "Lokesh",
-        "Imrana": "Imrana",
-    }
-    for k, val in mappings.items():
-        if s.lower() == k.lower():
-            return val
-    return s.split()[0]  # take first word only for short names
 
-def placeholder_phone(room_no, name) -> str:
-    safe = re.sub(r"[^a-zA-Z0-9]", "", str(name))[:12]
-    return f"NOPHONE_{room_no}_{safe}"
+def _norm_staff(raw: str) -> str:
+    if not raw:
+        return ''
+    s = str(raw).strip().title()
+    if s.lower() == 'lokesh lk':
+        return 'Lokesh'
+    return s.split()[0]
+
+
+def _placeholder_phone(room: str, name: str) -> str:
+    safe = re.sub(r'[^a-zA-Z0-9]', '', name)[:12]
+    return f"NOPHONE_{room}_{safe}"
+
+
+def _to_dec(val) -> Decimal:
+    """Convert float/int to Decimal safely."""
+    if not val:
+        return Decimal("0")
+    try:
+        return Decimal(str(int(val)))
+    except (ValueError, TypeError):
+        return Decimal("0")
 
 
 # ── Main import ──────────────────────────────────────────────────────────────
 
-async def run_import():
-    engine = create_async_engine(DATABASE_URL, echo=False)
+async def run_import(write: bool) -> None:
+    url = DATABASE_URL
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    engine = create_async_engine(url, echo=False)
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
+    # Use the standard parser from clean_and_load.py
+    records = read_history()
+
+    active    = sum(1 for r in records if r['status'] == 'Active')
+    exited    = sum(1 for r in records if r['status'] == 'Exited')
+    noshow    = sum(1 for r in records if r['status'] == 'No-show')
+    cancelled = sum(1 for r in records if r['status'] == 'Cancelled')
+
+    print(f"\nHistory rows parsed: {len(records)}")
+    print(f"  Active: {active}  Exited: {exited}  No-show: {noshow}  Cancelled: {cancelled}")
+    print(f"Mode: {'WRITE' if write else 'DRY RUN (pass --write to actually insert)'}\n")
+
+    stats = {"tenants": 0, "tenancies": 0, "rent_schedule": 0, "payments": 0, "skipped": 0}
 
     async with Session() as session:
-        # ── Load existing properties ─────────────────────────────────────
-        result = await session.execute(select(Property))
-        props = {p.name: p for p in result.scalars().all()}
-        thor = props.get("Cozeevo THOR")
-        hulk = props.get("Cozeevo HULK")
+        # Pre-load lookups
+        props = {p.name: p for p in (await session.execute(select(Property))).scalars().all()}
+        thor = next((p for n, p in props.items() if 'THOR' in n.upper()), None)
+        hulk = next((p for n, p in props.items() if 'HULK' in n.upper()), None)
         if not thor or not hulk:
-            print("ERROR: Run seed.py first — properties not found.")
+            print("ERROR: properties not found. Run seed.py first.")
             return
 
-        # ── Load existing food plans ─────────────────────────────────────
-        result = await session.execute(select(FoodPlan))
-        food_map = {fp.name: fp for fp in result.scalars().all()}
+        all_rooms = (await session.execute(select(Room))).scalars().all()
+        # Room lookup by number (DB building is truth, Excel BLOCK may be wrong)
+        room_by_num: dict[str, Room] = {}  # room_number → Room (first match wins)
+        for r in all_rooms:
+            if r.room_number not in room_by_num:
+                room_by_num[r.room_number] = r
 
-        print("\n=== IMPORTING HISTORY SHEET ===")
-        ws = wb["History"]
-        rows = list(ws.iter_rows(min_row=2, values_only=True))
-        rows = [r for r in rows if r[1]]  # skip empty rows
-
-        # ── PASS 1: Collect unique staff names → create Staff records ────
-        print("\n[1/6] Importing staff...")
-        staff_names_seen = set()
-        for row in rows:
-            sn = norm_staff_name(row[15])
-            if sn:
-                staff_names_seen.add(sn)
-
-        staff_map = {}  # name → Staff object
-        for sname in sorted(staff_names_seen):
-            result = await session.execute(select(Staff).where(Staff.name == sname))
-            existing = result.scalars().first()
-            if existing:
-                staff_map[sname] = existing
-            else:
-                s = Staff(name=sname, role="Staff", active=True)
-                session.add(s)
-                await session.flush()
-                staff_map[sname] = s
-                print(f"  + Staff: {sname}")
-
-        # ── PASS 2: Collect unique rooms → create Room records ────────────
-        print("\n[2/6] Importing rooms...")
-        room_map = {}  # (property_id, room_number) → Room
-
-        for row in rows:
-            room_raw = row[0]
-            block    = clean_str(row[17]).upper()
-            floor    = row[18]
-            rtype    = norm_room_type(row[12])
-
-            if not room_raw:
-                continue
-
-            room_num = str(room_raw).rstrip(".0") if isinstance(room_raw, float) else str(room_raw)
-            prop = hulk if block == "HULK" else thor
-            key  = (prop.id, room_num)
-
-            if key not in room_map:
-                result = await session.execute(
-                    select(Room).where(Room.property_id == prop.id, Room.room_number == room_num)
-                )
-                existing = result.scalars().first()
-                if existing:
-                    room_map[key] = existing
-                else:
-                    try:
-                        floor_int = int(float(floor)) if floor else 1
-                    except (ValueError, TypeError):
-                        floor_int = 1
-
-                    r = Room(
-                        property_id=prop.id,
-                        room_number=room_num,
-                        floor=floor_int,
-                        room_type=rtype,
-                        max_occupancy={"single": 1, "double": 2, "triple": 3, "premium": 1}[rtype.value],
-                        active=True,
-                    )
-                    session.add(r)
-                    await session.flush()
-                    room_map[key] = r
-                    print(f"  + Room {room_num} ({block}, {rtype.value})")
-
-        await session.commit()
-
-        # ── PASS 3: Tenants ───────────────────────────────────────────────
-        print("\n[3/6] Importing tenants...")
-        tenant_map = {}  # phone → Tenant
-
-        for row in rows:
-            name  = norm_name(row[1])
-            phone = clean_phone(row[3])
-            room_raw = row[0]
-
-            if not name:
-                continue
-
-            if not phone:
-                room_num = str(room_raw).rstrip(".0") if isinstance(room_raw, float) else str(room_raw or "X")
-                phone = placeholder_phone(room_num, name)
-
-            if phone in tenant_map:
-                continue
-
-            result = await session.execute(select(Tenant).where(Tenant.phone == phone))
-            existing = result.scalars().first()
-            if existing:
-                tenant_map[phone] = existing
-                continue
-
-            gender_raw = clean_str(row[2]).lower()
-            gender = "female" if gender_raw == "female" else "male"
-
-            t = Tenant(name=name, phone=phone, gender=gender)
-            session.add(t)
-            await session.flush()
-            tenant_map[phone] = t
-
-        await session.commit()
-        print(f"  Total tenants: {len(tenant_map)}")
-
-        # ── PASS 4: Tenancies ─────────────────────────────────────────────
-        print("\n[4/6] Importing tenancies...")
-        tenancy_list = []
-
-        for row in rows:
-            name     = norm_name(row[1])
-            phone    = clean_phone(row[3])
-            room_raw = row[0]
-            block    = clean_str(row[17]).upper()
-            checkin  = row[4]
-            booking  = to_decimal(row[5])
-            deposit  = to_decimal(row[6])
-            maint    = to_decimal(row[7])
-            monthly  = to_decimal(row[9])
-            status   = norm_status(row[16])
-            staff_nm = norm_staff_name(row[15])
-            food_raw = clean_str(row[34]).lower() if len(row) > 34 else ""
-
-            if not name or not room_raw or not checkin:
-                continue
-
-            room_num = str(room_raw).rstrip(".0") if isinstance(room_raw, float) else str(room_raw)
-            if not phone:
-                phone = placeholder_phone(room_num, name)
-
-            prop = hulk if block == "HULK" else thor
-            room = room_map.get((prop.id, room_num))
-            tenant = tenant_map.get(phone)
-
-            if not room or not tenant:
-                print(f"  SKIP {name}: room or tenant not found")
-                continue
-
-            if isinstance(checkin, datetime):
-                checkin_date = checkin.date()
-            elif isinstance(checkin, date):
-                checkin_date = checkin
-            else:
-                continue
-
-            # Map food plan
-            fp = None
-            for fp_key in food_map:
-                if any(w in food_raw for w in fp_key.split()):
-                    fp = food_map[fp_key]
-                    break
-
-            staff_obj = staff_map.get(staff_nm)
-
-            t = Tenancy(
-                tenant_id=tenant.id,
-                room_id=room.id,
-                stay_type=StayType.monthly,
-                status=status,
-                checkin_date=checkin_date,
-                booking_amount=booking,
-                security_deposit=deposit,
-                maintenance_fee=maint,
-                agreed_rent=monthly,
-                food_plan_id=fp.id if fp else None,
-                assigned_staff_id=staff_obj.id if staff_obj else None,
-                notes=clean_str(row[14]) if len(row) > 14 else None,
+        # Pre-load dummy room for future no-shows (May bookings etc.)
+        dummy_room = room_by_num.get("UNASSIGNED")
+        if not dummy_room:
+            dummy_room = Room(
+                property_id=thor.id, room_number="UNASSIGNED", floor=0,
+                room_type="single", max_occupancy=1, active=False,
+                notes="Dummy room for future no-shows with no room assigned",
             )
-            session.add(t)
+            session.add(dummy_room)
             await session.flush()
-            tenancy_list.append((t, row))
+            room_by_num["UNASSIGNED"] = dummy_room
+            print("  + Created UNASSIGNED dummy room for future no-shows")
 
-        await session.commit()
-        print(f"  Total tenancies: {len(tenancy_list)}")
+        all_staff = (await session.execute(select(Staff))).scalars().all()
+        staff_map = {s.name: s for s in all_staff}
 
-        # ── PASS 5: Rent Schedule ─────────────────────────────────────────
-        print("\n[5/6] Importing rent schedule...")
-        rs_count = 0
+        tenant_cache: dict[str, Tenant] = {}
 
-        for tenancy, row in tenancy_list:
-            for col_idx, period, cash_col, upi_col in MONTH_COLS:
-                status_val = row[col_idx] if len(row) > col_idx else None
-                if status_val is None:
-                    continue
-
-                rs = norm_rent_status(status_val)
-                maint = tenancy.maintenance_fee or Decimal("0")
-
-                result = await session.execute(
-                    select(RentSchedule).where(
-                        RentSchedule.tenancy_id == tenancy.id,
-                        RentSchedule.period_month == period,
-                    )
-                )
-                if result.scalars().first():
-                    continue
-
-                rs_row = RentSchedule(
-                    tenancy_id=tenancy.id,
-                    period_month=period,
-                    rent_due=tenancy.agreed_rent,
-                    maintenance_due=maint,
-                    status=rs,
-                    due_date=period,
-                    notes=clean_str(status_val) if rs != RentStatus.paid else None,
-                )
-                session.add(rs_row)
-                rs_count += 1
-
-        await session.commit()
-        print(f"  Total rent_schedule rows: {rs_count}")
-
-        # ── PASS 6: Payments (Cash + UPI from month columns) ──────────────
-        print("\n[6/6] Importing payments...")
-        pay_count = 0
-
-        for tenancy, row in tenancy_list:
-            for col_idx, period, cash_col, upi_col in MONTH_COLS:
-                status_val = row[col_idx] if len(row) > col_idx else None
-                if status_val is None:
-                    continue
-
-                cash_val = to_decimal(row[cash_col]) if (cash_col is not None and len(row) > cash_col) else Decimal("0")
-                upi_val  = to_decimal(row[upi_col])  if (upi_col  is not None and len(row) > upi_col)  else Decimal("0")
-
-                if cash_val > 0:
-                    session.add(Payment(
-                        tenancy_id=tenancy.id,
-                        amount=cash_val,
-                        payment_date=period,
-                        payment_mode=PaymentMode.cash,
-                        for_type=PaymentFor.rent,
-                        period_month=period,
-                        notes="Imported from Excel",
-                    ))
-                    pay_count += 1
-
-                if upi_val > 0:
-                    session.add(Payment(
-                        tenancy_id=tenancy.id,
-                        amount=upi_val,
-                        payment_date=period,
-                        payment_mode=PaymentMode.upi,
-                        for_type=PaymentFor.rent,
-                        period_month=period,
-                        notes="Imported from Excel",
-                    ))
-                    pay_count += 1
-
-                # Deposit as payment (for active tenants)
-                if col_idx == 20 and tenancy.security_deposit > 0:
-                    session.add(Payment(
-                        tenancy_id=tenancy.id,
-                        amount=tenancy.security_deposit,
-                        payment_date=tenancy.checkin_date,
-                        payment_mode=PaymentMode.cash,
-                        for_type=PaymentFor.deposit,
-                        period_month=None,
-                        notes="Security deposit — imported from Excel",
-                    ))
-                    pay_count += 1
-
-        await session.commit()
-        print(f"  Total payment rows: {pay_count}")
-
-        # ── Daily Basis sheet ─────────────────────────────────────────────
-        print("\n=== IMPORTING DAILY BASIS SHEET ===")
-        ws2 = wb["Daily Basis"]
-        daily_count = 0
-
-        for row in ws2.iter_rows(min_row=2, values_only=True):
-            if not row[1]:
+        for rec in records:
+            # 1. Normalize room number (handle edge cases)
+            room_num = rec['room']
+            if not room_num:
+                stats["skipped"] += 1
                 continue
 
-            name     = norm_name(row[1])
-            phone    = clean_phone(row[2]) if len(row) > 2 else ""
-            checkin  = row[3]
-            booking  = to_decimal(row[4])
-            maint    = to_decimal(row[6])
-            day_rate = to_decimal(row[7])
-            n_days   = to_decimal(row[8], default=Decimal("1"))
-            room_raw = row[0]
+            # Edge case: "May" = future no-show, no room assigned
+            if room_num.upper() == 'MAY':
+                room_num = "UNASSIGNED"
 
-            if not name or not checkin:
-                continue
+            # Edge case: "617/416" or "617/621" → use first room number
+            if '/' in room_num:
+                room_num = room_num.split('/')[0].strip()
 
-            room_num = str(room_raw).rstrip(".0") if isinstance(room_raw, float) else str(room_raw or "DAILY")
-
-            # Try to find room in thor first, then hulk
-            room = room_map.get((thor.id, room_num)) or room_map.get((hulk.id, room_num))
-
+            # 2. Resolve room — DB building is truth, ignore Excel BLOCK
+            room = room_by_num.get(room_num)
             if not room:
-                # Create a placeholder room for unknown short-stay rooms
-                r = Room(
-                    property_id=thor.id,
-                    room_number=room_num,
-                    floor=0,
-                    room_type=RoomType.double,
-                    max_occupancy=2,
-                    active=True,
-                    notes="Daily stay room — imported",
-                )
-                session.add(r)
-                await session.flush()
-                room = r
-                room_map[(thor.id, room_num)] = room
+                print(f"  SKIP: room {room_num} not in DB — {rec['name']}")
+                stats["skipped"] += 1
+                continue
 
-            # Tenant
+            # 3. Resolve or create tenant (dedup by phone)
+            phone = _norm_phone(rec['phone'])
             if not phone:
-                phone = placeholder_phone(room_num, name)
+                phone = _placeholder_phone(room_num, rec['name'])
 
-            tenant = tenant_map.get(phone)
-            if not tenant:
-                result = await session.execute(select(Tenant).where(Tenant.phone == phone))
-                tenant = result.scalars().first()
-                if not tenant:
-                    tenant = Tenant(name=name, phone=phone, gender="male")
+            tenant = tenant_cache.get(phone)
+            if not tenant and write:
+                existing = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+                if existing:
+                    tenant = existing
+                else:
+                    tenant = Tenant(
+                        name=rec['name'].strip().title(),
+                        phone=phone,
+                        gender=_norm_gender(rec['gender']),
+                        food_preference=_norm_food(rec.get('food', '')) or None,
+                    )
                     session.add(tenant)
                     await session.flush()
-                    tenant_map[phone] = tenant
+                    stats["tenants"] += 1
+                tenant_cache[phone] = tenant
+            elif not tenant:
+                stats["tenants"] += 1
+                continue  # dry run — skip DB writes
 
-            if isinstance(checkin, datetime):
-                checkin_date = checkin.date()
-            elif isinstance(checkin, date):
-                checkin_date = checkin
-            else:
-                continue
+            # 4. Checkin date
+            checkin = rec['checkin']
+            if not checkin:
+                if rec['status'] == 'No-show':
+                    checkin = date(2025, 12, 1)
+                else:
+                    print(f"  SKIP: no checkin date — {rec['name']}")
+                    stats["skipped"] += 1
+                    continue
 
-            total_days = int(n_days) if n_days > 0 else 1
-            checkout_date = date(checkin_date.year, checkin_date.month,
-                                 min(checkin_date.day + total_days, 28))
+            # 5. Staff
+            staff_name = _norm_staff(rec['staff'])
+            staff_obj = staff_map.get(staff_name)
 
-            ten = Tenancy(
+            # 6. Create tenancy
+            tenancy = Tenancy(
                 tenant_id=tenant.id,
                 room_id=room.id,
-                stay_type=StayType.daily,
-                status=TenancyStatus.exited,
-                checkin_date=checkin_date,
-                checkout_date=checkout_date,
-                booking_amount=booking,
-                maintenance_fee=maint,
-                agreed_rent=day_rate * Decimal(str(total_days)),
-                notes=clean_str(row[12]) if len(row) > 12 else None,
+                checkin_date=checkin,
+                agreed_rent=_to_dec(rec['current_rent']),
+                security_deposit=_to_dec(rec['deposit']),
+                booking_amount=_to_dec(rec['booking']),
+                maintenance_fee=_to_dec(rec['maintenance']),
+                status=_status_to_enum(rec['status']),
+                assigned_staff_id=staff_obj.id if staff_obj else None,
+                notes=rec.get('comment') or None,
             )
-            session.add(ten)
+            session.add(tenancy)
             await session.flush()
-            daily_count += 1
+            stats["tenancies"] += 1
 
-            # Payment for daily stay
-            if booking > 0:
+            # 7. Rent schedule + payments per month
+            for st_key, period, cash_key, upi_key in MONTH_COLS:
+                st_val = rec.get(st_key, '')
+
+                # Check for payments even if rent status is blank
+                has_cash = False
+                has_upi = False
+                if cash_key:
+                    cv, _, _, _ = clean_num(rec.get(cash_key, 0))
+                    has_cash = cv > 0
+                if upi_key:
+                    uv, _, _, _ = clean_num(rec.get(upi_key, 0))
+                    has_upi = uv > 0
+
+                if not st_val and not has_cash and not has_upi:
+                    continue
+
+                # Rent for this period (use revision columns from parser)
+                if period >= date(2026, 5, 1) and rec.get('rent_may', 0) > 0:
+                    period_rent = rec['rent_may']
+                elif period >= date(2026, 2, 1) and rec.get('rent_feb', 0) > 0:
+                    period_rent = rec['rent_feb']
+                else:
+                    period_rent = rec.get('rent_monthly', 0) or rec['current_rent']
+
+                # Rent schedule (only if status exists)
+                if st_val:
+                    session.add(RentSchedule(
+                        tenancy_id=tenancy.id,
+                        period_month=period,
+                        rent_due=_to_dec(period_rent),
+                        maintenance_due=Decimal("0"),
+                        status=_rent_status_to_enum(st_val),
+                        due_date=period,
+                    ))
+                    stats["rent_schedule"] += 1
+
+                # Cash payment (use clean_num to match Sheet parsing exactly)
+                if cash_key:
+                    cash_val, _, _, _ = clean_num(rec.get(cash_key, 0))
+                    if cash_val > 0:
+                        session.add(Payment(
+                            tenancy_id=tenancy.id,
+                            amount=_to_dec(cash_val),
+                            payment_date=period,
+                            payment_mode=PaymentMode.cash,
+                            for_type=PaymentFor.rent,
+                            period_month=period,
+                            notes="Imported from Excel",
+                        ))
+                        stats["payments"] += 1
+
+                # UPI payment (use clean_num to match Sheet parsing exactly)
+                if upi_key:
+                    upi_val, _, _, _ = clean_num(rec.get(upi_key, 0))
+                    if upi_val > 0:
+                        session.add(Payment(
+                            tenancy_id=tenancy.id,
+                            amount=_to_dec(upi_val),
+                            payment_date=period,
+                            payment_mode=PaymentMode.upi,
+                            for_type=PaymentFor.rent,
+                            period_month=period,
+                            notes="Imported from Excel",
+                        ))
+                        stats["payments"] += 1
+
+            # 8. Deposit payment
+            if rec['deposit'] > 0:
                 session.add(Payment(
-                    tenancy_id=ten.id,
-                    amount=booking,
-                    payment_date=checkin_date,
+                    tenancy_id=tenancy.id,
+                    amount=_to_dec(rec['deposit']),
+                    payment_date=checkin,
+                    payment_mode=PaymentMode.cash,
+                    for_type=PaymentFor.deposit,
+                    period_month=None,
+                    notes="Security deposit — imported from Excel",
+                ))
+                stats["payments"] += 1
+
+            # 9. Booking advance
+            if rec['booking'] > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id,
+                    amount=_to_dec(rec['booking']),
+                    payment_date=checkin,
                     payment_mode=PaymentMode.cash,
                     for_type=PaymentFor.booking,
-                    notes="Daily stay — imported from Excel",
+                    period_month=None,
+                    notes="Booking advance — imported from Excel",
                 ))
+                stats["payments"] += 1
 
-        await session.commit()
-        print(f"  Daily stay tenancies: {daily_count}")
+        if write:
+            await session.commit()
 
     await engine.dispose()
 
-    print("\n" + "="*50)
-    print("IMPORT COMPLETE")
-    print("="*50)
+    print("\n" + "=" * 60)
+    print("IMPORT SUMMARY")
+    print("=" * 60)
+    print(f"  Tenants created    : {stats['tenants']}")
+    print(f"  Tenancies created  : {stats['tenancies']}")
+    print(f"  Rent schedule rows : {stats['rent_schedule']}")
+    print(f"  Payment rows       : {stats['payments']}")
+    print(f"  Skipped            : {stats['skipped']}")
+    print("=" * 60)
+
+    if not write:
+        print("\nDRY RUN — nothing written. Re-run with --write to import.")
+    else:
+        print("\nIMPORT COMPLETE. Run verification next.")
 
 
 if __name__ == "__main__":
-    asyncio.run(run_import())
+    parser = argparse.ArgumentParser(description="Excel -> DB full import (drop/reload)")
+    parser.add_argument("--write", action="store_true", help="Actually write (default: dry run)")
+    args = parser.parse_args()
+    asyncio.run(run_import(write=args.write))

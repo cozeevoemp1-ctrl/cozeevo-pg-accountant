@@ -103,7 +103,7 @@ async def run(confirm: bool):
             print(f"  {table:<25} {count:>8,}  PROTECTED")
 
         if not confirm:
-            print("\n  ⚠  DRY RUN — nothing changed.")
+            print("\n  [!] DRY RUN -- nothing changed.")
             print("  Re-run with --confirm to actually wipe L1 + L2 data.\n")
             await engine.dispose()
             return
@@ -112,7 +112,7 @@ async def run(confirm: bool):
         print("\n  Wiping...")
         for table in WIPE_ORDER:
             await session.execute(text(f"TRUNCATE {table} RESTART IDENTITY CASCADE"))
-            print(f"  ✓  {table} cleared")
+            print(f"  [ok]  {table} cleared")
 
         await session.commit()
 

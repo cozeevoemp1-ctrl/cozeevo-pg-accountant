@@ -126,9 +126,11 @@ def get_ws(sp, name, rows=300, cols=20):
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
-def main():
-    print("Step 1: Reading Excel...")
-    wb = openpyxl.load_workbook(EXCEL_FILE, data_only=True)
+def read_history(excel_file=EXCEL_FILE):
+    """Parse History sheet → list of tenant dicts.
+    This is the SINGLE parser — used by both clean_and_load.py and excel_import.py.
+    """
+    wb = openpyxl.load_workbook(excel_file, data_only=True)
     ws = wb['History']
 
     tenants = []
@@ -152,12 +154,14 @@ def main():
             'checkin_raw': safe_str(ws.cell(row, 5).value),
             'checkin': parse_date(ws.cell(row, 5).value),
             'status': clean_status(ws.cell(row, 17).value),
-            'rent_monthly': rm, 'current_rent': rent,
+            'rent_monthly': rm, 'rent_feb': rf, 'rent_may': ry,
+            'current_rent': rent,
             'deposit': sn(ws.cell(row, 7).value),
             'booking': sn(ws.cell(row, 6).value),
             'maintenance': sn(ws.cell(row, 8).value),
             'staff': safe_str(ws.cell(row, 16).value),
             'comment': safe_str(ws.cell(row, 15).value),
+            'food': safe_str(ws.cell(row, 35).value),
             'refund_status': safe_str(ws.cell(row, 39).value),
             'refund_amount': sn(ws.cell(row, 40).value),
             # Raw payment values (cleaned later per-month)
@@ -170,12 +174,30 @@ def main():
             'mar_bal': ws.cell(row, 31).value, 'mar_cash': ws.cell(row, 32).value, 'mar_upi': ws.cell(row, 33).value,
         })
 
+    # Generate April status from tenancy status (no Excel column yet)
+    for t in tenants:
+        if t['status'] == 'Active':
+            t['apr_st'] = 'UNPAID'
+        elif t['status'] == 'No-show':
+            t['apr_st'] = 'NO SHOW'
+        elif t['status'] == 'Exited':
+            # Only show EXIT in April if they didn't already exit in March
+            t['apr_st'] = '' if t.get('mar_st') == 'EXIT' else ''
+        else:
+            t['apr_st'] = ''
+        t['apr_cash'] = 0
+        t['apr_upi'] = 0
+        t['apr_bal'] = 0
+
+    return tenants
+
+
+def main():
+    print("Step 1: Reading Excel...")
+    tenants = read_history()
     print(f"  {len(tenants)} tenants parsed")
 
-    # Global occupancy (same for all months)
-    all_noshow = [t for t in tenants if t['status'] == 'No-show']
-    ns_prem = sum(1 for t in all_noshow if str(t['sharing']).lower() == 'premium')
-    ns_beds = (len(all_noshow) - ns_prem) + ns_prem * 2
+    # No-show count is calculated per-month (only those whose checkin >= month start)
 
     # ── Step 2: Write to Google Sheet ────────────────────────────────────
     print("\nStep 2: Writing to Google Sheet...")
@@ -212,6 +234,7 @@ def main():
         ("JANUARY 2026",  date(2026,1,1),  date(2026,1,31),  'jan_st', 'jan_cash', 'jan_upi', 'jan_bal'),
         ("FEBRUARY 2026", date(2026,2,1),  date(2026,2,28),  'feb_st', 'feb_cash', 'feb_upi', 'feb_bal'),
         ("MARCH 2026",    date(2026,3,1),  date(2026,3,31),  'mar_st', 'mar_cash', 'mar_upi', 'mar_bal'),
+        ("APRIL 2026",    date(2026,4,1),  date(2026,4,30),  'apr_st', 'apr_cash', 'apr_upi', 'apr_bal'),
     ]
 
     for label, ms, me, stk, ck, uk, bk in months_cfg:
@@ -251,16 +274,15 @@ def main():
                 has_payment = cash > 0 or upi > 0
 
             # Who appears in this month?
-            # NO SHOW: show in month of checkin, or in latest month for future bookings
-            is_last_month = (label == months_cfg[-1][0])
-            actual_noshow = (st == 'NO SHOW' and t['status'] == 'No-show' and t['checkin']
-                             and (ms <= t['checkin'] <= me  # checkin in this month
-                                  or (is_last_month and t['checkin'] > me)))  # future → latest month
+            # NO SHOW: show in EVERY month from first appearance until checkin month.
+            # A no-show bed is reserved and not available — must count in occupancy.
+            actual_noshow = (t['status'] == 'No-show' and t['checkin']
+                             and t['checkin'] >= ms)  # checkin is this month or later
             is_meaningful = st in ('PAID', 'PARTIAL', 'UNPAID', 'ADVANCE') or actual_noshow
 
             # EXIT: only include if this is the first month with EXIT
             if st == 'EXIT':
-                prev_months = {'dec_st': None, 'jan_st': 'dec_st', 'feb_st': 'jan_st', 'mar_st': 'feb_st'}
+                prev_months = {'dec_st': None, 'jan_st': 'dec_st', 'feb_st': 'jan_st', 'mar_st': 'feb_st', 'apr_st': 'mar_st'}
                 prev_key = prev_months.get(stk)
                 prev_st = t.get(prev_key, '') if prev_key else ''
                 if prev_st == 'EXIT':
@@ -290,17 +312,37 @@ def main():
             upi_total += upi
             bal_total += bal
 
-            m_rows.append([
-                t['room'], t['name'], t['block'], t['sharing'],
-                t['current_rent'], cash, upi, total_paid, bal,
-                st, t['checkin_raw'], event, notes, t_chandra, t_lakshmi,
-            ])
+            # For April onwards: use formulas for Total Paid, Balance, Status
+            data_row_num = len(m_rows) + 5  # summary rows 1-3, header row 4, data starts row 5
+            use_formulas = (ms >= date(2026, 4, 1))
+
+            if use_formulas:
+                f_total = f'=F{data_row_num}+G{data_row_num}'
+                f_bal   = f'=E{data_row_num}-H{data_row_num}'
+                f_st    = f'=IF(I{data_row_num}<=0,"PAID","UNPAID")'
+                m_rows.append([
+                    t['room'], t['name'], t['block'], t['sharing'],
+                    t['current_rent'], cash, upi, f_total, f_bal,
+                    f_st, t['checkin_raw'], event, notes, t_chandra, t_lakshmi,
+                ])
+            else:
+                m_rows.append([
+                    t['room'], t['name'], t['block'], t['sharing'],
+                    t['current_rent'], cash, upi, total_paid, bal,
+                    st, t['checkin_raw'], event, notes, t_chandra, t_lakshmi,
+                ])
 
         # Occupancy for this month
         active = [t for t in tenants if t['status'] == 'Active' and t['checkin'] and t['checkin'] <= me]
         prem_a = sum(1 for t in active if str(t['sharing']).lower() == 'premium')
         reg_a = len(active) - prem_a
         a_beds = reg_a + prem_a * 2
+
+        # No-show beds for THIS month: checkin >= month start (bed reserved, not available)
+        month_noshow = [t for t in tenants if t['status'] == 'No-show' and t['checkin'] and t['checkin'] >= ms]
+        ns_prem = sum(1 for t in month_noshow if str(t['sharing']).lower() == 'premium')
+        ns_beds = (len(month_noshow) - ns_prem) + ns_prem * 2
+
         vacant = TOTAL_BEDS - a_beds - ns_beds
 
         # THOR/HULK
@@ -321,7 +363,7 @@ def main():
             [label, "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
             [
                 "Checked-in", f"{a_beds} beds ({reg_a}+{prem_a}P)",
-                f"No-show: {ns_beds} beds ({len(all_noshow)}t)",
+                f"No-show: {ns_beds} beds ({len(month_noshow)}t)",
                 f"Vacant: {vacant}", f"Occ: {a_beds/TOTAL_BEDS*100:.1f}%",
                 "Cash", cash_total, "UPI", upi_total, "Total", collected,
                 f"Bal: {bal_total:,.0f}", f"Chandra: {chandra_total:,.0f}",
