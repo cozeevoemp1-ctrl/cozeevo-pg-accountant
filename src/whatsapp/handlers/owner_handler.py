@@ -552,13 +552,23 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             if not checkin_iso:
                 return "__KEEP_PENDING__Couldn't parse that date. Try: *29 March* or *29/03/2026*"
             action_data["checkin_date"] = checkin_iso
+            action_data["step"] = "ask_notes"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Notes?* (e.g. _first 2 months 21k then 22k_ or _half deposit paid_)\nType *skip* if none."
+
+        if step == "ask_notes":
+            if ans.lower() not in ("skip", "none", "no", "na", "nil", "-"):
+                action_data["notes"] = ans
+            else:
+                action_data["notes"] = ""
             action_data["step"] = "confirm"
             await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
 
-            checkin_date = date.fromisoformat(checkin_iso)
+            checkin_date = date.fromisoformat(action_data["checkin_date"])
             rent = int(action_data.get("rent", 0))
             deposit = int(action_data.get("deposit", 0))
             maint = int(action_data.get("maintenance", 0))
+            notes_str = action_data.get("notes", "")
 
             return (
                 f"*Confirm New Tenant?*\n\n"
@@ -568,8 +578,9 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 f"Rent: Rs.{rent:,}/month\n"
                 f"Deposit: Rs.{deposit:,}\n"
                 + (f"Maintenance: Rs.{maint:,}\n" if maint > 0 else "")
-                + f"Check-in: {checkin_date.strftime('%d %b %Y')}\n\n"
-                "Reply *yes* to save or *no* to cancel."
+                + f"Check-in: {checkin_date.strftime('%d %b %Y')}\n"
+                + (f"Notes: {notes_str}\n" if notes_str else "")
+                + "\nReply *yes* to save or *no* to cancel."
             )
 
         if step == "confirm":
@@ -590,6 +601,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     "existing_tenant_id": None,
                     "building": action_data.get("building", ""),
                     "sharing": action_data.get("sharing", ""),
+                    "notes": action_data.get("notes", ""),
                 }
                 result = await _do_add_tenant(form_data, session)
                 return result
@@ -2089,13 +2101,16 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         room_obj = await session.get(Room, room_id)
         if room_obj:
             from src.integrations.gsheets import add_tenant as gsheets_add
-            # Get building from property
+            # Get building from property — strip "Cozeevo " prefix to match sheet format
             building = data.get("building", "")
             if not building and room_obj.property_id:
                 prop = await session.get(Property, room_obj.property_id)
                 building = prop.name if prop else ""
+            # Sheet uses "THOR" / "HULK", DB stores "Cozeevo THOR" / "Cozeevo HULK"
+            building = building.replace("Cozeevo ", "").strip() if building else ""
             floor_val = str(room_obj.floor or "")
-            sharing = data.get("sharing", "") or room_obj.room_type or ""
+            sharing = data.get("sharing", "") or str(room_obj.room_type or "")
+            sharing = sharing.capitalize()  # "double" → "Double"
             gs_r = await gsheets_add(
                 room_number=room_number, name=name, phone=phone,
                 gender=data.get("gender", ""), building=building,
@@ -2103,6 +2118,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
                 checkin=checkin_date.strftime("%d/%m/%Y"),
                 agreed_rent=float(base_rent), deposit=float(deposit),
                 booking=float(advance), maintenance=float(maintenance),
+                notes=data.get("notes", ""),
             )
             if gs_r.get("success"):
                 gsheets_note = "\nSheet updated"

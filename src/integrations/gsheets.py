@@ -514,6 +514,7 @@ def _add_tenant_sync(
     deposit: float,
     booking: float,
     maintenance: float,
+    notes: str = "",
 ) -> dict:
     """
     Add tenant to TENANTS master tab AND current monthly tab.
@@ -532,6 +533,19 @@ def _add_tenant_sync(
         result["error"] = "Room, name, and phone are required"
         return result
 
+    # Determine status: future check-in = No-show, past/today = Active
+    from datetime import date as _date
+    status = "Active"
+    try:
+        from src.whatsapp.intent_detector import _extract_date_entity
+        iso = _extract_date_entity(checkin)
+        if iso:
+            checkin_dt = _date.fromisoformat(iso)
+            if checkin_dt > _date.today():
+                status = "No-show"
+    except Exception:
+        pass
+
     try:
         # -- TENANTS tab --
         tenants_ws = _get_worksheet_sync("TENANTS")
@@ -544,7 +558,7 @@ def _add_tenant_sync(
             floor,             # 5: Floor
             sharing,           # 6: Sharing
             checkin,           # 7: Check-in
-            "ACTIVE",          # 8: Status
+            status,            # 8: Status (Active or No-show based on date)
             agreed_rent,       # 9: Agreed Rent
             deposit,           # 10: Deposit
             booking,           # 11: Booking
@@ -585,14 +599,14 @@ def _add_tenant_sync(
             monthly_row = [
                 room_number, name, phone, building, sharing,
                 agreed_rent, "", "", 0, agreed_rent, "UNPAID",
-                checkin, "", "", "", 0,
+                checkin, "", "", notes, 0,
             ]
         else:
             # Old format: no Phone column (15 cols)
             monthly_row = [
                 room_number, name, building, sharing,
                 agreed_rent, "", "", 0, agreed_rent, "UNPAID",
-                checkin, "", "", 0, 0,
+                checkin, "", notes, 0, 0,
             ]
         # Use update (not append_row) because filters block append
         next_row = len(all_vals) + 1
@@ -810,6 +824,7 @@ async def add_tenant(
     deposit: float,
     booking: float,
     maintenance: float,
+    notes: str = "",
 ) -> dict:
     """
     Async entry point — add tenant to TENANTS tab + current monthly tab.
@@ -818,7 +833,7 @@ async def add_tenant(
     """
     return await asyncio.to_thread(
         _add_tenant_sync, room_number, name, phone, gender, building, floor,
-        sharing, checkin, agreed_rent, deposit, booking, maintenance,
+        sharing, checkin, agreed_rent, deposit, booking, maintenance, notes,
     )
 
 
