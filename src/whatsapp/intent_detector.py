@@ -142,7 +142,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Report — general
     (re.compile(r"(?:report|summary|monthly|(?:monthly|financial)\s+statement|accounts|P&L|profit|income|collection|total collected|financial)", re.I), "REPORT", 0.88),
     # Report — cash / UPI / general collection queries
-    (re.compile(r"(?:how much (?:cash|upi|rent|money|total|was|is|have|did)|how much collect|cash collect|upi collect|total cash|total upi|what.?s collect|collect\w* in|collect\w* for|cash (?:for|in|this|last|march|feb|jan|dec|nov|oct|sep|aug|jul|jun|apr)|upi (?:for|in|this|last|march|feb|jan|dec|nov|oct|sep|aug|jul|jun|apr))", re.I), "REPORT", 0.92),
+    (re.compile(r"(?:how much (?:cash|upi|rent|money|total|was|is|have|did)|how much collect|cash collect|upi collect|total cash|total upi|what.?s collect|collect\w* in|collect\w* for|(?:cash|upi) (?:for|in|this|last) (?:month|week|year|march|feb|jan|dec|nov|oct|sep|aug|jul|jun|apr))", re.I), "REPORT", 0.92),
     # Salary / staff payment — must come BEFORE generic PAYMENT_LOG and ADD_EXPENSE
     (re.compile(r"(?:paid\s+salary|salary\s+paid|staff\s+salary|pay\s+salary|salary\s+to\s+\w+|wages?|disburse\w*\s+salary)", re.I), "ADD_EXPENSE", 0.92),
     # Bill payments (electricity/water/internet + "bill" + "paid") — ADD_EXPENSE not PAYMENT_LOG

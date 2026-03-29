@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.10.0] — 2026-03-29 — Workflow Enhancements + 30 Tests
+
+### Added
+- **ADD_TENANT: food_preference step** — veg/non-veg/egg asked after gender, saved to DB
+- **CHECKOUT: exit date collection** — receptionist enters actual exit date (was hardcoded to today)
+- **CHECKOUT: deposit forfeiture** — notice after 5th = deposit forfeited with clear message to receptionist
+- **LOG_EXPENSE: receipt photo** — asks for photo after description, allows skip
+- **NOTICE QUERY: enhanced** — shows count, deposit/refund per tenant, forfeiture status
+- **Intent: "how many notices"** — routes to QUERY_EXPIRING
+- **30 workflow tests** — tests/test_workflow_flows.py covering all flows with edge cases
+
+### Fixed
+- **Payment+month intent clash** — "Raj paid 15000 upi march" now routes to PAYMENT_LOG (was REPORT)
+- **Checkout Sheet update** — exit date passed to Google Sheet (was always today)
+- **Media fields in pending** — media_id/type/mime now passed through resolve_pending_action
+
+---
+
 ## [1.9.0] — 2026-03-29 — Excel Import Pipeline + Onboarding + Doc Cleanup
 
 ### Added
