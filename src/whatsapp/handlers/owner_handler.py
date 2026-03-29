@@ -551,8 +551,34 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
 
         if step == "ask_deposit":
             action_data["deposit"] = _parse_amount_field(ans)
+            deposit = action_data["deposit"]
+            if deposit > 0:
+                action_data["step"] = "ask_advance"
+                await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+                return f"Deposit is Rs.{int(deposit):,}.\n\n*How much paid now?* (amount, or *full* if fully paid)"
+            else:
+                action_data["advance"] = 0
+                action_data["step"] = "ask_maintenance"
+                await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+                return "*Maintenance fee?* (number, or *skip*)"
+
+        if step == "ask_advance":
+            deposit = action_data.get("deposit", 0)
+            if ans.lower() in ("full", "all", "complete", "done", "paid"):
+                action_data["advance"] = deposit
+            else:
+                adv = _parse_amount_field(ans)
+                if adv < 0:
+                    return "__KEEP_PENDING__Amount can't be negative. *How much paid now?*"
+                if adv > deposit:
+                    return f"__KEEP_PENDING__Can't pay more than deposit (Rs.{int(deposit):,}). *How much paid now?*"
+                action_data["advance"] = adv
             action_data["step"] = "ask_maintenance"
             await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            adv = action_data["advance"]
+            remaining = deposit - adv
+            if remaining > 0:
+                return f"Paid: Rs.{int(adv):,} | Remaining: Rs.{int(remaining):,} due on check-in.\n\n*Maintenance fee?* (number, or *skip*)"
             return "*Maintenance fee?* (number, or *skip*)"
 
         if step == "ask_maintenance":
@@ -582,6 +608,8 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             checkin_date = date.fromisoformat(action_data["checkin_date"])
             rent = int(action_data.get("rent", 0))
             deposit = int(action_data.get("deposit", 0))
+            advance = int(action_data.get("advance", 0))
+            deposit_remaining = deposit - advance
             maint = int(action_data.get("maintenance", 0))
             notes_str = action_data.get("notes", "")
 
@@ -593,7 +621,9 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 + (f"Gender: {gender_str}\n" if gender_str else "")
                 + f"Room: {action_data['room_number']}\n"
                 f"Rent: Rs.{rent:,}/month\n"
-                f"Deposit: Rs.{deposit:,}\n"
+                + f"Deposit: Rs.{deposit:,}"
+                + (f" (Paid: Rs.{advance:,} | Due: Rs.{deposit_remaining:,})" if 0 < advance < deposit else "")
+                + "\n"
                 + (f"Maintenance: Rs.{maint:,}\n" if maint > 0 else "")
                 + f"Check-in: {checkin_date.strftime('%d %b %Y')}\n"
                 + (f"Notes: {notes_str}\n" if notes_str else "")
@@ -610,7 +640,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     "room_number": action_data["room_number"],
                     "base_rent": action_data["rent"],
                     "deposit": action_data.get("deposit", 0),
-                    "advance": 0,
+                    "advance": action_data.get("advance", 0),
                     "maintenance": action_data.get("maintenance", 0),
                     "checkin_date": action_data["checkin_date"],
                     "food_pref": "none",
