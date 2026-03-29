@@ -3385,7 +3385,7 @@ async def _start_onboarding(entities: dict, ctx: CallerContext, session: AsyncSe
     # Create fresh onboarding session (48-hour window)
     ob = OnboardingSession(
         tenant_id=tenant.id,
-        step="ask_gender",
+        step="ask_dob",
         collected_data=json.dumps({"name": tenant.name}),
         expires_at=datetime.utcnow() + timedelta(hours=48),
     )

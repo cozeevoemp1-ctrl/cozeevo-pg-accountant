@@ -717,6 +717,7 @@ _ONBOARDING_STEPS = [
     "ask_email",
     "ask_occupation",
     "ask_gender",
+    "ask_food_pref",
     "ask_emergency_name",
     "ask_emergency_relationship",
     "ask_emergency_phone",
@@ -735,6 +736,7 @@ _ONBOARDING_QUESTIONS = {
     "ask_email":                  "Your *email address* (or type *skip*):",
     "ask_occupation":             "Your current *job or institution name* (e.g. Infosys / Christ University / skip):",
     "ask_gender":                 "Your *gender*?\nReply: *male* / *female* / *other*",
+    "ask_food_pref":              "*Food preference?*\nReply: *veg* / *non-veg* / *egg*",
     "ask_emergency_name":         "Your *emergency contact name* (parent / sibling / friend):",
     "ask_emergency_relationship": "Their *relationship* to you?\n(e.g. Father / Mother / Sibling / Friend)",
     "ask_emergency_phone":        "Their *phone number* (10 digits):",
@@ -796,6 +798,16 @@ async def handle_onboarding_step(
     elif step == "ask_gender":
         g = ans.lower()
         data["gender"] = "male" if "male" in g else ("female" if "female" in g else "other")
+    elif step == "ask_food_pref":
+        f = ans.lower().strip()
+        if "non" in f or "nonveg" in f:
+            data["food_pref"] = "non-veg"
+        elif "egg" in f:
+            data["food_pref"] = "egg"
+        elif "veg" in f:
+            data["food_pref"] = "veg"
+        elif not skip:
+            data["food_pref"] = ans.strip()
     elif step == "ask_emergency_name":
         data["emergency_name"] = ans
     elif step == "ask_emergency_relationship":
@@ -870,39 +882,52 @@ async def handle_onboarding_step(
         tenant_phone = tenant.phone if tenant else ""
 
         summary_lines = [
-            f"*New KYC Submission — {tenant_name}*",
-            f"Phone: {tenant_phone}",
+            f"*New KYC Submission*",
+            f"━━━━━━━━━━━━━━━━━━━━",
+            f"*Name:* {tenant_name}",
+            f"*Phone:* {tenant_phone}",
         ]
-        if data.get("gender"): summary_lines.append(f"Gender: {data['gender']}")
-        if data.get("dob"): summary_lines.append(f"DOB: {data['dob']}")
-        if data.get("father_name"): summary_lines.append(f"Father: {data['father_name']}")
-        if data.get("father_phone"): summary_lines.append(f"Father Phone: {data['father_phone']}")
-        if data.get("address"): summary_lines.append(f"Address: {data['address']}")
-        if data.get("email"): summary_lines.append(f"Email: {data['email']}")
-        if data.get("occupation"): summary_lines.append(f"Occupation: {data['occupation']}")
-        if data.get("emergency_name"): summary_lines.append(f"Emergency: {data['emergency_name']} ({data.get('emergency_relationship', '')})")
-        if data.get("emergency_phone"): summary_lines.append(f"Emergency Phone: {data['emergency_phone']}")
-        if data.get("id_type"): summary_lines.append(f"ID: {data['id_type']} — {data.get('id_number', '')}")
-        if data.get("ask_id_photo"): summary_lines.append("ID Photo: uploaded")
-        if data.get("ask_selfie"): summary_lines.append("Selfie: uploaded")
+        if data.get("gender"): summary_lines.append(f"*Gender:* {data['gender']}")
+        if data.get("dob"): summary_lines.append(f"*DOB:* {data['dob']}")
+        if data.get("food_pref"): summary_lines.append(f"*Food:* {data['food_pref']}")
+        summary_lines.append("")
+        if data.get("father_name"): summary_lines.append(f"*Father:* {data['father_name']}")
+        if data.get("father_phone"): summary_lines.append(f"*Father Ph:* {data['father_phone']}")
+        if data.get("address"): summary_lines.append(f"*Address:* {data['address']}")
+        if data.get("email"): summary_lines.append(f"*Email:* {data['email']}")
+        if data.get("occupation"): summary_lines.append(f"*Work:* {data['occupation']}")
+        summary_lines.append("")
+        if data.get("emergency_name"):
+            rel = data.get('emergency_relationship', '')
+            summary_lines.append(f"*Emergency:* {data['emergency_name']}" + (f" ({rel})" if rel else ""))
+        if data.get("emergency_phone"): summary_lines.append(f"*Emergency Ph:* {data['emergency_phone']}")
+        summary_lines.append("")
+        if data.get("id_type"): summary_lines.append(f"*ID Proof:* {data['id_type']} — {data.get('id_number', '')}")
+        if data.get("ask_id_photo"): summary_lines.append("*ID Photo:* uploaded")
+        if data.get("ask_selfie"): summary_lines.append("*Selfie:* uploaded")
+        summary_lines.append("━━━━━━━━━━━━━━━━━━━━")
 
         summary = "\n".join(summary_lines)
         summary += "\n\nReply *yes* to approve or *no* to reject."
 
-        # Save pending action for admin
+        # Save pending action for admin (2-hour expiry, don't clear other admin pendings)
         import os
         admin_phone = os.getenv("ADMIN_PHONE", "+917845952289")
-        from src.whatsapp.handlers._shared import _save_pending
-        await _save_pending(
-            admin_phone, "APPROVE_ONBOARDING",
-            {
+        from src.database.models import PendingAction
+        pa = PendingAction(
+            phone=admin_phone,
+            intent="APPROVE_ONBOARDING",
+            action_data=json.dumps({
                 "onboarding_id": ob.id,
                 "tenant_id": ob.tenant_id,
                 "data": data,
                 "summary": summary,
-            },
-            [], session,
+            }),
+            choices=json.dumps([]),
+            expires_at=datetime.utcnow() + timedelta(hours=2),
+            resolved=False,
         )
+        session.add(pa)
 
         # Send the summary to admin via WhatsApp
         try:

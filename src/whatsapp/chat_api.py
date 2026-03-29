@@ -118,12 +118,14 @@ async def _process_message_inner(
             data = _json.loads(ob.collected_data or "{}")
             name = data.get("name", ctx.name)
             # First contact: send welcome + Q1 without consuming their message as an answer
-            if ob.step == "ask_gender" and message.lower() in ("hi", "hello", "hey", "start", ""):
+            if ob.step == "ask_dob" and message.lower() in ("hi", "hello", "hey", "start", ""):
+                total_steps = len([s for s in ["ask_dob", "ask_father_name", "ask_father_phone", "ask_address", "ask_email", "ask_occupation", "ask_gender", "ask_emergency_name", "ask_emergency_relationship", "ask_emergency_phone", "ask_id_type", "ask_id_number", "ask_id_photo", "ask_selfie"]])
                 reply = (
-                    f"*Welcome to the PG, {name}!*\n\n"
-                    "Please answer a few quick questions to complete your check-in.\n\n"
-                    "*Step 1 of 5*\n"
-                    "What is your *gender*?\nReply: *male* / *female* / *other*"
+                    f"*Welcome to Cozeevo, {name}!*\n\n"
+                    "Please answer a few quick questions to complete your check-in.\n"
+                    "Type *skip* for any field you want to skip.\n\n"
+                    f"*Step 1 of {total_steps}*\n"
+                    "Your *date of birth*? (DD/MM/YYYY)\nOr type *skip*."
                 )
             else:
                 reply = await handle_onboarding_step(
