@@ -188,15 +188,21 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
                 unique.append(row)
         return unique
 
-    # Try broad match first
-    rows = await _search(f"%{name}%")
-    if rows:
-        return rows
-
-    # Try prefix of first word (min 3 chars)
+    # 1. Exact first-name match: "Arun" matches "Arun Vasavan" but not "Tarun" or "Varunlal"
     first_word = name.split()[0] if name else name
     if len(first_word) >= 3:
         rows = await _search(f"{first_word}%")
+        if rows:
+            return rows
+
+    # 2. Full name contains match (multi-word queries like "Arun Vas")
+    if " " in name.strip():
+        rows = await _search(f"%{name}%")
+        if rows:
+            return rows
+
+    # 3. Broad substring match as last resort (catches typos/partial)
+    rows = await _search(f"%{name}%")
     return rows
 
 

@@ -585,11 +585,13 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             maint = int(action_data.get("maintenance", 0))
             notes_str = action_data.get("notes", "")
 
+            gender_str = action_data.get("gender", "")
             return (
                 f"*Confirm New Tenant?*\n\n"
                 f"Name: {action_data['name']}\n"
                 f"Phone: {action_data['phone']}\n"
-                f"Room: {action_data['room_number']}\n"
+                + (f"Gender: {gender_str}\n" if gender_str else "")
+                + f"Room: {action_data['room_number']}\n"
                 f"Rent: Rs.{rent:,}/month\n"
                 f"Deposit: Rs.{deposit:,}\n"
                 + (f"Maintenance: Rs.{maint:,}\n" if maint > 0 else "")
@@ -801,6 +803,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                         tenancy_id=action_data["tenancy_id"],
                         amount=upi, mode="upi",
                         ctx_name=pending.phone, session=session,
+                        skip_duplicate_check=(cash > 0),  # skip dup check if cash was just logged
                     )
                     results.append(f"UPI Rs.{int(upi):,} — {r}")
 
