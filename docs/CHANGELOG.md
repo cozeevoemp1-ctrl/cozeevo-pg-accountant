@@ -2,6 +2,37 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.9.0] — 2026-03-29 — Excel Import Pipeline + Onboarding + Doc Cleanup
+
+### Added
+- **Excel import pipeline** — single parser (`clean_and_load.py :: read_history()`), DB import calls it. 283/283 rows, 0 skipped. DB == Sheet financials verified.
+- **Onboarding system** — media intake (ID photo + selfie), admin approval flow (yes/no), food preference step, 15 steps total.
+- **Deposit tracking** — ask advance paid, show remaining balance in tenant queries.
+- **Smart activity/expense queries** — Groq-powered natural language answers from logs and expense records.
+- **April tab** — with formulas (Total Paid = Cash+UPI, Balance = Rent-Paid, Status = IF).
+- **Gender-based bed search** — find rooms with female/male occupant + empty bed.
+- **Monthly/yearly reports** — cash/UPI/expenses/deposits breakdown + vacant beds by building.
+- **Help menu** — example queries for every service.
+- **Receptionist cheat sheet** — `docs/RECEPTIONIST_CHEAT_SHEET.md`.
+- **1519 unit tests** — all passing.
+
+### Fixed
+- **No-show logic** — appear in EVERY month until checkin (was only checkin month). Per-month bed count.
+- **Room lookup** — DB building is truth, Excel BLOCK ignored. UNASSIGNED dummy room for May no-shows.
+- **Payment extraction** — uses `clean_num()` not `sn()`, handles messy cells like `19500/6500`.
+- **Payments without rent status** — created even when rent status column is blank.
+- **Name search precision** — exact first-word match before substring (Arun no longer matches Tarun).
+- **Phone normalization** — +91 mismatch between pending and ctx.phone in onboarding approval.
+
+### Docs
+- Deleted stale: QUICKSTART.md, SHEET_WORKFLOW.md
+- Removed n8n refs from DEPLOYMENT.md, SYSTEM_ARCHITECTURE.md, INTEGRATIONS.md
+- Created `docs/EXCEL_IMPORT.md` — single workflow doc for Excel → Sheet → DB
+- Updated CLAUDE.md — current architecture, data flow, docs index, end-of-day checklist
+- Created global `~/.claude/CLAUDE.md` — behavioral rules for all projects
+
+---
+
 ## [1.7.0] — 2026-03-15 — VPS Live + Bot Improvements
 
 ### Deployed

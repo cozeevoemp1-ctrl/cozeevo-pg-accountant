@@ -106,6 +106,19 @@ TEST_MODE=1   # enables /api/test/clear-pending endpoint
 - Prabhakaran (9444296681)
 - Lakshmi Mam
 
+## End of day checklist (COMPULSORY — do this before closing EVERY session)
+Before closing any session, complete ALL of these:
+1. **CHANGELOG** — update `docs/CHANGELOG.md` with version entry of what was done
+2. **Pending tasks** — update `memory/project_pending_tasks.md` with current state
+3. **Memory** — save any new decisions, preferences, rules to memory files
+4. **Affected docs** — update any docs that describe things that changed today
+5. **CLAUDE.md** — if architecture, data flow, or active files changed, update this file
+6. **Commit + push** — stage all changes, commit with clear message, push to GitHub
+7. **VPS deploy** — if code is stable and tested: `git pull && systemctl restart pg-accountant`
+8. **If NOT deploying** — note why in pending tasks (what needs testing/fixing first)
+
+This is NOT optional. Every session ends with this checklist completed.
+
 ## Preferences
 - Short, direct responses — no fluff
 - No emojis unless asked
