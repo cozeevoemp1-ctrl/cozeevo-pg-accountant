@@ -639,6 +639,21 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 action_data["tenancy_id"] = tenancy.id
                 action_data["tenant_name"] = tenant.name
                 action_data["room_number"] = room_obj.room_number
+                # Fetch existing notes from sheet
+                try:
+                    from src.integrations.gsheets import get_sheet
+                    ws = await get_sheet()
+                    all_vals = ws.get_all_values()
+                    rclean = room_obj.room_number.strip().upper()
+                    nlow = tenant.name.strip().lower()
+                    for row in all_vals[4:]:
+                        if str(row[0]).strip().upper() == rclean and nlow in str(row[1]).strip().lower():
+                            existing_notes = str(row[14]) if len(row) > 14 else ""
+                            if existing_notes:
+                                action_data["existing_notes"] = existing_notes
+                            break
+                except Exception:
+                    pass
                 action_data["step"] = "ask_cash"
                 await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
                 return f"*{tenant.name}* (Room {room_obj.room_number})\n\n*Cash amount?* (number, or *skip* if no cash)"
@@ -696,9 +711,32 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
                 return "__KEEP_PENDING__Total can't be zero. Enter at least one amount.\n\n*Cash amount?* (number, or *skip*)"
 
+            action_data["step"] = "ask_notes"
+            await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+
+            # Show existing notes if any
+            existing = action_data.get("existing_notes", "")
+            prompt = "*Notes?* (add/update comment, or *skip*)"
+            if existing:
+                prompt = f"Current notes: _{existing}_\n\n*Update notes?* (type new text, *delete* to clear, or *skip* to keep)"
+            return prompt
+
+        if step == "ask_notes":
+            if ans.lower() == "delete":
+                action_data["notes"] = ""
+                action_data["notes_action"] = "delete"
+            elif ans.lower() not in ("skip", "none", "no", "na", "nil", "-"):
+                action_data["notes"] = ans
+                action_data["notes_action"] = "update"
+            else:
+                action_data["notes_action"] = "skip"
+
             action_data["step"] = "confirm"
             await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
 
+            cash = action_data.get("cash", 0)
+            upi = action_data.get("upi", 0)
+            total = cash + upi
             tname = action_data.get("tenant_name", "")
             rnum = action_data.get("room_number", "")
             parts = []
@@ -706,13 +744,17 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 parts.append(f"Cash: Rs.{int(cash):,}")
             if upi > 0:
                 parts.append(f"UPI: Rs.{int(upi):,}")
+            notes_str = action_data.get("notes", "")
+            notes_action = action_data.get("notes_action", "skip")
 
             return (
                 f"*Confirm Payment?*\n\n"
                 f"Tenant: {tname} (Room {rnum})\n"
                 + "\n".join(f"  {p}" for p in parts)
-                + f"\n*Total: Rs.{int(total):,}*\n\n"
-                "Reply *yes* to save or *no* to cancel."
+                + f"\n*Total: Rs.{int(total):,}*"
+                + (f"\nNotes: {notes_str}" if notes_action == "update" else "")
+                + ("\nNotes: _cleared_" if notes_action == "delete" else "")
+                + "\n\nReply *yes* to save or *no* to cancel."
             )
 
         if step == "confirm":
@@ -741,11 +783,26 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     )
                     results.append(f"UPI Rs.{int(upi):,} — {r}")
 
+                # Update notes in sheet if changed
+                notes_action = action_data.get("notes_action", "skip")
+                notes_note = ""
+                if notes_action in ("update", "delete"):
+                    try:
+                        from src.integrations.gsheets import update_notes as gsheets_update_notes
+                        new_notes = action_data.get("notes", "") if notes_action == "update" else ""
+                        gs_r = await gsheets_update_notes(rnum, tname, new_notes)
+                        if gs_r.get("success"):
+                            notes_note = "\nNotes updated in sheet"
+                    except Exception as e:
+                        import logging as _log
+                        _log.getLogger(__name__).error("GSheets update_notes failed: %s", e)
+
                 total = cash + upi
                 return (
                     f"*Payment logged — {tname}* (Room {rnum})\n"
                     + "\n".join(results)
                     + f"\nTotal: Rs.{int(total):,}"
+                    + notes_note
                 )
             else:
                 return "Cancelled. No payment logged."
@@ -1663,10 +1720,26 @@ async def _do_update_checkin(
     old_checkin = tenancy.checkin_date
     tenancy.checkin_date = new_checkin
 
+    # Google Sheets write-back
+    gsheets_note = ""
+    try:
+        room_obj = await session.get(Room, tenancy.room_id)
+        if room_obj:
+            from src.integrations.gsheets import update_checkin as gsheets_update_checkin
+            gs_r = await gsheets_update_checkin(
+                room_obj.room_number, tenant_name, new_checkin.strftime("%d/%m/%Y")
+            )
+            if gs_r.get("success"):
+                gsheets_note = "\nSheet updated"
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).error("GSheets update_checkin failed: %s", e)
+
     return (
         f"*Checkin updated — {tenant_name}*\n"
         f"Was: {old_checkin.strftime('%d %b %Y')}\n"
-        f"Now: {new_checkin.strftime('%d %b %Y')}\n\n"
+        f"Now: {new_checkin.strftime('%d %b %Y')}\n"
+        f"{gsheets_note}\n\n"
         "Note: rent schedule rows are not auto-adjusted.\n"
         "Send *report* to verify dues."
     )

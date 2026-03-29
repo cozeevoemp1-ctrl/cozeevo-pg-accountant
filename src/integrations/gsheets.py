@@ -870,6 +870,124 @@ async def record_notice(
     )
 
 
+# -- Update check-in date ------------------------------------------------------
+
+def _update_checkin_sync(room_number: str, tenant_name: str, new_checkin: str) -> dict:
+    """Update check-in date in TENANTS tab and current monthly tab."""
+    result: dict[str, Any] = {"success": False, "error": None}
+
+    try:
+        # Parse to DD/MM/YYYY display format
+        from src.whatsapp.intent_detector import _extract_date_entity
+        iso = _extract_date_entity(new_checkin)
+        if iso:
+            checkin_display = date.fromisoformat(iso).strftime("%d/%m/%Y")
+        else:
+            checkin_display = new_checkin
+
+        # -- TENANTS tab --
+        tenants_ws = _get_worksheet_sync("TENANTS")
+        t_data = tenants_ws.get_all_values()
+        room_clean = room_number.strip().upper()
+        name_lower = tenant_name.strip().lower()
+
+        for i in range(1, len(t_data)):
+            row = t_data[i]
+            if (str(row[T_ROOM]).strip().upper() == room_clean and
+                    name_lower in str(row[T_NAME]).strip().lower()):
+                cell = gspread.utils.rowcol_to_a1(i + 1, T_CHECKIN + 1)
+                tenants_ws.update(values=[[checkin_display]], range_name=cell, value_input_option="USER_ENTERED")
+                logger.info("GSheets: updated checkin for %s in TENANTS row %d", tenant_name, i + 1)
+                break
+
+        # -- Monthly tabs: search all tabs for this tenant --
+        ss = _get_spreadsheet_sync()
+        for ws_meta in ss.worksheets():
+            tab = ws_meta.title
+            if not any(m in tab.upper() for m in MONTH_NAMES):
+                continue
+            try:
+                ws = _get_worksheet_sync(tab)
+                all_vals = ws.get_all_values()
+                header_row = all_vals[3] if len(all_vals) > 3 else []
+                is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
+                col_checkin = M_CHECKIN if is_new else 10  # old format
+
+                for j in range(4, len(all_vals)):
+                    r = all_vals[j]
+                    if (str(r[0]).strip().upper() == room_clean and
+                            name_lower in str(r[1]).strip().lower()):
+                        cell = gspread.utils.rowcol_to_a1(j + 1, col_checkin + 1)
+                        ws.update(values=[[checkin_display]], range_name=cell, value_input_option="USER_ENTERED")
+                        logger.info("GSheets: updated checkin in '%s' row %d", tab, j + 1)
+                        break
+            except Exception:
+                continue
+
+        result["success"] = True
+    except Exception as e:
+        result["error"] = f"Update checkin failed: {e}"
+        logger.error("GSheets: %s", result["error"])
+
+    return result
+
+
+async def update_checkin(room_number: str, tenant_name: str, new_checkin: str) -> dict:
+    """Async entry point — update check-in date in TENANTS + monthly tabs."""
+    return await asyncio.to_thread(_update_checkin_sync, room_number, tenant_name, new_checkin)
+
+
+# -- Update notes in monthly tab -----------------------------------------------
+
+def _update_notes_sync(room_number: str, tenant_name: str, notes: str,
+                       month: Optional[int] = None, year: Optional[int] = None) -> dict:
+    """Update/replace notes for a tenant in a monthly tab."""
+    result: dict[str, Any] = {"success": False, "error": None, "tab": None}
+
+    today = date.today()
+    if month is None:
+        month = today.month
+    if year is None:
+        year = today.year
+
+    tab_name = _month_tab_for(month, year)
+    result["tab"] = tab_name
+
+    try:
+        ws = _get_worksheet_sync(tab_name)
+        all_vals = ws.get_all_values()
+        header_row = all_vals[3] if len(all_vals) > 3 else []
+        is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
+        col_notes = M_NOTES if is_new else 12
+
+        room_clean = room_number.strip().upper()
+        name_lower = tenant_name.strip().lower()
+
+        for i in range(4, len(all_vals)):
+            r = all_vals[i]
+            if (str(r[0]).strip().upper() == room_clean and
+                    name_lower in str(r[1]).strip().lower()):
+                cell = gspread.utils.rowcol_to_a1(i + 1, col_notes + 1)
+                ws.update(values=[[notes]], range_name=cell, value_input_option="USER_ENTERED")
+                result["success"] = True
+                logger.info("GSheets: updated notes for %s in '%s' row %d", tenant_name, tab_name, i + 1)
+                return result
+
+        result["error"] = f"Row not found for {room_number}/{tenant_name} in {tab_name}"
+    except gspread.exceptions.WorksheetNotFound:
+        result["error"] = f"Tab '{tab_name}' not found"
+    except Exception as e:
+        result["error"] = f"Update notes failed: {e}"
+
+    return result
+
+
+async def update_notes(room_number: str, tenant_name: str, notes: str,
+                       month: Optional[int] = None, year: Optional[int] = None) -> dict:
+    """Async entry point — update notes in monthly tab."""
+    return await asyncio.to_thread(_update_notes_sync, room_number, tenant_name, notes, month, year)
+
+
 # -- Convenience: get sheet for direct access ----------------------------------
 
 async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:
