@@ -631,7 +631,22 @@ def _detect_followup_context(message: str, chat_context: str) -> Optional[dict]:
 
 
 async def _get_active_pending(phone: str, session: AsyncSession) -> Optional[PendingAction]:
-    """Return the most recent unresolved pending action for this phone, if not expired."""
+    """Return the most recent unresolved pending action for this phone, if not expired.
+    APPROVE_ONBOARDING is prioritized over other intents (created by tenant session)."""
+    # Check for high-priority approval pendings first
+    approval = await session.scalar(
+        select(PendingAction).where(
+            and_(
+                PendingAction.phone == phone,
+                PendingAction.resolved == False,
+                PendingAction.expires_at > datetime.utcnow(),
+                PendingAction.intent == "APPROVE_ONBOARDING",
+            )
+        ).order_by(PendingAction.created_at.desc())
+    )
+    if approval:
+        return approval
+    # Then normal most-recent lookup
     return await session.scalar(
         select(PendingAction).where(
             and_(

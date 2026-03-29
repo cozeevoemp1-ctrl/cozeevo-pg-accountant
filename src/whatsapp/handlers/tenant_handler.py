@@ -911,8 +911,14 @@ async def handle_onboarding_step(
         summary += "\n\nReply *yes* to approve or *no* to reject."
 
         # Save pending action for admin (2-hour expiry, don't clear other admin pendings)
-        import os
+        import os, re as _re
         admin_phone = os.getenv("ADMIN_PHONE", "+917845952289")
+        # Normalize phone to match how role_service stores it (strip +91 for Indian numbers)
+        _digits = _re.sub(r"[^0-9]", "", admin_phone)
+        if len(_digits) == 12 and _digits.startswith("91"):
+            admin_phone = _digits[2:]  # 917845952289 → 7845952289
+        elif len(_digits) == 10:
+            admin_phone = _digits
         from src.database.models import PendingAction
         pa = PendingAction(
             phone=admin_phone,
