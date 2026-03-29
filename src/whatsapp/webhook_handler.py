@@ -146,8 +146,21 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
             background.add_task(_handle_pdf_upload, from_number, media_id, body, effective_mime)
             return {"status": "ok"}
         else:
-            # Non-audio (image, etc.) — save to disk for downstream processing
-            await _download_media(media_id, media_mime)
+            # Non-audio, non-statement media (image, etc.)
+            # Don't download here — let chat_api handle via media_handler
+            # for onboarding photo uploads
+            pass
+
+    # Detect media type for InboundMessage
+    _media_type = None
+    if media_id:
+        base = (media_mime or "").split(";")[0].strip()
+        if base.startswith("image/"):
+            _media_type = "image"
+        elif base.startswith("video/"):
+            _media_type = "video"
+        elif base.startswith("application/"):
+            _media_type = "document"
 
     # -- Route through the v1 regex-first pipeline ----------------------------
     try:
@@ -155,7 +168,13 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         from src.whatsapp.chat_api import process_message, InboundMessage
         async with _session_factory() as session:
             result = await process_message(
-                body=InboundMessage(phone=from_number, message=body, message_id=None),
+                body=InboundMessage(
+                    phone=from_number, message=body, message_id=None,
+                    media_type=_media_type,
+                    media_id=media_id if _media_type else None,
+                    media_mime=media_mime if _media_type else None,
+                    media_filename=media_name if _media_type else None,
+                ),
                 session=session,
             )
         reply = result.reply if not result.skip else None
