@@ -100,6 +100,7 @@ class RoomType(str, enum.Enum):
     single  = "single"
     double  = "double"
     triple  = "triple"
+    premium = "premium"    # single occupancy in a multi-bed room (higher rate)
 
 class SharingType(str, enum.Enum):
     """Tenancy sharing type — how the tenant uses the room. Premium = 1 person in a multi-bed room."""

@@ -2393,12 +2393,20 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     from collections import defaultdict
     from src.database.models import Property
 
-    all_rows = (await session.execute(
-        select(Room, Property.name)
-        .join(Property, Property.id == Room.property_id)
-        .where(Room.active == True, Room.is_staff_room == False)
-        .order_by(Property.name, Room.room_number)
-    )).all()
+    # Detect building filter from message
+    desc = (entities.get("description") or entities.get("_raw_message") or "").lower()
+    building_filter = None
+    if "thor" in desc:
+        building_filter = "THOR"
+    elif "hulk" in desc:
+        building_filter = "HULK"
+
+    q = select(Room, Property.name).join(Property, Property.id == Room.property_id).where(Room.active == True, Room.is_staff_room == False)
+    if building_filter:
+        q = q.where(Property.name.ilike(f"%{building_filter}%"))
+    q = q.order_by(Property.name, Room.room_number)
+
+    all_rows = (await session.execute(q)).all()
 
     occupied_ids = {row[0] for row in (await session.execute(
         select(Tenancy.room_id)
@@ -2418,8 +2426,10 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     occupied_beds  = total_beds - vacant_beds
 
     if not vacant:
+        bld = f" in *{building_filter}*" if building_filter else ""
         return (
-            f"🔴 All {total_rooms} rooms / {total_beds} beds are currently occupied."
+            f"All {total_rooms} rooms / {total_beds} beds{bld} are currently occupied.\n"
+            "No vacant rooms available."
         )
 
     _ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡", "triple": "🟠", "premium": "⭐"}
@@ -2435,7 +2445,11 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
         block = "THOR" if "THOR" in prop.upper() else "HULK"
         fl = _floor_label(r.room_number)
         blocks[block][fl].append(r)
-        type_counts[r.room_type.value] += 1
+        try:
+            rt = r.room_type.value if r.room_type else "double"
+        except (LookupError, AttributeError):
+            rt = "double"
+        type_counts[rt] += 1
         beds = r.max_occupancy or 1
         if block == "THOR":
             thor_rooms += 1; thor_beds += beds
@@ -2463,7 +2477,11 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
             rooms = sorted(blocks[block][fl], key=lambda x: x.room_number)
             cells = []
             for r in rooms:
-                icon = _ICON.get(r.room_type.value, "⬜")
+                try:
+                    _rt = r.room_type.value if r.room_type else "double"
+                except (LookupError, AttributeError):
+                    _rt = "double"
+                icon = _ICON.get(_rt, "⬜")
                 ac = "❄" if r.has_ac else ""
                 cells.append(f"{icon}{r.room_number}{ac}")
             label = "GF" if fl == "G" else f"F{fl}"

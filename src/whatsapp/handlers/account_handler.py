@@ -1324,7 +1324,36 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     regular = active_tenants - premium_count
     active_beds = regular + (premium_count * 2)
     total_beds = 291
+    vacant_beds = total_beds - active_beds - no_show
     net_income = int(collected) - int(total_expenses)
+
+    # Vacant beds by building (THOR / HULK)
+    from src.database.models import Property
+    building_vacant = {}
+    try:
+        all_rooms = (await session.execute(
+            select(Room, Property.name)
+            .join(Property, Property.id == Room.property_id)
+            .where(Room.active == True, Room.is_staff_room == False)
+        )).all()
+
+        occupied_room_ids = {row[0] for row in (await session.execute(
+            select(Tenancy.room_id).where(
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                Tenancy.room_id.isnot(None),
+            )
+        )).all()}
+
+        for room, prop_name in all_rooms:
+            if room.id not in occupied_room_ids:
+                block = "THOR" if "THOR" in prop_name.upper() else "HULK"
+                building_vacant[block] = building_vacant.get(block, 0) + (room.max_occupancy or 1)
+    except Exception:
+        pass
+
+    thor_vacant = building_vacant.get("THOR", 0)
+    hulk_vacant = building_vacant.get("HULK", 0)
+    vacant_line = f"  THOR: {thor_vacant} empty | HULK: {hulk_vacant} empty"
 
     # Expense source note
     exp_source = ""
@@ -1337,11 +1366,15 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     if deposits_returned > 0:
         deposit_line = f"\nDeposits returned: Rs.{int(deposits_returned):,}"
 
+    month_tag = current_month.strftime("%B %Y")
+
     return (
-        f"*Monthly Report — {current_month.strftime('%B %Y')}*\n\n"
-        f"Beds: {active_beds}/{total_beds} occupied"
-        + (f" | {no_show} no-show" if no_show else "")
-        + f"\n\n"
+        f"*Monthly Report — {month_tag}*\n\n"
+        f"*Occupancy*\n"
+        f"  Occupied: {active_beds} beds"
+        + (f" | No-show: {no_show}" if no_show else "")
+        + f"\n  Vacant: {vacant_beds} beds\n"
+        f"{vacant_line}\n\n"
         f"*Income*\n"
         f"  Cash: Rs.{int(cash_collected):,}\n"
         f"  UPI:  Rs.{int(upi_collected):,}\n"
@@ -1351,7 +1384,7 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
         f"  Total: Rs.{int(total_expenses):,}{exp_source}\n"
         f"{deposit_line}\n"
         f"*Net: Rs.{net_income:,}*\n\n"
-        f"Say *dues* for unpaid list | *expenses March* for details"
+        f"Say *empty beds in thor* or *hulk vacant* for room details"
     )
 
 
