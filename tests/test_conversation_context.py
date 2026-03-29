@@ -939,3 +939,336 @@ class TestExtractEntities:
     def test_extract_from_checkout(self):
         entities = _extract_entities("checkout Raj", "CHECKOUT")
         assert "name" in entities
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 8. COLLECT_RENT_STEP BREAKOUT (20 tests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestCollectRentStepBreakout:
+    """Breakout detection specifically for COLLECT_RENT_STEP pending intent."""
+
+    # --- Cancel words ---
+
+    def test_cancel_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("cancel", "COLLECT_RENT_STEP") == "cancel"
+
+    def test_stop_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("stop", "COLLECT_RENT_STEP") == "cancel"
+
+    # --- Greeting words ---
+
+    def test_hi_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("hi", "COLLECT_RENT_STEP") == "greeting"
+
+    def test_help_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("help", "COLLECT_RENT_STEP") == "greeting"
+
+    def test_menu_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("menu", "COLLECT_RENT_STEP") == "greeting"
+
+    # --- New intent breakout (high confidence) ---
+
+    def test_checkout_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("checkout Raj", "COLLECT_RENT_STEP") == "new_intent"
+
+    def test_add_tenant_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("add tenant", "COLLECT_RENT_STEP") == "new_intent"
+
+    def test_who_owes_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("who owes", "COLLECT_RENT_STEP") == "new_intent"
+
+    def test_report_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("report", "COLLECT_RENT_STEP") == "new_intent"
+
+    def test_vacant_rooms_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("vacant rooms", "COLLECT_RENT_STEP") == "new_intent"
+
+    # --- Valid form answers (should NOT break out) ---
+
+    def test_amount_14000_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("14000", "COLLECT_RENT_STEP") is None
+
+    def test_skip_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("skip", "COLLECT_RENT_STEP") is None
+
+    def test_name_raj_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("Raj", "COLLECT_RENT_STEP") is None
+
+    def test_room_301_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("301", "COLLECT_RENT_STEP") is None
+
+    def test_yes_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("yes", "COLLECT_RENT_STEP") is None
+
+    def test_no_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("no", "COLLECT_RENT_STEP") is None
+
+    def test_upi_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("upi", "COLLECT_RENT_STEP") is None
+
+    def test_cash_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("cash", "COLLECT_RENT_STEP") is None
+
+    def test_confirm_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("confirm", "COLLECT_RENT_STEP") is None
+
+    def test_done_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("done", "COLLECT_RENT_STEP") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9. LOG_EXPENSE_STEP BREAKOUT (15 tests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestLogExpenseStepBreakout:
+    """Breakout detection specifically for LOG_EXPENSE_STEP pending intent."""
+
+    # --- Cancel ---
+
+    def test_cancel_during_log_expense(self):
+        assert _detect_mid_flow_breakout("cancel", "LOG_EXPENSE_STEP") == "cancel"
+
+    def test_stop_during_log_expense(self):
+        assert _detect_mid_flow_breakout("stop", "LOG_EXPENSE_STEP") == "cancel"
+
+    def test_nvm_during_log_expense(self):
+        assert _detect_mid_flow_breakout("nvm", "LOG_EXPENSE_STEP") == "cancel"
+
+    # --- Greeting ---
+
+    def test_hi_during_log_expense(self):
+        assert _detect_mid_flow_breakout("hi", "LOG_EXPENSE_STEP") == "greeting"
+
+    def test_hello_during_log_expense(self):
+        assert _detect_mid_flow_breakout("hello", "LOG_EXPENSE_STEP") == "greeting"
+
+    # --- New intent breakout ---
+
+    def test_payment_during_log_expense(self):
+        assert _detect_mid_flow_breakout("Raj paid 14000 cash", "LOG_EXPENSE_STEP") == "new_intent"
+
+    def test_checkout_during_log_expense(self):
+        assert _detect_mid_flow_breakout("checkout Suresh", "LOG_EXPENSE_STEP") == "new_intent"
+
+    def test_add_tenant_during_log_expense(self):
+        assert _detect_mid_flow_breakout("add tenant Priya room 301", "LOG_EXPENSE_STEP") == "new_intent"
+
+    # --- Valid form answers (should NOT break out) ---
+
+    def test_number_1_during_log_expense(self):
+        assert _detect_mid_flow_breakout("1", "LOG_EXPENSE_STEP") is None
+
+    def test_amount_4500_during_log_expense(self):
+        assert _detect_mid_flow_breakout("4500", "LOG_EXPENSE_STEP") is None
+
+    def test_electricity_during_log_expense(self):
+        assert _detect_mid_flow_breakout("electricity", "LOG_EXPENSE_STEP") is None
+
+    def test_march_bill_during_log_expense(self):
+        assert _detect_mid_flow_breakout("March bill", "LOG_EXPENSE_STEP") is None
+
+    def test_skip_during_log_expense(self):
+        assert _detect_mid_flow_breakout("skip", "LOG_EXPENSE_STEP") is None
+
+    def test_yes_during_log_expense(self):
+        assert _detect_mid_flow_breakout("yes", "LOG_EXPENSE_STEP") is None
+
+    def test_no_during_log_expense(self):
+        assert _detect_mid_flow_breakout("no", "LOG_EXPENSE_STEP") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 10. ROOM_TRANSFER BREAKOUT (15 tests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestRoomTransferBreakout:
+    """ROOM_TRANSFER is NOT in the multi-step breakout list.
+    Only cancel and greeting should work; new_intent should NOT trigger."""
+
+    # --- Cancel still works ---
+
+    def test_cancel_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("cancel", "ROOM_TRANSFER") == "cancel"
+
+    def test_stop_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("stop", "ROOM_TRANSFER") == "cancel"
+
+    def test_abort_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("abort", "ROOM_TRANSFER") == "cancel"
+
+    # --- Greeting still works ---
+
+    def test_hi_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("hi", "ROOM_TRANSFER") == "greeting"
+
+    def test_hello_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("hello", "ROOM_TRANSFER") == "greeting"
+
+    def test_menu_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("menu", "ROOM_TRANSFER") == "greeting"
+
+    # --- New intent should NOT trigger (not in multi-step list) ---
+
+    def test_payment_not_breakout_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("Raj paid 14000", "ROOM_TRANSFER") is None
+
+    def test_checkout_not_breakout_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("checkout Raj", "ROOM_TRANSFER") is None
+
+    def test_add_tenant_not_breakout_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("add tenant Priya", "ROOM_TRANSFER") is None
+
+    # --- Valid form answers ---
+
+    def test_number_1_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("1", "ROOM_TRANSFER") is None
+
+    def test_number_2_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("2", "ROOM_TRANSFER") is None
+
+    def test_amount_15000_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("15000", "ROOM_TRANSFER") is None
+
+    def test_skip_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("skip", "ROOM_TRANSFER") is None
+
+    def test_yes_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("yes", "ROOM_TRANSFER") is None
+
+    def test_room_305_during_room_transfer(self):
+        assert _detect_mid_flow_breakout("305", "ROOM_TRANSFER") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 11. SKIP IS NOT CANCEL (20 tests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestSkipNotCancel:
+    """'skip' must NEVER be treated as cancel in any pending intent."""
+
+    @pytest.mark.parametrize("pending_intent", [
+        "ADD_TENANT_STEP",
+        "RECORD_CHECKOUT",
+        "CONFIRM_PAYMENT_LOG",
+        "COLLECT_RENT_STEP",
+        "LOG_EXPENSE_STEP",
+        "ROOM_TRANSFER",
+        "INTENT_AMBIGUOUS",
+        "NOTICE_GIVEN",
+        "AWAITING_CLARIFICATION",
+        "VOID_PAYMENT",
+        "SCHEDULE_CHECKOUT",
+        "REMINDER_SET",
+    ])
+    def test_skip_not_cancel(self, pending_intent):
+        result = _detect_mid_flow_breakout("skip", pending_intent)
+        assert result != "cancel", f"'skip' wrongly detected as cancel during {pending_intent}"
+
+    @pytest.mark.parametrize("skip_variant", [
+        "skip",
+        "Skip",
+        "SKIP",
+        "skip.",
+        "  skip  ",
+    ])
+    def test_skip_variants_not_cancel(self, skip_variant):
+        result = _detect_mid_flow_breakout(skip_variant, "ADD_TENANT_STEP")
+        assert result != "cancel", f"'{skip_variant}' wrongly detected as cancel"
+
+    def test_skip_not_cancel_during_collect_rent(self):
+        assert _detect_mid_flow_breakout("skip", "COLLECT_RENT_STEP") is None
+
+    def test_skip_not_cancel_during_log_expense(self):
+        assert _detect_mid_flow_breakout("skip", "LOG_EXPENSE_STEP") is None
+
+    def test_skip_capitalized_not_cancel(self):
+        assert _detect_mid_flow_breakout("Skip", "CONFIRM_PAYMENT_LOG") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 12. NEW INTENT ONLY FOR MULTI-STEP FLOWS (15 tests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestNewIntentOnlyForMultiStep:
+    """new_intent breakout ONLY triggers for the 5 multi-step pending intents:
+    ADD_TENANT_STEP, RECORD_CHECKOUT, CONFIRM_PAYMENT_LOG, COLLECT_RENT_STEP, LOG_EXPENSE_STEP."""
+
+    # --- Should NOT trigger new_intent ---
+
+    @pytest.mark.parametrize("pending_intent", [
+        "INTENT_AMBIGUOUS",
+        "NOTICE_GIVEN",
+        "VOID_PAYMENT",
+        "PAYMENT_LOG",
+        "AWAITING_CLARIFICATION",
+        "SCHEDULE_CHECKOUT",
+        "REMINDER_SET",
+        "RENT_DISCOUNT",
+        "QUERY_DUES",
+        "ROOM_TRANSFER",
+    ])
+    def test_checkout_not_new_intent_for_non_multistep(self, pending_intent):
+        result = _detect_mid_flow_breakout("checkout Raj", pending_intent)
+        assert result is None, f"'checkout Raj' wrongly triggered new_intent during {pending_intent}"
+
+    # --- Should trigger new_intent ---
+
+    @pytest.mark.parametrize("pending_intent", [
+        "ADD_TENANT_STEP",
+        "RECORD_CHECKOUT",
+        "CONFIRM_PAYMENT_LOG",
+        "COLLECT_RENT_STEP",
+        "LOG_EXPENSE_STEP",
+    ])
+    def test_checkout_new_intent_for_multistep(self, pending_intent):
+        result = _detect_mid_flow_breakout("checkout Raj", pending_intent)
+        assert result == "new_intent", f"'checkout Raj' failed to trigger new_intent during {pending_intent}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 13. CANCEL WORDS EXHAUSTIVE (15 tests)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestCancelWordsExhaustive:
+    """Every known cancel word works, and non-cancel words don't."""
+
+    # --- All 12 cancel words should work ---
+
+    @pytest.mark.parametrize("cancel_word", [
+        "cancel",
+        "stop",
+        "abort",
+        "nevermind",
+        "never mind",
+        "nvm",
+        "forget it",
+        "leave it",
+        "exit",
+        "quit",
+        "chhodo",
+        "rehne do",
+    ])
+    def test_cancel_word_detected(self, cancel_word):
+        result = _detect_mid_flow_breakout(cancel_word, "ADD_TENANT_STEP")
+        assert result == "cancel", f"'{cancel_word}' not detected as cancel"
+
+    # --- Words that are NOT cancel ---
+
+    @pytest.mark.parametrize("not_cancel", [
+        "done",
+        "finished",
+        "complete",
+        "ok",
+        "yes",
+        "no",
+        "1",
+        "2",
+        "skip",
+        "confirm",
+        "sure",
+        "alright",
+    ])
+    def test_not_cancel_word(self, not_cancel):
+        result = _detect_mid_flow_breakout(not_cancel, "ADD_TENANT_STEP")
+        assert result != "cancel", f"'{not_cancel}' wrongly detected as cancel"
