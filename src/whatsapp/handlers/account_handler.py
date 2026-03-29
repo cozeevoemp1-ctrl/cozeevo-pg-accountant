@@ -1196,18 +1196,33 @@ async def _add_expense_prompt(entities: dict, ctx: CallerContext, session: Async
 # ── Monthly report ─────────────────────────────────────────────────────────────
 
 async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    desc = (entities.get("description") or entities.get("_raw_message") or "").lower()
+    is_yearly = (
+        entities.get("year") and not entities.get("month")
+    ) or any(w in desc for w in ("yearly", "annual", "all months", "this year", "full year"))
+
+    if is_yearly:
+        return await _yearly_report(entities, session)
+
+    # Single month report
     if entities.get("date"):
         target_month = date.fromisoformat(entities["date"]).replace(day=1)
     elif entities.get("month"):
         today = date.today()
-        year = today.year
+        year = int(entities.get("year") or today.year)
         m = int(entities["month"])
-        if date(year, m, 1) > today.replace(day=1):
+        if not entities.get("year") and date(year, m, 1) > today.replace(day=1):
             year -= 1
         target_month = date(year, m, 1)
     else:
         target_month = date.today().replace(day=1)
-    current_month = target_month
+
+    return await _single_month_report(target_month, session)
+
+
+async def _single_month_report(current_month: date, session: AsyncSession) -> str:
+    """Generate detailed report for a single month."""
+    from src.database.models import BankTransaction, Refund, RefundStatus
 
     collected = await session.scalar(
         select(func.sum(Payment.amount)).where(
@@ -1235,7 +1250,6 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
         )
     ) or Decimal("0")
 
-    # Last day of the target month — used to exclude future/no-show check-ins
     last_day = date(
         current_month.year, current_month.month,
         calendar.monthrange(current_month.year, current_month.month)[1],
@@ -1259,7 +1273,6 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
         )
     ) or 0
 
-    # Premium tenants occupy 2 beds
     premium_count = await session.scalar(
         select(func.count(Tenancy.id)).where(
             Tenancy.status == TenancyStatus.active,
@@ -1274,21 +1287,187 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
         )
     ) or 0
 
+    # Expenses — manual (from expenses table)
+    manual_expenses = await session.scalar(
+        select(func.sum(Expense.amount)).where(
+            func.date_trunc("month", Expense.expense_date) == current_month,
+            Expense.is_void == False,
+        )
+    ) or Decimal("0")
+
+    # Expenses — bank statement (from bank_transactions, type=expense)
+    bank_expenses = Decimal("0")
+    try:
+        bank_expenses = await session.scalar(
+            select(func.sum(BankTransaction.amount)).where(
+                func.date_trunc("month", BankTransaction.txn_date) == current_month,
+                BankTransaction.txn_type == "expense",
+            )
+        ) or Decimal("0")
+    except Exception:
+        pass  # bank_transactions table may not exist yet
+
+    total_expenses = manual_expenses + bank_expenses
+
+    # Deposits returned (refunds)
+    deposits_returned = Decimal("0")
+    try:
+        deposits_returned = await session.scalar(
+            select(func.sum(Refund.amount)).where(
+                func.date_trunc("month", Refund.refund_date) == current_month,
+                Refund.status == RefundStatus.completed,
+            )
+        ) or Decimal("0")
+    except Exception:
+        pass
+
     regular = active_tenants - premium_count
     active_beds = regular + (premium_count * 2)
     total_beds = 291
+    net_income = int(collected) - int(total_expenses)
+
+    # Expense source note
+    exp_source = ""
+    if manual_expenses > 0 and bank_expenses > 0:
+        exp_source = f"\n  Manual: Rs.{int(manual_expenses):,} | Bank: Rs.{int(bank_expenses):,}"
+    elif bank_expenses > 0:
+        exp_source = " (from bank statement)"
+
+    deposit_line = ""
+    if deposits_returned > 0:
+        deposit_line = f"\nDeposits returned: Rs.{int(deposits_returned):,}"
 
     return (
         f"*Monthly Report — {current_month.strftime('%B %Y')}*\n\n"
-        f"Checked-in: {active_beds} beds ({regular} regular + {premium_count} premium)\n"
-        f"No-show: {no_show} beds reserved\n"
-        f"Vacant: {total_beds - active_beds - no_show} beds\n\n"
-        f"Rent collected: Rs.{int(collected):,}\n"
-        f"  • Cash: Rs.{int(cash_collected):,}\n"
-        f"  • UPI:  Rs.{int(upi_collected):,}\n"
-        f"Still pending:  Rs.{int(pending):,}\n\n"
-        f"Send *dues* to see who hasn't paid."
+        f"Beds: {active_beds}/{total_beds} occupied"
+        + (f" | {no_show} no-show" if no_show else "")
+        + f"\n\n"
+        f"*Income*\n"
+        f"  Cash: Rs.{int(cash_collected):,}\n"
+        f"  UPI:  Rs.{int(upi_collected):,}\n"
+        f"  Total: Rs.{int(collected):,}\n"
+        f"  Pending: Rs.{int(pending):,}\n\n"
+        f"*Expenses*\n"
+        f"  Total: Rs.{int(total_expenses):,}{exp_source}\n"
+        f"{deposit_line}\n"
+        f"*Net: Rs.{net_income:,}*\n\n"
+        f"Say *dues* for unpaid list | *expenses March* for details"
     )
+
+
+async def _yearly_report(entities: dict, session: AsyncSession) -> str:
+    """Generate year-at-a-glance report — all months with cash/UPI/expenses."""
+    from src.database.models import BankTransaction, Refund, RefundStatus
+
+    year = int(entities.get("year") or date.today().year)
+    today = date.today()
+
+    # Determine which months to show (up to current month for current year)
+    if year == today.year:
+        max_month = today.month
+    else:
+        max_month = 12
+
+    lines = [f"*Yearly Report — {year}*\n"]
+    total_cash = total_upi = total_pending = total_expenses = total_deposits = 0
+
+    for m in range(1, max_month + 1):
+        period = date(year, m, 1)
+        month_label = period.strftime("%b")
+
+        cash = int(await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.period_month == period,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+                Payment.payment_mode == PaymentMode.cash,
+            )
+        ) or 0)
+
+        upi = int(await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.period_month == period,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+                Payment.payment_mode == PaymentMode.upi,
+            )
+        ) or 0)
+
+        collected = cash + upi
+
+        last_day = date(year, m, calendar.monthrange(year, m)[1])
+        pend = int(await session.scalar(
+            select(func.sum(RentSchedule.rent_due))
+            .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+            .where(
+                RentSchedule.period_month == period,
+                RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.checkin_date <= last_day,
+            )
+        ) or 0)
+
+        # Expenses (manual + bank)
+        exp = int(await session.scalar(
+            select(func.sum(Expense.amount)).where(
+                func.date_trunc("month", Expense.expense_date) == period,
+                Expense.is_void == False,
+            )
+        ) or 0)
+        try:
+            bank_exp = int(await session.scalar(
+                select(func.sum(BankTransaction.amount)).where(
+                    func.date_trunc("month", BankTransaction.txn_date) == period,
+                    BankTransaction.txn_type == "expense",
+                )
+            ) or 0)
+            exp += bank_exp
+        except Exception:
+            pass
+
+        # Deposits returned
+        dep_ret = 0
+        try:
+            dep_ret = int(await session.scalar(
+                select(func.sum(Refund.amount)).where(
+                    func.date_trunc("month", Refund.refund_date) == period,
+                    Refund.status == RefundStatus.completed,
+                )
+            ) or 0)
+        except Exception:
+            pass
+
+        net = collected - exp
+        total_cash += cash
+        total_upi += upi
+        total_pending += pend
+        total_expenses += exp
+        total_deposits += dep_ret
+
+        dep_note = f" | Dep.Ret: {dep_ret//1000}K" if dep_ret > 0 else ""
+        lines.append(
+            f"*{month_label}* | Cash {cash//1000}K | UPI {upi//1000}K"
+            f" | Exp {exp//1000}K{dep_note}"
+            f" | Net {net//1000}K"
+            + (f" | Pend {pend//1000}K" if pend > 0 else "")
+        )
+
+    total_collected = total_cash + total_upi
+    total_net = total_collected - total_expenses
+
+    lines.append(f"\n{'─' * 30}")
+    lines.append(
+        f"*TOTAL*\n"
+        f"  Cash: Rs.{total_cash:,}\n"
+        f"  UPI:  Rs.{total_upi:,}\n"
+        f"  Collected: Rs.{total_collected:,}\n"
+        f"  Expenses:  Rs.{total_expenses:,}\n"
+        + (f"  Deposits returned: Rs.{total_deposits:,}\n" if total_deposits > 0 else "")
+        + f"  Pending: Rs.{total_pending:,}\n"
+        f"  *Net Income: Rs.{total_net:,}*"
+    )
+
+    return "\n".join(lines)
 
 
 # ── Query expenses ─────────────────────────────────────────────────────────────
