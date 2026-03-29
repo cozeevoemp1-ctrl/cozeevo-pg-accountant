@@ -272,6 +272,35 @@ class ClaudeClient:
             logger.warning(f"[LLM] suggest_entity failed: {e}")
             return {"name": party or description[:50], "phone": None, "upi_id": upi_id or None, "notes": ""}
 
+    # ── Smart log/expense query ─────────────────────────────────────────
+
+    async def answer_from_logs(self, question: str, logs: list[str], log_type: str = "activity") -> str:
+        """
+        Given a user question and a list of log entries, use LLM to answer.
+        log_type: "activity" or "expense"
+        """
+        if not logs:
+            return ""
+
+        logs_text = "\n".join(logs[:100])  # cap at 100 entries
+        prompt = (
+            f"You are a helpful PG (paying guest hostel) operations assistant.\n"
+            f"Below are {log_type} log entries from the hostel. "
+            f"Answer the user's question based ONLY on these logs.\n"
+            f"Be concise. Use bullet points. Include dates and room numbers when relevant.\n"
+            f"If the logs don't contain enough info to answer, say so.\n\n"
+            f"--- {log_type.upper()} LOGS ---\n{logs_text}\n--- END LOGS ---\n\n"
+            f"Question: {question}\n\n"
+            f"Answer:"
+        )
+        try:
+            response = await self._call(prompt)
+            self._log(f"answer_{log_type}", prompt)
+            return response
+        except Exception as e:
+            logger.warning(f"[LLM] answer_from_logs failed: {e}")
+            return ""
+
     # ── Internal ──────────────────────────────────────────────────────────
 
     async def _call(self, prompt: str) -> str:

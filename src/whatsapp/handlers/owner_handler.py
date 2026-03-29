@@ -3825,13 +3825,25 @@ async def _activity_log(entities: dict, ctx: CallerContext, session: AsyncSessio
 
 
 async def _query_activity(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Query activity log entries."""
+    """
+    Smart activity log query — uses keyword SQL filter + Groq for complex questions.
+
+    Simple queries (activity today, activity this week) → list entries.
+    Complex queries (how many TVs, chairs status, pending maintenance) → Groq answers.
+    """
     raw = entities.get("_raw_message", "").lower().strip()
     today = date.today()
 
-    # Determine date range
+    # Detect if this is a SMART query (needs LLM) or SIMPLE list query
+    is_smart = any(w in raw for w in (
+        "how many", "how much", "status", "pending", "total", "count",
+        "ordered", "delivered", "needed", "remaining", "summary",
+        "what", "which", "did we", "have we", "was the", "is the",
+    ))
+
+    # ── SIMPLE: time-based activity list ──────────────────────────────────
     from_dt = datetime(today.year, today.month, today.day, 0, 0, 0)
-    to_dt = datetime(today.year, today.month, today.day, 23, 59, 59)
+    to_dt = datetime.now()
     label = "today"
 
     if "yesterday" in raw:
@@ -3843,12 +3855,19 @@ async def _query_activity(entities: dict, ctx: CallerContext, session: AsyncSess
         week_start = today - timedelta(days=today.weekday())
         from_dt = datetime(week_start.year, week_start.month, week_start.day, 0, 0, 0)
         label = "this week"
+    elif "this month" in raw or "month" in raw:
+        from_dt = datetime(today.year, today.month, 1, 0, 0, 0)
+        label = "this month"
     elif re.search(r"last\s+(\d+)\s+days?", raw):
         m = re.search(r"last\s+(\d+)\s+days?", raw)
-        days = int(m.group(1))
-        start = today - timedelta(days=days)
+        days_back = int(m.group(1))
+        start = today - timedelta(days=days_back)
         from_dt = datetime(start.year, start.month, start.day, 0, 0, 0)
-        label = f"last {days} days"
+        label = f"last {days_back} days"
+    elif is_smart:
+        # Smart queries search ALL time — no date filter
+        from_dt = datetime(2025, 1, 1, 0, 0, 0)
+        label = "all time"
 
     # Build query
     q = select(ActivityLog).where(
@@ -3859,31 +3878,62 @@ async def _query_activity(entities: dict, ctx: CallerContext, session: AsyncSess
     )
 
     # Room filter
-    room_filter = None
     rm = re.search(r"room\s+([\w-]+)", raw, re.I)
     if rm:
-        room_filter = rm.group(1)
-        q = q.where(ActivityLog.room == room_filter)
-        label += f" (room {room_filter})"
+        q = q.where(ActivityLog.room == rm.group(1))
+        label += f" (room {rm.group(1)})"
 
-    q = q.order_by(ActivityLog.created_at.desc())
+    # Keyword filter for smart queries — extract topic words
+    if is_smart:
+        # Extract meaningful keywords (skip stop words)
+        _STOP = {"how", "many", "much", "what", "which", "the", "is", "are", "was",
+                 "were", "did", "do", "we", "have", "has", "any", "all", "show",
+                 "tell", "me", "about", "for", "and", "or", "in", "on", "to",
+                 "status", "pending", "total", "count", "needed", "activity", "log"}
+        keywords = [w for w in re.findall(r"[a-z]+", raw) if w not in _STOP and len(w) > 2]
+        if keywords:
+            # Search description for ANY keyword
+            keyword_filters = [ActivityLog.description.ilike(f"%{kw}%") for kw in keywords]
+            q = q.where(or_(*keyword_filters))
+
+    q = q.order_by(ActivityLog.created_at.desc()).limit(200)
     result = await session.execute(q)
     entries = result.scalars().all()
 
     if not entries:
-        return f"No activity logged {label}."
+        return f"No activity logs found for this query."
 
+    # ── SMART: use Groq to answer ─────────────────────────────────────────
+    if is_smart:
+        log_lines = []
+        for e in entries:
+            dt = e.created_at.strftime("%d %b %Y %I:%M %p") if e.created_at else ""
+            room_tag = f" [Room {e.room}]" if e.room else ""
+            amt = f" (Rs.{int(e.amount):,})" if e.amount else ""
+            log_lines.append(f"{dt}: {e.description}{room_tag}{amt}")
+
+        try:
+            from src.llm_gateway.claude_client import get_claude_client
+            ai = get_claude_client()
+            answer = await ai.answer_from_logs(raw, log_lines, "activity")
+            if answer:
+                return f"*Activity Query*\n_{len(entries)} logs searched_\n\n{answer}"
+        except Exception:
+            pass  # fall through to simple list
+
+    # ── SIMPLE: list entries ──────────────────────────────────────────────
     lines = [f"*Activity log — {label}* ({len(entries)} entries)\n"]
-    for e in entries:
+    for e in entries[:30]:  # cap display at 30
         icon = _TYPE_ICONS.get(e.log_type, "📝") if e.log_type else "📝"
-        time_str = e.created_at.strftime("%I:%M %p") if e.created_at else ""
-        who = e.logged_by or "?"
+        time_str = e.created_at.strftime("%d %b %I:%M %p") if e.created_at else ""
         line = f"{icon} {time_str} — {e.description}"
         if e.amount:
-            line += f" (₹{int(e.amount):,})"
+            line += f" (Rs.{int(e.amount):,})"
         if e.room:
             line += f" [Room {e.room}]"
-        line += f" — by {who}"
         lines.append(line)
+
+    if len(entries) > 30:
+        lines.append(f"\n_...and {len(entries) - 30} more_")
 
     return "\n".join(lines)

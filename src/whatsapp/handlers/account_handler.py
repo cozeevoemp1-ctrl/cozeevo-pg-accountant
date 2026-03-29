@@ -1506,6 +1506,14 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
 # ── Query expenses ─────────────────────────────────────────────────────────────
 
 async def _query_expenses(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    raw = (entities.get("_raw_message") or entities.get("description") or "").lower()
+
+    # Detect smart query — needs LLM
+    is_smart = any(w in raw for w in (
+        "how much", "total", "compare", "breakdown", "category", "yearly",
+        "this year", "all time", "trend", "highest", "lowest", "average",
+    ))
+
     if entities.get("date"):
         target_month = date.fromisoformat(entities["date"]).replace(day=1)
     elif entities.get("month"):
@@ -1516,15 +1524,27 @@ async def _query_expenses(entities: dict, ctx: CallerContext, session: AsyncSess
     else:
         target_month = date.today().replace(day=1)
 
-    last_day = calendar.monthrange(target_month.year, target_month.month)[1]
-    month_end = date(target_month.year, target_month.month, last_day)
+    # For smart queries, search wider range
+    if is_smart and "year" in raw:
+        search_start = date(date.today().year, 1, 1)
+        search_end = date.today()
+        label = str(date.today().year)
+    elif is_smart:
+        search_start = date(2025, 1, 1)
+        search_end = date.today()
+        label = "all time"
+    else:
+        search_start = target_month
+        last_day = calendar.monthrange(target_month.year, target_month.month)[1]
+        search_end = date(target_month.year, target_month.month, last_day)
+        label = target_month.strftime('%B %Y')
 
     result = await session.execute(
         select(Expense)
         .options(selectinload(Expense.category))
         .where(
-            Expense.expense_date >= target_month,
-            Expense.expense_date <= month_end,
+            Expense.expense_date >= search_start,
+            Expense.expense_date <= search_end,
             Expense.is_void == False,
         )
         .order_by(Expense.expense_date.desc())
@@ -1532,16 +1552,41 @@ async def _query_expenses(entities: dict, ctx: CallerContext, session: AsyncSess
     expenses = result.scalars().all()
 
     if not expenses:
-        return f"No expenses recorded for {target_month.strftime('%B %Y')}."
+        return f"No expenses recorded for {label}."
 
+    # Smart query — use Groq
+    if is_smart and len(expenses) > 0:
+        log_lines = []
+        for e in expenses:
+            cat = e.category.name if e.category else "Other"
+            log_lines.append(
+                f"{e.expense_date.strftime('%d %b %Y')}: {cat} Rs.{int(e.amount):,}"
+                + (f" — {e.description[:50]}" if e.description else "")
+            )
+        try:
+            from src.llm_gateway.claude_client import get_claude_client
+            ai = get_claude_client()
+            answer = await ai.answer_from_logs(raw, log_lines, "expense")
+            if answer:
+                total = sum(e.amount for e in expenses)
+                return (
+                    f"*Expense Query* ({len(expenses)} records, {label})\n"
+                    f"Total: Rs.{int(total):,}\n\n{answer}"
+                )
+        except Exception:
+            pass  # fall through to simple list
+
+    # Simple list
     total = sum(e.amount for e in expenses)
-    lines = [f"*Expenses — {target_month.strftime('%B %Y')}*\n"]
-    for e in expenses:
+    lines = [f"*Expenses — {label}*\n"]
+    for e in expenses[:30]:
         cat = e.category.name if e.category else str(e.category_id or "Other")
         lines.append(
             f"• {e.expense_date.strftime('%d %b')} {cat.title()}: Rs.{int(e.amount):,}"
             + (f" ({e.description[:30]})" if e.description else "")
         )
+    if len(expenses) > 30:
+        lines.append(f"\n_...and {len(expenses) - 30} more_")
     lines.append(f"\n*Total: Rs.{int(total):,}*")
     return "\n".join(lines)
 
