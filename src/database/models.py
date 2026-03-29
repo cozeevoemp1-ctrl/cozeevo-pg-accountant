@@ -296,6 +296,7 @@ class Tenant(Base):
     emergency_contact_relationship  = Column(String(60))        # Father / Mother / Sibling etc.
     id_proof_type                   = Column(String(40))        # Aadhar / Passport / DL
     id_proof_number                 = Column(String(60))
+    food_preference                 = Column(String(20))        # veg / non-veg / egg
     notes                           = Column(Text)
     created_at                      = Column(DateTime, default=datetime.utcnow)
 

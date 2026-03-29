@@ -835,7 +835,9 @@ async def handle_onboarding_step(
         data["id_number"] = ans.upper()
     elif step in ("ask_id_photo", "ask_selfie"):
         if not skip:
-            if media_id and media_type == "image":
+            # ID photo accepts images + PDFs; selfie accepts images only
+            allowed_types = {"image", "document"} if step == "ask_id_photo" else {"image"}
+            if media_id and media_type in allowed_types:
                 from src.whatsapp.media_handler import download_whatsapp_media
                 from src.database.models import Document, DocumentType
                 subfolder = "id_proofs" if step == "ask_id_photo" else "photos"
@@ -859,8 +861,9 @@ async def handle_onboarding_step(
                 else:
                     data[step] = "upload_failed"
             else:
-                # User sent text instead of photo
-                return "__KEEP_PENDING__Please *send a photo* (not text). Or type *skip*."
+                # User sent text instead of media
+                hint = "photo or PDF" if step == "ask_id_photo" else "photo"
+                return f"__KEEP_PENDING__Please *send a {hint}* (not text). Or type *skip*."
 
     # Advance to next step
     try:

@@ -54,6 +54,8 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
     ("tenants", "emergency_contact_relationship", "VARCHAR(60)"),
     # WiFi floor map (added 2026-03-15)
     ("properties", "wifi_floor_map",              "JSONB"),
+    # Tenant food preference (added 2026-03-29)
+    ("tenants", "food_preference",                "VARCHAR(20)"),
 ]
 
 # -- Tables to create if missing -----------------------------------------------
@@ -506,7 +508,7 @@ async def run_room_cleanup_2026_03_23(conn: AsyncConnection) -> None:
         WHERE room_number = '114'
           AND property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
     """))
-    print(f"  [ok] Room 114 moved THOR→HULK + staff: {r.rowcount} updated")
+    print(f"  [ok] Room 114 moved THOR->HULK + staff: {r.rowcount} updated")
 
     # If 114 already belongs to HULK, just ensure staff flag
     r = await conn.execute(text("""

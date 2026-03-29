@@ -988,6 +988,42 @@ async def update_notes(room_number: str, tenant_name: str, notes: str,
     return await asyncio.to_thread(_update_notes_sync, room_number, tenant_name, notes, month, year)
 
 
+# -- Update KYC gender on TENANTS tab after onboarding approval ----------------
+
+def _update_tenant_gender_sync(phone: str, gender: str) -> dict:
+    """Find tenant row by phone in TENANTS tab and update gender column."""
+    result: dict[str, Any] = {"success": False, "error": None}
+    if not phone or not gender:
+        result["error"] = "Phone and gender required"
+        return result
+
+    try:
+        ws = _get_worksheet_sync("TENANTS")
+        all_vals = ws.get_all_values()
+        phone_clean = phone.strip().replace("+91", "").replace(" ", "")
+
+        for i, row in enumerate(all_vals):
+            if i == 0:
+                continue  # skip header
+            cell_phone = _cell(row, T_PHONE).strip().replace("+91", "").replace(" ", "")
+            if cell_phone == phone_clean:
+                cell_ref = gspread.utils.rowcol_to_a1(i + 1, T_GENDER + 1)
+                ws.update(values=[[gender]], range_name=cell_ref, value_input_option="USER_ENTERED")
+                result["success"] = True
+                logger.info("GSheets: updated gender for phone %s to '%s' at row %d", phone, gender, i + 1)
+                return result
+
+        result["error"] = f"Tenant with phone {phone} not found in TENANTS tab"
+    except Exception as e:
+        result["error"] = f"Update gender failed: {e}"
+    return result
+
+
+async def update_tenant_gender(phone: str, gender: str) -> dict:
+    """Async entry point — update gender in TENANTS tab by phone."""
+    return await asyncio.to_thread(_update_tenant_gender_sync, phone, gender)
+
+
 # -- Convenience: get sheet for direct access ----------------------------------
 
 async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:

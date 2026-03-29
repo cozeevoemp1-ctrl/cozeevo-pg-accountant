@@ -10,6 +10,7 @@ Disambiguation flow:
 """
 from __future__ import annotations
 
+import asyncio
 import calendar
 import hashlib
 import json
@@ -190,6 +191,14 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 await _send_whatsapp(tenant.phone, f"Your check-in has been approved! Welcome to Cozeevo, {tenant.name}.")
             except Exception:
                 pass
+
+            # Update gender in Google Sheet (fire-and-forget, best-effort)
+            if data.get("gender"):
+                try:
+                    from src.integrations.gsheets import update_tenant_gender
+                    asyncio.ensure_future(update_tenant_gender(tenant.phone, data["gender"]))
+                except Exception:
+                    pass
 
             return f"*Onboarding approved — {tenant.name}*\nKYC data saved."
 
@@ -3204,7 +3213,7 @@ async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSe
     if len(tenancies) > 1:
         choices = _make_choices(tenancies)
         await _save_pending(ctx.phone, "GET_TENANT_NOTES", {}, choices, session)
-        return _format_choices_message(choices, "Which tenant?")
+        return _format_choices_message(name or room or "tenant", choices, "see notes")
 
     t, tncy, room_obj = tenancies[0]
     notes = tncy.notes
