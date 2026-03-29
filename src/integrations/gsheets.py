@@ -631,6 +631,7 @@ def _record_checkout_sync(
     room_number: str,
     tenant_name: str,
     notice_date: Optional[str] = None,
+    exit_date: Optional[str] = None,
 ) -> dict:
     """
     Mark tenant as EXIT in the current monthly tab.
@@ -685,7 +686,7 @@ def _record_checkout_sync(
             t_found = _find_row_in_tenants(tenants_ws, room_number, tenant_name)
             if t_found:
                 t_row, _ = t_found
-                today_str = datetime.now().strftime("%d/%m/%Y")
+                checkout_str = exit_date or datetime.now().strftime("%d/%m/%Y")
                 t_batch = [
                     {
                         "range": gspread.utils.rowcol_to_a1(t_row, T_STATUS + 1),
@@ -693,7 +694,7 @@ def _record_checkout_sync(
                     },
                     {
                         "range": gspread.utils.rowcol_to_a1(t_row, T_CHECKOUT_DATE + 1),
-                        "values": [[today_str]],
+                        "values": [[checkout_str]],
                     },
                 ]
                 if notice_date:
@@ -843,6 +844,7 @@ async def record_checkout(
     room_number: str,
     tenant_name: str,
     notice_date: Optional[str] = None,
+    exit_date: Optional[str] = None,
 ) -> dict:
     """
     Async entry point — mark tenant as EXIT in monthly tab + TENANTS tab.
@@ -850,7 +852,7 @@ async def record_checkout(
     Returns dict: success, row, tab, error
     """
     return await asyncio.to_thread(
-        _record_checkout_sync, room_number, tenant_name, notice_date,
+        _record_checkout_sync, room_number, tenant_name, notice_date, exit_date,
     )
 
 

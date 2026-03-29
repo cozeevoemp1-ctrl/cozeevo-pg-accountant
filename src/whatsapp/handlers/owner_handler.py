@@ -111,7 +111,10 @@ async def handle_owner(
 
 # ── Pending action resolver (called from chat_api before intent detection) ────
 
-async def resolve_pending_action(pending: PendingAction, reply_text: str, session: AsyncSession) -> Optional[str]:
+async def resolve_pending_action(
+    pending: PendingAction, reply_text: str, session: AsyncSession,
+    media_id: str | None = None, media_type: str | None = None, media_mime: str | None = None,
+) -> Optional[str]:
     """
     Called when the user replies to a disambiguation question.
     Returns the final reply string, or None if the reply wasn't a valid choice.
@@ -429,19 +432,36 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             if not (1 <= num <= len(choices)):
                 return None
             chosen_tenant = choices[num - 1]
-            action_data["step"]        = "ask_cupboard_key"
+            action_data["step"]        = "ask_exit_date"
             action_data["tenancy_id"]  = chosen_tenant["tenancy_id"]
             action_data["tenant_name"] = chosen_tenant["label"]
             await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
             return (
                 f"*Checkout Form — {chosen_tenant['label']}*\n\n"
-                "*Q1/5* Was the *cupboard/almirah key* returned?\n"
-                "Reply: *yes* or *no*"
+                "*Exit date?* (e.g. *today* or *29 March*)"
             )
 
         # Steps 1–5 are text-based
         ans = reply_text.lower().strip()
         yes = ans in ("yes", "y", "haan", "ha", "done", "returned", "1")
+
+        if step == "ask_exit_date":
+            from src.whatsapp.intent_detector import _extract_date_entity
+            if ans in ("today", "now", "aaj"):
+                action_data["exit_date"] = date.today().isoformat()
+            else:
+                exit_iso = _extract_date_entity(reply_text)
+                if not exit_iso:
+                    return "__KEEP_PENDING__Couldn't parse that date. Try: *today* or *29 March* or *29/03/2026*"
+                action_data["exit_date"] = exit_iso
+            exit_d = date.fromisoformat(action_data["exit_date"])
+            action_data["step"] = "ask_cupboard_key"
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            return (
+                f"Exit date: *{exit_d.strftime('%d %b %Y')}*\n\n"
+                "*Q1/5* Was the *cupboard/almirah key* returned?\n"
+                "Reply: *yes* or *no*"
+            )
 
         if step == "ask_cupboard_key":
             action_data["cupboard_key"] = yes
@@ -473,33 +493,57 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             maintenance = int(tenancy.maintenance_fee or 0) if tenancy else 0
             o_rent, o_maint = await _calc_outstanding_dues(tenancy_id, session) if tenancy_id else (Decimal("0"), Decimal("0"))
             total_dues = int(o_rent) + int(o_maint)
-            refund = max(0, deposit - total_dues - maintenance)
+
+            # Deposit forfeiture: notice after 5th = deposit forfeited, refund = 0
+            deposit_forfeited = False
+            notice_line = ""
+            if tenancy and not tenancy.notice_date:
+                deposit_forfeited = True
+                notice_line = "\nNo notice on record — *deposit forfeited*"
+            elif tenancy and tenancy.notice_date:
+                if tenancy.notice_date.day > _NOTICE_BY_DAY:
+                    deposit_forfeited = True
+                    notice_line = (f"\nNotice given: {tenancy.notice_date.strftime('%d %b %Y')} "
+                                   f"(after {_NOTICE_BY_DAY}th) — *deposit Rs.{deposit:,} forfeited*")
+                else:
+                    notice_line = (f"\nNotice given: {tenancy.notice_date.strftime('%d %b %Y')} "
+                                   f"(before {_NOTICE_BY_DAY}th) — deposit eligible for refund")
+
+            if deposit_forfeited:
+                refund = 0
+            else:
+                refund = max(0, deposit - total_dues - maintenance)
 
             action_data["auto_dues"] = total_dues
             action_data["auto_maintenance"] = maintenance
             action_data["auto_deposit"] = deposit
             action_data["auto_refund"] = refund
+            action_data["deposit_forfeited"] = deposit_forfeited
             await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
 
-            # Notice status
-            notice_line = ""
-            if tenancy and not tenancy.notice_date:
-                notice_line = "\nNo notice on record — deposit may be forfeited"
-            elif tenancy and tenancy.notice_date:
-                notice_line = f"\nNotice given: {tenancy.notice_date.strftime('%d %b %Y')}"
+            if deposit_forfeited:
+                settlement = (
+                    f"Deposit held: Rs.{deposit:,}\n"
+                    f"*FORFEITED — Refund: Rs.0*"
+                )
+            else:
+                settlement = (
+                    f"Deposit held: Rs.{deposit:,}\n"
+                    f"Unpaid rent: -Rs.{int(o_rent):,}\n"
+                    f"Maintenance: -Rs.{maintenance:,}\n"
+                    f"{'─' * 25}\n"
+                    f"*Refund: Rs.{refund:,}*"
+                )
 
             return (
                 f"*Q5/5 — Settlement Summary*\n\n"
+                f"Exit date: {date.fromisoformat(action_data.get('exit_date', date.today().isoformat())).strftime('%d %b %Y')}\n"
                 f"Cupboard key: {'Returned' if action_data.get('cupboard_key') else 'NOT returned'}\n"
                 f"Main key: {'Returned' if action_data.get('main_key') else 'NOT returned'}\n"
                 f"Damages: {action_data.get('damage') or 'None'}\n"
                 f"Fingerprint: {'Deleted' if action_data.get('fingerprint_deleted') else 'NOT deleted'}\n"
                 f"{notice_line}\n\n"
-                f"Deposit held: Rs.{deposit:,}\n"
-                f"Unpaid rent: -Rs.{int(o_rent):,}\n"
-                f"Maintenance: -Rs.{maintenance:,}\n"
-                f"{'─' * 25}\n"
-                f"*Refund: Rs.{refund:,}*\n\n"
+                f"{settlement}\n\n"
                 "Reply *confirm* to process checkout\n"
                 "or *cancel* to abort"
             )
@@ -507,6 +551,9 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
         if step == "confirm_checkout":
             if ans in ("confirm", "yes", "y", "done", "ok", "proceed"):
                 tenancy_id = action_data.get("tenancy_id")
+                exit_date = date.fromisoformat(action_data["exit_date"]) if action_data.get("exit_date") else date.today()
+                refund_amt = action_data.get("auto_refund", 0)
+                deposit_forfeited = action_data.get("deposit_forfeited", False)
 
                 cr = CheckoutRecord(
                     tenancy_id=tenancy_id,
@@ -514,20 +561,20 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     main_key_returned=action_data.get("main_key", False),
                     damage_notes=action_data.get("damage") or None,
                     pending_dues_amount=action_data.get("auto_dues", 0),
-                    deposit_refunded_amount=action_data.get("auto_refund", 0),
-                    deposit_refund_date=date.today() if action_data.get("auto_refund", 0) > 0 else None,
-                    actual_exit_date=date.today(),
+                    deposit_refunded_amount=refund_amt,
+                    deposit_refund_date=exit_date if refund_amt > 0 else None,
+                    actual_exit_date=exit_date,
                     recorded_by=pending.phone,
                 )
                 session.add(cr)
 
-                refund_amt = action_data.get("auto_refund", 0)
                 if tenancy_id:
+                    reason = "deposit forfeited — late notice" if deposit_forfeited else "deposit refund on checkout"
                     session.add(Refund(
                         tenancy_id  = tenancy_id,
                         amount      = Decimal(str(refund_amt)),
-                        refund_date = date.today() if refund_amt > 0 else None,
-                        reason      = "deposit refund on checkout",
+                        refund_date = exit_date if refund_amt > 0 else None,
+                        reason      = reason,
                         status      = RefundStatus.pending if refund_amt > 0 else RefundStatus.cancelled,
                         notes       = f"Recorded during checkout by {pending.phone}",
                     ))
@@ -536,9 +583,9 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 tenancy = await session.get(Tenancy, tenancy_id)
                 if tenancy:
                     tenancy.status = TenancyStatus.exited
-                    tenancy.checkout_date = date.today()
+                    tenancy.checkout_date = exit_date
 
-                # Google Sheets write-back
+                # Google Sheets write-back: TENANTS tab + month tab EXIT
                 gsheets_note = ""
                 if tenancy:
                     room_obj = await session.get(Room, tenancy.room_id)
@@ -546,24 +593,38 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                         try:
                             from src.integrations.gsheets import record_checkout as gsheets_checkout
                             notice_str = tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None
-                            gs_r = await gsheets_checkout(room_obj.room_number, action_data.get("tenant_name", ""), notice_str)
+                            gs_r = await gsheets_checkout(
+                                room_obj.room_number,
+                                action_data.get("tenant_name", ""),
+                                notice_str,
+                                exit_date.strftime("%d/%m/%Y"),
+                            )
                             if gs_r.get("success"):
                                 gsheets_note = "\nSheet updated"
                         except Exception:
                             pass
+                        # Update month tab status to EXIT
 
                 name = action_data.get("tenant_name", "Tenant")
-                now = datetime.now()
+                deposit = action_data.get("auto_deposit", 0)
+
+                if deposit_forfeited:
+                    settlement_line = f"Deposit: Rs.{deposit:,} — *FORFEITED*\n*Refund: Rs.0*"
+                else:
+                    settlement_line = (
+                        f"Deposit: Rs.{deposit:,}\n"
+                        f"Dues deducted: -Rs.{action_data.get('auto_dues', 0):,}\n"
+                        f"Maintenance: -Rs.{action_data.get('auto_maintenance', 0):,}\n"
+                        f"*Refund: Rs.{refund_amt:,}*"
+                    )
+
                 return (
                     f"*Checkout Complete — {name}*\n"
-                    f"Date: {now.strftime('%d %b %Y, %I:%M %p')}\n\n"
+                    f"Exit date: {exit_date.strftime('%d %b %Y')}\n\n"
                     f"Keys: {'collected' if action_data.get('cupboard_key') and action_data.get('main_key') else 'PENDING'}\n"
                     f"Fingerprint: {'deleted' if action_data.get('fingerprint_deleted') else 'NOT DELETED'}\n"
                     f"Damages: {action_data.get('damage') or 'None'}\n\n"
-                    f"Deposit: Rs.{action_data.get('auto_deposit', 0):,}\n"
-                    f"Dues deducted: -Rs.{action_data.get('auto_dues', 0):,}\n"
-                    f"Maintenance: -Rs.{action_data.get('auto_maintenance', 0):,}\n"
-                    f"*Refund: Rs.{refund_amt:,}*\n\n"
+                    f"{settlement_line}\n\n"
                     f"Saved to DB. Room is now vacant."
                     f"{gsheets_note}"
                 )
@@ -608,6 +669,22 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 action_data["gender"] = "female"
             else:
                 return "__KEEP_PENDING__Please enter *male* or *female*:"
+            action_data["step"] = "ask_food"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Food preference?* (veg / non-veg / egg / skip)"
+
+        if step == "ask_food":
+            f = ans.strip().lower()
+            if f in ("skip", "none", "na", "no", "-"):
+                action_data["food_pref"] = ""
+            elif "non" in f:
+                action_data["food_pref"] = "non-veg"
+            elif "egg" in f:
+                action_data["food_pref"] = "egg"
+            elif "veg" in f:
+                action_data["food_pref"] = "veg"
+            else:
+                return "__KEEP_PENDING__Please enter *veg*, *non-veg*, *egg*, or *skip*:"
             action_data["step"] = "ask_room"
             await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
             return "*Room number?*"
@@ -708,11 +785,13 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             notes_str = action_data.get("notes", "")
 
             gender_str = action_data.get("gender", "")
+            food_str = action_data.get("food_pref", "")
             return (
                 f"*Confirm New Tenant?*\n\n"
                 f"Name: {action_data['name']}\n"
                 f"Phone: {action_data['phone']}\n"
                 + (f"Gender: {gender_str}\n" if gender_str else "")
+                + (f"Food: {food_str}\n" if food_str else "")
                 + f"Room: {action_data['room_number']}\n"
                 f"Rent: Rs.{rent:,}/month\n"
                 + f"Deposit: Rs.{deposit:,}"
@@ -737,7 +816,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     "advance": action_data.get("advance", 0),
                     "maintenance": action_data.get("maintenance", 0),
                     "checkin_date": action_data["checkin_date"],
-                    "food_pref": "none",
+                    "food_pref": action_data.get("food_pref", ""),
                     "discount": {},
                     "existing_tenant_id": None,
                     "gender": action_data.get("gender", ""),
@@ -1009,18 +1088,38 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
         if step == "ask_description":
             desc = ans if ans.lower() not in ("skip", "none", "no", "nil", "-") else ""
             action_data["final_description"] = desc
+            action_data["step"] = "ask_photo"
+            await _save_pending(pending.phone, "LOG_EXPENSE_STEP", action_data, [], session)
+            return "*Receipt photo?* Send a photo or type *skip*"
+
+        if step == "ask_photo":
+            skip = ans.lower() in ("skip", "none", "no", "nil", "-", "na")
+            if not skip and media_id and media_type == "image":
+                try:
+                    from src.whatsapp.media_handler import download_whatsapp_media
+                    from src.database.models import Document, DocumentType
+                    file_path = await download_whatsapp_media(media_id, media_mime or "image/jpeg", "expense_receipts")
+                    if file_path:
+                        action_data["receipt_path"] = file_path
+                except Exception:
+                    pass  # photo save failed — continue without
+            elif not skip:
+                return "__KEEP_PENDING__Please *send a photo* or type *skip*."
+
             action_data["step"] = "confirm"
             await _save_pending(pending.phone, "LOG_EXPENSE_STEP", action_data, [], session)
 
             cat = action_data["category"].capitalize()
             amt = int(action_data["amount"])
+            desc = action_data.get("final_description", "")
             desc_line = f"\nDescription: {desc}" if desc else ""
+            photo_line = "\nReceipt: attached" if action_data.get("receipt_path") else ""
 
             return (
                 f"*Confirm Expense?*\n\n"
                 f"Category: {cat}\n"
                 f"Amount: Rs.{amt:,}"
-                f"{desc_line}\n\n"
+                f"{desc_line}{photo_line}\n\n"
                 "Reply *yes* to save or *no* to cancel."
             )
 
@@ -2237,16 +2336,22 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
 
     # Tenant record
     gender = data.get("gender", "")
+    food_pref = data.get("food_pref", "")
+    if food_pref in ("none", "skip"):
+        food_pref = ""
     if existing_tid:
         tenant = await session.get(Tenant, existing_tid)
     else:
         tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
     if not tenant:
-        tenant = Tenant(name=name, phone=phone, gender=gender or None)
+        tenant = Tenant(name=name, phone=phone, gender=gender or None, food_preference=food_pref or None)
         session.add(tenant)
         await session.flush()
-    elif gender and not tenant.gender:
-        tenant.gender = gender
+    else:
+        if gender and not tenant.gender:
+            tenant.gender = gender
+        if food_pref and not tenant.food_preference:
+            tenant.food_preference = food_pref
 
     # Tenancy record
     tenancy = Tenancy(
@@ -3037,13 +3142,23 @@ async def _query_expiring(entities: dict, ctx: CallerContext, session: AsyncSess
     rows = result.all()
 
     if not rows:
-        return f"No tenants expecting to leave this month ({today.strftime('%B %Y')})."
+        return f"No notices or upcoming checkouts in {today.strftime('%B %Y')}."
 
-    lines = [f"*Upcoming Checkouts — {today.strftime('%B %Y')}*\n"]
+    notice_count = sum(1 for _, t, _ in rows if t.notice_date and t.notice_date >= today.replace(day=1))
+    lines = [f"*{notice_count} notice(s) / {len(rows)} upcoming exit(s) — {today.strftime('%B %Y')}*\n"]
     for name, tenancy, room in rows:
         exit_str = tenancy.expected_checkout.strftime("%d %b") if tenancy.expected_checkout else "TBD"
-        notice_str = f" | Notice: {tenancy.notice_date.strftime('%d %b')}" if tenancy.notice_date else " | No notice"
-        lines.append(f"• {name} (Room {room.room_number}) — Exit: {exit_str}{notice_str}")
+        notice_str = tenancy.notice_date.strftime("%d %b") if tenancy.notice_date else "No notice"
+        deposit = int(tenancy.security_deposit or 0)
+        # Check forfeiture
+        if tenancy.notice_date and tenancy.notice_date.day > _NOTICE_BY_DAY:
+            deposit_note = f"Deposit Rs.{deposit:,} *forfeited*"
+        elif tenancy.notice_date:
+            refund = max(0, deposit - int(tenancy.maintenance_fee or 0))
+            deposit_note = f"Refund ~Rs.{refund:,}"
+        else:
+            deposit_note = f"Deposit Rs.{deposit:,}"
+        lines.append(f"• {name} (Room {room.room_number})\n  Notice: {notice_str} | Exit: {exit_str} | {deposit_note}")
     return "\n".join(lines)
 
 
@@ -3482,7 +3597,7 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
         phone=ctx.phone,
         intent="RECORD_CHECKOUT",
         action_data=json.dumps({
-            "step": "ask_cupboard_key",
+            "step": "ask_exit_date",
             "tenancy_id": tenancy.id,
             "tenant_name": tenant.name,
             "room": room.room_number,
@@ -3494,8 +3609,7 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
 
     return (
         f"*Checkout Form — {tenant.name}* (Room {room.room_number})\n\n"
-        f"*Q1/5* Was the *cupboard/almirah key* returned?\n"
-        "Reply: *yes* or *no*"
+        "*Exit date?* (e.g. *today* or *29 March*)"
     )
 
 

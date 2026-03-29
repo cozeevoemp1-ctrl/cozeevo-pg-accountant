@@ -225,7 +225,10 @@ async def _process_message_inner(
                 return OutboundReply(reply=clarif_reply, intent=original_intent, role=ctx.role)
 
             if not pending.resolved:
-                resolved_reply = await resolve_pending_action(pending, message, session)
+                resolved_reply = await resolve_pending_action(
+                    pending, message, session,
+                    media_id=body.media_id, media_type=body.media_type, media_mime=body.media_mime,
+                )
             else:
                 resolved_reply = None
             if resolved_reply:
