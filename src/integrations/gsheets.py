@@ -690,9 +690,14 @@ def _record_notice_sync(
     room_number: str,
     tenant_name: str,
     notice_date: str,
+    expected_exit: str = "",
 ) -> dict:
     """
-    Update Notice Date column in current monthly tab and TENANTS tab.
+    Update Notice Date + Expected Exit in monthly tab (if exists) and TENANTS tab.
+
+    For future-month exits (e.g. "exiting in June"), the monthly tab won't exist yet.
+    We still write to the TENANTS tab — the monthly tab will be populated when
+    Apps Script creates it.
     """
     result: dict[str, Any] = {
         "success": False,
@@ -703,39 +708,42 @@ def _record_notice_sync(
 
     try:
         # -- Monthly tab (search current + adjacent months) --
+        # Gracefully skip if tab doesn't exist (future month)
         tenant_tab = _find_tenant_tab(room_number, tenant_name)
-        if tenant_tab is None:
-            result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
-            logger.warning("GSheets: %s", result["error"])
-            return result
+        if tenant_tab is not None:
+            ws, tab_name, _row, _row_data = tenant_tab
+            result["tab"] = tab_name
+            result["row"] = _row
 
-        ws, tab_name, _row, _row_data = tenant_tab
-        result["tab"] = tab_name
-        found = (_row, _row_data)
+            ws.batch_update(
+                [{"range": gspread.utils.rowcol_to_a1(_row, M_NOTICE_DATE + 1), "values": [[notice_date]]}],
+                value_input_option="USER_ENTERED",
+            )
+            logger.info(
+                "GSheets: notice date %s for Room %s / %s in %s at row %d",
+                notice_date, room_number, tenant_name, tab_name, _row,
+            )
+        else:
+            logger.info(
+                "GSheets: monthly tab not found for Room %s / %s — future exit, skipping monthly tab",
+                room_number, tenant_name,
+            )
 
-        row, _ = found
-        result["row"] = row
-
-        ws.batch_update(
-            [{"range": gspread.utils.rowcol_to_a1(row, M_NOTICE_DATE + 1), "values": [[notice_date]]}],
-            value_input_option="USER_ENTERED",
-        )
-        logger.info(
-            "GSheets: notice date %s for Room %s / %s in %s at row %d",
-            notice_date, room_number, tenant_name, tab_name, row,
-        )
-
-        # -- TENANTS tab --
+        # -- TENANTS tab (always written — this is the master record) --
         try:
             tenants_ws = _get_worksheet_sync("TENANTS")
             t_found = _find_row_in_tenants(tenants_ws, room_number, tenant_name)
             if t_found:
                 t_row, _ = t_found
-                tenants_ws.batch_update(
-                    [{"range": gspread.utils.rowcol_to_a1(t_row, T_NOTICE_DATE + 1), "values": [[notice_date]]}],
-                    value_input_option="USER_ENTERED",
-                )
-                logger.info("GSheets: updated TENANTS tab notice date for %s", tenant_name)
+                updates = [
+                    {"range": gspread.utils.rowcol_to_a1(t_row, T_NOTICE_DATE + 1), "values": [[notice_date]]},
+                ]
+                if expected_exit:
+                    updates.append(
+                        {"range": gspread.utils.rowcol_to_a1(t_row, T_EXPECTED_EXIT + 1), "values": [[expected_exit]]},
+                    )
+                tenants_ws.batch_update(updates, value_input_option="USER_ENTERED")
+                logger.info("GSheets: updated TENANTS tab notice=%s expected_exit=%s for %s", notice_date, expected_exit, tenant_name)
         except Exception as e:
             logger.warning("GSheets: TENANTS tab notice update failed: %s", e)
 
@@ -820,14 +828,15 @@ async def record_notice(
     room_number: str,
     tenant_name: str,
     notice_date: str,
+    expected_exit: str = "",
 ) -> dict:
     """
-    Async entry point — update Notice Date in monthly tab + TENANTS tab.
+    Async entry point — update Notice Date + Expected Exit in monthly tab + TENANTS tab.
 
     Returns dict: success, row, tab, error
     """
     return await asyncio.to_thread(
-        _record_notice_sync, room_number, tenant_name, notice_date,
+        _record_notice_sync, room_number, tenant_name, notice_date, expected_exit,
     )
 
 

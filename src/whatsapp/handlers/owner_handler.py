@@ -598,6 +598,148 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
 
         return None
 
+    if pending.intent == "COLLECT_RENT_STEP":
+        ans = reply_text.strip()
+        step = action_data.get("step", "")
+
+        # Cancel detection
+        if ans.lower() in ("cancel", "no", "stop", "abort"):
+            return "Cancelled. No payment logged."
+
+        if step == "ask_name":
+            # Search for tenant by name or room
+            search = ans
+            rows = await _find_active_tenants_by_name(ans, session)
+            if not rows:
+                room_clean = re.sub(r"[^0-9a-zA-Z\-]", "", ans)
+                rows = await _find_active_tenants_by_room(room_clean, session)
+                search = f"Room {room_clean}"
+            if not rows:
+                suggestions = await _find_similar_names(ans, session)
+                hint = ""
+                if suggestions:
+                    hint = "\nDid you mean: " + ", ".join(f"*{s}*" for s in suggestions[:3]) + "?"
+                return f"__KEEP_PENDING__No tenant found for *{ans}*.{hint}\n\n*Who paid?* (name or room number)"
+
+            if len(rows) == 1:
+                tenant, tenancy, room_obj = rows[0]
+                action_data["tenant_id"] = tenant.id
+                action_data["tenancy_id"] = tenancy.id
+                action_data["tenant_name"] = tenant.name
+                action_data["room_number"] = room_obj.room_number
+                action_data["step"] = "ask_cash"
+                await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+                return f"*{tenant.name}* (Room {room_obj.room_number})\n\n*Cash amount?* (number, or *skip* if no cash)"
+
+            # Multiple matches — ask which one
+            choices = _make_choices(rows)
+            action_data["step"] = "pick_tenant"
+            await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, choices, session)
+            return _format_choices_message(search, choices, "collect rent")
+
+        if step == "pick_tenant":
+            if not ans.rstrip(".").isdigit():
+                return "__KEEP_PENDING__Reply with a *number* to pick the tenant."
+            num = int(ans.rstrip("."))
+            if not (1 <= num <= len(choices)):
+                return f"__KEEP_PENDING__Pick a number between 1 and {len(choices)}."
+            chosen = choices[num - 1]
+            tenant = await session.get(Tenant, chosen["tenant_id"])
+            tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+            room_obj = await session.get(Room, tenancy.room_id) if tenancy else None
+            action_data["tenant_id"] = chosen["tenant_id"]
+            action_data["tenancy_id"] = chosen["tenancy_id"]
+            action_data["tenant_name"] = chosen["label"].split(" (Room")[0]
+            action_data["room_number"] = room_obj.room_number if room_obj else ""
+            action_data["step"] = "ask_cash"
+            await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+            return f"*{action_data['tenant_name']}* (Room {action_data['room_number']})\n\n*Cash amount?* (number, or *skip* if no cash)"
+
+        if step == "ask_cash":
+            cash = _parse_amount_field(ans)
+            if ans.lower() not in ("skip", "0", "nil", "none", "no", "nahi") and cash <= 0:
+                # They typed something but it's not a valid number
+                if not re.search(r"\d", ans):
+                    return "__KEEP_PENDING__Please enter a *number* for cash amount (e.g. 14000), or *skip*:"
+                if cash < 0:
+                    return "__KEEP_PENDING__Amount can't be negative. *Cash amount?* (number, or *skip*)"
+            action_data["cash"] = cash
+            action_data["step"] = "ask_upi"
+            await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+            return "*UPI amount?* (number, or *skip* if no UPI)"
+
+        if step == "ask_upi":
+            upi = _parse_amount_field(ans)
+            if ans.lower() not in ("skip", "0", "nil", "none", "no", "nahi") and upi <= 0:
+                if not re.search(r"\d", ans):
+                    return "__KEEP_PENDING__Please enter a *number* for UPI amount (e.g. 5000), or *skip*:"
+                if upi < 0:
+                    return "__KEEP_PENDING__Amount can't be negative. *UPI amount?* (number, or *skip*)"
+            action_data["upi"] = upi
+
+            cash = action_data.get("cash", 0)
+            total = cash + upi
+            if total <= 0:
+                action_data["step"] = "ask_cash"
+                await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+                return "__KEEP_PENDING__Total can't be zero. Enter at least one amount.\n\n*Cash amount?* (number, or *skip*)"
+
+            action_data["step"] = "confirm"
+            await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+
+            tname = action_data.get("tenant_name", "")
+            rnum = action_data.get("room_number", "")
+            parts = []
+            if cash > 0:
+                parts.append(f"Cash: Rs.{int(cash):,}")
+            if upi > 0:
+                parts.append(f"UPI: Rs.{int(upi):,}")
+
+            return (
+                f"*Confirm Payment?*\n\n"
+                f"Tenant: {tname} (Room {rnum})\n"
+                + "\n".join(f"  {p}" for p in parts)
+                + f"\n*Total: Rs.{int(total):,}*\n\n"
+                "Reply *yes* to save or *no* to cancel."
+            )
+
+        if step == "confirm":
+            if ans.lower() in ("yes", "y", "confirm", "save", "ok", "done"):
+                cash = action_data.get("cash", 0)
+                upi = action_data.get("upi", 0)
+                tname = action_data.get("tenant_name", "")
+                rnum = action_data.get("room_number", "")
+                results = []
+
+                if cash > 0:
+                    r = await _do_log_payment_by_ids(
+                        tenant_id=action_data["tenant_id"],
+                        tenancy_id=action_data["tenancy_id"],
+                        amount=cash, mode="cash",
+                        ctx_name=pending.phone, session=session,
+                    )
+                    results.append(f"Cash Rs.{int(cash):,} — {r}")
+
+                if upi > 0:
+                    r = await _do_log_payment_by_ids(
+                        tenant_id=action_data["tenant_id"],
+                        tenancy_id=action_data["tenancy_id"],
+                        amount=upi, mode="upi",
+                        ctx_name=pending.phone, session=session,
+                    )
+                    results.append(f"UPI Rs.{int(upi):,} — {r}")
+
+                total = cash + upi
+                return (
+                    f"*Payment logged — {tname}* (Room {rnum})\n"
+                    + "\n".join(results)
+                    + f"\nTotal: Rs.{int(total):,}"
+                )
+            else:
+                return "Cancelled. No payment logged."
+
+        return None
+
     if pending.intent == "ADD_TENANT_INCOMPLETE":
         # Legacy — clear and re-prompt
         return "Please send *add tenant* to start the checkin form."
@@ -745,9 +887,13 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
     if pending.intent == "NOTICE_GIVEN":
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
         if tenancy:
+            notice_date_val = None
+            last_day_val = None
             try:
-                tenancy.notice_date = date.fromisoformat(action_data["notice_date"])
-                tenancy.expected_checkout = date.fromisoformat(action_data["last_day"])
+                notice_date_val = date.fromisoformat(action_data["notice_date"])
+                last_day_val = date.fromisoformat(action_data["last_day"])
+                tenancy.notice_date = notice_date_val
+                tenancy.expected_checkout = last_day_val
             except (ValueError, KeyError):
                 pass
             last_day_str = action_data.get("last_day", "")
@@ -756,11 +902,26 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             except ValueError:
                 last_day_fmt = last_day_str
             deposit_note = action_data.get("deposit_note", "")
+
+            # Google Sheets write-back
+            gsheets_note = ""
+            try:
+                room_obj = await session.get(Room, tenancy.room_id)
+                if room_obj:
+                    from src.integrations.gsheets import record_notice as gsheets_notice
+                    notice_fmt = notice_date_val.strftime("%d/%m/%Y") if notice_date_val else action_data.get("notice_date", "")
+                    exit_fmt = last_day_val.strftime("%d/%m/%Y") if last_day_val else ""
+                    gs_r = await gsheets_notice(room_obj.room_number, chosen["label"].split(" (Room")[0], notice_fmt, exit_fmt)
+                    if gs_r.get("success"):
+                        gsheets_note = "\nSheet updated"
+            except Exception:
+                pass
+
             return (
                 f"*Notice recorded — {chosen['label']}*\n"
                 f"Notice date: {action_data.get('notice_date', '')}\n"
                 f"Last day: {last_day_fmt}\n\n"
-                f"{deposit_note}"
+                f"{deposit_note}{gsheets_note}"
             )
         return "Tenancy not found."
 
@@ -1187,7 +1348,7 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         gsheets_note = ""
         try:
             from src.integrations.gsheets import record_notice as gsheets_notice
-            gs_r = await gsheets_notice(room_obj.room_number, tenant.name, notice_date_val.strftime("%d/%m/%Y"))
+            gs_r = await gsheets_notice(room_obj.room_number, tenant.name, notice_date_val.strftime("%d/%m/%Y"), last_day.strftime("%d/%m/%Y"))
             if gs_r.get("success"):
                 gsheets_note = "\nSheet updated"
         except Exception:
@@ -1761,6 +1922,13 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         import logging as _log
         _log.getLogger(__name__).error("GSheets add_tenant failed: %s", e)
 
+    # Auto-chain: start collect rent flow for this tenant
+    # Save pending so next message goes into COLLECT_RENT_STEP
+    from src.whatsapp.handlers._shared import _save_pending as _sp
+    # We need the caller phone — get it from the pending action that triggered this
+    # The caller phone is passed via the session context, but we don't have it here.
+    # Instead, append a prompt to the reply — the next message will trigger collect rent.
+
     return (
         f"*Tenant saved — {name}* ✅\n\n"
         f"Room: {room_number}\n"
@@ -1770,6 +1938,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         + (f"Advance logged: Rs.{int(advance):,}\n" if advance > 0 else "")
         + "Rent schedule created."
         + gsheets_note
+        + "\n\nSay *collect rent* to log their first payment."
     )
 
 

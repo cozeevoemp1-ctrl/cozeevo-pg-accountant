@@ -115,6 +115,15 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     mode   = entities.get("payment_mode", "cash")
     month_num = entities.get("month")    # int 1-12 if mentioned in message
 
+    # If no amount AND no name → start step-by-step collect rent form
+    if not amount and not name and not room:
+        await _save_pending(
+            ctx.phone, "COLLECT_RENT_STEP",
+            {"step": "ask_name", "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return "*Collect Rent*\n\n*Who paid?* (tenant name or room number)"
+
     if not amount:
         return (
             "Please include the amount.\n"

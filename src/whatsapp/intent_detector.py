@@ -239,6 +239,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"^(?:maintena?na?ce?|maintanace|maintanance|cleaning|repairs?|furniture|plumbing|painting|pest\s*(?:control)?|food\s+(?:supplies?|expense|stuff)|internet|generator|groceries?|housekeeping|supplies|security)\s+[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "ADD_EXPENSE", 0.94),
     # Without payment mode (e.g. "electricity 8400", "internet 1800", "maintenance 3000")
     (re.compile(r"^(?:electricity|water\s*bill|internet|maintenance|food|groceries?|cleaning|plumbing|pest\s*(?:control)?|generator|security|supplies|housekeeping|repairs?|diesel|salary)\s+[\d,k]+\s*$", re.I), "ADD_EXPENSE", 0.92),
+    # Collect rent — step-by-step form trigger (no amount/name)
+    (re.compile(r"^(?:collect\s+rent|rent\s+collect(?:ion)?|log\s+(?:a\s+)?payment|record\s+payment|payment\s+log)\s*$", re.I), "PAYMENT_LOG", 0.93),
     # Payment log — before HELP so "Hi sir Raj paid 15000" doesn't become HELP
     (re.compile(r"(?:p[ai]{2,3}d?|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
     (re.compile(r"\d[\d,k]+\s*(?:paid|p[ai]{2,3}d?|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),

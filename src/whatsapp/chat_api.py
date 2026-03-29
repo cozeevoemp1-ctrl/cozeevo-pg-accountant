@@ -130,8 +130,20 @@ async def _process_message_inner(
     if ctx.role in ("admin", "power_user", "key_user", "receptionist"):
         pending = await _get_active_pending(ctx.phone, session)
         if pending:
+            # ── Mid-flow breakout detection ────────────────────────────────────
+            _breakout = _detect_mid_flow_breakout(message, pending.intent)
+            if _breakout == "cancel":
+                pending.resolved = True
+                cancel_reply = "Cancelled. What would you like to do?"
+                await _log(session, phone, message, ctx.role, "CANCEL", cancel_reply)
+                await session.commit()
+                return OutboundReply(reply=cancel_reply, intent="CANCEL", role=ctx.role)
+            if _breakout in ("greeting", "new_intent"):
+                # Clear pending and fall through to normal intent detection
+                pending.resolved = True
+
             # ── Intent-ambiguity resolution (e.g. "Raj 31st March" → checkin or checkout?) ──
-            if pending.intent == "INTENT_AMBIGUOUS":
+            if not pending.resolved and pending.intent == "INTENT_AMBIGUOUS":
                 import json as _j
                 choice = message.strip().rstrip(".")
                 choices_data = _j.loads(pending.choices or "[]")
@@ -160,7 +172,7 @@ async def _process_message_inner(
                 return OutboundReply(reply=re_prompt, intent="AMBIGUOUS", role=ctx.role)
 
             # ── AWAITING_CLARIFICATION: bot asked follow-up, this is the answer ──
-            if pending.intent == "AWAITING_CLARIFICATION":
+            if not pending.resolved and pending.intent == "AWAITING_CLARIFICATION":
                 import json as _jc
                 import re as _re
                 ad = _jc.loads(pending.action_data or "{}")
@@ -196,7 +208,10 @@ async def _process_message_inner(
                 await session.commit()
                 return OutboundReply(reply=clarif_reply, intent=original_intent, role=ctx.role)
 
-            resolved_reply = await resolve_pending_action(pending, message, session)
+            if not pending.resolved:
+                resolved_reply = await resolve_pending_action(pending, message, session)
+            else:
+                resolved_reply = None
             if resolved_reply:
                 # Prefix "__KEEP_PENDING__" means correction re-prompt — keep pending alive
                 if resolved_reply.startswith("__KEEP_PENDING__"):
@@ -483,6 +498,60 @@ async def _load_chat_context(phone: str, session: AsyncSession, limit: int = 5) 
         lines.append(f"{prefix}: {text}")
 
     return "[Recent context]\n" + "\n".join(lines)
+
+
+# ── Mid-flow breakout detection ───────────────────────────────────────────────
+
+# Intents that are clearly new actions (not answers to a pending question)
+_NEW_INTENT_TRIGGERS = frozenset({
+    "PAYMENT_LOG", "ADD_EXPENSE", "ADD_TENANT", "CHECKOUT", "NOTICE_GIVEN",
+    "REPORT", "QUERY_DUES", "QUERY_VACANT_ROOMS", "VOID_PAYMENT",
+    "ROOM_TRANSFER", "RENT_CHANGE", "QUERY_TENANT",
+})
+
+_CANCEL_WORDS = frozenset({
+    "cancel", "stop", "abort", "nevermind", "never mind", "nvm",
+    "forget it", "leave it", "exit", "quit", "chhodo", "rehne do",
+})
+# NOTE: "skip" removed — it's a valid answer in step-by-step forms (skip cash/UPI)
+
+_GREETING_WORDS = frozenset({
+    "hi", "hello", "hey", "menu", "help", "start",
+})
+
+
+def _detect_mid_flow_breakout(message: str, pending_intent: str) -> Optional[str]:
+    """
+    Check if a message during a pending flow is a breakout signal.
+
+    Returns:
+      "cancel"    — user wants to cancel the current flow
+      "greeting"  — user said hi/hello/menu → clear flow, show menu
+      "new_intent"— user started a clearly different action
+      None        — not a breakout, continue with pending flow
+    """
+    msg = message.strip().lower().rstrip(".!?")
+
+    # Cancel keywords
+    if msg in _CANCEL_WORDS:
+        return "cancel"
+
+    # Greeting / menu reset
+    if msg in _GREETING_WORDS:
+        return "greeting"
+
+    # Check if message matches a clear new intent (high confidence, different from pending)
+    # Only check for multi-step flows (ADD_TENANT_STEP, RECORD_CHECKOUT) where user
+    # might abandon mid-flow to do something else
+    if pending_intent in ("ADD_TENANT_STEP", "RECORD_CHECKOUT", "CONFIRM_PAYMENT_LOG", "COLLECT_RENT_STEP"):
+        probe = detect_intent(message, "admin")
+        if (
+            probe.intent in _NEW_INTENT_TRIGGERS
+            and probe.confidence >= 0.85
+        ):
+            return "new_intent"
+
+    return None
 
 
 # ── Follow-up detection ──────────────────────────────────────────────────────
