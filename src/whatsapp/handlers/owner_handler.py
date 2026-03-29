@@ -2389,17 +2389,131 @@ async def _do_room_transfer(action_data: dict, session: AsyncSession) -> str:
     )
 
 
+async def _query_beds_by_gender(gender: str, building_filter: str | None, session: AsyncSession) -> str:
+    """Show rooms with empty beds where current occupant(s) match the given gender."""
+    from collections import defaultdict
+    from src.database.models import Property
+
+    # Get all multi-bed rooms (double/triple) with their occupants
+    q = (
+        select(Room, Property.name, Tenant.name, Tenant.gender)
+        .join(Property, Property.id == Room.property_id)
+        .join(Tenancy, and_(Tenancy.room_id == Room.id, Tenancy.status == TenancyStatus.active))
+        .join(Tenant, Tenant.id == Tenancy.tenant_id)
+        .where(
+            Room.active == True,
+            Room.is_staff_room == False,
+            Room.max_occupancy > 1,  # only multi-bed rooms
+        )
+    )
+    if building_filter:
+        q = q.where(Property.name.ilike(f"%{building_filter}%"))
+    q = q.order_by(Property.name, Room.room_number)
+
+    rows = (await session.execute(q)).all()
+
+    # Group by room: {room_id: {room, prop, occupants: [(name, gender)]}}
+    room_data: dict = {}
+    for room, prop_name, tenant_name, tenant_gender in rows:
+        if room.id not in room_data:
+            room_data[room.id] = {
+                "room": room,
+                "prop": prop_name,
+                "occupants": [],
+            }
+        room_data[room.id]["occupants"].append((tenant_name, (tenant_gender or "").lower()))
+
+    # Filter: rooms where occupancy < max AND at least one occupant matches gender
+    matching = []
+    for rid, data in room_data.items():
+        room = data["room"]
+        occupants = data["occupants"]
+        max_occ = room.max_occupancy or 2
+        if len(occupants) < max_occ:
+            # Check if any occupant matches the requested gender
+            genders = [g for _, g in occupants]
+            if gender in genders:
+                free_beds = max_occ - len(occupants)
+                matching.append({
+                    "room": room.room_number,
+                    "prop": data["prop"],
+                    "occupants": occupants,
+                    "free_beds": free_beds,
+                    "max": max_occ,
+                })
+
+    # Also include fully vacant multi-bed rooms (anyone can go there)
+    all_room_ids_with_tenants = set(room_data.keys())
+    vacant_q = (
+        select(Room, Property.name)
+        .join(Property, Property.id == Room.property_id)
+        .where(
+            Room.active == True,
+            Room.is_staff_room == False,
+            Room.max_occupancy > 1,
+            Room.id.notin_(
+                select(Tenancy.room_id).where(
+                    Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                    Tenancy.room_id.isnot(None),
+                )
+            ),
+        )
+    )
+    if building_filter:
+        vacant_q = vacant_q.where(Property.name.ilike(f"%{building_filter}%"))
+
+    vacant_rows = (await session.execute(vacant_q)).all()
+
+    gender_label = gender.capitalize()
+    bld_label = f" in {building_filter}" if building_filter else ""
+
+    if not matching and not vacant_rows:
+        return f"No rooms available for a {gender_label} tenant{bld_label}.\nAll double/triple rooms are either full or occupied by the other gender."
+
+    lines = [f"*Beds available for {gender_label}{bld_label}*\n"]
+
+    if matching:
+        lines.append(f"*Rooms with {gender_label} occupant + empty bed:*")
+        for m in sorted(matching, key=lambda x: x["room"]):
+            block = "THOR" if "THOR" in m["prop"].upper() else "HULK"
+            names = ", ".join(n for n, _ in m["occupants"])
+            lines.append(f"  Room *{m['room']}* ({block}) — {names} | *{m['free_beds']} bed free*")
+        lines.append("")
+
+    if vacant_rows:
+        lines.append(f"*Fully vacant rooms (any gender):*")
+        for room, prop_name in sorted(vacant_rows, key=lambda x: x[0].room_number):
+            block = "THOR" if "THOR" in prop_name.upper() else "HULK"
+            beds = room.max_occupancy or 2
+            lines.append(f"  Room *{room.room_number}* ({block}) — {beds} beds free")
+
+    total_beds = sum(m["free_beds"] for m in matching) + sum((r.max_occupancy or 2) for r, _ in vacant_rows)
+    lines.append(f"\n*Total available: {total_beds} beds*")
+
+    return "\n".join(lines)
+
+
 async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     from collections import defaultdict
     from src.database.models import Property
 
-    # Detect building filter from message
+    # Detect building + gender filter from message
     desc = (entities.get("description") or entities.get("_raw_message") or "").lower()
     building_filter = None
     if "thor" in desc:
         building_filter = "THOR"
     elif "hulk" in desc:
         building_filter = "HULK"
+
+    gender_filter = None
+    if any(w in desc for w in ("female", "girl", "woman", "women", "ladies", "lady")):
+        gender_filter = "female"
+    elif any(w in desc for w in ("male", "boy", "man", "men", "gents")):
+        gender_filter = "male"
+
+    # If gender filter → show PARTIALLY OCCUPIED rooms with matching gender
+    if gender_filter:
+        return await _query_beds_by_gender(gender_filter, building_filter, session)
 
     q = select(Room, Property.name).join(Property, Property.id == Room.property_id).where(Room.active == True, Room.is_staff_room == False)
     if building_filter:
