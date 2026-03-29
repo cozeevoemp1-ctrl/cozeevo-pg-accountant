@@ -14,16 +14,12 @@ Internet
     ▼ HTTPS (443)
 nginx (reverse proxy + SSL)
     │
-    ├──► /api/*        → FastAPI (port 8000, systemd service)
-    └──► /n8n/*        → n8n (port 5678, Docker)
+    ├──► /webhook/*    → FastAPI (port 8000, systemd service)
+    └──► /api/*        → FastAPI (port 8000, systemd service)
 
 FastAPI
     └──► Supabase (cloud PostgreSQL — no local DB needed)
     └──► Ollama (port 11434 — local LLM on same server)
-
-n8n
-    └──► Meta Cloud API (WhatsApp webhook receiver)
-    └──► FastAPI (POST /api/whatsapp/process)
 ```
 
 ---
@@ -50,14 +46,6 @@ Update and install dependencies:
 ```bash
 apt update && apt upgrade -y
 apt install -y python3.11 python3.11-venv python3-pip git nginx certbot python3-certbot-nginx
-```
-
-Install Docker:
-
-```bash
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker
-systemctl start docker
 ```
 
 ---
@@ -162,27 +150,7 @@ Test: `curl http://localhost:8000/healthz` → `{"status":"ok"}`
 
 ---
 
-## Step 6 — n8n via Docker
-
-Start n8n:
-
-```bash
-cd /opt/pg-accountant
-docker-compose up -d
-```
-
-The `docker-compose.yml` starts n8n on port 5678.
-
-Open `http://your-server-ip:5678` (temporarily) to:
-1. Create admin account
-2. Go to **Settings → Variables** → add `FASTAPI_URL` = `http://host.docker.internal:8000`
-   > ⚠️ Use `host.docker.internal`, NOT `localhost` — from inside Docker, localhost is the container. `host.docker.internal` resolves to the VPS host where FastAPI runs.
-3. Import workflow: **Workflows → Import from File** → `workflows/WA-01-whatsapp-router.json`
-4. Open the workflow → click **Active** toggle → copy the **Webhook URL**
-
----
-
-## Step 7 — nginx + SSL
+## Step 6 — nginx + SSL
 
 Create nginx config:
 
@@ -214,15 +182,6 @@ server {
         proxy_pass http://localhost:8000;
     }
 
-    # n8n dashboard (optional — only needed for workflow management)
-    location /n8n/ {
-        proxy_pass http://localhost:5678/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
 }
 ```
 
@@ -239,7 +198,7 @@ certbot --nginx -d api.yourpg.com
 
 ---
 
-## Step 8 — Meta Cloud API Webhook
+## Step 7 — Meta Cloud API Webhook
 
 In your Meta Developer Console ([developers.facebook.com](https://developers.facebook.com)):
 
@@ -253,7 +212,7 @@ Test: Send a WhatsApp message to your business number → should get a reply.
 
 ---
 
-## Step 9 — Run Database Migrations
+## Step 8 — Run Database Migrations
 
 ```bash
 cd /opt/pg-accountant
@@ -268,19 +227,15 @@ python -m src.database.migrate_wifi
 
 ---
 
-## Step 10 — Health Check
+## Step 9 — Health Check
 
 ```bash
 # FastAPI
 curl https://api.yourpg.com/healthz
 
-# n8n
-curl https://api.yourpg.com/n8n/
-
 # Check services
 systemctl status pg-accountant
 systemctl status ollama
-docker ps
 ```
 
 ---
@@ -292,9 +247,6 @@ docker ps
 ```bash
 # FastAPI logs
 journalctl -u pg-accountant -f
-
-# n8n logs
-docker-compose logs -f n8n
 
 # nginx logs
 tail -f /var/log/nginx/access.log
@@ -329,8 +281,7 @@ For a second PG customer:
 3. Copy the repo to `/opt/pg-accountant-customer2/`
 4. Create new `.env` with new Supabase + WhatsApp credentials
 5. Create new systemd service on a different port (e.g. 8001)
-6. Create new n8n workflow instance pointing to port 8001
-7. Add new nginx location block for the new customer's domain
+6. Add new nginx location block for the new customer's domain
 
 Each instance is fully isolated — no shared DB, no shared phone number.
 
@@ -344,7 +295,6 @@ Each instance is fully isolated — no shared DB, no shared phone number.
 | Supabase (free tier — up to 500 MB) | Free |
 | Meta WhatsApp Cloud API (up to 1,000 msgs/day) | Free |
 | Ollama llama3.2 (runs on VPS) | Free |
-| n8n (self-hosted Docker) | Free |
 | **Total** | **~$5/month** |
 
 For multiple PG customers: upgrade to VPS KVM 2 (~$10/month) to handle load.

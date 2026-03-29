@@ -184,7 +184,13 @@ Match bank income to tenant deposits: amount within 10%, date within 45 days of 
 
 ---
 
-## 6. Data Import/Export
+## 6. n8n (Not Used)
+
+n8n was evaluated but skipped -- webhooks go directly to FastAPI via nginx.
+
+---
+
+## 7. Data Import/Export
 
 ### Full Excel Import
 
@@ -211,7 +217,7 @@ python -m src.database.delta_import --write  # insert
 
 ---
 
-## 7. Environment Variables — Complete Reference
+## 8. Environment Variables — Complete Reference
 
 ### Required
 
@@ -238,7 +244,7 @@ python -m src.database.delta_import --write  # insert
 
 ---
 
-## 8. Integration Map
+## 9. Integration Map
 
 | Use Case | Integration | File |
 |----------|-------------|------|

@@ -32,8 +32,8 @@ WhatsApp User
 Meta Cloud API (free — no Twilio)
       │ webhook POST
       ▼
-n8n (Docker, port 5678) — thin pipe only
-      │ POST /api/whatsapp/process
+nginx (reverse proxy + SSL)
+      │ proxy_pass :8000
       ▼
 FastAPI chat_api.py (port 8000)
       │
@@ -77,7 +77,7 @@ FastAPI chat_api.py (port 8000)
       4. Log to whatsapp_log + session.commit()
       │
       ▼
-      5. Return reply → n8n → Meta Cloud API → WhatsApp User
+      5. Return reply → Meta Cloud API → WhatsApp User
 ```
 
 ---
@@ -208,22 +208,6 @@ data/raw/file.csv
 
 ---
 
-## n8n Integration (WA-01-whatsapp-router.json)
-
-```
-Meta Cloud API webhook
-       │
-       ▼
-  n8n: WhatsApp Trigger → Extract Message → Is Text? → Call FastAPI → Should Reply? → Send Reply
-       │ POST /api/whatsapp/process
-       │ Body: { phone, message, message_id }
-       │ n8n Variable: FASTAPI_URL = http://host.docker.internal:8000
-       ▼
-  FastAPI returns: { reply, intent, role, confidence, skip }
-```
-
----
-
 ## Multi-PG / SaaS Path
 
 Each PG customer gets:
@@ -243,5 +227,5 @@ No shared state between instances.
 | API | FastAPI + Uvicorn | 8000 |
 | DB | Supabase PostgreSQL (asyncpg) | cloud |
 | LLM | Ollama llama3.2 | 11434 |
-| Automation | n8n (Docker) | 5678 |
+| Reverse Proxy | nginx + Let's Encrypt SSL | 443 |
 | WhatsApp | Meta Cloud API (free) | — |
