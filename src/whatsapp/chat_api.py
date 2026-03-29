@@ -131,7 +131,11 @@ async def _process_message_inner(
         pending = await _get_active_pending(ctx.phone, session)
         if pending:
             # ── Mid-flow breakout detection ────────────────────────────────────
-            _breakout = _detect_mid_flow_breakout(message, pending.intent)
+            # Skip new_intent detection during free-text steps (notes, description)
+            import json as _jbr
+            _step = _jbr.loads(pending.action_data or "{}").get("step", "")
+            _free_text_steps = {"ask_notes", "ask_description"}
+            _breakout = _detect_mid_flow_breakout(message, pending.intent, skip_new_intent=(_step in _free_text_steps))
             if _breakout == "cancel":
                 pending.resolved = True
                 cancel_reply = "Cancelled. What would you like to do?"
@@ -520,7 +524,7 @@ _GREETING_WORDS = frozenset({
 })
 
 
-def _detect_mid_flow_breakout(message: str, pending_intent: str) -> Optional[str]:
+def _detect_mid_flow_breakout(message: str, pending_intent: str, skip_new_intent: bool = False) -> Optional[str]:
     """
     Check if a message during a pending flow is a breakout signal.
 
@@ -539,6 +543,11 @@ def _detect_mid_flow_breakout(message: str, pending_intent: str) -> Optional[str
     # Greeting / menu reset
     if msg in _GREETING_WORDS:
         return "greeting"
+
+    # Skip new_intent detection during free-text input steps (notes, description)
+    # where user input may accidentally match intent patterns like "paid"
+    if skip_new_intent:
+        return None
 
     # Check if message matches a clear new intent (high confidence, different from pending)
     # Only check for multi-step flows (ADD_TENANT_STEP, RECORD_CHECKOUT) where user

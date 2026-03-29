@@ -502,6 +502,18 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             if len(phone_clean) != 10:
                 return f"__KEEP_PENDING__Need 10 digits, got {len(phone_clean)}. *Phone number?*"
             action_data["phone"] = phone_clean
+            action_data["step"] = "ask_gender"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Gender?* (male / female)"
+
+        if step == "ask_gender":
+            g = ans.strip().lower()
+            if g in ("male", "m", "boy", "man", "gents"):
+                action_data["gender"] = "male"
+            elif g in ("female", "f", "girl", "woman", "ladies"):
+                action_data["gender"] = "female"
+            else:
+                return "__KEEP_PENDING__Please enter *male* or *female*:"
             action_data["step"] = "ask_room"
             await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
             return "*Room number?*"
@@ -520,10 +532,13 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                 if prop:
                     action_data["building"] = prop.name or ""
             action_data["floor"] = str(room_row.floor or "")
-            action_data["sharing"] = room_row.room_type or ""
+            # Store room_type as string value, not enum repr
+            rt = room_row.room_type
+            action_data["sharing"] = rt.value if hasattr(rt, 'value') else str(rt or "")
             action_data["step"] = "ask_rent"
             await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
-            return f"Room *{room_row.room_number}* ({room_row.room_type or 'unknown'} sharing)\n\n*Monthly rent?* (number)"
+            rt_display = rt.value if hasattr(rt, 'value') else str(rt or 'unknown')
+            return f"Room *{room_row.room_number}* ({rt_display} sharing)\n\n*Monthly rent?* (number)"
 
         if step == "ask_rent":
             rent = _parse_amount_field(ans)
@@ -599,6 +614,7 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     "food_pref": "none",
                     "discount": {},
                     "existing_tenant_id": None,
+                    "gender": action_data.get("gender", ""),
                     "building": action_data.get("building", ""),
                     "sharing": action_data.get("sharing", ""),
                     "notes": action_data.get("notes", ""),
@@ -644,12 +660,17 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
                     from src.integrations.gsheets import get_sheet
                     ws = await get_sheet()
                     all_vals = ws.get_all_values()
+                    # Detect notes column: new format (with Phone col) = 14, old = 12
+                    header = all_vals[3] if len(all_vals) > 3 else []
+                    is_new = "phone" in str(header[2] if len(header) > 2 else "").lower()
+                    notes_col = 14 if is_new else 12
                     rclean = room_obj.room_number.strip().upper()
                     nlow = tenant.name.strip().lower()
                     for row in all_vals[4:]:
                         if str(row[0]).strip().upper() == rclean and nlow in str(row[1]).strip().lower():
-                            existing_notes = str(row[14]) if len(row) > 14 else ""
-                            if existing_notes:
+                            existing_notes = str(row[notes_col]).strip() if len(row) > notes_col else ""
+                            # Skip numeric-only values (likely PrevDue column bleed)
+                            if existing_notes and not existing_notes.replace(".", "").replace("-", "").isdigit():
                                 action_data["existing_notes"] = existing_notes
                             break
                 except Exception:
@@ -2086,14 +2107,17 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     existing_tid = data.get("existing_tenant_id")
 
     # Tenant record
+    gender = data.get("gender", "")
     if existing_tid:
         tenant = await session.get(Tenant, existing_tid)
     else:
         tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
     if not tenant:
-        tenant = Tenant(name=name, phone=phone)
+        tenant = Tenant(name=name, phone=phone, gender=gender or None)
         session.add(tenant)
         await session.flush()
+    elif gender and not tenant.gender:
+        tenant.gender = gender
 
     # Tenancy record
     tenancy = Tenancy(
@@ -2180,7 +2204,8 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
                 prop = await session.get(Property, room_obj.property_id)
                 building = prop.name if prop else ""
             floor_val = str(room_obj.floor or "")
-            sharing = data.get("sharing", "") or str(room_obj.room_type or "")
+            rt = data.get("sharing", "") or room_obj.room_type
+            sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
             gs_r = await gsheets_add(
                 room_number=room_number, name=name, phone=phone,
                 gender=data.get("gender", ""), building=building,
