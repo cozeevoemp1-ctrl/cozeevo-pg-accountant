@@ -45,6 +45,11 @@ class InboundMessage(BaseModel):
     phone:      str
     message:    str
     message_id: Optional[str] = None
+    media_type: Optional[str] = None      # "image", "document", "video"
+    media_id:   Optional[str] = None      # WhatsApp media ID
+    media_url:  Optional[str] = None      # direct URL if available
+    media_mime: Optional[str] = None      # "image/jpeg", "application/pdf"
+    media_filename: Optional[str] = None
 
 
 class OutboundReply(BaseModel):
@@ -121,7 +126,12 @@ async def _process_message_inner(
                     "What is your *gender*?\nReply: *male* / *female* / *other*"
                 )
             else:
-                reply = await handle_onboarding_step(ob, message, ctx, session)
+                reply = await handle_onboarding_step(
+                    ob, message, ctx, session,
+                    media_id=body.media_id,
+                    media_type=body.media_type,
+                    media_mime=body.media_mime,
+                )
             await _log(session, phone, message, ctx.role, "ONBOARDING", reply)
             await session.commit()
             return OutboundReply(reply=reply, intent="ONBOARDING", role=ctx.role)

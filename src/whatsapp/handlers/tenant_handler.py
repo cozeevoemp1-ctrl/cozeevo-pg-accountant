@@ -722,6 +722,8 @@ _ONBOARDING_STEPS = [
     "ask_emergency_phone",
     "ask_id_type",
     "ask_id_number",
+    "ask_id_photo",
+    "ask_selfie",
     "done",
 ]
 
@@ -738,6 +740,8 @@ _ONBOARDING_QUESTIONS = {
     "ask_emergency_phone":        "Their *phone number* (10 digits):",
     "ask_id_type":                "Your *ID proof type*?\nReply: *aadhar* / *passport* / *pan* / *driving license*",
     "ask_id_number":       "Your *ID proof number*:",
+    "ask_id_photo":        "Please *send a photo* of your ID proof (Aadhar/PAN card).\nOr type *skip*.",
+    "ask_selfie":          "Please *send a selfie* for verification.\nOr type *skip*.",
 }
 
 
@@ -758,6 +762,9 @@ async def handle_onboarding_step(
     reply_text: str,
     ctx: CallerContext,
     session: AsyncSession,
+    media_id: Optional[str] = None,
+    media_type: Optional[str] = None,
+    media_mime: Optional[str] = None,
 ) -> str:
     """
     Process one step of the onboarding form.
@@ -814,6 +821,34 @@ async def handle_onboarding_step(
             data["id_type"] = ans.title()
     elif step == "ask_id_number":
         data["id_number"] = ans.upper()
+    elif step in ("ask_id_photo", "ask_selfie"):
+        if not skip:
+            if media_id and media_type == "image":
+                from src.whatsapp.media_handler import download_whatsapp_media
+                from src.database.models import Document, DocumentType
+                subfolder = "id_proofs" if step == "ask_id_photo" else "photos"
+                prefix = f"tenant_{ob.tenant_id}_{step.replace('ask_', '')}"
+                file_path = await download_whatsapp_media(
+                    media_id, media_mime or "image/jpeg",
+                    subfolder=subfolder, filename_prefix=prefix,
+                )
+                if file_path:
+                    doc = Document(
+                        doc_type=DocumentType.id_proof if step == "ask_id_photo" else DocumentType.photo,
+                        file_path=file_path,
+                        original_name=f"{step}_{ob.tenant_id}",
+                        mime_type=media_mime or "image/jpeg",
+                        tenant_id=ob.tenant_id,
+                        uploaded_by=ctx.phone,
+                        notes=step.replace("ask_", "").replace("_", " ").title(),
+                    )
+                    session.add(doc)
+                    data[step] = file_path
+                else:
+                    data[step] = "upload_failed"
+            else:
+                # User sent text instead of photo
+                return "__KEEP_PENDING__Please *send a photo* (not text). Or type *skip*."
 
     # Advance to next step
     try:
