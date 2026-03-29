@@ -1408,6 +1408,86 @@ async def resolve_pending_action(pending: PendingAction, reply_text: str, sessio
             return await _do_add_tenant(action_data, session)
         return "__KEEP_PENDING__Reply *Yes* to save the new tenant or *No* to cancel."
 
+    if pending.intent == "APPROVE_ONBOARDING":
+        ans = reply_text.strip().lower()
+        if ans in ("yes", "y", "approve", "confirm", "1"):
+            data = action_data.get("data", {})
+            tenant_id = action_data.get("tenant_id")
+            onboarding_id = action_data.get("onboarding_id")
+
+            tenant = await session.get(Tenant, tenant_id)
+            if not tenant:
+                return "Tenant not found. Onboarding may have expired."
+
+            # Save KYC data to Tenant record
+            if data.get("gender"):
+                tenant.gender = data["gender"]
+            if data.get("dob"):
+                try:
+                    from datetime import date as _date
+                    parts = data["dob"].replace("-", "/").split("/")
+                    if len(parts) == 3:
+                        d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+                        tenant.date_of_birth = _date(y, m, d)
+                except (ValueError, AttributeError):
+                    pass
+            if data.get("father_name"):
+                tenant.father_name = data["father_name"]
+            if data.get("father_phone"):
+                tenant.father_phone = data["father_phone"]
+            if data.get("address"):
+                tenant.permanent_address = data["address"]
+            if data.get("email"):
+                tenant.email = data["email"]
+            if data.get("occupation"):
+                tenant.occupation = data["occupation"]
+            if data.get("emergency_name"):
+                tenant.emergency_contact_name = data["emergency_name"]
+            if data.get("emergency_phone"):
+                tenant.emergency_contact_phone = data["emergency_phone"]
+            if data.get("emergency_relationship"):
+                tenant.emergency_contact_relationship = data["emergency_relationship"]
+            if data.get("id_type"):
+                tenant.id_proof_type = data["id_type"]
+            if data.get("id_number"):
+                tenant.id_proof_number = data["id_number"]
+
+            # Mark onboarding complete
+            ob = await session.get(OnboardingSession, onboarding_id)
+            if ob:
+                ob.completed = True
+                ob.step = "done"
+
+            # Notify tenant
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                await _send_whatsapp(tenant.phone, f"Your check-in has been approved! Welcome to Cozeevo, {tenant.name}.")
+            except Exception:
+                pass
+
+            return f"*Onboarding approved — {tenant.name}*\nKYC data saved to DB."
+
+        elif ans in ("no", "n", "reject", "2"):
+            onboarding_id = action_data.get("onboarding_id")
+            ob = await session.get(OnboardingSession, onboarding_id)
+            if ob:
+                ob.completed = True
+                ob.step = "rejected"
+
+            # Notify tenant
+            tenant = await session.get(Tenant, action_data.get("tenant_id"))
+            if tenant:
+                try:
+                    from src.whatsapp.webhook_handler import _send_whatsapp
+                    await _send_whatsapp(tenant.phone, "Your check-in request was not approved. Please contact the reception.")
+                except Exception:
+                    pass
+
+            return "Onboarding rejected."
+
+        else:
+            return "__KEEP_PENDING__Reply *yes* to approve or *no* to reject."
+
     return None
 
 

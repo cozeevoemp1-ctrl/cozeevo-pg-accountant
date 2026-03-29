@@ -860,40 +860,60 @@ async def handle_onboarding_step(
     ob.collected_data = json.dumps(data)
 
     if next_step == "done":
-        # Save all collected data to Tenant record
+        # Don't auto-save — send to receptionist for approval
+        ob.step = "awaiting_approval"
+        ob.collected_data = json.dumps(data)
+
+        # Build summary
         tenant = await session.get(_Tenant, ob.tenant_id)
-        if tenant:
-            from datetime import date as _date
-            tenant.gender                             = data.get("gender")
-            tenant.father_name                        = data.get("father_name")
-            tenant.father_phone                       = data.get("father_phone")
-            tenant.permanent_address                  = data.get("address")
-            tenant.email                              = data.get("email")
-            tenant.occupation                         = data.get("occupation")
-            tenant.emergency_contact_name             = data.get("emergency_name")
-            tenant.emergency_contact_relationship     = data.get("emergency_relationship")
-            tenant.emergency_contact_phone            = data.get("emergency_phone")
-            tenant.id_proof_type                      = data.get("id_type")
-            tenant.id_proof_number                    = data.get("id_number")
-            # Parse DOB if provided (DD/MM/YYYY)
-            dob_str = data.get("dob")
-            if dob_str:
-                try:
-                    parts = dob_str.replace("-", "/").split("/")
-                    if len(parts) == 3:
-                        d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
-                        tenant.date_of_birth = _date(y, m, d)
-                except (ValueError, AttributeError):
-                    pass
-        ob.completed = True
+        tenant_name = tenant.name if tenant else "Unknown"
+        tenant_phone = tenant.phone if tenant else ""
+
+        summary_lines = [
+            f"*New KYC Submission — {tenant_name}*",
+            f"Phone: {tenant_phone}",
+        ]
+        if data.get("gender"): summary_lines.append(f"Gender: {data['gender']}")
+        if data.get("dob"): summary_lines.append(f"DOB: {data['dob']}")
+        if data.get("father_name"): summary_lines.append(f"Father: {data['father_name']}")
+        if data.get("father_phone"): summary_lines.append(f"Father Phone: {data['father_phone']}")
+        if data.get("address"): summary_lines.append(f"Address: {data['address']}")
+        if data.get("email"): summary_lines.append(f"Email: {data['email']}")
+        if data.get("occupation"): summary_lines.append(f"Occupation: {data['occupation']}")
+        if data.get("emergency_name"): summary_lines.append(f"Emergency: {data['emergency_name']} ({data.get('emergency_relationship', '')})")
+        if data.get("emergency_phone"): summary_lines.append(f"Emergency Phone: {data['emergency_phone']}")
+        if data.get("id_type"): summary_lines.append(f"ID: {data['id_type']} — {data.get('id_number', '')}")
+        if data.get("ask_id_photo"): summary_lines.append("ID Photo: uploaded")
+        if data.get("ask_selfie"): summary_lines.append("Selfie: uploaded")
+
+        summary = "\n".join(summary_lines)
+        summary += "\n\nReply *yes* to approve or *no* to reject."
+
+        # Save pending action for admin
+        import os
+        admin_phone = os.getenv("ADMIN_PHONE", "+917845952289")
+        from src.whatsapp.handlers._shared import _save_pending
+        await _save_pending(
+            admin_phone, "APPROVE_ONBOARDING",
+            {
+                "onboarding_id": ob.id,
+                "tenant_id": ob.tenant_id,
+                "data": data,
+                "summary": summary,
+            },
+            [], session,
+        )
+
+        # Send the summary to admin via WhatsApp
+        try:
+            from src.whatsapp.webhook_handler import _send_whatsapp
+            await _send_whatsapp(admin_phone, summary)
+        except Exception:
+            pass  # best effort
+
         return (
-            f"*Thank you, {ctx.name}!* Your details have been saved.\n\n"
-            "The PG team will confirm your check-in shortly.\n\n"
-            "You can now use this number to:\n"
-            "• Check your *balance*\n"
-            "• View *payment history*\n"
-            "• Register a *complaint*\n\n"
-            "Welcome to the PG! "
+            "Thank you! Your details have been submitted.\n"
+            "The receptionist will confirm your check-in shortly."
         )
 
     return (
