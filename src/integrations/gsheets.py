@@ -533,16 +533,18 @@ def _add_tenant_sync(
         result["error"] = "Room, name, and phone are required"
         return result
 
-    # Determine status: future check-in = No-show, past/today = Active
+    # Determine status: future check-in = no_show, past/today = active (match DB enum)
     from datetime import date as _date
-    status = "Active"
+    status = "active"
+    checkin_display = checkin  # for sheet display (DD/MM/YYYY)
     try:
         from src.whatsapp.intent_detector import _extract_date_entity
         iso = _extract_date_entity(checkin)
         if iso:
             checkin_dt = _date.fromisoformat(iso)
+            checkin_display = checkin_dt.strftime("%d/%m/%Y")
             if checkin_dt > _date.today():
-                status = "No-show"
+                status = "no_show"
     except Exception:
         pass
 
@@ -557,8 +559,8 @@ def _add_tenant_sync(
             building,          # 4: Building
             floor,             # 5: Floor
             sharing,           # 6: Sharing
-            checkin,           # 7: Check-in
-            status,            # 8: Status (Active or No-show based on date)
+            checkin_display,   # 7: Check-in (DD/MM/YYYY, Indian format)
+            status,            # 8: Status (active/no_show, matches DB enum)
             agreed_rent,       # 9: Agreed Rent
             deposit,           # 10: Deposit
             booking,           # 11: Booking
@@ -599,14 +601,14 @@ def _add_tenant_sync(
             monthly_row = [
                 room_number, name, phone, building, sharing,
                 agreed_rent, "", "", 0, agreed_rent, "UNPAID",
-                checkin, "", "", notes, 0,
+                checkin_display, "", "", notes, 0,
             ]
         else:
             # Old format: no Phone column (15 cols)
             monthly_row = [
                 room_number, name, building, sharing,
                 agreed_rent, "", "", 0, agreed_rent, "UNPAID",
-                checkin, "", notes, 0, 0,
+                checkin_display, "", notes, 0, 0,
             ]
         # Use update (not append_row) because filters block append
         next_row = len(all_vals) + 1

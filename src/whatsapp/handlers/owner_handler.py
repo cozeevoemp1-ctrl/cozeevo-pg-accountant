@@ -2101,16 +2101,13 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         room_obj = await session.get(Room, room_id)
         if room_obj:
             from src.integrations.gsheets import add_tenant as gsheets_add
-            # Get building from property — strip "Cozeevo " prefix to match sheet format
+            # Get building from property — use DB name as-is
             building = data.get("building", "")
             if not building and room_obj.property_id:
                 prop = await session.get(Property, room_obj.property_id)
                 building = prop.name if prop else ""
-            # Sheet uses "THOR" / "HULK", DB stores "Cozeevo THOR" / "Cozeevo HULK"
-            building = building.replace("Cozeevo ", "").strip() if building else ""
             floor_val = str(room_obj.floor or "")
             sharing = data.get("sharing", "") or str(room_obj.room_type or "")
-            sharing = sharing.capitalize()  # "double" → "Double"
             gs_r = await gsheets_add(
                 room_number=room_number, name=name, phone=phone,
                 gender=data.get("gender", ""), building=building,
