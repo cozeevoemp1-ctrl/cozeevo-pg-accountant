@@ -212,20 +212,59 @@ Ignore overpayments under Rs 10 (rounding noise). Above Rs 10: prompt user for a
 
 ---
 
-## 6. PRORATION
+## 6. BILLING CYCLE & PRORATION
 
-### 6.1 Check-in Proration
+### 6.1 Billing Cycle Types
+
+| Type | Example | First month | Ongoing | How stored |
+|------|---------|-------------|---------|------------|
+| **Standard (1st-to-1st)** | Checkin Jan 15 | Prorated: rent x 17/31 | Full rent on 1st | `billing_cycle_day` = 1 (default) |
+| **Custom (Nth-to-Nth)** | Checkin Mar 6, cycle 6th-to-6th | Full rent (first billing month is complete) | Full rent on 6th | `tenancy.notes` = "billing cycle 6th to 6th", `rent_schedule.due_date` = 6th |
+
+**Standard tenants (majority):** first month prorated based on checkin day, then full rent from next month.
+**Custom cycle tenants:** first month is full (their billing cycle starts on checkin day), full rent continues on their cycle day.
+
+### 6.2 Proration Rules — When It Applies
+
+| Scenario | Proration? | Calculation |
+|----------|-----------|-------------|
+| **New checkin mid-month (standard cycle)** | YES — first month only | `INT(rent * days_remaining / days_in_month)` rounds DOWN |
+| **New checkin mid-month (custom cycle)** | NO — full rent | Full `agreed_rent` (billing month starts on checkin day) |
+| **Normal checkout (notice given, end of month)** | NO | Full month charged |
+| **Early exit (leaves before agreed date)** | NO — no refund | Full month charged, no refund for unused days |
+| **Overstay (stays past agreed checkout)** | YES — extra days only | `INT(rent * extra_days / days_in_month)` rounds DOWN |
+| **Ongoing months** | NO | Full `agreed_rent` every month |
+
+### 6.3 Check-in Proration Formula (standard cycle only)
 
 ```
 days_remaining = days_in_month - checkin_day + 1  (inclusive of checkin day)
 prorated_rent = INT(rent * days_remaining / days_in_month)  (rounds DOWN)
 ```
 
-### 6.2 Checkout Proration
+Example: Rent Rs.13,000, checkin Jan 15, January has 31 days
+→ days_remaining = 31 - 15 + 1 = 17
+→ prorated = INT(13000 * 17 / 31) = INT(7129) = Rs.7,129
+
+### 6.4 Overstay Proration Formula
 
 ```
-prorated_rent = INT(rent * checkout_day / days_in_month)  (day 1 to checkout_day inclusive)
+extra_days = actual_checkout_day - agreed_checkout_day
+prorated_extra = INT(rent * extra_days / days_in_month)  (rounds DOWN)
 ```
+
+Only applies when tenant stays PAST their agreed checkout date. Charged on top of the full months already billed.
+
+### 6.5 Checkout Rules — NO Proration at Exit
+
+| Checkout scenario | Charge | Deposit |
+|-------------------|--------|---------|
+| Notice by 5th → leave end of month | Full month | Refunded (minus damages/dues) |
+| Notice after 5th → leave end of month | Full month | **Forfeited** |
+| Leaves before agreed checkout (sudden exit) | Full month charged, **no refund** for unused days | Forfeited |
+| Stays past agreed checkout (overstay) | Full month + prorated extra days | Held until settlement |
+
+**Key principle:** We never refund partial months on exit. If tenant paid for the month and leaves early, that's their choice. Proration only helps tenants (first month, overstay) — it never reduces what they owe for a committed month.
 
 ---
 

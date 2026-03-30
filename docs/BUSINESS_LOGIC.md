@@ -208,23 +208,35 @@ Separate from void -- for exiting tenants. Recorded in Refund table with status 
 
 ---
 
-## 6. CHECKOUT & SETTLEMENT
+## 6. BILLING CYCLE, PRORATION & CHECKOUT
 
-**File:** `src/whatsapp/handlers/owner_handler.py:818-902`
+**Files:** `services/property_logic.py`, `src/whatsapp/handlers/owner_handler.py`
 
-### 6.1 Notice Period
+### 6.1 Billing Cycles
 
-- Notice by 5th of month → deposit refundable
-- Notice after 5th → deposit forfeited + extra month charged
+- **Standard (default):** 1st to 1st. First month prorated if mid-month checkin.
+- **Custom (per agreement):** e.g. 6th to 6th. Stored in `tenancy.notes`. First month = full rent. No proration.
 
-### 6.2 Proration (rounds DOWN)
+### 6.2 When Proration Applies
 
-```python
-days_in_month = calendar.monthrange(year, month)[1]
-prorated_rent = INT(agreed_rent * days_stayed / days_in_month)
-```
+| Scenario | Proration? | Details |
+|----------|-----------|---------|
+| New checkin mid-month (standard) | YES | First month only. `INT(rent * days_remaining / days_in_month)` |
+| New checkin mid-month (custom cycle) | NO | Full rent — billing month starts on checkin day |
+| Normal checkout end of month | NO | Full month charged |
+| Early exit before agreed date | NO | Full month, no refund for unused days |
+| Overstay past agreed checkout | YES | Extra days: `INT(rent * extra_days / days_in_month)` |
 
-### 6.3 Settlement
+**Proration always rounds DOWN** — tenant pays less, not more.
+
+### 6.3 Checkout & Notice Rules
+
+- Notice by 5th of month → deposit refundable, leave end of month
+- Notice after 5th → deposit **forfeited**, charged until end of NEXT month
+- Early exit (before agreed date) → full month charged, **no refund**
+- Overstay (past agreed date) → prorated extra days charged
+
+### 6.4 Settlement
 
 ```python
 net_refund = deposit - outstanding_rent - outstanding_maintenance - damages
@@ -310,6 +322,9 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 9. **Maintenance = one-time, NEVER monthly**
 10. **Premium is tenancy status, not room type**
 11. **Total beds = dynamic from rooms table** -- never hardcode
+12. **No refund for early exit** -- tenant leaves before agreed date = full month charged
+13. **Overstay = prorate extra days** -- only case proration applies at checkout
+14. **Custom billing cycle = full first month** -- no proration for 6th-to-6th type agreements
 
 ---
 
