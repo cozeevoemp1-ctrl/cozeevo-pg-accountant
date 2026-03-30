@@ -15,10 +15,12 @@ import json
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from decimal import Decimal
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus, WhatsappLog
+from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus, WhatsappLog, RentSchedule, RentStatus, Payment, PaymentFor
 
 BOT_NAME = "Cozeevo Help Desk"
 _IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -356,3 +358,161 @@ def _format_no_match_message(name: str, suggestions: list[str] | None = None) ->
         "• *[Name] balance* to look up a tenant",
     ]
     return "\n".join(lines)
+
+
+# ── Dues snapshot + allocation helpers ────────────────────────────────────────
+
+
+async def build_dues_snapshot(
+    tenancy_id: int,
+    tenant_name: str,
+    room_number: str,
+    session: AsyncSession,
+) -> dict:
+    """
+    Build a complete dues snapshot for a tenant.
+    Returns:
+        {
+            "text": str,              # formatted snapshot string
+            "months": [               # list of pending months
+                {"period": date, "due": Decimal, "paid": Decimal, "remaining": Decimal,
+                 "status": str, "notes": str|None},
+            ],
+            "total_outstanding": Decimal,
+            "tenant_notes": str|None,  # permanent tenancy.notes
+        }
+    """
+    tenancy = await session.get(Tenancy, tenancy_id)
+    tenant_notes = tenancy.notes if tenancy else None
+
+    # Get all pending/partial rent_schedule rows, ordered oldest first
+    rs_result = await session.execute(
+        select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy_id,
+            RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
+        ).order_by(RentSchedule.period_month.asc())
+    )
+    months = []
+    total_outstanding = Decimal("0")
+
+    for rs in rs_result.scalars().all():
+        paid = await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.tenancy_id == tenancy_id,
+                Payment.period_month == rs.period_month,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+            )
+        ) or Decimal("0")
+        effective_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
+        remaining = max(Decimal("0"), effective_due - paid)
+        total_outstanding += remaining
+        status_label = "partial" if paid > 0 else "unpaid"
+        months.append({
+            "period": rs.period_month,
+            "due": effective_due,
+            "paid": paid,
+            "remaining": remaining,
+            "status": status_label,
+            "notes": rs.notes,
+        })
+
+    # Build text
+    lines = [f"*{tenant_name}* (Room {room_number})"]
+    if tenant_notes:
+        lines.append(f"\nTenant notes: {tenant_notes}")
+    if months:
+        lines.append("\nDues:")
+        for m in months:
+            month_str = m["period"].strftime("%b %Y")
+            status_str = f"({m['status']}"
+            if m["paid"] > 0:
+                status_str += f" -- Rs.{int(m['paid']):,} of Rs.{int(m['due']):,} paid"
+            status_str += ")"
+            line = f"  {month_str}: Rs.{int(m['remaining']):,} {status_str}"
+            if m["notes"]:
+                line += f' -- "{m["notes"]}"'
+            lines.append(line)
+        lines.append(f"  *Total outstanding: Rs.{int(total_outstanding):,}*")
+    else:
+        lines.append("\nAll paid up!")
+
+    return {
+        "text": "\n".join(lines),
+        "months": months,
+        "total_outstanding": total_outstanding,
+        "tenant_notes": tenant_notes,
+    }
+
+
+def compute_allocation(
+    amount: Decimal,
+    months: list[dict],
+) -> list[dict]:
+    """
+    Allocate payment amount oldest-first across pending months.
+    Returns list of {"period": date, "amount": Decimal, "clears": bool} dicts.
+    """
+    remaining = Decimal(str(amount))
+    allocation = []
+    for m in months:
+        if remaining <= 0:
+            break
+        apply = min(remaining, m["remaining"])
+        if apply > 0:
+            allocation.append({
+                "period": m["period"],
+                "amount": apply,
+                "clears": apply >= m["remaining"],
+            })
+            remaining -= apply
+    return allocation
+
+
+def format_allocation(allocation: list[dict], amount, mode: str) -> str:
+    """Format allocation into a confirmation message section."""
+    mode_label = (mode or "cash").upper()
+    lines = [f"\nSuggested allocation for Rs.{int(amount):,} {mode_label}:"]
+    for a in allocation:
+        month_str = a["period"].strftime("%b %Y")
+        label = "clears balance" if a["clears"] else "partial"
+        lines.append(f"  -> {month_str}: Rs.{int(a['amount']):,} ({label})")
+    return "\n".join(lines)
+
+
+def parse_allocation_override(text: str, months: list[dict]) -> list[dict] | None:
+    """
+    Parse receptionist override like "all to march" or "feb 3000 march 5000".
+    Returns list of {"period": date, "amount": Decimal} or None if unparseable.
+    """
+    import re as _re
+    text_lower = text.strip().lower()
+
+    # Build month name -> period map from available months
+    month_map = {}
+    for m in months:
+        month_map[m["period"].strftime("%b").lower()] = m["period"]
+        month_map[m["period"].strftime("%B").lower()] = m["period"]
+
+    # "all to march" / "all to feb"
+    match = _re.match(r"all\s+to\s+(\w+)", text_lower)
+    if match:
+        month_name = match.group(1)
+        period = month_map.get(month_name)
+        if period:
+            return [{"period": period, "amount": None}]  # None = full amount
+        return None
+
+    # "feb 3000 march 5000" or "feb 3000, march 5000"
+    parts = _re.findall(r"(\w+)\s+([\d,]+)", text_lower)
+    if parts:
+        result = []
+        for month_name, amt_str in parts:
+            period = month_map.get(month_name)
+            if not period:
+                return None
+            amt = Decimal(amt_str.replace(",", ""))
+            result.append({"period": period, "amount": amt})
+        return result
+
+    return None
