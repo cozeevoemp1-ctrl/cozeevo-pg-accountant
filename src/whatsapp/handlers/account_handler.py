@@ -360,6 +360,34 @@ async def _do_log_payment_by_ids(
         )
     )
 
+    if not rs:
+        # Auto-generate rent_schedule for this month with notes carry-over
+        prev_month = period_month.replace(day=1)
+        if prev_month.month == 1:
+            prev_month = date(prev_month.year - 1, 12, 1)
+        else:
+            prev_month = date(prev_month.year, prev_month.month - 1, 1)
+
+        prev_rs = await session.scalar(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy.id,
+                RentSchedule.period_month == prev_month,
+            )
+        )
+        carry_notes = prev_rs.notes if prev_rs else None
+
+        rs = RentSchedule(
+            tenancy_id=tenancy.id,
+            period_month=period_month,
+            rent_due=tenancy.agreed_rent or Decimal("0"),
+            maintenance_due=tenancy.maintenance_fee or Decimal("0"),
+            status=RentStatus.pending,
+            due_date=period_month,
+            notes=carry_notes,
+        )
+        session.add(rs)
+        await session.flush()
+
     prev_paid = await session.scalar(
         select(func.sum(Payment.amount)).where(
             Payment.tenancy_id == tenancy.id,
