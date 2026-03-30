@@ -22,6 +22,7 @@ import re
 import sys
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import select
@@ -50,6 +51,29 @@ MONTH_COLS = [
     ("feb_st", date(2026,  2, 1), "feb_cash", "feb_upi"),
     ("mar_st", date(2026,  3, 1), "mar_cash", "mar_upi"),
 ]
+
+
+# ── Comment classification ───────────────────────────────────────────────────
+
+_PERMANENT_SIGNALS = re.compile(
+    r"(?:always|agreed|checkout|planned|lease|contract|first.*months|from.*month|company|student|parent)",
+    re.I,
+)
+_MONTHLY_SIGNALS = re.compile(
+    r"(?:will pay|by \d+|next week|balance|partial|collected|pending)",
+    re.I,
+)
+
+
+def classify_comment(comment: str) -> str:
+    """Classify a comment as 'permanent', 'monthly', or 'ambiguous'."""
+    if not comment or not comment.strip():
+        return "permanent"
+    if _PERMANENT_SIGNALS.search(comment):
+        return "permanent"
+    if _MONTHLY_SIGNALS.search(comment):
+        return "monthly"
+    return "ambiguous"
 
 
 # ── DB-specific normalization (not in parser) ────────────────────────────────
@@ -126,6 +150,42 @@ def _to_dec(val) -> Decimal:
         return Decimal(str(int(val)))
     except (ValueError, TypeError):
         return Decimal("0")
+
+
+# ── Preview notes ─────────────────────────────────────────────────────────────
+
+async def preview_notes():
+    """Show classification of all tenant comments for review."""
+    import json
+
+    tenants = read_history()
+    rows_with_comments = [(i, t) for i, t in enumerate(tenants, 1) if t.get("comment", "").strip()]
+
+    print(f"\n{'Row':>4}  {'Tenant':<20}  {'Comment':<45}  Type")
+    print("-" * 95)
+
+    ambiguous = []
+    for row_num, t in rows_with_comments:
+        comment = t["comment"].strip()
+        cls = classify_comment(comment)
+        tag = "PERM" if cls == "permanent" else ("MONTH" if cls == "monthly" else "???")
+        print(f"{row_num:>4}  {t['name']:<20}  {comment:<45}  {tag}")
+        if cls == "ambiguous":
+            ambiguous.append({
+                "row": row_num,
+                "tenant": t["name"],
+                "comment": comment,
+                "type": "permanent",  # default for user to change
+            })
+
+    if ambiguous:
+        out_path = Path("data/notes_classification.json")
+        out_path.parent.mkdir(exist_ok=True)
+        out_path.write_text(json.dumps(ambiguous, indent=2))
+        print(f"\n{len(ambiguous)} ambiguous comments need classification.")
+        print(f"Edit {out_path} and re-run with --write")
+    else:
+        print(f"\nAll {len(rows_with_comments)} comments auto-classified. No manual review needed.")
 
 
 # ── Main import ──────────────────────────────────────────────────────────────
@@ -247,7 +307,26 @@ async def run_import(write: bool) -> None:
             staff_name = _norm_staff(rec['staff'])
             staff_obj = staff_map.get(staff_name)
 
-            # 6. Create tenancy
+            # 6. Classify comment
+            comment = rec.get('comment') or ""
+            # Load overrides if available
+            classification_path = Path("data/notes_classification.json")
+            overrides = {}
+            if classification_path.exists():
+                import json as _json
+                for entry in _json.loads(classification_path.read_text()):
+                    overrides[entry["tenant"]] = entry["type"]
+
+            cls = overrides.get(rec["name"], classify_comment(comment))
+            monthly_note = None
+            if cls == "monthly":
+                tenancy_notes = None
+                monthly_note = comment
+            else:
+                tenancy_notes = comment or None
+                monthly_note = None
+
+            # Create tenancy
             tenancy = Tenancy(
                 tenant_id=tenant.id,
                 room_id=room.id,
@@ -258,7 +337,7 @@ async def run_import(write: bool) -> None:
                 maintenance_fee=_to_dec(rec['maintenance']),
                 status=_status_to_enum(rec['status']),
                 assigned_staff_id=staff_obj.id if staff_obj else None,
-                notes=rec.get('comment') or None,
+                notes=tenancy_notes,
             )
             session.add(tenancy)
             await session.flush()
@@ -331,6 +410,16 @@ async def run_import(write: bool) -> None:
                         ))
                         stats["payments"] += 1
 
+            # Apply monthly-classified comment to most recent rent_schedule
+            if monthly_note:
+                last_rs = await session.scalar(
+                    select(RentSchedule).where(
+                        RentSchedule.tenancy_id == tenancy.id,
+                    ).order_by(RentSchedule.period_month.desc()).limit(1)
+                )
+                if last_rs:
+                    last_rs.notes = monthly_note
+
             # 8. Deposit payment
             if rec['deposit'] > 0:
                 session.add(Payment(
@@ -381,5 +470,9 @@ async def run_import(write: bool) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Excel -> DB full import (drop/reload)")
     parser.add_argument("--write", action="store_true", help="Actually write (default: dry run)")
+    parser.add_argument("--preview-notes", action="store_true", help="Preview comment classification")
     args = parser.parse_args()
-    asyncio.run(run_import(write=args.write))
+    if args.preview_notes:
+        asyncio.run(preview_notes())
+    else:
+        asyncio.run(run_import(write=args.write))
