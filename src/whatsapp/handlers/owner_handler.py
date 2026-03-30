@@ -1132,8 +1132,18 @@ async def resolve_pending_action(
                     notes_note = ""
                     if notes_action in ("update", "delete"):
                         try:
-                            from src.integrations.gsheets import sync_notes_with_retry
                             new_notes = action_data.get("notes", "") if notes_action == "update" else ""
+                            # Update DB — rent_schedule.notes for current month
+                            current_month = date.today().replace(day=1)
+                            rs = await session.scalar(
+                                select(RentSchedule).where(
+                                    RentSchedule.tenancy_id == action_data["tenancy_id"],
+                                    RentSchedule.period_month == current_month,
+                                )
+                            )
+                            if rs:
+                                rs.notes = new_notes if notes_action == "update" else None
+                            from src.integrations.gsheets import sync_notes_with_retry
                             await sync_notes_with_retry(rnum, tname, new_notes)
                             notes_note = "\nNotes updated"
                         except Exception as e:
@@ -1172,8 +1182,18 @@ async def resolve_pending_action(
                     notes_note = ""
                     if notes_action in ("update", "delete"):
                         try:
-                            from src.integrations.gsheets import sync_notes_with_retry
                             new_notes = action_data.get("notes", "") if notes_action == "update" else ""
+                            # Update DB — rent_schedule.notes for current month
+                            current_month = date.today().replace(day=1)
+                            rs = await session.scalar(
+                                select(RentSchedule).where(
+                                    RentSchedule.tenancy_id == action_data["tenancy_id"],
+                                    RentSchedule.period_month == current_month,
+                                )
+                            )
+                            if rs:
+                                rs.notes = new_notes if notes_action == "update" else None
+                            from src.integrations.gsheets import sync_notes_with_retry
                             await sync_notes_with_retry(rnum, tname, new_notes)
                             notes_note = "\nNotes updated"
                         except Exception as e:
