@@ -2,7 +2,10 @@
 # BRAIN.md — PG Accountant Architecture Reference
 
 > Read this file at the start of every session. It is the ground truth for the system.
-> Last updated: 2026-03-15 (session 4)
+> Consolidated from ARCHITECTURE.md + SYSTEM_ARCHITECTURE.md on 2026-03-30.
+> For detailed DB schema, see DATA_MODEL.md.
+> For detailed floor-by-floor room layouts, see MASTER_DATA.md.
+> Last updated: 2026-03-30
 
 ---
 
@@ -21,25 +24,100 @@
 
 ---
 
-## 2. Architecture
+## 2. Architecture & Component Diagram
 
 ```
-WhatsApp User
-      ↓
-Meta Cloud API  (free — no Twilio)
-      ↓  webhook POST
-nginx (api.getkozzy.com, Let's Encrypt SSL)
-      ↓  proxy_pass
-FastAPI Brain (port 8000, systemd service) — all logic lives here
-      ↓
-Supabase (PostgreSQL)  — cloud DB, always on
+  WhatsApp User
+       |
+       | Meta Cloud API
+       v
+  +----------------------+
+  | nginx (SSL)          |  api.getkozzy.com:443
+  | Let's Encrypt        |
+  +----------+-----------+
+             | proxy_pass :8000
+             v
+  +--------------------------------------------------------+
+  |  FastAPI (port 8000, systemd)                          |
+  |                                                        |
+  |  webhook_handler.py                                    |
+  |  +- GET /webhook/whatsapp  (Meta verification)         |
+  |  +- POST /webhook/whatsapp (receive messages)          |
+  |  +- Voice -> Groq Whisper transcription                |
+  |  +- Bank PDF -> parse + classify                       |
+  |       |                                                |
+  |       v                                                |
+  |  chat_api.py (main brain)                              |
+  |  +- 1. Rate limit + role_service.py                    |
+  |  +- 2. Load chat history (last 5 msgs)                 |
+  |  +- 3. Check pending actions                           |
+  |  +- 4. intent_detector.py (regex, 97% accuracy)        |
+  |  +- 5. Follow-up detection (pronouns)                  |
+  |  +- 6. AI fallback (Groq) if UNKNOWN                   |
+  |  +- 7. gatekeeper.py -> route to handler               |
+  |       |                                                |
+  |       +-- account_handler.py  (financial)               |
+  |       +-- owner_handler.py    (operational)             |
+  |       +-- tenant_handler.py   (disabled -> None)        |
+  |       +-- lead_handler.py     (disabled -> None)        |
+  |       +-- _shared.py          (fuzzy search, pending)   |
+  |                                                        |
+  |  Also:                                                 |
+  |  +- dashboard_router.py  -> REST API for web dashboard  |
+  |  +- gsheets.py           -> Google Sheets read/write    |
+  |  +- finance_handler.py   -> bank statement processing   |
+  |                                                        |
+  +---------------+----------------------------------------+
+                  |
+                  v
+  +----------------------------------------+
+  | Supabase PostgreSQL (26 tables)        |
+  | tenants, tenancies, payments,          |
+  | rent_schedule, rooms, complaints,      |
+  | chat_messages, activity_log, ...       |
+  +----------------------------------------+
 ```
 
-**Note:** n8n was evaluated but skipped entirely. Meta webhooks go directly to FastAPI via nginx reverse proxy. n8n workflow file (`workflows/`) kept for reference only.
+**Note:** n8n was evaluated but not used. Meta webhooks go directly to FastAPI via nginx reverse proxy. n8n workflow file (`workflows/`) kept for reference only.
 
 ---
 
-## 3. Database Schema — 21 Tables (Supabase PostgreSQL)
+## 3. Request Lifecycle
+
+### Phase 1: Reception
+1. Meta sends POST to `/webhook/whatsapp`
+2. `webhook_handler.py` verifies HMAC signature
+3. Extract message from nested Meta JSON
+4. Voice? -> Groq Whisper transcription
+5. Bank PDF? -> save + parse in background
+
+### Phase 2: Processing (chat_api.py)
+6. **Rate limit** — 10/10min, 50/day per phone
+7. **Role detection** — authorized_users -> tenants -> lead
+8. **Load chat history** — last 5 messages for context
+9. **Check pending actions** — disambiguation, clarification, confirmation
+10. **Intent detection** — learned rules -> 50+ regex patterns -> AI fallback
+11. **Follow-up detection** — pronoun patterns re-route to QUERY_TENANT
+12. **Route** via gatekeeper -> correct handler
+
+### Phase 3: Handling
+13. Handler executes (DB read/write, calculations)
+14. If ambiguous -> save pending action, ask user to clarify
+15. If clear -> execute and return reply
+
+### Phase 4: Response
+16. Log to whatsapp_log + chat_messages
+17. Send reply via Meta Graph API (background task)
+18. Return 200 OK
+
+---
+
+## 4. Database Schema — 26 Tables (Supabase PostgreSQL)
+
+> For complete column-level schema, ERD, enums, and constraints, see `docs/DATA_MODEL.md`.
+
+### Layer 0 — Investment & Contacts (permanent)
+`investment_expenses`, `pg_contacts`
 
 ### Layer 1 — Master Data (changes rarely, owner approval needed)
 
@@ -83,8 +161,9 @@ Supabase (PostgreSQL)  — cloud DB, always on
 |-------|------------|-------|
 | `vacations` | id, tenancy_id, from_date, to_date, affects_billing | Tenant away periods |
 | `reminders` | id, tenancy_id, reminder_type, remind_at, status | Rent due / checkout alerts |
-| `onboarding_sessions` | id, tenant_id, tenancy_id, step, collected_data (JSON), expires_at, completed | Step-based KYC form. Steps: ask_dob → ask_father_name → ask_father_phone → ask_address → ask_email → ask_occupation → ask_gender → ask_emergency_name → ask_emergency_relationship → ask_emergency_phone → ask_id_type → ask_id_number → done. 48-hr TTL. |
+| `onboarding_sessions` | id, tenant_id, tenancy_id, step, collected_data (JSON), expires_at, completed | Step-based KYC form. Steps: ask_dob -> ask_father_name -> ask_father_phone -> ask_address -> ask_email -> ask_occupation -> ask_gender -> ask_emergency_name -> ask_emergency_relationship -> ask_emergency_phone -> ask_id_type -> ask_id_number -> done. 48-hr TTL. |
 | `checkout_records` | id, tenancy_id (UNIQUE), cupboard_key_returned, main_key_returned, damage_notes, other_comments, pending_dues_amount, deposit_refunded_amount, deposit_refund_date, actual_exit_date, recorded_by | Offboarding checklist — one row per tenancy |
+| `pending_actions` | id, phone, action_type, context (JSON), expires_at | Multi-step flow state — 30min expiry |
 
 ### Layer 6 — Access Control
 
@@ -93,21 +172,22 @@ Supabase (PostgreSQL)  — cloud DB, always on
 | `authorized_users` | id, phone (UNIQUE), name, role, property_id, active | Dynamic role registry |
 
 **Key design decisions:**
-- `rent_schedule` ≠ `payments` — enables "who hasn't paid March?" queries
+- `rent_schedule` != `payments` — enables "who hasn't paid March?" queries
 - `room_number` as TEXT — handles "G15", "508/509", "G20"
-- `rate_cards` separate — handles rent changes over time (Feb→May price changes in Excel)
+- `rate_cards` separate — handles rent changes over time (Feb->May price changes in Excel)
 - `is_void` on payments/expenses — never hard-delete financial records
 - `payment_mode` column — replaces messy Cash/UPI split columns in old Excel
 
 ---
 
-## 4. WhatsApp Bot — Role System (4 tiers)
+## 5. WhatsApp Bot — Role System
 
 | Role | Identified by | Permissions |
 |------|--------------|-------------|
 | `admin` | Phone in `authorized_users` with role=admin | EVERYTHING — add/remove users, full CRUD |
 | `power_user` | Phone in `authorized_users` with role=power_user | Full business access via WhatsApp — all tenants, payments, reports |
 | `key_user` | Phone in `authorized_users` with role=key_user | Scoped — log payments + view assigned tenants only |
+| `receptionist` | Phone in `authorized_users` with role=receptionist | Ops + finance (no reports) |
 | `tenant` | Phone in `tenants` table | Read-only — own balance, payment history only |
 | `lead` | Unknown phone (none of the above) | Room price enquiry + sales chat only |
 | `blocked` | Rate-limit exceeded | Ignored, no reply |
@@ -120,13 +200,13 @@ Supabase (PostgreSQL)  — cloud DB, always on
 
 ---
 
-## 5. WhatsApp Intents
+## 6. WhatsApp Intents
 
 ### Admin / Power User intents
 | Intent | Trigger phrases |
 |--------|----------------|
 | START_ONBOARDING | "start onboarding for Ravi 9876543210", "begin kyc", "checkin for [name]" |
-| RECORD_CHECKOUT | "record checkout", "offboard", "keys returned", "mark checkout complete" — 5-step form: keys → damage → dues → deposit refund → creates CheckoutRecord + Refund(pending) |
+| RECORD_CHECKOUT | "record checkout", "offboard", "keys returned", "mark checkout complete" — 5-step form: keys -> damage -> dues -> deposit refund -> creates CheckoutRecord + Refund(pending) |
 | CONFIRM_DEPOSIT_REFUND | Auto-created by 9am checkout alert. Reply: "process" (confirm refund), "deduct XXXX" (adjust maintenance), "deduct XXXX process" (adjust+confirm). Creates Refund(processed). |
 | PAYMENT_LOG | "Raj paid 15000 upi", "received 12500 cash from room 201" |
 | QUERY_DUES | "who hasn't paid", "pending rent", "dues list" |
@@ -157,13 +237,76 @@ Supabase (PostgreSQL)  — cloud DB, always on
 
 ---
 
-## 6. API Endpoints
+## 7. Intent Detection Pipeline
+
+```
+Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
+                                                              |
+                                         +--------------------+
+                                         |                    |
+                                    confidence            UNKNOWN
+                                    >= 0.70?                  |
+                                    |   |                Save to
+                                   Yes  No              pending_learning
+                                    |   |
+                                Route  SYSTEM_HARD_UNKNOWN
+                                    |  "Could you rephrase?"
+                                    v
+                               gatekeeper.route()
+```
+
+**Accuracy:** 97% on 177-test evaluation suite. AI costs near zero.
+
+---
+
+## 8. Pending Actions State Machine
+
+| State | Trigger | User Reply | Resolution |
+|-------|---------|------------|------------|
+| INTENT_AMBIGUOUS | 2+ regex matches | Pick number | Re-route chosen intent |
+| AWAITING_CLARIFICATION | Missing month/name | Provide data | Merge + re-route |
+| CONFIRM_PAYMENT_LOG | Payment details shown | Yes/No | Log or cancel |
+| CONFIRM_ADD_EXPENSE | Expense shown | Yes/No | Log or cancel |
+| Multi-step form | Onboarding/checkout | Answer each step | Progress through form |
+
+- **Expiry:** 30 minutes
+- **`__KEEP_PENDING__`:** Handler reply prefix = keep pending alive for next turn
+
+---
+
+## 9. Chat History & Follow-up Detection
+
+**Storage:** `chat_messages` table — all inbound/outbound messages, never deleted.
+
+**Context:** Last 5 messages loaded per request for AI context.
+
+**Follow-up:** When intent=UNKNOWN and message contains pronouns ("how much", "his payments", "uska"):
+1. Extract room/name from last bot response
+2. Re-route as QUERY_TENANT with injected context
+3. Example: "Raj balance" -> bot responds -> "his payments" -> auto-routes to Raj's payment history
+
+---
+
+## 10. Error Handling
+
+| Scenario | Response |
+|----------|----------|
+| Rate limit exceeded | Silent (skip=True, no reply) |
+| Low confidence (<0.70) | "Could you rephrase? Type *help* for options." |
+| Handler exception | "Sorry, something went wrong. Please try again." |
+| Voice transcription fails | "Couldn't understand voice note. Please type instead." |
+| DB unreachable | App won't start (fails at lifespan init) |
+| Groq API fails | Fall back to UNKNOWN, log error |
+| Pending expired (>30min) | Treat as fresh message |
+
+---
+
+## 11. API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | /api/whatsapp/process | Main WhatsApp brain — called by n8n |
 | GET | /webhook/whatsapp | Meta Cloud API webhook verification |
-| POST | /webhook/whatsapp | Meta Cloud API direct webhook (fallback) |
+| POST | /webhook/whatsapp | Meta Cloud API direct webhook |
 | POST | /api/ingest/upload | Upload CSV/PDF for ingestion |
 | POST | /api/ingest/scan | Scan data/raw/ for new files |
 | POST | /api/reconcile | Run reconciliation |
@@ -176,104 +319,133 @@ Supabase (PostgreSQL)  — cloud DB, always on
 
 ---
 
-## 7. Key Files
+## 12. Key Files
 
-| Purpose | File |
-|---------|------|
-| ORM Models (21 tables) | `src/database/models.py` |
-| DB Manager + CRUD | `src/database/db_manager.py` |
-| Seed data (users, properties, food, categories) | `src/database/seed.py` |
-| Excel import script | `src/database/excel_import.py` |
-| Master migration (idempotent) | `src/database/migrate_all.py` |
-| Supabase RLS policies | `src/database/rls_policies.sql` |
-| WhatsApp process endpoint | `src/whatsapp/chat_api.py` |
-| Webhook handler (Meta verification) | `src/whatsapp/webhook_handler.py` |
-| Role detection + rate limiting | `src/whatsapp/role_service.py` |
-| Intent detection (rules-based) | `src/whatsapp/intent_detector.py` |
-| **Gatekeeper router (role+intent → worker)** | **`src/whatsapp/gatekeeper.py`** |
-| **AccountWorker — all financial intents** | **`src/whatsapp/handlers/account_handler.py`** |
-| OwnerWorker — operational intents only | `src/whatsapp/handlers/owner_handler.py` |
-| **Shared fuzzy-search helpers** | **`src/whatsapp/handlers/_shared.py`** |
-| Tenant handlers + onboarding flow | `src/whatsapp/handlers/tenant_handler.py` |
-| Lead conversation handlers | `src/whatsapp/handlers/lead_handler.py` |
-| LangGraph router (NOT active — v1.0 artifact) | `src/agents/langgraph_router.py` |
-| Business scheduler (5 jobs — rent reminders, recon, backup, checkout alerts) | `src/scheduler.py` |
-| Diagnostic scripts (occupancy, empty rooms, payment breakdown, deposit check) | `scripts/` |
-| LLM client (Ollama/Groq/Anthropic) | `src/llm_gateway/claude_client.py` |
-| Reconciliation engine | `src/reports/reconciliation.py` |
-| n8n workflow | `workflows/WA-01-whatsapp-router.json` |
-| App entry point | `main.py` |
+| File | Purpose |
+|------|---------|
+| `main.py` | App entry point, routers, middleware |
+| `src/whatsapp/webhook_handler.py` | Meta webhook, media download, voice transcription |
+| `src/whatsapp/chat_api.py` | Main pipeline — rate limit, role, intent, route, log |
+| `src/whatsapp/role_service.py` | Role detection + rate limiting |
+| `src/whatsapp/intent_detector.py` | 50+ regex patterns, entity extraction, AI fallback |
+| `src/whatsapp/gatekeeper.py` | (role, intent) -> handler routing |
+| `src/whatsapp/handlers/account_handler.py` | 13 financial intents |
+| `src/whatsapp/handlers/owner_handler.py` | 28 operational intents |
+| `src/whatsapp/handlers/tenant_handler.py` | Tenant self-service (disabled) |
+| `src/whatsapp/handlers/lead_handler.py` | Sales conversation (disabled) |
+| `src/whatsapp/handlers/_shared.py` | Fuzzy search, disambiguation, pending helpers |
+| `src/api/dashboard_router.py` | REST API for web dashboard |
+| `src/integrations/gsheets.py` | Google Sheets read/write |
+| `src/database/models.py` | 26 ORM table definitions |
+| `src/database/db_manager.py` | DB Manager + CRUD |
+| `src/database/seed.py` | Seed data (users, properties, food, categories) |
+| `src/database/excel_import.py` | Excel import script |
+| `src/database/migrate_all.py` | Master migration (idempotent, append only) |
+| `src/scheduler.py` | 5 jobs — rent reminders, recon, backup, checkout alerts |
+| `src/llm_gateway/claude_client.py` | LLM client (Ollama/Groq/Anthropic) |
+| `src/reports/reconciliation.py` | Reconciliation engine |
+| `scripts/` | Diagnostic scripts (occupancy, empty rooms, payment breakdown, deposit check) |
 
-### Worker Architecture (2026-03-14)
+### Worker Architecture
 
 ```
 chat_api.py
-    │
-    ▼ detect_intent()
-    │
-    ▼ route() ← gatekeeper.py
-    │
-    ├─── OWNER_ROLES + FINANCIAL_INTENTS ──► AccountWorker (account_handler.py)
-    │         PAYMENT_LOG, QUERY_DUES, QUERY_TENANT, ADD_EXPENSE,
-    │         QUERY_EXPENSES, REPORT, RENT_CHANGE, RENT_DISCOUNT,
-    │         VOID_PAYMENT, ADD_REFUND, QUERY_REFUNDS
-    │
-    ├─── OWNER_ROLES + operational intents ──► OwnerWorker (owner_handler.py)
-    │         ADD_TENANT, START_ONBOARDING, CHECKOUT, NOTICE_GIVEN,
-    │         RECORD_CHECKOUT, COMPLAINT_REGISTER, QUERY_ROOMS, etc.
-    │
-    ├─── role=tenant ──────────────────────► TenantWorker (tenant_handler.py)
-    │
-    └─── role=lead/unknown ────────────────► LeadWorker (lead_handler.py)
+    |
+    v detect_intent()
+    |
+    v route() <- gatekeeper.py
+    |
+    +--- OWNER_ROLES + FINANCIAL_INTENTS --> AccountWorker (account_handler.py)
+    |         PAYMENT_LOG, QUERY_DUES, QUERY_TENANT, ADD_EXPENSE,
+    |         QUERY_EXPENSES, REPORT, RENT_CHANGE, RENT_DISCOUNT,
+    |         VOID_PAYMENT, ADD_REFUND, QUERY_REFUNDS
+    |
+    +--- OWNER_ROLES + operational intents --> OwnerWorker (owner_handler.py)
+    |         ADD_TENANT, START_ONBOARDING, CHECKOUT, NOTICE_GIVEN,
+    |         RECORD_CHECKOUT, COMPLAINT_REGISTER, QUERY_ROOMS, etc.
+    |
+    +--- role=tenant --> TenantWorker (tenant_handler.py)
+    |
+    +--- role=lead/unknown --> LeadWorker (lead_handler.py)
 
 Both AccountWorker and OwnerWorker share:
-    _shared.py  → fuzzy tenant search, disambiguation helpers
+    _shared.py  -> fuzzy tenant search, disambiguation helpers
 ```
 
-**File sizes after refactor:**
-| File | Lines |
-|------|-------|
-| `owner_handler.py` | ~1,434 (was 2,595) |
-| `account_handler.py` | ~1,058 (new) |
-| `_shared.py` | ~212 (new) |
-| `gatekeeper.py` | ~46 (new) |
-| `chat_api.py` | ~253 (was 259) |
+**Design rules:**
+- Workers are unaware of each other
+- `_shared.py` is pure DB helpers — no business logic, no HTTP calls
+- `resolve_pending_action` stays in owner_handler (imported by chat_api) — no circular imports
+- `_do_*` functions live in account_handler, imported back by owner_handler for pending action resolution
+
+### Planned: LedgerWorker
+
+```
+ledger_handler.py (thin adapter) --> finance/ package
+  (fully self-contained, zero imports from src/)
+  extractors/ -> parsers/ -> matching/ -> categorization/ -> output/ -> config/
+```
+
+**`finance/` package has zero imports from `src/`** — fully standalone, callable from CLI or WhatsApp.
 
 ---
 
-## 8. AI Usage Policy
+## 13. AI Usage Policy
 
 | Task | Method | Cost |
 |------|--------|------|
 | Intent detection (97% of cases) | Regex rules in `intent_detector.py` | Free |
-| Intent detection (ambiguous) | Ollama local (llama3.2) | Free |
+| Intent detection (ambiguous ~3%) | Groq llama-3.3-70b (cloud) | Low |
 | Merchant categorization (known) | Rules | Free |
 | Merchant categorization (unknown ~3%) | Ollama/Groq/Claude | Low/Free |
 | Lead conversation (natural chat) | Ollama/Groq | Free/Low |
 | Reporting, dedup, reconciliation | Python only | Free |
 
-**LLM_PROVIDER=ollama** (default, local, free) — switch to `groq` (free cloud) or `anthropic` (paid) in `.env`.
+**LLM_PROVIDER=groq** (current production) — can switch to `ollama` (local, free) or `anthropic` (paid) in `.env`.
 **No LangGraph** — Gatekeeper+Worker is the agent architecture. PendingAction is the state machine.
 
 ---
 
-## 9. n8n Workflow — WA-01-whatsapp-router.json
+## 14. Runtime Stack
 
-5 nodes (lean pipe):
-1. **WhatsApp Trigger** — receives Meta Cloud API messages
-2. **Extract Message** (Code node) — extracts phone, message, skip=true for non-text
-3. **Is Text?** (IF) — drops media messages
-4. **Call FastAPI Brain** (HTTP POST) → `{{ $vars.FASTAPI_URL }}/api/whatsapp/process`
-   - Body: `{"phone": "+{{ phone }}", "message": "{{ message }}", "message_id": "{{ id }}"}`
-   - Timeout: 15s
-5. **Should Reply?** (IF) — checks `skip=false` and `reply` not empty
-6. **Send Reply** (WhatsApp node) → sends `reply` text back to sender
-
-**n8n Variable required:** `FASTAPI_URL` = `http://host.docker.internal:8000` (local) or VPS URL (cloud)
+| Component | Technology | Port |
+|-----------|-----------|------|
+| API | FastAPI + Uvicorn | 8000 |
+| DB | Supabase PostgreSQL (asyncpg) | cloud |
+| LLM | Groq llama-3.3-70b-versatile | cloud |
+| Reverse Proxy | nginx + Let's Encrypt SSL | 443 |
+| WhatsApp | Meta Cloud API (free) | -- |
+| Scheduler | APScheduler (5 jobs) | in-process |
 
 ---
 
-## 10. Deduplication
+## 15. Data Flow: File Ingestion
+
+```
+data/raw/file.csv
+      |
+      v
+ Dispatcher --detect source--> PhonePeParser | PaytmParser | BankParser | CSVParser
+      |
+      v
+ BaseParser.normalize()
+      |
+      v
+ batch_deduplicate() -- SHA-256(date + amount + upi_ref) per row
+      |
+      v
+ classify_batch() <-- Rules Engine (97%)
+      | confidence < 0.70
+      v
+ Ollama classify_merchant() (~3%)
+      |
+      v
+ upsert_transaction() -- skip duplicates via unique_hash
+```
+
+---
+
+## 16. Deduplication
 
 ```
 unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
@@ -283,181 +455,63 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 
 ---
 
-## 11. Current Runtime Status (2026-03-14)
+## 17. Real Property Master Data
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Supabase DB | **Live** | 21 tables. Excel data: 234 tenants, 292 tenancies, 929 rent_schedule, 705 payments |
-| FastAPI | **Needs restart** | Restart `START_API.bat` to pick up all 2026-03-14 changes |
-| Ollama | **Running** | llama3.2 at http://localhost:11434 |
-| APScheduler | **5 jobs** | rent_reminder_early, rent_reminder_late, daily_reconciliation, weekly_backup, checkout_deposit_alerts |
-| n8n | **Not running** | Needs Docker Desktop installed |
-| Docker | **Not installed** | Install from docker.com |
-| WhatsApp Meta API | **Credentials configured** | Token + Phone ID in .env, webhook not yet pointed |
+**Last verified:** 2026-03-23 by Kiran (owner confirmation)
+**Two properties:** Cozeevo THOR + Cozeevo HULK (166 total rooms)
+**PG business name:** Cozeevo Co-living. Platform brand: Kozzy / getkozzy.com. Bot name: Cozeevo Help Desk.
 
-### Recently completed (2026-03-14 session 3)
-- **Deposit tracking + checkout flow fixes:**
-  - `rooms.is_charged` field: G05 and G06 (THOR) marked is_charged=False (owner-free rooms)
-  - `rooms.is_staff_room` field: staff rooms excluded from tenant occupancy/vacancy counts
-  - `refunds` table now actively used: `RECORD_CHECKOUT` creates `Refund(status=pending)` on completion
-  - `CONFIRM_DEPOSIT_REFUND` intent: 9am daily scheduler job alerts staff on checkout day
-  - Staff WhatsApp replies: `process` / `deduct XXXX` / `deduct XXXX process` finalise the refund
-  - `resolve_pending_action` structural fix: RECORD_CHECKOUT text-reply steps (Q2–Q5) now correctly intercepted before numeric check
-  - `scheduler.py`: 5th job `_checkout_deposit_alerts` — daily 9am, checks expected_checkout=today
-  - Deposit query clarity: deposits split by payment_date (when received) vs for whom (by checkin_date) vs total held (active tenants)
+> For detailed floor-by-floor room layouts, see `docs/MASTER_DATA.md`.
 
-- **Data verification scripts (`scripts/`):**
-  - `occupancy_today.py` — current bed/room snapshot, breakdown by THOR/HULK
-  - `empty_rooms.py` — floor-wise empty rooms + partial rooms, exports CSV
-  - `payment_breakdown.py` — payments by mode (cash/UPI/bank/cheque) and for_type (rent/deposit/booking)
-  - `deposit_check.py` — 4 views: received in month, by checkin date, total held, advance payments
+### Staff Rooms (9 total — excluded from occupancy/revenue counts)
+| Room | Property | Beds | Notes |
+|------|----------|------|-------|
+| G05  | THOR | 3 | Staff quarters |
+| G06  | THOR | 2 | Staff quarters |
+| 107  | THOR | 2 | Staff quarters |
+| 108  | THOR | 2 | Staff quarters |
+| 701  | THOR | 1 | Staff quarters (floor 7) |
+| 702  | THOR | 1 | Staff quarters (floor 7) |
+| G12  | HULK | 3 | Staff quarters |
+| 114  | HULK | 2 | Staff quarters |
+| 618  | HULK | 2 | Staff quarters |
 
-### Completed (2026-03-14 session 2)
-- **Gatekeeper + AccountWorker Architecture** refactor:
-  - `gatekeeper.py` — smart router replacing flat if/elif chain in chat_api.py
-  - `account_handler.py` — AccountWorker owning all 11 financial intents
-  - `_shared.py` — 8 shared fuzzy-search/disambiguation helpers
-  - `owner_handler.py` slimmed from 2,595 → 1,434 lines (operational only)
-  - `chat_api.py` updated to use `route()` from gatekeeper
+### Revenue Summary
 
-### Completed (2026-03-13 session 2)
-- PG Rules & Regulations (19 rules) → RULES intent in both tenant + owner handlers
-- Registration Form fields → 7 new Tenant columns + 12-step onboarding (DOB, father, address, email, occupation added)
-- PAN Card added as ID proof option (+ Voter ID, Ration Card)
-- Master migration script: `src/database/migrate_all.py` (idempotent, all scenarios)
-- Data strategy guide: `DATA_STRATEGY.md`
+| Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
+|---|---|---|---|---|---|
+| THOR | 78 | 14 | 61 | 3 | **145** |
+| HULK | 79 | 14 | 63 | 2 | **146** |
+| **Total** | **157** | **28** | **124** | **5** | **291** |
+
+### Bed Count Formula
+```
+Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
+                   = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
+                   = 28 + 248 + 15
+                   = 291
+```
 
 ---
 
-## 12. Local Setup Checklist
+## 18. Multi-PG / SaaS Path
+
+Each PG customer gets:
+- Own Supabase project (isolated DB)
+- Own WhatsApp Business number
+- Own `.env` config file
+- Same codebase, config-driven
+
+No shared state between instances.
+
+---
+
+## 19. Local Setup Checklist
 
 - [x] Python dependencies installed (`pip install -r requirements.txt`)
 - [x] `.env` configured (Supabase URL, ADMIN_PHONE, WHATSAPP_TOKEN)
 - [x] Supabase tables created via `init_db()`
 - [x] Seed data loaded (`src/database/seed.py`)
 - [x] Excel data imported (`src/database/excel_import.py`)
-- [ ] Docker Desktop installed (for n8n)
-- [ ] n8n running: `docker-compose up -d`
-- [ ] WA-01 workflow imported into n8n
-- [ ] `FASTAPI_URL` variable set in n8n → `http://host.docker.internal:8000`
-- [ ] WhatsApp webhook URL set in Meta Developer Console → n8n webhook URL
-- [ ] End-to-end test: send WhatsApp message → get reply
-
----
-
-## 13. Cloud Deployment Plan (after local testing)
-
-**Target:** Hostinger VPS KVM 1 (~$5/month)
-- Runs: FastAPI (systemd) + n8n (Docker)
-- DB stays on Supabase (no migration needed)
-- WhatsApp webhook → VPS public IP
-
-**Future SaaS path:** Each PG gets their own:
-- Supabase project (isolated DB)
-- WhatsApp Business number
-- `.env` config
-- Same codebase, different config
-
----
-
-## 14. Changelog
-
-| Date | Change |
-|------|--------|
-| 2026-03-10 | Initial scaffolding — generic 8-table schema, Twilio, SQLite |
-| 2026-03-10 | LLM switched from Anthropic to Ollama (rate limit issue) |
-| 2026-03-10 | FastAPI verified working locally |
-| 2026-03-12 | **Major rebuild**: 19-table schema from Excel analysis |
-| 2026-03-12 | Database switched: SQLite → Supabase (PostgreSQL) |
-| 2026-03-12 | WhatsApp switched: Twilio → Meta Cloud API (free) |
-| 2026-03-12 | 4-tier role system: admin/power_user/key_user/tenant/lead/blocked |
-| 2026-03-12 | Excel data imported: 234 tenants, 292 tenancies, 929 rent_schedule, 705 payments |
-| 2026-03-12 | Docs overhauled: local-first approach, Hostinger cloud plan, SaaS future |
-| 2026-03-13 | Phone normalization: `+91XXXXXXXXXX` → `XXXXXXXXXX` in `role_service._normalize()` |
-| 2026-03-13 | Hot water / geyser / heater / shower added to plumbing complaint keywords |
-| 2026-03-13 | Complaint raw message passthrough in `chat_api.py` (`entities["description"]`) |
-| 2026-03-13 | New intent START_ONBOARDING: owner triggers tenant KYC via WhatsApp |
-| 2026-03-13 | New intent RECORD_CHECKOUT: owner-driven digital offboarding checklist |
-| 2026-03-13 | New ORM tables: `onboarding_sessions` + `checkout_records` (migrated to Supabase) |
-| 2026-03-13 | Tenant KYC flow: 12-step WhatsApp form (full registration form) saves to Tenant |
-| 2026-03-13 | Checkout flow: 5-step form creates CheckoutRecord + marks Tenancy as exited |
-| 2026-03-14 | **Gatekeeper** (`gatekeeper.py`): smart router — (role, intent) → worker. Replaces flat if/elif in chat_api.py |
-| 2026-03-14 | **AccountWorker** (`account_handler.py`): dedicated accounting persona for 11 financial intents |
-| 2026-03-14 | **Shared helpers** (`_shared.py`): 8 fuzzy-search helpers extracted from owner_handler — used by both workers |
-| 2026-03-14 | `owner_handler.py` trimmed from 2,595 → 1,434 lines — operational intents only |
-| 2026-03-14 | `rooms.is_charged` + `rooms.is_staff_room` fields added — G05/G06 THOR marked free, staff rooms excluded from occupancy |
-| 2026-03-14 | Canonical room migration: `migrate_rooms.py` — upserts 166 rooms, deactivates non-canonical |
-| 2026-03-14 | **Deposit tracking**: `refunds` table now used. RECORD_CHECKOUT creates Refund(pending). Staff confirms via "process" |
-| 2026-03-14 | **9am checkout alerts**: `_checkout_deposit_alerts` scheduler job — sends deposit summary to staff, creates CONFIRM_DEPOSIT_REFUND PendingAction |
-| 2026-03-14 | `resolve_pending_action` structural fix: RECORD_CHECKOUT text steps (Q2–Q5 yes/no) now work correctly |
-| 2026-03-14 | Data verification scripts: `occupancy_today.py`, `empty_rooms.py`, `payment_breakdown.py`, `deposit_check.py` |
-| 2026-03-14 | Data fixes: 17 future no_show tenancies corrected to active. 9 real no-shows identified (past checkin, never arrived) |
-
----
-
-## 15. Real Property Master Data Structure
-
-**Last verified:** 2026-03-17 by Kiran
-**Two properties:** Cozeevo THOR + Cozeevo HULK (83 rooms each, ~166 total)
-**PG business name:** Cozeevo Co-living. Platform brand: Kozzy / getkozzy.com. Bot name: Artha.
-
-### Staff Rooms (excluded from occupancy/revenue counts)
-| Room | Property | Type | Notes |
-|------|----------|------|-------|
-| G05  | THOR | Single | Staff |
-| G06  | THOR | Double | Staff |
-| 107  | THOR | Double | Staff |
-| 108  | THOR | Double | Staff |
-| 114  | THOR | — | Staff (extra, non-standard) |
-| 701  | THOR | Single | Staff, 7th floor |
-| G12  | HULK | Triple | Staff |
-| 702  | HULK | Single | Staff, 7th floor |
-
-### Property 1: Cozeevo THOR
-- **Ground Floor (G01–G10):**
-  - **Single:** G01, G10
-  - **Double:** G02, G03, G04
-  - **Triple:** G07, G08, G09
-  - **Staff (excluded):** G05, G06
-- **Floor 1 (101–112 + extras):**
-  - **Single:** 101, 112
-  - **Double:** 102, 103, 104, 105, 106, 109, 110, 111
-  - **Staff (excluded):** 107, 108, 114
-- **Floors 2–6 (12 revenue rooms each, e.g. 201–212...):**
-  - **Single:** `x01` and `x12` on every floor
-  - **Double:** All remaining rooms (`x02` to `x11`)
-- **Floor 7:** 701 = Staff only (excluded)
-
-**THOR revenue rooms: ~78 rooms, ~145 beds**
-
-### Property 2: Cozeevo HULK
-- **Ground Floor (G11–G20):**
-  - **Single:** G11, G20
-  - **Double:** G15, G16, G17, G18, G19
-  - **Triple:** G13, G14
-  - **Staff (excluded):** G12
-- **Floors 1–6 (12 revenue rooms each, e.g. 101–112...):**
-  - **Single:** `x01` and `x12` on every floor
-  - **Double:** All remaining rooms (`x02` to `x11`)
-- **Floor 7:** 702 = Staff only (excluded)
-
-**HULK revenue rooms: ~81 rooms, ~150 beds**
-
-### Totals (revenue only, staff excluded)
-| | Rooms | Beds |
-|--|--|--|
-| THOR | ~78 | ~145 |
-| HULK | ~81 | ~150 |
-| **Total** | **~159** | **~295** |
-
-*Exact totals to be confirmed when DB max_occupancy values are verified against physical count.*
-
-### Current Occupancy (from Untitled spreadsheet.xlsx, 2026-03-17)
-| | THOR | HULK | Total |
-|--|--|--|--|
-| Active tenants (beds occupied) | 112 | 73 | **185** |
-| Rooms with ≥1 tenant | ~78 | ~47 | **~125** |
-| Occupancy by beds | 112/145 = **77%** | 73/150 = **49%** | 185/295 = **63%** |
-| Occupancy by rooms | ~96% | ~57%  | **~77%** |
-
-Pending bookings (room TBD, arriving May): Prasad Vadlamani, Aravind, Santhosh (all HULK)
+- [x] WhatsApp webhook URL set in Meta Developer Console -> nginx -> FastAPI
+- [x] End-to-end test: send WhatsApp message -> get reply

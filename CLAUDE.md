@@ -80,15 +80,23 @@ Kiran's Excel (offline)
 ## Docs index
 | Doc | What it covers |
 |---|---|
-| `docs/BRAIN.md` | Master reference — schema, roles, intents, runtime |
+| `docs/BRAIN.md` | Master reference — architecture, schema overview, workers, intents, master data |
+| `docs/DATA_MODEL.md` | Complete DB schema — 26 tables, ERD, enums, constraints |
+| `docs/MASTER_DATA.md` | Detailed floor-by-floor room layouts, bed counts, staff rooms |
 | `docs/REPORTING.md` | Financial formulas — P&L, dues, occupancy, proration |
-| `docs/EXCEL_IMPORT.md` | Import workflow — Excel → Sheet → DB, single parser |
-| `docs/SHEET_LOGIC.md` | Parsing rules — Chandra, exits, balance, messy cells |
-| `docs/BUSINESS_LOGIC.md` | Calculation rules — occupancy, rent, expenses |
+| `docs/BUSINESS_LOGIC.md` | Calculation rules — occupancy, rent, expenses, billing |
 | `docs/BOT_FLOWS.md` | Intent catalog, role flows, pending state machine |
-| `docs/TESTING.md` | Test SOP — golden suite, thresholds |
+| `docs/EXCEL_IMPORT.md` | Import workflow — Excel → Sheet → DB, single parser, migration strategy |
+| `docs/SHEET_LOGIC.md` | Parsing rules — Chandra, exits, balance, messy cells |
+| `docs/INTEGRATIONS.md` | External APIs — WhatsApp, Sheets, Supabase, Groq |
 | `docs/RECEPTIONIST_CHEAT_SHEET.md` | Staff command reference |
 | `docs/DEPLOYMENT.md` | VPS setup — nginx, systemd, SSL |
+| `docs/TESTING.md` | Test SOP — golden suite, thresholds |
+| `docs/CHANGELOG.md` | Session history |
+| `docs/business/PRICING.md` | SaaS tiers, pricing strategy |
+| `docs/planning/PRD.md` | Product requirements document |
+| `docs/planning/ROADMAP.md` | Feature priorities, timeline |
+| `docs/planning/FINANCIAL_VISION.md` | Reconciliation engine design (future) |
 
 ## Environment
 ```
