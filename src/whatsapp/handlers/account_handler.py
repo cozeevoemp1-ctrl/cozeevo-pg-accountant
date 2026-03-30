@@ -47,6 +47,9 @@ from src.whatsapp.handlers._shared import (
     _save_pending,
     _format_choices_message,
     _format_no_match_message,
+    build_dues_snapshot,
+    compute_allocation,
+    format_allocation,
 )
 
 
@@ -113,9 +116,9 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     room   = entities.get("room", "").strip()
     amount = entities.get("amount")
     mode   = entities.get("payment_mode", "cash")
-    month_num = entities.get("month")    # int 1-12 if mentioned in message
+    month_num = entities.get("month")
 
-    # If no amount AND no name → start step-by-step collect rent form
+    # If no amount AND no name -> start step-by-step collect rent form
     if not amount and not name and not room:
         await _save_pending(
             ctx.phone, "COLLECT_RENT_STEP",
@@ -135,16 +138,9 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
         return (
             f"Whose payment of Rs.{int(amount):,}? Please say: *[Name] paid [Amount]*\n"
             "For family payments covering multiple tenants, send separately:\n"
-            "• *Raj paid 15000 upi*\n"
-            "• *Rahul paid 15000 upi*"
+            "- *Raj paid 15000 upi*\n"
+            "- *Rahul paid 15000 upi*"
         )
-
-    # Determine intended period month
-    current_month = date.today().replace(day=1)
-    if month_num:
-        period_month = date(date.today().year, int(month_num), 1)
-    else:
-        period_month = current_month
 
     rows: list = []
     search_term = name
@@ -160,41 +156,96 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
         base = _format_no_match_message(name or room, suggestions)
         return base + f"\n\n_(Amount to log: Rs.{int(amount):,} {(mode or 'cash').upper()})_"
 
-    period_month_str = period_month.isoformat()
+    # Determine intended period month
+    current_month = date.today().replace(day=1)
+    if month_num:
+        period_month = date(date.today().year, int(month_num), 1)
+    else:
+        period_month = None  # let allocation decide
 
     if len(rows) == 1:
         tenant, tenancy, _room = rows[0]
-        mode_label = (mode or "cash").upper()
-        await _save_pending(
-            ctx.phone, "CONFIRM_PAYMENT_LOG",
-            {
-                "tenant_id": tenant.id,
-                "tenancy_id": tenancy.id,
-                "amount": amount,
-                "mode": mode,
-                "logged_by": ctx.name or ctx.phone,
-                "period_month": period_month_str,
-                "tenant_name": tenant.name,
-                "room_number": _room.room_number,
-            },
-            [], session,
-        )
-        return (
-            f"*Confirm Payment?*\n\n"
-            f"• Tenant : {tenant.name} (Room {_room.room_number})\n"
-            f"• Amount : Rs.{int(amount):,}\n"
-            f"• Mode   : {mode_label}\n"
-            f"• Month  : {period_month.strftime('%B %Y')}\n\n"
-            "Reply *Yes* to log or *No* to cancel."
-        )
+        snapshot = await build_dues_snapshot(tenancy.id, tenant.name, _room.room_number, session)
+        amount_dec = Decimal(str(amount))
+        pending_months = snapshot["months"]
 
-    # Multiple matches — ask which one
+        if not pending_months:
+            # No dues — log to current month, will trigger overpayment flow
+            pm = period_month or current_month
+            await _save_pending(
+                ctx.phone, "CONFIRM_PAYMENT_LOG",
+                {
+                    "tenant_id": tenant.id,
+                    "tenancy_id": tenancy.id,
+                    "amount": amount,
+                    "mode": mode,
+                    "logged_by": ctx.name or ctx.phone,
+                    "period_month": pm.isoformat(),
+                    "tenant_name": tenant.name,
+                    "room_number": _room.room_number,
+                },
+                [], session,
+            )
+            mode_label = (mode or "cash").upper()
+            return (
+                snapshot["text"] + "\n\n"
+                f"*Confirm Payment?*\n"
+                f"- Amount : Rs.{int(amount):,}\n"
+                f"- Mode   : {mode_label}\n"
+                f"- Month  : {pm.strftime('%B %Y')}\n\n"
+                "Reply *Yes* to log or *No* to cancel."
+            )
+
+        # If user specified a month, force allocation to that month
+        if period_month:
+            allocation = [{"period": period_month, "amount": amount_dec, "clears": False}]
+        else:
+            allocation = compute_allocation(amount_dec, pending_months)
+
+        # Build allocation data for pending
+        alloc_data = [{"period": a["period"].isoformat(), "amount": float(a["amount"])} for a in allocation]
+        pending_data = {
+            "tenant_id": tenant.id,
+            "tenancy_id": tenancy.id,
+            "amount": amount,
+            "mode": mode,
+            "logged_by": ctx.name or ctx.phone,
+            "allocation": alloc_data,
+            "tenant_name": tenant.name,
+            "room_number": _room.room_number,
+        }
+
+        # If multi-month dues, include month data for override parsing
+        if len(pending_months) > 1:
+            pending_data["pending_months"] = [
+                {"period": m["period"].isoformat(), "remaining": float(m["remaining"])}
+                for m in pending_months
+            ]
+
+        await _save_pending(ctx.phone, "CONFIRM_PAYMENT_ALLOC", pending_data, [], session)
+        alloc_text = format_allocation(allocation, amount, mode)
+
+        if len(pending_months) > 1:
+            return (
+                snapshot["text"] + "\n"
+                + alloc_text + "\n\n"
+                'Reply *Yes* to confirm, or specify different allocation:\n'
+                '  e.g. "all to march" or "feb 3000 march 5000"'
+            )
+        else:
+            return (
+                snapshot["text"] + "\n"
+                + alloc_text + "\n\n"
+                "Reply *Yes* to confirm, or *No* to cancel."
+            )
+
+    # Multiple tenant matches — ask which one
     choices = _make_choices(rows)
     await _save_pending(
         ctx.phone, "PAYMENT_LOG",
         {
             "amount": amount, "mode": mode, "name_raw": search_term,
-            "logged_by": ctx.name or ctx.phone, "period_month": period_month_str,
+            "logged_by": ctx.name or ctx.phone,
         },
         choices, session,
     )

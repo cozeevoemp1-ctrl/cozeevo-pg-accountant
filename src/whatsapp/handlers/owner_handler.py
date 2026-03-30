@@ -282,6 +282,65 @@ async def resolve_pending_action(
             f"for {_tlabel}, or *No* to cancel."
         )
 
+    if pending.intent == "CONFIRM_PAYMENT_ALLOC":
+        from src.whatsapp.handlers._shared import parse_allocation_override
+        from src.whatsapp.handlers.account_handler import _do_log_payment_by_ids
+
+        ans = reply_text.strip()
+        if is_negative(ans):
+            return "Cancelled. No payment logged."
+
+        if is_affirmative(ans):
+            allocation = action_data.get("allocation", [])
+            results = []
+            for i, alloc in enumerate(allocation):
+                r = await _do_log_payment_by_ids(
+                    tenant_id=action_data["tenant_id"],
+                    tenancy_id=action_data["tenancy_id"],
+                    amount=alloc["amount"],
+                    mode=action_data["mode"],
+                    ctx_name=action_data["logged_by"],
+                    session=session,
+                    period_month_str=alloc["period"],
+                    skip_duplicate_check=(i > 0),
+                )
+                month_label = date.fromisoformat(alloc["period"]).strftime("%b %Y")
+                results.append(f"{month_label}: Rs.{int(alloc['amount']):,} -- {r}")
+            return "\n".join(results)
+
+        # Try override parsing
+        pending_months_raw = action_data.get("pending_months", [])
+        if pending_months_raw:
+            pending_months = [
+                {"period": date.fromisoformat(m["period"]), "remaining": Decimal(str(m["remaining"]))}
+                for m in pending_months_raw
+            ]
+            override = parse_allocation_override(ans, pending_months)
+            if override:
+                amount = Decimal(str(action_data["amount"]))
+                new_alloc = []
+                remaining_amt = amount
+                for o in override:
+                    alloc_amt = Decimal(str(o["amount"])) if o["amount"] is not None else remaining_amt
+                    new_alloc.append({
+                        "period": o["period"].isoformat(),
+                        "amount": float(alloc_amt),
+                    })
+                    remaining_amt -= alloc_amt
+
+                action_data["allocation"] = new_alloc
+                await _save_pending(pending.phone, "CONFIRM_PAYMENT_ALLOC", action_data, [], session)
+
+                mode_label = (action_data.get("mode") or "cash").upper()
+                lines = [f"Updated allocation for Rs.{int(amount):,} {mode_label}:"]
+                for a in new_alloc:
+                    ml = date.fromisoformat(a["period"]).strftime("%b %Y")
+                    lines.append(f"  -> {ml}: Rs.{int(a['amount']):,}")
+                lines.append("\nReply *Yes* to confirm or *No* to cancel.")
+                return "__KEEP_PENDING__" + "\n".join(lines)
+
+        return "__KEEP_PENDING__Reply *Yes* to confirm, *No* to cancel, or specify allocation (e.g. 'all to march')."
+
     if pending.intent == "CONFIRM_ADD_EXPENSE":
         # ── Correction check (before yes/no) ──────────────────────────────────
         _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
