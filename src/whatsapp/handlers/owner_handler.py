@@ -39,6 +39,7 @@ from src.whatsapp.handlers._shared import (
     _format_choices_message, _format_no_match_message,
     BOT_NAME, time_greeting, is_first_time_today, bot_intro,
     is_affirmative, is_negative, parse_target_month,
+    build_dues_snapshot, compute_allocation, format_allocation,
 )
 from src.whatsapp.handlers.account_handler import (
     _calc_outstanding_dues,       # needed by _room_status + _do_checkout
@@ -919,12 +920,20 @@ async def resolve_pending_action(
                 action_data["tenancy_id"] = tenancy.id
                 action_data["tenant_name"] = tenant.name
                 action_data["room_number"] = room_obj.room_number
-                # Fetch existing notes from sheet
+
+                # Build dues snapshot
+                snapshot = await build_dues_snapshot(tenancy.id, tenant.name, room_obj.room_number, session)
+                action_data["snapshot_text"] = snapshot["text"]
+                action_data["pending_months"] = [
+                    {"period": m["period"].isoformat(), "remaining": float(m["remaining"])}
+                    for m in snapshot["months"]
+                ]
+
+                # Fetch existing notes from sheet (keep existing logic)
                 try:
                     from src.integrations.gsheets import get_sheet
                     ws = await get_sheet()
                     all_vals = ws.get_all_values()
-                    # Detect notes column: new format (with Phone col) = 14, old = 12
                     header = all_vals[3] if len(all_vals) > 3 else []
                     is_new = "phone" in str(header[2] if len(header) > 2 else "").lower()
                     notes_col = 14 if is_new else 12
@@ -933,15 +942,15 @@ async def resolve_pending_action(
                     for row in all_vals[4:]:
                         if str(row[0]).strip().upper() == rclean and nlow in str(row[1]).strip().lower():
                             existing_notes = str(row[notes_col]).strip() if len(row) > notes_col else ""
-                            # Skip numeric-only values (likely PrevDue column bleed)
                             if existing_notes and not existing_notes.replace(".", "").replace("-", "").isdigit():
                                 action_data["existing_notes"] = existing_notes
                             break
                 except Exception:
                     pass
+
                 action_data["step"] = "ask_cash"
                 await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
-                return f"*{tenant.name}* (Room {room_obj.room_number})\n\n*Cash amount?* (number, or *skip* if no cash)"
+                return snapshot["text"] + "\n\n*Cash amount?* (number, or *skip* if no cash)"
 
             # Multiple matches — ask which one
             choices = _make_choices(rows)
@@ -963,9 +972,18 @@ async def resolve_pending_action(
             action_data["tenancy_id"] = chosen["tenancy_id"]
             action_data["tenant_name"] = chosen["label"].split(" (Room")[0]
             action_data["room_number"] = room_obj.room_number if room_obj else ""
+
+            # Build dues snapshot
+            snapshot = await build_dues_snapshot(tenancy.id, action_data["tenant_name"], action_data["room_number"], session)
+            action_data["snapshot_text"] = snapshot["text"]
+            action_data["pending_months"] = [
+                {"period": m["period"].isoformat(), "remaining": float(m["remaining"])}
+                for m in snapshot["months"]
+            ]
+
             action_data["step"] = "ask_cash"
             await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
-            return f"*{action_data['tenant_name']}* (Room {action_data['room_number']})\n\n*Cash amount?* (number, or *skip* if no cash)"
+            return snapshot["text"] + "\n\n*Cash amount?* (number, or *skip* if no cash)"
 
         if step == "ask_cash":
             cash = _parse_amount_field(ans)
@@ -1024,6 +1042,9 @@ async def resolve_pending_action(
             total = cash + upi
             tname = action_data.get("tenant_name", "")
             rnum = action_data.get("room_number", "")
+
+            pending_months_raw = action_data.get("pending_months", [])
+
             parts = []
             if cash > 0:
                 parts.append(f"Cash: Rs.{int(cash):,}")
@@ -1032,15 +1053,43 @@ async def resolve_pending_action(
             notes_str = action_data.get("notes", "")
             notes_action = action_data.get("notes_action", "skip")
 
-            return (
-                f"*Confirm Payment?*\n\n"
-                f"Tenant: {tname} (Room {rnum})\n"
-                + "\n".join(f"  {p}" for p in parts)
-                + f"\n*Total: Rs.{int(total):,}*"
-                + (f"\nNotes: {notes_str}" if notes_action == "update" else "")
-                + ("\nNotes: _cleared_" if notes_action == "delete" else "")
-                + "\n\nReply *yes* to save or *no* to cancel."
-            )
+            # Compute allocation if multiple months
+            if pending_months_raw and len(pending_months_raw) > 1:
+                from decimal import Decimal as _Dec
+                pending_months = [
+                    {"period": date.fromisoformat(m["period"]), "remaining": _Dec(str(m["remaining"]))}
+                    for m in pending_months_raw
+                ]
+                alloc = compute_allocation(_Dec(str(total)), pending_months)
+                alloc_data = [{"period": a["period"].isoformat(), "amount": float(a["amount"])} for a in alloc]
+                action_data["allocation"] = alloc_data
+                await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
+
+                alloc_text = format_allocation(alloc, total, "cash" if cash > 0 else "upi")
+
+                return (
+                    f"*Confirm Payment?*\n\n"
+                    f"Tenant: {tname} (Room {rnum})\n"
+                    + "\n".join(f"  {p}" for p in parts)
+                    + f"\n*Total: Rs.{int(total):,}*"
+                    + (f"\nNotes: {notes_str}" if notes_action == "update" else "")
+                    + ("\nNotes: _cleared_" if notes_action == "delete" else "")
+                    + alloc_text + "\n\n"
+                    'Reply *yes* to save, *no* to cancel, or specify allocation:\n'
+                    '  e.g. "all to march" or "feb 3000 march 5000"'
+                )
+            else:
+                pm = date.fromisoformat(pending_months_raw[0]["period"]) if pending_months_raw else date.today().replace(day=1)
+                return (
+                    f"*Confirm Payment?*\n\n"
+                    f"Tenant: {tname} (Room {rnum})\n"
+                    + "\n".join(f"  {p}" for p in parts)
+                    + f"\n*Total: Rs.{int(total):,}*"
+                    + f"\nMonth: {pm.strftime('%B %Y')}"
+                    + (f"\nNotes: {notes_str}" if notes_action == "update" else "")
+                    + ("\nNotes: _cleared_" if notes_action == "delete" else "")
+                    + "\n\nReply *yes* to save or *no* to cancel."
+                )
 
         if step == "confirm":
             if ans.lower() in ("yes", "y", "confirm", "save", "ok", "done"):
@@ -1048,50 +1097,133 @@ async def resolve_pending_action(
                 upi = action_data.get("upi", 0)
                 tname = action_data.get("tenant_name", "")
                 rnum = action_data.get("room_number", "")
-                results = []
+                allocation = action_data.get("allocation")
 
-                if cash > 0:
-                    r = await _do_log_payment_by_ids(
-                        tenant_id=action_data["tenant_id"],
-                        tenancy_id=action_data["tenancy_id"],
-                        amount=cash, mode="cash",
-                        ctx_name=pending.phone, session=session,
+                if allocation:
+                    # Log split payments per allocation
+                    results = []
+                    for i, alloc in enumerate(allocation):
+                        if cash > 0 and i == 0:
+                            # First allocation entry uses cash mode
+                            r = await _do_log_payment_by_ids(
+                                tenant_id=action_data["tenant_id"],
+                                tenancy_id=action_data["tenancy_id"],
+                                amount=alloc["amount"],
+                                mode="cash",
+                                ctx_name=pending.phone, session=session,
+                                period_month_str=alloc["period"],
+                            )
+                        else:
+                            mode = "upi" if upi > 0 else "cash"
+                            r = await _do_log_payment_by_ids(
+                                tenant_id=action_data["tenant_id"],
+                                tenancy_id=action_data["tenancy_id"],
+                                amount=alloc["amount"],
+                                mode=mode,
+                                ctx_name=pending.phone, session=session,
+                                period_month_str=alloc["period"],
+                                skip_duplicate_check=(i > 0),
+                            )
+                        month_label = date.fromisoformat(alloc["period"]).strftime("%b %Y")
+                        results.append(f"{month_label}: Rs.{int(alloc['amount']):,} -- {r}")
+
+                    # Update notes
+                    notes_action = action_data.get("notes_action", "skip")
+                    notes_note = ""
+                    if notes_action in ("update", "delete"):
+                        try:
+                            from src.integrations.gsheets import sync_notes_with_retry
+                            new_notes = action_data.get("notes", "") if notes_action == "update" else ""
+                            await sync_notes_with_retry(rnum, tname, new_notes)
+                            notes_note = "\nNotes updated"
+                        except Exception as e:
+                            import logging as _log
+                            _log.getLogger(__name__).error("Notes sync failed: %s", e)
+
+                    total = cash + upi
+                    return (
+                        f"*Payment logged — {tname}* (Room {rnum})\n"
+                        + "\n".join(results)
+                        + f"\nTotal: Rs.{int(total):,}"
+                        + notes_note
                     )
-                    results.append(f"Cash Rs.{int(cash):,} — {r}")
+                else:
+                    # Single month — original behavior
+                    results = []
+                    if cash > 0:
+                        r = await _do_log_payment_by_ids(
+                            tenant_id=action_data["tenant_id"],
+                            tenancy_id=action_data["tenancy_id"],
+                            amount=cash, mode="cash",
+                            ctx_name=pending.phone, session=session,
+                        )
+                        results.append(f"Cash Rs.{int(cash):,} -- {r}")
+                    if upi > 0:
+                        r = await _do_log_payment_by_ids(
+                            tenant_id=action_data["tenant_id"],
+                            tenancy_id=action_data["tenancy_id"],
+                            amount=upi, mode="upi",
+                            ctx_name=pending.phone, session=session,
+                            skip_duplicate_check=(cash > 0),
+                        )
+                        results.append(f"UPI Rs.{int(upi):,} -- {r}")
 
-                if upi > 0:
-                    r = await _do_log_payment_by_ids(
-                        tenant_id=action_data["tenant_id"],
-                        tenancy_id=action_data["tenancy_id"],
-                        amount=upi, mode="upi",
-                        ctx_name=pending.phone, session=session,
-                        skip_duplicate_check=(cash > 0),  # skip dup check if cash was just logged
+                    notes_action = action_data.get("notes_action", "skip")
+                    notes_note = ""
+                    if notes_action in ("update", "delete"):
+                        try:
+                            from src.integrations.gsheets import sync_notes_with_retry
+                            new_notes = action_data.get("notes", "") if notes_action == "update" else ""
+                            await sync_notes_with_retry(rnum, tname, new_notes)
+                            notes_note = "\nNotes updated"
+                        except Exception as e:
+                            import logging as _log
+                            _log.getLogger(__name__).error("Notes sync failed: %s", e)
+
+                    total = cash + upi
+                    return (
+                        f"*Payment logged — {tname}* (Room {rnum})\n"
+                        + "\n".join(results)
+                        + f"\nTotal: Rs.{int(total):,}"
+                        + notes_note
                     )
-                    results.append(f"UPI Rs.{int(upi):,} — {r}")
 
-                # Update notes in sheet if changed
-                notes_action = action_data.get("notes_action", "skip")
-                notes_note = ""
-                if notes_action in ("update", "delete"):
-                    try:
-                        from src.integrations.gsheets import update_notes as gsheets_update_notes
-                        new_notes = action_data.get("notes", "") if notes_action == "update" else ""
-                        gs_r = await gsheets_update_notes(rnum, tname, new_notes)
-                        if gs_r.get("success"):
-                            notes_note = "\nNotes updated in sheet"
-                    except Exception as e:
-                        import logging as _log
-                        _log.getLogger(__name__).error("GSheets update_notes failed: %s", e)
+            # Check for allocation override
+            pending_months_raw = action_data.get("pending_months", [])
+            if pending_months_raw and len(pending_months_raw) > 1:
+                from src.whatsapp.handlers._shared import parse_allocation_override
+                from decimal import Decimal as _Dec
+                pending_months = [
+                    {"period": date.fromisoformat(m["period"]), "remaining": _Dec(str(m["remaining"]))}
+                    for m in pending_months_raw
+                ]
+                override = parse_allocation_override(ans, pending_months)
+                if override:
+                    amount = _Dec(str(action_data.get("cash", 0) + action_data.get("upi", 0)))
+                    new_alloc = []
+                    remaining_amt = amount
+                    for o in override:
+                        alloc_amt = _Dec(str(o["amount"])) if o["amount"] is not None else remaining_amt
+                        new_alloc.append({
+                            "period": o["period"].isoformat(),
+                            "amount": float(alloc_amt),
+                        })
+                        remaining_amt -= alloc_amt
+                    action_data["allocation"] = new_alloc
+                    await _save_pending(pending.phone, "COLLECT_RENT_STEP", action_data, [], session)
 
-                total = cash + upi
-                return (
-                    f"*Payment logged — {tname}* (Room {rnum})\n"
-                    + "\n".join(results)
-                    + f"\nTotal: Rs.{int(total):,}"
-                    + notes_note
-                )
-            else:
+                    mode_label = "CASH" if action_data.get("cash", 0) > 0 else "UPI"
+                    lines = [f"Updated allocation for Rs.{int(amount):,} {mode_label}:"]
+                    for a in new_alloc:
+                        ml = date.fromisoformat(a["period"]).strftime("%b %Y")
+                        lines.append(f"  -> {ml}: Rs.{int(a['amount']):,}")
+                    lines.append("\nReply *yes* to confirm or *no* to cancel.")
+                    return "__KEEP_PENDING__" + "\n".join(lines)
+
+            if is_negative(ans):
                 return "Cancelled. No payment logged."
+
+            return "__KEEP_PENDING__Reply *yes* to save, *no* to cancel, or specify allocation."
 
         return None
 
