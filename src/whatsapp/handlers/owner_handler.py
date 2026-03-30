@@ -98,6 +98,7 @@ async def handle_owner(
         "COMPLAINT_UPDATE":   _complaint_update,
         "QUERY_COMPLAINTS":   _query_complaints,
         "GET_TENANT_NOTES":   _get_tenant_notes,
+        "UPDATE_TENANT_NOTES": _update_tenant_notes,
         "QUERY_CONTACTS":     _query_contacts,
         "ACTIVITY_LOG":       _activity_log,
         "QUERY_ACTIVITY":     _query_activity,
@@ -1811,6 +1812,87 @@ async def resolve_pending_action(
         if is_affirmative(reply_text):
             return await _do_add_tenant(action_data, session)
         return "__KEEP_PENDING__Reply *Yes* to save the new tenant or *No* to cancel."
+
+    if pending.intent == "UPDATE_TENANT_NOTES_STEP":
+        ans = reply_text.strip()
+        step = action_data.get("step", "")
+
+        if ans.lower() in ("cancel", "stop", "abort"):
+            return "Cancelled."
+
+        if step == "pick_tenant":
+            if not ans.rstrip(".").isdigit():
+                return "__KEEP_PENDING__Reply with a *number* to pick the tenant."
+            num = int(ans.rstrip("."))
+            if not (1 <= num <= len(choices)):
+                return f"__KEEP_PENDING__Pick a number between 1 and {len(choices)}."
+            chosen = choices[num - 1]
+            tenant = await session.get(Tenant, chosen["tenant_id"])
+            tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+            room_obj = await session.get(Room, tenancy.room_id) if tenancy else None
+            current_notes = tenancy.notes or "(no notes)"
+            action_data.update({
+                "step": "enter_notes",
+                "tenant_id": chosen["tenant_id"],
+                "tenancy_id": chosen["tenancy_id"],
+                "tenant_name": chosen["label"].split(" (Room")[0],
+                "room_number": room_obj.room_number if room_obj else "",
+                "current_notes": tenancy.notes or "",
+            })
+            await _save_pending(pending.phone, "UPDATE_TENANT_NOTES_STEP", action_data, [], session)
+            return (
+                f"*{action_data['tenant_name']}* (Room {action_data['room_number']})\n\n"
+                f"Current tenant agreement: _{current_notes}_\n\n"
+                "Type new agreement notes, or *delete* to clear:"
+            )
+
+        if step == "enter_notes":
+            if ans.lower() == "delete":
+                new_notes = None
+                action_data["new_notes"] = ""
+                action_data["notes_action"] = "delete"
+            else:
+                new_notes = ans
+                action_data["new_notes"] = ans
+                action_data["notes_action"] = "update"
+
+            action_data["step"] = "confirm"
+            await _save_pending(pending.phone, "UPDATE_TENANT_NOTES_STEP", action_data, [], session)
+
+            display = f'"{new_notes}"' if new_notes else "_cleared_"
+            return (
+                f"*Updated tenant agreement for {action_data['tenant_name']}:*\n"
+                f"{display}\n\n"
+                "Reply *Yes* to save or *No* to cancel."
+            )
+
+        if step == "confirm":
+            if is_negative(ans):
+                return "Cancelled. Notes not changed."
+            if is_affirmative(ans):
+                tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+                if not tenancy:
+                    return "Tenancy not found."
+
+                notes_action = action_data.get("notes_action", "skip")
+                new_notes = action_data.get("new_notes", "")
+                tenancy.notes = new_notes if notes_action == "update" else None
+
+                # Sync to Sheet TENANTS tab
+                try:
+                    from src.integrations.gsheets import sync_tenants_tab_notes
+                    await sync_tenants_tab_notes(
+                        action_data["room_number"],
+                        action_data["tenant_name"],
+                        new_notes if notes_action == "update" else "",
+                    )
+                except Exception as e:
+                    import logging as _log
+                    _log.getLogger(__name__).error("TENANTS tab sync failed: %s", e)
+
+                return f"Tenant agreement updated for *{action_data['tenant_name']}*."
+
+            return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
 
     # APPROVE_ONBOARDING is handled at the TOP of resolve_pending_action (line ~132)
 
@@ -3550,6 +3632,53 @@ async def _get_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSe
     return (
         f"*{t.name}* — Room {room_obj.room_number}\n"
         f"Agreed terms:\n{notes}"
+    )
+
+
+async def _update_tenant_notes(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show current tenant agreement notes and prompt for update."""
+    name = entities.get("name", "").strip()
+    room = entities.get("room", "").strip()
+
+    if not name and not room:
+        return "Which tenant? Reply with: *update notes [Name]* or *update notes room [Number]*"
+
+    rows = await _find_active_tenants_by_name(name, session) if name else []
+    if not rows and room:
+        rows = await _find_active_tenants_by_room(room, session)
+
+    if not rows:
+        suggestions = await _find_similar_names(name, session) if name else []
+        return _format_no_match_message(name or room, suggestions)
+
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(
+            ctx.phone, "UPDATE_TENANT_NOTES_STEP",
+            {"step": "pick_tenant"},
+            choices, session,
+        )
+        return _format_choices_message(name or room, choices, "update notes")
+
+    tenant, tenancy, room_obj = rows[0]
+    current_notes = tenancy.notes or "(no notes)"
+
+    await _save_pending(
+        ctx.phone, "UPDATE_TENANT_NOTES_STEP",
+        {
+            "step": "enter_notes",
+            "tenant_id": tenant.id,
+            "tenancy_id": tenancy.id,
+            "tenant_name": tenant.name,
+            "room_number": room_obj.room_number,
+            "current_notes": tenancy.notes or "",
+        },
+        [], session,
+    )
+    return (
+        f"*{tenant.name}* (Room {room_obj.room_number})\n\n"
+        f"Current tenant agreement: _{current_notes}_\n\n"
+        "Type new agreement notes, or *delete* to clear:"
     )
 
 

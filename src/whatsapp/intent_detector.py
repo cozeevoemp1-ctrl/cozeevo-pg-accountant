@@ -240,6 +240,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:complaint|complain|issue|problem|not working|broken|leak(?:ing)?\b|fix|tap|flush|bulb|fan|switch|slow net|food (?:complaint|bad|issue|quality)|bed sheet|mattress|pillow|chair|table|shelf|almirah|\bAC\b|air.?condition|toilet|blocked|door\s*lock|kharab\b|pest\b|wifi\s+(?:not|issue|problem|broken|slow)|internet\s+(?:not|issue|problem|down|slow))", re.I), "COMPLAINT_REGISTER", 0.88),
     # PG rules & regulations
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
+    # Update tenant permanent notes / agreement
+    (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
     # Tenant notes / agreed terms / payment method lookup
     (re.compile(r"(?:notes?|agreement|agreed\s+terms?|payment\s+method|cash\s+only|rent\s+terms?|terms?)\s+(?:for\s+|of\s+)?(?:room\s+)?[\w-]+|(?:check|show|get|what(?:'?s|\s+is)?)\s+(?:the\s+)?(?:notes?|agreement|terms?|payment\s+method)\s+(?:for\s+|of\s+)?[\w\s-]+|room\s+[\w-]+\s+(?:notes?|terms?|agreement|payment\s+method|cash\s+only)|(?:notes?|agreement|terms?)\s+room\s+[\w-]+", re.I), "GET_TENANT_NOTES", 0.93),
     # Expense category shorthand "Category Amount [Mode]" — MUST come before PAYMENT_LOG shorthand

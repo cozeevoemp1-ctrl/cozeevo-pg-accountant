@@ -49,7 +49,7 @@ def send(message: str) -> dict:
     return r.json()
 
 def reply_text(resp: dict) -> str:
-    return resp.get("reply", "")
+    return str(resp.get("reply", "") or "")
 
 def contains(text: str, *keywords: str) -> list[str]:
     """Return list of missing keywords (empty = all found)."""
@@ -773,6 +773,76 @@ def t30_collect_rent_duplicate_warning():
         f"Expected payment flow for duplicate: {text[:200]}"
     time.sleep(DELAY)
     send("no")  # cancel
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PAYMENT FLOW REWORK TESTS (T31 - T35)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def t31_payment_shows_snapshot():
+    """Quick payment should show dues snapshot before confirmation."""
+    r = send("Raj paid 8000 cash")
+    text = reply_text(r)
+    # Should show snapshot with dues or confirm prompt
+    missing = contains(text, "confirm")
+    assert not missing, f"Snapshot missing confirm: {missing}. Got: {text[:300]}"
+
+
+def t32_payment_confirm_yes():
+    """Payment confirmation with Yes should log the payment."""
+    r = send("Raj paid 8000 cash")
+    text = reply_text(r)
+    if "yes" in text.lower() or "confirm" in text.lower():
+        time.sleep(DELAY)
+        r = send("yes")
+        text = reply_text(r)
+        # Should contain payment logged confirmation or a result
+        assert any_contains(text, "logged", "rs.", "payment", "paid"), \
+            f"Expected payment result. Got: {text[:300]}"
+
+
+def t33_payment_confirm_no():
+    """Payment cancellation with No should cancel."""
+    r = send("Raj paid 8000 cash")
+    text = reply_text(r)
+    time.sleep(DELAY)
+    r = send("no")
+    text = reply_text(r)
+    assert any_contains(text, "cancel", "no payment"), \
+        f"Expected cancellation. Got: {text[:300]}"
+
+
+def t34_collect_rent_shows_snapshot():
+    """Step-by-step collect rent should show snapshot after tenant ID."""
+    r = send("collect rent")
+    text = reply_text(r)
+    assert "who paid" in text.lower(), f"Expected name prompt. Got: {text[:200]}"
+
+    time.sleep(DELAY)
+    r = send("Raj")
+    text = reply_text(r)
+    # Should show snapshot + cash prompt
+    assert "cash" in text.lower(), f"Expected cash prompt. Got: {text[:200]}"
+
+
+def t35_update_tenant_notes():
+    """UPDATE_TENANT_NOTES intent should show current notes and allow edit."""
+    r = send("update agreement for Raj")
+    text = reply_text(r)
+    assert any_contains(text, "agreement", "notes", "current", "tenant"), \
+        f"Expected notes prompt. Got: {text[:200]}"
+
+    time.sleep(DELAY)
+    r = send("Always cash payment.")
+    text = reply_text(r)
+    assert any_contains(text, "yes", "confirm", "save"), \
+        f"Expected confirm. Got: {text[:200]}"
+
+    time.sleep(DELAY)
+    r = send("no")
+    text = reply_text(r)
+    assert any_contains(text, "cancel", "not changed"), \
+        f"Expected cancel. Got: {text[:200]}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
