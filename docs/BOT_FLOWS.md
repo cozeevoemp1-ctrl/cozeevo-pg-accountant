@@ -51,6 +51,7 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | QUERY_ACTIVITY | "activity today" | owner_handler | owner | Show activity timeline |
 | RULES | "house rules" | all handlers | all | PG house rules |
 | HELP | "help", "menu" | all handlers | all | Role-specific menu |
+| UPDATE_TENANT_NOTES | "update agreement for Raj" | owner_handler | owner | Edit permanent tenant notes |
 | MY_BALANCE | "my balance" | tenant_handler | tenant | Own dues (DISABLED) |
 | MY_PAYMENTS | "my payments" | tenant_handler | tenant | Own payment history (DISABLED) |
 | MY_DETAILS | "my room" | tenant_handler | tenant | Own stay details (DISABLED) |
@@ -249,3 +250,19 @@ Sheet writes are async and non-blocking. Sheet errors don't prevent payment logg
    - Google Sheets write-back (async)
    - Reply: "Payment logged — Raj Kumar (Room 203): Rs.15,000 UPI"
 ```
+
+### 9b. Updated Payment Flow (v2)
+
+The payment flow now shows a dues snapshot before confirmation:
+
+1. Resolve tenant (same fuzzy search as before)
+2. Fetch dues snapshot: all pending/partial months + tenant notes + monthly notes
+3. Compute oldest-first allocation
+4. Show snapshot + allocation, ask for confirmation or override
+5. If multi-month: allow override (e.g. "all to march" or "feb 3000 march 5000")
+6. On confirm: log split payments, update rent_schedule, sync to Sheet
+
+**Notes system:**
+- `tenancy.notes` = permanent agreements (editable via UPDATE_TENANT_NOTES intent)
+- `rent_schedule.notes` = monthly notes (editable during payment flow, auto-carried to next month)
+- Both synced to Sheet with retry (3 attempts)

@@ -16,6 +16,8 @@
 
 **Split payment (cash + UPI):** Use "collect rent", enter cash amount, then UPI amount separately.
 
+**New:** Bot now shows dues summary (all months + notes) before asking for amounts.
+
 ---
 
 ## ADD TENANT (Check-in)
@@ -171,6 +173,16 @@
 | Message | What it does |
 |---------|-------------|
 | **wifi password** | Shows current WiFi password |
+
+---
+
+## UPDATE TENANT NOTES
+
+| Message | What it does |
+|---------|-------------|
+| **update agreement for Raj** | View + edit permanent tenant notes |
+| **update tenant notes Raj** | Same |
+| **change notes for room 301** | Same, by room |
 
 ---
 
