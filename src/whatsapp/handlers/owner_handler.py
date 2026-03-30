@@ -100,6 +100,7 @@ async def handle_owner(
         "GET_TENANT_NOTES":   _get_tenant_notes,
         "UPDATE_TENANT_NOTES": _update_tenant_notes,
         "QUERY_CONTACTS":     _query_contacts,
+        "ADD_CONTACT":        _add_contact,
         "ACTIVITY_LOG":       _activity_log,
         "QUERY_ACTIVITY":     _query_activity,
         "RULES":              _rules,
@@ -1894,6 +1895,97 @@ async def resolve_pending_action(
 
             return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
 
+    if pending.intent == "ADD_CONTACT_STEP":
+        import hashlib
+        ans = reply_text.strip()
+
+        if ans.lower() in ("cancel", "stop", "abort", "no", "nahi"):
+            return "Cancelled. Contact not saved."
+
+        step = action_data.get("step", "")
+
+        if step == "ask_name":
+            action_data["name"] = ans.strip().title()
+            if action_data.get("phone"):
+                if action_data.get("category"):
+                    action_data["step"] = "confirm"
+                else:
+                    action_data["step"] = "ask_category"
+            else:
+                action_data["step"] = "ask_phone"
+            await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+            if action_data["step"] == "ask_phone":
+                return f"*{action_data['name']}*\n\n*Phone number?*"
+            elif action_data["step"] == "ask_category":
+                return f"*{action_data['name']}* — {action_data['phone']}\n\n*What do they do?* (e.g. electrician, plumber)"
+            else:
+                return (
+                    f"*Add Contact?*\n\n"
+                    f"Name: {action_data['name']}\n"
+                    f"Phone: {action_data['phone']}\n"
+                    f"Category: {action_data['category']}\n\n"
+                    "Reply *Yes* to save or *No* to cancel."
+                )
+
+        if step == "ask_phone":
+            phone_match = re.search(r'\d{7,15}', ans)
+            if not phone_match:
+                return "__KEEP_PENDING__Please enter a valid phone number (at least 7 digits):"
+            action_data["phone"] = phone_match.group()
+            if action_data.get("category"):
+                action_data["step"] = "confirm"
+            else:
+                action_data["step"] = "ask_category"
+            await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+            if action_data["step"] == "ask_category":
+                return f"*{action_data['name']}* — {action_data['phone']}\n\n*What do they do?* (e.g. electrician, plumber)"
+            return (
+                f"*Add Contact?*\n\n"
+                f"Name: {action_data['name']}\n"
+                f"Phone: {action_data['phone']}\n"
+                f"Category: {action_data['category']}\n\n"
+                "Reply *Yes* to save or *No* to cancel."
+            )
+
+        if step == "ask_category":
+            action_data["category"] = ans.strip().title()
+            action_data["step"] = "confirm"
+            await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+            return (
+                f"*Add Contact?*\n\n"
+                f"Name: {action_data['name']}\n"
+                f"Phone: {action_data['phone']}\n"
+                f"Category: {action_data['category']}\n\n"
+                "Reply *Yes* to save or *No* to cancel."
+            )
+
+        if step == "confirm":
+            if is_affirmative(ans):
+                name = action_data["name"]
+                phone = action_data["phone"]
+                category = action_data["category"]
+                dedup = hashlib.sha256(f"{phone}:{name}".encode()).hexdigest()
+
+                # Check duplicate
+                existing = await session.scalar(
+                    select(PgContact).where(PgContact.unique_hash == dedup)
+                )
+                if existing:
+                    return f"Contact *{name}* ({phone}) already exists."
+
+                contact = PgContact(
+                    name=name,
+                    phone=phone,
+                    category=category,
+                    contact_for=category,
+                    property="Whitefield",
+                    unique_hash=dedup,
+                )
+                session.add(contact)
+                return f"Contact saved — *{name}* ({category}) {phone}"
+
+            return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
+
     # APPROVE_ONBOARDING is handled at the TOP of resolve_pending_action (line ~132)
 
     return None
@@ -3679,6 +3771,106 @@ async def _update_tenant_notes(entities: dict, ctx: CallerContext, session: Asyn
         f"*{tenant.name}* (Room {room_obj.room_number})\n\n"
         f"Current tenant agreement: _{current_notes}_\n\n"
         "Type new agreement notes, or *delete* to clear:"
+    )
+
+
+async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Parse contact details from message and confirm before saving."""
+    import hashlib
+    raw = entities.get("_raw_message", "").strip()
+
+    # Extract phone number (7+ digits)
+    phone_match = re.search(r'\b(\d{7,15})\b', raw)
+    phone = phone_match.group(1) if phone_match else ""
+
+    # Extract category — match known service keywords
+    _CATEGORIES = {
+        "electrician": "Electrician", "plumber": "Plumber", "carpenter": "Carpenter",
+        "painter": "Painter", "vendor": "Vendor", "supplier": "Supplier",
+        "cleaner": "Cleaner", "cleaning": "Cleaner", "security": "Security",
+        "pest": "Pest Control", "internet": "Internet/WiFi", "wifi": "Internet/WiFi",
+        "water": "Water", "gas": "Gas", "furniture": "Furniture", "gym": "Gym",
+        "cctv": "CCTV", "lift": "Lift/Elevator", "cook": "Cook", "maid": "Housekeeping",
+        "housekeeping": "Housekeeping", "caretaker": "Caretaker", "watchman": "Security",
+        "building": "Building Services", "maintenance": "Maintenance",
+    }
+    raw_lower = raw.lower()
+    category = ""
+    for keyword, cat in _CATEGORIES.items():
+        if keyword in raw_lower:
+            category = cat
+            break
+
+    # Extract name — remove noise words, phone number, category keywords, "add/save/contact" etc.
+    _NOISE = {"add", "save", "store", "new", "contact", "contacts", "to", "as", "vendor", "supplier", "number", "phone"}
+    words = raw.split()
+    name_parts = []
+    for w in words:
+        w_clean = re.sub(r'[^\w]', '', w)
+        if not w_clean:
+            continue
+        if w_clean.lower() in _NOISE:
+            continue
+        if w_clean == phone:
+            continue
+        if w_clean.lower() in _CATEGORIES:
+            continue
+        if w_clean.isdigit():
+            continue
+        name_parts.append(w_clean)
+
+    name = " ".join(name_parts).strip()
+    # Capitalize first letter of each word
+    name = " ".join(w.capitalize() for w in name.split()) if name else ""
+
+    if not name and not phone:
+        await _save_pending(
+            ctx.phone, "ADD_CONTACT_STEP",
+            {"step": "ask_name", "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return "*Add Contact*\n\n*Name?*"
+
+    if not phone:
+        await _save_pending(
+            ctx.phone, "ADD_CONTACT_STEP",
+            {"step": "ask_phone", "name": name, "category": category, "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return f"*Add Contact: {name}*" + (f" ({category})" if category else "") + "\n\n*Phone number?*"
+
+    if not name:
+        await _save_pending(
+            ctx.phone, "ADD_CONTACT_STEP",
+            {"step": "ask_name", "phone": phone, "category": category, "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return f"*Add Contact*\n\nPhone: {phone}" + (f"\nCategory: {category}" if category else "") + "\n\n*Name?*"
+
+    # Have name + phone — ask for category if missing, then confirm
+    if not category:
+        await _save_pending(
+            ctx.phone, "ADD_CONTACT_STEP",
+            {"step": "ask_category", "name": name, "phone": phone, "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return (
+            f"*Add Contact: {name}*\nPhone: {phone}\n\n"
+            "*What do they do?* (e.g. electrician, plumber, vendor, or type a description)"
+        )
+
+    # All fields present — confirm
+    await _save_pending(
+        ctx.phone, "ADD_CONTACT_STEP",
+        {"step": "confirm", "name": name, "phone": phone, "category": category, "logged_by": ctx.name or ctx.phone},
+        [], session,
+    )
+    return (
+        f"*Add Contact?*\n\n"
+        f"Name: {name}\n"
+        f"Phone: {phone}\n"
+        f"Category: {category}\n\n"
+        "Reply *Yes* to save or *No* to cancel."
     )
 
 
