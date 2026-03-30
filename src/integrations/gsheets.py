@@ -990,6 +990,86 @@ async def update_notes(room_number: str, tenant_name: str, notes: str,
     return await asyncio.to_thread(_update_notes_sync, room_number, tenant_name, notes, month, year)
 
 
+async def sync_notes_with_retry(
+    room_number: str,
+    tenant_name: str,
+    notes: str,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    max_retries: int = 3,
+) -> dict:
+    """
+    Update notes in Sheet with retry. Up to max_retries attempts.
+    Returns the result dict from the last attempt.
+    """
+    result = {}
+    for attempt in range(max_retries):
+        result = await update_notes(room_number, tenant_name, notes, month, year)
+        if result.get("success"):
+            return result
+        if attempt < max_retries - 1:
+            await asyncio.sleep(1 * (attempt + 1))  # backoff: 1s, 2s
+            logger.warning("GSheets sync retry %d/%d for %s: %s", attempt + 1, max_retries, tenant_name, result.get("error"))
+    logger.error("GSheets sync FAILED after %d retries for %s/%s: %s", max_retries, room_number, tenant_name, result.get("error"))
+    return result
+
+
+def _update_tenants_tab_notes_sync(room_number: str, tenant_name: str, notes: str) -> dict:
+    """Update permanent notes in the TENANTS tab."""
+    result: dict[str, Any] = {"success": False, "error": None}
+    try:
+        ws = _get_worksheet_sync("TENANTS")
+        all_vals = ws.get_all_values()
+        room_clean = room_number.strip().upper()
+        name_lower = tenant_name.strip().lower()
+        # Find notes column — scan header for "Notes" or "Comment"
+        header = all_vals[0] if all_vals else []
+        notes_col = None
+        for i, h in enumerate(header):
+            if h.strip().lower() in ("notes", "comment", "remarks"):
+                notes_col = i
+                break
+        if notes_col is None:
+            result["error"] = "Notes column not found in TENANTS tab"
+            return result
+
+        assert notes_col is not None  # guarded above
+        col_idx: int = notes_col
+        for i in range(1, len(all_vals)):
+            r = all_vals[i]
+            if (str(r[0]).strip().upper() == room_clean and
+                    name_lower in str(r[1]).strip().lower()):
+                cell = gspread.utils.rowcol_to_a1(i + 1, col_idx + 1)
+                ws.update(values=[[notes]], range_name=cell, value_input_option="USER_ENTERED")
+                result["success"] = True
+                logger.info("GSheets: updated TENANTS notes for %s row %d", tenant_name, i + 1)
+                return result
+
+        result["error"] = f"Row not found for {room_number}/{tenant_name} in TENANTS"
+    except Exception as e:
+        result["error"] = f"TENANTS notes update failed: {e}"
+    return result
+
+
+async def sync_tenants_tab_notes(
+    room_number: str,
+    tenant_name: str,
+    notes: str,
+    max_retries: int = 3,
+) -> dict:
+    """Async entry point — update permanent notes in TENANTS tab with retry."""
+    result = {}
+    for attempt in range(max_retries):
+        result = await asyncio.to_thread(_update_tenants_tab_notes_sync, room_number, tenant_name, notes)
+        if result.get("success"):
+            return result
+        if attempt < max_retries - 1:
+            await asyncio.sleep(1 * (attempt + 1))
+            logger.warning("GSheets TENANTS sync retry %d/%d for %s: %s", attempt + 1, max_retries, tenant_name, result.get("error"))
+    logger.error("GSheets TENANTS sync FAILED after %d retries for %s: %s", max_retries, tenant_name, result.get("error"))
+    return result
+
+
 # -- Update KYC gender on TENANTS tab after onboarding approval ----------------
 
 def _update_tenant_gender_sync(phone: str, gender: str) -> dict:
