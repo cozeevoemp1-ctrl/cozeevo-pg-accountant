@@ -150,7 +150,7 @@ def parse_target_month(entities: dict) -> date:
 
 # ── Yes / No answer helpers ───────────────────────────────────────────────────
 
-_AFFIRMATIVE = {"yes", "y", "confirm", "ok", "haan", "ha", "yeah", "sure", "proceed", "done", "returned"}
+_AFFIRMATIVE = {"yes", "y", "confirm", "ok", "haan", "ha", "yeah", "sure", "proceed", "done", "returned", "theek hai", "thik hai", "sahi hai"}
 _NEGATIVE    = {"no", "n", "cancel", "nahi", "nope", "stop", "none", "nil"}
 
 

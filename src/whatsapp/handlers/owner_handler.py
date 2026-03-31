@@ -43,10 +43,6 @@ from src.whatsapp.handlers._shared import (
 )
 from src.whatsapp.handlers.account_handler import (
     _calc_outstanding_dues,       # needed by _room_status + _do_checkout
-    _do_log_payment_by_ids,       # needed by resolve_pending_action
-    _do_void_payment,             # needed by resolve_pending_action
-    _do_rent_change,              # needed by resolve_pending_action
-    _do_query_tenant_by_id,       # needed by resolve_pending_action
 )
 from services.property_logic import (
     NOTICE_BY_DAY,
@@ -122,6 +118,10 @@ async def resolve_pending_action(
     Called when the user replies to a disambiguation question.
     Returns the final reply string, or None if the reply wasn't a valid choice.
     """
+    # Lazy imports to avoid circular import at module load time
+    from src.whatsapp.handlers.account_handler import (
+        _do_log_payment_by_ids, _do_void_payment, _do_rent_change, _do_query_tenant_by_id,
+    )
     reply_text = reply_text.strip()
     choices = json.loads(pending.choices or "[]")
     action_data = json.loads(pending.action_data or "{}")
@@ -248,6 +248,23 @@ async def resolve_pending_action(
             if _new_amt != action_data.get("amount", 0) and _new_amt > 0:
                 action_data["amount"] = _new_amt
                 _corrected = True
+        _MONTH_MAP = {
+            "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+            "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+            "january": 1, "february": 2, "march": 3, "april": 4,
+            "june": 6, "july": 7, "august": 8, "september": 9,
+            "october": 10, "november": 11, "december": 12,
+        }
+        for _mname, _mnum in _MONTH_MAP.items():
+            if re.search(r"\b" + _mname + r"\b", _rl):
+                from datetime import date as _date
+                _today = _date.today()
+                _yr = _today.year if _mnum <= _today.month + 1 else _today.year - 1
+                _new_period = f"{_yr}-{_mnum:02d}-01"
+                if _new_period != action_data.get("period_month", ""):
+                    action_data["period_month"] = _new_period
+                    _corrected = True
+                break
         if _corrected:
             pending.action_data = json.dumps(action_data)
             await session.flush()
@@ -256,13 +273,22 @@ async def resolve_pending_action(
             _tname = action_data.get("tenant_name", "")
             _room  = action_data.get("room_number", "")
             _tlabel = f"{_tname} (Room {_room})" if _room else _tname
+            _pm = action_data.get("period_month", "")
+            _month_label = ""
+            if _pm:
+                try:
+                    from datetime import datetime as _dt
+                    _month_label = _dt.strptime(_pm, "%Y-%m-%d").strftime("%B %Y")
+                except Exception:
+                    _month_label = _pm
             return (
                 "__KEEP_PENDING__"
                 f"✏️ Updated. Please confirm:\n"
                 f"• Tenant: {_tlabel}\n"
                 f"• Amount: ₹{_amt:,}\n"
-                f"• Mode: {_mode}\n\n"
-                "Reply *Yes* to confirm or *No* to cancel."
+                f"• Mode: {_mode}\n"
+                + (f"• Month: {_month_label}\n" if _month_label else "")
+                + "\nReply *Yes* to confirm or *No* to cancel."
             )
         if is_affirmative(reply_text):
             return await _do_log_payment_by_ids(
@@ -287,7 +313,6 @@ async def resolve_pending_action(
 
     if pending.intent == "CONFIRM_PAYMENT_ALLOC":
         from src.whatsapp.handlers._shared import parse_allocation_override
-        from src.whatsapp.handlers.account_handler import _do_log_payment_by_ids
 
         ans = reply_text.strip()
         if is_negative(ans):

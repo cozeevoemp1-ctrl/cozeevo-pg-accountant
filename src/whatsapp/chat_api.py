@@ -71,9 +71,10 @@ async def process_message(
 ):
     try:
         return await _process_message_inner(body, session)
-    except Exception:
-        import logging
+    except Exception as _exc:
+        import logging, traceback
         logging.getLogger(__name__).exception("Unhandled error in process_message")
+        traceback.print_exc()  # ensure it goes to stderr
         return OutboundReply(
             reply="Sorry, something went wrong. Please try again in a moment.",
             intent="ERROR", role="unknown",

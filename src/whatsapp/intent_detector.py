@@ -128,7 +128,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
     (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|expense\s+(?:summary|breakdown|analysis)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
-    (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
+    (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+dues|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
     # QUERY_CONTACTS — vendor/supplier/service contact lookup
     (re.compile(r"(?:(?:give|get|show|find|list|who\s+is)\s+(?:me\s+)?(?:the\s+)?(?:our\s+)?(?:plumber|electrician|carpenter|painter|vendor|supplier|contact|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\b|(?:plumber|electrician|carpenter|painter|vendor|supplier|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\s+(?:contact|number|phone|details?|vendor|guy)\b|(?:all|list|show)\s+(?:contacts?|vendors?|suppliers?)\b|vendor\s+(?:list|directory|contacts?)|contacts?\s+(?:list|for|of)\b|who\s+(?:do|did)\s+we\s+(?:call|use)\s+for\s+\w+|who\s+is\s+(?:the|our)\s+\w+\s+(?:vendor|supplier|guy|contact)|\w+\s+(?:number|contact|phone)\s*$)", re.I), "QUERY_CONTACTS", 0.93),
     # Log vacation / absence for tenant (any name, not hardcoded)
@@ -255,8 +255,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"^(?:collect\s+rent|rent\s+collect(?:ion)?|log\s+(?:a\s+)?payment|record\s+payment|payment\s+log)\s*$", re.I), "PAYMENT_LOG", 0.93),
     # (log expense + bulk reminder rules moved earlier — before ACTIVITY_LOG/QUERY_DUES)
     # Payment log — before HELP so "Hi sir Raj paid 15000" doesn't become HELP
-    (re.compile(r"(?:p[ai]{2,3}d?|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
-    (re.compile(r"\d[\d,k]+\s*(?:paid|p[ai]{2,3}d?|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),
+    (re.compile(r"(?:p[aie]{2,3}d?|paied|payment|received|collected|deposited|transferred|jama|diya)\s.*?\d", re.I), "PAYMENT_LOG", 0.92),
+    (re.compile(r"\d[\d,k]+\s*(?:paid|paied|p[aie]{2,3}d?|payment|received|from|by)", re.I), "PAYMENT_LOG", 0.92),
     # "Deepak payment received" — payment received without explicit digit (assume most recent payment)
     (re.compile(r"(?:[A-Z][a-z]{2,})\s+payment\s+(?:received|confirmed|done|collected|cleared)\b", re.I), "PAYMENT_LOG", 0.90),
     # Shorthand "Name Amount Mode" — e.g. "Arjun 12000 cash", "Raj 8000 upi"
@@ -264,7 +264,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Amount-first shorthand: "15000 Raj gpay", "8000 from Suresh cash"
     (re.compile(r"^\d[\d,k]+\s+(?:[A-Z][a-z]{2,}|from\s+[A-Z][a-z]{2,})\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "PAYMENT_LOG", 0.91),
     # Word-number payments: "Raj paid fifteen thousand", "paid ten thousand"
-    (re.compile(r"(?:[A-Z][a-z]+\s+)?p[ai]{2,3}d?\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty)\s+(?:thousand|hundred|lakh)\b", re.I), "PAYMENT_LOG", 0.90),
+    (re.compile(r"(?:[A-Z][a-z]+\s+)?(?:p[aie]{2,3}d?|paied)\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty)\s+(?:thousand|hundred|lakh)\b", re.I), "PAYMENT_LOG", 0.90),
     # Help — only for short greeting messages (moved after PAYMENT_LOG)
     (re.compile(r"^(?:hi|hello|hey|help|menu|commands?|start|hii|helo)\b|kya\s+kar\s+sakte|what\s+can\s+(?:i|you)\b|how\s+to\s+use\b|show\s+commands?\b", re.I), "HELP", 0.95),
 ]
@@ -492,7 +492,7 @@ def _extract_entities(text: str, intent: str) -> dict:
     # Extract amount — prefer number AFTER a payment keyword (avoids room-number-as-amount)
     # e.g. "203 paid 8000" → 8000, not 203
     amount_match = re.search(
-        r"(?:paid|payment|received|collected|deposited|rs\.?|inr)\s*(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?",
+        r"(?:paid|paied|payment|received|collected|deposited|rs\.?|inr)\s*(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?",
         text, re.I,
     )
     if not amount_match:
@@ -527,7 +527,7 @@ def _extract_entities(text: str, intent: str) -> dict:
     room_match = re.search(r"(?:room|bed|flat|unit)\s*([\w-]+)", text, re.I)
     if not room_match:
         room_match = re.search(
-            r"^([\d]{2,4}[A-Za-z]?)\s+(?:paid|payment|received|balance|dues|has|is|gave|wants|plans|leaving|checkout|checked|joined)\b",
+            r"^([\d]{2,4}[A-Za-z]?)\s+(?:paid|paied|payment|received|balance|dues|has|is|gave|wants|plans|leaving|checkout|checked|joined)\b",
             text, re.I,
         )
     if room_match:
