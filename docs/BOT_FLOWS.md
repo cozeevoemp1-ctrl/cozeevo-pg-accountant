@@ -49,6 +49,13 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | QUERY_CONTACTS | "plumber contact" | owner_handler | owner | Vendor/supplier contacts |
 | ACTIVITY_LOG | "log plumber visit" | owner_handler | owner | Record operational activity |
 | QUERY_ACTIVITY | "activity today" | owner_handler | owner | Show activity timeline |
+| ADD_CONTACT | "add plumber Raju 9876543210" | owner_handler | owner | Save vendor/service contact |
+| GET_TENANT_NOTES | "notes for Raj" | owner_handler | owner | View tenant agreement notes |
+| REMINDER_SET | "remind me tomorrow" | owner_handler | owner | Set a reminder |
+| REQUEST_RECEIPT | "receipt for Raj" | owner_handler | owner | Generate payment receipt |
+| ROOM_TYPE | "what type is room 203" | owner_handler | owner | Room sharing type info |
+| VACATION_NOTICE | "Raj going home 5 days" | owner_handler | owner | Record planned absence |
+| MORE_MENU | "more options" | all handlers | all | Extended menu |
 | RULES | "house rules" | all handlers | all | PG house rules |
 | HELP | "help", "menu" | all handlers | all | Role-specific menu |
 | UPDATE_TENANT_NOTES | "update agreement for Raj" | owner_handler | owner | Edit permanent tenant notes |
