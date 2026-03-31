@@ -186,6 +186,22 @@
 
 ---
 
+## CORRECTIONS (During Payment Confirmation)
+
+When the bot asks "Confirm? Raj Kumar, Rs.15,000 UPI, March 2026. Reply Yes/No", you can correct instead of just saying yes/no:
+
+| Message | What it does |
+|---------|-------------|
+| **no 15000** or just **15000** | Correct the amount |
+| **no it was upi** / **actually cash** / **no gpay** | Correct the payment mode |
+| **no for february** / **no january** | Correct the month |
+| **no 14000 for february** | Correct amount + month together |
+| **no 14000 upi** | Correct amount + mode together |
+| **no** / **cancel** / **stop** | Cancel the payment |
+| **yes** / **ok** / **haan** / **theek hai** / **confirm** | Confirm and save |
+
+---
+
 ## CANCEL / RESET
 
 | During any form... | What it does |
@@ -197,4 +213,4 @@
 
 ---
 
-*Generated: 29 Mar 2026 | Cozeevo Co-living*
+*Updated: 31 Mar 2026 | Cozeevo Co-living*

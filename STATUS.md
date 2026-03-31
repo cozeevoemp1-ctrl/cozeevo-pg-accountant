@@ -1,6 +1,6 @@
 # Cozeevo Help Desk — Project Status
 
-> Updated: 2026-03-27 (session 2)
+> Updated: 2026-03-31
 > Read this FIRST at the start of every session.
 
 ## What's Working (Live on VPS after deploy)
@@ -32,7 +32,7 @@
 - 261 tenants, 261 tenancies, 498 rent_schedules, 471 payments
 - 200 active (181 regular + 19 premium = 219 beds), 22 no-show
 - Master: 166 rooms (THOR 84 + HULK 82), 291 revenue beds, 8 staff rooms
-- Authorized users: Kiran (admin), Lakshmi Mam (admin), Prabhakaran 9444296681 (admin), test receptionist
+- Authorized users: Kiran (admin), Lakshmi Mam (admin), Prabhakaran 9444296681 (admin), 8548884455 (admin/business number), Sathyam 7993273966 (receptionist)
 
 ### Google Sheets
 - Sheet ID: 1T4YE7RK2eIZRg330kaOaNb5-8o8kJbxpDzK_7MfoyiA
@@ -43,9 +43,10 @@
 - ~~Monthly report Rs.0~~ — FIXED (is_void was NULL, now false; commit b17327b)
 - ~~No-show count wrong (9 instead of 22)~~ — FIXED (commit 950a994)
 - **Tenant/lead auto-reply disabled** (commit 6a3618f) — bot silent for non-authorized users, messages still logged
-- **Prabhakaran (9444296681) can't access bot** — messages don't reach webhook. Likely messaging wrong number or WhatsApp issue.
+- **Prabhakaran (9444296681)** — messages reach bot, but replies blocked by Meta error 131030 (recipient not in allowed list). App still uses test number (+1 555 192 0467). Added to Meta test number list but needs real business number migration.
 - **Golden suite: 86/100** — 14 failing (mostly test-env issues with tenant/lead phone numbers, not code bugs)
-- **WhatsApp number migration on hold** — 8548884455 stays on WhatsApp Business app, bot stays on test number
+- **WhatsApp number migration on hold** — 8548884455 stays on WhatsApp Business app, bot stays on Meta test number (+1 555 192 0467). Must migrate to real business number for Prabhakaran and other external users to receive replies.
+- **Payment confirmation crash fixed** — UnboundLocalError on _do_log_payment_by_ids resolved (lazy import)
 
 ## Master Data Rules (LOCKED)
 - Room layout: THOR G01-G10 + floors 1-6 (x01-x12) + 701,702 = 84 rooms

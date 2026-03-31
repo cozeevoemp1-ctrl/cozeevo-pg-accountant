@@ -8,8 +8,8 @@ Complete reference for all intents, role-based routing, pending state machine, a
 
 | Intent | Example Messages | Handler | Role | What It Does |
 |--------|------------------|---------|------|--------------|
-| PAYMENT_LOG | "Raj paid 15000 upi" | account_handler | owner | Log rent payment |
-| QUERY_DUES | "who owes", "pending dues" | account_handler | owner | List tenants with outstanding dues |
+| PAYMENT_LOG | "Raj paid 15000 upi", "Raj paied 15000" | account_handler | owner | Log rent payment |
+| QUERY_DUES | "who owes", "pending dues", "dues" | account_handler | owner | List tenants with outstanding dues |
 | QUERY_TENANT | "Raj balance", "room 203 balance" | account_handler | owner | Tenant account: rent, paid, balance, history |
 | ADD_EXPENSE | "electricity 5000 upi" | account_handler | owner | Log operational expense |
 | QUERY_EXPENSES | "total expenses" | account_handler | owner | Expense breakdown by category/month |
@@ -140,6 +140,20 @@ Bot returns `None` → no reply sent. Message logged to `chat_messages`.
 - **Auto-expiry**: All pending actions expire after 30 minutes
 - **Learning**: When user picks from ambiguous list, pattern→intent saved to `learned_rules.json`
 
+### Mid-Flow Corrections (v1.12)
+
+During CONFIRM_PAYMENT_LOG, users can correct details instead of just yes/no:
+
+| Correction | Examples |
+|------------|----------|
+| Amount only | "no 15000", "15000" |
+| Mode only | "no it was upi", "actually cash", "no gpay" |
+| Month only | "no for february", "no january" |
+| Amount + month | "no 14000 for february" |
+| Amount + mode | "no 14000 upi" |
+| Cancel | "no", "cancel", "stop" |
+| Confirm | "yes", "ok", "haan", "theek hai", "thik hai", "sahi hai", "confirm" |
+
 ---
 
 ## 5. Shared Helpers (`_shared.py`)
@@ -152,7 +166,7 @@ Bot returns `None` → no reply sent. Message logged to `chat_messages`.
 | `_make_choices(rows)` | Format numbered choice list | account, owner |
 | `_save_pending(phone, intent, ...)` | Save pending action (30min expiry) | all handlers |
 | `bot_intro(first_time, name, role)` | Greeting header (rotates daily) | all handlers |
-| `is_affirmative(text)` | "yes", "haan", "confirm" → True | owner (pending) |
+| `is_affirmative(text)` | "yes", "haan", "confirm", "theek hai", "thik hai", "sahi hai" → True | owner (pending) |
 | `is_negative(text)` | "no", "nahi", "cancel" → True | owner (pending) |
 | `parse_target_month(entities)` | Extract month from entities | account, owner |
 

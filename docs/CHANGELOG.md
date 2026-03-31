@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.12.0] — 2026-03-31 — Bug Fixes, Corrections, Receptionist Test Suite
+
+### Fixed
+- **Payment confirmation crash** — `UnboundLocalError` on `_do_log_payment_by_ids` in `resolve_pending_action` (lazy import fix)
+- **"paied" typo** not matching PAYMENT_LOG intent
+- **"pending dues"** not matching QUERY_DUES intent
+
+### Added
+- **Month correction mid-flow** — "no for february", "no january" during payment confirmation
+- **Amount+month combo correction** — "no 14000 for february" during payment confirmation
+- **Hindi affirmative keywords** — "theek hai", "thik hai", "sahi hai" now recognized as confirmation
+- **Sathyam (7993273966)** added as receptionist in authorized_users + staff table
+- **8548884455 (Business Number)** added as admin in authorized_users
+- **Prabhakaran (9444296681)** added to Meta WhatsApp test number list
+- **102-case E2E receptionist test suite** (96/102 passing)
+- **25-case correction workflow test suite** (25/25 passing)
+- **Bank P&L report** — `scripts/full_pnl_view.py` for investment vs operating expense breakdown
+
+### Diagnosed
+- **Prabhakaran bot not responding** — Meta error 131030 (recipient not in allowed list). App still uses test number (+1 555 192 0467), not real business number. Messages reach bot but replies blocked by Meta.
+
+---
+
 ## [1.11.0] — 2026-03-30 — Payment Flow Rework + Notes Architecture + Doc Consolidation
 
 ### Added
