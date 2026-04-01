@@ -2438,7 +2438,7 @@
         "expected_intent": "HELP",
         "expected_state": "idle",
         "reply_must_contain": [
-          "Artha"
+          "Cozeevo"
         ],
         "reply_must_not_contain": [
           "error",
@@ -2571,7 +2571,7 @@
         "input": "hello",
         "expected_state": "idle",
         "reply_must_contain": [
-          "Artha"
+          "Cozeevo"
         ],
         "reply_must_not_contain": [
           "error",
@@ -2595,7 +2595,7 @@
         "expected_intent": "HELP",
         "expected_state": "idle",
         "reply_must_contain": [
-          "Artha"
+          "Cozeevo"
         ],
         "reply_must_not_contain": [
           "error",

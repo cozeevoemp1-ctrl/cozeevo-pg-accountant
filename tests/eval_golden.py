@@ -310,7 +310,7 @@ def print_report(results: list[dict], elapsed: float) -> bool:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Artha Golden Test Suite")
+    parser = argparse.ArgumentParser(description="Cozeevo Golden Test Suite")
     parser.add_argument("--category", help="Run only this category")
     parser.add_argument("--id",       help="Run only this case ID")
     parser.add_argument("--verbose",  action="store_true", help="Show all turn details")
@@ -340,7 +340,7 @@ def main() -> None:
         print("No matching cases found.")
         sys.exit(1)
 
-    print(f"\nArtha Golden Test Suite — {len(cases)} cases")
+    print(f"\nCozeevo Golden Test Suite — {len(cases)} cases")
     print(f"API: {API_URL}")
     if args.check_leaks:
         print("Mode: LEAK CHECK ONLY (skipping intent/keyword checks)")
