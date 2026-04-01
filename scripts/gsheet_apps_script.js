@@ -436,17 +436,22 @@ function createMonthTab(tabName, monthIdx, year) {
   const prevTab = MONTH_NAMES[prevIdx] + " " + prevYear;
   const prevSheet = ss.getSheetByName(prevTab);
 
-  // Build lookup: tenant name → {balance} from previous month
+  // Build lookup: tenant name → {balance, notes} from previous month
   const prevData = {};
   if (prevSheet) {
     const pData = prevSheet.getDataRange().getValues();
     const hdr = pData.length > 3 ? pData[3] : [];
-    const balCol = String(hdr[2] || "").toUpperCase().includes("PHONE") ? 9 : 8;  // new vs old format
+    const isNewFmt = String(hdr[2] || "").toUpperCase().includes("PHONE");
+    const balCol = isNewFmt ? 9 : 8;
+    const notesCol = isNewFmt ? 14 : 12;
     const startRow = pData.length > 4 ? 4 : 1;
     for (let i = startRow; i < pData.length; i++) {
       const name = String(pData[i][1]).trim();
       if (!name) continue;
-      prevData[name] = { balance: pn(pData[i][balCol]) };
+      prevData[name] = {
+        balance: pn(pData[i][balCol]),
+        notes: String(pData[i][notesCol] || "").trim(),
+      };
     }
   }
 
@@ -489,10 +494,13 @@ function createMonthTab(tabName, monthIdx, year) {
     if (status === "No-show" && (!checkin || checkin > mEnd)) continue;
 
     const name = String(t[1]).trim();
-    const prev = prevData[name] || { balance: 0 };
+    const prev = prevData[name] || { balance: 0, notes: "" };
     const prevDue = prev.balance > 0 ? prev.balance : 0;
     const totalDue = rentDue + prevDue;
     const noticeDate = String(t[13] || "").trim();  // Notice Date from TENANTS
+
+    // Carry forward notes from previous month if tenant has dues
+    const carryNotes = (prevDue > 0 && prev.notes) ? "[" + prevTab.split(" ")[0].substring(0, 3) + "] " + prev.notes.substring(0, 100) : "";
 
     rows.push([
       t[0], t[1], t[2],          // A: Room, B: Name, C: Phone
@@ -504,7 +512,7 @@ function createMonthTab(tabName, monthIdx, year) {
       t[7],                       // L: Check-in
       noticeDate,                 // M: Notice Date
       event,                      // N: Event
-      "",                         // O: Notes
+      carryNotes,                 // O: Notes (carried from prev month if dues exist)
       prevDue,                    // P: Prev Due
     ]);
   }

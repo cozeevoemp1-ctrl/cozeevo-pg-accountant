@@ -102,6 +102,7 @@ T_CHECKOUT_DATE = 15
 T_REFUND_STATUS = 16
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
+TOTAL_BEDS = 291
 
 # -- Spreadsheet + worksheet cache --------------------------------------------
 
@@ -314,6 +315,175 @@ def _find_row_in_tenants(
     return None
 
 
+# -- Summary refresh (mirrors Apps Script updateMonthSummary) ------------------
+
+def _refresh_summary_sync(tab_name: str) -> None:
+    """
+    Recalculate per-row metrics AND summary rows 2-3 for a monthly tab.
+    Mirrors the Apps Script updateMonthSummary function so that
+    API writes (which don't trigger onEdit) still refresh the dashboard.
+
+    Per-row recalculation (for non-EXIT/NO-SHOW rows):
+      Total Paid = Cash + UPI
+      Balance = Rent Due + Prev Due - Total Paid
+      Status = UNPAID / PARTIAL / PAID
+    """
+    try:
+        ws = _get_worksheet_sync(tab_name)
+        all_vals = ws.get_all_values()
+        if len(all_vals) < 5:
+            return
+
+        # Detect column layout
+        hdr = all_vals[3] if len(all_vals) > 3 else []
+        is_new = "phone" in str(hdr[2] if len(hdr) > 2 else "").lower()
+        if is_new:
+            ci = {"rent": 5, "cash": 6, "upi": 7, "tp": 8, "bal": 9, "st": 10,
+                  "building": 3, "sharing": 4, "event": 13, "prev": 15}
+        else:
+            ci = {"rent": 4, "cash": 5, "upi": 6, "tp": 7, "bal": 8, "st": 9,
+                  "building": 2, "sharing": 3, "event": 11, "prev": 15}
+
+        # ── Per-row recalculation ──
+        row_updates = []  # list of batch update dicts
+        for i in range(4, len(all_vals)):
+            row = all_vals[i]
+            if not row[0]:
+                continue
+            status = str(row[ci["st"]] if ci["st"] < len(row) else "").upper().strip()
+            if status in ("EXIT", "NO SHOW", "ADVANCE", "CANCELLED"):
+                continue
+
+            cash = _safe_parse_numeric(_cell(row, ci["cash"]))
+            upi = _safe_parse_numeric(_cell(row, ci["upi"]))
+            rent = _safe_parse_numeric(_cell(row, ci["rent"]))
+            prev_due = _safe_parse_numeric(_cell(row, ci["prev"])) if ci["prev"] < len(row) else 0.0
+
+            tp = cash + upi
+            bal = rent + prev_due - tp
+            st = "UNPAID" if tp == 0 else ("PAID" if bal <= 0 else "PARTIAL")
+
+            sheet_row = i + 1  # 1-based
+            row_updates.append({"range": gspread.utils.rowcol_to_a1(sheet_row, ci["tp"] + 1), "values": [[tp]]})
+            row_updates.append({"range": gspread.utils.rowcol_to_a1(sheet_row, ci["bal"] + 1), "values": [[bal]]})
+            row_updates.append({"range": gspread.utils.rowcol_to_a1(sheet_row, ci["st"] + 1), "values": [[st]]})
+
+        if row_updates:
+            ws.batch_update(row_updates, value_input_option="USER_ENTERED")
+
+        # ── Re-read to aggregate summary stats from recalculated values ──
+        all_vals = ws.get_all_values()
+
+        beds = 0
+        regular = 0
+        premium = 0
+        noshow = 0
+        cash_total = 0
+        upi_total = 0
+        balance_total = 0
+        paid = 0
+        partial = 0
+        unpaid = 0
+        new_checkins = 0
+        exits = 0
+        thor_beds = 0
+        hulk_beds = 0
+        thor_tenants = 0
+        hulk_tenants = 0
+
+        for i in range(4, len(all_vals)):
+            row = all_vals[i]
+            if not row[0] or not row[1]:
+                continue
+
+            building = str(row[ci["building"]]).upper().strip()
+            sharing = str(row[ci["sharing"]]).lower().strip()
+            cash = _safe_parse_numeric(_cell(row, ci["cash"]))
+            upi = _safe_parse_numeric(_cell(row, ci["upi"]))
+            bal = _safe_parse_numeric(_cell(row, ci["bal"]))
+            status = str(row[ci["st"]]).upper().strip() if ci["st"] < len(row) else ""
+            event = str(row[ci["event"]]).upper().strip() if ci["event"] < len(row) else ""
+
+            cash_total += cash
+            upi_total += upi
+            balance_total += bal
+
+            if status == "PAID":
+                paid += 1
+            elif status == "PARTIAL":
+                partial += 1
+            elif status == "UNPAID":
+                unpaid += 1
+
+            if "NEW CHECK-IN" in event:
+                new_checkins += 1
+            if "EXIT" in event or status == "EXIT":
+                exits += 1
+
+            if status == "EXIT":
+                continue
+            if event == "NO-SHOW" or status == "NO SHOW":
+                noshow += 1
+                continue
+
+            bed_count = 2 if sharing == "premium" else 1
+            beds += bed_count
+            if sharing == "premium":
+                premium += 1
+            else:
+                regular += 1
+
+            if building == "THOR":
+                thor_beds += bed_count
+                thor_tenants += 1
+            else:
+                hulk_beds += bed_count
+                hulk_tenants += 1
+
+        collected = cash_total + upi_total
+        vacant = TOTAL_BEDS - beds - noshow
+        occ_pct = f"{beds / TOTAL_BEDS * 100:.1f}" if TOTAL_BEDS > 0 else "0"
+
+        last_col = "P" if is_new else "O"
+        num_cols = 16 if is_new else 15
+
+        # Row 2: Occupancy + Collections
+        r2 = [
+            "Checked-in",
+            f"{beds} beds ({regular}+{premium}P)",
+            f"No-show: {noshow}",
+            f"Vacant: {vacant}",
+            f"Occ: {occ_pct}%",
+            "Cash", cash_total, "UPI", upi_total, "Total", collected,
+            f"Bal: {int(balance_total)}", "", "", "",
+        ]
+        if is_new:
+            r2.append("")  # 16th col
+
+        # Row 3: Building split + status
+        r3 = [
+            f"THOR: {thor_beds}b ({thor_tenants}t)",
+            f"HULK: {hulk_beds}b ({hulk_tenants}t)",
+            f"New: {new_checkins}",
+            f"Exit: {exits}",
+            "",
+            f"PAID:{paid}", f"PARTIAL:{partial}", f"UNPAID:{unpaid}",
+            "", "", "", "", "", "", "",
+        ]
+        if is_new:
+            r3.append("")  # 16th col
+
+        ws.update(values=[r2[:num_cols]], range_name=f"A2:{last_col}2", value_input_option="USER_ENTERED")
+        ws.update(values=[r3[:num_cols]], range_name=f"A3:{last_col}3", value_input_option="USER_ENTERED")
+
+        logger.info(
+            "GSheets: refreshed summary for %s — %d beds, %d paid, %d partial, %d unpaid, collected=%d, balance=%d",
+            tab_name, beds, paid, partial, unpaid, int(collected), int(balance_total),
+        )
+    except Exception as e:
+        logger.warning("GSheets: summary refresh failed for %s: %s", tab_name, e)
+
+
 # -- Core functions (sync) -----------------------------------------------------
 
 def _update_payment_sync(
@@ -494,6 +664,8 @@ def _update_payment_sync(
             row, tab_name, room_number, tenant_name, int(amount), method_upper,
             int(new_total_paid), int(total_due), int(new_balance), new_status,
         )
+        # Refresh summary rows (API writes don't trigger Apps Script onEdit)
+        _refresh_summary_sync(tab_name)
     except Exception as e:
         result["error"] = f"Batch update failed: {e}"
         logger.error("GSheets batch update error: %s", e)
@@ -619,6 +791,8 @@ def _add_tenant_sync(
             "GSheets: added tenant %s to monthly tab '%s' at row %d",
             name, tab_name, result["monthly_row"],
         )
+        # Refresh summary rows
+        _refresh_summary_sync(tab_name)
 
     except Exception as e:
         result["error"] = f"Add tenant failed: {e}"
@@ -708,6 +882,8 @@ def _record_checkout_sync(
             logger.warning("GSheets: TENANTS tab update failed (checkout still recorded): %s", e)
 
         result["success"] = True
+        # Refresh summary rows
+        _refresh_summary_sync(tab_name)
 
     except Exception as e:
         result["error"] = f"Checkout failed: {e}"
@@ -778,6 +954,9 @@ def _record_notice_sync(
             logger.warning("GSheets: TENANTS tab notice update failed: %s", e)
 
         result["success"] = True
+        # Refresh summary rows if monthly tab was updated
+        if tenant_tab is not None:
+            _refresh_summary_sync(tab_name)
 
     except Exception as e:
         result["error"] = f"Record notice failed: {e}"
