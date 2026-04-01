@@ -14,7 +14,8 @@
  * COLUMN LAYOUT (monthly tabs, row 5+, DB-aligned):
  *   A=Room, B=Name, C=Phone, D=Building, E=Sharing, F=Rent Due,
  *   G=Cash, H=UPI, I=Total Paid, J=Balance, K=Status,
- *   L=Check-in, M=Notice Date, N=Event, O=Notes, P=Prev Due
+ *   L=Check-in, M=Notice Date, N=Event, O=Notes, P=Prev Due,
+ *   Q=Entered By
  */
 
 const TOTAL_BEDS = 291;
@@ -338,14 +339,14 @@ function updateMonthSummary(sheet) {
   const isNew = String(hdr[2] || "").toUpperCase().includes("PHONE");
 
   // Summary rows — clean formatting, no grids
-  const lastCol = isNew ? "P" : "O";
+  const lastCol = isNew ? "Q" : "O";
 
   // Row 2: Occupancy + Collections
   const r2 = isNew
     ? ["Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
        "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
        "Cash", d.cash, "UPI", d.upi, "Total", collected,
-       "Bal: " + d.balance, "", "", "", ""]
+       "Bal: " + d.balance, "", "", "", "", ""]
     : ["Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
        "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
        "Cash", d.cash, "UPI", d.upi, "Total", collected,
@@ -357,7 +358,7 @@ function updateMonthSummary(sheet) {
     ? ["THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)", "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
        "New: " + d.newCheckins, "Exit: " + d.exits, "",
        "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
-       "", "", "", "", "", "", "", ""]
+       "", "", "", "", "", "", "", "", ""]
     : ["THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)", "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
        "New: " + d.newCheckins, "Exit: " + d.exits, "",
        "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
@@ -458,16 +459,16 @@ function createMonthTab(tabName, monthIdx, year) {
   const tData = tenants.getDataRange().getValues();
   const sheet = ss.insertSheet(tabName);
 
-  // 16 columns: A-P (DB-aligned)
+  // 17 columns: A-Q (DB-aligned)
   const headers = ["Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
     "Cash", "UPI", "Total Paid", "Balance", "Status",
-    "Check-in", "Notice Date", "Event", "Notes", "Prev Due"];
+    "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By"];
 
   sheet.getRange("A1").setValue(tabName);
-  sheet.getRange("A1:P1").merge().setFontSize(13).setFontWeight("bold");
-  sheet.getRange("A2:P2").setValues([["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
-  sheet.getRange("A3:P3").setValues([["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
-  sheet.getRange("A4:P4").setValues([headers]).setFontWeight("bold").setBackground("#D6EAF8");
+  sheet.getRange("A1:Q1").merge().setFontSize(13).setFontWeight("bold");
+  sheet.getRange("A2:Q2").setValues([["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
+  sheet.getRange("A3:Q3").setValues([["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]]);
+  sheet.getRange("A4:Q4").setValues([headers]).setFontWeight("bold").setBackground("#D6EAF8");
 
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
   const mStart = new Date(year, monthIdx, 1);
@@ -514,10 +515,11 @@ function createMonthTab(tabName, monthIdx, year) {
       event,                      // N: Event
       carryNotes,                 // O: Notes (carried from prev month if dues exist)
       prevDue,                    // P: Prev Due
+      "",                         // Q: Entered By
     ]);
   }
 
-  if (rows.length > 0) sheet.getRange(5, 1, rows.length, 16).setValues(rows);
+  if (rows.length > 0) sheet.getRange(5, 1, rows.length, 17).setValues(rows);
 
   sheet.setFrozenRows(4);
   sheet.getRange("F5:J" + (4 + rows.length)).setNumberFormat("#,##0");
@@ -539,8 +541,8 @@ function createMonthTab(tabName, monthIdx, year) {
   );
   sheet.setConditionalFormatRules(existingRules);
 
-  sheet.getRange("A4:P" + (4 + rows.length)).createFilter();
-  [70, 180, 120, 70, 80, 90, 90, 90, 90, 90, 80, 100, 100, 100, 200, 90].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  sheet.getRange("A4:Q" + (4 + rows.length)).createFilter();
+  [70, 180, 120, 70, 80, 90, 90, 90, 90, 90, 80, 100, 100, 100, 200, 90, 100].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
 
   updateMonthSummary(sheet);
 }

@@ -13,7 +13,8 @@ TENANTS tab (master data) columns (0-indexed):
 Monthly tab (e.g. "APRIL 2026") columns (0-indexed):
   [0] Room, [1] Name, [2] Phone, [3] Building, [4] Sharing, [5] Rent Due,
   [6] Cash, [7] UPI, [8] Total Paid, [9] Balance, [10] Status,
-  [11] Check-in, [12] Notice Date, [13] Event, [14] Notes, [15] Prev Due
+  [11] Check-in, [12] Notice Date, [13] Event, [14] Notes, [15] Prev Due,
+  [16] Entered By
 
 Monthly tab row layout:
   Row 1: Month title (merged)
@@ -80,6 +81,7 @@ M_NOTICE_DATE = 12
 M_EVENT = 13
 M_NOTES = 14
 M_PREV_DUE = 15
+M_ENTERED_BY = 16
 
 # -- TENANTS tab column indices (0-indexed) ------------------------------------
 
@@ -444,8 +446,8 @@ def _refresh_summary_sync(tab_name: str) -> None:
         vacant = TOTAL_BEDS - beds - noshow
         occ_pct = f"{beds / TOTAL_BEDS * 100:.1f}" if TOTAL_BEDS > 0 else "0"
 
-        last_col = "P" if is_new else "O"
-        num_cols = 16 if is_new else 15
+        last_col = "Q" if is_new else "O"
+        num_cols = 17 if is_new else 15
 
         # Row 2: Occupancy + Collections
         r2 = [
@@ -458,7 +460,7 @@ def _refresh_summary_sync(tab_name: str) -> None:
             f"Bal: {int(balance_total)}", "", "", "",
         ]
         if is_new:
-            r2.append("")  # 16th col
+            r2 += ["", ""]  # 16th + 17th col
 
         # Row 3: Building split + status
         r3 = [
@@ -471,7 +473,7 @@ def _refresh_summary_sync(tab_name: str) -> None:
             "", "", "", "", "", "", "",
         ]
         if is_new:
-            r3.append("")  # 16th col
+            r3 += ["", ""]  # 16th + 17th col
 
         ws.update(values=[r2[:num_cols]], range_name=f"A2:{last_col}2", value_input_option="USER_ENTERED")
         ws.update(values=[r3[:num_cols]], range_name=f"A3:{last_col}3", value_input_option="USER_ENTERED")
@@ -493,6 +495,7 @@ def _update_payment_sync(
     method: str,
     month: Optional[int] = None,
     year: Optional[int] = None,
+    entered_by: str = "",
 ) -> dict:
     """
     Update payment in the monthly tab. ADDs amount to Cash or UPI column.
@@ -629,7 +632,8 @@ def _update_payment_sync(
     # Build notes append
     ts = datetime.now().strftime("%d-%b %H:%M")
     method_upper = method.upper()
-    note_entry = f"[{ts}] Rs.{int(amount):,} {method_upper}"
+    by_tag = f" by {entered_by}" if entered_by else ""
+    note_entry = f"[{ts}] Rs.{int(amount):,} {method_upper}{by_tag}"
     existing_notes = _cell(row_data, col_notes)
     updated_notes = f"{existing_notes} | {note_entry}" if existing_notes else note_entry
 
@@ -657,6 +661,12 @@ def _update_payment_sync(
                 "values": [[updated_notes]],
             },
         ]
+        # Add Entered By column if new format
+        if is_new and entered_by:
+            batch.append({
+                "range": gspread.utils.rowcol_to_a1(row, M_ENTERED_BY + 1),
+                "values": [[entered_by]],
+            })
         ws.batch_update(batch, value_input_option="USER_ENTERED")
         result["success"] = True
         logger.info(
@@ -974,6 +984,7 @@ async def update_payment(
     method: str,
     month: Optional[int] = None,
     year: Optional[int] = None,
+    entered_by: str = "",
 ) -> dict:
     """
     Async entry point — update payment in Google Sheet monthly tab.
@@ -985,11 +996,12 @@ async def update_payment(
         method: "cash" or "upi"
         month: month number (1-12). None = current month
         year: year. None = current year
+        entered_by: name of person who logged this payment (for audit trail)
 
     Returns dict: success, row, tab, rent_due, total_paid, balance, overpayment, warning, error
     """
     return await asyncio.to_thread(
-        _update_payment_sync, room_number, tenant_name, amount, method, month, year,
+        _update_payment_sync, room_number, tenant_name, amount, method, month, year, entered_by,
     )
 
 

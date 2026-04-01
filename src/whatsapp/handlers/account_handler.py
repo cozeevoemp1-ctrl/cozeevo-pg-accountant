@@ -459,6 +459,7 @@ async def _do_log_payment_by_ids(
                 method=mode,
                 month=period_month.month,
                 year=period_month.year,
+                entered_by=ctx.name or ctx.role,
             )
             if gs_result.get("error"):
                 import logging as _logging
