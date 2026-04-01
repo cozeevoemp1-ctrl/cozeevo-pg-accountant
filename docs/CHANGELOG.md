@@ -2,6 +2,39 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.14.0] — 2026-04-01 — Sheet Dashboard Auto-Refresh + Full April Reload
+
+### Fixed
+- **Sheet dashboard not auto-updating** — Apps Script `onEdit` doesn't fire on API writes. Added `_refresh_summary_sync()` in gsheets.py that recalculates per-row Total Paid, Balance, Status AND summary rows 2-3 after every bot write.
+- **Previous month dues not carried forward** — APRIL 2026 was in old 15-column format without Prev Due column. Upgraded to new 17-column format with Phone, Prev Due, Entered By.
+- **No-shows missing from April** — reload script was excluding NO SHOW entries. Fixed to include April no-shows (18 total).
+- **Stale NO-SHOW events** — tenants who changed from NO SHOW to CHECKIN in Excel kept stale NO-SHOW event in sheet. Excel now overrides.
+- **Missing tenants in TENANTS master** — 14 tenants added (new bookings, no-shows with empty IN/OUT).
+
+### Added
+- **`_refresh_summary_sync()`** — Python-side mirror of Apps Script `updateMonthSummary`. Per-row recalc + summary rows. Called after payment, add_tenant, checkout, notice.
+- **Entered By column (Q)** — audit trail showing who logged each payment (from `ctx.name` in WhatsApp handler).
+- **Notes carry-forward** — permanent DB comments + March notes loaded into April Notes column. Apps Script `createMonthTab` updated to carry forward prev month notes when dues exist.
+- **`scripts/reload_april.py`** — full reload script: Excel + DB notes + March Sheet + existing payments → 17-column April tab.
+- **DB payment reader** in reload script — ensures real payments survive reloads.
+
+### Changed
+- Monthly tab format: 15 → 17 columns (added Phone, Prev Due, Entered By)
+- Apps Script `createMonthTab`: 16 → 17 columns, notes carry-forward
+- Apps Script summary rows: lastCol P → Q
+
+### Sheet State (April 2026)
+- 225 rows (207 checked-in + 18 no-show)
+- 225 beds occupied (189 regular + 18 premium × 2)
+- 48 vacant, 77.3% occupancy
+- 25 tenants with prev dues from March
+- 106 tenants with permanent notes
+
+### Files changed
+gsheets.py, account_handler.py, gsheet_apps_script.js, reload_april.py (new)
+
+---
+
 ## [1.13.0] — 2026-04-01 — Overpayment Fix + Role Simplification
 
 ### Fixed
