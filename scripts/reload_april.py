@@ -76,7 +76,13 @@ def read_excel(path: str) -> dict:
     data = {}
     for r in range(2, ws.max_row + 1):
         inout = str(ws.cell(r, 17).value or "").strip().upper()
-        if inout != "CHECKIN":
+        # Include CHECKIN + empty IN/OUT with a checkin date (new entries not yet tagged)
+        if inout == "EXIT" or inout == "NO SHOW":
+            continue
+        if inout != "CHECKIN" and inout != "":
+            continue
+        # Skip rows with no checkin date and no name
+        if not ws.cell(r, 5).value and inout == "":
             continue
 
         room_raw = str(ws.cell(r, 1).value or "").replace(".0", "").strip()
