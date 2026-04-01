@@ -76,12 +76,13 @@ def read_excel(path: str) -> dict:
     data = {}
     for r in range(2, ws.max_row + 1):
         inout = str(ws.cell(r, 17).value or "").strip().upper()
-        # Include CHECKIN + empty IN/OUT with a checkin date (new entries not yet tagged)
-        if inout == "EXIT" or inout == "NO SHOW":
+        # Skip EXIT and CANCELLED
+        if inout in ("EXIT", "CANCELLED"):
             continue
-        if inout != "CHECKIN" and inout != "":
+        # Include: CHECKIN, NO SHOW (with checkin in target month), empty with checkin date
+        if inout not in ("CHECKIN", "NO SHOW", ""):
             continue
-        # Skip rows with no checkin date and no name
+        # Skip rows with no checkin date and empty status
         if not ws.cell(r, 5).value and inout == "":
             continue
 
@@ -111,6 +112,20 @@ def read_excel(path: str) -> dict:
         # April rent column (col 28) — may have "PAID"/"NOT PAID" or a number
         april_col = str(ws.cell(r, 28).value or "").strip()
 
+        # Skip NO SHOW with checkin NOT in April 2026
+        from datetime import datetime as _dt
+        if inout == "NO SHOW":
+            ci_dt = None
+            if isinstance(checkin, _dt):
+                ci_dt = checkin
+            elif checkin:
+                try:
+                    ci_dt = _dt.strptime(str(checkin)[:10], "%Y-%m-%d")
+                except ValueError:
+                    pass
+            if not ci_dt or ci_dt.month != 4 or ci_dt.year != 2026:
+                continue
+
         key = (room_raw, name.lower())
         data[key] = {
             "room": room_raw,
@@ -129,6 +144,7 @@ def read_excel(path: str) -> dict:
             "staff": staff,
             "march_bal": march_bal,
             "april_status": april_col,
+            "inout": inout,
         }
 
     wb.close()
@@ -279,8 +295,11 @@ def build_april_rows(
         total_due = rent + prev_due
         balance = total_due - tp
 
-        # Status
+        # Status + Event
         event = april["event"]
+        # Set event from Excel inout if not already set from existing April sheet
+        if not event and ex.get("inout") == "NO SHOW":
+            event = "NO-SHOW"
         if event.upper() in ("EXIT", "NO-SHOW") or ex.get("april_status", "").upper() == "EXIT":
             status = event.upper() if event else "EXIT"
             balance = 0
