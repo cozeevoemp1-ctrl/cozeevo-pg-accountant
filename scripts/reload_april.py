@@ -230,6 +230,43 @@ def read_current_april() -> dict:
     return data
 
 
+async def read_db_payments() -> dict:
+    """Read April 2026 payments from DB. Returns dict keyed by (room_number, name_lower)."""
+    from src.database.db_manager import get_session, init_db
+    from src.database.models import Payment, Room, Tenancy, Tenant
+    from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
+
+    await init_db(os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL"))
+    async with get_session() as s:
+        rooms = {r.id: r.room_number for r in (await s.execute(select(Room))).scalars().all()}
+        result = await s.execute(
+            select(Payment).options(
+                joinedload(Payment.tenancy).joinedload(Tenancy.tenant)
+            ).where(
+                Payment.is_void == False,
+                Payment.period_month == date(2026, 4, 1),
+            )
+        )
+        payments = result.unique().scalars().all()
+
+        data: dict = {}
+        for p in payments:
+            if not p.tenancy or not p.tenancy.tenant:
+                continue
+            rn = rooms.get(p.tenancy.room_id, "")
+            name = p.tenancy.tenant.name.lower()
+            key = (rn, name)
+            if key not in data:
+                data[key] = {"cash": 0.0, "upi": 0.0}
+            if p.payment_mode.value == "cash":
+                data[key]["cash"] += float(p.amount)
+            else:
+                data[key]["upi"] += float(p.amount)
+
+    return data
+
+
 async def read_db_notes() -> dict:
     """Read tenancy notes from DB. Returns dict keyed by (room_number, name_lower)."""
     from src.database.db_manager import get_session, init_db
@@ -297,9 +334,11 @@ def build_april_rows(
 
         # Status + Event
         event = april["event"]
-        # Set event from Excel inout if not already set from existing April sheet
-        if not event and ex.get("inout") == "NO SHOW":
+        # Excel is the source of truth for status — override stale sheet events
+        if ex.get("inout") == "NO SHOW":
             event = "NO-SHOW"
+        elif ex.get("inout") == "CHECKIN" and event.upper() == "NO-SHOW":
+            event = ""  # was no-show, now checked in — clear stale event
         if event.upper() in ("EXIT", "NO-SHOW") or ex.get("april_status", "").upper() == "EXIT":
             status = event.upper() if event else "EXIT"
             balance = 0
