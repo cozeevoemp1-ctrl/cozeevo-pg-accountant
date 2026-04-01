@@ -56,7 +56,7 @@ def _get_llm() -> ChatGroq:
 class PGState(TypedDict):
     # ── Input (set by chat_api_v2 before calling the graph)
     user_id:    str    # phone number
-    role:       str    # admin | power_user | tenant | lead
+    role:       str    # admin | owner | receptionist | tenant | lead
     message:    str    # current inbound message
     ctx:        Any    # CallerContext object (not serialised, passed in-memory)
     session:    Any    # AsyncSession (not serialised, passed in-memory)

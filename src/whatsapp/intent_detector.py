@@ -433,7 +433,7 @@ def detect_intent(text: str, role: str) -> IntentResult:
 
     # ── Button / list tap: exact intent name sent by Meta ─────────────────────
     upper = text.upper()
-    if role in ("admin", "power_user", "key_user") and upper in _OWNER_DIRECT:
+    if role in ("admin", "owner") and upper in _OWNER_DIRECT:
         return IntentResult(intent=upper, confidence=0.99)
     if role == "receptionist" and upper in _RECEPTIONIST_DIRECT:
         return IntentResult(intent=upper, confidence=0.99)
@@ -442,10 +442,10 @@ def detect_intent(text: str, role: str) -> IntentResult:
     if role == "lead" and upper in _LEAD_DIRECT:
         return IntentResult(intent=upper, confidence=0.99)
 
-    if role in ("admin", "power_user", "key_user", "receptionist"):
+    if role in ("admin", "owner", "receptionist"):
         rules = _OWNER_RULES
         # Check ambiguous patterns first (before main rules) — only for full owner roles
-        if role in ("admin", "power_user", "key_user"):
+        if role in ("admin", "owner"):
             for amb_pattern, amb_intents, amb_labels in _AMBIGUOUS_OWNER:
                 if amb_pattern.search(text):
                     entities = _extract_entities(text, amb_intents[0])
@@ -472,7 +472,7 @@ def detect_intent(text: str, role: str) -> IntentResult:
     # ── Learned rules (admin-taught via !learn command) ───────────────────────
     for pattern, intent, conf, applies_to in _load_learned_rules():
         if applies_to not in ("all", role) and applies_to != "owner" or (
-            applies_to == "owner" and role not in ("admin", "power_user", "key_user", "receptionist")
+            applies_to == "owner" and role not in ("admin", "owner", "receptionist")
         ):
             continue
         if pattern.search(text):

@@ -56,7 +56,7 @@ _GREETINGS: dict[str, list[str]] = {
 
 def _greeting_style(role: str) -> int:
     """Deterministic style index for today × role. Rotates daily, never same two consecutive days."""
-    bucket = "owner" if role in ("admin", "power_user", "key_user", "receptionist") else (
+    bucket = "owner" if role in ("admin", "owner", "receptionist") else (
         "tenant" if role == "tenant" else "lead"
     )
     raw = hashlib.md5(f"{date.today().isoformat()}:{bucket}".encode()).hexdigest()
@@ -65,7 +65,7 @@ def _greeting_style(role: str) -> int:
 
 def _make_greeting(role: str, name: str) -> str:
     """Build a role-appropriate, daily-rotating greeting line."""
-    bucket = "owner" if role in ("admin", "power_user", "key_user", "receptionist") else (
+    bucket = "owner" if role in ("admin", "owner", "receptionist") else (
         "tenant" if role == "tenant" else "lead"
     )
     style    = _greeting_style(role)
@@ -121,7 +121,7 @@ def bot_intro(first_time_today: bool, name: str = "", role: str = "owner") -> st
 
 def is_owner_role(role: str) -> bool:
     """Return True if the role has owner-level access (including receptionist)."""
-    return role in ("admin", "power_user", "key_user", "receptionist")
+    return role in ("admin", "owner", "receptionist")
 
 
 def parse_target_month(entities: dict) -> date:

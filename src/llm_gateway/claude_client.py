@@ -216,7 +216,7 @@ class ClaudeClient:
         NLP fallback for WhatsApp messages that don't match any regex rule.
         Returns {"intent": str, "confidence": float, "entities": dict}.
         """
-        if role in ("admin", "power_user", "key_user"):
+        if role in ("admin", "owner"):
             intents_text = self._OWNER_INTENTS
         elif role == "tenant":
             intents_text = self._TENANT_INTENTS

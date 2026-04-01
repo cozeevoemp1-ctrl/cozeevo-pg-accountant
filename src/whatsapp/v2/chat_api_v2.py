@@ -73,12 +73,12 @@ async def _get_active_pending(phone: str, session: AsyncSession) -> Optional[Pen
 
 
 _ROLE_MAP = {
-    "admin":      CallerRole.owner,
-    "power_user": CallerRole.owner,
-    "key_user":   CallerRole.tenant,
-    "tenant":     CallerRole.tenant,
-    "lead":       CallerRole.lead,
-    "blocked":    CallerRole.blocked,
+    "admin":        CallerRole.owner,
+    "owner":        CallerRole.owner,
+    "receptionist": CallerRole.owner,
+    "tenant":       CallerRole.tenant,
+    "lead":         CallerRole.lead,
+    "blocked":      CallerRole.blocked,
 }
 
 async def _log(
@@ -160,7 +160,7 @@ async def _process_v2_inner(
     # ── 0. !learn command — admin/power_user shortcut ─────────────────────
     if message.startswith("!learn"):
         ctx_quick = await get_caller_context(phone, session)
-        if ctx_quick.role in ("admin", "power_user"):
+        if ctx_quick.role in ("admin", "owner"):
             reply = await handle_learn_command(message, ctx_quick, session)
             await _log(session, phone, message, ctx_quick.role, "LEARN_COMMAND", reply)
             await session.commit()
@@ -194,7 +194,7 @@ async def _process_v2_inner(
             return OutboundReply(reply=reply, intent="ONBOARDING", role=ctx.role)
 
     # ── 2b. Pending disambiguation / correction (owner roles) ────────────
-    if ctx.role in ("admin", "power_user", "key_user"):
+    if ctx.role in ("admin", "owner", "receptionist"):
         pending = await _get_active_pending(phone, session)
         if pending:
             if pending.intent == "INTENT_AMBIGUOUS":

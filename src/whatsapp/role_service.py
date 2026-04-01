@@ -3,7 +3,7 @@ Role detection + rate limiting for incoming WhatsApp messages.
 
 Every inbound message goes through this gate:
   1. Rate limit check  → BLOCKED if exceeded
-  2. Role lookup       → admin / power_user / key_user / tenant / lead
+  2. Role lookup       → admin / owner / receptionist / tenant / lead
   3. Return CallerContext (role + tenant/staff record if found)
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ ADMIN_PHONE = os.getenv("ADMIN_PHONE", "")
 @dataclass
 class CallerContext:
     phone:        str
-    role:         str          # "admin" | "power_user" | "key_user" | "tenant" | "lead" | "blocked"
+    role:         str          # "admin" | "owner" | "receptionist" | "tenant" | "lead" | "blocked"
     name:         str
     tenant_id:    Optional[int] = None
     auth_user_id: Optional[int] = None
@@ -51,7 +51,7 @@ async def get_caller_context(phone: str, session: AsyncSession) -> CallerContext
     if await _is_rate_limited(phone, session):
         return CallerContext(phone=phone, role="blocked", name="", is_blocked=True)
 
-    # 2. Check authorized_users table (admin / power_user / key_user)
+    # 2. Check authorized_users table (admin / owner / receptionist)
     result = await session.execute(
         select(AuthorizedUser).where(
             AuthorizedUser.phone == phone,

@@ -91,7 +91,7 @@ async def _process_message_inner(
     # ── 0. Admin !learn command — intercept before any other processing ──
     if message.startswith("!learn"):
         ctx_quick = await get_caller_context(phone, session)
-        if ctx_quick.role in ("admin", "power_user"):
+        if ctx_quick.role in ("admin", "owner"):
             reply = await handle_learn_command(message, ctx_quick, session)
             await _log(session, phone, message, ctx_quick.role, "LEARN_COMMAND", reply)
             await session.commit()
@@ -140,7 +140,7 @@ async def _process_message_inner(
             return OutboundReply(reply=reply, intent="ONBOARDING", role=ctx.role)
 
     # ── 2b. Check pending disambiguation (owner) or complaint follow-up (tenant) ──
-    if ctx.role in ("admin", "power_user", "key_user", "receptionist"):
+    if ctx.role in ("admin", "owner", "receptionist"):
         pending = await _get_active_pending(ctx.phone, session)
         if pending:
             # ── Mid-flow breakout detection ────────────────────────────────────
@@ -331,7 +331,7 @@ async def _process_message_inner(
         )
 
     # ── 3c. Ambiguous intent — ask user to choose ────────────────────────
-    if intent == "AMBIGUOUS" and ctx.role in ("admin", "power_user", "key_user"):
+    if intent == "AMBIGUOUS" and ctx.role in ("admin", "owner"):
         alternatives = intent_result.entities.get("alternatives", [])
         alt_labels   = intent_result.entities.get("alt_labels", alternatives)
         choices_list = [
@@ -383,7 +383,7 @@ async def _process_message_inner(
 
     # ── 4b. Attach interactive payload for menu intents ───────────────────
     interactive_payload = None
-    if intent in ("HELP", "MORE_MENU") and ctx.role in ("admin", "power_user", "key_user"):
+    if intent in ("HELP", "MORE_MENU") and ctx.role in ("admin", "owner"):
         interactive_payload = _build_owner_interactive(intent, reply, ctx)
 
     # ── 5. Log ────────────────────────────────────────────────────────────
@@ -671,12 +671,12 @@ async def _log(
     reply: Optional[str],
 ):
     role_map = {
-        "admin":      CallerRole.owner,
-        "power_user": CallerRole.owner,
-        "key_user":   CallerRole.tenant,
-        "tenant":     CallerRole.tenant,
-        "lead":       CallerRole.lead,
-        "blocked":    CallerRole.blocked,
+        "admin":        CallerRole.owner,
+        "owner":        CallerRole.owner,
+        "receptionist": CallerRole.owner,
+        "tenant":       CallerRole.tenant,
+        "lead":         CallerRole.lead,
+        "blocked":      CallerRole.blocked,
     }
     session.add(WhatsappLog(
         direction=MessageDirection.inbound,

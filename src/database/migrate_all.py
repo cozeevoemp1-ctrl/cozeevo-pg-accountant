@@ -614,13 +614,19 @@ async def _add_receptionist_role(conn: AsyncConnection) -> None:
     """Add 'receptionist' value to the user_role PostgreSQL enum (idempotent).
     Skips gracefully if user_role is not a Postgres ENUM (e.g. VARCHAR column)."""
     print("\n== Receptionist role (2026-03-24) ==")
-    try:
+    # Check if the enum type exists first (could be 'userrole' or 'user_role')
+    result = await conn.execute(text("""
+        SELECT typname FROM pg_type WHERE typname IN ('userrole', 'user_role') LIMIT 1
+    """))
+    row = result.fetchone()
+    if row:
+        enum_name = row[0]
         await conn.execute(text(
-            "ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'receptionist'"
+            f"ALTER TYPE {enum_name} ADD VALUE IF NOT EXISTS 'receptionist'"
         ))
-        print("  [ok] user_role enum now includes 'receptionist'")
-    except Exception:
-        print("  [skip] user_role type not found — role stored as text, no migration needed")
+        print(f"  [ok] {enum_name} enum now includes 'receptionist'")
+    else:
+        print("  [skip] role enum type not found — role stored as text, no migration needed")
 
 
 async def run_activity_log_table(conn: AsyncConnection) -> None:
@@ -693,6 +699,51 @@ async def run_chat_messages_table(conn: AsyncConnection) -> None:
     print("  [ok] chat_messages table ready")
 
 
+async def run_simplify_roles_2026_04_01(engine) -> None:
+    """Simplify to 3 roles: admin, owner, receptionist. Remove key_user/power_user. Added 2026-04-01.
+    Uses separate connections because PG requires new enum values to be committed before use."""
+    print("\n== Simplify roles (2026-04-01) ==")
+
+    # Step 1: Add 'owner' to enum in its own transaction
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            DO $$ BEGIN
+                ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'owner';
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$
+        """))
+    print("  [ok] 'owner' enum value added")
+
+    # Step 2: Use the new value in a separate transaction
+    async with engine.begin() as conn:
+        # Migrate power_user → owner
+        r = await conn.execute(text("""
+            UPDATE authorized_users SET role = 'owner' WHERE role = 'power_user'
+        """))
+        print(f"  [ok] power_user → owner: {r.rowcount} rows")
+
+        # Migrate key_user → owner
+        r = await conn.execute(text("""
+            UPDATE authorized_users SET role = 'owner' WHERE role = 'key_user'
+        """))
+        print(f"  [ok] key_user → owner: {r.rowcount} rows")
+
+        # Update Lakshmi and Prabhakaran to owner
+        r = await conn.execute(text("""
+            UPDATE authorized_users SET role = 'owner'
+            WHERE phone IN ('7358341775', '9444296681') AND role = 'admin'
+        """))
+        print(f"  [ok] Lakshmi + Prabhakaran → owner: {r.rowcount} rows")
+
+        # Remove test users
+        r = await conn.execute(text("""
+            DELETE FROM authorized_users WHERE phone IN ('9000000099', '9999999999')
+        """))
+        print(f"  [ok] removed test users: {r.rowcount} rows")
+
+    print("  [ok] roles simplified")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -711,6 +762,8 @@ async def main(args: argparse.Namespace) -> None:
             await _add_receptionist_role(conn)
             await run_activity_log_table(conn)
             await run_chat_messages_table(conn)
+        # Runs outside the main transaction (needs separate commits for enum values)
+        await run_simplify_roles_2026_04_01(engine)
         if args.seed:
             await run_seed(conn)
     await engine.dispose()

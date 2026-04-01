@@ -89,10 +89,9 @@ Base = declarative_base()
 # ── Enums ──────────────────────────────────────────────────────────────────
 
 class UserRole(str, enum.Enum):
-    admin        = "admin"        # Kiran — controls code, manages authorized_users
-    power_user   = "power_user"   # Partner owners — full WhatsApp bot access
-    key_user     = "key_user"     # Staff — scoped to assigned tenants
-    receptionist = "receptionist" # Front-desk — complaints, payments, dues, occupancy (no financials)
+    admin        = "admin"        # Kiran — full access including L0 master data
+    owner        = "owner"        # Partners (Lakshmi, Prabhakaran) — all except L0 master data
+    receptionist = "receptionist" # Sathyam — payments, individual queries, no financial reports
     end_user     = "end_user"     # Tenants (read-only) + Leads (enquiry only)
 
 class RoomType(str, enum.Enum):

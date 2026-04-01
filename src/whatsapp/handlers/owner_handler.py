@@ -1,6 +1,6 @@
 """
-Owner / Power-user handler.
-Processes intents for admin, power_user, key_user roles.
+Owner handler.
+Processes intents for admin, owner, receptionist roles.
 
 Disambiguation flow:
   - Fuzzy name search → 0 results  → suggest similar names, save pending action

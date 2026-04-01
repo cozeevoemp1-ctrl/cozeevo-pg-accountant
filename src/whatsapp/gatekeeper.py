@@ -7,13 +7,12 @@ Called by chat_api.py after intent detection instead of the old
 flat if/elif chain. This is the only place that knows which worker
 handles what; all workers remain unaware of each other.
 
-Routing rules:
-  admin / power_user / key_user
-    + financial intent  → AccountWorker  (account_handler)
-    + operational intent → OwnerWorker   (owner_handler)
-  receptionist         → OwnerWorker / AccountWorker (restricted allowlist only)
-  tenant               → TenantWorker   (tenant_handler)
-  lead / unknown       → LeadWorker     (lead_handler)
+Routing rules (3 tiers):
+  admin        → full access (financial + operational + L0 master data)
+  owner        → financial + operational (no L0 master data changes)
+  receptionist → payment logging + individual queries (no financial reports)
+  tenant       → TenantWorker   (tenant_handler)
+  lead / unknown → LeadWorker  (lead_handler)
 """
 from __future__ import annotations
 
@@ -25,14 +24,22 @@ from src.whatsapp.handlers.tenant_handler import handle_tenant
 from src.whatsapp.handlers.lead_handler import handle_lead
 from src.whatsapp.role_service import CallerContext
 
-OWNER_ROLES: frozenset[str] = frozenset({"admin", "power_user", "key_user"})
+OWNER_ROLES: frozenset[str] = frozenset({"admin", "owner"})
 
 # Intents the receptionist role is BLOCKED from.
-# Only financial summary reports and bank statement features are restricted.
+# Financial summaries, bank features, and expense management are restricted.
 RECEPTIONIST_BLOCKED: frozenset[str] = frozenset({
-    "REPORT",            # monthly financial report
+    "REPORT",            # monthly financial report / P&L
     "BANK_REPORT",       # bank statement analysis
     "BANK_DEPOSIT_MATCH",# bank deposit matching
+    "QUERY_EXPENSES",    # expense breakdown
+    "ADD_EXPENSE",       # log expenses
+    "VOID_EXPENSE",      # cancel expenses
+    "ADD_REFUND",        # process refunds
+    "QUERY_REFUNDS",     # list refunds
+    "VOID_PAYMENT",      # void/reverse payments
+    "RENT_CHANGE",       # change permanent rent
+    "RENT_DISCOUNT",     # one-time discount/surcharge
 })
 
 

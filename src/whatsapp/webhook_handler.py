@@ -442,7 +442,7 @@ async def _handle_pdf_upload(from_number: str, media_id: str, caption: str, mime
         async with _session_factory() as session:
             ctx = await get_caller_context(from_number, session)
 
-        if ctx.role not in ("admin", "power_user"):
+        if ctx.role not in ("admin", "owner"):
             await _send_whatsapp(
                 from_number,
                 "Bank statement uploads are only available for admins.",

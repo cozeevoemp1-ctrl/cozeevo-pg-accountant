@@ -45,13 +45,13 @@ async def seed():
                     AuthorizedUser(
                         phone="+917358341775",
                         name="Partner",
-                        role=UserRole.power_user,
+                        role=UserRole.owner,
                         added_by="+917845952289",
                     ),
                     AuthorizedUser(
                         phone="+966534015243",
                         name="Prabhakaran Devarjulu",
-                        role=UserRole.power_user,
+                        role=UserRole.owner,
                         added_by="+917845952289",
                     ),
                 ])

@@ -340,18 +340,6 @@ async def _do_log_payment_by_ids(
                 note += f" Did you mean *{current_month.strftime('%b %Y')}* (currently pending)?"
             wrong_month_note = note
 
-    # ── Create payment ─────────────────────────────────────────────────────────
-    payment = Payment(
-        tenancy_id=tenancy.id,
-        amount=amount_dec,
-        payment_date=date.today(),
-        payment_mode=pay_mode,
-        for_type=PaymentFor.rent,
-        period_month=period_month,
-        notes=f"Logged via WhatsApp by {ctx_name}",
-    )
-    session.add(payment)
-
     # ── Update rent schedule ───────────────────────────────────────────────────
     rs = await session.scalar(
         select(RentSchedule).where(
@@ -395,6 +383,19 @@ async def _do_log_payment_by_ids(
             Payment.is_void == False,
         )
     ) or Decimal("0")
+
+    # ── Create payment (AFTER prev_paid query to avoid double-counting) ───────
+    payment = Payment(
+        tenancy_id=tenancy.id,
+        amount=amount_dec,
+        payment_date=date.today(),
+        payment_mode=pay_mode,
+        for_type=PaymentFor.rent,
+        period_month=period_month,
+        notes=f"Logged via WhatsApp by {ctx_name}",
+    )
+    session.add(payment)
+
     total_paid = prev_paid + amount_dec
     rent_due = (rs.rent_due if rs else tenancy.agreed_rent) or Decimal("0")
     adj = (rs.adjustment if rs else Decimal("0")) or Decimal("0")

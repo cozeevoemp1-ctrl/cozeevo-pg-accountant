@@ -439,7 +439,7 @@ async def _checkout_deposit_alerts() -> None:
             # All admin + power_user phones (to always notify owners)
             auth_rows = await conn.execute(text("""
                 SELECT phone FROM authorized_users
-                WHERE role IN ('admin', 'power_user') AND active = TRUE
+                WHERE role IN ('admin', 'owner') AND active = TRUE
             """))
             owner_phones = [r[0] for r in auth_rows.fetchall() if r[0]]
 
