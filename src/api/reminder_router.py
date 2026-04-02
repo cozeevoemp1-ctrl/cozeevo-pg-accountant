@@ -106,6 +106,65 @@ async def preview_rent_reminders():
     }
 
 
+@router.get("/preview-all-tenants")
+async def preview_all_tenants():
+    """Show ALL active tenants who would receive a rent reminder."""
+    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(text("""
+                SELECT t.name, t.phone, r.room_number
+                FROM tenancies tn
+                JOIN tenants t ON t.id = tn.tenant_id
+                JOIN rooms   r ON r.id = tn.room_id
+                WHERE tn.status = 'active'
+                  AND t.phone IS NOT NULL
+                  AND t.phone != ''
+                ORDER BY t.name
+            """))
+            rows = result.fetchall()
+    finally:
+        await engine.dispose()
+
+    tenants = [{"name": r.name, "phone": r.phone, "room": r.room_number} for r in rows]
+    return {"count": len(tenants), "tenants": tenants}
+
+
+@router.post("/blast-rent-reminder")
+async def blast_rent_reminder():
+    """Send rent_reminder template to ALL active tenants. No amount, just generic reminder."""
+    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(text("""
+                SELECT t.name, t.phone
+                FROM tenancies tn
+                JOIN tenants t ON t.id = tn.tenant_id
+                WHERE tn.status = 'active'
+                  AND t.phone IS NOT NULL
+                  AND t.phone != ''
+                ORDER BY t.name
+            """))
+            rows = result.fetchall()
+    finally:
+        await engine.dispose()
+
+    if not rows:
+        return {"sent": 0, "failed": 0, "message": "No active tenants with phone numbers"}
+
+    sent, failed = 0, 0
+    for name, phone in rows:
+        ok = await send_template(phone, "rent_reminder", body_params=[name])
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+
+    return {"sent": sent, "failed": failed, "total": len(rows)}
+
+
 @router.post("/trigger-rent")
 async def trigger_rent_reminders(req: TriggerRentRequest):
     """Manually trigger rent reminders (same logic as the scheduled job)."""
