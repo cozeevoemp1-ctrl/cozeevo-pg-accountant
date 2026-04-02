@@ -38,6 +38,12 @@ _BOT_PHONE_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
 _API_VERSION = "v18.0"
 
+# Map template names to their variable names (must match what's in Meta Business Manager)
+TEMPLATE_PARAM_NAMES = {
+    "rent_reminder": ["name"],
+    "general_notice": ["name", "message"],
+}
+
 
 def _get_reminder_creds() -> tuple[str, str]:
     """Return (token, phone_id) for the reminder number, fallback to bot."""
@@ -59,6 +65,7 @@ async def send_template(
     template_name: str,
     language_code: str = "en",
     body_params: Optional[list[str]] = None,
+    param_names: Optional[list[str]] = None,
 ) -> bool:
     """
     Send an approved Message Template via the official reminder number.
@@ -67,7 +74,9 @@ async def send_template(
         to_number:     Recipient phone (e.g. "+917845952289" or "917845952289")
         template_name: Exact name from Meta Business Manager (e.g. "rent_reminder")
         language_code: Template language (default "en")
-        body_params:   List of strings to fill {{1}}, {{2}}, etc. in the template body
+        body_params:   List of strings to fill template variables
+        param_names:   List of variable names (e.g. ["name"]). If None, uses
+                       TEMPLATE_PARAM_NAMES lookup or falls back to positional.
 
     Returns:
         True if sent successfully, False otherwise.
@@ -81,14 +90,24 @@ async def send_template(
     url = f"https://graph.facebook.com/{_API_VERSION}/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    # Build template component
+    # Build template component — Meta requires named parameters for {{name}} style vars
     components = []
     if body_params:
+        names = param_names or TEMPLATE_PARAM_NAMES.get(template_name, [])
+        if names and len(names) == len(body_params):
+            # Named parameters (new Meta format: {{name}}, {{message}}, etc.)
+            parameters = [
+                {"type": "text", "parameter_name": n, "text": str(v)}
+                for n, v in zip(names, body_params)
+            ]
+        else:
+            # Positional fallback (old Meta format: {{1}}, {{2}}, etc.)
+            parameters = [
+                {"type": "text", "text": str(p)} for p in body_params
+            ]
         components.append({
             "type": "body",
-            "parameters": [
-                {"type": "text", "text": str(p)} for p in body_params
-            ],
+            "parameters": parameters,
         })
 
     payload = {
