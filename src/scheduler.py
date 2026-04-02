@@ -153,10 +153,12 @@ def _log_next_runs(scheduler: AsyncIOScheduler) -> None:
 async def _rent_reminder(label: str = "first") -> None:
     """
     Query active tenancies with unpaid or partially-paid rent for the current month.
-    Send a personalised WhatsApp reminder to each tenant's phone.
+    Send a personalised WhatsApp reminder via the OFFICIAL number (template-based).
+    Falls back to bot number free-form text if official number not configured.
     label: "first" (1st of month) or "second" (15th of month)
     """
     from src.whatsapp.webhook_handler import _send_whatsapp
+    from src.whatsapp.reminder_sender import send_template, _REMINDER_TOKEN
 
     engine = create_async_engine(_ASYNC_DB_URL, echo=False)
     today  = date.today()
@@ -191,37 +193,56 @@ async def _rent_reminder(label: str = "first") -> None:
         return
 
     month_label = today.strftime("%B %Y")
+    use_template = bool(_REMINDER_TOKEN)
     sent = 0
+
     for name, phone, due, paid, balance in rows:
         if not phone:
             continue
-        if label == "first":
-            msg = (
-                f"Hi {name} 👋\n\n"
-                f"This is a friendly reminder that your rent for *{month_label}* is due.\n"
-                f"Amount due: *₹{balance:,.0f}*\n\n"
-                f"Please arrange payment at your earliest convenience.\n"
-                f"Thank you! — Cozeevo PG"
-            )
+
+        if use_template:
+            # Official number — send approved template
+            if label == "first":
+                ok = await send_template(phone, "rent_reminder", body_params=[
+                    name, f"{balance:,.0f}", month_label,
+                ])
+            else:
+                ok = await send_template(phone, "rent_overdue", body_params=[
+                    name, f"{balance:,.0f}", month_label,
+                ])
+            if ok:
+                sent += 1
         else:
-            msg = (
-                f"Hi {name},\n\n"
-                f"This is a *second reminder* — your rent for *{month_label}* is still outstanding.\n"
-                f"Balance: *₹{balance:,.0f}*\n\n"
-                f"Kindly clear this immediately to avoid a late fee.\n"
-                f"— Cozeevo PG"
-            )
-        await _send_whatsapp(phone, msg)
-        sent += 1
+            # Fallback — bot number, free-form text
+            if label == "first":
+                msg = (
+                    f"Hi {name},\n\n"
+                    f"This is a friendly reminder that your rent for *{month_label}* is due.\n"
+                    f"Amount due: *Rs.{balance:,.0f}*\n\n"
+                    f"Please arrange payment at your earliest convenience.\n"
+                    f"Thank you! — Cozeevo Co-living"
+                )
+            else:
+                msg = (
+                    f"Hi {name},\n\n"
+                    f"This is a *second reminder* — your rent for *{month_label}* is still outstanding.\n"
+                    f"Balance: *Rs.{balance:,.0f}*\n\n"
+                    f"Kindly clear this immediately to avoid a late fee.\n"
+                    f"— Cozeevo Co-living"
+                )
+            await _send_whatsapp(phone, msg)
+            sent += 1
 
-    logger.info(f"[Scheduler] rent_reminder ({label}) — sent {sent}/{len(rows)} reminders")
+    source = "official number (template)" if use_template else "bot number (text)"
+    logger.info(f"[Scheduler] rent_reminder ({label}) — sent {sent}/{len(rows)} via {source}")
 
-    # Notify admin with summary
+    # Notify admin with summary (always via bot number)
     if _ADMIN_PHONE and rows:
         summary = (
-            f"📋 *Rent Reminder Sent ({label})* — {month_label}\n"
+            f"*Rent Reminder Sent ({label})* — {month_label}\n"
             f"Tenants messaged: {sent}\n"
-            f"Total outstanding: ₹{sum(r[4] for r in rows):,.0f}"
+            f"Total outstanding: Rs.{sum(r[4] for r in rows):,.0f}\n"
+            f"Sent via: {source}"
         )
         await _send_whatsapp(_ADMIN_PHONE, summary)
 
