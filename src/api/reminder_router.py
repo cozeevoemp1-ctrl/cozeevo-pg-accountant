@@ -65,9 +65,14 @@ async def preview_rent_reminders():
                 SELECT
                     t.name,
                     t.phone,
-                    rs.due_amount,
-                    COALESCE(rs.paid_amount, 0) AS paid,
-                    (rs.due_amount - COALESCE(rs.paid_amount, 0)) AS balance,
+                    (rs.rent_due + rs.maintenance_due + COALESCE(rs.adjustment, 0)) AS due_total,
+                    COALESCE(
+                        (SELECT SUM(p.amount) FROM payments p
+                         WHERE p.tenancy_id = rs.tenancy_id
+                           AND p.period_month = rs.period_month
+                           AND p.for_type IN ('rent', 'maintenance')
+                           AND p.is_void = FALSE), 0
+                    ) AS paid,
                     r.room_number
                 FROM rent_schedule rs
                 JOIN tenancies  tn ON tn.id  = rs.tenancy_id
@@ -75,9 +80,7 @@ async def preview_rent_reminders():
                 JOIN rooms      r  ON r.id   = tn.room_id
                 WHERE rs.period_month = :period
                   AND tn.status       = 'active'
-                  AND rs.is_void      = FALSE
-                  AND (rs.due_amount - COALESCE(rs.paid_amount, 0)) > 0
-                ORDER BY (rs.due_amount - COALESCE(rs.paid_amount, 0)) DESC
+                ORDER BY t.name
             """), {"period": period})
             rows = result.fetchall()
     finally:
@@ -88,11 +91,12 @@ async def preview_rent_reminders():
             "name": r.name,
             "phone": r.phone,
             "room": r.room_number,
-            "due": float(r.due_amount),
+            "due": float(r.due_total),
             "paid": float(r.paid),
-            "balance": float(r.balance),
+            "balance": float(r.due_total - r.paid),
         }
         for r in rows
+        if float(r.due_total - r.paid) > 0
     ]
 
     return {
