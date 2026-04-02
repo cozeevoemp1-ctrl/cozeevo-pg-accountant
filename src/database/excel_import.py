@@ -250,8 +250,8 @@ async def run_import(write: bool) -> None:
             # 1. Normalize room number (handle edge cases)
             room_num = rec['room']
             if not room_num:
-                stats["skipped"] += 1
-                continue
+                room_num = "UNASSIGNED"
+                print(f"  WARN: no room for {rec['name']} — assigning UNASSIGNED")
 
             # Edge case: "May" = future no-show, no room assigned
             if room_num.upper() == 'MAY':
@@ -262,11 +262,11 @@ async def run_import(write: bool) -> None:
                 room_num = room_num.split('/')[0].strip()
 
             # 2. Resolve room — DB building is truth, ignore Excel BLOCK
+            #    NEVER skip a tenant. If room not found, assign UNASSIGNED.
             room = room_by_num.get(room_num)
             if not room:
-                print(f"  SKIP: room {room_num} not in DB — {rec['name']}")
-                stats["skipped"] += 1
-                continue
+                print(f"  WARN: room {room_num} not in DB — {rec['name']} → UNASSIGNED")
+                room = room_by_num["UNASSIGNED"]
 
             # 3. Resolve or create tenant (dedup by phone)
             phone = _norm_phone(rec['phone'])
@@ -293,15 +293,14 @@ async def run_import(write: bool) -> None:
                 stats["tenants"] += 1
                 continue  # dry run — skip DB writes
 
-            # 4. Checkin date
+            # 4. Checkin date — NEVER skip, use fallback if missing
             checkin = rec['checkin']
             if not checkin:
                 if rec['status'] == 'No-show':
                     checkin = date(2025, 12, 1)
                 else:
-                    print(f"  SKIP: no checkin date — {rec['name']}")
-                    stats["skipped"] += 1
-                    continue
+                    checkin = date(2026, 1, 1)  # fallback — flag for review
+                    print(f"  WARN: no checkin date for {rec['name']} — using 2026-01-01 fallback")
 
             # 5. Staff
             staff_name = _norm_staff(rec['staff'])
