@@ -57,7 +57,7 @@ async def preview_rent_reminders():
     """Dry run — show who would receive rent reminders this month."""
     engine = create_async_engine(_ASYNC_DB_URL, echo=False)
     today = date.today()
-    period = today.strftime("%Y-%m-01")
+    period = date(today.year, today.month, 1)
 
     try:
         async with engine.connect() as conn:
