@@ -70,7 +70,6 @@ async def preview_rent_reminders():
                         (SELECT SUM(p.amount) FROM payments p
                          WHERE p.tenancy_id = rs.tenancy_id
                            AND p.period_month = rs.period_month
-                           AND p.for_type IN ('rent', 'maintenance')
                            AND p.is_void = FALSE), 0
                     ) AS paid,
                     r.room_number
