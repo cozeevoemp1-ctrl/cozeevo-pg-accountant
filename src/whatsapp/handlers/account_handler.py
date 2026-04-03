@@ -550,15 +550,27 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
 
     tenant, tenancy, _room = rows[0]
 
+    # Try current month first, then fall back to most recent
+    if month_num:
+        period = date(date.today().year, int(month_num), 1)
+    else:
+        period = date.today().replace(day=1)  # default to current month
+
     q = select(Payment).where(
         Payment.tenancy_id == tenancy.id,
         Payment.is_void == False,
+        Payment.period_month == period,
     ).order_by(Payment.created_at.desc())
-    if month_num:
-        period = date(date.today().year, int(month_num), 1)
-        q = q.where(Payment.period_month == period)
-
     payment = await session.scalar(q)
+
+    # If no payment found for current month, try most recent across all months
+    if not payment and not month_num:
+        q_any = select(Payment).where(
+            Payment.tenancy_id == tenancy.id,
+            Payment.is_void == False,
+        ).order_by(Payment.created_at.desc())
+        payment = await session.scalar(q_any)
+
     if not payment:
         return f"No active payment found for *{tenant.name}*."
 
