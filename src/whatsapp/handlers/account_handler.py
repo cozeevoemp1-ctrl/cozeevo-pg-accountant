@@ -460,13 +460,12 @@ async def _do_log_payment_by_ids(
     room_obj = await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room_obj.room_number})" if room_obj else ""
 
-    # ── Google Sheets write-back (true fire-and-forget — never blocks response) ─
+    # ── Google Sheets write-back (with 10s timeout — never hangs) ────────────
     import asyncio as _aio
-
-    async def _bg_sheet_update():
+    if room_obj:
         try:
             from src.integrations.gsheets import update_payment as gsheets_update
-            await gsheets_update(
+            await _aio.wait_for(gsheets_update(
                 room_number=room_obj.room_number,
                 tenant_name=tenant.name,
                 amount=float(amount_dec),
@@ -474,13 +473,13 @@ async def _do_log_payment_by_ids(
                 month=period_month.month,
                 year=period_month.year,
                 entered_by=ctx_name or "bot",
-            )
+            ), timeout=10)
+        except _aio.TimeoutError:
+            import logging as _logging
+            _logging.getLogger(__name__).warning("GSheets write-back timed out (10s)")
         except Exception as e:
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
-
-    if room_obj:
-        _aio.create_task(_bg_sheet_update())
 
     return (
         f"*Payment logged — {tenant.name}{room_label}*\n"
@@ -658,20 +657,20 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
         if room_obj:
             _void_room = room_obj.room_number
 
-    async def _bg_void_sheet():
+    if _void_room:
         try:
             from src.integrations.gsheets import void_payment as gsheets_void
-            await gsheets_void(
+            await _aio.wait_for(gsheets_void(
                 room_number=_void_room, tenant_name=tenant_name,
                 amount=_void_amount, method=_void_method,
                 month=_void_month, year=_void_year,
-            )
+            ), timeout=10)
+        except _aio.TimeoutError:
+            import logging as _logging
+            _logging.getLogger(__name__).warning("GSheets void timed out (10s)")
         except Exception as e:
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets void failed: %s", e)
-
-    if _void_room:
-        _aio.create_task(_bg_void_sheet())
 
     period_str = payment.period_month.strftime("%b %Y") if payment.period_month else ""
     return (
