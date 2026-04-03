@@ -231,15 +231,15 @@ async def resolve_pending_action(
     if pending.intent == "CONFIRM_PAYMENT_LOG":
         # ── Correction check (before yes/no) ──────────────────────────────────
         _MODE_MAP = {
-            "upi": "UPI", "cash": "Cash", "gpay": "GPay", "phonepe": "PhonePe",
-            "paytm": "Paytm", "online": "Online", "bank": "Bank Transfer",
-            "neft": "NEFT", "cheque": "Cheque", "imps": "IMPS",
+            "upi": "upi", "cash": "cash", "gpay": "upi", "phonepe": "upi",
+            "paytm": "upi", "online": "upi", "bank": "bank_transfer",
+            "neft": "bank_transfer", "cheque": "cheque", "imps": "upi",
         }
         _corrected = False
         _rl = reply_text.lower()
-        for _word, _label in _MODE_MAP.items():
-            if _word in _rl and _label != action_data.get("mode", ""):
-                action_data["mode"] = _label
+        for _word, _norm in _MODE_MAP.items():
+            if _word in _rl and _norm != action_data.get("mode", "").lower():
+                action_data["mode"] = _norm
                 _corrected = True
                 break
         _amt_m = re.search(r"\b(\d[\d,]+)\b", reply_text)
@@ -269,7 +269,7 @@ async def resolve_pending_action(
             pending.action_data = json.dumps(action_data)
             await session.flush()
             _amt   = int(action_data["amount"])
-            _mode  = action_data.get("mode", "Cash")
+            _mode  = (action_data.get("mode") or "cash").upper()
             _tname = action_data.get("tenant_name", "")
             _room  = action_data.get("room_number", "")
             _tlabel = f"{_tname} (Room {_room})" if _room else _tname
@@ -327,7 +327,7 @@ async def resolve_pending_action(
         _corrected_alloc = False
         _rl_alloc = ans.lower()
         for _word, _norm in _MODE_MAP_ALLOC.items():
-            if _word in _rl_alloc and _norm != action_data.get("mode", ""):
+            if _word in _rl_alloc and _norm != action_data.get("mode", "").lower():
                 action_data["mode"] = _norm
                 _corrected_alloc = True
                 break

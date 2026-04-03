@@ -116,6 +116,8 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     room   = entities.get("room", "").strip()
     amount = entities.get("amount")
     mode   = entities.get("payment_mode")  # None if not specified — will ask user
+    if mode:
+        mode = mode.lower().strip()
     month_num = entities.get("month")
 
     # If no amount AND no name -> start step-by-step collect rent form
@@ -289,7 +291,8 @@ async def _do_log_payment_by_ids(
     except ValueError:
         period_month = current_month
 
-    pay_mode = PaymentMode.upi if mode == "upi" else PaymentMode.cash
+    mode_lower = (mode or "cash").lower().strip()
+    pay_mode = PaymentMode.upi if mode_lower in ("upi", "gpay", "phonepe", "paytm", "online", "transfer") else PaymentMode.cash
     amount_dec = Decimal(str(amount))
 
     # ── Duplicate detection ────────────────────────────────────────────────────
