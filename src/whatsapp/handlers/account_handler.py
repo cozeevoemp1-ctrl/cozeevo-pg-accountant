@@ -115,7 +115,7 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     name   = entities.get("name", "").strip()
     room   = entities.get("room", "").strip()
     amount = entities.get("amount")
-    mode   = entities.get("payment_mode", "cash")
+    mode   = entities.get("payment_mode")  # None if not specified — will ask user
     month_num = entities.get("month")
 
     # If no amount AND no name -> start step-by-step collect rent form
@@ -154,7 +154,8 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     if len(rows) == 0:
         suggestions = await _find_similar_names(name, session) if name else []
         base = _format_no_match_message(name or room, suggestions)
-        return base + f"\n\n_(Amount to log: Rs.{int(amount):,} {(mode or 'cash').upper()})_"
+        mode_hint = f" {mode.upper()}" if mode else ""
+        return base + f"\n\n_(Amount to log: Rs.{int(amount):,}{mode_hint})_"
 
     # Determine intended period month
     current_month = date.today().replace(day=1)
@@ -178,7 +179,7 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
                     "tenant_id": tenant.id,
                     "tenancy_id": tenancy.id,
                     "amount": amount,
-                    "mode": mode,
+                    "mode": mode or "cash",
                     "logged_by": ctx.name or ctx.phone,
                     "period_month": pm.isoformat(),
                     "tenant_name": tenant.name,
@@ -204,11 +205,12 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
 
         # Build allocation data for pending
         alloc_data = [{"period": a["period"].isoformat(), "amount": float(a["amount"])} for a in allocation]
+        effective_mode = mode or "cash"
         pending_data = {
             "tenant_id": tenant.id,
             "tenancy_id": tenancy.id,
             "amount": amount,
-            "mode": mode,
+            "mode": effective_mode,
             "logged_by": ctx.name or ctx.phone,
             "allocation": alloc_data,
             "tenant_name": tenant.name,
@@ -223,20 +225,28 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
             ]
 
         await _save_pending(ctx.phone, "CONFIRM_PAYMENT_ALLOC", pending_data, [], session)
-        alloc_text = format_allocation(allocation, amount, mode)
 
-        if len(pending_months) > 1:
+        mode_label = effective_mode.upper()
+        if len(pending_months) == 1:
+            # Single month — simple confirmation, no "Suggested allocation" noise
+            pm = pending_months[0]
+            clears = amount_dec >= pm["remaining"]
+            status = "clears balance" if clears else "partial"
+            return (
+                snapshot["text"] + "\n\n"
+                f"*Confirm Payment?*\n"
+                f"- Amount : Rs.{int(amount):,}\n"
+                f"- Mode   : {mode_label}\n"
+                f"- Month  : {pm['period'].strftime('%B %Y')} ({status})\n\n"
+                "Reply *Yes* to log or *No* to cancel."
+            )
+        else:
+            alloc_text = format_allocation(allocation, amount, effective_mode)
             return (
                 snapshot["text"] + "\n"
                 + alloc_text + "\n\n"
                 'Reply *Yes* to confirm, or specify different allocation:\n'
                 '  e.g. "all to march" or "feb 3000 march 5000"'
-            )
-        else:
-            return (
-                snapshot["text"] + "\n"
-                + alloc_text + "\n\n"
-                "Reply *Yes* to confirm, or *No* to cancel."
             )
 
     # Multiple tenant matches — ask which one

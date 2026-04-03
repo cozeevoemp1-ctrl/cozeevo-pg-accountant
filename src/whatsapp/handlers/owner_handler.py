@@ -318,6 +318,42 @@ async def resolve_pending_action(
         if is_negative(ans):
             return "Cancelled. No payment logged."
 
+        # ── Mode/amount correction (same logic as CONFIRM_PAYMENT_LOG) ────────
+        _MODE_MAP_ALLOC = {
+            "upi": "upi", "cash": "cash", "gpay": "upi", "phonepe": "upi",
+            "paytm": "upi", "online": "upi", "transfer": "upi",
+            "neft": "bank_transfer", "cheque": "cheque", "imps": "upi",
+        }
+        _corrected_alloc = False
+        _rl_alloc = ans.lower()
+        for _word, _norm in _MODE_MAP_ALLOC.items():
+            if _word in _rl_alloc and _norm != action_data.get("mode", ""):
+                action_data["mode"] = _norm
+                _corrected_alloc = True
+                break
+        _amt_m_alloc = re.search(r"\b(\d[\d,]+)\b", ans)
+        if _amt_m_alloc and not is_affirmative(ans):
+            _new_amt = float(_amt_m_alloc.group(1).replace(",", ""))
+            if _new_amt != action_data.get("amount", 0) and _new_amt > 0:
+                action_data["amount"] = _new_amt
+                _corrected_alloc = True
+        if _corrected_alloc and not is_affirmative(ans):
+            pending.action_data = json.dumps(action_data)
+            await session.flush()
+            _amt   = int(action_data["amount"])
+            _mode  = (action_data.get("mode") or "cash").upper()
+            _tname = action_data.get("tenant_name", "")
+            _room  = action_data.get("room_number", "")
+            _tlabel = f"{_tname} (Room {_room})" if _room else _tname
+            return (
+                "__KEEP_PENDING__"
+                f"Updated. Please confirm:\n"
+                f"- Tenant: {_tlabel}\n"
+                f"- Amount: Rs.{_amt:,}\n"
+                f"- Mode: {_mode}\n\n"
+                "Reply *Yes* to confirm or *No* to cancel."
+            )
+
         if is_affirmative(ans):
             allocation = action_data.get("allocation", [])
             results = []
