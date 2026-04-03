@@ -1877,6 +1877,56 @@ async def resolve_pending_action(
             return await _do_void_expense(match["expense_id"], session)
         return "Void cancelled."
 
+    if pending.intent == "VOID_WHO":
+        # User picked which tenant to void — now find their latest payment
+        tenant_id = chosen.get("tenant_id")
+        tenancy_id = chosen.get("tenancy_id")
+        if not tenant_id or not tenancy_id:
+            return "Invalid selection. Try again."
+        # Get most recent non-void payment for current month
+        from src.database.models import Payment as _Pay
+        current_period = date.today().replace(day=1)
+        q = select(_Pay).where(
+            _Pay.tenancy_id == tenancy_id,
+            _Pay.is_void == False,
+            _Pay.period_month == current_period,
+        ).order_by(_Pay.created_at.desc())
+        payment = await session.scalar(q)
+        if not payment:
+            # Try any recent payment
+            q2 = select(_Pay).where(
+                _Pay.tenancy_id == tenancy_id,
+                _Pay.is_void == False,
+                _Pay.period_month.isnot(None),
+            ).order_by(_Pay.created_at.desc())
+            payment = await session.scalar(q2)
+        if not payment:
+            return f"No active payment found for this tenant."
+        # Show void confirmation
+        t_name = chosen.get("label", "").split(" (Room")[0]
+        period_str = payment.period_month.strftime("%b %Y") if payment.period_month else "?"
+        void_choices = [
+            {"seq": 1, "label": "Yes, void it"},
+            {"seq": 2, "label": "No, keep it"},
+        ]
+        from src.whatsapp.handlers._shared import _save_pending
+        await _save_pending(
+            pending.phone, "VOID_PAYMENT",
+            {"payment_id": payment.id, "tenant_name": t_name,
+             "amount": float(payment.amount), "period_month": payment.period_month.isoformat() if payment.period_month else ""},
+            void_choices, session,
+        )
+        return (
+            "__KEEP_PENDING__"
+            f"*Void this payment?*\n"
+            f"Tenant: {t_name}\n"
+            f"Amount: Rs.{int(payment.amount):,} ({payment.payment_mode.value if payment.payment_mode else '?'})\n"
+            f"Month: {period_str}\n\n"
+            "1. Yes, void it\n"
+            "2. No, keep it\n\n"
+            "Reply *1* or *2*."
+        )
+
     if pending.intent == "DEPOSIT_CHANGE":
         if is_affirmative(reply_text):
             from src.whatsapp.handlers.account_handler import _do_deposit_change
