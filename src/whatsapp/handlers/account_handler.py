@@ -460,12 +460,13 @@ async def _do_log_payment_by_ids(
     room_obj = await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room_obj.room_number})" if room_obj else ""
 
-    # ── Google Sheets write-back (fire-and-forget) ────────────────────────────
-    gsheets_note = ""
-    if room_obj:
+    # ── Google Sheets write-back (true fire-and-forget — never blocks response) ─
+    import asyncio as _aio
+
+    async def _bg_sheet_update():
         try:
             from src.integrations.gsheets import update_payment as gsheets_update
-            gs_result = await gsheets_update(
+            await gsheets_update(
                 room_number=room_obj.room_number,
                 tenant_name=tenant.name,
                 amount=float(amount_dec),
@@ -474,38 +475,12 @@ async def _do_log_payment_by_ids(
                 year=period_month.year,
                 entered_by=ctx_name or "bot",
             )
-            if gs_result.get("error"):
-                import logging as _logging
-                _logging.getLogger(__name__).warning("GSheets: %s", gs_result["error"])
-                gsheets_note = f"\n⚠️ Sheet not updated: {gs_result['error']}"
-            elif gs_result.get("success"):
-                sheet_month = gs_result.get("month", period_month.month)
-                month_names = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun"}
-                ml = month_names.get(sheet_month, f"M{sheet_month}")
-                rent = gs_result.get("rent_due", 0)
-                total = gs_result.get("total_paid", 0)
-                parts = [f"Sheet updated ({ml})"]
-                if rent > 0:
-                    parts.append(f"Rs.{int(total):,}/{int(rent):,}")
-                overpay = gs_result.get("overpayment", 0)
-                if overpay and overpay > 0:
-                    parts.append(f"OVERPAID +Rs.{int(overpay):,}")
-                warning = gs_result.get("warning")
-                if warning:
-                    parts.append(warning)
-                gsheets_note = "\n" + " | ".join(parts)
-                # Previous month dues reminder
-                prev_dues = gs_result.get("prev_dues", 0)
-                if prev_dues and prev_dues > 0:
-                    prev_tab = gs_result.get("prev_tab", "")
-                    prev_notes = gs_result.get("prev_notes", "")
-                    gsheets_note += f"\n⚠️ *Previous dues: Rs.{int(prev_dues):,}* ({prev_tab})"
-                    if prev_notes:
-                        gsheets_note += f"\nPrev notes: {prev_notes[:100]}"
         except Exception as e:
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
-            # Don't block the payment response on sheet errors
+
+    if room_obj:
+        _aio.create_task(_bg_sheet_update())
 
     return (
         f"*Payment logged — {tenant.name}{room_label}*\n"
@@ -671,36 +646,39 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
             else:
                 rs.status = RentStatus.paid
 
-    # ── Google Sheets write-back (reverse the payment in Sheet) ─────────────
-    gsheets_note = ""
+    # ── Google Sheets write-back (true fire-and-forget — never blocks response) ─
+    import asyncio as _aio
+    _void_room = None
+    _void_method = payment.payment_mode.value if payment.payment_mode else "cash"
+    _void_amount = float(payment.amount)
+    _void_month = payment.period_month.month if payment.period_month else None
+    _void_year = payment.period_month.year if payment.period_month else None
     tenancy = await session.get(Tenancy, payment.tenancy_id)
     if tenancy:
         room_obj = await session.get(Room, tenancy.room_id)
         if room_obj:
-            try:
-                from src.integrations.gsheets import void_payment as gsheets_void
-                method_str = payment.payment_mode.value if payment.payment_mode else "cash"
-                gs_result = await gsheets_void(
-                    room_number=room_obj.room_number,
-                    tenant_name=tenant_name,
-                    amount=float(payment.amount),
-                    method=method_str,
-                    month=payment.period_month.month if payment.period_month else None,
-                    year=payment.period_month.year if payment.period_month else None,
-                )
-                if gs_result.get("success"):
-                    gsheets_note = "\nSheet updated."
-                elif gs_result.get("error"):
-                    gsheets_note = f"\nSheet not updated: {gs_result['error']}"
-            except Exception as e:
-                import logging as _logging
-                _logging.getLogger(__name__).error("GSheets void failed: %s", e)
+            _void_room = room_obj.room_number
+
+    async def _bg_void_sheet():
+        try:
+            from src.integrations.gsheets import void_payment as gsheets_void
+            await gsheets_void(
+                room_number=_void_room, tenant_name=tenant_name,
+                amount=_void_amount, method=_void_method,
+                month=_void_month, year=_void_year,
+            )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).error("GSheets void failed: %s", e)
+
+    if _void_room:
+        _aio.create_task(_bg_void_sheet())
 
     period_str = payment.period_month.strftime("%b %Y") if payment.period_month else ""
     return (
         f"*Payment voided — {tenant_name}*\n"
         f"Rs.{int(payment.amount):,} for {period_str} reversed.\n"
-        f"Rent schedule updated. Log correct payment if needed.{gsheets_note}"
+        f"Rent schedule updated. Log correct payment if needed."
     )
 
 
