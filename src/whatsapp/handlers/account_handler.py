@@ -550,7 +550,7 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
 
     tenant, tenancy, _room = rows[0]
 
-    # Try current month first, then fall back to most recent
+    # Try specified month or current month first
     if month_num:
         period = date(date.today().year, int(month_num), 1)
     else:
@@ -563,16 +563,48 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
     ).order_by(Payment.created_at.desc())
     payment = await session.scalar(q)
 
-    # If no payment found for current month, try most recent across all months
+    # If no payment for current month and user didn't specify month,
+    # show all recent payments and ask which one to void
     if not payment and not month_num:
-        q_any = select(Payment).where(
+        from sqlalchemy import select as sa_select
+        q_recent = select(Payment).where(
             Payment.tenancy_id == tenancy.id,
             Payment.is_void == False,
-        ).order_by(Payment.created_at.desc())
-        payment = await session.scalar(q_any)
+        ).order_by(Payment.created_at.desc()).limit(5)
+        recent_payments = (await session.execute(q_recent)).scalars().all()
+
+        if not recent_payments:
+            return f"No active payments found for *{tenant.name}*."
+
+        if len(recent_payments) == 1:
+            payment = recent_payments[0]
+        else:
+            # Multiple payments across months — ask user to pick
+            lines = [f"*Which payment to void for {tenant.name}?*\n"]
+            choices = []
+            for i, p in enumerate(recent_payments, 1):
+                pm_str = p.period_month.strftime("%b %Y") if p.period_month else "?"
+                mode_str = p.payment_mode.value if p.payment_mode else "?"
+                lines.append(f"*{i}.* Rs.{int(p.amount):,} ({mode_str}) — {pm_str}")
+                choices.append({
+                    "seq": i,
+                    "label": f"Rs.{int(p.amount):,} {mode_str} {pm_str}",
+                    "payment_id": p.id,
+                    "tenant_name": tenant.name,
+                    "amount": float(p.amount),
+                    "period_month": p.period_month.isoformat() if p.period_month else "",
+                })
+            lines.append("\nReply with the number, or say *cancel*.")
+            await _save_pending(
+                ctx.phone, "VOID_WHICH",
+                {"tenant_name": tenant.name, "payments": choices},
+                choices, session,
+            )
+            return "\n".join(lines)
 
     if not payment:
-        return f"No active payment found for *{tenant.name}*."
+        month_label = period.strftime("%B %Y")
+        return f"No active payment found for *{tenant.name}* in {month_label}."
 
     choices = [
         {"seq": 1, "label": "Yes, void it"},

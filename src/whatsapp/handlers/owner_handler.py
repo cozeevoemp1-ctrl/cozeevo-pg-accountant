@@ -1834,6 +1834,40 @@ async def resolve_pending_action(
             )
         return "Void cancelled — payment remains as logged."
 
+    if pending.intent == "VOID_WHICH":
+        # User picked which payment to void from the list
+        from src.whatsapp.handlers._shared import _save_pending
+        choices_data = json.loads(pending.choices or "[]")
+        seq = chosen.get("seq")
+        match = next((c for c in choices_data if c["seq"] == seq), None)
+        if not match:
+            return "Invalid choice. Void cancelled."
+        # Now confirm before voiding
+        p_id = match["payment_id"]
+        t_name = match["tenant_name"]
+        amt = match["amount"]
+        pm = match.get("period_month", "")
+        pm_label = date.fromisoformat(pm).strftime("%b %Y") if pm else "?"
+        confirm_choices = [
+            {"seq": 1, "label": "Yes, void it"},
+            {"seq": 2, "label": "No, keep it"},
+        ]
+        await _save_pending(
+            pending.phone, "VOID_PAYMENT",
+            {"payment_id": p_id, "tenant_name": t_name, "amount": amt, "period_month": pm},
+            confirm_choices, session,
+        )
+        return (
+            f"__KEEP_PENDING__"
+            f"*Void this payment?*\n"
+            f"Tenant: {t_name}\n"
+            f"Amount: Rs.{int(amt):,}\n"
+            f"Month: {pm_label}\n\n"
+            "1. Yes, void it\n"
+            "2. No, keep it\n\n"
+            "Reply *1* or *2*."
+        )
+
     if pending.intent == "VOID_EXPENSE":
         choices_data = json.loads(pending.choices or "[]")
         seq = chosen.get("seq")
