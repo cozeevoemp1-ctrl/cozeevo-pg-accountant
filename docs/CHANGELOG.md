@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.15.0] — 2026-04-02 — Official WhatsApp Reminder System + Data Integrity Fixes
+
+### Added
+- **Reminder system via official WhatsApp number** — separate Indian number (85488 84466) for sending template-based rent reminders to all tenants
+- **`src/whatsapp/reminder_sender.py`** — template + text sending via official number, auto-fallback to bot number
+- **`src/api/reminder_router.py`** — API endpoints: preview-rent, preview-all-tenants, blast-rent-reminder, trigger-rent, send-custom, send-bulk
+- **Meta Message Templates** — `rent_reminder` and `general_notice` approved and working
+- **Named template parameters** — supports Meta's new `{{name}}` style variables
+
+### Fixed
+- **GSheets payment write-back was broken** — `ctx.name` referenced undefined variable `ctx`, should be `ctx_name`. Every bot payment was silently failing to update the Sheet.
+- **Excel import silently skipping tenants** — missing room or checkin date caused ~22 tenants to be dropped. Now assigns UNASSIGNED room and fallback date instead of skipping.
+
+### Architecture
+- Two WhatsApp numbers: +1 55 (bot, DM conversations) + 84466 (official, reminders only)
+- 84455 remains regular WhatsApp Business app for manual chatting
+- Reminder templates direct tenants to send receipts to 84455
+- Scheduler sends reminders on 1st/15th of month via official number when configured
+
+### Config
+- New env vars: `REMINDER_WHATSAPP_TOKEN`, `REMINDER_WHATSAPP_PHONE_NUMBER_ID`
+
 ## [1.14.0] — 2026-04-01 — Sheet Dashboard Auto-Refresh + Full April Reload
 
 ### Fixed
