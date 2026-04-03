@@ -573,6 +573,7 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
         q_recent = select(Payment).where(
             Payment.tenancy_id == tenancy.id,
             Payment.is_void == False,
+            Payment.period_month.isnot(None),  # exclude booking/deposit with no month
         ).order_by(Payment.created_at.desc()).limit(5)
         recent_payments = (await session.execute(q_recent)).scalars().all()
 
