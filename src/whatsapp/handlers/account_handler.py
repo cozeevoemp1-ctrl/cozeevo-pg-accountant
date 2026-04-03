@@ -623,11 +623,36 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
             else:
                 rs.status = RentStatus.paid
 
+    # ── Google Sheets write-back (reverse the payment in Sheet) ─────────────
+    gsheets_note = ""
+    tenancy = await session.get(Tenancy, payment.tenancy_id)
+    if tenancy:
+        room_obj = await session.get(Room, tenancy.room_id)
+        if room_obj:
+            try:
+                from src.integrations.gsheets import void_payment as gsheets_void
+                method_str = payment.payment_mode.value if payment.payment_mode else "cash"
+                gs_result = await gsheets_void(
+                    room_number=room_obj.room_number,
+                    tenant_name=tenant_name,
+                    amount=float(payment.amount),
+                    method=method_str,
+                    month=payment.period_month.month if payment.period_month else None,
+                    year=payment.period_month.year if payment.period_month else None,
+                )
+                if gs_result.get("success"):
+                    gsheets_note = "\nSheet updated."
+                elif gs_result.get("error"):
+                    gsheets_note = f"\nSheet not updated: {gs_result['error']}"
+            except Exception as e:
+                import logging as _logging
+                _logging.getLogger(__name__).error("GSheets void failed: %s", e)
+
     period_str = payment.period_month.strftime("%b %Y") if payment.period_month else ""
     return (
         f"*Payment voided — {tenant_name}*\n"
         f"Rs.{int(payment.amount):,} for {period_str} reversed.\n"
-        "Rent schedule updated. Log correct payment if needed."
+        f"Rent schedule updated. Log correct payment if needed.{gsheets_note}"
     )
 
 

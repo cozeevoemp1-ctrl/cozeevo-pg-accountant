@@ -1006,6 +1006,116 @@ async def update_payment(
     )
 
 
+def _void_payment_sync(
+    room_number: str,
+    tenant_name: str,
+    amount: float,
+    method: str,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+) -> dict:
+    """
+    Reverse/void a payment in the monthly tab. SUBTRACTS amount from Cash or UPI column.
+    """
+    result = {"success": False, "error": None}
+    method = method.lower().strip()
+    if method not in ("cash", "upi"):
+        method = "cash"  # fallback
+
+    today = date.today()
+    if month is None:
+        month = today.month
+    if year is None:
+        year = today.year
+
+    tab_name = _month_tab_name(month, year)
+    try:
+        sh = get_sheet()
+        ws = sh.worksheet(tab_name)
+    except gspread.WorksheetNotFound:
+        result["error"] = f"Tab '{tab_name}' not found"
+        return result
+    except Exception as e:
+        result["error"] = f"Sheet access failed: {e}"
+        return result
+
+    all_vals = ws.get_all_values()
+    found = _find_tenant_row(all_vals, room_number, tenant_name)
+    if found is None:
+        result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
+        return result
+
+    row, row_data = found
+
+    header_row = all_vals[3] if len(all_vals) > 3 else []
+    is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
+
+    if is_new:
+        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
+            M_CASH, M_UPI, M_RENT_DUE, M_PREV_DUE, M_TOTAL_PAID, M_BALANCE, M_STATUS, M_NOTES)
+    else:
+        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
+            5, 6, 4, 15, 7, 8, 9, 12)
+
+    target_col = col_cash if method == "cash" else col_upi
+    other_col = col_upi if method == "cash" else col_cash
+
+    existing_target = _safe_parse_numeric(_cell(row_data, target_col))
+    existing_other = _safe_parse_numeric(_cell(row_data, other_col))
+    rent_due = _safe_parse_numeric(_cell(row_data, col_rent))
+    prev_due = _safe_parse_numeric(_cell(row_data, col_prev))
+
+    new_target = max(0, existing_target - amount)  # never go negative
+    new_total_paid = new_target + existing_other
+    total_due = rent_due + prev_due
+    new_balance = total_due - new_total_paid
+
+    if new_total_paid >= total_due and total_due > 0:
+        new_status = "PAID"
+    elif new_total_paid > 0:
+        new_status = "PARTIAL"
+    else:
+        new_status = "UNPAID"
+
+    ts = datetime.now().strftime("%d-%b %H:%M")
+    note_entry = f"[{ts}] VOID Rs.{int(amount):,} {method.upper()}"
+    existing_notes = _cell(row_data, col_notes)
+    updated_notes = f"{existing_notes} | {note_entry}" if existing_notes else note_entry
+
+    try:
+        batch = [
+            {"range": gspread.utils.rowcol_to_a1(row, target_col + 1), "values": [[new_target]]},
+            {"range": gspread.utils.rowcol_to_a1(row, col_tp + 1), "values": [[new_total_paid]]},
+            {"range": gspread.utils.rowcol_to_a1(row, col_bal + 1), "values": [[new_balance]]},
+            {"range": gspread.utils.rowcol_to_a1(row, col_st + 1), "values": [[new_status]]},
+            {"range": gspread.utils.rowcol_to_a1(row, col_notes + 1), "values": [[updated_notes]]},
+        ]
+        ws.batch_update(batch, value_input_option="USER_ENTERED")
+        result["success"] = True
+        logger.info("GSheets VOID: row %d in %s — Room %s / %s — Rs.%s %s",
+                     row, tab_name, room_number, tenant_name, int(amount), method.upper())
+        _refresh_summary_sync(tab_name)
+    except Exception as e:
+        result["error"] = f"Batch update failed: {e}"
+        logger.error("GSheets void error: %s", e)
+
+    return result
+
+
+async def void_payment(
+    room_number: str,
+    tenant_name: str,
+    amount: float,
+    method: str,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+) -> dict:
+    """Async entry point — void/reverse a payment in Google Sheet monthly tab."""
+    return await asyncio.to_thread(
+        _void_payment_sync, room_number, tenant_name, amount, method, month, year,
+    )
+
+
 async def add_tenant(
     room_number: str,
     name: str,
