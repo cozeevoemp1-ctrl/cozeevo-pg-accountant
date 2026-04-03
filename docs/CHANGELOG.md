@@ -2,24 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
-## [1.15.0] — 2026-04-02 — Official WhatsApp Reminder System + Data Integrity Fixes
+## [1.15.0] — 2026-04-02/03 — Reminder System + Payment Flow Fixes + Sheet Sync
 
 ### Added
-- **Reminder system via official WhatsApp number** — separate Indian number (85488 84466) for sending template-based rent reminders to all tenants
-- **`src/whatsapp/reminder_sender.py`** — template + text sending via official number, auto-fallback to bot number
-- **`src/api/reminder_router.py`** — API endpoints: preview-rent, preview-all-tenants, blast-rent-reminder, trigger-rent, send-custom, send-bulk
+- **Reminder system via official WhatsApp number** — 85488 84466 sends template-based rent reminders
+- **`src/whatsapp/reminder_sender.py`** — template + text sending, auto-fallback to bot number
+- **`src/api/reminder_router.py`** — endpoints: preview-rent, preview-all-tenants, blast-rent-reminder, send-custom, send-bulk
 - **Meta Message Templates** — `rent_reminder` and `general_notice` approved and working
-- **Named template parameters** — supports Meta's new `{{name}}` style variables
+- **GSheets void_payment()** — voids now sync to Sheet (subtract amount, update status/notes)
+- **Void payment picker** — when no current month payment, shows list of recent payments to choose from
+- **CONFIRM_PAYMENT_ALLOC mode correction** — replies like "upi" or "no she paid upi" now update payment mode
 
 ### Fixed
-- **GSheets payment write-back was broken** — `ctx.name` referenced undefined variable `ctx`, should be `ctx_name`. Every bot payment was silently failing to update the Sheet.
-- **Excel import silently skipping tenants** — missing room or checkin date caused ~22 tenants to be dropped. Now assigns UNASSIGNED room and fallback date instead of skipping.
+- **GSheets payment write-back was broken** — `ctx.name` → `ctx_name` (every bot payment was silently failing)
+- **GSheets method validation** — `Cash` rejected, now lowercased before validation
+- **Excel import silently skipping tenants** — missing room → UNASSIGNED, missing date → fallback
+- **Payment mode defaulting to CASH** — no longer hardcoded, uses explicit fallback
+- **"Suggested allocation" noise** — single-month payments now show simple confirmation
+- **Void defaulting to most recent payment** — now defaults to current month, prevents accidental old-month voids
 
 ### Architecture
-- Two WhatsApp numbers: +1 55 (bot, DM conversations) + 84466 (official, reminders only)
+- Two WhatsApp numbers: +1 55 (bot) + 84466 (official, reminders only)
 - 84455 remains regular WhatsApp Business app for manual chatting
-- Reminder templates direct tenants to send receipts to 84455
-- Scheduler sends reminders on 1st/15th of month via official number when configured
+- Scheduler sends reminders on 1st/15th via official number when configured
 
 ### Config
 - New env vars: `REMINDER_WHATSAPP_TOKEN`, `REMINDER_WHATSAPP_PHONE_NUMBER_ID`
