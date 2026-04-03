@@ -1039,7 +1039,19 @@ def _void_payment_sync(
         return result
 
     all_vals = ws.get_all_values()
-    found = _find_tenant_row(all_vals, room_number, tenant_name)
+    room_clean = room_number.strip().upper()
+    name_lower = tenant_name.strip().lower()
+    found = None
+    for i in range(4, len(all_vals)):
+        r_data = all_vals[i]
+        if not r_data or not r_data[0]:
+            continue
+        cell_room = str(r_data[0]).strip().upper()
+        cell_name = str(r_data[1]).strip().lower() if len(r_data) > 1 else ""
+        if cell_room == room_clean and (name_lower in cell_name or cell_name in name_lower):
+            found = (i + 1, r_data)
+            break
+
     if found is None:
         result["error"] = f"Row not found for Room {room_number} / {tenant_name} in {tab_name}"
         return result
