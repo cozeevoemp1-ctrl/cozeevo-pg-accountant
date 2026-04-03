@@ -1088,10 +1088,22 @@ def _void_payment_sync(
     else:
         new_status = "UNPAID"
 
-    ts = datetime.now().strftime("%d-%b %H:%M")
-    note_entry = f"[{ts}] VOID Rs.{int(amount):,} {method.upper()}"
+    # Remove the specific payment note that was added when this payment was logged
+    # Notes format: "[03-Apr 11:00] Rs.5,000 UPI by Kiran | [other notes]"
     existing_notes = _cell(row_data, col_notes)
-    updated_notes = f"{existing_notes} | {note_entry}" if existing_notes else note_entry
+    import re as _re
+    # Match pattern: [date time] Rs.AMOUNT METHOD ... (with optional "by Name")
+    amount_str = f"{int(amount):,}"
+    method_upper = method.upper()
+    # Remove the matching note entry (last occurrence — most recent payment)
+    pattern = _re.compile(
+        r'\s*\|?\s*\[\d{2}-\w{3}\s\d{2}:\d{2}\]\s*Rs\.' + _re.escape(amount_str)
+        + r'\s+' + _re.escape(method_upper) + r'[^|]*',
+        _re.IGNORECASE,
+    )
+    updated_notes = pattern.sub('', existing_notes).strip(' |')
+    if not updated_notes:
+        updated_notes = ""
 
     try:
         batch = [
