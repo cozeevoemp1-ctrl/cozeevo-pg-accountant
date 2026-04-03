@@ -232,8 +232,9 @@ async def resolve_pending_action(
         # ── Correction check (before yes/no) ──────────────────────────────────
         _MODE_MAP = {
             "upi": "upi", "cash": "cash", "gpay": "upi", "phonepe": "upi",
-            "paytm": "upi", "online": "upi", "bank": "bank_transfer",
-            "neft": "bank_transfer", "cheque": "cheque", "imps": "upi",
+            "paytm": "upi", "online": "upi", "bank": "upi",
+            "neft": "upi", "cheque": "cheque", "imps": "upi",
+            "netbanking": "upi", "net banking": "upi",
         }
         _corrected = False
         _rl = reply_text.lower()
@@ -322,7 +323,8 @@ async def resolve_pending_action(
         _MODE_MAP_ALLOC = {
             "upi": "upi", "cash": "cash", "gpay": "upi", "phonepe": "upi",
             "paytm": "upi", "online": "upi", "transfer": "upi",
-            "neft": "bank_transfer", "cheque": "cheque", "imps": "upi",
+            "neft": "upi", "cheque": "cheque", "imps": "upi",
+            "netbanking": "upi", "net banking": "upi", "bank": "upi",
         }
         _corrected_alloc = False
         _rl_alloc = ans.lower()

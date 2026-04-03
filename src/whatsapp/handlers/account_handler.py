@@ -292,7 +292,7 @@ async def _do_log_payment_by_ids(
         period_month = current_month
 
     mode_lower = (mode or "cash").lower().strip()
-    pay_mode = PaymentMode.upi if mode_lower in ("upi", "gpay", "phonepe", "paytm", "online", "transfer") else PaymentMode.cash
+    pay_mode = PaymentMode.upi if mode_lower in ("upi", "gpay", "phonepe", "paytm", "online", "transfer", "netbanking", "net banking", "neft", "imps", "bank") else PaymentMode.cash
     amount_dec = Decimal(str(amount))
 
     # ── Duplicate detection ────────────────────────────────────────────────────

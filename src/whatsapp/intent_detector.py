@@ -548,7 +548,7 @@ def _extract_entities(text: str, intent: str) -> dict:
     # Extract payment mode
     if re.search(r"\b(?:cash|naqad)\b", text, re.I):
         entities["payment_mode"] = "cash"
-    elif re.search(r"\b(?:upi|gpay|phonepe|paytm|online|transfer)\b", text, re.I):
+    elif re.search(r"\b(?:upi|gpay|phonepe|paytm|online|transfer|netbanking|net\s*banking|neft|imps)\b", text, re.I):
         entities["payment_mode"] = "upi"
 
     # Extract expense category (for ADD_EXPENSE — avoids unnecessary "choose category" prompt)
