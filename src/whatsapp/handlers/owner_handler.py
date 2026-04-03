@@ -957,6 +957,7 @@ async def resolve_pending_action(
         return None
 
     if pending.intent == "COLLECT_RENT_STEP":
+        from src.whatsapp.handlers._shared import _save_pending
         ans = reply_text.strip()
         step = action_data.get("step", "")
 
