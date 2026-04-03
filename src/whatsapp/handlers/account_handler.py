@@ -490,7 +490,6 @@ async def _do_log_payment_by_ids(
         f"{underpayment_note}"
         f"{wrong_month_note}"
         f"{overpayment_pending}"
-        f"{gsheets_note}"
     )
 
 
