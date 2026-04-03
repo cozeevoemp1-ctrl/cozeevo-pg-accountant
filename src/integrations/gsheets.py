@@ -505,6 +505,7 @@ def _update_payment_sync(
     if not amount or amount <= 0:
         return {"success": False, "error": "Amount must be positive", "row": None, "tab": None,
                 "rent_due": 0, "total_paid": 0, "balance": 0, "overpayment": 0, "warning": None}
+    method = method.lower().strip()
     if method not in ("cash", "upi"):
         return {"success": False, "error": f"Invalid method '{method}', must be 'cash' or 'upi'",
                 "row": None, "tab": None, "rent_due": 0, "total_paid": 0, "balance": 0,
