@@ -329,13 +329,17 @@ async def test_12_payment_by_room_number():
     r = await send(ADMIN_PHONE, "room 211 paid 5000 upi")
     # Should find tenants in room 211
     check("12a_found", r["reply"], ["211"])
-    r = await send(ADMIN_PHONE, "no") if "yes" in r["reply"].lower() else r
+    r = await send(ADMIN_PHONE, "cancel")
     await cleanup_test_tenant("Krishnanshu")
 
 
 async def test_13_who_hasnt_paid():
     """Query unpaid tenants."""
     print("\n=== TEST 13: Who hasn't paid ===")
+    # Clear any stale pending from previous test
+    async with SessionFactory() as session:
+        await session.execute(text("DELETE FROM pending_actions WHERE phone = :p"), {"p": ADMIN_PHONE})
+        await session.commit()
     r = await send(ADMIN_PHONE, "who hasn't paid")
     check("13_unpaid_list", r["reply"], ["outstanding", "rs."])
 
@@ -344,6 +348,10 @@ async def test_14_single_month_no_allocation_noise():
     """Single month dues should NOT show 'Suggested allocation'."""
     print("\n=== TEST 14: No allocation noise for single month ===")
     await cleanup_test_tenant("Krishnanshu")
+    # Clear any stale pending
+    async with SessionFactory() as session:
+        await session.execute(text("DELETE FROM pending_actions WHERE phone = :p"), {"p": ADMIN_PHONE})
+        await session.commit()
 
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 upi")
     check("14_no_allocation", r["reply"],
