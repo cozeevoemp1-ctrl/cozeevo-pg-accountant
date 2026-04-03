@@ -1030,8 +1030,7 @@ def _void_payment_sync(
 
     tab_name = _month_tab_for(month, year)
     try:
-        sh = get_sheet()
-        ws = sh.worksheet(tab_name)
+        ws = _get_worksheet_sync(tab_name)
     except gspread.WorksheetNotFound:
         result["error"] = f"Tab '{tab_name}' not found"
         return result
