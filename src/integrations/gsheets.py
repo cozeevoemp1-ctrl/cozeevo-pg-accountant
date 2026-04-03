@@ -1028,7 +1028,7 @@ def _void_payment_sync(
     if year is None:
         year = today.year
 
-    tab_name = _month_tab_name(month, year)
+    tab_name = _month_tab_for(month, year)
     try:
         sh = get_sheet()
         ws = sh.worksheet(tab_name)
