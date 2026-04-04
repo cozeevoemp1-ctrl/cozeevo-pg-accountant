@@ -325,6 +325,17 @@ async def run_import(write: bool) -> None:
                 tenancy_notes = comment or None
                 monthly_note = None
 
+            # Check for existing tenancy (dedup by tenant+room)
+            existing_tenancy = await session.scalar(
+                select(Tenancy).where(
+                    Tenancy.tenant_id == tenant.id,
+                    Tenancy.room_id == room.id,
+                )
+            )
+            if existing_tenancy:
+                # Already exists — skip, don't create duplicate
+                continue
+
             # Create tenancy
             tenancy = Tenancy(
                 tenant_id=tenant.id,
