@@ -984,6 +984,309 @@ async def test_50_three_partial_payments():
     reset_sheet_row("211", "Krishnanshu")
 
 
+# =============================================================================
+# FULL LIFECYCLE TESTS (51-100)
+# =============================================================================
+
+async def cleanup_test_data(name: str):
+    """Full cleanup: payments, rent_schedule, tenancy, tenant."""
+    async with SessionFactory() as session:
+        await session.execute(text("""
+            DELETE FROM payments WHERE tenancy_id IN (
+                SELECT tn.id FROM tenancies tn JOIN tenants t ON t.id = tn.tenant_id
+                WHERE t.name ILIKE :name)
+        """), {"name": f"%{name}%"})
+        await session.execute(text("""
+            DELETE FROM rent_schedule WHERE tenancy_id IN (
+                SELECT tn.id FROM tenancies tn JOIN tenants t ON t.id = tn.tenant_id
+                WHERE t.name ILIKE :name)
+        """), {"name": f"%{name}%"})
+        await session.execute(text("""
+            DELETE FROM tenancies WHERE tenant_id IN (
+                SELECT id FROM tenants WHERE name ILIKE :name)
+        """), {"name": f"%{name}%"})
+        await session.execute(text("""
+            DELETE FROM tenants WHERE name ILIKE :name
+        """), {"name": f"%{name}%"})
+        await session.execute(text("DELETE FROM pending_actions WHERE phone = :p"), {"p": ADMIN_PHONE})
+        await session.commit()
+
+
+async def verify_db_tenant(name: str) -> dict:
+    """Check if tenant exists in DB and return info."""
+    async with SessionFactory() as session:
+        r = await session.execute(text("""
+            SELECT t.name, t.phone, t.gender, tn.status, tn.agreed_rent, tn.security_deposit,
+                   tn.checkin_date, r.room_number, tn.maintenance_fee
+            FROM tenants t
+            JOIN tenancies tn ON tn.tenant_id = t.id
+            JOIN rooms r ON r.id = tn.room_id
+            WHERE t.name ILIKE :name
+            ORDER BY tn.created_at DESC LIMIT 1
+        """), {"name": f"%{name}%"})
+        row = r.fetchone()
+        if row:
+            return {
+                "name": row[0], "phone": row[1], "gender": row[2],
+                "status": row[3], "rent": float(row[4] or 0),
+                "deposit": float(row[5] or 0), "checkin": row[6],
+                "room": row[7], "maintenance": float(row[8] or 0),
+            }
+        return None
+
+
+async def test_51_add_tenant_full_flow():
+    """Full add tenant: name → phone → gender → food → room → rent → deposit → advance → maintenance → checkin → notes → confirm."""
+    print("\n=== TEST 51: Add tenant full flow ===")
+    await cleanup_test_data("Testuser Alpha")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "add tenant")
+    check("51a_asks_name", r["reply"], ["name"])
+
+    r = await send(ADMIN_PHONE, "Testuser Alpha")
+    check("51b_asks_phone", r["reply"], ["phone"])
+
+    r = await send(ADMIN_PHONE, "9876543210")
+    check("51c_asks_gender", r["reply"], ["gender"])
+
+    r = await send(ADMIN_PHONE, "male")
+    check("51d_asks_food", r["reply"], ["food"])
+
+    r = await send(ADMIN_PHONE, "non-veg")
+    check("51e_asks_room", r["reply"], ["room"])
+
+    r = await send(ADMIN_PHONE, "101")
+    check("51f_asks_rent", r["reply"], ["rent"])
+
+    r = await send(ADMIN_PHONE, "15000")
+    check("51g_asks_deposit", r["reply"], ["deposit"])
+
+    r = await send(ADMIN_PHONE, "15000")
+    check("51h_asks_advance", r["reply"], ["paid", "advance"])
+
+    r = await send(ADMIN_PHONE, "5000")
+    check("51i_asks_maintenance", r["reply"], ["maintenance"])
+
+    r = await send(ADMIN_PHONE, "5000")
+    check("51j_asks_checkin", r["reply"], ["check-in", "date"])
+
+    r = await send(ADMIN_PHONE, "1 april 2026")
+    check("51k_asks_notes", r["reply"], ["notes"])
+
+    r = await send(ADMIN_PHONE, "3 month lockin")
+    check("51l_confirm", r["reply"], ["testuser alpha", "15,000", "confirm"])
+
+    r = await send(ADMIN_PHONE, "yes")
+    check("51m_saved", r["reply"], ["saved", "testuser alpha"])
+
+    # Verify DB
+    tenant = await verify_db_tenant("Testuser Alpha")
+    if tenant:
+        global PASS, FAIL
+        if tenant["rent"] == 15000.0 and tenant["status"] == "active":
+            PASS += 1
+            print(f"  DB OK [51n]: rent={tenant['rent']}, status={tenant['status']}, room={tenant['room']}")
+        else:
+            FAIL += 1
+            ERRORS.append("51n_db")
+            print(f"  DB FAIL [51n]: {tenant}")
+    else:
+        FAIL += 1
+        ERRORS.append("51n_db")
+        print("  DB FAIL [51n]: Tenant not found in DB")
+
+    await cleanup_test_data("Testuser Alpha")
+
+
+async def test_52_add_tenant_cancel():
+    """Cancel add tenant midway."""
+    print("\n=== TEST 52: Add tenant cancel ===")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "add tenant")
+    check("52a_asks_name", r["reply"], ["name"])
+
+    r = await send(ADMIN_PHONE, "cancel")
+    check("52b_cancelled", r["reply"], ["cancel"])
+
+
+async def test_53_add_tenant_skip_optional():
+    """Add tenant with skip on optional fields."""
+    print("\n=== TEST 53: Add tenant skip optional ===")
+    await cleanup_test_data("Testuser Beta")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "add tenant")
+    r = await send(ADMIN_PHONE, "Testuser Beta")
+    r = await send(ADMIN_PHONE, "9876543211")
+    r = await send(ADMIN_PHONE, "female")
+    r = await send(ADMIN_PHONE, "skip")  # food
+    r = await send(ADMIN_PHONE, "203")   # room
+    r = await send(ADMIN_PHONE, "12000")  # rent
+    r = await send(ADMIN_PHONE, "skip")  # deposit
+    # Should skip advance since deposit=0
+    r = await send(ADMIN_PHONE, "skip")  # maintenance
+    r = await send(ADMIN_PHONE, "15 april 2026")  # checkin
+    r = await send(ADMIN_PHONE, "skip")  # notes
+    check("53a_confirm", r["reply"], ["testuser beta", "confirm"])
+
+    r = await send(ADMIN_PHONE, "yes")
+    check("53b_saved", r["reply"], ["saved"])
+
+    tenant = await verify_db_tenant("Testuser Beta")
+    if tenant:
+        PASS += 1
+        print(f"  DB OK [53c]: rent={tenant['rent']}, gender={tenant['gender']}")
+    else:
+        FAIL += 1
+        ERRORS.append("53c_db")
+        print("  DB FAIL [53c]: Tenant not found")
+
+    await cleanup_test_data("Testuser Beta")
+
+
+async def test_54_checkout_flow():
+    """Full checkout flow for existing tenant."""
+    print("\n=== TEST 54: Checkout flow ===")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "checkout Manoj")
+    check("54a_starts", r["reply"], ["manoj"])
+
+    if "exit date" in r["reply"].lower():
+        r = await send(ADMIN_PHONE, "today")
+        check("54b_cupboard", r["reply"], ["cupboard", "key"])
+
+        r = await send(ADMIN_PHONE, "yes")
+        check("54c_main_key", r["reply"], ["main", "key"])
+
+        r = await send(ADMIN_PHONE, "yes")
+        check("54d_damage", r["reply"], ["damage"])
+
+        r = await send(ADMIN_PHONE, "no")
+        check("54e_fingerprint", r["reply"], ["fingerprint", "biometric"])
+
+        r = await send(ADMIN_PHONE, "yes")
+        check("54f_summary", r["reply"], ["settlement", "confirm"])
+
+        # Cancel — don't actually check out Manoj
+        r = await send(ADMIN_PHONE, "cancel")
+        check("54g_cancelled", r["reply"], ["cancel"])
+    else:
+        # Might show disambiguation
+        r = await send(ADMIN_PHONE, "cancel")
+        check("54b_cancelled", r["reply"], ["cancel"])
+
+
+async def test_55_notice_then_checkout():
+    """Give notice then checkout."""
+    print("\n=== TEST 55: Notice flow ===")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "Ronak notice")
+    check("55a_notice", r["reply"], ["ronak"])
+    r = await send(ADMIN_PHONE, "cancel")
+
+
+async def test_56_payment_log_then_balance():
+    """Log payment, check balance, void, check balance again."""
+    print("\n=== TEST 56: Pay → balance → void → balance ===")
+    await cleanup_test_tenant("Akarsh")
+    await clear_pendings()
+    reset_sheet_row("102", "Akarsh")
+
+    # Pay
+    r = await send(ADMIN_PHONE, "Akarsh SM room 102 paid 8000 upi")
+    r = await send(ADMIN_PHONE, "yes")
+    check("56a_paid", r["reply"], ["payment logged", "8,000"])
+
+    # Check balance
+    await clear_pendings()
+    r = await send(ADMIN_PHONE, "Akarsh balance")
+    check("56b_balance", r["reply"], ["7,000"])  # 15000-8000=7000
+
+    # Void
+    await clear_pendings()
+    r = await send(ADMIN_PHONE, "void payment Akarsh SM")
+    if "void this payment" in r["reply"].lower():
+        r = await send(ADMIN_PHONE, "1")
+    check("56c_voided", r["reply"], ["voided"])
+
+    # Check balance after void
+    await clear_pendings()
+    r = await send(ADMIN_PHONE, "Akarsh balance")
+    check("56d_balance_after", r["reply"], ["15,000"])  # back to full
+
+    verify_sheet("56e_sheet", "102", "Akarsh",
+                 expected_cash=0.0, expected_upi=0.0, expected_status="UNPAID")
+
+    await cleanup_test_tenant("Akarsh")
+
+
+async def test_57_multiple_tenants_different_rooms():
+    """Payments for different tenants in different rooms."""
+    print("\n=== TEST 57: Multi-tenant payments ===")
+    await clear_pendings()
+
+    # Akarsh room 102
+    await cleanup_test_tenant("Akarsh")
+    r = await send(ADMIN_PHONE, "Akarsh SM room 102 paid 5000 cash")
+    r = await send(ADMIN_PHONE, "yes")
+    check("57a_akarsh", r["reply"], ["payment logged"])
+
+    # Ronak room 203
+    await clear_pendings()
+    await cleanup_test_tenant("Ronak")
+    r = await send(ADMIN_PHONE, "Ronak Samriya paid 8000 upi")
+    r = await send(ADMIN_PHONE, "yes")
+    check("57b_ronak", r["reply"], ["payment logged"])
+
+    await verify_db_payment("Akarsh", 1, 5000.0)
+    await verify_db_payment("Ronak", 1, 8000.0)
+
+    await cleanup_test_tenant("Akarsh")
+    await cleanup_test_tenant("Ronak")
+
+
+async def test_58_expense_log():
+    """Log an expense and verify."""
+    print("\n=== TEST 58: Expense log ===")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "generator diesel 5000 cash")
+    check("58a_expense", r["reply"], ["5,000"])
+
+    if "yes" in r["reply"].lower():
+        r = await send(ADMIN_PHONE, "no")  # don't actually log
+
+
+async def test_59_payment_with_imps():
+    """IMPS maps to UPI."""
+    print("\n=== TEST 59: IMPS = UPI ===")
+    await cleanup_test_tenant("Krishnanshu")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 imps")
+    check("59_imps", r["reply"], ["upi"])
+    r = await send(ADMIN_PHONE, "no")
+    await cleanup_test_tenant("Krishnanshu")
+
+
+async def test_60_add_tenant_existing_phone():
+    """Add tenant with phone that already exists — should link to existing tenant."""
+    print("\n=== TEST 60: Add tenant existing phone ===")
+    await clear_pendings()
+
+    r = await send(ADMIN_PHONE, "add tenant")
+    r = await send(ADMIN_PHONE, "Test Duplicate")
+    # Use Krishnanshu's phone
+    r = await send(ADMIN_PHONE, "6284043938")
+    # Should either link to existing or continue
+    check("60_existing", r["reply"], ["gender", "already"])
+    r = await send(ADMIN_PHONE, "cancel")
+
+
 # ── Helper ──
 
 async def clear_pendings():
@@ -1062,6 +1365,16 @@ async def main():
         test_48_payment_no_amount,
         test_49_payment_no_name,
         test_50_three_partial_payments,
+        test_51_add_tenant_full_flow,
+        test_52_add_tenant_cancel,
+        test_53_add_tenant_skip_optional,
+        test_54_checkout_flow,
+        test_55_notice_then_checkout,
+        test_56_payment_log_then_balance,
+        test_57_multiple_tenants_different_rooms,
+        test_58_expense_log,
+        test_59_payment_with_imps,
+        test_60_add_tenant_existing_phone,
     ]
 
     for test_fn in tests:
