@@ -1037,6 +1037,7 @@ async def verify_db_tenant(name: str) -> dict:
 
 async def test_51_add_tenant_full_flow():
     """Full add tenant: name → phone → gender → food → room → rent → deposit → advance → maintenance → checkin → notes → confirm."""
+    global PASS, FAIL
     print("\n=== TEST 51: Add tenant full flow ===")
     await cleanup_test_data("Testuser Alpha")
     await clear_pendings()
@@ -1113,6 +1114,7 @@ async def test_52_add_tenant_cancel():
 
 async def test_53_add_tenant_skip_optional():
     """Add tenant with skip on optional fields."""
+    global PASS, FAIL
     print("\n=== TEST 53: Add tenant skip optional ===")
     await cleanup_test_data("Testuser Beta")
     await clear_pendings()

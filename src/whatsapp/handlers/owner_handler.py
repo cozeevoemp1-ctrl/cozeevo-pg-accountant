@@ -760,6 +760,7 @@ async def resolve_pending_action(
 
     # ── Step-by-step Add Tenant flow ─────────────────────────────────────────
     if pending.intent == "ADD_TENANT_STEP":
+        from src.whatsapp.handlers._shared import _save_pending
         ans = reply_text.strip()
         step = action_data.get("step", "")
 
