@@ -40,6 +40,127 @@ PASS = 0
 FAIL = 0
 ERRORS = []
 
+# Sheet column indices (APRIL 2026 — new 17-column format)
+S_ROOM = 0
+S_NAME = 1
+S_RENT = 5
+S_CASH = 6
+S_UPI = 7
+S_TOTAL = 8
+S_BAL = 9
+S_STATUS = 10
+S_NOTES = 14
+
+_sheet_cache = {}  # tab_name -> worksheet
+
+
+def _get_sheet_ws(tab_name: str = None):
+    """Get worksheet, cached to avoid rate limits."""
+    import gspread
+    if tab_name is None:
+        today = date.today()
+        months = ["", "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
+                  "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
+        tab_name = f"{months[today.month]} {today.year}"
+    if tab_name not in _sheet_cache:
+        sa = gspread.service_account(filename='credentials/gsheets_service_account.json')
+        sh = sa.open_by_key(os.getenv("GSHEETS_SHEET_ID", "1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw"))
+        _sheet_cache[tab_name] = sh.worksheet(tab_name)
+    return _sheet_cache[tab_name]
+
+
+def _find_sheet_row(room_number: str, tenant_name: str, tab_name: str = None) -> dict:
+    """Find a tenant's row in the Sheet and return their data."""
+    import time
+    time.sleep(1)  # wait for Sheet API write to propagate
+    ws = _get_sheet_ws(tab_name)
+    all_vals = ws.get_all_values()
+    room_clean = room_number.strip().upper()
+    name_lower = tenant_name.strip().lower()
+    for i in range(4, len(all_vals)):
+        r = all_vals[i]
+        if not r or not r[0]:
+            continue
+        cell_room = str(r[0]).strip().upper()
+        cell_name = str(r[1]).strip().lower() if len(r) > 1 else ""
+        if cell_room == room_clean and (name_lower in cell_name or cell_name in name_lower):
+            def _num(idx):
+                try:
+                    return float(str(r[idx]).replace(",", "").strip() or "0")
+                except (ValueError, IndexError):
+                    return 0.0
+            return {
+                "row": i + 1,
+                "room": r[S_ROOM],
+                "name": r[S_NAME],
+                "rent_due": _num(S_RENT),
+                "cash": _num(S_CASH),
+                "upi": _num(S_UPI),
+                "total_paid": _num(S_TOTAL),
+                "balance": _num(S_BAL),
+                "status": str(r[S_STATUS]).strip().upper() if len(r) > S_STATUS else "",
+                "notes": str(r[S_NOTES]) if len(r) > S_NOTES else "",
+            }
+    return None
+
+
+def verify_sheet(test_name: str, room: str, name: str,
+                 expected_cash: float = None, expected_upi: float = None,
+                 expected_status: str = None, expected_total: float = None):
+    """Verify Sheet row matches expected values."""
+    global PASS, FAIL
+    row = _find_sheet_row(room, name)
+    if row is None:
+        FAIL += 1
+        ERRORS.append(f"{test_name}_sheet")
+        print(f"  SHEET FAIL [{test_name}]: Row not found for {name} / Room {room}")
+        return False
+
+    failed = False
+    if expected_cash is not None and row["cash"] != expected_cash:
+        print(f"  SHEET FAIL: Cash expected {expected_cash}, got {row['cash']}")
+        failed = True
+    if expected_upi is not None and row["upi"] != expected_upi:
+        print(f"  SHEET FAIL: UPI expected {expected_upi}, got {row['upi']}")
+        failed = True
+    if expected_total is not None and row["total_paid"] != expected_total:
+        print(f"  SHEET FAIL: Total expected {expected_total}, got {row['total_paid']}")
+        failed = True
+    if expected_status is not None and row["status"] != expected_status.upper():
+        print(f"  SHEET FAIL: Status expected {expected_status}, got {row['status']}")
+        failed = True
+
+    if failed:
+        FAIL += 1
+        ERRORS.append(f"{test_name}_sheet")
+        print(f"  SHEET FAIL [{test_name}]")
+        return False
+    else:
+        PASS += 1
+        print(f"  SHEET OK [{test_name}]: Cash={row['cash']}, UPI={row['upi']}, Status={row['status']}")
+        return True
+
+
+def reset_sheet_row(room: str, name: str):
+    """Reset a tenant's Sheet row to clean state (0/0/UNPAID)."""
+    row_data = _find_sheet_row(room, name)
+    if not row_data:
+        return
+    ws = _get_sheet_ws()
+    row = row_data["row"]
+    rent_due = row_data["rent_due"]
+    import gspread
+    ws.batch_update([
+        {"range": gspread.utils.rowcol_to_a1(row, S_CASH + 1), "values": [[0]]},
+        {"range": gspread.utils.rowcol_to_a1(row, S_UPI + 1), "values": [[0]]},
+        {"range": gspread.utils.rowcol_to_a1(row, S_TOTAL + 1), "values": [[0]]},
+        {"range": gspread.utils.rowcol_to_a1(row, S_BAL + 1), "values": [[rent_due]]},
+        {"range": gspread.utils.rowcol_to_a1(row, S_STATUS + 1), "values": [["UNPAID"]]},
+        {"range": gspread.utils.rowcol_to_a1(row, S_NOTES + 1), "values": [[""]]},
+    ], value_input_option="USER_ENTERED")
+    import time
+    time.sleep(1)
+
 
 async def send(phone: str, message: str) -> dict:
     """Send a message through the chat API and return the result."""
@@ -135,9 +256,10 @@ async def verify_db_payment(tenant_name: str, expected_count: int, expected_tota
 # =============================================================================
 
 async def test_01_payment_with_upi():
-    """Payment with explicit UPI mode."""
-    print("\n=== TEST 01: Payment with UPI ===")
+    """Payment with explicit UPI mode — verify DB + Sheet."""
+    print("\n=== TEST 01: Payment with UPI + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 upi")
     check("01a_confirm_prompt", r["reply"],
@@ -149,24 +271,28 @@ async def test_01_payment_with_upi():
           ["payment logged", "5,000", "upi"])
 
     await verify_db_payment("Krishnanshu", 1, 5000.0)
+    verify_sheet("01c_sheet_after_pay", "211", "Krishnanshu",
+                 expected_upi=5000.0, expected_cash=0.0, expected_status="PARTIAL")
 
     # Void it
     r = await send(ADMIN_PHONE, "void payment Krishnanshu")
-    # Might show void confirm or "which tenant"
     if "void this payment" in r["reply"].lower():
         r = await send(ADMIN_PHONE, "1")
     elif "which" in r["reply"].lower():
-        r = await send(ADMIN_PHONE, "2")  # pick Krishnanshu
-        r = await send(ADMIN_PHONE, "1")  # confirm void
+        r = await send(ADMIN_PHONE, "2")
+        r = await send(ADMIN_PHONE, "1")
 
-    check("01c_voided", r["reply"], ["voided", "krishnanshu"])
+    check("01d_voided", r["reply"], ["voided", "krishnanshu"])
     await verify_db_payment("Krishnanshu", 0)
+    verify_sheet("01e_sheet_after_void", "211", "Krishnanshu",
+                 expected_upi=0.0, expected_cash=0.0, expected_status="UNPAID")
 
 
 async def test_02_payment_with_cash():
-    """Payment with explicit CASH mode."""
-    print("\n=== TEST 02: Payment with CASH ===")
+    """Payment with explicit CASH mode — verify DB + Sheet."""
+    print("\n=== TEST 02: Payment with CASH + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 cash")
     check("02a_confirm_prompt", r["reply"],
@@ -177,7 +303,11 @@ async def test_02_payment_with_cash():
           ["payment logged", "5,000", "cash"])
 
     await verify_db_payment("Krishnanshu", 1, 5000.0)
+    verify_sheet("02c_sheet", "211", "Krishnanshu",
+                 expected_cash=5000.0, expected_upi=0.0, expected_status="PARTIAL")
+
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
 
 async def test_03_payment_no_mode_defaults_cash():
@@ -228,35 +358,46 @@ async def test_05_mode_correction_phrase():
 
 
 async def test_06_full_payment_shows_paid():
-    """Full rent payment shows PAID status."""
-    print("\n=== TEST 06: Full payment = PAID ===")
+    """Full rent payment shows PAID status — verify DB + Sheet."""
+    print("\n=== TEST 06: Full payment = PAID + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 15000 upi")
     r = await send(ADMIN_PHONE, "yes")
     check("06a_paid_status", r["reply"], ["payment logged", "paid"])
 
     await verify_db_payment("Krishnanshu", 1, 15000.0)
+    verify_sheet("06b_sheet_paid", "211", "Krishnanshu",
+                 expected_upi=15000.0, expected_status="PAID")
+
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
 
 async def test_07_partial_then_full():
-    """Two partial payments completing the full amount."""
-    print("\n=== TEST 07: Partial + Partial = PAID ===")
+    """Two partial payments — verify DB + Sheet after each."""
+    print("\n=== TEST 07: Partial + Partial = PAID + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
     # First partial
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 upi")
     r = await send(ADMIN_PHONE, "yes")
     check("07a_partial", r["reply"], ["partial"])
+    verify_sheet("07b_sheet_partial", "211", "Krishnanshu",
+                 expected_upi=5000.0, expected_cash=0.0, expected_status="PARTIAL")
 
     # Second partial to complete
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 10000 cash")
     r = await send(ADMIN_PHONE, "yes")
-    check("07b_paid", r["reply"], ["paid"])
+    check("07c_paid", r["reply"], ["paid"])
+    verify_sheet("07d_sheet_paid", "211", "Krishnanshu",
+                 expected_upi=5000.0, expected_cash=10000.0, expected_status="PAID")
 
     await verify_db_payment("Krishnanshu", 2, 15000.0)
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
 
 async def test_08_overpayment():
@@ -274,25 +415,29 @@ async def test_08_overpayment():
 
 
 async def test_09_void_current_month():
-    """Void defaults to current month payment."""
-    print("\n=== TEST 09: Void current month ===")
+    """Void defaults to current month — verify DB + Sheet."""
+    print("\n=== TEST 09: Void current month + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 upi")
     r = await send(ADMIN_PHONE, "yes")
+    verify_sheet("09a_sheet_after_pay", "211", "Krishnanshu",
+                 expected_upi=5000.0, expected_status="PARTIAL")
 
     r = await send(ADMIN_PHONE, "void payment Krishnanshu")
     if "void this payment" in r["reply"].lower():
-        check("09a_shows_april", r["reply"], ["apr 2026"])
+        check("09b_shows_april", r["reply"], ["apr 2026"])
         r = await send(ADMIN_PHONE, "1")
-        check("09b_voided", r["reply"], ["voided"])
+        check("09c_voided", r["reply"], ["voided"])
     elif "which" in r["reply"].lower():
-        # Multi-tenant room
         r = await send(ADMIN_PHONE, "2")
         r = await send(ADMIN_PHONE, "1")
-        check("09b_voided", r["reply"], ["voided"])
+        check("09c_voided", r["reply"], ["voided"])
 
     await verify_db_payment("Krishnanshu", 0)
+    verify_sheet("09d_sheet_after_void", "211", "Krishnanshu",
+                 expected_upi=0.0, expected_cash=0.0, expected_status="UNPAID")
     await cleanup_test_tenant("Krishnanshu")
 
 
@@ -740,15 +885,18 @@ async def test_45_correction_mode_then_confirm():
 
 
 async def test_46_void_then_relog():
-    """Void a payment then log a new one."""
-    print("\n=== TEST 46: Void then relog ===")
+    """Void a payment then log correct one — verify DB + Sheet at each step."""
+    print("\n=== TEST 46: Void then relog + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
     await clear_pendings()
+    reset_sheet_row("211", "Krishnanshu")
 
     # Log wrong amount
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 5000 cash")
     r = await send(ADMIN_PHONE, "yes")
     check("46a_logged", r["reply"], ["payment logged"])
+    verify_sheet("46b_sheet_wrong", "211", "Krishnanshu",
+                 expected_cash=5000.0, expected_status="PARTIAL")
 
     # Void it
     r = await send(ADMIN_PHONE, "void payment Krishnanshu")
@@ -757,16 +905,21 @@ async def test_46_void_then_relog():
     elif "which" in r["reply"].lower():
         r = await send(ADMIN_PHONE, "2")
         r = await send(ADMIN_PHONE, "1")
-    check("46b_voided", r["reply"], ["voided"])
+    check("46c_voided", r["reply"], ["voided"])
+    verify_sheet("46d_sheet_voided", "211", "Krishnanshu",
+                 expected_cash=0.0, expected_upi=0.0, expected_status="UNPAID")
 
     # Relog correct amount
     await clear_pendings()
     r = await send(ADMIN_PHONE, "Krishnanshu room 211 paid 10000 upi")
     r = await send(ADMIN_PHONE, "yes")
-    check("46c_relogged", r["reply"], ["payment logged", "upi", "10,000"])
+    check("46e_relogged", r["reply"], ["payment logged", "upi", "10,000"])
+    verify_sheet("46f_sheet_correct", "211", "Krishnanshu",
+                 expected_upi=10000.0, expected_cash=0.0, expected_status="PARTIAL")
 
     await verify_db_payment("Krishnanshu", 1, 10000.0)
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
 
 async def test_47_payment_various_formats():
@@ -807,10 +960,11 @@ async def test_49_payment_no_name():
 
 
 async def test_50_three_partial_payments():
-    """Three partial payments completing rent."""
-    print("\n=== TEST 50: Three partials ===")
+    """Three partial payments — verify DB + Sheet cumulative."""
+    print("\n=== TEST 50: Three partials + Sheet sync ===")
     await cleanup_test_tenant("Krishnanshu")
     await clear_pendings()
+    reset_sheet_row("211", "Krishnanshu")
 
     # Use different amounts to avoid duplicate detection
     for i, (amt, mode) in enumerate([(3000, "cash"), (5000, "upi"), (7000, "cash")]):
@@ -823,7 +977,11 @@ async def test_50_three_partial_payments():
         await clear_pendings()
 
     await verify_db_payment("Krishnanshu", 3, 15000.0)
+    verify_sheet("50_sheet_final", "211", "Krishnanshu",
+                 expected_cash=10000.0, expected_upi=5000.0, expected_status="PAID")
+
     await cleanup_test_tenant("Krishnanshu")
+    reset_sheet_row("211", "Krishnanshu")
 
 
 # ── Helper ──
