@@ -166,6 +166,8 @@ async def send(phone: str, message: str) -> dict:
     """Send a message through the chat API and return the result."""
     from src.whatsapp.chat_api import process_message, InboundMessage
     async with SessionFactory() as session:
+        pass  # pendings cleared by clear_pendings() in each test
+
         result = await process_message(
             body=InboundMessage(phone=phone, message=message),
             session=session,
@@ -205,8 +207,9 @@ def check(test_name: str, reply: str, must_contain: list[str], must_not_contain:
 
 
 async def cleanup_test_tenant(name: str):
-    """Remove test tenant data from DB."""
+    """Remove test tenant data from DB + clear pendings."""
     async with SessionFactory() as session:
+        await session.execute(text("DELETE FROM pending_actions WHERE phone = :p"), {"p": ADMIN_PHONE})
         await session.execute(text("""
             DELETE FROM payments WHERE tenancy_id IN (
                 SELECT tn.id FROM tenancies tn
@@ -858,6 +861,9 @@ async def test_44_payment_exact_rent_multiple_tenants():
     await clear_pendings()
 
     r = await send(ADMIN_PHONE, "Prashant room 102 paid 15000 cash")
+    # Might disambiguate Prashant vs Prashanth
+    if "which" in r["reply"].lower():
+        r = await send(ADMIN_PHONE, "1")  # pick first
     r = await send(ADMIN_PHONE, "yes")
     check("44_paid", r["reply"], ["payment logged"])
 
