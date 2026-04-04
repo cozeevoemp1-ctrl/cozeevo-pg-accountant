@@ -47,11 +47,7 @@ async def get_caller_context(phone: str, session: AsyncSession) -> CallerContext
     # Normalize phone
     phone = _normalize(phone)
 
-    # 1. Rate limit check
-    if await _is_rate_limited(phone, session):
-        return CallerContext(phone=phone, role="blocked", name="", is_blocked=True)
-
-    # 2. Check authorized_users table (admin / owner / receptionist)
+    # 1. Check authorized_users FIRST (admin/owner bypass rate limiting)
     result = await session.execute(
         select(AuthorizedUser).where(
             AuthorizedUser.phone == phone,
@@ -66,6 +62,10 @@ async def get_caller_context(phone: str, session: AsyncSession) -> CallerContext
             name=auth_user.name or "",
             auth_user_id=auth_user.id,
         )
+
+    # 2. Rate limit check (only for non-admin/owner — admins are exempt)
+    if await _is_rate_limited(phone, session):
+        return CallerContext(phone=phone, role="blocked", name="", is_blocked=True)
 
     # 3. Check tenants table (end_user / tenant)
     result = await session.execute(
