@@ -239,17 +239,8 @@ async def resolve_pending_action(
             return "Cancelled. Tenant not added."
 
         # ── Edit a field ──────────────────────────────────────────────────
-        if ans.startswith("edit "):
-            # Use original reply_text to preserve case in the value
-            raw_edit = reply_text.strip()[5:].strip()  # skip "edit " prefix
-            parts = raw_edit.split(None, 1)
-            if len(parts) < 2:
-                return "__KEEP_PENDING__Format: *edit field_name new_value*\nExample: *edit name Rahul Sharma*"
-
-            field_key = parts[0].lower()
-            new_val = parts[1].strip()
-
-            # Map user-friendly names to JSON keys
+        if ans.startswith("edit ") or "\nedit " in reply_text.lower():
+            # Multi-edit support: parse each line starting with "edit"
             key_aliases = {
                 "name": "name", "phone": "phone", "room": "room_number",
                 "room_number": "room_number", "gender": "gender",
@@ -262,8 +253,10 @@ async def resolve_pending_action(
                 "address": "permanent_address", "permanent_address": "permanent_address",
                 "emergency": "emergency_contact", "emergency_contact": "emergency_contact",
                 "relationship": "emergency_relationship",
-                "email": "email", "occupation": "occupation",
+                "email": "email", "mail": "email", "mail_id": "email",
+                "occupation": "occupation", "employee": "occupation", "company": "occupation",
                 "id_type": "id_proof_type", "id_number": "id_proof_number",
+                "id_proof": "id_proof_number", "id": "id_proof_number",
                 "food": "food_preference", "food_preference": "food_preference",
                 "education": "educational_qualification", "educational_qualification": "educational_qualification",
                 "office_address": "office_address", "office": "office_address",
@@ -273,18 +266,40 @@ async def resolve_pending_action(
                 "maintenance_remarks": "maintenance_remarks", "maint_terms": "maintenance_remarks",
             }
 
-            actual_key = key_aliases.get(field_key)
-            if not actual_key:
-                return f"__KEEP_PENDING__Unknown field *{field_key}*. Try: name, phone, room, rent, deposit, checkin, gender, food, etc."
-
             extracted = action_data.get("extracted", {})
-            extracted[actual_key] = new_val
+            edits_made = []
+            errors = []
+
+            # Parse each line
+            for line in reply_text.strip().splitlines():
+                line = line.strip()
+                if not line.lower().startswith("edit "):
+                    continue
+                raw = line[5:].strip()  # skip "edit "
+                parts = raw.split(None, 1)
+                if len(parts) < 2:
+                    continue
+                field_key = parts[0].lower()
+                new_val = parts[1].strip()
+                actual_key = key_aliases.get(field_key)
+                if actual_key:
+                    extracted[actual_key] = new_val
+                    edits_made.append(field_key)
+                else:
+                    errors.append(field_key)
+
+            if not edits_made and not errors:
+                return "__KEEP_PENDING__Format: *edit field_name new_value*\nExample: *edit name Rahul Sharma*"
+
             action_data["extracted"] = extracted
             await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
 
             msg = format_extracted_data(extracted, action_data.get("provider", ""))
+            msg += f"\n\nUpdated: {', '.join(edits_made)}"
+            if errors:
+                msg += f"\nUnknown fields (skipped): {', '.join(errors)}"
             msg += "\n\nReply *yes* to save, *no* to cancel."
-            msg += "\nTo edit another field: *edit field_name new_value*"
+            msg += "\nTo edit more: *edit field_name new_value*"
             return msg
 
         # ── Confirm and save — run room validation first ────────────────
