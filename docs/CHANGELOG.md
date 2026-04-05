@@ -25,10 +25,22 @@ All notable changes to PG Accountant will be documented here.
 - Intent detection falls back to Haiku (~$0.0005/call) instead of Groq for unrecognized messages
 - ADD_TENANT prompt now offers image upload option
 
+### Added (continued — same session)
+- **Checkout form extraction** — photo upload extracts name, room, date, refund details, verification checklist
+- **Refund Amount column** in Sheet (col 17, KYC shifted to 18-32)
+- **Receipt slip archiving** — auto-prompts after payment confirm AND checkout refund
+- **COLLECT_RECEIPT handler** — saves receipt photos tagged to tenant/payment
+- **Image + expense keyword routing** — photo with "EB bill" always routes to ADD_EXPENSE
+- **"log EB bill" regex fix** — routes to ADD_EXPENSE instead of ACTIVITY_LOG
+- **_save_pending import fix** in LOG_EXPENSE_STEP handler
+- **"eb" alone** maps to electricity category (no need for "eb bill")
+
 ### Architecture
-- Haiku vision: only called once per form photo upload (no API calls for edits/confirms)
+- Haiku vision: called once per form photo (check-in or checkout), no API for edits
+- Haiku intent fallback: called only for UNKNOWN intents (~$0.0005/call)
 - Training pairs saved to data/form_training/ for future Groq fine-tuning
 - All documents tagged to tenant_id/tenancy_id in documents table
+- Receipt slips saved under data/documents/receipts/YYYY-MM/
 
 ## [1.15.0] — 2026-04-02/03 — Reminder System + Payment Flow Fixes + Sheet Sync
 
