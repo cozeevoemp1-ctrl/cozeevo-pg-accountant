@@ -56,6 +56,10 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
     ("properties", "wifi_floor_map",              "JSONB"),
     # Tenant food preference (added 2026-03-29)
     ("tenants", "food_preference",                "VARCHAR(20)"),
+    # Tenant extended KYC fields (added 2026-04-05)
+    ("tenants", "educational_qualification",      "VARCHAR(120)"),
+    ("tenants", "office_address",                 "TEXT"),
+    ("tenants", "office_phone",                   "VARCHAR(20)"),
 ]
 
 # -- Tables to create if missing -----------------------------------------------

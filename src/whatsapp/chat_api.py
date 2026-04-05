@@ -373,6 +373,12 @@ async def _process_message_inner(
     if chat_context:
         intent_result.entities["_chat_context"] = chat_context
 
+    # Pass media info to intent handlers (for image-based form extraction etc.)
+    if body.media_id:
+        intent_result.entities["_media_id"] = body.media_id
+        intent_result.entities["_media_type"] = body.media_type
+        intent_result.entities["_media_mime"] = body.media_mime
+
     reply = await route(intent, intent_result.entities, ctx, message, session)
 
     # ── 4a. No reply = bot disabled for this role (tenant/lead) ───────────
@@ -568,7 +574,7 @@ def _detect_mid_flow_breakout(message: str, pending_intent: str, skip_new_intent
     # Check if message matches a clear new intent (high confidence, different from pending)
     # Only check for multi-step flows (ADD_TENANT_STEP, RECORD_CHECKOUT) where user
     # might abandon mid-flow to do something else
-    if pending_intent in ("ADD_TENANT_STEP", "RECORD_CHECKOUT", "CONFIRM_PAYMENT_LOG", "COLLECT_RENT_STEP", "LOG_EXPENSE_STEP", "CONFIRM_PAYMENT_ALLOC", "UPDATE_TENANT_NOTES_STEP", "ADD_CONTACT_STEP"):
+    if pending_intent in ("ADD_TENANT_STEP", "RECORD_CHECKOUT", "CONFIRM_PAYMENT_LOG", "COLLECT_RENT_STEP", "LOG_EXPENSE_STEP", "CONFIRM_PAYMENT_ALLOC", "UPDATE_TENANT_NOTES_STEP", "ADD_CONTACT_STEP", "FORM_EXTRACT_CONFIRM", "COLLECT_DOCS", "CONFIRM_ADD_TENANT"):
         probe = detect_intent(message, "admin")
         if (
             probe.intent in _NEW_INTENT_TRIGGERS

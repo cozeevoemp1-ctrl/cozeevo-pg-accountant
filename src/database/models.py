@@ -156,6 +156,8 @@ class DocumentType(str, enum.Enum):
     import_file = "import_file" # archived Excel / CSV import
     report     = "report"       # generated monthly report
     staff_doc  = "staff_doc"    # staff contract / staff ID proof
+    reg_form   = "reg_form"     # tenant registration form (filled, signed)
+    rules_page = "rules_page"   # signed rules & regulations page
     other      = "other"
 
 class ReminderType(str, enum.Enum):
@@ -296,6 +298,9 @@ class Tenant(Base):
     id_proof_type                   = Column(String(40))        # Aadhar / Passport / DL
     id_proof_number                 = Column(String(60))
     food_preference                 = Column(String(20))        # veg / non-veg / egg
+    educational_qualification       = Column(String(120))       # B.Tech / MBA / etc.
+    office_address                  = Column(Text)
+    office_phone                    = Column(String(20))
     notes                           = Column(Text)
     created_at                      = Column(DateTime, default=datetime.utcnow)
 

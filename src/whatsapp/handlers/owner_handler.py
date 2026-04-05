@@ -228,6 +228,349 @@ async def resolve_pending_action(
         else:
             return "__KEEP_PENDING__Reply *yes* to approve or *no* to reject."
 
+    # ── Form image extraction confirmation ────────────────────────────────
+    if pending.intent == "FORM_EXTRACT_CONFIRM":
+        from src.whatsapp.form_extractor import format_extracted_data
+        from src.whatsapp.handlers._shared import _save_pending
+        ans = reply_text.strip().lower()
+        step = action_data.get("step", "")
+
+        if ans in ("no", "n", "cancel", "abort"):
+            return "Cancelled. Tenant not added."
+
+        # ── Edit a field ──────────────────────────────────────────────────
+        if ans.startswith("edit "):
+            # Use original reply_text to preserve case in the value
+            raw_edit = reply_text.strip()[5:].strip()  # skip "edit " prefix
+            parts = raw_edit.split(None, 1)
+            if len(parts) < 2:
+                return "__KEEP_PENDING__Format: *edit field_name new_value*\nExample: *edit name Rahul Sharma*"
+
+            field_key = parts[0].lower()
+            new_val = parts[1].strip()
+
+            # Map user-friendly names to JSON keys
+            key_aliases = {
+                "name": "name", "phone": "phone", "room": "room_number",
+                "room_number": "room_number", "gender": "gender",
+                "rent": "monthly_rent", "monthly_rent": "monthly_rent",
+                "deposit": "deposit", "maintenance": "maintenance",
+                "checkin": "date_of_admission", "date_of_admission": "date_of_admission",
+                "dob": "date_of_birth", "date_of_birth": "date_of_birth",
+                "father": "father_name", "father_name": "father_name",
+                "father_phone": "father_phone",
+                "address": "permanent_address", "permanent_address": "permanent_address",
+                "emergency": "emergency_contact", "emergency_contact": "emergency_contact",
+                "relationship": "emergency_relationship",
+                "email": "email", "occupation": "occupation",
+                "id_type": "id_proof_type", "id_number": "id_proof_number",
+                "food": "food_preference", "food_preference": "food_preference",
+                "education": "educational_qualification", "educational_qualification": "educational_qualification",
+                "office_address": "office_address", "office": "office_address",
+                "office_phone": "office_phone",
+                "rent_remarks": "rent_remarks", "rent_terms": "rent_remarks",
+                "deposit_remarks": "deposit_remarks", "deposit_terms": "deposit_remarks",
+                "maintenance_remarks": "maintenance_remarks", "maint_terms": "maintenance_remarks",
+            }
+
+            actual_key = key_aliases.get(field_key)
+            if not actual_key:
+                return f"__KEEP_PENDING__Unknown field *{field_key}*. Try: name, phone, room, rent, deposit, checkin, gender, food, etc."
+
+            extracted = action_data.get("extracted", {})
+            extracted[actual_key] = new_val
+            action_data["extracted"] = extracted
+            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+            msg = format_extracted_data(extracted, action_data.get("provider", ""))
+            msg += "\n\nReply *yes* to save, *no* to cancel."
+            msg += "\nTo edit another field: *edit field_name new_value*"
+            return msg
+
+        # ── Confirm and save — run room validation first ────────────────
+        if step == "confirm_extracted" and ans in ("yes", "y", "confirm", "save", "ok", "done"):
+            extracted = action_data.get("extracted", {})
+
+            # Validate room exists
+            room_str = extracted.get("room_number", "")
+            room_row = await session.scalar(select(Room).where(Room.room_number.ilike(room_str)))
+            if not room_row:
+                similar_res = await session.execute(
+                    select(Room).where(Room.room_number.ilike(f"%{room_str}%")).limit(5)
+                )
+                similar = [r.room_number for r in similar_res.scalars().all()]
+                hint = f"\nDid you mean: {', '.join(f'*{r}*' for r in similar)}?" if similar else ""
+                return f"__KEEP_PENDING__Room *{room_str}* not found.{hint}\n\nUse *edit room T-201* to correct."
+
+            # Check duplicate phone
+            phone_raw = extracted.get("phone", "")
+            phone_clean = re.sub(r"[^0-9]", "", phone_raw)
+            if len(phone_clean) > 10:
+                phone_clean = phone_clean[-10:]
+            if phone_clean and len(phone_clean) == 10:
+                existing = await session.scalar(select(Tenant).where(Tenant.phone == phone_clean))
+                if existing:
+                    active_tncy = await session.scalar(
+                        select(Tenancy).where(Tenancy.tenant_id == existing.id, Tenancy.status == TenancyStatus.active)
+                    )
+                    if active_tncy:
+                        r2 = await session.get(Room, active_tncy.room_id)
+                        return (f"__KEEP_PENDING__Phone *{phone_clean}* already belongs to *{existing.name}* "
+                                f"(active in Room {r2.room_number if r2 else '?'}).\n\n"
+                                "Checkout that tenant first, or *edit phone* to correct.")
+
+            # Check room occupancy
+            active_res = await session.execute(
+                select(Tenancy).where(Tenancy.room_id == room_row.id, Tenancy.status == TenancyStatus.active)
+            )
+            occupants = active_res.scalars().all()
+            max_occ = room_row.max_occupancy or 1
+            rt = room_row.room_type
+            rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
+
+            if len(occupants) >= max_occ:
+                # Room full — offer checkout option
+                occ_lines = []
+                for i, tncy in enumerate(occupants, 1):
+                    t = await session.get(Tenant, tncy.tenant_id)
+                    checkin_str = tncy.checkin_date.strftime('%d %b %Y') if tncy.checkin_date else "?"
+                    occ_lines.append(f"*{i}.* {t.name} (since {checkin_str})")
+
+                action_data["step"] = "resolve_room_full"
+                action_data["room_id"] = room_row.id
+                action_data["room_number"] = room_row.room_number
+                action_data["room_type"] = rt_str
+                action_data["max_occupancy"] = max_occ
+                action_data["occupant_tenancies"] = [
+                    {"tenancy_id": tncy.id, "tenant_id": tncy.tenant_id}
+                    for tncy in occupants
+                ]
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+                return (
+                    f"*Room {room_row.room_number} is full* ({len(occupants)}/{max_occ} — {rt_str} sharing)\n\n"
+                    + "\n".join(occ_lines) + "\n\n"
+                    "Options:\n"
+                    "- Reply *1 today* or *2 31 march* to checkout that person & proceed\n"
+                    "- Reply *edit room T-201* to use a different room\n"
+                    "- Reply *no* to cancel"
+                )
+
+            # Gender check
+            gender_s = extracted.get("gender", "").lower()
+            if gender_s and occupants:
+                occ_t_ids = [tncy.tenant_id for tncy in occupants]
+                occ_g_res = await session.execute(select(Tenant.gender).where(Tenant.id.in_(occ_t_ids)))
+                occ_genders = [g for g in occ_g_res.scalars().all() if g]
+                if occ_genders and any(g != gender_s for g in occ_genders):
+                    action_data["step"] = "confirm_gender_mismatch"
+                    action_data["room_id"] = room_row.id
+                    action_data["room_number"] = room_row.room_number
+                    action_data["room_type"] = rt_str
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return (
+                        f"*Gender mismatch:* New tenant is *{gender_s}*, "
+                        f"existing occupant(s) in Room {room_row.room_number} are *{', '.join(set(occ_genders))}*.\n\n"
+                        "Reply *yes* to proceed anyway, *edit room* to change room, or *no* to cancel."
+                    )
+
+            # Room has space — go to sharing type confirmation
+            action_data["step"] = "confirm_sharing"
+            action_data["room_id"] = room_row.id
+            action_data["room_number"] = room_row.room_number
+            action_data["room_type"] = rt_str
+            action_data["max_occupancy"] = max_occ
+            action_data["current_occupants"] = len(occupants)
+            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+            if rt_str == "single":
+                # Single room — no sharing question needed, auto-proceed
+                return await _finalize_form_checkin(action_data, pending, session, sharing_type="single")
+
+            occ_info = ""
+            if occupants:
+                occ_names = []
+                for tncy in occupants:
+                    t = await session.get(Tenant, tncy.tenant_id)
+                    occ_names.append(t.name)
+                occ_info = f"\nCurrent occupants: {', '.join(occ_names)} ({len(occupants)}/{max_occ})"
+
+            return (
+                f"*Room {room_row.room_number}* — {rt_str} sharing room ({len(occupants)}/{max_occ} occupied){occ_info}\n\n"
+                f"Checking in as:\n"
+                f"*1.* {rt_str.title()} sharing\n"
+                f"*2.* Premium (single occupancy — all beds)\n\n"
+                f"Reply *1* or *2*"
+            )
+
+        # ── Resolve room full — checkout old tenant ───────────────────────
+        if step == "resolve_room_full":
+            # Parse: "1 today" or "2 31 march" or "edit room T-201"
+            if ans.startswith("edit room"):
+                new_room = ans.replace("edit room", "").strip()
+                if new_room:
+                    extracted = action_data.get("extracted", {})
+                    extracted["room_number"] = new_room
+                    action_data["extracted"] = extracted
+                    action_data["step"] = "confirm_extracted"
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return f"__KEEP_PENDING__Room changed to *{new_room}*. Reply *yes* to proceed."
+                return "__KEEP_PENDING__Please specify room: *edit room T-201*"
+
+            # Parse "1 today" or "2 31 march"
+            m = re.match(r"(\d+)\s+(.+)", ans)
+            if m:
+                idx = int(m.group(1)) - 1
+                exit_date_str = m.group(2).strip()
+                occupant_list = action_data.get("occupant_tenancies", [])
+
+                if 0 <= idx < len(occupant_list):
+                    from src.whatsapp.intent_detector import _extract_date_entity
+                    if exit_date_str.lower() in ("today", "now"):
+                        exit_iso = date.today().isoformat()
+                    else:
+                        exit_iso = _extract_date_entity(exit_date_str)
+
+                    if not exit_iso:
+                        return f"__KEEP_PENDING__Could not parse date *{exit_date_str}*. Try: *{idx+1} today* or *{idx+1} 31 march*"
+
+                    exit_date = date.fromisoformat(exit_iso)
+                    occ = occupant_list[idx]
+                    tenancy = await session.get(Tenancy, occ["tenancy_id"])
+                    tenant = await session.get(Tenant, occ["tenant_id"])
+
+                    if tenancy:
+                        tenancy.status = TenancyStatus.exited
+                        tenancy.checkout_date = exit_date
+                        checkout_name = tenant.name if tenant else "Tenant"
+
+                        # Now re-check — go back to confirm_extracted to re-validate
+                        action_data["step"] = "confirm_extracted"
+                        await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                        return (
+                            f"*{checkout_name}* checked out (exit: {exit_date.strftime('%d %b %Y')}).\n\n"
+                            f"Room {action_data.get('room_number', '')} now has space.\n"
+                            f"Reply *yes* to proceed with check-in."
+                        )
+
+                return f"__KEEP_PENDING__Invalid. Reply like *1 today* or *2 31 march* to checkout."
+
+            return "__KEEP_PENDING__Reply: *1 today* (checkout person 1), *edit room T-201*, or *no* to cancel."
+
+        # ── Gender mismatch confirmation ──────────────────────────────────
+        if step == "confirm_gender_mismatch":
+            if ans in ("yes", "y", "proceed", "ok"):
+                action_data["step"] = "confirm_sharing"
+                rt_str = action_data.get("room_type", "double")
+                max_occ = action_data.get("max_occupancy", 2)
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+                if rt_str == "single":
+                    return await _finalize_form_checkin(action_data, pending, session, sharing_type="single")
+
+                return (
+                    f"Checking in as:\n"
+                    f"*1.* {rt_str.title()} sharing\n"
+                    f"*2.* Premium (single occupancy)\n\n"
+                    f"Reply *1* or *2*"
+                )
+            if ans.startswith("edit room"):
+                new_room = ans.replace("edit room", "").strip()
+                if new_room:
+                    extracted = action_data.get("extracted", {})
+                    extracted["room_number"] = new_room
+                    action_data["extracted"] = extracted
+                    action_data["step"] = "confirm_extracted"
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return f"__KEEP_PENDING__Room changed to *{new_room}*. Reply *yes* to proceed."
+            return "__KEEP_PENDING__Reply *yes* to proceed, *edit room T-201* to change, or *no* to cancel."
+
+        # ── Sharing type confirmation ─────────────────────────────────────
+        if step == "confirm_sharing":
+            rt_str = action_data.get("room_type", "double")
+            if ans in ("1", rt_str, "sharing", "shared"):
+                return await _finalize_form_checkin(action_data, pending, session, sharing_type=rt_str)
+            elif ans in ("2", "premium", "single", "solo"):
+                return await _finalize_form_checkin(action_data, pending, session, sharing_type="premium")
+            return f"__KEEP_PENDING__Reply *1* for {rt_str} sharing or *2* for premium (single occupancy)."
+
+        if step == "confirm_extracted":
+            return "__KEEP_PENDING__Reply *yes* to save, *no* to cancel, or *edit field_name value* to correct."
+
+    # ── Document collection (ID proofs + rules page after check-in) ───────
+    if pending.intent == "COLLECT_DOCS":
+        from src.whatsapp.handlers._shared import _save_pending
+        ans = reply_text.strip().lower()
+
+        if ans in ("done", "finish", "finished", "that's all", "thats all", "complete", "skip"):
+            docs_count = action_data.get("docs_saved", 0)
+            return f"Documents saved ({docs_count} total) for {action_data.get('tenant_name', 'tenant')}."
+
+        if ans in ("cancel", "abort", "no"):
+            return "Document collection cancelled."
+
+        # Image received — save it
+        if media_id and media_type == "image":
+            from src.whatsapp.webhook_handler import _fetch_media_bytes
+            from src.whatsapp.media_handler import MEDIA_DIR
+            from src.database.models import Document, DocumentType
+            from pathlib import Path
+
+            img_bytes = await _fetch_media_bytes(media_id)
+            if not img_bytes:
+                return "__KEEP_PENDING__Could not download. Please resend the image."
+
+            # Determine doc type: rules page or ID proof
+            # Rules page detection: check image size and use simple heuristic
+            # Rules pages are typically the 2nd page with "RULES & REGULATIONS" header
+            # For efficiency, we check if user caption hints at it, otherwise default to id_proof
+            caption = reply_text.strip().lower()
+            if any(w in caption for w in ("rule", "sign", "declaration", "terms")):
+                doc_type = DocumentType.rules_page
+                doc_label = "rules_page"
+            else:
+                doc_type = DocumentType.id_proof
+                doc_label = "id_proof"
+
+            # Save to disk
+            ext = ".jpg"
+            if "png" in (media_mime or ""):
+                ext = ".png"
+            elif "webp" in (media_mime or ""):
+                ext = ".webp"
+
+            t_name = re.sub(r"[^a-zA-Z0-9]", "_", action_data.get("tenant_name", "tenant")).lower()
+            room = action_data.get("room_number", "unknown")
+            save_dir = MEDIA_DIR / doc_label / datetime.now().strftime("%Y-%m")
+            save_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = save_dir / f"{room}_{t_name}_{ts}{ext}"
+            file_path.write_bytes(img_bytes)
+            rel_path = str(file_path.relative_to(MEDIA_DIR))
+
+            # Save Document record
+            session.add(Document(
+                doc_type=doc_type,
+                file_path=rel_path,
+                original_name=f"{doc_label}_{t_name}_{room}",
+                file_size_kb=len(img_bytes) // 1024,
+                mime_type=media_mime or "image/jpeg",
+                tenant_id=action_data.get("tenant_id"),
+                tenancy_id=action_data.get("tenancy_id"),
+                uploaded_by=pending.phone,
+                notes=f"{doc_label} - {action_data.get('tenant_name', '')} - Room {room}",
+            ))
+
+            action_data["docs_saved"] = action_data.get("docs_saved", 0) + 1
+            await _save_pending(pending.phone, "COLLECT_DOCS", action_data, [], session)
+
+            count = action_data["docs_saved"]
+            type_label = "Rules page" if doc_type == DocumentType.rules_page else "ID proof"
+            return f"__KEEP_PENDING__{type_label} saved ({count} docs total).\n\nSend more or say *done*."
+
+        # Text message but no image — remind them
+        return "__KEEP_PENDING__Send photos of ID proof (front & back) and signed rules page.\nOr say *done* if finished."
+
     if pending.intent == "CONFIRM_PAYMENT_LOG":
         # ── Correction check (before yes/no) ──────────────────────────────────
         _MODE_MAP = {
@@ -768,6 +1111,13 @@ async def resolve_pending_action(
         if ans.lower() in ("cancel", "no", "stop", "start over", "abort"):
             return "Cancelled. Tenant not added."
 
+        # Image upload during step-by-step → switch to image extraction
+        if media_id and media_type == "image" and step == "ask_name":
+            from src.whatsapp.role_service import get_caller_context
+            ctx = await get_caller_context(pending.phone, session)
+            pending.resolved = True
+            return await _extract_tenant_from_image(media_id, media_mime or "image/jpeg", ctx, session)
+
         if step == "ask_name":
             if not ans or ans[0].isdigit():
                 return "__KEEP_PENDING__Please enter the *tenant's full name*:"
@@ -951,6 +1301,104 @@ async def resolve_pending_action(
                     "notes": action_data.get("notes", ""),
                 }
                 result = await _do_add_tenant(form_data, session)
+
+                # Save KYC extra fields from image extraction if present
+                kyc = action_data.get("_kyc_extra")
+                if kyc:
+                    phone_clean = re.sub(r"[^0-9]", "", action_data["phone"])
+                    if len(phone_clean) > 10:
+                        phone_clean = phone_clean[-10:]
+                    tenant = await session.scalar(
+                        select(Tenant).where(Tenant.phone.like(f"%{phone_clean}"))
+                    )
+                    if tenant:
+                        if kyc.get("father_name"):
+                            tenant.father_name = kyc["father_name"]
+                        if kyc.get("father_phone"):
+                            tenant.father_phone = kyc["father_phone"]
+                        if kyc.get("date_of_birth"):
+                            try:
+                                for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+                                    try:
+                                        tenant.date_of_birth = datetime.strptime(kyc["date_of_birth"], fmt).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                            except Exception:
+                                pass
+                        if kyc.get("permanent_address"):
+                            tenant.permanent_address = kyc["permanent_address"]
+                        if kyc.get("emergency_contact"):
+                            # Smart split: if it looks like a phone, save as phone; otherwise as name
+                            ec = kyc["emergency_contact"]
+                            ec_digits = re.sub(r"[^0-9]", "", ec)
+                            if len(ec_digits) >= 10:
+                                tenant.emergency_contact_phone = ec_digits[-10:]
+                            else:
+                                tenant.emergency_contact_name = ec
+                        if kyc.get("emergency_relationship"):
+                            tenant.emergency_contact_relationship = kyc["emergency_relationship"]
+                        if kyc.get("email"):
+                            tenant.email = kyc["email"]
+                        if kyc.get("occupation"):
+                            tenant.occupation = kyc["occupation"]
+                        if kyc.get("educational_qualification"):
+                            tenant.educational_qualification = kyc["educational_qualification"]
+                        if kyc.get("office_address"):
+                            tenant.office_address = kyc["office_address"]
+                        if kyc.get("office_phone"):
+                            tenant.office_phone = kyc["office_phone"]
+                        if kyc.get("id_proof_type"):
+                            tenant.id_proof_type = kyc["id_proof_type"]
+                        if kyc.get("id_proof_number"):
+                            tenant.id_proof_number = kyc["id_proof_number"]
+                        result += "\nKYC data saved."
+
+                # Save registration form image as Document
+                form_image_path = action_data.get("form_image_path")
+                if form_image_path:
+                    from src.database.models import Document, DocumentType
+                    # Find the tenant we just created
+                    phone_clean = re.sub(r"[^0-9]", "", action_data["phone"])
+                    if len(phone_clean) > 10:
+                        phone_clean = phone_clean[-10:]
+                    t = await session.scalar(
+                        select(Tenant).where(Tenant.phone.like(f"%{phone_clean}"))
+                    )
+                    t_id = t.id if t else None
+                    # Find tenancy
+                    tn = None
+                    if t_id:
+                        tn = await session.scalar(
+                            select(Tenancy).where(
+                                Tenancy.tenant_id == t_id,
+                                Tenancy.status == TenancyStatus.active,
+                            )
+                        )
+                    session.add(Document(
+                        doc_type=DocumentType.reg_form,
+                        file_path=form_image_path,
+                        original_name=f"reg_form_{action_data.get('name', 'tenant')}",
+                        mime_type="image/jpeg",
+                        tenant_id=t_id,
+                        tenancy_id=tn.id if tn else None,
+                        uploaded_by=pending.phone,
+                        notes=f"Registration form - {action_data.get('name', '')} - Room {action_data.get('room_number', '')}",
+                    ))
+
+                    # Start COLLECT_DOCS flow for ID proofs + rules page
+                    doc_data = {
+                        "step": "collecting",
+                        "tenant_id": t_id,
+                        "tenancy_id": tn.id if tn else None,
+                        "tenant_name": action_data.get("name", ""),
+                        "room_number": action_data.get("room_number", ""),
+                        "phone": action_data.get("phone", ""),
+                        "docs_saved": 1,  # reg form already saved
+                    }
+                    await _save_pending(pending.phone, "COLLECT_DOCS", doc_data, [], session)
+                    result += "\n\nNow send:\n- *ID proof front & back* (Aadhaar/DL/Passport)\n- *Signed rules page*\n\nJust send the photos — I'll save them automatically.\nSay *done* when finished."
+
                 return result
             else:
                 return "Cancelled. Tenant not added."
@@ -1958,9 +2406,101 @@ async def resolve_pending_action(
 
     if pending.intent == "CONFIRM_ADD_TENANT":
         if is_negative(reply_text):
-            return "❌ Tenant check-in cancelled. Nothing was saved."
+            return "Tenant check-in cancelled. Nothing was saved."
         if is_affirmative(reply_text):
-            return await _do_add_tenant(action_data, session)
+            result = await _do_add_tenant(action_data, session)
+
+            # Save KYC extra fields from image extraction if present
+            kyc = action_data.get("_kyc_extra")
+            if kyc:
+                phone_clean = re.sub(r"[^0-9]", "", action_data.get("phone", ""))
+                if len(phone_clean) > 10:
+                    phone_clean = phone_clean[-10:]
+                if phone_clean:
+                    tenant = await session.scalar(
+                        select(Tenant).where(Tenant.phone.like(f"%{phone_clean}"))
+                    )
+                    if tenant:
+                        if kyc.get("father_name"):
+                            tenant.father_name = kyc["father_name"]
+                        if kyc.get("father_phone"):
+                            tenant.father_phone = kyc["father_phone"]
+                        if kyc.get("date_of_birth"):
+                            try:
+                                for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+                                    try:
+                                        tenant.date_of_birth = datetime.strptime(kyc["date_of_birth"], fmt).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                            except Exception:
+                                pass
+                        if kyc.get("permanent_address"):
+                            tenant.permanent_address = kyc["permanent_address"]
+                        if kyc.get("emergency_contact"):
+                            ec = kyc["emergency_contact"]
+                            ec_digits = re.sub(r"[^0-9]", "", ec)
+                            if len(ec_digits) >= 10:
+                                tenant.emergency_contact_phone = ec_digits[-10:]
+                            else:
+                                tenant.emergency_contact_name = ec
+                        if kyc.get("emergency_relationship"):
+                            tenant.emergency_contact_relationship = kyc["emergency_relationship"]
+                        if kyc.get("email"):
+                            tenant.email = kyc["email"]
+                        if kyc.get("occupation"):
+                            tenant.occupation = kyc["occupation"]
+                        if kyc.get("educational_qualification"):
+                            tenant.educational_qualification = kyc["educational_qualification"]
+                        if kyc.get("office_address"):
+                            tenant.office_address = kyc["office_address"]
+                        if kyc.get("office_phone"):
+                            tenant.office_phone = kyc["office_phone"]
+                        if kyc.get("id_proof_type"):
+                            tenant.id_proof_type = kyc["id_proof_type"]
+                        if kyc.get("id_proof_number"):
+                            tenant.id_proof_number = kyc["id_proof_number"]
+                        result += "\nKYC data saved."
+
+            # Save registration form image as Document + start doc collection
+            form_image_path = action_data.get("form_image_path")
+            if form_image_path:
+                from src.database.models import Document, DocumentType
+                phone_clean = re.sub(r"[^0-9]", "", action_data.get("phone", ""))
+                if len(phone_clean) > 10:
+                    phone_clean = phone_clean[-10:]
+                t = await session.scalar(select(Tenant).where(Tenant.phone.like(f"%{phone_clean}"))) if phone_clean else None
+                t_id = t.id if t else None
+                tn = None
+                if t_id:
+                    tn = await session.scalar(
+                        select(Tenancy).where(Tenancy.tenant_id == t_id, Tenancy.status == TenancyStatus.active)
+                    )
+                session.add(Document(
+                    doc_type=DocumentType.reg_form,
+                    file_path=form_image_path,
+                    original_name=f"reg_form_{action_data.get('name', 'tenant')}",
+                    mime_type="image/jpeg",
+                    tenant_id=t_id,
+                    tenancy_id=tn.id if tn else None,
+                    uploaded_by=pending.phone,
+                    notes=f"Registration form - {action_data.get('name', '')} - Room {action_data.get('room_number', '')}",
+                ))
+
+                from src.whatsapp.handlers._shared import _save_pending as _sp
+                doc_data = {
+                    "step": "collecting",
+                    "tenant_id": t_id,
+                    "tenancy_id": tn.id if tn else None,
+                    "tenant_name": action_data.get("name", ""),
+                    "room_number": action_data.get("room_number", ""),
+                    "phone": action_data.get("phone", ""),
+                    "docs_saved": 1,
+                }
+                await _sp(pending.phone, "COLLECT_DOCS", doc_data, [], session)
+                result += "\n\nNow send:\n- *ID proof front & back* (Aadhaar/DL/Passport)\n- *Signed rules page*\n\nJust send the photos — I'll save them automatically.\nSay *done* when finished."
+
+            return result
         return "__KEEP_PENDING__Reply *Yes* to save the new tenant or *No* to cancel."
 
     if pending.intent == "UPDATE_TENANT_NOTES_STEP":
@@ -2653,8 +3193,152 @@ def _parse_amount_field(s: str) -> float:
     return float(m.group(1).replace(",", "")) if m else 0.0
 
 
+async def _finalize_form_checkin(
+    action_data: dict, pending, session: AsyncSession, sharing_type: str = "double",
+) -> str:
+    """After all validations pass, create tenant via _process_tenant_form pipeline."""
+    extracted = action_data.get("extracted", {})
+
+    # Build form lines for _process_tenant_form
+    form_lines = [
+        f"Name: {extracted.get('name', '')}",
+        f"Phone: {extracted.get('phone', '')}",
+        f"Room: {action_data.get('room_number', extracted.get('room_number', ''))}",
+        f"Rent: {extracted.get('monthly_rent', 'skip')}",
+        f"Deposit: {extracted.get('deposit', 'skip')}",
+        f"Maintenance: {extracted.get('maintenance', 'skip')}",
+        f"Checkin: {extracted.get('date_of_admission', '')}",
+        f"Food: {extracted.get('food_preference', 'none')}",
+        f"Gender: {extracted.get('gender', '')}",
+    ]
+
+    # Build notes from agreed terms/remarks
+    remarks_parts = []
+    if extracted.get("rent_remarks"):
+        remarks_parts.append(f"Rent: {extracted['rent_remarks']}")
+    if extracted.get("deposit_remarks"):
+        remarks_parts.append(f"Deposit: {extracted['deposit_remarks']}")
+    if extracted.get("maintenance_remarks"):
+        remarks_parts.append(f"Maintenance: {extracted['maintenance_remarks']}")
+    agreed_terms = " | ".join(remarks_parts) if remarks_parts else ""
+    if agreed_terms:
+        form_lines.append(f"Notes: {agreed_terms}")
+
+    form_msg = "\n".join(form_lines)
+
+    # Mark this pending as resolved before creating new one
+    pending.resolved = True
+
+    from src.whatsapp.role_service import get_caller_context
+    ctx = await get_caller_context(pending.phone, session)
+
+    result = await _process_tenant_form(form_msg, ctx, session)
+
+    # Store KYC extra + sharing type in the new pending action
+    from src.whatsapp.chat_api import _get_active_pending
+    new_pending = await _get_active_pending(pending.phone, session)
+
+    # Build KYC dict
+    kyc_extra = {
+        "father_name": extracted.get("father_name", ""),
+        "father_phone": extracted.get("father_phone", ""),
+        "date_of_birth": extracted.get("date_of_birth", ""),
+        "permanent_address": extracted.get("permanent_address", ""),
+        "emergency_contact": extracted.get("emergency_contact", ""),
+        "emergency_relationship": extracted.get("emergency_relationship", ""),
+        "email": extracted.get("email", ""),
+        "occupation": extracted.get("occupation", ""),
+        "educational_qualification": extracted.get("educational_qualification", ""),
+        "office_address": extracted.get("office_address", ""),
+        "office_phone": extracted.get("office_phone", ""),
+        "id_proof_type": extracted.get("id_proof_type", ""),
+        "id_proof_number": extracted.get("id_proof_number", ""),
+    }
+
+    extra_fields = [f"{l}: {kyc_extra[k]}" for k, l in [
+        ("father_name", "Father"), ("father_phone", "Father Phone"),
+        ("date_of_birth", "DOB"), ("permanent_address", "Address"),
+        ("emergency_contact", "Emergency"), ("emergency_relationship", "Relationship"),
+        ("email", "Email"), ("occupation", "Occupation"),
+        ("educational_qualification", "Education"),
+        ("office_address", "Office Address"), ("office_phone", "Office Phone"),
+        ("id_proof_type", "ID Type"), ("id_proof_number", "ID Number"),
+    ] if kyc_extra.get(k)]
+
+    if new_pending and new_pending.intent in ("CONFIRM_ADD_TENANT", "ADD_TENANT_STEP"):
+        import json as _j
+        ad = _j.loads(new_pending.action_data or "{}")
+        ad["_kyc_extra"] = kyc_extra
+        ad["_sharing_type"] = sharing_type
+        ad["form_image_path"] = action_data.get("form_image_path", "")
+        new_pending.action_data = _j.dumps(ad)
+
+    if extra_fields:
+        result += "\n\n_KYC data (saved on confirm):_\n" + "\n".join(extra_fields)
+
+    result += f"\n_Sharing: {sharing_type}_"
+
+    return result
+
+
+async def _extract_tenant_from_image(
+    media_id: str, media_mime: str, ctx: CallerContext, session: AsyncSession,
+) -> str:
+    """Download form image, extract data via Claude Haiku, show confirmation."""
+    from src.whatsapp.webhook_handler import _fetch_media_bytes
+    from src.whatsapp.form_extractor import extract_form_from_image, format_extracted_data
+    from src.whatsapp.handlers._shared import _save_pending
+
+    image_bytes = await _fetch_media_bytes(media_id)
+    if not image_bytes:
+        return "Could not download the image. Please try again."
+
+    # Save the form image to disk immediately
+    from src.whatsapp.media_handler import MEDIA_DIR
+    from pathlib import Path
+    save_dir = MEDIA_DIR / "reg_forms" / datetime.now().strftime("%Y-%m")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    ext = {".jpeg": ".jpg"}.get("", ".jpg")
+    if "png" in (media_mime or ""):
+        ext = ".png"
+    elif "webp" in (media_mime or ""):
+        ext = ".webp"
+    else:
+        ext = ".jpg"
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    form_path = save_dir / f"reg_form_{ts}{ext}"
+    form_path.write_bytes(image_bytes)
+    form_rel_path = str(form_path.relative_to(MEDIA_DIR))
+
+    result = await extract_form_from_image(image_bytes, media_mime)
+    data = result.get("result")
+
+    if not data:
+        return "Could not extract data from the image. Please try the step-by-step flow instead:\n\nSend *add tenant* again without an image."
+
+    action_data = {
+        "step": "confirm_extracted",
+        "extracted": data,
+        "provider": "haiku",
+        "form_image_path": form_rel_path,
+    }
+    await _save_pending(ctx.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+    msg = format_extracted_data(data, "haiku")
+    msg += "\n\nReply *yes* to save, *no* to cancel."
+    msg += "\nTo edit a field: *edit name Rahul Sharma*"
+    return msg
+
+
 async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     msg = entities.get("description", "").strip()
+
+    # ── Image-based form extraction ───────────────────────────────────────
+    media_id = entities.get("_media_id")
+    media_type = entities.get("_media_type")
+    media_mime = entities.get("_media_mime")
+    if media_id and media_type == "image":
+        return await _extract_tenant_from_image(media_id, media_mime or "image/jpeg", ctx, session)
 
     # ── Detect filled form submission ──────────────────────────────────────
     if _is_form_submission(msg):
@@ -2683,7 +3367,7 @@ async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncS
         action_data=json.dumps(action_data), choices=json.dumps([]),
         expires_at=datetime.utcnow() + timedelta(minutes=30),
     ))
-    return "*New tenant check-in*\n\nLet's go step by step.\n\n*Tenant's full name?*"
+    return "*New tenant check-in*\n\nYou can:\n1. Send a *photo of the registration form* to auto-extract details\n2. Or type the *tenant's full name* to go step by step"
 
 
 async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSession) -> str:
@@ -2820,6 +3504,31 @@ async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSessi
             discount_line = (f"\nDiscount: Rs.{int(d['off_amount']):,} off "
                              f"= Rs.{int(d['discounted_rent']):,}/month")
 
+    # Room occupancy info
+    room_info = f"{room_row.room_number}"
+    rt = room_row.room_type
+    rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
+    max_occ = room_row.max_occupancy or 1
+    occ_line = ""
+    if occupants:
+        occ_tenant_ids = [tncy.tenant_id for tncy in occupants]
+        occ_name_rows = await session.execute(select(Tenant.name).where(Tenant.id.in_(occ_tenant_ids)))
+        occ_names = list(occ_name_rows.scalars().all())
+        occ_line = f"\nCurrent occupants: {', '.join(occ_names)} ({len(occupants)}/{max_occ})"
+    room_info += f" ({rt_str} sharing, {len(occupants)}/{max_occ} occupied)"
+
+    # Gender check for warnings
+    gender_s = _get_ff(msg, "gender").lower() if _get_ff(msg, "gender") else ""
+    gender_warn = ""
+    if gender_s and occupants:
+        # Check if existing occupants have a different gender
+        occ_t_ids = [tncy.tenant_id for tncy in occupants]
+        occ_tenants_res = await session.execute(select(Tenant.gender).where(Tenant.id.in_(occ_t_ids)))
+        occ_genders = [g for g in occ_tenants_res.scalars().all() if g]
+        if occ_genders and gender_s not in ("", "none"):
+            if any(g != gender_s for g in occ_genders):
+                gender_warn = f"\n*Warning:* Gender mismatch — new tenant is {gender_s}, existing occupant(s) are {', '.join(set(occ_genders))}"
+
     # Save pending
     pending_data = {
         "name": name, "phone": phone,
@@ -2839,10 +3548,10 @@ async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSessi
     ))
 
     return (
-        f"*Confirm New Tenant?*{date_warn}\n\n"
+        f"*Confirm New Tenant?*{date_warn}{gender_warn}\n\n"
         f"Name: {name}\n"
         f"Phone: {phone}\n"
-        f"Room: {room_row.room_number}\n"
+        f"Room: {room_info}{occ_line}\n"
         f"Rent: Rs.{int(base_rent):,}/month{discount_line}\n"
         f"Deposit: Rs.{int(deposit):,}\n"
         + (f"Advance paid: Rs.{int(advance):,}\n" if advance > 0 else "")
@@ -2974,6 +3683,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             floor_val = str(room_obj.floor or "")
             rt = data.get("sharing", "") or room_obj.room_type
             sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
+            kyc = data.get("_kyc_extra") or {}
             gs_r = await gsheets_add(
                 room_number=room_number, name=name, phone=phone,
                 gender=data.get("gender", ""), building=building,
@@ -2982,6 +3692,20 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
                 agreed_rent=float(base_rent), deposit=float(deposit),
                 booking=float(advance), maintenance=float(maintenance),
                 notes=data.get("notes", ""),
+                dob=kyc.get("date_of_birth", ""),
+                father_name=kyc.get("father_name", ""),
+                father_phone=kyc.get("father_phone", ""),
+                address=kyc.get("permanent_address", ""),
+                emergency_contact=kyc.get("emergency_contact", ""),
+                emergency_relationship=kyc.get("emergency_relationship", ""),
+                email=kyc.get("email", ""),
+                occupation=kyc.get("occupation", ""),
+                education=kyc.get("educational_qualification", ""),
+                office_address=kyc.get("office_address", ""),
+                office_phone=kyc.get("office_phone", ""),
+                id_type=kyc.get("id_proof_type", ""),
+                id_number=kyc.get("id_proof_number", ""),
+                food_pref=data.get("food_pref", ""),
             )
             if gs_r.get("success"):
                 gsheets_note = "\nSheet updated"

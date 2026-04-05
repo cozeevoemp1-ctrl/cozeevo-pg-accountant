@@ -8,7 +8,12 @@ Sheet ID: 1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw
 TENANTS tab (master data) columns (0-indexed):
   [0] Room, [1] Name, [2] Phone, [3] Gender, [4] Building, [5] Floor,
   [6] Sharing, [7] Check-in, [8] Status, [9] Agreed Rent, [10] Deposit,
-  [11] Booking, [12] Maintenance, [13] Notice Date, [14] Expected Exit
+  [11] Booking, [12] Maintenance, [13] Notice Date, [14] Expected Exit,
+  [15] Checkout Date, [16] Refund Status,
+  [17] DOB, [18] Father Name, [19] Father Phone, [20] Address,
+  [21] Emergency Contact, [22] Emergency Relationship, [23] Email,
+  [24] Occupation, [25] Education, [26] Office Address, [27] Office Phone,
+  [28] ID Type, [29] ID Number, [30] Food Pref, [31] Notes
 
 Monthly tab (e.g. "APRIL 2026") columns (0-indexed):
   [0] Room, [1] Name, [2] Phone, [3] Building, [4] Sharing, [5] Rent Due,
@@ -102,6 +107,21 @@ T_NOTICE_DATE = 13
 T_EXPECTED_EXIT = 14
 T_CHECKOUT_DATE = 15
 T_REFUND_STATUS = 16
+T_DOB = 17
+T_FATHER_NAME = 18
+T_FATHER_PHONE = 19
+T_ADDRESS = 20
+T_EMERGENCY_CONTACT = 21
+T_EMERGENCY_RELATIONSHIP = 22
+T_EMAIL = 23
+T_OCCUPATION = 24
+T_EDUCATION = 25
+T_OFFICE_ADDRESS = 26
+T_OFFICE_PHONE = 27
+T_ID_TYPE = 28
+T_ID_NUMBER = 29
+T_FOOD_PREF = 30
+T_NOTES = 31
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
 TOTAL_BEDS = 291
@@ -698,6 +718,21 @@ def _add_tenant_sync(
     booking: float,
     maintenance: float,
     notes: str = "",
+    # KYC fields
+    dob: str = "",
+    father_name: str = "",
+    father_phone: str = "",
+    address: str = "",
+    emergency_contact: str = "",
+    emergency_relationship: str = "",
+    email: str = "",
+    occupation: str = "",
+    education: str = "",
+    office_address: str = "",
+    office_phone: str = "",
+    id_type: str = "",
+    id_number: str = "",
+    food_pref: str = "",
 ) -> dict:
     """
     Add tenant to TENANTS master tab AND current monthly tab.
@@ -750,6 +785,23 @@ def _add_tenant_sync(
             maintenance,       # 12: Maintenance
             "",                # 13: Notice Date
             "",                # 14: Expected Exit
+            "",                # 15: Checkout Date
+            "",                # 16: Refund Status
+            dob,               # 17: DOB
+            father_name,       # 18: Father Name
+            father_phone,      # 19: Father Phone
+            address,           # 20: Address
+            emergency_contact, # 21: Emergency Contact
+            emergency_relationship,  # 22: Emergency Relationship
+            email,             # 23: Email
+            occupation,        # 24: Occupation
+            education,         # 25: Education
+            office_address,    # 26: Office Address
+            office_phone,      # 27: Office Phone
+            id_type,           # 28: ID Type
+            id_number,         # 29: ID Number
+            food_pref,         # 30: Food Pref
+            notes,             # 31: Notes
         ]
         t_data = tenants_ws.get_all_values()
         t_next = len(t_data) + 1
@@ -1153,6 +1205,21 @@ async def add_tenant(
     booking: float,
     maintenance: float,
     notes: str = "",
+    # KYC fields
+    dob: str = "",
+    father_name: str = "",
+    father_phone: str = "",
+    address: str = "",
+    emergency_contact: str = "",
+    emergency_relationship: str = "",
+    email: str = "",
+    occupation: str = "",
+    education: str = "",
+    office_address: str = "",
+    office_phone: str = "",
+    id_type: str = "",
+    id_number: str = "",
+    food_pref: str = "",
 ) -> dict:
     """
     Async entry point — add tenant to TENANTS tab + current monthly tab.
@@ -1162,6 +1229,9 @@ async def add_tenant(
     return await asyncio.to_thread(
         _add_tenant_sync, room_number, name, phone, gender, building, floor,
         sharing, checkin, agreed_rent, deposit, booking, maintenance, notes,
+        dob, father_name, father_phone, address, emergency_contact,
+        emergency_relationship, email, occupation, education, office_address,
+        office_phone, id_type, id_number, food_pref,
     )
 
 
