@@ -294,10 +294,9 @@ async def resolve_pending_action(
             action_data["extracted"] = extracted
             await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
 
-            msg = format_extracted_data(extracted, action_data.get("provider", ""))
-            msg += f"\n\nUpdated: {', '.join(edits_made)}"
+            msg = format_extracted_data(extracted, "")
             if errors:
-                msg += f"\nUnknown fields (skipped): {', '.join(errors)}"
+                msg += f"\n\nUnknown fields (skipped): {', '.join(errors)}"
             msg += "\n\nReply *yes* to save, *no* to cancel."
             msg += "\nTo edit more: *edit field_name new_value*"
             return msg
