@@ -3566,7 +3566,7 @@ async def _process_checkout_from_form(
     if biometric:
         checklist.append(f"Biometric: {'removed' if biometric == 'yes' else 'NOT removed'}")
 
-    return (
+    result = (
         f"*Checkout Complete — {tenant.name}*\n"
         f"Room: {room_obj.room_number}\n"
         f"Exit: {checkout_date.strftime('%d %b %Y')}\n\n"
@@ -3576,6 +3576,20 @@ async def _process_checkout_from_form(
         + ("\n".join(checklist) + "\n\n" if checklist else "")
         + f"Saved to DB.{gsheets_note}"
     )
+
+    # Start receipt collection for refund slip
+    if refund_amount > 0:
+        from src.whatsapp.handlers._shared import _save_pending
+        await _save_pending(pending.phone, "COLLECT_RECEIPT", {
+            "tenant_id": tenant.id,
+            "tenancy_id": tenancy.id,
+            "tenant_name": tenant.name,
+            "room_number": room_obj.room_number,
+            "receipt_note": f"Refund Rs.{int(refund_amount):,} {refund_mode} - {tenant.name} - Room {room_obj.room_number} checkout",
+        }, [], session)
+        result += "\n\nSend photo of *refund receipt slip* to save, or say *skip*."
+
+    return result
 
 
 async def _extract_checkout_from_image(
