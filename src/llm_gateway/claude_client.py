@@ -176,23 +176,31 @@ class ClaudeClient:
     # ── WhatsApp intent (NLP fallback) ────────────────────────────────────
 
     _OWNER_INTENTS = (
-        "PAYMENT_LOG     : tenant paid rent (e.g. 'Raj paid 15000', 'received 8k from 203')\n"
-        "QUERY_DUES      : who hasn't paid, pending list, outstanding balances\n"
-        "QUERY_TENANT    : balance / dues / details of a specific tenant\n"
-        "ADD_TENANT      : add new tenant, check-in, onboard\n"
-        "CHECKOUT        : tenant leaving / vacating (immediate)\n"
-        "SCHEDULE_CHECKOUT: tenant leaving on a future date\n"
-        "NOTICE_GIVEN    : tenant gave notice / plans to leave\n"
-        "UPDATE_CHECKIN  : correct/backdate a check-in date\n"
-        "RENT_CHANGE     : permanent rent increase or decrease\n"
-        "RENT_DISCOUNT   : one-time concession, discount, surcharge, waiver\n"
-        "ADD_EXPENSE     : log a property expense (electricity, salary, maintenance)\n"
-        "REPORT          : monthly summary, P&L, collection report\n"
-        "ADD_PARTNER     : add a new admin or power user\n"
-        "REMINDER_SET    : set a reminder for a tenant or event\n"
-        "VOID_PAYMENT    : cancel, reverse, or void a payment\n"
-        "HELP            : help, menu, list of commands\n"
-        "UNKNOWN         : cannot determine intent"
+        "PAYMENT_LOG       : tenant paid rent (e.g. 'Raj paid 15000', 'received 8k from 203')\n"
+        "QUERY_DUES        : who hasn't paid, pending list, outstanding balances\n"
+        "QUERY_TENANT      : balance / dues / details of a specific tenant\n"
+        "ADD_TENANT        : add new tenant, check-in, onboard\n"
+        "CHECKOUT          : tenant leaving / vacating (immediate)\n"
+        "SCHEDULE_CHECKOUT : tenant leaving on a future date\n"
+        "NOTICE_GIVEN      : tenant gave notice / plans to leave\n"
+        "UPDATE_CHECKIN    : correct/backdate a check-in date\n"
+        "RENT_CHANGE       : permanent rent increase or decrease\n"
+        "RENT_DISCOUNT     : one-time concession, discount, surcharge, waiver\n"
+        "ADD_EXPENSE       : log a property expense (electricity, salary, plumber, maintenance bill)\n"
+        "QUERY_EXPENSES    : check/query expenses already logged (e.g. 'April EB bill' after logging)\n"
+        "REPORT            : monthly summary, P&L, collection report\n"
+        "COMPLAINT_REGISTER: report a problem (no water, broken fan, plumbing issue, wifi down)\n"
+        "COMPLAINT_UPDATE  : update/resolve a complaint (e.g. 'plumber fixed room 201')\n"
+        "QUERY_COMPLAINTS  : check complaint status\n"
+        "LOG_VACATION      : staff or tenant going on leave/vacation (e.g. 'loki went on vacation')\n"
+        "QUERY_CHECKINS    : who checked in recently, new admissions\n"
+        "QUERY_CHECKOUTS   : who checked out recently, recent exits\n"
+        "ROOM_STATUS       : room occupancy, vacant rooms, bed availability\n"
+        "ADD_PARTNER       : add a new admin or power user\n"
+        "REMINDER_SET      : set a reminder for a tenant or event\n"
+        "VOID_PAYMENT      : cancel, reverse, or void a payment\n"
+        "HELP              : help, menu, list of commands\n"
+        "UNKNOWN           : cannot determine intent"
     )
 
     _TENANT_INTENTS = (
@@ -211,9 +219,31 @@ class ClaudeClient:
         "GENERAL       : everything else (general enquiry or conversation)"
     )
 
+    async def _call_haiku(self, prompt: str) -> str:
+        """Direct call to Claude Haiku for intent detection (bypasses main LLM provider)."""
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if not api_key or api_key.startswith("PASTE_"):
+            # Fallback to main backend if Haiku not configured
+            return await self._call(prompt)
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=api_key)
+            msg = await client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=512,
+                temperature=0.0,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            logger.debug("[LLM] Intent detection via Claude Haiku")
+            return msg.content[0].text
+        except Exception as e:
+            logger.warning(f"[LLM] Haiku call failed, falling back to {type(self._backend).__name__}: {e}")
+            return await self._call(prompt)
+
     async def detect_whatsapp_intent(self, message: str, role: str) -> dict:
         """
         NLP fallback for WhatsApp messages that don't match any regex rule.
+        Uses Claude Haiku (cheap, fast, accurate) instead of main LLM provider.
         Returns {"intent": str, "confidence": float, "entities": dict}.
         """
         if role in ("admin", "owner"):
@@ -229,7 +259,7 @@ class ClaudeClient:
             message=message,
         )
         try:
-            response = await self._call(prompt)
+            response = await self._call_haiku(prompt)
             # Strip markdown fences if model wraps in ```json ... ```
             clean = response.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
             result = json.loads(clean)
