@@ -361,19 +361,16 @@ async def resolve_pending_action(
                 ]
                 await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
 
-                # Build checkout instructions based on number of occupants
-                if len(occupants) == 1:
-                    checkout_hint = f"To checkout *{occ_lines[0].split('*')[1]}*: reply with exit date\nExample: *today* or *03 april*"
-                else:
-                    checkout_hint = "To checkout, reply: *person# date*\nExample: *1 today* or *2 03 april*"
-
                 return (
                     f"*Room {room_row.room_number} is full* ({len(occupants)}/{max_occ} — {rt_str} sharing)\n\n"
                     + "\n".join(occ_lines) + "\n\n"
-                    f"{checkout_hint}\n"
-                    "Or *edit room T-201* to use a different room\n"
-                    "Or *no* to cancel"
+                    "*What would you like to do?*\n\n"
+                    "*1.* Checkout existing tenant & proceed\n"
+                    "*2.* Use a different room\n"
+                    "*3.* Cancel"
                 )
+
+                # Note: step stays as "resolve_room_full", handled below
 
             # Gender check
             gender_s = extracted.get("gender", "").lower()
@@ -422,90 +419,107 @@ async def resolve_pending_action(
                 f"Reply *1* or *2*"
             )
 
-        # ── Resolve room full — checkout old tenant ───────────────────────
+        # ── Resolve room full — step 1: pick action ─────────────────────
         if step == "resolve_room_full":
-            # Parse: "1 today" or "2 31 march" or "edit room T-201"
-            if ans.startswith("edit room"):
-                new_room = ans.replace("edit room", "").strip()
-                if new_room:
-                    extracted = action_data.get("extracted", {})
-                    extracted["room_number"] = new_room
-                    action_data["extracted"] = extracted
-                    action_data["step"] = "confirm_extracted"
-                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
-                    return f"__KEEP_PENDING__Room changed to *{new_room}*. Reply *yes* to proceed."
-                return "__KEEP_PENDING__Please specify room: *edit room T-201*"
-
-            # Single occupant: accept just a date (e.g. "today", "03 april")
-            occupant_list = action_data.get("occupant_tenancies", [])
-            if len(occupant_list) == 1 and not ans[0].isdigit():
-                from src.whatsapp.intent_detector import _extract_date_entity
-                if ans.lower() in ("today", "now"):
-                    exit_iso = date.today().isoformat()
-                else:
-                    exit_iso = _extract_date_entity(ans)
-                if exit_iso:
-                    exit_date = date.fromisoformat(exit_iso)
-                    occ = occupant_list[0]
-                    tenancy = await session.get(Tenancy, occ["tenancy_id"])
-                    tenant = await session.get(Tenant, occ["tenant_id"])
-                    if tenancy:
-                        tenancy.status = TenancyStatus.exited
-                        tenancy.checkout_date = exit_date
-                        checkout_name = tenant.name if tenant else "Tenant"
-                        action_data["step"] = "confirm_extracted"
-                        await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
-                        return (
-                            f"*{checkout_name}* checked out (exit: {exit_date.strftime('%d %b %Y')}).\n\n"
-                            f"Room {action_data.get('room_number', '')} now has space.\n"
-                            f"Reply *yes* to proceed with check-in."
-                        )
-
-            # Multi-occupant: parse "1 today" or "2 31 march"
-            m = re.match(r"(\d+)\s+(.+)", ans)
-            if m:
-                idx = int(m.group(1)) - 1
-                exit_date_str = m.group(2).strip()
+            if ans == "1":
+                # Checkout existing tenant — ask which one (or go straight to date if only 1)
                 occupant_list = action_data.get("occupant_tenancies", [])
+                if len(occupant_list) == 1:
+                    occ = occupant_list[0]
+                    t = await session.get(Tenant, occ["tenant_id"])
+                    action_data["step"] = "ask_checkout_date"
+                    action_data["checkout_idx"] = 0
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return (
+                        f"Checking out *{t.name}*\n\n"
+                        f"*When did they leave?*\n\n"
+                        f"*1.* Today\n"
+                        f"*2.* Type a date (e.g. 03 April)"
+                    )
+                else:
+                    # Multiple occupants — ask which one
+                    lines = ["*Who is checking out?*\n"]
+                    for i, occ in enumerate(occupant_list, 1):
+                        t = await session.get(Tenant, occ["tenant_id"])
+                        lines.append(f"*{i}.* {t.name}")
+                    action_data["step"] = "pick_checkout_occupant"
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return "\n".join(lines)
 
+            elif ans == "2":
+                # Different room
+                action_data["step"] = "ask_new_room"
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                return "*Which room?* (e.g. T-201)"
+
+            elif ans == "3":
+                return "Cancelled. Tenant not added."
+
+            return "__KEEP_PENDING__Reply *1*, *2*, or *3*."
+
+        # ── Pick which occupant to checkout ───────────────────────────────
+        if step == "pick_checkout_occupant":
+            occupant_list = action_data.get("occupant_tenancies", [])
+            if ans.rstrip(".").isdigit():
+                idx = int(ans.rstrip(".")) - 1
                 if 0 <= idx < len(occupant_list):
-                    from src.whatsapp.intent_detector import _extract_date_entity
-                    if exit_date_str.lower() in ("today", "now"):
-                        exit_iso = date.today().isoformat()
-                    else:
-                        exit_iso = _extract_date_entity(exit_date_str)
+                    t = await session.get(Tenant, occupant_list[idx]["tenant_id"])
+                    action_data["step"] = "ask_checkout_date"
+                    action_data["checkout_idx"] = idx
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return (
+                        f"Checking out *{t.name}*\n\n"
+                        f"*When did they leave?*\n\n"
+                        f"*1.* Today\n"
+                        f"*2.* Type a date (e.g. 03 April)"
+                    )
+            return f"__KEEP_PENDING__Reply with a number (1-{len(occupant_list)})."
 
-                    if not exit_iso:
-                        return f"__KEEP_PENDING__Could not parse date *{exit_date_str}*. Try: *{idx+1} today* or *{idx+1} 31 march*"
+        # ── Ask checkout date ─────────────────────────────────────────────
+        if step == "ask_checkout_date":
+            from src.whatsapp.intent_detector import _extract_date_entity
+            occupant_list = action_data.get("occupant_tenancies", [])
+            idx = action_data.get("checkout_idx", 0)
 
-                    exit_date = date.fromisoformat(exit_iso)
-                    occ = occupant_list[idx]
-                    tenancy = await session.get(Tenancy, occ["tenancy_id"])
-                    tenant = await session.get(Tenant, occ["tenant_id"])
+            if ans == "1" or ans.lower() in ("today", "now"):
+                exit_iso = date.today().isoformat()
+            else:
+                exit_iso = _extract_date_entity(reply_text.strip())
 
-                    if tenancy:
-                        tenancy.status = TenancyStatus.exited
-                        tenancy.checkout_date = exit_date
-                        checkout_name = tenant.name if tenant else "Tenant"
+            if not exit_iso:
+                return "__KEEP_PENDING__Could not read that date.\nTry: *today* or *03 April* or *31/03/2026*"
 
-                        # Now re-check — go back to confirm_extracted to re-validate
-                        action_data["step"] = "confirm_extracted"
-                        await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
-                        return (
-                            f"*{checkout_name}* checked out (exit: {exit_date.strftime('%d %b %Y')}).\n\n"
-                            f"Room {action_data.get('room_number', '')} now has space.\n"
-                            f"Reply *yes* to proceed with check-in."
-                        )
+            exit_date = date.fromisoformat(exit_iso)
+            occ = occupant_list[idx]
+            tenancy = await session.get(Tenancy, occ["tenancy_id"])
+            tenant = await session.get(Tenant, occ["tenant_id"])
 
-                occ_count = len(action_data.get("occupant_tenancies", []))
-                if occ_count == 1:
-                    return "__KEEP_PENDING__Reply with the exit date:\n*today* or *03 april*\n\nOr *edit room T-201* to change room."
-                return f"__KEEP_PENDING__Reply: *1 today* (checkout person 1)\nOr *edit room T-201* to change room."
+            if tenancy:
+                tenancy.status = TenancyStatus.exited
+                tenancy.checkout_date = exit_date
+                checkout_name = tenant.name if tenant else "Tenant"
 
-            occ_count = len(action_data.get("occupant_tenancies", []))
-            if occ_count == 1:
-                return "__KEEP_PENDING__Reply with the exit date:\n*today* or *03 april*\n\nOr *edit room T-201* to change room\nOr *no* to cancel."
-            return "__KEEP_PENDING__Reply: *1 today* (checkout person 1)\nOr *edit room T-201*\nOr *no* to cancel."
+                action_data["step"] = "confirm_extracted"
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                return (
+                    f"*{checkout_name}* checked out ({exit_date.strftime('%d %b %Y')})\n\n"
+                    f"Room {action_data.get('room_number', '')} now has space.\n"
+                    f"Reply *yes* to proceed with new check-in."
+                )
+
+            return "__KEEP_PENDING__Something went wrong. Try again or say *no* to cancel."
+
+        # ── Ask for new room ──────────────────────────────────────────────
+        if step == "ask_new_room":
+            new_room = reply_text.strip()
+            if new_room:
+                extracted = action_data.get("extracted", {})
+                extracted["room_number"] = new_room
+                action_data["extracted"] = extracted
+                action_data["step"] = "confirm_extracted"
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                return f"Room changed to *{new_room}*.\nReply *yes* to proceed."
+            return "__KEEP_PENDING__Please type the room number (e.g. T-201)."
 
         # ── Gender mismatch confirmation ──────────────────────────────────
         if step == "confirm_gender_mismatch":
