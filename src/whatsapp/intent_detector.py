@@ -554,7 +554,7 @@ def _extract_entities(text: str, intent: str) -> dict:
     # Extract expense category (for ADD_EXPENSE — avoids unnecessary "choose category" prompt)
     if intent == "ADD_EXPENSE":
         _EXPENSE_KEYWORDS = [
-            (r"\belectricity\b|\blight\s+bill\b|\beb\s+bill\b", "electricity"),
+            (r"\belectricity\b|\blight\s+bill\b|\beb\s*bill\b|\beb\b|\bcurrent\s+bill\b", "electricity"),
             (r"\bwater\s+bill\b|\bwater\b", "water"),
             (r"\binternet\b|\bbroadband\b|\bwifi\s+bill\b", "internet"),
             (r"\bsalary\b|\bwages?\b|\bstaff\s+pay\b", "salary"),
