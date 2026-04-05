@@ -458,23 +458,21 @@ def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict
                         "rows": [
                             {"id": "PAYMENT_LOG",  "title": "Log Payment",      "description": "Record rent received"},
                             {"id": "QUERY_DUES",   "title": "Who Owes",          "description": "Pending dues list"},
-                            {"id": "REPORT",       "title": "Revenue Report",    "description": "Monthly income summary"},
-                            {"id": "VOID_PAYMENT", "title": "Void Payment",      "description": "Reverse a wrong entry"},
+                            {"id": "REPORT",       "title": "Monthly Report",    "description": "Income & expense summary"},
                         ],
                     },
                     {
-                        "title": "Check-in & Checkout",
+                        "title": "Tenants & Rooms",
                         "rows": [
-                            {"id": "ADD_TENANT",     "title": "Add Tenant",      "description": "New check-in (text or photo)"},
+                            {"id": "ADD_TENANT",     "title": "Check-in",        "description": "New tenant (text or photo)"},
                             {"id": "CHECKOUT",       "title": "Checkout",        "description": "Exit process (text or photo)"},
-                            {"id": "QUERY_TENANT",   "title": "Tenant Account",  "description": "Balance & payment history"},
-                            {"id": "ROOM_TRANSFER",  "title": "Room Transfer",   "description": "Move tenant to another room"},
+                            {"id": "QUERY_TENANT",   "title": "Tenant Info",     "description": "Balance & payment history"},
+                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms", "description": "Empty beds by floor"},
                         ],
                     },
                     {
-                        "title": "Rooms & Operations",
+                        "title": "Operations",
                         "rows": [
-                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms",    "description": "Empty beds by floor"},
                             {"id": "ADD_EXPENSE",        "title": "Log Expense",     "description": "EB, salary, maintenance"},
                             {"id": "COMPLAINT_REGISTER", "title": "Report Issue",    "description": "Plumbing, electric, wifi"},
                             {"id": "SEND_REMINDER_ALL",  "title": "Send Reminders",  "description": "Remind all unpaid tenants"},
