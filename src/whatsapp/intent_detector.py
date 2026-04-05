@@ -101,12 +101,14 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:activity\s+(?:log\s+)?(?:today|yesterday|this\s+week|last\s+\d+\s+days?|room\s+[\w-]+)|show\s+activit(?:y|ies)|activit(?:y|ies)\s+(?:today|yesterday|this\s+week|log)|^activit(?:y|ies)$|^activity\s+log$)", re.I), "QUERY_ACTIVITY", 0.94),
     # Add contact / save contact — MUST come before ADD_EXPENSE (phone numbers look like amounts)
     (re.compile(r"(?:add|save|store|new)\s+(?:contact|vendor|supplier)|(?:add|save)\s+\w+.*(?:to\s+contacts?|as\s+contact)|(?:add|save)\s+\w+.*(?:plumber|electrician|carpenter|painter|vendor|supplier|cleaner|security|pest|internet|wifi|water|gas|furniture|gym|cctv|lift).*\d{7,}|(?:add|save)\s+\w+.*\d{7,}.*(?:to\s+contacts?|contact)", re.I), "ADD_CONTACT", 0.95),
-    # Log expense — step-by-step form (must be BEFORE ACTIVITY_LOG which catches "log ...")
+    # Log expense — step-by-step form OR "log <expense keyword>" (must be BEFORE ACTIVITY_LOG)
     (re.compile(r"^(?:log\s+(?:an?\s+)?expense|add\s+(?:an?\s+)?expense|record\s+expense|new\s+expense)\s*$", re.I), "ADD_EXPENSE", 0.95),
+    (re.compile(r"^log\s+(?!received|delivered|got|bought)(?:.*?\b(?:eb|electricity|bill|water\s+bill|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)", re.I), "ADD_EXPENSE", 0.94),
     # Bulk reminder — (must be BEFORE QUERY_DUES which catches "unpaid")
     (re.compile(r"^(?:remind\s+(?:all\s+)?unpaid|remind\s+(?:all\s+)?defaulters?|send\s+(?:dues?\s+)?reminder(?:s)?(?:\s+to\s+all)?|reminder\s+(?:to\s+)?all|bulk\s+reminder|remind\s+all)\s*$", re.I), "SEND_REMINDER_ALL", 0.95),
     # Activity log — "log ...", "note ...", "log received ...", "log delivered ...", bare "log"
-    (re.compile(r"(?:^log\s*$|^log\s+\S|^note\s+\S|^activity\s+log\s+\S|^logged?\s+(?:received|delivered|got|bought|purchased|fixed|repaired|plumber|electrician|water|generator)|^received\s+\d+\s+\w+|^delivered\s+\d+\s+\w+)", re.I), "ACTIVITY_LOG", 0.93),
+    # EXCLUDES expense keywords (handled above)
+    (re.compile(r"(?:^log\s*$|^log\s+(?!.*\b(?:eb|electricity|bill|water|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)\S|^note\s+\S|^activity\s+log\s+\S|^logged?\s+(?:received|delivered|got|bought|purchased|fixed|repaired|plumber|electrician|water|generator)|^received\s+\d+\s+\w+|^delivered\s+\d+\s+\w+)", re.I), "ACTIVITY_LOG", 0.93),
     # Room status — who's in / status of a specific room (incl bare "room 205" and "room X details")
     (re.compile(r"(?:who(?:'?s| is)(?: living| staying)? in room|room\s+[\w-]+\s+(?:who|occupant|tenant|person|status|details?)|who (?:lives?|stays?|is living|is staying) in|status\s+of\s+room\s+[\w-]+|is\s+room\s+[\w-]+\s+(?:occupied|free|vacant|empty|available)|room\s+[\w-]+\s+occupied|^room\s+[\d\w-]+\s*$)", re.I), "ROOM_STATUS", 0.94),
     # Vacant rooms
