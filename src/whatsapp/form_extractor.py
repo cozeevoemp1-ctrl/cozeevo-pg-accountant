@@ -62,7 +62,7 @@ Rules:
 """
 
 
-async def _extract_with_haiku(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict | None:
+async def _extract_with_haiku(image_bytes: bytes, mime_type: str = "image/jpeg", prompt: str = None) -> dict | None:
     """Extract form data using Claude Haiku (~$0.001/call)."""
     api_key = ANTHROPIC_API_KEY or os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key or api_key.startswith("PASTE_"):
@@ -87,7 +87,7 @@ async def _extract_with_haiku(image_bytes: bytes, mime_type: str = "image/jpeg")
                             "type": "image",
                             "source": {"type": "base64", "media_type": media_type, "data": b64},
                         },
-                        {"type": "text", "text": EXTRACTION_PROMPT},
+                        {"type": "text", "text": prompt or EXTRACTION_PROMPT},
                     ],
                 }
             ],
@@ -195,6 +195,103 @@ def format_extracted_data(data: dict, provider: str = "") -> str:
                     lines.append(f"{label}: Rs.{int(float(val)):,}")
                 except (ValueError, TypeError):
                     lines.append(f"{label}: {val}")
+            else:
+                lines.append(f"{label}: {val}")
+
+    return "\n".join(lines)
+
+
+# ── Checkout form extraction ─────────────────────────────────────────────────
+
+CHECKOUT_EXTRACTION_PROMPT = """You are extracting data from a PG (paying guest) checkout form photo.
+The form is from Cozeevo Co-living, Bangalore. It's a printed form with handwritten entries.
+Extract ALL fields you can read. Return ONLY valid JSON, no markdown, no explanation.
+
+Required JSON structure:
+{
+  "name": "",
+  "room_number": "",
+  "phone": "",
+  "checkout_date": "",
+  "security_deposit": "",
+  "deductions": "",
+  "deductions_reason": "",
+  "refund_amount": "",
+  "refund_mode": "",
+  "room_investigation": "",
+  "room_key_returned": "",
+  "wardrobe_key_returned": "",
+  "biometric_removed": "",
+  "signature_date": ""
+}
+
+Rules:
+- Phone numbers: extract digits only, must be exactly 10 digits for Indian numbers
+- Room numbers: typically short like G17, T-201, 102, 301 etc
+- Dates: use DD/MM/YYYY format. Admission dates should be 2024-2026 range
+- Money amounts: numbers only, no Rs. or commas
+- refund_mode: normalize to "cash", "upi", or "bank"
+- room_investigation: "ok" or "not_ok"
+- room_key_returned / wardrobe_key_returned / biometric_removed: "yes" or "no"
+- If checkbox is ticked/checked, use "yes". If empty/unchecked, use "no"
+- If a field is empty/blank/unreadable, use empty string ""
+- Read carefully — handwriting can be messy
+"""
+
+
+async def extract_checkout_form(
+    image_bytes: bytes,
+    mime_type: str = "image/jpeg",
+) -> dict:
+    """Extract checkout form data from image using Claude Haiku."""
+    result = await _extract_with_haiku(image_bytes, mime_type, prompt=CHECKOUT_EXTRACTION_PROMPT)
+    if result:
+        try:
+            _save_training_pair(image_bytes, mime_type, result)
+        except Exception:
+            pass
+        return {"result": result, "provider": "haiku"}
+    return {"result": None, "provider": None}
+
+
+def format_checkout_data(data: dict, provider: str = "") -> str:
+    """Format checkout extraction as WhatsApp confirmation message."""
+    if not data:
+        return "Could not extract any data from the image."
+
+    provider_tag = f" _({provider})_" if provider else ""
+    lines = [f"*Checkout form{provider_tag}:*\n"]
+
+    field_map = [
+        ("name", "Name"),
+        ("room_number", "Room"),
+        ("phone", "Phone"),
+        ("checkout_date", "Checkout Date"),
+        ("security_deposit", "Security Deposit"),
+        ("deductions", "Deductions"),
+        ("deductions_reason", "  Reason"),
+        ("refund_amount", "Refund Amount"),
+        ("refund_mode", "Refund Mode"),
+        ("room_investigation", "Room Check"),
+        ("room_key_returned", "Room Key"),
+        ("wardrobe_key_returned", "Wardrobe Key"),
+        ("biometric_removed", "Biometric"),
+        ("signature_date", "Signed Date"),
+    ]
+
+    for key, label in field_map:
+        val = data.get(key, "")
+        if val:
+            if key in ("security_deposit", "deductions", "refund_amount"):
+                try:
+                    lines.append(f"{label}: Rs.{int(float(val)):,}")
+                except (ValueError, TypeError):
+                    lines.append(f"{label}: {val}")
+            elif key in ("room_key_returned", "wardrobe_key_returned", "biometric_removed"):
+                lines.append(f"{label}: {'Returned' if val.lower() == 'yes' else 'NOT returned'}" if 'key' in key
+                             else f"{label}: {'Removed' if val.lower() == 'yes' else 'NOT removed'}")
+            elif key == "room_investigation":
+                lines.append(f"{label}: {'OK' if val.lower() == 'ok' else 'Issues found'}")
             else:
                 lines.append(f"{label}: {val}")
 

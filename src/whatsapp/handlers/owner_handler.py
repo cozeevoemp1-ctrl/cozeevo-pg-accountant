@@ -497,6 +497,120 @@ async def resolve_pending_action(
         if step == "confirm_extracted":
             return "__KEEP_PENDING__Reply *yes* to save, *no* to cancel, or *edit field_name value* to correct."
 
+    # ── Checkout form extraction confirmation ────────────────────────────
+    if pending.intent == "CHECKOUT_FORM_CONFIRM":
+        from src.whatsapp.form_extractor import format_checkout_data
+        from src.whatsapp.handlers._shared import _save_pending
+        ans = reply_text.strip().lower()
+        step = action_data.get("step", "")
+
+        if ans in ("no", "n", "cancel", "abort"):
+            return "Checkout cancelled."
+
+        # Edit a field
+        if ans.startswith("edit "):
+            raw_edit = reply_text.strip()[5:].strip()
+            parts = raw_edit.split(None, 1)
+            if len(parts) < 2:
+                return "__KEEP_PENDING__Format: *edit field_name new_value*"
+
+            field_key = parts[0].lower()
+            new_val = parts[1].strip()
+
+            key_aliases = {
+                "name": "name", "phone": "phone", "room": "room_number",
+                "room_number": "room_number",
+                "checkout_date": "checkout_date", "date": "checkout_date",
+                "deposit": "security_deposit", "security_deposit": "security_deposit",
+                "deductions": "deductions", "deduction": "deductions",
+                "reason": "deductions_reason",
+                "refund": "refund_amount", "refund_amount": "refund_amount",
+                "refund_mode": "refund_mode", "mode": "refund_mode",
+                "room_check": "room_investigation", "investigation": "room_investigation",
+                "room_key": "room_key_returned", "wardrobe_key": "wardrobe_key_returned",
+                "biometric": "biometric_removed",
+            }
+
+            actual_key = key_aliases.get(field_key)
+            if not actual_key:
+                return f"__KEEP_PENDING__Unknown field *{field_key}*. Try: name, room, date, deposit, deductions, refund, mode, room_key, wardrobe_key, biometric"
+
+            extracted = action_data.get("extracted", {})
+            extracted[actual_key] = new_val
+            action_data["extracted"] = extracted
+            await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
+
+            msg = format_checkout_data(extracted, "")
+            msg += "\n\nReply *yes* to process, *no* to cancel."
+            msg += "\nTo edit: *edit field_name new_value*"
+            return msg
+
+        # Confirm and process checkout
+        if step == "confirm_checkout_extracted" and ans in ("yes", "y", "confirm", "ok", "done"):
+            extracted = action_data.get("extracted", {})
+
+            # Find the tenant
+            name = extracted.get("name", "")
+            room_str = extracted.get("room_number", "")
+            phone_raw = extracted.get("phone", "")
+
+            # Search by name first, then room
+            rows = await _find_active_tenants_by_name(name, session) if name else []
+            if not rows and room_str:
+                rows = await _find_active_tenants_by_room(room_str, session)
+            if not rows and phone_raw:
+                phone_clean = re.sub(r"[^0-9]", "", phone_raw)
+                if len(phone_clean) > 10:
+                    phone_clean = phone_clean[-10:]
+                if phone_clean:
+                    t = await session.scalar(select(Tenant).where(Tenant.phone.like(f"%{phone_clean}")))
+                    if t:
+                        tncy = await session.scalar(
+                            select(Tenancy).where(Tenancy.tenant_id == t.id, Tenancy.status == TenancyStatus.active)
+                        )
+                        if tncy:
+                            r = await session.get(Room, tncy.room_id)
+                            rows = [(t, tncy, r)]
+
+            if not rows:
+                return f"__KEEP_PENDING__No active tenant found for *{name}* / Room *{room_str}*.\nUse *edit name* or *edit room* to correct."
+
+            if len(rows) > 1:
+                lines = ["Multiple matches:\n"]
+                for i, (t, tncy, rm) in enumerate(rows, 1):
+                    lines.append(f"*{i}.* {t.name} — Room {rm.room_number}")
+                action_data["step"] = "pick_checkout_tenant"
+                action_data["candidates"] = [
+                    {"tenant_id": t.id, "tenancy_id": tncy.id, "name": t.name, "room": rm.room_number}
+                    for t, tncy, rm in rows
+                ]
+                await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
+                return "\n".join(lines) + "\n\nReply with number."
+
+            # Single match — process checkout
+            tenant, tenancy, room_obj = rows[0]
+            return await _process_checkout_from_form(
+                extracted, tenant, tenancy, room_obj, action_data, pending, session,
+            )
+
+        if step == "pick_checkout_tenant":
+            candidates = action_data.get("candidates", [])
+            if ans.rstrip(".").isdigit():
+                idx = int(ans.rstrip(".")) - 1
+                if 0 <= idx < len(candidates):
+                    c = candidates[idx]
+                    tenant = await session.get(Tenant, c["tenant_id"])
+                    tenancy = await session.get(Tenancy, c["tenancy_id"])
+                    room_obj = await session.get(Room, tenancy.room_id)
+                    extracted = action_data.get("extracted", {})
+                    return await _process_checkout_from_form(
+                        extracted, tenant, tenancy, room_obj, action_data, pending, session,
+                    )
+            return f"__KEEP_PENDING__Reply with a number (1-{len(candidates)})."
+
+        if step == "confirm_checkout_extracted":
+            return "__KEEP_PENDING__Reply *yes* to process checkout, *no* to cancel, or *edit field value*."
+
     # ── Document collection (ID proofs + rules page after check-in) ───────
     if pending.intent == "COLLECT_DOCS":
         from src.whatsapp.handlers._shared import _save_pending
@@ -571,6 +685,49 @@ async def resolve_pending_action(
         # Text message but no image — remind them
         return "__KEEP_PENDING__Send photos of ID proof (front & back) and signed rules page.\nOr say *done* if finished."
 
+    # ── Receipt slip collection (after payment/refund confirmation) ────────
+    if pending.intent == "COLLECT_RECEIPT":
+        from src.whatsapp.handlers._shared import _save_pending
+        ans = reply_text.strip().lower()
+
+        if ans in ("done", "skip", "no", "cancel", "later"):
+            return "OK, no receipt saved."
+
+        if media_id and media_type == "image":
+            from src.whatsapp.webhook_handler import _fetch_media_bytes
+            from src.whatsapp.media_handler import MEDIA_DIR
+            from src.database.models import Document, DocumentType
+
+            img_bytes = await _fetch_media_bytes(media_id)
+            if not img_bytes:
+                return "__KEEP_PENDING__Could not download. Please resend."
+
+            t_name = re.sub(r"[^a-zA-Z0-9]", "_", action_data.get("tenant_name", "tenant")).lower()
+            room = action_data.get("room_number", "unknown")
+            ext = ".png" if "png" in (media_mime or "") else ".webp" if "webp" in (media_mime or "") else ".jpg"
+            save_dir = MEDIA_DIR / "receipts" / datetime.now().strftime("%Y-%m")
+            save_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = save_dir / f"{room}_{t_name}_{ts}{ext}"
+            file_path.write_bytes(img_bytes)
+            rel_path = str(file_path.relative_to(MEDIA_DIR))
+
+            session.add(Document(
+                doc_type=DocumentType.receipt,
+                file_path=rel_path,
+                original_name=f"receipt_{t_name}_{room}",
+                file_size_kb=len(img_bytes) // 1024,
+                mime_type=media_mime or "image/jpeg",
+                tenant_id=action_data.get("tenant_id"),
+                tenancy_id=action_data.get("tenancy_id"),
+                uploaded_by=pending.phone,
+                notes=action_data.get("receipt_note", f"Payment receipt - {action_data.get('tenant_name', '')} - Room {room}"),
+            ))
+
+            return f"Receipt saved for {action_data.get('tenant_name', 'tenant')} (Room {room})."
+
+        return "__KEEP_PENDING__Send photo of the receipt slip, or say *skip*."
+
     if pending.intent == "CONFIRM_PAYMENT_LOG":
         # ── Correction check (before yes/no) ──────────────────────────────────
         _MODE_MAP = {
@@ -635,7 +792,7 @@ async def resolve_pending_action(
                 + "\nReply *Yes* to confirm or *No* to cancel."
             )
         if is_affirmative(reply_text):
-            return await _do_log_payment_by_ids(
+            result = await _do_log_payment_by_ids(
                 tenant_id=action_data["tenant_id"],
                 tenancy_id=action_data["tenancy_id"],
                 amount=action_data["amount"],
@@ -644,8 +801,19 @@ async def resolve_pending_action(
                 period_month_str=action_data["period_month"],
                 session=session,
             )
+            # Start receipt collection
+            from src.whatsapp.handlers._shared import _save_pending as _sp_r
+            await _sp_r(pending.phone, "COLLECT_RECEIPT", {
+                "tenant_id": action_data.get("tenant_id"),
+                "tenancy_id": action_data.get("tenancy_id"),
+                "tenant_name": action_data.get("tenant_name", ""),
+                "room_number": action_data.get("room_number", ""),
+                "receipt_note": f"Rent Rs.{int(action_data['amount']):,} {action_data.get('mode', '')} - {action_data.get('tenant_name', '')}",
+            }, [], session)
+            result += "\n\nSend photo of *receipt slip* to save, or say *skip*."
+            return result
         if is_negative(reply_text):
-            return "❌ Payment cancelled. Nothing was logged."
+            return "Payment cancelled. Nothing was logged."
         _room  = action_data.get("room_number", "")
         _tname = action_data.get("tenant_name", "")
         _tlabel = f"{_tname} (Room {_room})" if _room else _tname
@@ -3282,6 +3450,176 @@ async def _finalize_form_checkin(
     return result
 
 
+async def _process_checkout_from_form(
+    extracted: dict, tenant, tenancy, room_obj, action_data: dict, pending, session: AsyncSession,
+) -> str:
+    """Process checkout from extracted form data."""
+    from src.whatsapp.intent_detector import _extract_date_entity
+    from src.database.models import Document, DocumentType, Refund
+
+    # Parse checkout date
+    checkout_str = extracted.get("checkout_date", "")
+    checkout_iso = _extract_date_entity(checkout_str) if checkout_str else None
+    if not checkout_iso:
+        checkout_date = date.today()
+    else:
+        checkout_date = date.fromisoformat(checkout_iso)
+
+    # Update tenancy
+    tenancy.status = TenancyStatus.exited
+    tenancy.checkout_date = checkout_date
+
+    # Parse refund info
+    refund_amount = 0
+    try:
+        refund_amount = float(re.sub(r"[^0-9.]", "", extracted.get("refund_amount", "") or "0"))
+    except (ValueError, TypeError):
+        pass
+
+    deposit = float(tenancy.security_deposit or 0)
+    deductions = 0
+    try:
+        deductions = float(re.sub(r"[^0-9.]", "", extracted.get("deductions", "") or "0"))
+    except (ValueError, TypeError):
+        pass
+
+    refund_mode = (extracted.get("refund_mode", "") or "cash").lower()
+    if refund_mode not in ("cash", "upi", "bank"):
+        refund_mode = "cash"
+
+    # Create refund record if refund amount > 0
+    if refund_amount > 0:
+        from decimal import Decimal
+        mode_map = {"cash": PaymentMode.cash, "upi": PaymentMode.upi, "bank": PaymentMode.upi}
+        session.add(Refund(
+            tenancy_id=tenancy.id,
+            amount=Decimal(str(refund_amount)),
+            refund_date=checkout_date,
+            payment_mode=mode_map.get(refund_mode, PaymentMode.cash),
+            reason="deposit refund",
+            notes=f"Deposit: {int(deposit)}, Deductions: {int(deductions)}. {extracted.get('deductions_reason', '')}".strip(),
+        ))
+
+    # Save checkout form as document
+    form_path = action_data.get("form_image_path", "")
+    if form_path:
+        session.add(Document(
+            doc_type=DocumentType.checkout_form,
+            file_path=form_path,
+            original_name=f"checkout_{tenant.name}_{room_obj.room_number}",
+            mime_type="image/jpeg",
+            tenant_id=tenant.id,
+            tenancy_id=tenancy.id,
+            uploaded_by=pending.phone,
+            notes=f"Checkout form - {tenant.name} - Room {room_obj.room_number} - {checkout_date.strftime('%d %b %Y')}",
+        ))
+
+    # Google Sheets update
+    gsheets_note = ""
+    try:
+        from src.integrations.gsheets import record_checkout as gsheets_checkout
+        notice_str = tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None
+        gs_r = await gsheets_checkout(
+            room_obj.room_number,
+            tenant.name,
+            notice_str,
+            checkout_date.strftime("%d/%m/%Y"),
+        )
+        if gs_r.get("success"):
+            gsheets_note = "\nSheet updated"
+
+        # Update refund amount in Sheet
+        if refund_amount > 0:
+            from src.integrations.gsheets import _get_worksheet_sync, _find_row_in_tenants, T_REFUND_AMOUNT, T_REFUND_STATUS
+            import asyncio, gspread as _gspread
+            def _update_refund_sync():
+                ws = _get_worksheet_sync("TENANTS")
+                found = _find_row_in_tenants(ws, room_obj.room_number, tenant.name)
+                if found:
+                    row, _ = found
+                    ws.batch_update([
+                        {"range": _gspread.utils.rowcol_to_a1(row, T_REFUND_STATUS + 1), "values": [[f"{refund_mode} refunded"]]},
+                        {"range": _gspread.utils.rowcol_to_a1(row, T_REFUND_AMOUNT + 1), "values": [[refund_amount]]},
+                    ], value_input_option="USER_ENTERED")
+            await asyncio.to_thread(_update_refund_sync)
+    except Exception as e:
+        import logging as _log
+        _log.getLogger(__name__).error("GSheets checkout update failed: %s", e)
+
+    pending.resolved = True
+
+    # Verification checklist
+    room_check = extracted.get("room_investigation", "").lower()
+    room_key = extracted.get("room_key_returned", "").lower()
+    wardrobe_key = extracted.get("wardrobe_key_returned", "").lower()
+    biometric = extracted.get("biometric_removed", "").lower()
+
+    checklist = []
+    if room_check == "ok":
+        checklist.append("Room: OK")
+    elif room_check:
+        checklist.append(f"Room: {room_check.upper()}")
+    if room_key:
+        checklist.append(f"Room key: {'returned' if room_key == 'yes' else 'NOT returned'}")
+    if wardrobe_key:
+        checklist.append(f"Wardrobe key: {'returned' if wardrobe_key == 'yes' else 'NOT returned'}")
+    if biometric:
+        checklist.append(f"Biometric: {'removed' if biometric == 'yes' else 'NOT removed'}")
+
+    return (
+        f"*Checkout Complete — {tenant.name}*\n"
+        f"Room: {room_obj.room_number}\n"
+        f"Exit: {checkout_date.strftime('%d %b %Y')}\n\n"
+        f"Deposit: Rs.{int(deposit):,}\n"
+        f"Deductions: Rs.{int(deductions):,}\n"
+        f"*Refund: Rs.{int(refund_amount):,}* ({refund_mode})\n\n"
+        + ("\n".join(checklist) + "\n\n" if checklist else "")
+        + f"Saved to DB.{gsheets_note}"
+    )
+
+
+async def _extract_checkout_from_image(
+    media_id: str, media_mime: str, ctx: CallerContext, session: AsyncSession,
+) -> str:
+    """Download checkout form image, extract data via Haiku, show confirmation."""
+    from src.whatsapp.webhook_handler import _fetch_media_bytes
+    from src.whatsapp.form_extractor import extract_checkout_form, format_checkout_data
+    from src.whatsapp.handlers._shared import _save_pending
+    from src.whatsapp.media_handler import MEDIA_DIR
+    from pathlib import Path
+
+    image_bytes = await _fetch_media_bytes(media_id)
+    if not image_bytes:
+        return "Could not download the image. Please try again."
+
+    # Save the form image
+    save_dir = MEDIA_DIR / "checkout_forms" / datetime.now().strftime("%Y-%m")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    ext = ".png" if "png" in (media_mime or "") else ".webp" if "webp" in (media_mime or "") else ".jpg"
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    form_path = save_dir / f"checkout_{ts}{ext}"
+    form_path.write_bytes(image_bytes)
+    form_rel_path = str(form_path.relative_to(MEDIA_DIR))
+
+    result = await extract_checkout_form(image_bytes, media_mime)
+    data = result.get("result")
+
+    if not data:
+        return "Could not extract data from the checkout form. Please use the step-by-step flow:\n\nSend *record checkout [name]*"
+
+    action_data = {
+        "step": "confirm_checkout_extracted",
+        "extracted": data,
+        "form_image_path": form_rel_path,
+    }
+    await _save_pending(ctx.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
+
+    msg = format_checkout_data(data, "haiku")
+    msg += "\n\nReply *yes* to process checkout, *no* to cancel."
+    msg += "\nTo edit: *edit refund_amount 15000*"
+    return msg
+
+
 async def _extract_tenant_from_image(
     media_id: str, media_mime: str, ctx: CallerContext, session: AsyncSession,
 ) -> str:
@@ -4945,6 +5283,13 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
     Walks through a multi-step offboarding checklist via PendingAction.
     Step 1: find the tenant, confirm which tenancy, then ask checklist questions.
     """
+    # Image-based checkout form extraction
+    media_id = entities.get("_media_id")
+    media_type = entities.get("_media_type")
+    media_mime = entities.get("_media_mime")
+    if media_id and media_type == "image":
+        return await _extract_checkout_from_image(media_id, media_mime or "image/jpeg", ctx, session)
+
     name = entities.get("name", "").strip()
     if not name:
         desc = entities.get("description", "")

@@ -156,9 +156,10 @@ class DocumentType(str, enum.Enum):
     import_file = "import_file" # archived Excel / CSV import
     report     = "report"       # generated monthly report
     staff_doc  = "staff_doc"    # staff contract / staff ID proof
-    reg_form   = "reg_form"     # tenant registration form (filled, signed)
-    rules_page = "rules_page"   # signed rules & regulations page
-    other      = "other"
+    reg_form       = "reg_form"       # tenant registration form (filled, signed)
+    checkout_form  = "checkout_form"  # tenant checkout form (filled, signed)
+    rules_page     = "rules_page"    # signed rules & regulations page
+    other          = "other"
 
 class ReminderType(str, enum.Enum):
     rent_due  = "rent_due"

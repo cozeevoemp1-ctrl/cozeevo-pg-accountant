@@ -9,11 +9,11 @@ TENANTS tab (master data) columns (0-indexed):
   [0] Room, [1] Name, [2] Phone, [3] Gender, [4] Building, [5] Floor,
   [6] Sharing, [7] Check-in, [8] Status, [9] Agreed Rent, [10] Deposit,
   [11] Booking, [12] Maintenance, [13] Notice Date, [14] Expected Exit,
-  [15] Checkout Date, [16] Refund Status,
-  [17] DOB, [18] Father Name, [19] Father Phone, [20] Address,
-  [21] Emergency Contact, [22] Emergency Relationship, [23] Email,
-  [24] Occupation, [25] Education, [26] Office Address, [27] Office Phone,
-  [28] ID Type, [29] ID Number, [30] Food Pref, [31] Notes
+  [15] Checkout Date, [16] Refund Status, [17] Refund Amount,
+  [18] DOB, [19] Father Name, [20] Father Phone, [21] Address,
+  [22] Emergency Contact, [23] Emergency Relationship, [24] Email,
+  [25] Occupation, [26] Education, [27] Office Address, [28] Office Phone,
+  [29] ID Type, [30] ID Number, [31] Food Pref, [32] Notes
 
 Monthly tab (e.g. "APRIL 2026") columns (0-indexed):
   [0] Room, [1] Name, [2] Phone, [3] Building, [4] Sharing, [5] Rent Due,
@@ -107,21 +107,22 @@ T_NOTICE_DATE = 13
 T_EXPECTED_EXIT = 14
 T_CHECKOUT_DATE = 15
 T_REFUND_STATUS = 16
-T_DOB = 17
-T_FATHER_NAME = 18
-T_FATHER_PHONE = 19
-T_ADDRESS = 20
-T_EMERGENCY_CONTACT = 21
-T_EMERGENCY_RELATIONSHIP = 22
-T_EMAIL = 23
-T_OCCUPATION = 24
-T_EDUCATION = 25
-T_OFFICE_ADDRESS = 26
-T_OFFICE_PHONE = 27
-T_ID_TYPE = 28
-T_ID_NUMBER = 29
-T_FOOD_PREF = 30
-T_NOTES = 31
+T_REFUND_AMOUNT = 17
+T_DOB = 18
+T_FATHER_NAME = 19
+T_FATHER_PHONE = 20
+T_ADDRESS = 21
+T_EMERGENCY_CONTACT = 22
+T_EMERGENCY_RELATIONSHIP = 23
+T_EMAIL = 24
+T_OCCUPATION = 25
+T_EDUCATION = 26
+T_OFFICE_ADDRESS = 27
+T_OFFICE_PHONE = 28
+T_ID_TYPE = 29
+T_ID_NUMBER = 30
+T_FOOD_PREF = 31
+T_NOTES = 32
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
 TOTAL_BEDS = 291
@@ -787,21 +788,22 @@ def _add_tenant_sync(
             "",                # 14: Expected Exit
             "",                # 15: Checkout Date
             "",                # 16: Refund Status
-            dob,               # 17: DOB
-            father_name,       # 18: Father Name
-            father_phone,      # 19: Father Phone
-            address,           # 20: Address
-            emergency_contact, # 21: Emergency Contact
-            emergency_relationship,  # 22: Emergency Relationship
-            email,             # 23: Email
-            occupation,        # 24: Occupation
-            education,         # 25: Education
-            office_address,    # 26: Office Address
-            office_phone,      # 27: Office Phone
-            id_type,           # 28: ID Type
-            id_number,         # 29: ID Number
-            food_pref,         # 30: Food Pref
-            notes,             # 31: Notes
+            "",                # 17: Refund Amount
+            dob,               # 18: DOB
+            father_name,       # 19: Father Name
+            father_phone,      # 20: Father Phone
+            address,           # 21: Address
+            emergency_contact, # 22: Emergency Contact
+            emergency_relationship,  # 23: Emergency Relationship
+            email,             # 24: Email
+            occupation,        # 25: Occupation
+            education,         # 26: Education
+            office_address,    # 27: Office Address
+            office_phone,      # 28: Office Phone
+            id_type,           # 29: ID Type
+            id_number,         # 30: ID Number
+            food_pref,         # 31: Food Pref
+            notes,             # 32: Notes
         ]
         t_data = tenants_ws.get_all_values()
         t_next = len(t_data) + 1
