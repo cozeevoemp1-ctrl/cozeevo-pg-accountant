@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.16.0] — 2026-04-05 — Image-Based Check-in + Haiku Intent Fallback
+
+### Added
+- **Image-based tenant check-in** — upload registration form photo, Claude Haiku extracts all fields
+- **form_extractor.py** — vision extraction with training data collection for future Groq fine-tuning
+- **Interactive edit flow** — "edit name Kanchan Sharma" to correct any extracted field
+- **Room validation on check-in** — full rooms show occupants with checkout option ("1 today")
+- **Gender mismatch warning** — warns when adding male tenant to female-occupied room
+- **Sharing type confirmation** — asks double/premium for multi-bed rooms
+- **Document collection flow** — after check-in, collects ID proofs + signed rules page
+- **15 new TENANTS Sheet columns** — DOB, father, address, emergency, email, occupation, education, office, ID proof, food, notes
+- **3 new DB columns** — educational_qualification, office_address, office_phone
+- **New DocumentTypes** — reg_form, rules_page (archived per tenant)
+- **Duplicate-log prevention** — message after successful log treated as query, not re-log
+- **Claude Haiku as intent fallback** — replaces Groq for UNKNOWN intents (much better accuracy)
+- **Expanded intent list** — complaints, vacation, room status, expense queries now recognized
+- **38 edge case tests** for the full check-in flow
+
+### Changed
+- ANTHROPIC_API_KEY now used for two features: form extraction + intent fallback
+- Intent detection falls back to Haiku (~$0.0005/call) instead of Groq for unrecognized messages
+- ADD_TENANT prompt now offers image upload option
+
+### Architecture
+- Haiku vision: only called once per form photo upload (no API calls for edits/confirms)
+- Training pairs saved to data/form_training/ for future Groq fine-tuning
+- All documents tagged to tenant_id/tenancy_id in documents table
+
 ## [1.15.0] — 2026-04-02/03 — Reminder System + Payment Flow Fixes + Sheet Sync
 
 ### Added
