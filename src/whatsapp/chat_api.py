@@ -258,7 +258,28 @@ async def _process_message_inner(
     intent_result = detect_intent(message, ctx.role)
     intent = intent_result.intent
 
-    # ── 3a. Follow-up detection: pronoun-style messages referencing last turn ──
+    # ── 3a. Duplicate-log prevention: if user just logged something similar, treat as query ──
+    _LOG_INTENTS = {"ADD_EXPENSE", "LOG_EXPENSE", "PAYMENT_LOG"}
+    if intent in _LOG_INTENTS and not re.search(r"\b(log|add|record|save|enter)\b", message, re.I):
+        # Check if bot recently confirmed a log for this user (last 5 min)
+        from src.database.models import WhatsappLog, MessageDirection
+        five_min_ago = datetime.utcnow() - timedelta(minutes=5)
+        recent_reply = await session.scalar(
+            select(WhatsappLog).where(
+                WhatsappLog.to_number == phone,
+                WhatsappLog.direction == MessageDirection.outbound,
+                WhatsappLog.created_at >= five_min_ago,
+                WhatsappLog.intent.in_(list(_LOG_INTENTS) + ["CONFIRMATION"]),
+            ).order_by(WhatsappLog.created_at.desc()).limit(1)
+        )
+        if recent_reply and recent_reply.message_text:
+            reply_lower = recent_reply.message_text.lower()
+            if any(w in reply_lower for w in ("saved", "logged", "recorded", "added", "expense saved")):
+                _chat_logger.info("Duplicate-log prevention: %s -> QUERY_EXPENSES for %s", intent, phone)
+                intent = "QUERY_EXPENSES"
+                intent_result = IntentResult(intent="QUERY_EXPENSES", confidence=0.8, entities=intent_result.entities)
+
+    # ── 3b. Follow-up detection: pronoun-style messages referencing last turn ──
     if intent == "UNKNOWN" and chat_context:
         followup = _detect_followup_context(message, chat_context)
         if followup:
