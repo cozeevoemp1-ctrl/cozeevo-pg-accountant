@@ -4872,15 +4872,29 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
             select(Room).where(Room.room_number.ilike(f"%{room}%"))
         )
         if room_obj:
-            return f"Room {room_obj.room_number} is currently *vacant*."
+            rt = room_obj.room_type
+            rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
+            max_occ = room_obj.max_occupancy or 1
+            return (
+                f"*Room {room_obj.room_number}* ({rt_str} sharing)\n"
+                f"Status: VACANT (0/{max_occ} beds)\n\n"
+                f"No active tenants."
+            )
         return f"Room {room} not found."
 
-    lines = [f"*Room {room} Occupants*\n"]
+    first_room = rows[0][2]
+    rt = first_room.room_type
+    rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
+    max_occ = first_room.max_occupancy or 1
+    lines = [
+        f"*Room {first_room.room_number}* ({rt_str} sharing, {len(rows)}/{max_occ} occupied)\n"
+    ]
     for tenant, tenancy, room_obj in rows:
         o_rent, o_maint = await _calc_outstanding_dues(tenancy.id, session)
+        rent_str = f"Rs.{int(tenancy.agreed_rent or 0):,}/month"
         due_note = f" | Due: Rs.{int(o_rent):,}" if o_rent > 0 else " | Paid"
         lines.append(
-            f"• {tenant.name}\n"
+            f"• {tenant.name} — {rent_str}\n"
             f"  Since: {tenancy.checkin_date.strftime('%d %b %Y')}{due_note}"
         )
     return "\n".join(lines)
