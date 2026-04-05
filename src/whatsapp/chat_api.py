@@ -454,28 +454,30 @@ def _build_owner_interactive(intent: str, reply_text: str, ctx) -> Optional[dict
                 "button": "View Services",
                 "sections": [
                     {
-                        "title": "Finance",
+                        "title": "Rent & Payments",
                         "rows": [
                             {"id": "PAYMENT_LOG",  "title": "Log Payment",      "description": "Record rent received"},
-                            {"id": "REPORT",       "title": "Revenue Report",    "description": "Monthly income summary"},
                             {"id": "QUERY_DUES",   "title": "Who Owes",          "description": "Pending dues list"},
-                            {"id": "ADD_EXPENSE",  "title": "Log Expense",       "description": "Electricity, salary, bills"},
+                            {"id": "REPORT",       "title": "Revenue Report",    "description": "Monthly income summary"},
+                            {"id": "VOID_PAYMENT", "title": "Void Payment",      "description": "Reverse a wrong entry"},
                         ],
                     },
                     {
-                        "title": "Tenants",
+                        "title": "Check-in & Checkout",
                         "rows": [
-                            {"id": "ADD_TENANT",     "title": "Add Tenant",      "description": "New check-in onboarding"},
-                            {"id": "CHECKOUT",       "title": "Checkout",        "description": "Offboard a tenant"},
+                            {"id": "ADD_TENANT",     "title": "Add Tenant",      "description": "New check-in (text or photo)"},
+                            {"id": "CHECKOUT",       "title": "Checkout",        "description": "Exit process (text or photo)"},
                             {"id": "QUERY_TENANT",   "title": "Tenant Account",  "description": "Balance & payment history"},
                             {"id": "ROOM_TRANSFER",  "title": "Room Transfer",   "description": "Move tenant to another room"},
                         ],
                     },
                     {
-                        "title": "Corrections & Property",
+                        "title": "Rooms & Operations",
                         "rows": [
-                            {"id": "VOID_PAYMENT",       "title": "Void Payment",  "description": "Reverse a wrong payment"},
-                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms",  "description": "Which rooms are free by floor"},
+                            {"id": "QUERY_VACANT_ROOMS", "title": "Vacant Rooms",    "description": "Empty beds by floor"},
+                            {"id": "ADD_EXPENSE",        "title": "Log Expense",     "description": "EB, salary, maintenance"},
+                            {"id": "COMPLAINT_REGISTER", "title": "Report Issue",    "description": "Plumbing, electric, wifi"},
+                            {"id": "SEND_REMINDER_ALL",  "title": "Send Reminders",  "description": "Remind all unpaid tenants"},
                         ],
                     },
                 ],
