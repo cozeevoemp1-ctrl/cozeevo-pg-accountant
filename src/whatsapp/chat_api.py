@@ -258,7 +258,15 @@ async def _process_message_inner(
     intent_result = detect_intent(message, ctx.role)
     intent = intent_result.intent
 
-    # ── 3a. Duplicate-log prevention: if user just logged something similar, treat as query ──
+    # ── 3a. Image + expense keyword = always LOG (not query) ──
+    if body.media_id and body.media_type == "image" and intent in ("QUERY_EXPENSES", "UNKNOWN"):
+        _EXPENSE_KW = re.compile(r"\b(eb|bill|electricity|water|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|receipt)\b", re.I)
+        if _EXPENSE_KW.search(message):
+            intent = "ADD_EXPENSE"
+            intent_result = IntentResult(intent="ADD_EXPENSE", confidence=0.90, entities=intent_result.entities)
+            _chat_logger.info("Image + expense keyword: forced ADD_EXPENSE for %s", phone)
+
+    # ── 3b. Duplicate-log prevention: if user just logged something similar, treat as query ──
     _LOG_INTENTS = {"ADD_EXPENSE", "LOG_EXPENSE", "PAYMENT_LOG"}
     if intent in _LOG_INTENTS and not re.search(r"\b(log|add|record|save|enter)\b", message, re.I):
         # Check if bot recently confirmed a log for this user (last 5 min)
@@ -279,7 +287,7 @@ async def _process_message_inner(
                 intent = "QUERY_EXPENSES"
                 intent_result = IntentResult(intent="QUERY_EXPENSES", confidence=0.8, entities=intent_result.entities)
 
-    # ── 3b. Follow-up detection: pronoun-style messages referencing last turn ──
+    # ── 3c. Follow-up detection: pronoun-style messages referencing last turn ──
     if intent == "UNKNOWN" and chat_context:
         followup = _detect_followup_context(message, chat_context)
         if followup:
