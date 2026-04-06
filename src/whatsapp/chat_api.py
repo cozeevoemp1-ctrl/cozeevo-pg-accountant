@@ -243,18 +243,24 @@ async def _process_message_inner(
                         _value = conv["correction"].get("value", "")
                         if _field and _value:
                             _pending_data[_field] = _value
-                            pending.action_data = json.dumps(_pending_data, default=str)
-                            await session.flush()
-                            # Re-prompt with updated data
-                            corr_reply = f"__KEEP_PENDING__Updated *{_field}* to *{_value}*. Please confirm the updated details, or correct again."
-                            await _log(session, phone, message, ctx.role, "CORRECTION", corr_reply[len("__KEEP_PENDING__"):])
+                            # Re-save pending properly (creates new record, keeps it alive)
+                            from src.whatsapp.handlers._shared import _save_pending as _sp_corr
+                            await _sp_corr(phone, pending.intent, _pending_data, [], session)
+                            # Build confirmation summary
+                            _summary_parts = []
+                            for _k, _v in _pending_data.items():
+                                if _k not in ("step", "logged_by") and not _k.startswith("_") and _v:
+                                    _summary_parts.append(f"  {_k.title()}: *{_v}*")
+                            _summary = "\n".join(_summary_parts) if _summary_parts else ""
+                            corr_reply = f"Updated *{_field}* to *{_value}*.\n\n{_summary}\n\nReply *Yes* to confirm or correct again."
+                            await _log(session, phone, message, ctx.role, "CORRECTION", corr_reply)
                             await session.commit()
-                            return OutboundReply(reply=corr_reply[len("__KEEP_PENDING__"):], intent="CORRECTION", role=ctx.role)
+                            return OutboundReply(reply=corr_reply, intent="CORRECTION", role=ctx.role)
                     if conv.get("action") == "ask_what_to_change":
                         ask_reply = conv.get("reply") or "What would you like to change?"
                         await _log(session, phone, message, ctx.role, "CORRECTION", ask_reply)
                         await session.commit()
-                        return OutboundReply(reply=f"__KEEP_PENDING__{ask_reply}"[len("__KEEP_PENDING__"):], intent="CORRECTION", role=ctx.role)
+                        return OutboundReply(reply=ask_reply, intent="CORRECTION", role=ctx.role)
                 except Exception as _corr_err:
                     _chat_logger.warning("AI correction detection failed: %s", _corr_err)
 

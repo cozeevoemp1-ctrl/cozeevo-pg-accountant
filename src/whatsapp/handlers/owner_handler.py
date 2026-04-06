@@ -878,14 +878,34 @@ async def resolve_pending_action(
             result += "\n\nSend photo of *receipt slip* to save, or say *skip*."
             return result
         if is_negative(reply_text):
-            return "Payment cancelled. Nothing was logged."
+            _room  = action_data.get("room_number", "")
+            _tname = action_data.get("tenant_name", "")
+            _tlabel = f"{_tname} (Room {_room})" if _room else _tname
+            _mode  = (action_data.get("mode") or "cash").upper()
+            _pm = action_data.get("period_month", "")
+            _month_label = ""
+            if _pm:
+                try:
+                    from datetime import datetime as _dt
+                    _month_label = _dt.strptime(_pm, "%Y-%m-%d").strftime("%B %Y")
+                except Exception:
+                    _month_label = _pm
+            return (
+                "__KEEP_PENDING__"
+                "What would you like to change?\n"
+                f"  Tenant: {_tlabel}\n"
+                f"  Amount: Rs.{int(action_data['amount']):,}\n"
+                f"  Mode: {_mode}\n"
+                + (f"  Month: {_month_label}\n" if _month_label else "")
+                + "\nType the correction (e.g. *amount 15000*, *mode UPI*) or *cancel* to stop."
+            )
         _room  = action_data.get("room_number", "")
         _tname = action_data.get("tenant_name", "")
         _tlabel = f"{_tname} (Room {_room})" if _room else _tname
         return (
             "__KEEP_PENDING__"
             f"Reply *Yes* to confirm logging Rs.{int(action_data['amount']):,} "
-            f"for {_tlabel}, or *No* to cancel."
+            f"for {_tlabel}, or *No* to change."
         )
 
     if pending.intent == "CONFIRM_PAYMENT_ALLOC":
@@ -893,7 +913,10 @@ async def resolve_pending_action(
 
         ans = reply_text.strip()
         if is_negative(ans):
-            return "Cancelled. No payment logged."
+            return (
+                "__KEEP_PENDING__"
+                "What would you like to change? Type the correction or *cancel* to stop."
+            )
 
         # ── Mode/amount correction (same logic as CONFIRM_PAYMENT_LOG) ────────
         _MODE_MAP_ALLOC = {
@@ -1001,7 +1024,10 @@ async def resolve_pending_action(
                     "Reply *Yes* to confirm or *No* to cancel."
                 )
         if is_negative(reply_text):
-            return "❌ Expense cancelled. Nothing was logged."
+            return (
+                "__KEEP_PENDING__"
+                "What would you like to change? Type the correction or *cancel* to stop."
+            )
         if is_affirmative(reply_text):
             amount      = action_data.get("amount", 0)
             cat_name    = action_data.get("category", "Miscellaneous")
@@ -1358,8 +1384,8 @@ async def resolve_pending_action(
         ans = reply_text.strip()
         step = action_data.get("step", "")
 
-        # Cancel detection
-        if ans.lower() in ("cancel", "no", "stop", "start over", "abort"):
+        # Cancel detection (removed "no" — it's often a correction, not cancel)
+        if ans.lower() in ("cancel", "stop", "start over", "abort"):
             return "Cancelled. Tenant not added."
 
         # Image upload during step-by-step → switch to image extraction
@@ -3071,10 +3097,22 @@ async def resolve_pending_action(
         import hashlib
         ans = reply_text.strip()
 
-        if ans.lower() in ("cancel", "stop", "abort", "no", "nahi"):
+        # Only hard-cancel on explicit cancel words (not "no" — that means correction)
+        if ans.lower() in ("cancel", "stop", "abort"):
             return "Cancelled. Contact not saved."
 
         step = action_data.get("step", "")
+
+        # "No" during confirm → ask what to change, don't cancel
+        if step == "confirm" and is_negative(ans):
+            return (
+                "__KEEP_PENDING__"
+                "What would you like to change?\n"
+                f"  Name: {action_data.get('name', '')}\n"
+                f"  Phone: {action_data.get('phone', '')}\n"
+                f"  Category: {action_data.get('category', '')}\n\n"
+                "Type the correction (e.g. *name is Mahadevapura lineman*) or *cancel* to stop."
+            )
 
         if step == "ask_name":
             action_data["name"] = ans.strip().title()
