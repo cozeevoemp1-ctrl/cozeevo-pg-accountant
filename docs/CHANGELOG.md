@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.18.1] — 2026-04-06 — Critical Fix: Pending State + Conversation Flow
+
+### Fixed
+- **ROOT CAUSE: chat_messages table missing on VPS** — `_save_chat_message` in same transaction as pending actions caused commit rollback, losing ALL pending state (confirm steps never worked)
+- **Fix: separate commits** — critical ops (pending, payments) commit first; chat messages in separate try/except commit
+- **"No" during confirm** → now asks "what to change?" instead of cancelling (payment, expense, contact, tenant)
+- **Contact name truncation** — "Mahadevapura lineman" no longer stripped to "Mahadevapura" (category keywords kept in name)
+- **Pending alive after correction** — updates existing pending in-place instead of creating new record
+
+### Important
+- **Always run `python -m src.database.migrate_all` on VPS after deploy** — new tables must exist before code uses them
+
 ## [1.18.0] — 2026-04-06 — AI Conversation Manager
 
 ### Added
