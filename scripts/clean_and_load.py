@@ -163,6 +163,7 @@ def read_history(excel_file=EXCEL_FILE):
             'staff': safe_str(ws.cell(row, 16).value),
             'comment': safe_str(ws.cell(row, 15).value),
             'food': safe_str(ws.cell(row, 36).value),          # Col 36 = veg/nonveg/egg
+            'rent_updated': safe_str(ws.cell(row, 39).value),    # Col 39 = Rent Updated
             'refund_status': safe_str(ws.cell(row, 40).value),  # Col 40 = Refund Status
             'refund_amount': sn(ws.cell(row, 41).value),        # Col 41 = Refund Amount
             # Raw payment values (cleaned later per-month)
@@ -209,23 +210,34 @@ def main():
     sp = gc.open_by_key(NEW_SHEET)
 
     # ── TENANTS tab (DB-aligned: tenants + tenancies + rooms) ────────────
-    ws_t = get_ws(sp, "TENANTS", 300, 17)
-    t_headers = ["Room", "Name", "Phone", "Gender", "Building", "Floor",
-                 "Sharing", "Check-in", "Status", "Agreed Rent",
-                 "Deposit", "Booking", "Maintenance",
-                 "Notice Date", "Expected Exit", "Checkout Date", "Refund Status"]
+    ws_t = get_ws(sp, "TENANTS", 300, 32)
+    t_headers = [
+        "Room", "Name", "Phone", "Gender", "Building", "Floor",       # A-F
+        "Sharing", "Check-in", "Status", "Agreed Rent",                # G-J
+        "Deposit", "Booking", "Maintenance",                           # K-M
+        "Notice Date", "Expected Exit", "Checkout Date",               # N-P
+        "Refund Status", "Refund Amount",                              # Q-R
+        "Notes", "Food", "Staff", "Rent Updated",                      # S-V
+        "DOB", "Father Name", "Father Phone",                          # W-Y
+        "Address", "Email", "Occupation",                              # Z-AB
+        "Emergency Contact", "Emergency Phone", "ID Type", "ID Number" # AC-AF
+    ]
     t_rows = [[
         t['room'], t['name'], t['phone'], t['gender'], t['block'], t['floor'],
         t['sharing'], t['checkin_raw'], t['status'], t['current_rent'],
         t['deposit'], t['booking'], t['maintenance'],
-        '', '', '', t['refund_status'],
+        '', '', '',
+        t.get('refund_status', ''), sn(t.get('refund_amount', 0)) or '',
+        t.get('comment', ''), t.get('food', ''),
+        t.get('staff', ''), t.get('rent_updated', ''),
+        '', '', '', '', '', '', '', '', '', '',  # KYC fields — filled via bot, not Excel
     ] for t in tenants]
 
     ws_t.update(values=[t_headers] + t_rows, range_name="A1", value_input_option="USER_ENTERED")
-    ws_t.format("A1:Q1", {"textFormat": {"bold": True},
-                           "backgroundColor": {"red": 0.85, "green": 0.95, "blue": 0.85}})
+    ws_t.format("A1:AF1", {"textFormat": {"bold": True},
+                            "backgroundColor": {"red": 0.85, "green": 0.95, "blue": 0.85}})
     ws_t.freeze(rows=1)
-    try: ws_t.set_basic_filter(f"A1:Q{1 + len(t_rows)}")
+    try: ws_t.set_basic_filter(f"A1:AF{1 + len(t_rows)}")
     except: pass
     print(f"  TENANTS: {len(t_rows)} rows")
     time.sleep(8)
