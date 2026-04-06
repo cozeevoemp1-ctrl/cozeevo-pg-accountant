@@ -21,12 +21,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .month-sel{border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;background:var(--bg);font-family:inherit;}
 .refresh-btn{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:8px;}
 
-.loading{text-align:center;padding:60px 20px;color:var(--sub);}
-.loading-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
-@keyframes spin{to{transform:rotate(360deg);}}
-
 .content{padding:12px;max-width:600px;margin:0 auto;}
 
+/* KPI Grid */
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;}
 .kpi-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
@@ -36,6 +33,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .kpi-val.red{color:var(--red);}
 .kpi-val.blue{color:var(--blue);}
 
+/* Status Row */
 .status-row{display:flex;gap:8px;margin-bottom:12px;}
 .status-pill{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
 .sp-num{font-size:20px;font-weight:800;}
@@ -44,6 +42,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .sp-amber .sp-num{color:var(--amber);}
 .sp-red .sp-num{color:var(--red);}
 
+/* Property Cards */
 .prop-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
 .prop-card{border-radius:12px;padding:14px;border:1px solid;}
 .prop-card.thor{background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-color:#c4b5fd;}
@@ -55,10 +54,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .prop-key{color:var(--sub);}
 .prop-val{font-weight:700;}
 .prop-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:8px;overflow:hidden;}
-.prop-bar-fill{height:100%;border-radius:3px;transition:width .5s;}
+.prop-bar-fill{height:100%;border-radius:3px;}
 .prop-card.thor .prop-bar-fill{background:var(--thor);}
 .prop-card.hulk .prop-bar-fill{background:var(--hulk);}
+.prop-pct{text-align:center;font-size:11px;font-weight:700;margin-top:4px;}
 
+/* Card */
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
 .card-title{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text);}
 .coll-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;}
@@ -66,412 +67,205 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .coll-key{color:var(--sub);font-size:13px;}
 .coll-val{font-weight:700;font-size:13px;}
 
+/* Tabs */
 .tabs{display:flex;gap:0;margin-bottom:12px;background:var(--card);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
 .tab-btn{flex:1;padding:10px 8px;text-align:center;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;border:none;background:none;font-family:inherit;transition:.15s;}
 .tab-btn.active{background:var(--blue);color:#fff;}
 
+/* Sections */
 .section{display:none;}
 .section.active{display:block;}
 
-.trend-table{width:100%;border-collapse:collapse;font-size:12px;}
-.trend-table th{text-align:left;padding:8px 6px;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);}
-.trend-table td{padding:8px 6px;border-bottom:1px solid #f1f5f9;}
-.trend-table .num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
-.trend-table tr.current{background:#eff6ff;}
+/* Tables */
+.data-table{width:100%;border-collapse:collapse;font-size:12px;}
+.data-table th{text-align:left;padding:8px 6px;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);}
+.data-table td{padding:8px 6px;border-bottom:1px solid #f1f5f9;}
+.data-table .num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+.data-table tr.current{background:#eff6ff;}
 
-.dues-table{width:100%;border-collapse:collapse;font-size:12px;}
-.dues-table th{text-align:left;padding:8px 6px;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);}
-.dues-table td{padding:7px 6px;border-bottom:1px solid #f1f5f9;}
-.dues-table .num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
-.dues-filter{display:flex;gap:6px;margin-bottom:10px;}
-.filter-btn{padding:6px 14px;border-radius:99px;border:1px solid var(--border);background:var(--card);font-size:11px;font-weight:600;color:var(--sub);cursor:pointer;font-family:inherit;}
-.filter-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+/* Filter pills */
+.filter-row{display:flex;gap:6px;margin-bottom:10px;}
+.pill{padding:6px 14px;border-radius:99px;border:1px solid var(--border);background:var(--card);font-size:11px;font-weight:600;color:var(--sub);cursor:pointer;font-family:inherit;}
+.pill.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+/* Badge */
 .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
-.badge-red{background:#fef2f2;color:var(--red);}
+.badge-green{background:#f0fdf4;color:var(--green);}
 .badge-amber{background:#fffbeb;color:var(--amber);}
+.badge-red{background:#fef2f2;color:var(--red);}
 
+/* Footer */
 .footer{text-align:center;padding:16px;font-size:11px;color:var(--muted);}
-
-/* Login */
-.login{position:fixed;inset:0;background:var(--card);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
-.login-box{width:100%;max-width:320px;text-align:center;}
-.login-title{font-size:24px;font-weight:800;margin-bottom:4px;}
-.login-sub{font-size:13px;color:var(--sub);margin-bottom:32px;}
-.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;font-family:inherit;outline:none;}
-.login-input:focus{border-color:var(--blue);}
-.login-btn{width:100%;margin-top:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;}
-.login-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px;}
 </style>
 </head>
 <body>
-
-<!-- Login Screen -->
-<div class="login" id="loginScreen">
-  <div class="login-box">
-    <div class="login-title">Cozeevo</div>
-    <div class="login-sub">Dashboard</div>
-    <input class="login-input" id="pinInput" placeholder="Enter token" type="password"/>
-    <button class="login-btn" onclick="tryLogin()">Open Dashboard</button>
-    <div class="login-err" id="loginErr"></div>
-  </div>
-</div>
-
-<!-- App -->
-<div id="app" style="display:none;">
 
 <div class="header">
   <div class="header-top">
     <div class="brand">Cozeevo <span>Dashboard</span></div>
     <div style="display:flex;align-items:center;">
-      <select class="month-sel" id="monthSel" onchange="loadMonth()"></select>
-      <button class="refresh-btn" id="refreshBtn" onclick="loadMonth()">Refresh</button>
+      <select class="month-sel" id="monthSel" onchange="switchMonth()">
+        <option>MARCH 2026</option>
+        <option>FEBRUARY 2026</option>
+        <option>JANUARY 2026</option>
+        <option>DECEMBER 2025</option>
+      </select>
+      <button class="refresh-btn" onclick="location.reload()">Refresh</button>
     </div>
   </div>
 </div>
 
-<div class="loading" id="loadingState">
-  <div class="loading-spinner"></div>
-  Loading dashboard...
-</div>
+<div class="content">
 
-<div class="content" id="mainContent" style="display:none;">
-  <div class="kpi-grid" id="kpiGrid"></div>
-  <div class="status-row" id="statusRow"></div>
-  <div class="prop-row" id="propRow"></div>
-  <div class="card" id="collCard"></div>
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Occupancy</div>
+      <div class="kpi-val blue">78%</div>
+      <div class="kpi-sub">228 / 291 beds</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Collection</div>
+      <div class="kpi-val green">107%</div>
+      <div class="kpi-sub">42.0L of 39.3L</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Outstanding</div>
+      <div class="kpi-val red">-6.7L</div>
+      <div class="kpi-sub">7 unpaid tenants</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Collected</div>
+      <div class="kpi-val green">42.0L</div>
+      <div class="kpi-sub">Cash 14.3L + UPI 27.7L</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Check-ins</div>
+      <div class="kpi-val">61</div>
+      <div class="kpi-sub">this month</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Checkouts</div>
+      <div class="kpi-val">12</div>
+      <div class="kpi-sub">this month</div>
+    </div>
+  </div>
 
+  <!-- Status Pills -->
+  <div class="status-row">
+    <div class="status-pill sp-green">
+      <div class="sp-num">173</div>
+      <div class="sp-label">Paid</div>
+    </div>
+    <div class="status-pill sp-amber">
+      <div class="sp-num">32</div>
+      <div class="sp-label">Partial</div>
+    </div>
+    <div class="status-pill sp-red">
+      <div class="sp-num">7</div>
+      <div class="sp-label">Unpaid</div>
+    </div>
+  </div>
+
+  <!-- THOR vs HULK -->
+  <div class="prop-row">
+    <div class="prop-card thor">
+      <div class="prop-name thor">THOR</div>
+      <div class="prop-stat"><span class="prop-key">Beds</span><span class="prop-val">131</span></div>
+      <div class="prop-stat"><span class="prop-key">Tenants</span><span class="prop-val">114</span></div>
+      <div class="prop-stat"><span class="prop-key">Collected</span><span class="prop-val">23.3L</span></div>
+      <div class="prop-stat"><span class="prop-key">Expected</span><span class="prop-val">21.6L</span></div>
+      <div class="prop-bar"><div class="prop-bar-fill" style="width:108%"></div></div>
+      <div class="prop-pct" style="color:var(--green);">108% collected</div>
+    </div>
+    <div class="prop-card hulk">
+      <div class="prop-name hulk">HULK</div>
+      <div class="prop-stat"><span class="prop-key">Beds</span><span class="prop-val">97</span></div>
+      <div class="prop-stat"><span class="prop-key">Tenants</span><span class="prop-val">94</span></div>
+      <div class="prop-stat"><span class="prop-key">Collected</span><span class="prop-val">18.7L</span></div>
+      <div class="prop-stat"><span class="prop-key">Expected</span><span class="prop-val">17.7L</span></div>
+      <div class="prop-bar"><div class="prop-bar-fill" style="width:105%"></div></div>
+      <div class="prop-pct" style="color:var(--green);">105% collected</div>
+    </div>
+  </div>
+
+  <!-- Collections Breakdown -->
+  <div class="card">
+    <div class="card-title">Collections Breakdown</div>
+    <div class="coll-row"><span class="coll-key">Cash</span><span class="coll-val">14,31,720</span></div>
+    <div class="coll-row"><span class="coll-key">UPI</span><span class="coll-val">27,66,788</span></div>
+    <div class="coll-row"><span class="coll-key">Total Collected</span><span class="coll-val">41,98,508</span></div>
+    <div class="coll-row"><span class="coll-key">Total Rent Due</span><span class="coll-val">39,30,950</span></div>
+    <div class="coll-row"><span class="coll-key">Outstanding</span><span class="coll-val">-6,71,505</span></div>
+    <div class="coll-row"><span class="coll-key">Deposits (active)</span><span class="coll-val">35,87,500</span></div>
+  </div>
+
+  <!-- Tabs -->
   <div class="tabs">
     <button class="tab-btn active" onclick="showTab('trend',this)">Month Trend</button>
     <button class="tab-btn" onclick="showTab('dues',this)">Dues List</button>
   </div>
 
+  <!-- Month Trend -->
   <div class="section active" id="sec-trend">
-    <div class="card" id="trendCard"></div>
+    <div class="card">
+      <div class="card-title">Month-on-Month</div>
+      <table class="data-table">
+        <thead><tr><th>Month</th><th class="num">Beds</th><th class="num">Collected</th><th class="num">Dues</th><th class="num">Paid%</th></tr></thead>
+        <tbody>
+          <tr><td>DECEMBER 2025</td><td class="num">77</td><td class="num">12,800</td><td class="num">2,200</td><td class="num">1%</td></tr>
+          <tr><td>JANUARY 2026</td><td class="num">137</td><td class="num">8,31,147</td><td class="num">20,000</td><td class="num">32%</td></tr>
+          <tr><td>FEBRUARY 2026</td><td class="num">169</td><td class="num">29,93,348</td><td class="num">-16,000</td><td class="num">88%</td></tr>
+          <tr class="current"><td>MARCH 2026</td><td class="num">228</td><td class="num">41,98,508</td><td class="num">-6,71,505</td><td class="num">107%</td></tr>
+          <tr><td>APRIL 2026</td><td class="num">225</td><td class="num">1,42,000</td><td class="num">35,07,540</td><td class="num">4%</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
+  <!-- Dues List -->
   <div class="section" id="sec-dues">
-    <div class="dues-filter" id="duesFilter"></div>
-    <div class="card" id="duesCard"></div>
+    <div class="filter-row">
+      <button class="pill active" onclick="filterDues('all',this)">All</button>
+      <button class="pill" onclick="filterDues('thor',this)">THOR</button>
+      <button class="pill" onclick="filterDues('hulk',this)">HULK</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Unpaid Tenants (7) — Total: 1,28,594</div>
+      <table class="data-table" id="duesTable">
+        <thead><tr><th>Tenant</th><th>Room</th><th class="num">Due</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Anurag</td><td>104</td><td class="num" style="color:var(--red)">45,000</td><td><span class="badge badge-red">UNPAID</span></td></tr>
+          <tr><td>Manju Kumar</td><td>104</td><td class="num" style="color:var(--red)">10,000</td><td><span class="badge badge-red">UNPAID</span></td></tr>
+          <tr><td>Shubhi Vishnoi</td><td>304</td><td class="num" style="color:var(--red)">22,750</td><td><span class="badge badge-red">UNPAID</span></td></tr>
+          <tr><td>Vinod Kumar Reddy</td><td>518</td><td class="num" style="color:var(--red)">21,000</td><td><span class="badge badge-red">UNPAID</span></td></tr>
+          <tr><td>Hardik Rohilla</td><td>524</td><td class="num" style="color:var(--red)">32,000</td><td><span class="badge badge-amber">PARTIAL</span></td></tr>
+          <tr><td>Arjun Sumanth</td><td>523</td><td class="num" style="color:var(--red)">13,877</td><td><span class="badge badge-red">UNPAID</span></td></tr>
+          <tr><td>Ashish Das</td><td>121</td><td class="num" style="color:var(--red)">5,500</td><td><span class="badge badge-amber">PARTIAL</span></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="footer" id="footer"></div>
+  <div class="footer">Last updated: 6/4/2026, 11:30:00 am</div>
 </div>
 
-</div><!-- end app -->
-
 <script>
-var TOKEN = sessionStorage.getItem('cz_token') || '';
-var data = null;
-var duesFilter = 'all';
-var selMonth, selYear;
-
-// ── Formatters ──
-function fmt(n) {
-  if (n == null || isNaN(n)) return '--';
-  n = Math.round(n);
-  if (Math.abs(n) >= 100000) return (n/100000).toFixed(1) + 'L';
-  if (Math.abs(n) >= 1000) return Math.round(n/1000) + 'K';
-  return n.toLocaleString('en-IN');
-}
-function fmtFull(n) {
-  if (n == null || isNaN(n)) return '--';
-  return Math.round(n).toLocaleString('en-IN');
-}
-
-// ── Login ──
-function tryLogin() {
-  var val = document.getElementById('pinInput').value.trim();
-  if (!val) { document.getElementById('loginErr').textContent = 'Enter token'; return; }
-  fetch('/api/dashboard/kpis?token=' + encodeURIComponent(val))
-    .then(function(r) {
-      if (r.status === 403) { document.getElementById('loginErr').textContent = 'Invalid token'; return; }
-      TOKEN = val;
-      sessionStorage.setItem('cz_token', val);
-      showApp();
-    })
-    .catch(function() { document.getElementById('loginErr').textContent = 'Server unreachable'; });
-}
-document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') tryLogin(); });
-
-function showApp() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  buildMonths();
-  loadMonth();
-}
-
-// Auto-login from URL token or session
-(function() {
-  try {
-    var p = new URLSearchParams(location.search);
-    var t = p.get('token');
-    if (t) { TOKEN = t; sessionStorage.setItem('cz_token', t); showApp(); return; }
-    if (TOKEN) { showApp(); return; }
-    // Dev mode — try without token
-    fetch('/api/dashboard/kpis').then(function(r) {
-      if (r.ok) { TOKEN = ''; showApp(); }
-      // else: login screen stays visible (default)
-    }).catch(function() {
-      // Server unreachable — login screen stays visible
-    });
-  } catch(e) {
-    // Fallback — show login screen
-  }
-})();
-
-// ── API helper ──
-function api(path) {
-  var sep = path.includes('?') ? '&' : '?';
-  return fetch(path + sep + 'token=' + encodeURIComponent(TOKEN))
-    .then(function(r) {
-      if (r.status === 403) { sessionStorage.removeItem('cz_token'); location.reload(); }
-      if (!r.ok) throw new Error(r.status);
-      return r.json();
-    });
-}
-
-// ── Month picker ──
-function buildMonths() {
-  var sel = document.getElementById('monthSel');
-  if (sel.options.length > 0) return;
-  var now = new Date();
-  for (var i = 0; i < 13; i++) {
-    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    var opt = document.createElement('option');
-    opt.value = d.getFullYear() + '-' + (d.getMonth() + 1);
-    opt.textContent = d.toLocaleDateString('en-IN', {month: 'short', year: 'numeric'});
-    sel.appendChild(opt);
-  }
-  selMonth = now.getMonth() + 1;
-  selYear = now.getFullYear();
-}
-
-// ── Load data ──
-function loadMonth() {
-  var parts = document.getElementById('monthSel').value.split('-');
-  selYear = parseInt(parts[0]) || new Date().getFullYear();
-  selMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
-
-  document.getElementById('loadingState').style.display = 'block';
-  document.getElementById('mainContent').style.display = 'none';
-  document.getElementById('refreshBtn').textContent = '...';
-
-  var kpiUrl = '/api/dashboard/kpis?month=' + selMonth + '&year=' + selYear;
-  var duesUrl = '/api/dashboard/dues?month=' + selMonth + '&year=' + selYear;
-
-  Promise.all([
-    api(kpiUrl),
-    api(duesUrl)
-  ]).then(function(results) {
-   try {
-    var kpis = results[0];
-    var dues = results[1];
-
-    // Map API response to same format as Apps Script dashboard
-    var occ = kpis.occupancy || {};
-    var props = kpis.properties || [];
-    var glance = kpis.at_a_glance || {};
-    var thorP = props.find(function(p) { return p.name === 'THOR'; }) || {occupied:0,total:0,vacant:0,pct:0};
-    var hulkP = props.find(function(p) { return p.name === 'HULK'; }) || {occupied:0,total:0,vacant:0,pct:0};
-
-    // Compute collection totals from rent_schedule payments
-    var totalDue = kpis.revenue + kpis.dues_outstanding; // approximate
-    var collected = kpis.revenue;
-    var collPct = glance.collection_pct || 0;
-
-    data = {
-      occupancy: {
-        beds: occ.beds_occupied || 0,
-        total: occ.beds_total || 291,
-        vacant: occ.beds_vacant || 0,
-        pct: occ.pct || 0,
-        regular: (occ.checked_in || 0) - (occ.premium || 0),
-        premium: occ.premium || 0,
-        noshow: occ.no_show || 0
-      },
-      collection: {
-        cash: 0, upi: 0, // not available from DB API — only bank data
-        total: collected,
-        outstanding: kpis.dues_outstanding || 0,
-        rentExpected: totalDue,
-        pct: collPct
-      },
-      status: {
-        paid: 0, partial: 0,
-        unpaid: dues.length,
-        exits: glance.checkouts || 0,
-        newCheckins: glance.new_checkins || 0
-      },
-      properties: {
-        thor: { beds: thorP.occupied || 0, tenants: thorP.occupied || 0, collected: 0, rent: 0 },
-        hulk: { beds: hulkP.occupied || 0, tenants: hulkP.occupied || 0, collected: 0, rent: 0 }
-      },
-      deposit: 0,
-      trend: [], // would need separate API call
-      unpaidList: dues.map(function(r) {
-        return {
-          room: r.room,
-          name: r.tenant,
-          building: (r.room || '').match(/^[1-4]|^G/) ? 'THOR' : 'HULK',
-          rent: r.outstanding,
-          balance: r.outstanding,
-          status: r.months_pending > 1 ? 'UNPAID' : 'UNPAID'
-        };
-      }),
-      timestamp: new Date().toLocaleString('en-IN')
-    };
-
-    onData(data);
-   } catch(renderErr) { onError(renderErr); }
-  }).catch(function(e) {
-    onError(e);
-  });
-}
-
-function onData(d) {
-  data = d;
-  document.getElementById('loadingState').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'block';
-  document.getElementById('refreshBtn').textContent = 'Refresh';
-
-  renderKPIs(d);
-  renderStatus(d);
-  renderProperties(d);
-  renderCollections(d);
-  renderTrend(d);
-  renderDues(d);
-  document.getElementById('footer').textContent = 'Last updated: ' + d.timestamp;
-}
-
-function onError(e) {
-  document.getElementById('loadingState').style.display = 'block';
-  document.getElementById('mainContent').style.display = 'none';
-  document.getElementById('loadingState').innerHTML = '<div style="color:#dc2626;padding:20px;">Failed to load: ' + (e.message || e) + '<br><br><button onclick="loadMonth()" style="padding:10px 20px;font-size:14px;cursor:pointer;">Retry</button></div>';
-  document.getElementById('refreshBtn').textContent = 'Retry';
-}
-
-// ── Render (identical to Apps Script version) ──
-function renderKPIs(d) {
-  var o = d.occupancy;
-  var c = d.collection;
-  var s = d.status;
-  document.getElementById('kpiGrid').innerHTML =
-    kpiCard('Occupancy', o.pct + '%', o.beds + ' / ' + o.total + ' beds', 'blue') +
-    kpiCard('Collection', c.pct + '%', fmt(c.total) + ' of ' + fmt(c.rentExpected), c.pct >= 80 ? 'green' : c.pct >= 50 ? '' : 'red') +
-    kpiCard('Outstanding', fmt(c.outstanding), s.unpaid + ' unpaid tenants', 'red') +
-    kpiCard('Collected', fmt(c.total), 'Cash ' + fmt(c.cash) + ' + UPI ' + fmt(c.upi), 'green') +
-    kpiCard('Check-ins', s.newCheckins, 'this month', '') +
-    kpiCard('Checkouts', s.exits, 'this month', '');
-}
-
-function kpiCard(label, val, sub, color) {
-  return '<div class="kpi"><div class="kpi-label">' + label + '</div>' +
-    '<div class="kpi-val ' + color + '">' + val + '</div>' +
-    '<div class="kpi-sub">' + sub + '</div></div>';
-}
-
-function renderStatus(d) {
-  var s = d.status;
-  document.getElementById('statusRow').innerHTML =
-    '<div class="status-pill sp-green"><div class="sp-num">' + s.paid + '</div><div class="sp-label">Paid</div></div>' +
-    '<div class="status-pill sp-amber"><div class="sp-num">' + s.partial + '</div><div class="sp-label">Partial</div></div>' +
-    '<div class="status-pill sp-red"><div class="sp-num">' + s.unpaid + '</div><div class="sp-label">Unpaid</div></div>';
-}
-
-function renderProperties(d) {
-  var t = d.properties.thor;
-  var h = d.properties.hulk;
-  var tPct = t.rent > 0 ? Math.round(t.collected / t.rent * 100) : 0;
-  var hPct = h.rent > 0 ? Math.round(h.collected / h.rent * 100) : 0;
-  document.getElementById('propRow').innerHTML =
-    propCard('thor', 'THOR', t, tPct) + propCard('hulk', 'HULK', h, hPct);
-}
-
-function propCard(cls, name, p, pct) {
-  return '<div class="prop-card ' + cls + '">' +
-    '<div class="prop-name ' + cls + '">' + name + '</div>' +
-    '<div class="prop-stat"><span class="prop-key">Beds</span><span class="prop-val">' + p.beds + '</span></div>' +
-    '<div class="prop-stat"><span class="prop-key">Tenants</span><span class="prop-val">' + p.tenants + '</span></div>' +
-    '<div class="prop-stat"><span class="prop-key">Collected</span><span class="prop-val">' + fmt(p.collected) + '</span></div>' +
-    '<div class="prop-stat"><span class="prop-key">Expected</span><span class="prop-val">' + fmt(p.rent) + '</span></div>' +
-    '<div class="prop-bar"><div class="prop-bar-fill" style="width:' + pct + '%"></div></div>' +
-    '<div style="text-align:center;font-size:11px;color:' + (pct >= 80 ? 'var(--green)' : 'var(--amber)') + ';font-weight:700;margin-top:4px;">' + pct + '% collected</div>' +
-    '</div>';
-}
-
-function renderCollections(d) {
-  var c = d.collection;
-  document.getElementById('collCard').innerHTML =
-    '<div class="card-title">Collections Breakdown</div>' +
-    collRow('Cash', fmtFull(c.cash)) +
-    collRow('UPI', fmtFull(c.upi)) +
-    collRow('Total Collected', fmtFull(c.total)) +
-    collRow('Total Rent Due', fmtFull(c.rentExpected)) +
-    collRow('Outstanding', fmtFull(c.outstanding)) +
-    collRow('Deposits (active)', fmtFull(d.deposit));
-}
-
-function collRow(key, val) {
-  return '<div class="coll-row"><span class="coll-key">' + key + '</span><span class="coll-val">' + val + '</span></div>';
-}
-
-function renderTrend(d) {
-  if (!d.trend || d.trend.length === 0) {
-    document.getElementById('trendCard').innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px;">No trend data available from DB. Use the Google Sheet dashboard for month-on-month trends.</div>';
-    return;
-  }
-  var html = '<div class="card-title">Month-on-Month</div>' +
-    '<table class="trend-table"><thead><tr><th>Month</th><th class="num">Beds</th><th class="num">Collected</th><th class="num">Dues</th><th class="num">Paid%</th></tr></thead><tbody>';
-  d.trend.forEach(function(t) {
-    html += '<tr class="' + (t.isCurrent ? 'current' : '') + '">' +
-      '<td>' + t.name + '</td>' +
-      '<td class="num">' + t.beds + '</td>' +
-      '<td class="num">' + fmtFull(t.collected) + '</td>' +
-      '<td class="num">' + fmtFull(t.dues) + '</td>' +
-      '<td class="num">' + t.paidPct + '%</td></tr>';
-  });
-  html += '</tbody></table>';
-  document.getElementById('trendCard').innerHTML = html;
-}
-
-function renderDues(d) {
-  document.getElementById('duesFilter').innerHTML =
-    '<button class="filter-btn ' + (duesFilter === 'all' ? 'active' : '') + '" onclick="setDuesFilter(\'all\')">All</button>' +
-    '<button class="filter-btn ' + (duesFilter === 'thor' ? 'active' : '') + '" onclick="setDuesFilter(\'thor\')">THOR</button>' +
-    '<button class="filter-btn ' + (duesFilter === 'hulk' ? 'active' : '') + '" onclick="setDuesFilter(\'hulk\')">HULK</button>';
-
-  var list = d.unpaidList || [];
-  if (duesFilter === 'thor') list = list.filter(function(r) { return r.building === 'THOR'; });
-  else if (duesFilter === 'hulk') list = list.filter(function(r) { return r.building !== 'THOR'; });
-
-  if (list.length === 0) {
-    document.getElementById('duesCard').innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px;">No unpaid tenants</div>';
-    return;
-  }
-
-  var total = list.reduce(function(s, r) { return s + r.balance; }, 0);
-  var html = '<div class="card-title">Unpaid Tenants (' + list.length + ') — Total: ' + fmtFull(total) + '</div>' +
-    '<table class="dues-table"><thead><tr><th>Tenant</th><th>Room</th><th class="num">Due</th><th>Status</th></tr></thead><tbody>';
-  list.forEach(function(r) {
-    var badge = r.status === 'PARTIAL' ? 'badge-amber' : 'badge-red';
-    html += '<tr><td>' + r.name + '</td><td>' + r.room + '</td>' +
-      '<td class="num" style="color:var(--red);">' + fmtFull(r.balance) + '</td>' +
-      '<td><span class="badge ' + badge + '">' + r.status + '</span></td></tr>';
-  });
-  html += '</tbody></table>';
-  document.getElementById('duesCard').innerHTML = html;
-}
-
-function setDuesFilter(f) {
-  duesFilter = f;
-  if (data) renderDues(data);
-}
-
 function showTab(name, btn) {
   document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById('sec-' + name).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
+}
+
+function filterDues(filter, btn) {
+  document.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('active'); });
+  btn.classList.add('active');
+  // Filter logic will go here when wired to real data
+}
+
+function switchMonth() {
+  // Will reload data when wired to API
 }
 </script>
 </body>
