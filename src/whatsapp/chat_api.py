@@ -254,9 +254,35 @@ async def _process_message_inner(
             await session.commit()
             return OutboundReply(reply=resolved_reply, intent="COMPLAINT_REGISTER", role=ctx.role)
 
-    # ── 3. Detect intent (rules-first, AI fallback for UNKNOWN) ──────────
+    # ── 3. Detect intent — Groq LLM primary, regex fast-path ────────────
+    # Try regex first for speed (instant, free)
     intent_result = detect_intent(message, ctx.role)
     intent = intent_result.intent
+
+    # If regex is confident (>=0.90), use it. Otherwise, call Groq for better understanding.
+    if intent == "UNKNOWN" or intent_result.confidence < 0.90:
+        try:
+            ai = get_claude_client()
+            ai_result = await ai.detect_whatsapp_intent(message, ctx.role)
+            ai_intent = str(ai_result.get("intent", "UNKNOWN")).upper()
+            ai_conf   = float(ai_result.get("confidence", 0.5))
+            ai_entities = dict(ai_result.get("entities") or {})
+
+            # Use AI result if it's confident, or if regex was UNKNOWN
+            if ai_intent != "UNKNOWN" and (ai_conf >= 0.6 or intent == "UNKNOWN"):
+                # Merge entities: AI + regex (keep non-null from both, AI takes precedence for name)
+                merged = {}
+                for k, v in intent_result.entities.items():
+                    if v is not None:
+                        merged[k] = v
+                for k, v in ai_entities.items():
+                    if v is not None:
+                        merged[k] = v
+                intent_result = IntentResult(intent=ai_intent, confidence=ai_conf, entities=merged)
+                intent = ai_intent
+                _chat_logger.info("Groq classified: %s (%.2f) for %s", ai_intent, ai_conf, phone)
+        except Exception as e:
+            _chat_logger.warning("Groq intent detection failed: %s — using regex result", e)
 
     # ── 3a. Image + expense keyword = always LOG (not query) ──
     if body.media_id and body.media_type == "image" and intent in ("QUERY_EXPENSES", "UNKNOWN"):
@@ -269,7 +295,6 @@ async def _process_message_inner(
     # ── 3b. Duplicate-log prevention: if user just logged something similar, treat as query ──
     _LOG_INTENTS = {"ADD_EXPENSE", "LOG_EXPENSE", "PAYMENT_LOG"}
     if intent in _LOG_INTENTS and not re.search(r"\b(log|add|record|save|enter)\b", message, re.I):
-        # Check if bot recently confirmed a log for this user (last 5 min)
         from src.database.models import WhatsappLog, MessageDirection
         five_min_ago = datetime.utcnow() - timedelta(minutes=5)
         recent_reply = await session.scalar(
@@ -291,7 +316,6 @@ async def _process_message_inner(
     if intent == "UNKNOWN" and chat_context:
         followup = _detect_followup_context(message, chat_context)
         if followup:
-            # Re-route as QUERY_TENANT with room/name from last bot response
             followup_entities = _extract_entities(message, "QUERY_TENANT")
             if "room" in followup and "room" not in followup_entities:
                 followup_entities["room"] = followup["room"]
@@ -310,24 +334,7 @@ async def _process_message_inner(
                 phone, {k: v for k, v in followup.items()},
             )
 
-    if intent == "UNKNOWN":
-        try:
-            ai = get_claude_client()
-            ai_result = await ai.detect_whatsapp_intent(message, ctx.role)
-            ai_intent = str(ai_result.get("intent", "UNKNOWN")).upper()
-            ai_conf   = float(ai_result.get("confidence", 0.5))
-            ai_entities = dict(ai_result.get("entities") or {})
-            # Merge: AI entities + original rule entities (rules take precedence for non-None values)
-            merged_entities = {k: v for k, v in ai_entities.items() if v is not None}
-            merged_entities.update({k: v for k, v in intent_result.entities.items() if v is not None})
-            intent_result = IntentResult(
-                intent=ai_intent,
-                confidence=ai_conf,
-                entities=merged_entities,
-            )
-            intent = intent_result.intent
-        except Exception:
-            pass  # stay with UNKNOWN if AI also fails
+    # (Groq AI fallback already handled in step 3 above)
 
     # ── Self-learning: log unrecognised messages for admin review ─────────
     if intent == "UNKNOWN":
