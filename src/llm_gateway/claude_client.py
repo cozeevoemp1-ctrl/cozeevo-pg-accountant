@@ -29,6 +29,7 @@ from src.llm_gateway.prompts import (
     WHATSAPP_INTENT_PROMPT,
     CLARIFICATION_PROMPT,
     NEW_ENTITY_PROMPT,
+    CONVERSATION_MANAGER_PROMPT,
 )
 
 
@@ -178,13 +179,13 @@ class ClaudeClient:
     _OWNER_INTENTS = (
         "PAYMENT_LOG         : tenant paid rent (e.g. 'Raj paid 15000', 'received 8k from 203', 'collect rent')\n"
         "QUERY_DUES          : who hasn't paid, pending list, outstanding balances, defaulters\n"
-        "QUERY_TENANT        : balance/dues/details of a specific tenant (e.g. 'Raj balance', 'what is rent for chinmay')\n"
-        "ADD_TENANT          : add new tenant, check-in, new admission (NOT add contact)\n"
-        "START_ONBOARDING    : start KYC/onboarding/registration for a tenant\n"
-        "CHECKOUT            : tenant leaving/vacating (immediate)\n"
-        "RECORD_CHECKOUT     : checkout form, offboarding record, handover, keys returned\n"
-        "SCHEDULE_CHECKOUT   : tenant leaving on a future date\n"
-        "NOTICE_GIVEN        : tenant gave notice, plans to leave\n"
+        "QUERY_TENANT        : balance/dues/details of a specific tenant OR room (e.g. 'Raj balance', 'what is rent for chinmay', 'room 203 details', 'room 102 tenant'). Use this for ANY query about a tenant or room info/details.\n"
+        "ADD_TENANT          : add new tenant, check-in, new admission, register tenant (NOT add contact, NOT onboarding). Use for 'add tenant', 'new tenant', 'check in', 'admit', 'register tenant', 'allot room'.\n"
+        "START_ONBOARDING    : ONLY when user explicitly says 'start onboarding' or 'start KYC'. Do NOT use for 'register tenant' or 'add tenant'.\n"
+        "CHECKOUT            : tenant leaving/vacating NOW or today (immediate exit). Use for 'leaving', 'leaving today', 'vacating', 'checkout', 'ja raha hai', 'is leaving'. Default to CHECKOUT when no future date mentioned.\n"
+        "RECORD_CHECKOUT     : ONLY for filling checkout form AFTER tenant has already left (handover checklist, keys returned). NOT for initiating checkout or 'exit process'.\n"
+        "SCHEDULE_CHECKOUT   : tenant leaving on a specific FUTURE date (e.g. 'leaving on 15th april', 'vacating next week')\n"
+        "NOTICE_GIVEN        : tenant gave ADVANCE notice of leaving (e.g. 'wants to leave next month', 'gave 1 month notice', 'planning to leave'). Must have future timeframe. Do NOT use for 'is leaving' or 'ja raha hai' without future date — those are CHECKOUT.\n"
         "UPDATE_CHECKIN      : correct/backdate a check-in date\n"
         "UPDATE_CHECKOUT_DATE: change/correct a checkout date\n"
         "ROOM_TRANSFER       : move/transfer tenant to a different room\n"
@@ -203,7 +204,7 @@ class ClaudeClient:
         "QUERY_VACANT_ROOMS  : vacant/empty rooms, available beds, female/male rooms\n"
         "QUERY_OCCUPANCY     : occupancy, how full, how many tenants\n"
         "ROOM_LAYOUT         : floor plan, room diagram, building layout\n"
-        "ROOM_STATUS         : who is in room X, room details\n"
+        "ROOM_STATUS         : ONLY for explicit 'who is in room X' question. For 'room X details', 'room X tenant', 'room X info' use QUERY_TENANT.\n"
         "COMPLAINT_REGISTER  : report a problem (no water, broken fan, plumbing, wifi down)\n"
         "COMPLAINT_UPDATE    : resolve/close a complaint\n"
         "QUERY_COMPLAINTS    : check complaint status, pending complaints\n"
@@ -294,6 +295,54 @@ class ClaudeClient:
         except Exception as e:
             logger.warning(f"[LLM] detect_whatsapp_intent failed: {e}")
             return {"intent": "UNKNOWN", "confidence": 0.0, "entities": {}}
+
+    # ── Conversation manager (AI brain for all non-regex cases) ────────
+
+    async def manage_conversation(
+        self,
+        message: str,
+        role: str,
+        chat_history: str = "",
+        pending_context: str = "",
+    ) -> dict:
+        """
+        AI conversation manager — handles corrections, clarifications, unknowns.
+        Returns: {action, confidence, entities, correction, reply}
+        """
+        if role in ("admin", "owner"):
+            intents_text = self._OWNER_INTENTS
+        elif role == "tenant":
+            intents_text = self._TENANT_INTENTS
+        else:
+            intents_text = self._LEAD_INTENTS
+
+        prompt = CONVERSATION_MANAGER_PROMPT.format(
+            role=role,
+            pending_context=pending_context or "No pending action.",
+            chat_history=chat_history or "No prior messages.",
+            message=message,
+            intents=intents_text,
+        )
+        try:
+            response = await self._call_haiku(prompt)
+            clean = response.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+            result = json.loads(clean)
+            result.setdefault("action", "converse")
+            result.setdefault("confidence", 0.5)
+            result.setdefault("entities", {})
+            result.setdefault("correction", None)
+            result.setdefault("reply", None)
+            self._log("manage_conversation", prompt)
+            return result
+        except Exception as e:
+            logger.warning(f"[LLM] manage_conversation failed: {e}")
+            return {
+                "action": "converse",
+                "confidence": 0.0,
+                "entities": {},
+                "correction": None,
+                "reply": "I didn't quite get that. Could you rephrase? Type *help* to see what I can do.",
+            }
 
     # ── Clarification ─────────────────────────────────────────────────────
 

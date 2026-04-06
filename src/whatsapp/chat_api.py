@@ -15,8 +15,9 @@ Flow:
 """
 from __future__ import annotations
 
+import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -25,6 +26,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import logging
+import re
 import re as _re
 
 from src.database.db_manager import get_db_session as get_session
@@ -61,7 +63,7 @@ class OutboundReply(BaseModel):
     interactive_payload: Optional[dict] = None  # set for button/list messages
 
 # Intents that are safe to pass through even at low confidence
-_LOW_CONF_PASSTHROUGH = frozenset({"HELP", "GENERAL", "UNKNOWN", "SYSTEM_HARD_UNKNOWN", "BLOCKED", "ONBOARDING", "CONFIRMATION", "COMPLAINT_REGISTER", "AMBIGUOUS"})
+_LOW_CONF_PASSTHROUGH = frozenset({"HELP", "GENERAL", "SYSTEM_HARD_UNKNOWN", "BLOCKED", "ONBOARDING", "CONFIRMATION", "COMPLAINT_REGISTER", "AMBIGUOUS", "AI_CONVERSE"})
 
 
 @router.post("/process", response_model=OutboundReply)
@@ -144,7 +146,6 @@ async def _process_message_inner(
         pending = await _get_active_pending(ctx.phone, session)
         if pending:
             # ── Mid-flow breakout detection ────────────────────────────────────
-            # Skip new_intent detection during free-text steps (notes, description)
             import json as _jbr
             _step = _jbr.loads(pending.action_data or "{}").get("step", "")
             _free_text_steps = {"ask_notes", "ask_description"}
@@ -224,6 +225,38 @@ async def _process_message_inner(
                 await _log(session, phone, message, ctx.role, original_intent, clarif_reply)
                 await session.commit()
                 return OutboundReply(reply=clarif_reply, intent=original_intent, role=ctx.role)
+
+            # ── AI correction detection: "no, name is X" → correction, not cancel ──
+            if not pending.resolved and _is_correction_message(message):
+                try:
+                    _pending_data = _jbr.loads(pending.action_data or "{}")
+                    _pending_desc = f"Pending: {pending.intent}, step: {_pending_data.get('step', 'confirm')}, data: {json.dumps({k: v for k, v in _pending_data.items() if k != 'step' and not k.startswith('_')}, default=str)[:300]}"
+                    ai = get_claude_client()
+                    conv = await ai.manage_conversation(
+                        message=message,
+                        role=ctx.role,
+                        chat_history=chat_context,
+                        pending_context=_pending_desc,
+                    )
+                    if conv.get("action") == "correct_field" and conv.get("correction"):
+                        _field = conv["correction"].get("field", "")
+                        _value = conv["correction"].get("value", "")
+                        if _field and _value:
+                            _pending_data[_field] = _value
+                            pending.action_data = json.dumps(_pending_data, default=str)
+                            await session.flush()
+                            # Re-prompt with updated data
+                            corr_reply = f"__KEEP_PENDING__Updated *{_field}* to *{_value}*. Please confirm the updated details, or correct again."
+                            await _log(session, phone, message, ctx.role, "CORRECTION", corr_reply[len("__KEEP_PENDING__"):])
+                            await session.commit()
+                            return OutboundReply(reply=corr_reply[len("__KEEP_PENDING__"):], intent="CORRECTION", role=ctx.role)
+                    if conv.get("action") == "ask_what_to_change":
+                        ask_reply = conv.get("reply") or "What would you like to change?"
+                        await _log(session, phone, message, ctx.role, "CORRECTION", ask_reply)
+                        await session.commit()
+                        return OutboundReply(reply=f"__KEEP_PENDING__{ask_reply}"[len("__KEEP_PENDING__"):], intent="CORRECTION", role=ctx.role)
+                except Exception as _corr_err:
+                    _chat_logger.warning("AI correction detection failed: %s", _corr_err)
 
             if not pending.resolved:
                 resolved_reply = await resolve_pending_action(
@@ -345,26 +378,60 @@ async def _process_message_inner(
             detected_intent="UNKNOWN",
         ))
 
-    # ── 3b. Low-confidence gate → SYSTEM_HARD_UNKNOWN ───────────────────
-    # If intent router is not confident enough, ask the user to rephrase
-    # rather than taking a potentially wrong action.
+    # ── 3b. Low-confidence / UNKNOWN → AI conversation manager ─────────
+    # Instead of dead-end "I didn't understand", use Groq to have a
+    # natural conversation that guides toward the right intent.
     if (
         intent_result.confidence < 0.70
         and intent not in _LOW_CONF_PASSTHROUGH
         and ctx.role != "lead"   # leads always get conversational handling
     ):
-        hard_reply = (
-            "I'm not quite sure what you mean. Could you rephrase?\n\n"
-            "Type *help* to see what I can do."
-        )
-        await _log(session, phone, message, ctx.role, "SYSTEM_HARD_UNKNOWN", hard_reply)
-        await session.commit()
-        return OutboundReply(
-            reply=hard_reply,
-            intent="SYSTEM_HARD_UNKNOWN",
-            role=ctx.role,
-            confidence=intent_result.confidence,
-        )
+        try:
+            ai = get_claude_client()
+            conv_result = await ai.manage_conversation(
+                message=message,
+                role=ctx.role,
+                chat_history=chat_context,
+            )
+            conv_action = str(conv_result.get("action", "converse")).upper()
+            conv_conf = float(conv_result.get("confidence", 0.5))
+            conv_entities = dict(conv_result.get("entities") or {})
+
+            # If AI found a real intent with decent confidence, route it
+            if conv_action not in ("CONVERSE", "CANCEL", "CONFIRM", "CORRECT_FIELD", "ASK_WHAT_TO_CHANGE") and conv_conf >= 0.6:
+                if "description" not in conv_entities:
+                    conv_entities["description"] = message
+                intent_result = IntentResult(intent=conv_action, confidence=conv_conf, entities=conv_entities)
+                intent = conv_action
+                _chat_logger.info("AI conversation manager routed: %s (%.2f) for %s", conv_action, conv_conf, phone)
+                # Fall through to normal routing below
+            else:
+                # AI chose to converse — return its natural reply
+                conv_reply = conv_result.get("reply") or "Could you tell me more? Type *help* to see what I can do."
+                await _save_chat_message(session, phone, "inbound", message, "UNKNOWN", ctx.role)
+                await _save_chat_message(session, phone, "outbound", conv_reply, "AI_CONVERSE", ctx.role)
+                await _log(session, phone, message, ctx.role, "AI_CONVERSE", conv_reply)
+                await session.commit()
+                return OutboundReply(
+                    reply=conv_reply,
+                    intent="AI_CONVERSE",
+                    role=ctx.role,
+                    confidence=conv_conf,
+                )
+        except Exception as e:
+            _chat_logger.warning("AI conversation manager failed: %s — using fallback", e)
+            hard_reply = (
+                "I'm not quite sure what you mean. Could you rephrase?\n\n"
+                "Type *help* to see what I can do."
+            )
+            await _log(session, phone, message, ctx.role, "SYSTEM_HARD_UNKNOWN", hard_reply)
+            await session.commit()
+            return OutboundReply(
+                reply=hard_reply,
+                intent="SYSTEM_HARD_UNKNOWN",
+                role=ctx.role,
+                confidence=intent_result.confidence,
+            )
 
     # ── 3c. Ambiguous intent — ask user to choose ────────────────────────
     if intent == "AMBIGUOUS" and ctx.role in ("admin", "owner"):
@@ -428,7 +495,9 @@ async def _process_message_inner(
     if intent in ("HELP", "MORE_MENU") and ctx.role in ("admin", "owner"):
         interactive_payload = _build_owner_interactive(intent, reply, ctx)
 
-    # ── 5. Log ────────────────────────────────────────────────────────────
+    # ── 5. Log + save chat context for AI follow-ups ────────────────────
+    await _save_chat_message(session, phone, "inbound", message, intent, ctx.role)
+    await _save_chat_message(session, phone, "outbound", reply, intent, ctx.role)
     await _log(session, phone, message, ctx.role, intent, reply)
     await session.commit()
 
@@ -580,6 +649,25 @@ _CANCEL_WORDS = frozenset({
 _GREETING_WORDS = frozenset({
     "hi", "hello", "hey", "menu", "help", "start",
 })
+
+
+def _is_correction_message(message: str) -> bool:
+    """
+    Detect if a message looks like a correction (not a simple yes/no).
+    e.g. "no name is Raj", "wrong, room should be 305", "change amount to 15000"
+    Simple "no" or "yes" returns False — let the normal handler deal with those.
+    """
+    msg = message.strip().lower()
+    # Simple yes/no — not a correction, let normal flow handle
+    if msg in ("no", "n", "yes", "y", "ok", "cancel", "stop", "abort", "confirm"):
+        return False
+    # "No" followed by more content → likely a correction
+    if re.match(r"^no[\s,]+\w", msg, re.I):
+        return True
+    # Correction keywords
+    if re.search(r"\b(wrong|incorrect|change|update|correct|actually|should be|not \w+\s+its?)\b", msg, re.I):
+        return True
+    return False
 
 
 def _detect_mid_flow_breakout(message: str, pending_intent: str, skip_new_intent: bool = False) -> Optional[str]:
