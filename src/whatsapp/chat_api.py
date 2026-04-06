@@ -144,6 +144,10 @@ async def _process_message_inner(
     # ── 2b. Check pending disambiguation (owner) or complaint follow-up (tenant) ──
     if ctx.role in ("admin", "owner", "receptionist"):
         pending = await _get_active_pending(ctx.phone, session)
+        _chat_logger.info("Pending check for %s: %s (intent=%s, resolved=%s)",
+                          phone, "FOUND" if pending else "NONE",
+                          pending.intent if pending else "-",
+                          pending.resolved if pending else "-")
         if pending:
             # ── Mid-flow breakout detection ────────────────────────────────────
             import json as _jbr
@@ -269,12 +273,17 @@ async def _process_message_inner(
                     _chat_logger.warning("AI correction detection failed: %s", _corr_err)
 
             if not pending.resolved:
+                _chat_logger.info("Calling resolve_pending_action: intent=%s, msg=%s, step=%s",
+                                  pending.intent, message[:50],
+                                  _jbr.loads(pending.action_data or "{}").get("step", "?"))
                 resolved_reply = await resolve_pending_action(
                     pending, message, session,
                     media_id=body.media_id, media_type=body.media_type, media_mime=body.media_mime,
                 )
+                _chat_logger.info("resolve_pending_action returned: %s", repr(resolved_reply[:100]) if resolved_reply else "None")
             else:
                 resolved_reply = None
+                _chat_logger.info("Pending already resolved, skipping resolve_pending_action")
             if resolved_reply:
                 # Prefix "__KEEP_PENDING__" means correction re-prompt — keep pending alive
                 if resolved_reply.startswith("__KEEP_PENDING__"):
