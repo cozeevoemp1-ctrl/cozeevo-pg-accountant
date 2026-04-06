@@ -256,10 +256,14 @@ function loadMonth() {
   document.getElementById('mainContent').style.display = 'none';
   document.getElementById('refreshBtn').textContent = '...';
 
+  var kpiUrl = '/api/dashboard/kpis?month=' + selMonth + '&year=' + selYear;
+  var duesUrl = '/api/dashboard/dues?month=' + selMonth + '&year=' + selYear;
+
   Promise.all([
-    api('/api/dashboard/kpis?month=' + selMonth + '&year=' + selYear),
-    api('/api/dashboard/dues?month=' + selMonth + '&year=' + selYear)
+    api(kpiUrl),
+    api(duesUrl)
   ]).then(function(results) {
+   try {
     var kpis = results[0];
     var dues = results[1];
 
@@ -318,6 +322,7 @@ function loadMonth() {
     };
 
     onData(data);
+   } catch(renderErr) { onError(renderErr); }
   }).catch(function(e) {
     onError(e);
   });
@@ -339,7 +344,9 @@ function onData(d) {
 }
 
 function onError(e) {
-  document.getElementById('loadingState').innerHTML = '<div style="color:#dc2626;">Failed to load: ' + (e.message || e) + '</div>';
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('loadingState').innerHTML = '<div style="color:#dc2626;padding:20px;">Failed to load: ' + (e.message || e) + '<br><br><button onclick="loadMonth()" style="padding:10px 20px;font-size:14px;cursor:pointer;">Retry</button></div>';
   document.getElementById('refreshBtn').textContent = 'Retry';
 }
 
