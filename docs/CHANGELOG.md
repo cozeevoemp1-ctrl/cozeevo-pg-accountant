@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.17.0] — 2026-04-06 — Full Data Sync + Add Tenant KYC + Dashboard
+
+### Added
+- **Add Tenant form** — 14 new KYC fields (DOB, father, address, email, occupation, emergency contact, ID proof) — all skippable with "skip all" shortcut
+- **Change Checkout Date** — new intent UPDATE_CHECKOUT_DATE with handler
+- **Lokesh receptionist** — added to authorized_users (7680814628)
+- **Apps Script dashboard web app** — Code.gs + Index.html, reads from monthly tabs
+- **Anomaly report** — 93 items uploaded to ANOMALY REPORT tab in Google Sheet
+- **Cheat sheets** — full command reference + printable workflow guide
+- **Dependency sync rule** — 13-point checklist added to CLAUDE.md
+
+### Fixed
+- **Excel column mapping** — April column (col 28) shifted Feb/March Balance/Cash/UPI by 1 position
+- **Entity extraction** — "What is the rent for chinmay" now correctly extracts name (was grabbing "What")
+- **Month extraction** — word boundary prevents "chinmay" matching month "may"
+- **Exit text pattern** — "april 3rd 7am exit" no longer parsed as balance=3
+- **TENANTS tab** — expanded to 32 columns (Notes, Food, Staff, KYC fields)
+- **April tab** — uses Excel April column (col 28) when available
+- **Overpayment analysis** — accounts for rent+deposit and Feb balance (reduced false positives from 69 to 0)
+- **Apps Script** — case-insensitive tab matching, month-on-month row expansion, error handling
+
+### Data
+- Full Excel reimport: 291 tenants, 292 tenancies, 1009 payments, 1033 rent_schedule rows
+- March verified: Cash 1,030,220 + UPI 2,667,888 — matches manual count
+- 3 Hitachi tenants fixed in DB (Sachin, Pankaj, Himanshu — rent 23,850)
+
 ## [1.16.0] — 2026-04-05 — Image-Based Check-in + Haiku Intent Fallback
 
 ### Added
