@@ -202,15 +202,20 @@ function showApp() {
 
 // Auto-login from URL token or session
 (function() {
-  var p = new URLSearchParams(location.search);
-  var t = p.get('token');
-  if (t) { TOKEN = t; sessionStorage.setItem('cz_token', t); }
-  if (TOKEN) { showApp(); }
-  // If no token env var set on server, try without token (dev mode)
-  else {
+  try {
+    var p = new URLSearchParams(location.search);
+    var t = p.get('token');
+    if (t) { TOKEN = t; sessionStorage.setItem('cz_token', t); showApp(); return; }
+    if (TOKEN) { showApp(); return; }
+    // Dev mode — try without token
     fetch('/api/dashboard/kpis').then(function(r) {
       if (r.ok) { TOKEN = ''; showApp(); }
-    }).catch(function() {});
+      // else: login screen stays visible (default)
+    }).catch(function() {
+      // Server unreachable — login screen stays visible
+    });
+  } catch(e) {
+    // Fallback — show login screen
   }
 })();
 
