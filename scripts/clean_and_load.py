@@ -61,8 +61,9 @@ def rent_status(v):
 
 CHANDRA_RE = re.compile(r'received\s+by\s+chandra', re.I)
 EXIT_PATS = [
-    re.compile(r'(?:march|feb|jan|apr)\s*\d+\s*(?:st|nd|rd|th)?\s*exit', re.I),
+    re.compile(r'(?:march|feb|jan|apr)\w*\s+\d+\s*(?:st|nd|rd|th)?\s*(?:\d+\s*(?:am|pm)\s+)?exit', re.I),
     re.compile(r'exit\s+on\s+', re.I),
+    re.compile(r'\bexit\s*$', re.I),
 ]
 
 def clean_num(raw, is_balance=False, cash_num=0, upi_num=0, rent=0):
