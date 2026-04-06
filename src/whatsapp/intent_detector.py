@@ -515,15 +515,43 @@ def _extract_entities(text: str, intent: str) -> dict:
 
     # Extract name (capitalized word not a command word)
     SKIP_WORDS = {"paid", "payment", "balance", "dues", "pending", "report",
-                  "monthly", "summary", "from", "for", "room", "rent"}
-    name_match = re.search(r"\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+)?)\b", text)
-    if name_match:
-        parts = name_match.group(1).split()
-        # Strip trailing skip words (e.g. "Jeevan Balance" -> "Jeevan")
+                  "monthly", "summary", "from", "for", "room", "rent",
+                  "what", "whats", "the", "how", "who", "when", "where",
+                  "much", "does", "did", "has", "have", "is", "was", "are",
+                  "show", "check", "get", "give", "tell", "update", "change",
+                  "set", "add", "new", "collect", "record", "log", "void",
+                  "cancel", "total", "all", "this", "that", "last", "next",
+                  "month", "year", "today", "yesterday"}
+
+    # Priority: try "for/of <Name>" pattern first (e.g. "what is the rent for Chinmay")
+    for_name = re.search(r"(?:for|of)\s+([A-Za-z]{3,}(?:\s+[A-Za-z]+)*)\s*$", text, re.I)
+    if for_name:
+        candidate = for_name.group(1).strip()
+        parts = candidate.split()
         while parts and parts[-1].lower() in SKIP_WORDS:
             parts.pop()
-        if parts and parts[0].lower() not in SKIP_WORDS:
+        while parts and parts[0].lower() in SKIP_WORDS:
+            parts.pop(0)
+        if parts:
             entities["name"] = " ".join(parts)
+
+    # Fallback: first capitalized word not in skip list
+    if "name" not in entities:
+        name_match = re.search(r"\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+)?)\b", text)
+        if name_match:
+            parts = name_match.group(1).split()
+            while parts and parts[-1].lower() in SKIP_WORDS:
+                parts.pop()
+            if parts and parts[0].lower() not in SKIP_WORDS:
+                entities["name"] = " ".join(parts)
+
+    # Fallback for QUERY_TENANT: try lowercase "name balance/dues/account" pattern
+    if "name" not in entities and intent == "QUERY_TENANT":
+        qt_match = re.search(r"\b([a-z]{3,}(?:\s+[a-z]+)*)\s+(?:balance|dues|account|status|rent|payment|history|details)\b", text, re.I)
+        if qt_match:
+            candidate = qt_match.group(1).strip()
+            if candidate.lower() not in SKIP_WORDS:
+                entities["name"] = candidate
 
     # Extract room number — handles:
     #   "room 203", "room 203-A", "bed 203", "flat G15"
@@ -543,9 +571,10 @@ def _extract_entities(text: str, intent: str) -> dict:
         entities["date"] = date_val
 
     # Extract month (fallback when no full date extracted)
+    # Use word boundary to avoid matching "may" inside "chinmay"
     if "month" not in entities:
         for abbr, num in _MONTHS.items():
-            if re.search(abbr, text, re.I):
+            if re.search(r'\b' + abbr + r'\b', text, re.I):
                 entities["month"] = num
                 break
 

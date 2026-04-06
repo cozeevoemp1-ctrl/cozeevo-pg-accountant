@@ -177,15 +177,17 @@ def read_history(excel_file=EXCEL_FILE):
             'apr_st_raw': rent_status(ws.cell(row, 28).value),  # Col 28 = April
         })
 
-    # Generate April status from tenancy status (no Excel column yet)
+    # April status: use Excel column if available, else generate from tenant status
     for t in tenants:
-        if t['status'] == 'Active':
+        raw = t.get('apr_st_raw', '')
+        if raw and raw not in ('', 'None'):
+            t['apr_st'] = raw
+        elif t['status'] == 'Active':
             t['apr_st'] = 'UNPAID'
         elif t['status'] == 'No-show':
             t['apr_st'] = 'NO SHOW'
         elif t['status'] == 'Exited':
-            # Only show EXIT in April if they didn't already exit in March
-            t['apr_st'] = '' if t.get('mar_st') == 'EXIT' else ''
+            t['apr_st'] = 'EXIT' if t.get('mar_st') != 'EXIT' else ''
         else:
             t['apr_st'] = ''
         t['apr_cash'] = 0
