@@ -3138,12 +3138,27 @@ async def resolve_pending_action(
                 category = action_data["category"]
                 dedup = hashlib.sha256(f"{phone}:{name}".encode()).hexdigest()
 
-                # Check duplicate
+                # Check duplicate by hash (exact same name + phone)
                 existing = await session.scalar(
                     select(PgContact).where(PgContact.unique_hash == dedup)
                 )
                 if existing:
                     return f"Contact *{name}* ({phone}) already exists."
+
+                # Check same-name contacts — ask replace/new/cancel
+                same_name = (await session.execute(
+                    select(PgContact).where(func.lower(PgContact.name) == name.lower())
+                )).scalars().all()
+                if same_name and not action_data.get("_name_confirmed"):
+                    lines = [f"*Contact(s) with name \"{name}\" already exist:*\n"]
+                    for i, c in enumerate(same_name, 1):
+                        lines.append(f"*{i}.* {c.name} — {c.phone} ({c.category or ''})")
+                    lines.append(f"\n*{len(same_name)+1}.* Add as NEW contact")
+                    lines.append(f"*{len(same_name)+2}.* Cancel")
+                    action_data["step"] = "resolve_duplicate"
+                    action_data["_same_name_ids"] = [c.id for c in same_name]
+                    await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+                    return "\n".join(lines)
 
                 contact = PgContact(
                     name=name,
@@ -3157,6 +3172,40 @@ async def resolve_pending_action(
                 return f"Contact saved — *{name}* ({category}) {phone}"
 
             return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
+
+        if step == "resolve_duplicate":
+            same_ids = action_data.get("_same_name_ids", [])
+            n_options = len(same_ids) + 2  # existing contacts + "Add new" + "Cancel"
+
+            if ans.rstrip(".").isdigit():
+                choice = int(ans.rstrip("."))
+                if 1 <= choice <= len(same_ids):
+                    # Replace existing contact
+                    old_contact = await session.get(PgContact, same_ids[choice - 1])
+                    if old_contact:
+                        old_contact.phone = action_data["phone"]
+                        old_contact.category = action_data["category"]
+                        old_contact.contact_for = action_data["category"]
+                        old_contact.unique_hash = hashlib.sha256(
+                            f"{action_data['phone']}:{action_data['name']}".encode()
+                        ).hexdigest()
+                        return f"Contact updated — *{old_contact.name}* ({action_data['category']}) {action_data['phone']}"
+                elif choice == len(same_ids) + 1:
+                    # Add as new
+                    action_data["_name_confirmed"] = True
+                    action_data["step"] = "confirm"
+                    await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+                    return (
+                        f"*Add as new contact?*\n\n"
+                        f"Name: {action_data['name']}\n"
+                        f"Phone: {action_data['phone']}\n"
+                        f"Category: {action_data['category']}\n\n"
+                        "Reply *Yes* to save."
+                    )
+                elif choice == n_options:
+                    return "Cancelled."
+
+            return f"__KEEP_PENDING__Reply with a number (1-{n_options})."
 
     # APPROVE_ONBOARDING is handled at the TOP of resolve_pending_action (line ~132)
 
