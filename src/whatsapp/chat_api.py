@@ -427,10 +427,14 @@ async def _process_message_inner(
             else:
                 # AI chose to converse — return its natural reply
                 conv_reply = conv_result.get("reply") or "Could you tell me more? Type *help* to see what I can do."
-                await _save_chat_message(session, phone, "inbound", message, "UNKNOWN", ctx.role)
-                await _save_chat_message(session, phone, "outbound", conv_reply, "AI_CONVERSE", ctx.role)
                 await _log(session, phone, message, ctx.role, "AI_CONVERSE", conv_reply)
                 await session.commit()
+                try:
+                    await _save_chat_message(session, phone, "inbound", message, "UNKNOWN", ctx.role)
+                    await _save_chat_message(session, phone, "outbound", conv_reply, "AI_CONVERSE", ctx.role)
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
                 return OutboundReply(
                     reply=conv_reply,
                     intent="AI_CONVERSE",
@@ -514,11 +518,17 @@ async def _process_message_inner(
     if intent in ("HELP", "MORE_MENU") and ctx.role in ("admin", "owner"):
         interactive_payload = _build_owner_interactive(intent, reply, ctx)
 
-    # ── 5. Log + save chat context for AI follow-ups ────────────────────
-    await _save_chat_message(session, phone, "inbound", message, intent, ctx.role)
-    await _save_chat_message(session, phone, "outbound", reply, intent, ctx.role)
+    # ── 5. Log ────────────────────────────────────────────────────────────
     await _log(session, phone, message, ctx.role, intent, reply)
     await session.commit()
+
+    # Save chat context AFTER main commit (so pending actions aren't lost if chat_messages table missing)
+    try:
+        await _save_chat_message(session, phone, "inbound", message, intent, ctx.role)
+        await _save_chat_message(session, phone, "outbound", reply, intent, ctx.role)
+        await session.commit()
+    except Exception:
+        await session.rollback()
 
     return OutboundReply(
         reply=reply, intent=intent, role=ctx.role,
