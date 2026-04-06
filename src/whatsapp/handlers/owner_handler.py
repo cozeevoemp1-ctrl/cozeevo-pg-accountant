@@ -5574,7 +5574,8 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
             category = cat
             break
 
-    # Extract name — remove noise words, phone number, category keywords, "add/save/contact" etc.
+    # Extract name — remove noise words, phone number, "add/save/contact" etc.
+    # Category keywords are KEPT in the name (e.g. "Mahadevapura lineman" → name is full string)
     _NOISE = {"add", "save", "store", "new", "contact", "contacts", "to", "as", "vendor", "supplier", "number", "phone"}
     words = raw.split()
     name_parts = []
@@ -5585,8 +5586,6 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
         if w_clean.lower() in _NOISE:
             continue
         if w_clean == phone:
-            continue
-        if w_clean.lower() in _CATEGORIES:
             continue
         if w_clean.isdigit():
             continue

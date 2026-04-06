@@ -243,9 +243,10 @@ async def _process_message_inner(
                         _value = conv["correction"].get("value", "")
                         if _field and _value:
                             _pending_data[_field] = _value
-                            # Re-save pending properly (creates new record, keeps it alive)
-                            from src.whatsapp.handlers._shared import _save_pending as _sp_corr
-                            await _sp_corr(phone, pending.intent, _pending_data, [], session)
+                            # Update EXISTING pending in-place (don't create new one)
+                            pending.action_data = json.dumps(_pending_data, default=str)
+                            pending.expires_at = datetime.utcnow() + timedelta(minutes=30)
+                            await session.flush()
                             # Build confirmation summary
                             _summary_parts = []
                             for _k, _v in _pending_data.items():
@@ -258,6 +259,9 @@ async def _process_message_inner(
                             return OutboundReply(reply=corr_reply, intent="CORRECTION", role=ctx.role)
                     if conv.get("action") == "ask_what_to_change":
                         ask_reply = conv.get("reply") or "What would you like to change?"
+                        # Extend pending expiry so it stays alive
+                        pending.expires_at = datetime.utcnow() + timedelta(minutes=30)
+                        await session.flush()
                         await _log(session, phone, message, ctx.role, "CORRECTION", ask_reply)
                         await session.commit()
                         return OutboundReply(reply=ask_reply, intent="CORRECTION", role=ctx.role)
