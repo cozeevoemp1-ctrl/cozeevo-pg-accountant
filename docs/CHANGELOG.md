@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.18.0] — 2026-04-06 — AI Conversation Manager
+
+### Added
+- **AI conversation manager** — Groq-powered natural conversation replaces "I didn't understand" dead-ends
+- **Correction detection** — "no, name is X" during confirm steps updates the field instead of cancelling
+- **Chat history context** — all messages saved to chat_messages, fed to Groq for multi-turn understanding
+- **CONVERSATION_MANAGER_PROMPT** — new prompt in prompts.py for corrections, clarifications, natural chat
+- **manage_conversation()** — new ClaudeClient method returns structured {action, entities, correction, reply}
+- **Stress test suite** — 194 test cases across 16 intent groups, 100% pass rate
+
+### Fixed
+- **Intent disambiguation** — precise descriptions for CHECKOUT vs NOTICE_GIVEN, QUERY_TENANT vs ROOM_STATUS, ADD_TENANT vs START_ONBOARDING, CHECKOUT vs RECORD_CHECKOUT
+- **UNKNOWN passthrough** — removed from LOW_CONF_PASSTHROUGH so all unknowns hit AI conversation manager
+- "Priya is leaving" now correctly routes to CHECKOUT (was NOTICE_GIVEN)
+- "room 203 details" now correctly routes to QUERY_TENANT (was ROOM_STATUS)
+- "register tenant Arun" now correctly routes to ADD_TENANT (was START_ONBOARDING)
+- "thats wrong start over" now correctly routes to CANCEL (was ASK_WHAT_TO_CHANGE)
+
 ## [1.17.0] — 2026-04-06 — Full Data Sync + Add Tenant KYC + Dashboard
 
 ### Added
