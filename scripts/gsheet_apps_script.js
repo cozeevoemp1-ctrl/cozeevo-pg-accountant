@@ -20,7 +20,7 @@
 
 const TOTAL_BEDS = 291;
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
-const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/;
+const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/i;
 const DROPDOWN_CELL = "E1";  // Where the month picker lives on DASHBOARD
 
 // ── TRIGGERS & MENU ─────────────────────────────────────────────────────────
@@ -52,9 +52,9 @@ function onSheetEdit(e) {
       if (cell.getA1Notation() === DROPDOWN_CELL) {
         refreshDashboardContent_();
       }
-    } else if (MONTH_TAB_RE.test(name)) {
+    } else if (MONTH_TAB_RE.test(name.toUpperCase())) {
       updateMonthSummary(sheet);
-      refreshDashboard();
+      refreshDashboardContent_();
     } else if (name === "TENANTS") {
       refreshDashboard();
     }
@@ -75,7 +75,8 @@ function getMonthTabs_() {
   ss.getSheets().forEach(s => {
     if (MONTH_TAB_RE.test(s.getName())) {
       const p = s.getName().split(" ");
-      tabs.push({ name: s.getName(), sheet: s, sort: parseInt(p[1]) * 100 + MONTH_NAMES.indexOf(p[0]) });
+      const monthUpper = p[0].toUpperCase();
+      tabs.push({ name: s.getName(), sheet: s, sort: parseInt(p[1]) * 100 + MONTH_NAMES.indexOf(monthUpper) });
     }
   });
   tabs.sort((a, b) => a.sort - b.sort);
@@ -194,8 +195,8 @@ function refreshDashboard() {
     .setFontSize(14).setFontWeight("bold").setFontColor("#FFFFFF").setBackground("#1565C0")
     .setHorizontalAlignment("center");
 
-  // Column widths
-  [200, 150, 30, 200, 150].forEach((w, i) => dash.setColumnWidth(i + 1, w));
+  // Column widths — A:200, B:150, C:100, D:200, E:150
+  [200, 150, 100, 200, 150].forEach((w, i) => dash.setColumnWidth(i + 1, w));
 
   // Now draw the content
   refreshDashboardContent_();
@@ -211,7 +212,7 @@ function refreshDashboardContent_() {
 
   // Read selected month from dropdown
   const selected = String(dash.getRange(DROPDOWN_CELL).getValue()).trim();
-  const tab = tabs.find(t => t.name === selected) || tabs[tabs.length - 1];
+  const tab = tabs.find(t => t.name.toUpperCase() === selected.toUpperCase()) || tabs[tabs.length - 1];
   const d = readMonthData(tab.sheet);
   const collected = d.cash + d.upi;
   const vacant = TOTAL_BEDS - d.beds - d.noshow;
@@ -220,7 +221,13 @@ function refreshDashboardContent_() {
 
   // Clear content below row 1 (keep title + dropdown)
   if (dash.getMaxRows() > 1) {
-    dash.getRange(2, 1, dash.getMaxRows() - 1, 5).clear();
+    dash.getRange(2, 1, dash.getMaxRows() - 1, 8).clear();
+  }
+
+  // Ensure enough rows for all content (occupancy + collections + THOR + month-on-month)
+  const neededRows = 30 + tabs.length;
+  if (dash.getMaxRows() < neededRows) {
+    dash.insertRowsAfter(dash.getMaxRows(), neededRows - dash.getMaxRows());
   }
 
   let r = 3;  // Start after title row + blank row
@@ -285,6 +292,7 @@ function refreshDashboardContent_() {
     ["Beds", d.thorBeds, "", d.hulkBeds, ""],
     ["Tenants", d.thorTenants, "", d.hulkTenants, ""],
     ["Collected", thorColl, "", hulkColl, ""],
+    ["Rent Expected", d.thorRent, "", d.hulkRent, ""],
   ];
   dash.getRange(r, 1, thData.length, 5).setValues(thData);
   dash.getRange(r, 2, thData.length, 1).setNumberFormat("#,##0").setFontWeight("bold").setHorizontalAlignment("right");
@@ -303,18 +311,26 @@ function refreshDashboardContent_() {
   r++;
   const momRows = [];
   tabs.forEach(t => {
-    const md = readMonthData(t.sheet);
-    const mc = md.cash + md.upi;
-    const paidPct = md.rentExpected > 0 ? Math.round(mc / md.rentExpected * 100) + "%" : "—";
-    momRows.push([t.name, md.beds, mc, md.balance, paidPct]);
+    try {
+      const md = readMonthData(t.sheet);
+      const mc = md.cash + md.upi;
+      const paidPct = md.rentExpected > 0 ? Math.round(mc / md.rentExpected * 100) + "%" : "—";
+      momRows.push([t.name, md.beds, mc, md.balance, paidPct]);
+    } catch (err) {
+      momRows.push([t.name, "ERR", 0, 0, "—"]);
+    }
   });
   if (momRows.length > 0) {
     dash.getRange(r, 1, momRows.length, 5).setValues(momRows);
-    dash.getRange(r, 2, momRows.length, 4).setNumberFormat("#,##0").setHorizontalAlignment("right");
+    dash.getRange(r, 3, momRows.length, 2).setNumberFormat("#,##0");
+    dash.getRange(r, 2, momRows.length, 4).setHorizontalAlignment("right");
     for (let i = 0; i < momRows.length; i++) {
       const bg = (momRows[i][0] === tab.name) ? "#BBDEFB" : (i % 2 === 0 ? "#FFFFFF" : sectBg);
       dash.getRange(r + i, 1, 1, 5).setBackground(bg);
     }
+  } else {
+    dash.getRange(r, 1).setValue("No monthly tabs found").setFontColor("#999999");
+    r++;
   }
   r += momRows.length + 1;
 

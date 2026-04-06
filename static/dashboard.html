@@ -2,726 +2,594 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Cozeevo — Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Cozeevo Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-  :root {
-    --bg: #f8fafc;
-    --white: #fff;
-    --border: #e2e8f0;
-    --text: #1e293b;
-    --sub: #64748b;
-    --muted: #94a3b8;
-    --blue: #2563eb;
-    --blue-bg: #eff6ff;
-    --green: #16a34a;
-    --green-bg: #f0fdf4;
-    --red: #dc2626;
-    --red-bg: #fef2f2;
-    --amber: #d97706;
-    --amber-bg: #fffbeb;
-    --thor: #7c3aed;
-    --hulk: #059669;
-    --tab-h: 58px;
-    --header-h: 108px;
-  }
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;overflow:hidden;}
-  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+:root {
+  --bg: #f4f6fa;
+  --white: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --sub: #64748b;
+  --muted: #94a3b8;
+  --blue: #2563eb;
+  --blue-bg: #eff6ff;
+  --green: #16a34a;
+  --green-bg: #f0fdf4;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --thor: #7c3aed;
+  --thor-bg: #f5f3ff;
+  --hulk: #059669;
+  --hulk-bg: #ecfdf5;
+  --card-r: 14px;
+  --tab-h: 60px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
 
-  /* ── Login ───────────────────────────────────────────────────────────────── */
-  #login-screen{position:fixed;inset:0;background:var(--white);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
-  .login-logo{font-size:28px;font-weight:800;letter-spacing:-.5px;color:var(--text);}
-  .login-sub{font-size:13px;color:var(--sub);margin-top:4px;}
-  .login-box{margin-top:40px;width:100%;max-width:320px;}
-  .login-label{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
-  .login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;font-family:'Inter',sans-serif;outline:none;transition:.15s;}
-  .login-input:focus{border-color:var(--blue);}
-  .login-btn{width:100%;margin-top:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
-  .login-err{font-size:12px;color:var(--red);margin-top:8px;text-align:center;min-height:16px;}
+/* ── Login ─────────────────────────────────────── */
+#login-screen{position:fixed;inset:0;background:var(--white);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+#login-screen.hidden{display:none;}
+.login-logo{font-size:28px;font-weight:800;letter-spacing:-.5px;color:var(--text);}
+.login-sub{font-size:13px;color:var(--sub);margin-top:4px;}
+.login-box{margin-top:40px;width:100%;max-width:320px;}
+.login-label{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
+.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;font-family:'Inter',sans-serif;outline:none;transition:.15s;}
+.login-input:focus{border-color:var(--blue);}
+.login-btn{width:100%;margin-top:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
+.login-err{font-size:12px;color:var(--red);margin-top:8px;text-align:center;min-height:16px;}
 
-  /* ── App shell ───────────────────────────────────────────────────────────── */
-  #app{display:none;flex-direction:column;height:100%;}
-  #app.visible{display:flex;}
+/* ── App shell ─────────────────────────────────── */
+#app{display:none;flex-direction:column;height:100%;}
+#app.visible{display:flex;}
 
-  /* ── Header ─────────────────────────────────────────────────────────────── */
-  .header{background:var(--white);border-bottom:1px solid var(--border);padding:44px 14px 0;flex-shrink:0;}
-  .header-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;}
-  .brand{display:flex;flex-direction:column;}
-  .brand-name{font-size:17px;font-weight:800;letter-spacing:-.3px;}
-  .brand-sub{font-size:11px;color:var(--sub);margin-top:1px;}
-  .header-right{display:flex;align-items:center;gap:8px;}
-  .month-sel{font-size:12px;border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);background:var(--bg);font-family:'Inter',sans-serif;max-width:130px;}
-  .refresh-btn{background:var(--blue);color:#fff;border:none;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;font-family:'Inter',sans-serif;cursor:pointer;display:flex;align-items:center;gap:4px;}
-  .refresh-btn.spinning svg{animation:spin .7s linear infinite;}
-  @keyframes spin{to{transform:rotate(360deg);}}
+/* ── Header ────────────────────────────────────── */
+.header{background:var(--white);padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.brand{font-size:18px;font-weight:800;letter-spacing:-.3px;}
+.header-actions{display:flex;gap:8px;align-items:center;}
+.btn-icon{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--sub);}
+.btn-icon:active{background:var(--bg);}
+.month-select{border:1.5px solid var(--border);border-radius:10px;padding:7px 12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--text);background:var(--white);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
 
-  /* ── Property tabs ───────────────────────────────────────────────────────── */
-  .prop-tabs{display:flex;}
-  .prop-tab{flex:1;text-align:center;padding:9px 6px;font-size:13px;font-weight:600;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;transition:.15s;}
-  .prop-tab[data-prop="all"].sel{color:var(--blue);border-color:var(--blue);}
-  .prop-tab[data-prop="thor"].sel{color:var(--thor);border-color:var(--thor);}
-  .prop-tab[data-prop="hulk"].sel{color:var(--hulk);border-color:var(--hulk);}
+/* ── Tabs (bottom nav) ─────────────────────────── */
+.bottom-tabs{display:flex;height:var(--tab-h);background:var(--white);border-top:1px solid var(--border);flex-shrink:0;}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--muted);transition:.15s;}
+.tab-btn.active{color:var(--blue);}
+.tab-btn svg{width:22px;height:22px;}
 
-  /* ── Scroll area ─────────────────────────────────────────────────────────── */
-  .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--tab-h) + 8px);}
+/* ── Scroll area ───────────────────────────────── */
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 20px;}
 
-  /* ── KPI grid ────────────────────────────────────────────────────────────── */
-  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 12px 4px;}
-  .kpi{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:12px;}
-  .kpi-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
-  .kpi-val{font-size:22px;font-weight:800;line-height:1;}
-  .kpi-delta{font-size:11px;color:var(--muted);margin-top:4px;}
-  .kpi-delta.up{color:var(--green);}
-  .kpi-delta.dn{color:var(--red);}
+/* ── Pages ─────────────────────────────────────── */
+.page{display:none;}
+.page.active{display:block;}
 
-  /* ── Property comparison ─────────────────────────────────────────────────── */
-  .prop-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 12px 0;}
-  .prop-card{border-radius:12px;padding:12px;}
-  .prop-card.thor{background:linear-gradient(135deg,#ede9fe,#ddd6fe);border:1px solid #c4b5fd;}
-  .prop-card.hulk{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border:1px solid #6ee7b7;}
-  .pc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-  .pc-name{font-size:12px;font-weight:700;}
-  .pc-name.thor{color:var(--thor);}
-  .pc-name.hulk{color:var(--hulk);}
-  .pc-badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;color:#fff;}
-  .pc-badge.thor{background:var(--thor);}
-  .pc-badge.hulk{background:var(--hulk);}
-  .pc-stat{display:flex;justify-content:space-between;margin-top:4px;}
-  .pc-key{font-size:11px;color:var(--sub);}
-  .pc-val{font-size:12px;font-weight:700;}
+/* ── Cards ─────────────────────────────────────── */
+.card{background:var(--white);border-radius:var(--card-r);padding:16px;margin-bottom:12px;border:1px solid var(--border);}
+.card-title{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px;}
 
-  /* ── View switcher ───────────────────────────────────────────────────────── */
-  .view-switcher{display:flex;gap:6px;padding:12px 12px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
-  .view-switcher::-webkit-scrollbar{display:none;}
-  .view-btn{font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px solid var(--border);color:var(--sub);background:var(--white);cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Inter',sans-serif;}
-  .view-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+/* ── KPI grid ──────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.kpi-card{background:var(--white);border-radius:var(--card-r);padding:14px;border:1px solid var(--border);}
+.kpi-label{font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;}
+.kpi-value{font-size:24px;font-weight:800;margin-top:4px;letter-spacing:-.5px;}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.kpi-blue .kpi-value{color:var(--blue);}
+.kpi-green .kpi-value{color:var(--green);}
+.kpi-red .kpi-value{color:var(--red);}
+.kpi-amber .kpi-value{color:var(--amber);}
 
-  /* ── View panels ─────────────────────────────────────────────────────────── */
-  .view-panel{display:none;padding:0 12px;}
-  .view-panel.active{display:block;}
+/* ── Property cards ────────────────────────────── */
+.prop-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.prop-card{border-radius:var(--card-r);padding:14px;border:1px solid var(--border);}
+.prop-card.thor{background:var(--thor-bg);border-color:#ddd6fe;}
+.prop-card.hulk{background:var(--hulk-bg);border-color:#a7f3d0;}
+.prop-name{font-size:13px;font-weight:700;margin-bottom:6px;}
+.prop-card.thor .prop-name{color:var(--thor);}
+.prop-card.hulk .prop-name{color:var(--hulk);}
+.prop-stat{font-size:22px;font-weight:800;letter-spacing:-.5px;}
+.prop-card.thor .prop-stat{color:var(--thor);}
+.prop-card.hulk .prop-stat{color:var(--hulk);}
+.prop-detail{font-size:11px;color:var(--sub);margin-top:2px;}
+.prop-bar{height:6px;border-radius:3px;background:#e2e8f0;margin-top:8px;overflow:hidden;}
+.prop-bar-fill{height:100%;border-radius:3px;transition:width .4s ease;}
+.prop-card.thor .prop-bar-fill{background:var(--thor);}
+.prop-card.hulk .prop-bar-fill{background:var(--hulk);}
 
-  /* ── Cards ───────────────────────────────────────────────────────────────── */
-  .card{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px;}
-  .card-header{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-  .card-title{font-size:13px;font-weight:600;}
-  .badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;}
-  .badge-red{background:var(--red-bg);color:var(--red);}
-  .badge-green{background:var(--green-bg);color:var(--green);}
-  .badge-amber{background:var(--amber-bg);color:var(--amber);}
-  .badge-blue{background:var(--blue-bg);color:var(--blue);}
-  .badge-muted{background:#f1f5f9;color:var(--sub);}
+/* ── Glance row ────────────────────────────────── */
+.glance-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
+.glance-item{background:var(--white);border-radius:var(--card-r);padding:12px;border:1px solid var(--border);text-align:center;}
+.glance-val{font-size:16px;font-weight:700;}
+.glance-label{font-size:10px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-top:2px;}
 
-  /* ── Tables ──────────────────────────────────────────────────────────────── */
-  table{width:100%;border-collapse:collapse;}
-  th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left;padding:8px 12px;background:#f8fafc;border-bottom:1px solid var(--border);}
-  td{font-size:12px;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
-  tr:last-child td{border:none;}
-  .td-primary{font-weight:600;color:var(--text);}
-  .td-secondary{font-size:11px;color:var(--sub);margin-top:1px;}
-  .td-right{text-align:right;}
-  .td-num{font-weight:700;}
-  .status-pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;}
-  .pill-red{background:var(--red-bg);color:var(--red);}
-  .pill-green{background:var(--green-bg);color:var(--green);}
-  .pill-amber{background:var(--amber-bg);color:var(--amber);}
-  .pill-blue{background:var(--blue-bg);color:var(--blue);}
-  .pill-muted{background:#f1f5f9;color:var(--sub);}
-  .empty-state{text-align:center;padding:32px 16px;color:var(--muted);font-size:13px;}
+/* ── Tables ────────────────────────────────────── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;padding:8px 6px;border-bottom:2px solid var(--border);}
+.tbl td{padding:10px 6px;border-bottom:1px solid var(--border);}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl .amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+.tbl th.amt{text-align:right;}
 
-  /* ── Chart container ─────────────────────────────────────────────────────── */
-  .chart-wrap{padding:14px;position:relative;}
-  .chart-wrap canvas{max-height:180px;}
-  .chart-title{font-size:12px;font-weight:600;color:var(--sub);margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;}
+/* ── Filter pills ──────────────────────────────── */
+.filter-pills{display:flex;gap:6px;margin-bottom:12px;}
+.pill{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--white);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;}
+.pill.active{background:var(--blue);color:#fff;border-color:var(--blue);}
 
-  /* ── P&L summary ─────────────────────────────────────────────────────────── */
-  .pnl-rows{padding:4px 0;}
-  .pnl-row{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border);}
-  .pnl-row:last-child{border:none;}
-  .pnl-key{font-size:13px;color:var(--sub);}
-  .pnl-val{font-size:14px;font-weight:700;}
-  .pnl-row.total{background:#f8fafc;}
-  .pnl-row.total .pnl-key{color:var(--text);font-weight:600;}
+/* ── Chart container ───────────────────────────── */
+.chart-wrap{position:relative;height:240px;margin:8px 0;}
 
-  /* ── Pagination ──────────────────────────────────────────────────────────── */
-  .pager{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--border);font-size:12px;color:var(--sub);}
-  .pager-btn{border:1px solid var(--border);background:var(--white);color:var(--text);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;}
-  .pager-btn:disabled{opacity:.4;cursor:default;}
+/* ── Skeleton ──────────────────────────────────── */
+.skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-line{height:14px;margin-bottom:8px;border-radius:6px;}
+.skel-box{height:80px;border-radius:var(--card-r);margin-bottom:10px;}
 
-  /* ── Bottom tabs ─────────────────────────────────────────────────────────── */
-  .tab-bar{position:fixed;bottom:0;left:0;right:0;height:var(--tab-h);background:var(--white);border-top:1px solid var(--border);display:flex;z-index:50;}
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:500;}
-  .tab.active{color:var(--blue);}
-  .tab svg{width:20px;height:20px;}
+/* ── Error ─────────────────────────────────────── */
+.error-msg{background:var(--red-bg);color:var(--red);border-radius:10px;padding:14px;text-align:center;font-size:13px;font-weight:500;}
 
-  /* ── Loading skeleton ────────────────────────────────────────────────────── */
-  .skel{background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:6px;color:transparent;}
-  @keyframes shimmer{to{background-position:-200% 0;}}
+/* ── Expense table colors ──────────────────────── */
+.cat-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;}
 
-  /* desktop ≥ 640px */
-  @media(min-width:640px){
-    .header{padding-top:16px;}
-    .kpi-grid{grid-template-columns:repeat(4,1fr);}
-    .prop-compare{grid-template-columns:1fr 1fr;}
-  }
+/* ── Scrollbar ─────────────────────────────────── */
+.scroll-area::-webkit-scrollbar{width:4px;}
+.scroll-area::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}
+
+/* ── Desktop ───────────────────────────────────── */
+@media(min-width:640px){
+  .scroll-area{padding:16px 24px 24px;}
+  .kpi-grid{grid-template-columns:repeat(3,1fr);}
+  .glance-row{grid-template-columns:repeat(3,1fr);}
+}
+@media(min-width:1024px){
+  .kpi-grid{grid-template-columns:repeat(6,1fr);}
+}
 </style>
 </head>
 <body>
 
-<!-- ── Login screen ─────────────────────────────────────────────────────────── -->
+<!-- ═══════════════════ LOGIN ═══════════════════ -->
 <div id="login-screen">
   <div class="login-logo">Cozeevo</div>
   <div class="login-sub">Operations Dashboard</div>
   <div class="login-box">
-    <div class="login-label">Access token</div>
-    <input id="pin-input" class="login-input" type="password" placeholder="Enter dashboard token" autocomplete="current-password"/>
-    <button class="login-btn" onclick="tryLogin()">Open Dashboard</button>
+    <div class="login-label">Access Token</div>
+    <input id="token-input" class="login-input" type="password" placeholder="Paste your token"/>
+    <button id="login-btn" class="login-btn" onclick="doLogin()">Enter</button>
     <div id="login-err" class="login-err"></div>
   </div>
 </div>
 
-<!-- ── App ──────────────────────────────────────────────────────────────────── -->
+<!-- ═══════════════════ APP ═══════════════════ -->
 <div id="app">
-
   <!-- Header -->
   <div class="header">
     <div class="header-top">
-      <div class="brand">
-        <div class="brand-name">Cozeevo Co-living</div>
-        <div class="brand-sub" id="dateLabel">—</div>
+      <div class="brand">Cozeevo</div>
+      <div class="header-actions">
+        <select id="month-picker" class="month-select" onchange="onMonthChange()"></select>
+        <button class="btn-icon" onclick="refreshAll()" title="Refresh">&#x21bb;</button>
       </div>
-      <div class="header-right">
-        <select id="monthSel" class="month-sel" onchange="onMonthChange()"></select>
-        <button class="refresh-btn" id="refreshBtn" onclick="refreshAll()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Refresh
-        </button>
-      </div>
-    </div>
-    <!-- Property tabs -->
-    <div class="prop-tabs">
-      <div class="prop-tab sel" data-prop="all" onclick="setProp('all',this)">All</div>
-      <div class="prop-tab" data-prop="thor" onclick="setProp('thor',this)">THOR</div>
-      <div class="prop-tab" data-prop="hulk" onclick="setProp('hulk',this)">HULK</div>
     </div>
   </div>
 
   <!-- Scroll area -->
   <div class="scroll-area">
+    <!-- OVERVIEW page -->
+    <div id="page-overview" class="page active">
+      <div id="kpi-section"></div>
+      <div id="prop-section"></div>
+      <div id="glance-section"></div>
+    </div>
 
-    <!-- KPI grid -->
-    <div class="kpi-grid">
-      <div class="kpi">
-        <div class="kpi-label">Occupancy</div>
-        <div class="kpi-val" id="kOcc" style="color:var(--blue)">—</div>
-        <div class="kpi-delta" id="kOccSub">beds</div>
+    <!-- DUES page -->
+    <div id="page-dues" class="page">
+      <div class="filter-pills" id="dues-filters">
+        <button class="pill active" data-filter="all" onclick="filterDues('all',this)">All</button>
+        <button class="pill" data-filter="thor" onclick="filterDues('thor',this)">THOR</button>
+        <button class="pill" data-filter="hulk" onclick="filterDues('hulk',this)">HULK</button>
       </div>
-      <div class="kpi">
-        <div class="kpi-label">Net Profit</div>
-        <div class="kpi-val" id="kNet">—</div>
-        <div class="kpi-delta" id="kNetSub">this month</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Revenue</div>
-        <div class="kpi-val" id="kRev" style="color:var(--green)">—</div>
-        <div class="kpi-delta" id="kRevSub">collected</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Dues</div>
-        <div class="kpi-val" id="kDues" style="color:var(--amber)">—</div>
-        <div class="kpi-delta" id="kDuesSub">outstanding</div>
+      <div class="card" id="dues-card">
+        <div id="dues-content"></div>
       </div>
     </div>
 
-    <!-- Property cards -->
-    <div class="prop-compare" id="propCompare">
-      <div class="prop-card thor">
-        <div class="pc-header"><div class="pc-name thor">THOR</div><div class="pc-badge thor" id="pcThorOcc">—%</div></div>
-        <div class="pc-stat"><div class="pc-key">Beds</div><div class="pc-val" id="pcThorBeds">—</div></div>
-        <div class="pc-stat"><div class="pc-key">Revenue</div><div class="pc-val" id="pcThorRev">—</div></div>
-      </div>
-      <div class="prop-card hulk">
-        <div class="pc-header"><div class="pc-name hulk">HULK</div><div class="pc-badge hulk" id="pcHulkOcc">—%</div></div>
-        <div class="pc-stat"><div class="pc-key">Beds</div><div class="pc-val" id="pcHulkBeds">—</div></div>
-        <div class="pc-stat"><div class="pc-key">Revenue</div><div class="pc-val" id="pcHulkRev">—</div></div>
-      </div>
-    </div>
-
-    <!-- View switcher -->
-    <div class="view-switcher">
-      <button class="view-btn active" onclick="setView('dues',this)">Dues</button>
-      <button class="view-btn" onclick="setView('pnl',this)">P&amp;L</button>
-      <button class="view-btn" onclick="setView('expenses',this)">Expenses</button>
-      <button class="view-btn" onclick="setView('transactions',this)">Transactions</button>
-      <button class="view-btn" onclick="setView('deposits',this)">Deposits</button>
-    </div>
-
-    <!-- ── DUES VIEW ─────────────────────────────────────────────────────────── -->
-    <div id="view-dues" class="view-panel active">
+    <!-- P&L page -->
+    <div id="page-pnl" class="page">
       <div class="card">
-        <div class="card-header">
-          <div class="card-title">Outstanding Dues</div>
-          <div class="badge badge-red" id="duesBadge">—</div>
-        </div>
-        <table>
-          <thead><tr><th>Tenant</th><th>Room</th><th class="td-right">Amount</th><th class="td-right">Months</th></tr></thead>
-          <tbody id="duesBody"></tbody>
-        </table>
-        <div id="duesEmpty" class="empty-state" style="display:none">All dues cleared</div>
+        <div class="card-title">Income vs Expense (6 months)</div>
+        <div class="chart-wrap"><canvas id="pnl-chart"></canvas></div>
       </div>
     </div>
 
-    <!-- ── P&L VIEW ──────────────────────────────────────────────────────────── -->
-    <div id="view-pnl" class="view-panel">
+    <!-- EXPENSES page -->
+    <div id="page-expenses" class="page">
       <div class="card">
-        <div class="card-header"><div class="card-title">Income vs Expenses</div><div class="badge badge-muted">6 months</div></div>
-        <div class="chart-wrap">
-          <canvas id="pnlChart"></canvas>
-        </div>
+        <div class="card-title">Expense Breakdown</div>
+        <div class="chart-wrap"><canvas id="expense-chart"></canvas></div>
       </div>
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">P&amp;L — <span id="pnlMonthLabel">—</span></div>
-          <div class="badge badge-green" id="pnlNetBadge">—</div>
-        </div>
-        <div class="pnl-rows" id="pnlRows"></div>
+      <div class="card" id="expense-table-card">
+        <div id="expense-table-content"></div>
       </div>
     </div>
-
-    <!-- ── EXPENSES VIEW ─────────────────────────────────────────────────────── -->
-    <div id="view-expenses" class="view-panel">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Expense Breakdown</div><div class="badge badge-muted" id="expMonthLabel">—</div></div>
-        <div class="chart-wrap">
-          <canvas id="donutChart"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <table>
-          <thead><tr><th>Category</th><th class="td-right">Amount</th><th class="td-right">Share</th></tr></thead>
-          <tbody id="expBody"></tbody>
-        </table>
-        <div id="expEmpty" class="empty-state" style="display:none">No expense data</div>
-      </div>
-    </div>
-
-    <!-- ── TRANSACTIONS VIEW ─────────────────────────────────────────────────── -->
-    <div id="view-transactions" class="view-panel">
-      <!-- Filters -->
-      <div class="card" style="padding:12px;margin-bottom:8px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-          <div style="flex:1;min-width:100px;">
-            <div style="font-size:10px;color:var(--sub);margin-bottom:4px;font-weight:600;">FROM</div>
-            <input type="date" id="txnFrom" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif;"/>
-          </div>
-          <div style="flex:1;min-width:100px;">
-            <div style="font-size:10px;color:var(--sub);margin-bottom:4px;font-weight:600;">TO</div>
-            <input type="date" id="txnTo" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif;"/>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--sub);margin-bottom:4px;font-weight:600;">TYPE</div>
-            <select id="txnType" style="border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif;">
-              <option value="">All</option>
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
-            </select>
-          </div>
-          <button onclick="loadTxn(1)" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">Filter</button>
-        </div>
-      </div>
-      <div class="card">
-        <table>
-          <thead><tr><th>Date</th><th>Description</th><th class="td-right">Amount</th></tr></thead>
-          <tbody id="txnBody"></tbody>
-        </table>
-        <div id="txnEmpty" class="empty-state" style="display:none">No transactions</div>
-        <div class="pager">
-          <span id="txnCount" style="font-size:11px;"></span>
-          <div style="display:flex;gap:6px;">
-            <button class="pager-btn" id="txnPrev" onclick="loadTxn(txnPage-1)">Prev</button>
-            <button class="pager-btn" id="txnNext" onclick="loadTxn(txnPage+1)">Next</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── DEPOSITS VIEW ─────────────────────────────────────────────────────── -->
-    <div id="view-deposits" class="view-panel">
-      <div class="card">
-        <div class="card-header"><div class="card-title">Deposit Matching</div><div class="badge badge-muted">Last 90 days</div></div>
-        <table>
-          <thead><tr><th>Tenant</th><th>Room</th><th class="td-right">Deposit</th><th class="td-right">Status</th></tr></thead>
-          <tbody id="depositBody"></tbody>
-        </table>
-        <div id="depositEmpty" class="empty-state" style="display:none">No recent tenancies</div>
-      </div>
-    </div>
-
-  </div><!-- end scroll-area -->
-
-</div><!-- end app -->
-
-<!-- Bottom tab bar -->
-<div class="tab-bar" id="tabBar" style="display:none;">
-  <div class="tab active" onclick="tabClick(0,'dues',this)">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-    Dues
   </div>
-  <div class="tab" onclick="tabClick(1,'pnl',this)">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-    P&amp;L
-  </div>
-  <div class="tab" onclick="tabClick(2,'expenses',this)">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2"/></svg>
-    Expenses
-  </div>
-  <div class="tab" onclick="tabClick(3,'transactions',this)">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-    Txns
-  </div>
-  <div class="tab" onclick="tabClick(4,'deposits',this)">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    Deposits
+
+  <!-- Bottom tabs -->
+  <div class="bottom-tabs">
+    <button class="tab-btn active" onclick="switchTab('overview',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </button>
+    <button class="tab-btn" onclick="switchTab('dues',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Dues
+    </button>
+    <button class="tab-btn" onclick="switchTab('pnl',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 5-10"/></svg>
+      P&amp;L
+    </button>
+    <button class="tab-btn" onclick="switchTab('expenses',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 015.7 15.7"/><path d="M12 3v9h9"/></svg>
+      Expenses
+    </button>
   </div>
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────
-let TOKEN = sessionStorage.getItem('cz_token') || '';
-let selMonth, selYear, selProp = 'all';
-let pnlChart = null, donutChart = null;
-let txnPage = 1, txnTotal = 0;
-let loadedViews = new Set();
+/* ═══════════════════ STATE ═══════════════════ */
+let TOKEN = '';
+let MONTH, YEAR;
+let duesData = [];
+let pnlChart = null, expenseChart = null;
 
-// ── Formatters ─────────────────────────────────────────────────────────────
-const fmtL  = n => n == null ? '—' : Math.abs(n) >= 100000 ? `₹${(n/100000).toFixed(1)}L` : Math.abs(n) >= 1000 ? `₹${Math.round(n/1000)}K` : `₹${Math.round(n).toLocaleString('en-IN')}`;
-const fmtFull = n => n == null ? '—' : `₹${Math.round(n).toLocaleString('en-IN')}`;
-const sign = n => n >= 0 ? '+' : '';
+const EXPENSE_COLORS = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#4f46e5','#ca8a04','#0d9488','#9333ea','#e11d48'];
 
-// ── Login ──────────────────────────────────────────────────────────────────
-async function tryLogin() {
-  const val = document.getElementById('pin-input').value.trim();
-  if (!val) { document.getElementById('login-err').textContent = 'Enter the dashboard token.'; return; }
-  // Verify by hitting kpis endpoint
-  try {
-    const r = await fetch(`/api/dashboard/kpis?token=${encodeURIComponent(val)}`);
-    if (r.status === 403) { document.getElementById('login-err').textContent = 'Invalid token. Try again.'; return; }
-    TOKEN = val;
-    sessionStorage.setItem('cz_token', val);
-    showApp();
-  } catch(e) {
-    document.getElementById('login-err').textContent = 'Could not reach server.';
+/* ═══════════════════ UTILS ═══════════════════ */
+function fmt(n) {
+  if (n == null) return '--';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 100000) return sign + '\u20B9' + (abs / 100000).toFixed(1).replace(/\.0$/, '') + 'L';
+  if (abs >= 1000) return sign + '\u20B9' + (abs / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return sign + '\u20B9' + abs.toLocaleString('en-IN');
+}
+
+function pct(n) {
+  if (n == null) return '--';
+  return Math.round(n) + '%';
+}
+
+function skelBoxes(count) {
+  return Array(count).fill('<div class="skeleton skel-box"></div>').join('');
+}
+
+function apiUrl(path, params) {
+  const base = '/api/dashboard/' + path;
+  const p = new URLSearchParams(params || {});
+  if (TOKEN) p.set('token', TOKEN);
+  const qs = p.toString();
+  return qs ? base + '?' + qs : base;
+}
+
+async function apiFetch(path, params) {
+  const res = await fetch(apiUrl(path, params));
+  if (!res.ok) throw new Error('API error ' + res.status);
+  return res.json();
+}
+
+/* ═══════════════════ AUTH ═══════════════════ */
+function doLogin() {
+  const val = document.getElementById('token-input').value.trim();
+  if (!val) { document.getElementById('login-err').textContent = 'Token required'; return; }
+  TOKEN = val;
+  sessionStorage.setItem('dashboard_token', val);
+  enterApp();
+}
+
+function checkAuth() {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('token');
+  const stored = sessionStorage.getItem('dashboard_token');
+  if (urlToken) {
+    TOKEN = urlToken;
+    sessionStorage.setItem('dashboard_token', urlToken);
+    enterApp();
+  } else if (stored) {
+    TOKEN = stored;
+    enterApp();
+  } else {
+    // Try dev mode (no token)
+    fetch('/api/dashboard/kpis?month=1&year=2026').then(r => {
+      if (r.ok) { TOKEN = ''; enterApp(); }
+    }).catch(() => {});
   }
 }
-document.getElementById('pin-input').addEventListener('keydown', e => { if(e.key==='Enter') tryLogin(); });
 
-function showApp() {
-  document.getElementById('login-screen').style.display = 'none';
+function enterApp() {
+  document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.add('visible');
-  document.getElementById('tabBar').style.display = 'flex';
-  init();
-}
-
-// ── Token from URL (WhatsApp magic link) ──────────────────────────────────
-(function() {
-  const p = new URLSearchParams(location.search);
-  const t = p.get('token');
-  if (t) { TOKEN = t; sessionStorage.setItem('cz_token', t); showApp(); }
-  else if (TOKEN) { showApp(); }
-})();
-
-// ── API ────────────────────────────────────────────────────────────────────
-async function api(path, extra='') {
-  const sep = path.includes('?') ? '&' : '?';
-  const r = await fetch(`${path}${sep}token=${encodeURIComponent(TOKEN)}${extra}`);
-  if (r.status === 403) { sessionStorage.removeItem('cz_token'); location.reload(); }
-  if (!r.ok) throw new Error(`${r.status}`);
-  return r.json();
-}
-
-// ── Month picker ───────────────────────────────────────────────────────────
-function buildMonths() {
-  const sel = document.getElementById('monthSel');
-  const now = new Date();
-  for (let i = 0; i < 13; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const opt = document.createElement('option');
-    opt.value = `${d.getFullYear()}-${d.getMonth()+1}`;
-    opt.textContent = d.toLocaleDateString('en-IN', {month:'short', year:'numeric'});
-    sel.appendChild(opt);
-  }
-  selMonth = now.getMonth() + 1;
-  selYear  = now.getFullYear();
-}
-function onMonthChange() {
-  const [y, m] = document.getElementById('monthSel').value.split('-').map(Number);
-  selYear = y; selMonth = m;
-  loadedViews.clear();
+  initMonthPicker();
   refreshAll();
 }
 
-// ── Property tab ───────────────────────────────────────────────────────────
-function setProp(prop, el) {
-  selProp = prop;
-  document.querySelectorAll('.prop-tab').forEach(t => { t.className = 'prop-tab'; });
-  el.classList.add('sel');
-  // THOR/HULK split: future — currently shows all data
-}
-
-// ── View switching ─────────────────────────────────────────────────────────
-function setView(name, el) {
-  document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
-  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  if (!loadedViews.has(name)) { loadedViews.add(name); loadView(name); }
-}
-function tabClick(i, view, el) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  // sync view-btn
-  const btns = document.querySelectorAll('.view-btn');
-  if (btns[i]) { document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active')); btns[i].classList.add('active'); }
-  document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active'));
-  document.getElementById('view-'+view).classList.add('active');
-  if (!loadedViews.has(view)) { loadedViews.add(view); loadView(view); }
-}
-function loadView(name) {
-  if (name === 'dues')         loadDues();
-  if (name === 'pnl')          Promise.all([loadPnlChart(), loadPnlTable()]);
-  if (name === 'expenses')     loadExpenses();
-  if (name === 'transactions') loadTxn(1);
-  if (name === 'deposits')     loadDeposits();
-}
-
-// ── KPIs ───────────────────────────────────────────────────────────────────
-async function loadKpis() {
-  try {
-    const d = await api(`/api/dashboard/kpis?month=${selMonth}&year=${selYear}`);
-    const occ = d.occupancy;
-    document.getElementById('kOcc').textContent     = `${occ.pct}%`;
-    document.getElementById('kOccSub').textContent  = `${occ.beds_occupied} / ${occ.beds_total} beds`;
-    const netEl = document.getElementById('kNet');
-    netEl.textContent = fmtL(d.net);
-    netEl.style.color = d.net >= 0 ? 'var(--green)' : 'var(--red)';
-    document.getElementById('kRev').textContent     = fmtL(d.revenue);
-    document.getElementById('kRevSub').textContent  = `vs expenses ${fmtL(d.expenses)}`;
-    document.getElementById('kDues').textContent    = fmtL(d.dues_outstanding);
-    // Property cards — approximation (no per-building API yet)
-    const thorBeds = 145, hulkBeds = 160;
-    const thorOcc  = Math.round(occ.beds_occupied * (145/305));
-    const hulkOcc  = occ.beds_occupied - thorOcc;
-    document.getElementById('pcThorOcc').textContent  = `${Math.round(thorOcc/thorBeds*100)}%`;
-    document.getElementById('pcThorBeds').textContent = `${thorOcc} / ${thorBeds}`;
-    document.getElementById('pcThorRev').textContent  = fmtL(d.revenue * 145/305);
-    document.getElementById('pcHulkOcc').textContent  = `${Math.round(hulkOcc/hulkBeds*100)}%`;
-    document.getElementById('pcHulkBeds').textContent = `${hulkOcc} / ${hulkBeds}`;
-    document.getElementById('pcHulkRev').textContent  = fmtL(d.revenue * 160/305);
-    // date label
-    document.getElementById('dateLabel').textContent =
-      new Date(selYear, selMonth-1, 1).toLocaleDateString('en-IN',{month:'long',year:'numeric'}) + ' · Live';
-    if (d.bank_coverage)
-      document.getElementById('dateLabel').textContent += ` · Bank to ${d.bank_coverage}`;
-  } catch(e) { console.error('KPI', e); }
-}
-
-// ── Dues ───────────────────────────────────────────────────────────────────
-async function loadDues() {
-  const tbody = document.getElementById('duesBody');
-  tbody.innerHTML = '<tr><td colspan="4" class="skel" style="height:36px"></td></tr>'.repeat(4);
-  try {
-    const data = await api(`/api/dashboard/dues?month=${selMonth}&year=${selYear}`);
-    document.getElementById('duesBadge').textContent = `${data.length} tenants`;
-    document.getElementById('duesEmpty').style.display = data.length ? 'none' : 'block';
-    tbody.innerHTML = data.map(r => `
-      <tr>
-        <td><div class="td-primary">${r.tenant}</div></td>
-        <td><div style="font-size:12px">${r.room}</div></td>
-        <td class="td-right td-num" style="color:var(--red)">${fmtFull(r.outstanding)}</td>
-        <td class="td-right"><span class="status-pill ${r.months_pending>1?'pill-red':'pill-amber'}">${r.months_pending}mo</span></td>
-      </tr>`).join('');
-  } catch(e) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error loading dues</td></tr>`; }
-}
-
-// ── P&L chart ──────────────────────────────────────────────────────────────
-async function loadPnlChart() {
-  try {
-    const data = await api('/api/dashboard/pnl_trend?months=6');
-    if (pnlChart) pnlChart.destroy();
-    pnlChart = new Chart(document.getElementById('pnlChart'), {
-      type: 'bar',
-      data: {
-        labels: data.map(d=>d.label),
-        datasets: [
-          {label:'Income',   data:data.map(d=>d.income),  backgroundColor:'#16a34a', borderRadius:5, borderSkipped:false},
-          {label:'Expenses', data:data.map(d=>d.expense), backgroundColor:'#dc2626', borderRadius:5, borderSkipped:false},
-        ]
-      },
-      options: {
-        responsive:true, maintainAspectRatio:true, aspectRatio:2,
-        plugins:{legend:{labels:{color:'#64748b',font:{size:10,family:'Inter'},boxWidth:10,padding:12}}},
-        scales:{
-          x:{grid:{display:false},ticks:{color:'#94a3b8',font:{size:10,family:'Inter'}}},
-          y:{grid:{color:'#f1f5f9'},ticks:{color:'#94a3b8',font:{size:10,family:'Inter'},callback:v=>fmtL(v)}}
-        }
-      }
-    });
-  } catch(e) { console.error('PnL chart', e); }
-}
-
-async function loadPnlTable() {
-  try {
-    const [kpis, breakdown] = await Promise.all([
-      api(`/api/dashboard/kpis?month=${selMonth}&year=${selYear}`),
-      api(`/api/dashboard/expense_breakdown?month=${selMonth}&year=${selYear}`)
-    ]);
-    const label = new Date(selYear, selMonth-1, 1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
-    document.getElementById('pnlMonthLabel').textContent = label;
-    const net = kpis.net;
-    document.getElementById('pnlNetBadge').textContent = fmtFull(net);
-    document.getElementById('pnlNetBadge').className = `badge ${net>=0?'badge-green':'badge-red'}`;
-
-    const rows = [
-      `<div class="pnl-row"><div class="pnl-key">Revenue (bank credits)</div><div class="pnl-val" style="color:var(--green)">${fmtFull(kpis.revenue)}</div></div>`,
-      `<div class="pnl-row" style="background:#fef2f2"><div class="pnl-key" style="font-size:11px;font-weight:600;color:var(--muted)">EXPENSES</div><div class="pnl-val" style="color:var(--red)">${fmtFull(kpis.expenses)}</div></div>`,
-      ...breakdown.map(r => `<div class="pnl-row"><div class="pnl-key" style="padding-left:8px">${r.category}</div><div class="pnl-val">${fmtFull(r.amount)}</div></div>`),
-      `<div class="pnl-row total"><div class="pnl-key">Net Profit / Loss</div><div class="pnl-val" style="color:${net>=0?'var(--green)':'var(--red)'};font-size:16px">${fmtFull(net)}</div></div>`,
-    ];
-    document.getElementById('pnlRows').innerHTML = rows.join('');
-  } catch(e) { console.error('PnL table', e); }
-}
-
-// ── Expenses ───────────────────────────────────────────────────────────────
-const DONUT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#dc2626','#14b8a6','#a78bfa','#84cc16','#f97316'];
-
-async function loadExpenses() {
-  try {
-    const data = await api(`/api/dashboard/expense_breakdown?month=${selMonth}&year=${selYear}`);
-    const label = new Date(selYear, selMonth-1, 1).toLocaleDateString('en-IN',{month:'short',year:'numeric'});
-    document.getElementById('expMonthLabel').textContent = label;
-    const top = data.slice(0, 10);
-    const total = top.reduce((s,r) => s + r.amount, 0);
-
-    if (donutChart) donutChart.destroy();
-    donutChart = new Chart(document.getElementById('donutChart'), {
-      type: 'doughnut',
-      data: {
-        labels: top.map(r=>r.category),
-        datasets: [{ data:top.map(r=>r.amount), backgroundColor:DONUT_COLORS, borderWidth:0, hoverOffset:4 }]
-      },
-      options: {
-        responsive:true, maintainAspectRatio:true, aspectRatio:1.6, cutout:'60%',
-        plugins:{
-          legend:{position:'right',labels:{color:'#64748b',font:{size:10,family:'Inter'},boxWidth:10,padding:8}}
-        }
-      }
-    });
-
-    const tbody = document.getElementById('expBody');
-    document.getElementById('expEmpty').style.display = top.length ? 'none' : 'block';
-    tbody.innerHTML = top.map((r,i) => `
-      <tr>
-        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${DONUT_COLORS[i]};margin-right:6px"></span>${r.category}</td>
-        <td class="td-right td-num">${fmtFull(r.amount)}</td>
-        <td class="td-right" style="color:var(--sub)">${Math.round(r.amount/total*100)}%</td>
-      </tr>`).join('');
-  } catch(e) { console.error('Expenses', e); }
-}
-
-// ── Transactions ───────────────────────────────────────────────────────────
-async function loadTxn(page) {
-  txnPage = Math.max(1, page);
-  const from = document.getElementById('txnFrom').value;
-  const to   = document.getElementById('txnTo').value;
-  const type = document.getElementById('txnType').value;
-  const extra = `&page=${txnPage}&per_page=30`
-    + (from ? `&from_date=${from}` : '')
-    + (to   ? `&to_date=${to}` : '')
-    + (type ? `&txn_type=${type}` : '');
-
-  const tbody = document.getElementById('txnBody');
-  tbody.innerHTML = '<tr><td colspan="3" class="skel" style="height:36px"></td></tr>'.repeat(5);
-
-  try {
-    const data = await api('/api/dashboard/transactions', extra);
-    txnTotal = data.total;
-    document.getElementById('txnEmpty').style.display = data.items.length ? 'none' : 'block';
-    document.getElementById('txnCount').textContent = `${(txnPage-1)*30+1}–${Math.min(txnPage*30, txnTotal)} of ${txnTotal}`;
-    document.getElementById('txnPrev').disabled = txnPage <= 1;
-    document.getElementById('txnNext').disabled = txnPage * 30 >= txnTotal;
-    tbody.innerHTML = data.items.map(r => `
-      <tr>
-        <td style="font-size:11px;color:var(--sub);white-space:nowrap">${r.date}</td>
-        <td>
-          <div class="td-primary" style="font-size:12px">${r.description}</div>
-          <div style="font-size:10px;color:var(--muted)">${r.category}</div>
-        </td>
-        <td class="td-right td-num" style="color:${r.type==='income'?'var(--green)':'var(--text)'}">
-          ${r.type==='income'?'+':'−'}${fmtFull(r.amount)}
-        </td>
-      </tr>`).join('');
-  } catch(e) { tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Error loading</td></tr>`; }
-}
-
-// ── Deposits ───────────────────────────────────────────────────────────────
-async function loadDeposits() {
-  const tbody = document.getElementById('depositBody');
-  tbody.innerHTML = '<tr><td colspan="4" class="skel" style="height:36px"></td></tr>'.repeat(4);
-  try {
-    const data = await api('/api/dashboard/deposits');
-    document.getElementById('depositEmpty').style.display = data.length ? 'none' : 'block';
-    tbody.innerHTML = data.map(r => `
-      <tr>
-        <td>
-          <div class="td-primary">${r.tenant}</div>
-          <div style="font-size:10px;color:var(--muted)">${r.checkin}</div>
-        </td>
-        <td style="font-size:12px">${r.room}</td>
-        <td class="td-right td-num">${fmtFull(r.deposit)}</td>
-        <td class="td-right">
-          ${r.matched
-            ? `<span class="status-pill pill-green">Matched</span>`
-            : `<span class="status-pill pill-red">Missing</span>`}
-        </td>
-      </tr>`).join('');
-  } catch(e) { tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Error loading</td></tr>`; }
-}
-
-// ── Defaults ───────────────────────────────────────────────────────────────
-function setTxnDefaults() {
+/* ═══════════════════ MONTH PICKER ═══════════════════ */
+function initMonthPicker() {
+  const sel = document.getElementById('month-picker');
+  sel.innerHTML = '';
   const now = new Date();
-  document.getElementById('txnFrom').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-  document.getElementById('txnTo').value   = now.toISOString().slice(0,10);
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const m = d.getMonth() + 1;
+    const y = d.getFullYear();
+    const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+    const opt = document.createElement('option');
+    opt.value = m + '|' + y;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  }
+  const parts = sel.value.split('|');
+  MONTH = parseInt(parts[0]);
+  YEAR = parseInt(parts[1]);
 }
 
-// ── Refresh ────────────────────────────────────────────────────────────────
-async function refreshAll() {
-  const btn = document.getElementById('refreshBtn');
-  btn.classList.add('spinning');
-  loadedViews.clear();
+function onMonthChange() {
+  const parts = document.getElementById('month-picker').value.split('|');
+  MONTH = parseInt(parts[0]);
+  YEAR = parseInt(parts[1]);
+  refreshAll();
+}
+
+/* ═══════════════════ TABS ═══════════════════ */
+function switchTab(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ═══════════════════ REFRESH ═══════════════════ */
+function refreshAll() {
+  loadKPIs();
+  loadDues();
+  loadPnL();
+  loadExpenses();
+}
+
+/* ═══════════════════ KPIs ═══════════════════ */
+async function loadKPIs() {
+  const sec = document.getElementById('kpi-section');
+  const propSec = document.getElementById('prop-section');
+  const glanceSec = document.getElementById('glance-section');
+  sec.innerHTML = '<div class="kpi-grid">' + skelBoxes(6) + '</div>';
+  propSec.innerHTML = '<div class="prop-row">' + skelBoxes(2) + '</div>';
+  glanceSec.innerHTML = '<div class="glance-row">' + skelBoxes(3) + '</div>';
+
   try {
-    await loadKpis();
-    // reload whichever view is active
-    const active = document.querySelector('.view-panel.active');
-    if (active) { const name = active.id.replace('view-',''); loadedViews.add(name); loadView(name); }
-  } finally {
-    btn.classList.remove('spinning');
+    const d = await apiFetch('kpis', { month: MONTH, year: YEAR });
+    const occ = d.occupancy || {};
+    const g = d.at_a_glance || {};
+
+    // KPI cards
+    sec.innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">Occupancy</div>
+          <div class="kpi-value">${pct(occ.pct)}</div>
+          <div class="kpi-sub">${occ.beds_occupied || 0} / ${occ.beds_total || 0} beds</div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">Collection</div>
+          <div class="kpi-value">${pct(g.collection_pct)}</div>
+          <div class="kpi-sub">of expected rent</div>
+        </div>
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">Dues Outstanding</div>
+          <div class="kpi-value">${fmt(d.dues_outstanding)}</div>
+          <div class="kpi-sub">pending payments</div>
+        </div>
+        <div class="kpi-card ${(d.net || 0) >= 0 ? 'kpi-green' : 'kpi-red'}">
+          <div class="kpi-label">Net P&amp;L</div>
+          <div class="kpi-value">${fmt(d.net)}</div>
+          <div class="kpi-sub">Rev ${fmt(d.revenue)} - Exp ${fmt(d.expenses)}</div>
+        </div>
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-label">New Checkins</div>
+          <div class="kpi-value">${g.new_checkins != null ? g.new_checkins : '--'}</div>
+          <div class="kpi-sub">this month</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+          <div class="kpi-label">Checkouts</div>
+          <div class="kpi-value">${g.checkouts != null ? g.checkouts : '--'}</div>
+          <div class="kpi-sub">this month</div>
+        </div>
+      </div>`;
+
+    // Property cards
+    const props = d.properties || [];
+    const thorP = props.find(p => p.name === 'THOR') || { name: 'THOR', occupied: 0, total: 0, vacant: 0, pct: 0 };
+    const hulkP = props.find(p => p.name === 'HULK') || { name: 'HULK', occupied: 0, total: 0, vacant: 0, pct: 0 };
+    propSec.innerHTML = `
+      <div class="prop-row">
+        <div class="prop-card thor">
+          <div class="prop-name">THOR</div>
+          <div class="prop-stat">${pct(thorP.pct)}</div>
+          <div class="prop-detail">${thorP.occupied} / ${thorP.total} beds | ${thorP.vacant} vacant</div>
+          <div class="prop-bar"><div class="prop-bar-fill" style="width:${thorP.pct || 0}%"></div></div>
+        </div>
+        <div class="prop-card hulk">
+          <div class="prop-name">HULK</div>
+          <div class="prop-stat">${pct(hulkP.pct)}</div>
+          <div class="prop-detail">${hulkP.occupied} / ${hulkP.total} beds | ${hulkP.vacant} vacant</div>
+          <div class="prop-bar"><div class="prop-bar-fill" style="width:${hulkP.pct || 0}%"></div></div>
+        </div>
+      </div>`;
+
+    // At a glance
+    glanceSec.innerHTML = `
+      <div class="glance-row">
+        <div class="glance-item">
+          <div class="glance-val">${fmt(g.avg_rent)}</div>
+          <div class="glance-label">Avg Rent</div>
+        </div>
+        <div class="glance-item">
+          <div class="glance-val">${g.open_complaints != null ? g.open_complaints : '--'}</div>
+          <div class="glance-label">Open Complaints</div>
+        </div>
+        <div class="glance-item">
+          <div class="glance-val" style="font-size:13px">${d.bank_coverage || '--'}</div>
+          <div class="glance-label">Bank Coverage</div>
+        </div>
+      </div>`;
+  } catch (e) {
+    sec.innerHTML = '<div class="error-msg">Failed to load KPIs: ' + e.message + '</div>';
+    propSec.innerHTML = '';
+    glanceSec.innerHTML = '';
   }
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
-function init() {
-  buildMonths();
-  setTxnDefaults();
-  const now = new Date();
-  selMonth = now.getMonth() + 1;
-  selYear  = now.getFullYear();
-  loadedViews.add('dues');
-  Promise.all([loadKpis(), loadDues()]);
+/* ═══════════════════ DUES ═══════════════════ */
+async function loadDues() {
+  const el = document.getElementById('dues-content');
+  el.innerHTML = skelBoxes(3);
+
+  try {
+    duesData = await apiFetch('dues', { month: MONTH, year: YEAR });
+    duesData.sort((a, b) => (b.outstanding || 0) - (a.outstanding || 0));
+    renderDues('all');
+  } catch (e) {
+    el.innerHTML = '<div class="error-msg">Failed to load dues: ' + e.message + '</div>';
+  }
 }
+
+function filterDues(filter, btn) {
+  document.querySelectorAll('#dues-filters .pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderDues(filter);
+}
+
+function renderDues(filter) {
+  const el = document.getElementById('dues-content');
+  let rows = duesData;
+  if (filter === 'thor') rows = rows.filter(r => (r.room || '').startsWith('T-'));
+  else if (filter === 'hulk') rows = rows.filter(r => !(r.room || '').startsWith('T-'));
+
+  if (!rows.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;">No dues found</div>';
+    return;
+  }
+
+  const total = rows.reduce((s, r) => s + (r.outstanding || 0), 0);
+  let html = `<div style="margin-bottom:10px;font-size:13px;color:var(--sub);">${rows.length} tenants | Total: <strong style="color:var(--red)">${fmt(total)}</strong></div>`;
+  html += '<table class="tbl"><thead><tr><th>Tenant</th><th>Room</th><th>Pending</th><th class="amt">Amount</th></tr></thead><tbody>';
+  for (const r of rows) {
+    html += `<tr>
+      <td>${r.tenant || '--'}</td>
+      <td>${r.room || '--'}</td>
+      <td>${r.months_pending || '--'}m</td>
+      <td class="amt" style="color:var(--red)">${fmt(r.outstanding)}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+/* ═══════════════════ P&L ═══════════════════ */
+async function loadPnL() {
+  try {
+    const data = await apiFetch('pnl_trend', { months: 6 });
+    const labels = data.map(d => d.label);
+    const income = data.map(d => d.income || 0);
+    const expense = data.map(d => d.expense || 0);
+
+    if (pnlChart) pnlChart.destroy();
+    const ctx = document.getElementById('pnl-chart').getContext('2d');
+    pnlChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Income', data: income, backgroundColor: '#22c55e', borderRadius: 6, barPercentage: 0.7 },
+          { label: 'Expense', data: expense, backgroundColor: '#ef4444', borderRadius: 6, barPercentage: 0.7 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { font: { family: 'Inter', size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y) } }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { font: { family: 'Inter', size: 11 }, callback: v => fmt(v) }, grid: { color: '#f1f5f9' } },
+          x: { ticks: { font: { family: 'Inter', size: 11 } }, grid: { display: false } }
+        }
+      }
+    });
+  } catch (e) {
+    document.getElementById('pnl-chart').parentElement.innerHTML = '<div class="error-msg">Failed to load P&L: ' + e.message + '</div>';
+  }
+}
+
+/* ═══════════════════ EXPENSES ═══════════════════ */
+async function loadExpenses() {
+  const tableEl = document.getElementById('expense-table-content');
+  tableEl.innerHTML = skelBoxes(2);
+
+  try {
+    const data = await apiFetch('expense_breakdown', { month: MONTH, year: YEAR });
+    data.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+
+    const labels = data.map(d => d.category || 'Other');
+    const amounts = data.map(d => d.amount || 0);
+    const colors = labels.map((_, i) => EXPENSE_COLORS[i % EXPENSE_COLORS.length]);
+
+    // Donut chart
+    if (expenseChart) expenseChart.destroy();
+    const ctx = document.getElementById('expense-chart').getContext('2d');
+    expenseChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data: amounts, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmt(ctx.parsed) } }
+        }
+      }
+    });
+
+    // Table
+    const total = amounts.reduce((s, a) => s + a, 0);
+    let html = '<table class="tbl"><thead><tr><th>Category</th><th class="amt">Amount</th><th class="amt">%</th></tr></thead><tbody>';
+    for (let i = 0; i < data.length; i++) {
+      html += `<tr>
+        <td><span class="cat-dot" style="background:${colors[i]}"></span>${labels[i]}</td>
+        <td class="amt">${fmt(amounts[i])}</td>
+        <td class="amt">${total ? Math.round(amounts[i] / total * 100) : 0}%</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    tableEl.innerHTML = html;
+  } catch (e) {
+    tableEl.innerHTML = '<div class="error-msg">Failed to load expenses: ' + e.message + '</div>';
+  }
+}
+
+/* ═══════════════════ INIT ═══════════════════ */
+document.addEventListener('DOMContentLoaded', checkAuth);
+document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>
 </body>
 </html>

@@ -73,6 +73,7 @@ async def handle_owner(
         "CHECKOUT":           _checkout_prompt,
         "SCHEDULE_CHECKOUT":  _checkout_prompt,   # same handler — date in entities distinguishes
         "UPDATE_CHECKIN":     _update_checkin,
+        "UPDATE_CHECKOUT_DATE": _update_checkout_date,
         "NOTICE_GIVEN":       _notice_given,
         "ADD_PARTNER":        _add_partner,
         "REMINDER_SET":       _reminder_prompt,
@@ -1121,6 +1122,24 @@ async def resolve_pending_action(
             "or *deduct XXXX* to reduce for maintenance first."
         )
 
+    if pending.intent == "UPDATE_CHECKOUT_DATE_ASK":
+        from src.whatsapp.intent_detector import _extract_date_entity
+        if is_negative(reply_text):
+            return "Cancelled."
+        date_iso = _extract_date_entity(reply_text.strip())
+        if not date_iso:
+            return "__KEEP_PENDING__Couldn't parse that date. Try: *15 April* or *15/04/2026*"
+        # Resolve tenant — might be from choices or from single match
+        tenancy_id = action_data.get("tenancy_id")
+        tenant_name = action_data.get("tenant_name", "")
+        if not tenancy_id and choices:
+            # Single match was stored in choices[0]
+            tenancy_id = choices[0].get("tenancy_id")
+            tenant_name = choices[0].get("label", "")
+        if not tenancy_id:
+            return "Something went wrong. Please try again: *change checkout date [Name] to [date]*"
+        return await _do_update_checkout_date(tenancy_id, tenant_name, date_iso, session)
+
     if pending.intent == "RECORD_CHECKOUT":
         step = action_data.get("step", "")
 
@@ -1472,6 +1491,138 @@ async def resolve_pending_action(
             if not checkin_iso:
                 return "__KEEP_PENDING__Couldn't parse that date. Try: *29 March* or *29/03/2026*"
             action_data["checkin_date"] = checkin_iso
+            action_data["step"] = "ask_personal"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return (
+                "*Personal details?*\n"
+                "These match your printed check-in form.\n\n"
+                "Type *skip* to skip all, or *continue* to fill them."
+            )
+
+        # ── Personal details gate ─────────────────────────────────────────
+        if step == "ask_personal":
+            if ans.lower() in ("skip", "s", "no", "none"):
+                action_data["step"] = "ask_notes"
+                await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+                return "*Notes?* (e.g. _first 2 months 21k then 22k_ or _half deposit paid_)\nType *skip* if none."
+            action_data["step"] = "ask_dob"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Date of birth?* (e.g. 15/03/1995 or skip)"
+
+        if step == "ask_dob":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["date_of_birth"] = ans.strip()
+            action_data["step"] = "ask_father_name"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Father's name?* (or skip)"
+
+        if step == "ask_father_name":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["father_name"] = ans.strip()
+            action_data["step"] = "ask_father_phone"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Father's phone?* (10 digits, or skip)"
+
+        if step == "ask_father_phone":
+            if ans.lower() not in _SKIP_VALUES:
+                phone_clean = re.sub(r"[^0-9]", "", ans)
+                if len(phone_clean) > 10:
+                    phone_clean = phone_clean[-10:]
+                if len(phone_clean) == 10:
+                    action_data["father_phone"] = phone_clean
+                else:
+                    return "__KEEP_PENDING__Need 10 digits. *Father's phone?* (or skip)"
+            action_data["step"] = "ask_address"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Permanent address?* (or skip)"
+
+        if step == "ask_address":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["permanent_address"] = ans.strip()
+            action_data["step"] = "ask_email"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Email?* (or skip)"
+
+        if step == "ask_email":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["email"] = ans.strip()
+            action_data["step"] = "ask_occupation"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Occupation?* (e.g. Software Engineer, Student, or skip)"
+
+        if step == "ask_occupation":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["occupation"] = ans.strip()
+            action_data["step"] = "ask_education"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Educational qualification?* (e.g. B.Tech, MBA, or skip)"
+
+        if step == "ask_education":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["educational_qualification"] = ans.strip()
+            action_data["step"] = "ask_office_address"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Office/college address?* (or skip)"
+
+        if step == "ask_office_address":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["office_address"] = ans.strip()
+            action_data["step"] = "ask_office_phone"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Office phone?* (or skip)"
+
+        if step == "ask_office_phone":
+            if ans.lower() not in _SKIP_VALUES:
+                phone_clean = re.sub(r"[^0-9]", "", ans)
+                if len(phone_clean) > 10:
+                    phone_clean = phone_clean[-10:]
+                if phone_clean:
+                    action_data["office_phone"] = phone_clean
+            action_data["step"] = "ask_emergency_name"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Emergency contact name?* (or skip)"
+
+        if step == "ask_emergency_name":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["emergency_contact_name"] = ans.strip()
+            action_data["step"] = "ask_emergency_rel"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Relationship?* (e.g. Father, Mother, Sibling, or skip)"
+
+        if step == "ask_emergency_rel":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["emergency_contact_relationship"] = ans.strip()
+            action_data["step"] = "ask_emergency_phone"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*Emergency contact phone?* (10 digits, or skip)"
+
+        if step == "ask_emergency_phone":
+            if ans.lower() not in _SKIP_VALUES:
+                phone_clean = re.sub(r"[^0-9]", "", ans)
+                if len(phone_clean) > 10:
+                    phone_clean = phone_clean[-10:]
+                if len(phone_clean) == 10:
+                    action_data["emergency_contact_phone"] = phone_clean
+                else:
+                    return "__KEEP_PENDING__Need 10 digits. *Emergency phone?* (or skip)"
+            action_data["step"] = "ask_id_type"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            return "*ID proof type?*\n1. Aadhaar\n2. PAN\n3. Passport\n4. Driving License\n5. Voter ID\n(or skip)"
+
+        if step == "ask_id_type":
+            if ans.lower() not in _SKIP_VALUES:
+                _id_map = {"1": "aadhar", "2": "pan", "3": "passport", "4": "driving_license", "5": "voter_id",
+                           "aadhar": "aadhar", "aadhaar": "aadhar", "pan": "pan", "passport": "passport",
+                           "dl": "driving_license", "driving": "driving_license", "voter": "voter_id"}
+                action_data["id_proof_type"] = _id_map.get(ans.lower().strip().rstrip("."), ans.strip())
+            action_data["step"] = "ask_id_number"
+            await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
+            id_type = action_data.get("id_proof_type", "ID")
+            return f"*{id_type.replace('_', ' ').title()} number?* (or skip)"
+
+        if step == "ask_id_number":
+            if ans.lower() not in _SKIP_VALUES:
+                action_data["id_proof_number"] = ans.strip()
             action_data["step"] = "ask_notes"
             await _save_pending(pending.phone, "ADD_TENANT_STEP", action_data, [], session)
             return "*Notes?* (e.g. _first 2 months 21k then 22k_ or _half deposit paid_)\nType *skip* if none."
@@ -1494,6 +1645,28 @@ async def resolve_pending_action(
 
             gender_str = action_data.get("gender", "")
             food_str = action_data.get("food_pref", "")
+
+            # Build personal details lines
+            _personal_lines = []
+            if action_data.get("date_of_birth"):
+                _personal_lines.append(f"DOB: {action_data['date_of_birth']}")
+            if action_data.get("father_name"):
+                _personal_lines.append(f"Father: {action_data['father_name']}")
+            if action_data.get("permanent_address"):
+                _personal_lines.append(f"Address: {action_data['permanent_address']}")
+            if action_data.get("email"):
+                _personal_lines.append(f"Email: {action_data['email']}")
+            if action_data.get("occupation"):
+                _personal_lines.append(f"Occupation: {action_data['occupation']}")
+            if action_data.get("emergency_contact_name"):
+                _personal_lines.append(f"Emergency: {action_data['emergency_contact_name']} ({action_data.get('emergency_contact_relationship', '')})")
+            if action_data.get("id_proof_type"):
+                _id_line = action_data['id_proof_type'].replace('_', ' ').title()
+                if action_data.get("id_proof_number"):
+                    _id_line += f": {action_data['id_proof_number']}"
+                _personal_lines.append(f"ID: {_id_line}")
+            _personal_str = "\n".join(_personal_lines)
+
             return (
                 f"*Confirm New Tenant?*\n\n"
                 f"Name: {action_data['name']}\n"
@@ -1507,6 +1680,7 @@ async def resolve_pending_action(
                 + "\n"
                 + (f"Maintenance: Rs.{maint:,}\n" if maint > 0 else "")
                 + f"Check-in: {checkin_date.strftime('%d %b %Y')}\n"
+                + (f"{_personal_str}\n" if _personal_str else "")
                 + (f"Notes: {notes_str}\n" if notes_str else "")
                 + "\nReply *yes* to save or *no* to cancel."
             )
@@ -1585,6 +1759,59 @@ async def resolve_pending_action(
                         if kyc.get("id_proof_number"):
                             tenant.id_proof_number = kyc["id_proof_number"]
                         result += "\nKYC data saved."
+
+                # Save personal details entered via step-by-step form
+                _personal_keys = [
+                    "date_of_birth", "father_name", "father_phone",
+                    "permanent_address", "email", "occupation",
+                    "educational_qualification", "office_address", "office_phone",
+                    "emergency_contact_name", "emergency_contact_phone",
+                    "emergency_contact_relationship", "id_proof_type", "id_proof_number",
+                ]
+                if any(action_data.get(k) for k in _personal_keys):
+                    phone_clean = re.sub(r"[^0-9]", "", action_data["phone"])
+                    if len(phone_clean) > 10:
+                        phone_clean = phone_clean[-10:]
+                    tenant = await session.scalar(
+                        select(Tenant).where(Tenant.phone.like(f"%{phone_clean}"))
+                    )
+                    if tenant:
+                        if action_data.get("date_of_birth"):
+                            try:
+                                for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d %b %Y"):
+                                    try:
+                                        tenant.date_of_birth = datetime.strptime(action_data["date_of_birth"], fmt).date()
+                                        break
+                                    except ValueError:
+                                        continue
+                            except Exception:
+                                pass
+                        if action_data.get("father_name"):
+                            tenant.father_name = action_data["father_name"]
+                        if action_data.get("father_phone"):
+                            tenant.father_phone = action_data["father_phone"]
+                        if action_data.get("permanent_address"):
+                            tenant.permanent_address = action_data["permanent_address"]
+                        if action_data.get("email"):
+                            tenant.email = action_data["email"]
+                        if action_data.get("occupation"):
+                            tenant.occupation = action_data["occupation"]
+                        if action_data.get("educational_qualification"):
+                            tenant.educational_qualification = action_data["educational_qualification"]
+                        if action_data.get("office_address"):
+                            tenant.office_address = action_data["office_address"]
+                        if action_data.get("office_phone"):
+                            tenant.office_phone = action_data["office_phone"]
+                        if action_data.get("emergency_contact_name"):
+                            tenant.emergency_contact_name = action_data["emergency_contact_name"]
+                        if action_data.get("emergency_contact_phone"):
+                            tenant.emergency_contact_phone = action_data["emergency_contact_phone"]
+                        if action_data.get("emergency_contact_relationship"):
+                            tenant.emergency_contact_relationship = action_data["emergency_contact_relationship"]
+                        if action_data.get("id_proof_type"):
+                            tenant.id_proof_type = action_data["id_proof_type"]
+                        if action_data.get("id_proof_number"):
+                            tenant.id_proof_number = action_data["id_proof_number"]
 
                 # Save registration form image as Document
                 form_image_path = action_data.get("form_image_path")
@@ -2237,7 +2464,7 @@ async def resolve_pending_action(
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
-        "AWAITING_CLARIFICATION",
+        "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE",
     ):
         return "❌ Cancelled. Nothing was changed."
 
@@ -2352,6 +2579,29 @@ async def resolve_pending_action(
             new_checkin_str=action_data.get("new_checkin", ""),
             session=session,
         )
+
+    if pending.intent == "UPDATE_CHECKOUT_DATE":
+        new_checkout_str = action_data.get("new_checkout", "")
+        if new_checkout_str:
+            return await _do_update_checkout_date(
+                tenancy_id=chosen["tenancy_id"],
+                tenant_name=chosen["label"],
+                new_checkout_str=new_checkout_str,
+                session=session,
+            )
+        else:
+            # No date provided — ask for it
+            tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+            old_checkout = tenancy.checkout_date if tenancy else None
+            old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
+            action_data["tenancy_id"] = chosen["tenancy_id"]
+            action_data["tenant_name"] = chosen["label"]
+            await _save_pending(pending.phone, "UPDATE_CHECKOUT_DATE_ASK", action_data, [], session)
+            return (
+                f"*{chosen['label']}*\n"
+                f"Current checkout: {old_str}\n\n"
+                f"*New checkout date?* (e.g. *15 April* or *15/04/2026*)"
+            )
 
     if pending.intent == "NOTICE_GIVEN":
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
@@ -3299,6 +3549,130 @@ async def _do_update_checkin(
         "Note: rent schedule rows are not auto-adjusted.\n"
         "Send *report* to verify dues."
     )
+
+
+# ── Update checkout date ─────────────────────────────────────────────────────
+
+async def _update_checkout_date(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Change an already-recorded checkout date for a tenant."""
+    name     = entities.get("name", "").strip()
+    room     = entities.get("room", "").strip()
+    date_str = entities.get("date", "")
+
+    if not name and not room:
+        return "Whose checkout date? Say: *change checkout date [Name] to [date]*"
+
+    rows: list = []
+    search_term = name
+
+    if name:
+        # Search exited tenants first, then active (for expected_checkout)
+        rows = await _find_tenants_by_name_any_status(name, session)
+    if not rows and room:
+        rows = await _find_tenants_by_room_any_status(room, session)
+        search_term = f"Room {room}"
+
+    if len(rows) == 0:
+        suggestions = await _find_similar_names(name, session) if name else []
+        return _format_no_match_message(name or room, suggestions)
+
+    action_data = {"name_raw": search_term, "new_checkout": date_str}
+
+    if len(rows) == 1:
+        tenant, tenancy, room_obj = rows[0]
+        choices = _make_choices(rows)
+        if date_str:
+            await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE", action_data, choices, session)
+            try:
+                new_checkout = date.fromisoformat(date_str)
+            except ValueError:
+                return "Couldn't parse that date. Use: *20 Apr* or *20/04/2026*"
+            old_checkout = tenancy.checkout_date
+            old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
+            return (
+                f"Update checkout for *{tenant.name}* (Room {room_obj.room_number})?\n\n"
+                f"Current: {old_str}\n"
+                f"New:     {new_checkout.strftime('%d %b %Y')}\n\n"
+                f"Reply *1* to confirm."
+            )
+        else:
+            # No date provided — ask for it
+            await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE_ASK", action_data, choices, session)
+            old_checkout = tenancy.checkout_date
+            old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
+            return (
+                f"*{tenant.name}* (Room {room_obj.room_number})\n"
+                f"Current checkout: {old_str}\n\n"
+                f"*New checkout date?* (e.g. *15 April* or *15/04/2026*)"
+            )
+
+    choices = _make_choices(rows)
+    await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE", action_data, choices, session)
+    action_label = f"update checkout to {date_str}" if date_str else "update checkout date"
+    return _format_choices_message(search_term, choices, action_label)
+
+
+async def _do_update_checkout_date(
+    tenancy_id: int,
+    tenant_name: str,
+    new_checkout_str: str,
+    session: AsyncSession,
+) -> str:
+    tenancy = await session.get(Tenancy, tenancy_id)
+    if not tenancy:
+        return "Tenancy record not found."
+
+    try:
+        new_checkout = date.fromisoformat(new_checkout_str)
+    except (ValueError, TypeError):
+        return "Invalid date. Please try again."
+
+    if new_checkout <= tenancy.checkin_date:
+        return (
+            f"Cannot update: new checkout {new_checkout.strftime('%d %b %Y')} is on/before "
+            f"checkin {tenancy.checkin_date.strftime('%d %b %Y')}."
+        )
+
+    old_checkout = tenancy.checkout_date
+    old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
+    tenancy.checkout_date = new_checkout
+
+    return (
+        f"*Checkout date updated — {tenant_name}*\n"
+        f"Was: {old_str}\n"
+        f"Now: {new_checkout.strftime('%d %b %Y')}\n\n"
+        "Send *report* to verify."
+    )
+
+
+async def _find_tenants_by_name_any_status(name: str, session: AsyncSession) -> list:
+    """Find tenants by name across all statuses (active + exited)."""
+    from sqlalchemy import or_
+    rows = (await session.execute(
+        select(Tenant, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(or_(
+            Tenant.name.ilike(f"%{name}%"),
+            Tenant.name.ilike(f"{name}%"),
+        ))
+        .order_by(Tenancy.checkin_date.desc())
+        .limit(10)
+    )).all()
+    return rows
+
+
+async def _find_tenants_by_room_any_status(room: str, session: AsyncSession) -> list:
+    """Find tenants by room across all statuses (active + exited)."""
+    rows = (await session.execute(
+        select(Tenant, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(Room.room_number.ilike(room))
+        .order_by(Tenancy.checkin_date.desc())
+        .limit(10)
+    )).all()
+    return rows
 
 
 # ── Other handlers ────────────────────────────────────────────────────────────

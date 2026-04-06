@@ -748,6 +748,20 @@ async def run_simplify_roles_2026_04_01(engine) -> None:
     print("  [ok] roles simplified")
 
 
+async def run_add_lokesh_receptionist(conn: AsyncConnection) -> None:
+    """Add Lokesh (7680814628) as receptionist. Added 2026-04-06."""
+    print("\n── Add Lokesh receptionist ──")
+    await conn.execute(text("""
+        INSERT INTO authorized_users (phone, name, role, added_by, active)
+        VALUES ('7680814628', 'Lokesh', 'receptionist', '7845952289', TRUE)
+        ON CONFLICT (phone) DO UPDATE SET
+            role = 'receptionist',
+            active = TRUE,
+            name = 'Lokesh'
+    """))
+    print("  [ok] Lokesh (7680814628) → receptionist")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -766,6 +780,7 @@ async def main(args: argparse.Namespace) -> None:
             await _add_receptionist_role(conn)
             await run_activity_log_table(conn)
             await run_chat_messages_table(conn)
+            await run_add_lokesh_receptionist(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         await run_simplify_roles_2026_04_01(engine)
         if args.seed:
