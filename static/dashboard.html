@@ -1,595 +1,466 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8"/>
+<meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>Cozeevo Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
-:root {
-  --bg: #f4f6fa;
-  --white: #ffffff;
-  --border: #e2e8f0;
-  --text: #1e293b;
-  --sub: #64748b;
-  --muted: #94a3b8;
-  --blue: #2563eb;
-  --blue-bg: #eff6ff;
-  --green: #16a34a;
-  --green-bg: #f0fdf4;
-  --red: #dc2626;
-  --red-bg: #fef2f2;
-  --amber: #d97706;
-  --amber-bg: #fffbeb;
-  --thor: #7c3aed;
-  --thor-bg: #f5f3ff;
-  --hulk: #059669;
-  --hulk-bg: #ecfdf5;
-  --card-r: 14px;
-  --tab-h: 60px;
+:root{
+  --bg:#f1f5f9;--card:#fff;--border:#e2e8f0;
+  --text:#1e293b;--sub:#64748b;--muted:#94a3b8;
+  --blue:#2563eb;--green:#16a34a;--red:#dc2626;--amber:#d97706;
+  --thor:#7c3aed;--hulk:#059669;
 }
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;padding:0;min-height:100vh;}
 
-/* ── Login ─────────────────────────────────────── */
-#login-screen{position:fixed;inset:0;background:var(--white);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
-#login-screen.hidden{display:none;}
-.login-logo{font-size:28px;font-weight:800;letter-spacing:-.5px;color:var(--text);}
-.login-sub{font-size:13px;color:var(--sub);margin-top:4px;}
-.login-box{margin-top:40px;width:100%;max-width:320px;}
-.login-label{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
-.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;font-family:'Inter',sans-serif;outline:none;transition:.15s;}
-.login-input:focus{border-color:var(--blue);}
-.login-btn{width:100%;margin-top:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
-.login-err{font-size:12px;color:var(--red);margin-top:8px;text-align:center;min-height:16px;}
-
-/* ── App shell ─────────────────────────────────── */
-#app{display:none;flex-direction:column;height:100%;}
-#app.visible{display:flex;}
-
-/* ── Header ────────────────────────────────────── */
-.header{background:var(--white);padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.header{background:var(--card);border-bottom:1px solid var(--border);padding:16px;position:sticky;top:0;z-index:10;}
+.header-top{display:flex;justify-content:space-between;align-items:center;}
 .brand{font-size:18px;font-weight:800;letter-spacing:-.3px;}
-.header-actions{display:flex;gap:8px;align-items:center;}
-.btn-icon{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--sub);}
-.btn-icon:active{background:var(--bg);}
-.month-select{border:1.5px solid var(--border);border-radius:10px;padding:7px 12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--text);background:var(--white);outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
+.brand span{color:var(--blue);}
+.month-sel{border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;background:var(--bg);font-family:inherit;}
+.refresh-btn{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:8px;}
 
-/* ── Tabs (bottom nav) ─────────────────────────── */
-.bottom-tabs{display:flex;height:var(--tab-h);background:var(--white);border-top:1px solid var(--border);flex-shrink:0;}
-.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--muted);transition:.15s;}
-.tab-btn.active{color:var(--blue);}
-.tab-btn svg{width:22px;height:22px;}
+.loading{text-align:center;padding:60px 20px;color:var(--sub);}
+.loading-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
 
-/* ── Scroll area ───────────────────────────────── */
-.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 20px;}
+.content{padding:12px;max-width:600px;margin:0 auto;}
 
-/* ── Pages ─────────────────────────────────────── */
-.page{display:none;}
-.page.active{display:block;}
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.kpi-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.kpi-val{font-size:24px;font-weight:800;margin:4px 0 2px;line-height:1;}
+.kpi-sub{font-size:11px;color:var(--sub);}
+.kpi-val.green{color:var(--green);}
+.kpi-val.red{color:var(--red);}
+.kpi-val.blue{color:var(--blue);}
 
-/* ── Cards ─────────────────────────────────────── */
-.card{background:var(--white);border-radius:var(--card-r);padding:16px;margin-bottom:12px;border:1px solid var(--border);}
-.card-title{font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px;}
+.status-row{display:flex;gap:8px;margin-bottom:12px;}
+.status-pill{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.sp-num{font-size:20px;font-weight:800;}
+.sp-label{font-size:10px;color:var(--sub);font-weight:600;text-transform:uppercase;margin-top:2px;}
+.sp-green .sp-num{color:var(--green);}
+.sp-amber .sp-num{color:var(--amber);}
+.sp-red .sp-num{color:var(--red);}
 
-/* ── KPI grid ──────────────────────────────────── */
-.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
-.kpi-card{background:var(--white);border-radius:var(--card-r);padding:14px;border:1px solid var(--border);}
-.kpi-label{font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;}
-.kpi-value{font-size:24px;font-weight:800;margin-top:4px;letter-spacing:-.5px;}
-.kpi-sub{font-size:11px;color:var(--muted);margin-top:2px;}
-.kpi-blue .kpi-value{color:var(--blue);}
-.kpi-green .kpi-value{color:var(--green);}
-.kpi-red .kpi-value{color:var(--red);}
-.kpi-amber .kpi-value{color:var(--amber);}
-
-/* ── Property cards ────────────────────────────── */
-.prop-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
-.prop-card{border-radius:var(--card-r);padding:14px;border:1px solid var(--border);}
-.prop-card.thor{background:var(--thor-bg);border-color:#ddd6fe;}
-.prop-card.hulk{background:var(--hulk-bg);border-color:#a7f3d0;}
-.prop-name{font-size:13px;font-weight:700;margin-bottom:6px;}
-.prop-card.thor .prop-name{color:var(--thor);}
-.prop-card.hulk .prop-name{color:var(--hulk);}
-.prop-stat{font-size:22px;font-weight:800;letter-spacing:-.5px;}
-.prop-card.thor .prop-stat{color:var(--thor);}
-.prop-card.hulk .prop-stat{color:var(--hulk);}
-.prop-detail{font-size:11px;color:var(--sub);margin-top:2px;}
-.prop-bar{height:6px;border-radius:3px;background:#e2e8f0;margin-top:8px;overflow:hidden;}
-.prop-bar-fill{height:100%;border-radius:3px;transition:width .4s ease;}
+.prop-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.prop-card{border-radius:12px;padding:14px;border:1px solid;}
+.prop-card.thor{background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-color:#c4b5fd;}
+.prop-card.hulk{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-color:#6ee7b7;}
+.prop-name{font-size:13px;font-weight:800;margin-bottom:6px;}
+.prop-name.thor{color:var(--thor);}
+.prop-name.hulk{color:var(--hulk);}
+.prop-stat{display:flex;justify-content:space-between;font-size:12px;margin-top:4px;}
+.prop-key{color:var(--sub);}
+.prop-val{font-weight:700;}
+.prop-bar{height:6px;background:#e2e8f0;border-radius:3px;margin-top:8px;overflow:hidden;}
+.prop-bar-fill{height:100%;border-radius:3px;transition:width .5s;}
 .prop-card.thor .prop-bar-fill{background:var(--thor);}
 .prop-card.hulk .prop-bar-fill{background:var(--hulk);}
 
-/* ── Glance row ────────────────────────────────── */
-.glance-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;}
-.glance-item{background:var(--white);border-radius:var(--card-r);padding:12px;border:1px solid var(--border);text-align:center;}
-.glance-val{font-size:16px;font-weight:700;}
-.glance-label{font-size:10px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-top:2px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
+.card-title{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text);}
+.coll-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;}
+.coll-row:last-child{border:none;}
+.coll-key{color:var(--sub);font-size:13px;}
+.coll-val{font-weight:700;font-size:13px;}
 
-/* ── Tables ────────────────────────────────────── */
-.tbl{width:100%;border-collapse:collapse;font-size:13px;}
-.tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.3px;padding:8px 6px;border-bottom:2px solid var(--border);}
-.tbl td{padding:10px 6px;border-bottom:1px solid var(--border);}
-.tbl tr:last-child td{border-bottom:none;}
-.tbl .amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
-.tbl th.amt{text-align:right;}
+.tabs{display:flex;gap:0;margin-bottom:12px;background:var(--card);border-radius:10px;border:1px solid var(--border);overflow:hidden;}
+.tab-btn{flex:1;padding:10px 8px;text-align:center;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;border:none;background:none;font-family:inherit;transition:.15s;}
+.tab-btn.active{background:var(--blue);color:#fff;}
 
-/* ── Filter pills ──────────────────────────────── */
-.filter-pills{display:flex;gap:6px;margin-bottom:12px;}
-.pill{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--white);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;color:var(--sub);cursor:pointer;}
-.pill.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.section{display:none;}
+.section.active{display:block;}
 
-/* ── Chart container ───────────────────────────── */
-.chart-wrap{position:relative;height:240px;margin:8px 0;}
+.trend-table{width:100%;border-collapse:collapse;font-size:12px;}
+.trend-table th{text-align:left;padding:8px 6px;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);}
+.trend-table td{padding:8px 6px;border-bottom:1px solid #f1f5f9;}
+.trend-table .num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+.trend-table tr.current{background:#eff6ff;}
 
-/* ── Skeleton ──────────────────────────────────── */
-.skeleton{background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.skel-line{height:14px;margin-bottom:8px;border-radius:6px;}
-.skel-box{height:80px;border-radius:var(--card-r);margin-bottom:10px;}
+.dues-table{width:100%;border-collapse:collapse;font-size:12px;}
+.dues-table th{text-align:left;padding:8px 6px;font-size:10px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--border);}
+.dues-table td{padding:7px 6px;border-bottom:1px solid #f1f5f9;}
+.dues-table .num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+.dues-filter{display:flex;gap:6px;margin-bottom:10px;}
+.filter-btn{padding:6px 14px;border-radius:99px;border:1px solid var(--border);background:var(--card);font-size:11px;font-weight:600;color:var(--sub);cursor:pointer;font-family:inherit;}
+.filter-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
+.badge-red{background:#fef2f2;color:var(--red);}
+.badge-amber{background:#fffbeb;color:var(--amber);}
 
-/* ── Error ─────────────────────────────────────── */
-.error-msg{background:var(--red-bg);color:var(--red);border-radius:10px;padding:14px;text-align:center;font-size:13px;font-weight:500;}
+.footer{text-align:center;padding:16px;font-size:11px;color:var(--muted);}
 
-/* ── Expense table colors ──────────────────────── */
-.cat-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;}
-
-/* ── Scrollbar ─────────────────────────────────── */
-.scroll-area::-webkit-scrollbar{width:4px;}
-.scroll-area::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}
-
-/* ── Desktop ───────────────────────────────────── */
-@media(min-width:640px){
-  .scroll-area{padding:16px 24px 24px;}
-  .kpi-grid{grid-template-columns:repeat(3,1fr);}
-  .glance-row{grid-template-columns:repeat(3,1fr);}
-}
-@media(min-width:1024px){
-  .kpi-grid{grid-template-columns:repeat(6,1fr);}
-}
+/* Login */
+.login{position:fixed;inset:0;background:var(--card);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;}
+.login-box{width:100%;max-width:320px;text-align:center;}
+.login-title{font-size:24px;font-weight:800;margin-bottom:4px;}
+.login-sub{font-size:13px;color:var(--sub);margin-bottom:32px;}
+.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;font-family:inherit;outline:none;}
+.login-input:focus{border-color:var(--blue);}
+.login-btn{width:100%;margin-top:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;}
+.login-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px;}
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════ LOGIN ═══════════════════ -->
-<div id="login-screen">
-  <div class="login-logo">Cozeevo</div>
-  <div class="login-sub">Operations Dashboard</div>
+<!-- Login Screen -->
+<div class="login" id="loginScreen">
   <div class="login-box">
-    <div class="login-label">Access Token</div>
-    <input id="token-input" class="login-input" type="password" placeholder="Paste your token"/>
-    <button id="login-btn" class="login-btn" onclick="doLogin()">Enter</button>
-    <div id="login-err" class="login-err"></div>
+    <div class="login-title">Cozeevo</div>
+    <div class="login-sub">Dashboard</div>
+    <input class="login-input" id="pinInput" placeholder="Enter token" type="password"/>
+    <button class="login-btn" onclick="tryLogin()">Open Dashboard</button>
+    <div class="login-err" id="loginErr"></div>
   </div>
 </div>
 
-<!-- ═══════════════════ APP ═══════════════════ -->
-<div id="app">
-  <!-- Header -->
-  <div class="header">
-    <div class="header-top">
-      <div class="brand">Cozeevo</div>
-      <div class="header-actions">
-        <select id="month-picker" class="month-select" onchange="onMonthChange()"></select>
-        <button class="btn-icon" onclick="refreshAll()" title="Refresh">&#x21bb;</button>
-      </div>
-    </div>
-  </div>
+<!-- App -->
+<div id="app" style="display:none;">
 
-  <!-- Scroll area -->
-  <div class="scroll-area">
-    <!-- OVERVIEW page -->
-    <div id="page-overview" class="page active">
-      <div id="kpi-section"></div>
-      <div id="prop-section"></div>
-      <div id="glance-section"></div>
+<div class="header">
+  <div class="header-top">
+    <div class="brand">Cozeevo <span>Dashboard</span></div>
+    <div style="display:flex;align-items:center;">
+      <select class="month-sel" id="monthSel" onchange="loadMonth()"></select>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadMonth()">Refresh</button>
     </div>
-
-    <!-- DUES page -->
-    <div id="page-dues" class="page">
-      <div class="filter-pills" id="dues-filters">
-        <button class="pill active" data-filter="all" onclick="filterDues('all',this)">All</button>
-        <button class="pill" data-filter="thor" onclick="filterDues('thor',this)">THOR</button>
-        <button class="pill" data-filter="hulk" onclick="filterDues('hulk',this)">HULK</button>
-      </div>
-      <div class="card" id="dues-card">
-        <div id="dues-content"></div>
-      </div>
-    </div>
-
-    <!-- P&L page -->
-    <div id="page-pnl" class="page">
-      <div class="card">
-        <div class="card-title">Income vs Expense (6 months)</div>
-        <div class="chart-wrap"><canvas id="pnl-chart"></canvas></div>
-      </div>
-    </div>
-
-    <!-- EXPENSES page -->
-    <div id="page-expenses" class="page">
-      <div class="card">
-        <div class="card-title">Expense Breakdown</div>
-        <div class="chart-wrap"><canvas id="expense-chart"></canvas></div>
-      </div>
-      <div class="card" id="expense-table-card">
-        <div id="expense-table-content"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bottom tabs -->
-  <div class="bottom-tabs">
-    <button class="tab-btn active" onclick="switchTab('overview',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Overview
-    </button>
-    <button class="tab-btn" onclick="switchTab('dues',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-      Dues
-    </button>
-    <button class="tab-btn" onclick="switchTab('pnl',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 5-10"/></svg>
-      P&amp;L
-    </button>
-    <button class="tab-btn" onclick="switchTab('expenses',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 015.7 15.7"/><path d="M12 3v9h9"/></svg>
-      Expenses
-    </button>
   </div>
 </div>
+
+<div class="loading" id="loadingState">
+  <div class="loading-spinner"></div>
+  Loading dashboard...
+</div>
+
+<div class="content" id="mainContent" style="display:none;">
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div class="status-row" id="statusRow"></div>
+  <div class="prop-row" id="propRow"></div>
+  <div class="card" id="collCard"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('trend',this)">Month Trend</button>
+    <button class="tab-btn" onclick="showTab('dues',this)">Dues List</button>
+  </div>
+
+  <div class="section active" id="sec-trend">
+    <div class="card" id="trendCard"></div>
+  </div>
+
+  <div class="section" id="sec-dues">
+    <div class="dues-filter" id="duesFilter"></div>
+    <div class="card" id="duesCard"></div>
+  </div>
+
+  <div class="footer" id="footer"></div>
+</div>
+
+</div><!-- end app -->
 
 <script>
-/* ═══════════════════ STATE ═══════════════════ */
-let TOKEN = '';
-let MONTH, YEAR;
-let duesData = [];
-let pnlChart = null, expenseChart = null;
+var TOKEN = sessionStorage.getItem('cz_token') || '';
+var data = null;
+var duesFilter = 'all';
+var selMonth, selYear;
 
-const EXPENSE_COLORS = ['#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#be185d','#4f46e5','#ca8a04','#0d9488','#9333ea','#e11d48'];
-
-/* ═══════════════════ UTILS ═══════════════════ */
+// ── Formatters ──
 function fmt(n) {
-  if (n == null) return '--';
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs >= 100000) return sign + '\u20B9' + (abs / 100000).toFixed(1).replace(/\.0$/, '') + 'L';
-  if (abs >= 1000) return sign + '\u20B9' + (abs / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-  return sign + '\u20B9' + abs.toLocaleString('en-IN');
+  if (n == null || isNaN(n)) return '--';
+  n = Math.round(n);
+  if (Math.abs(n) >= 100000) return (n/100000).toFixed(1) + 'L';
+  if (Math.abs(n) >= 1000) return Math.round(n/1000) + 'K';
+  return n.toLocaleString('en-IN');
+}
+function fmtFull(n) {
+  if (n == null || isNaN(n)) return '--';
+  return Math.round(n).toLocaleString('en-IN');
 }
 
-function pct(n) {
-  if (n == null) return '--';
-  return Math.round(n) + '%';
+// ── Login ──
+function tryLogin() {
+  var val = document.getElementById('pinInput').value.trim();
+  if (!val) { document.getElementById('loginErr').textContent = 'Enter token'; return; }
+  fetch('/api/dashboard/kpis?token=' + encodeURIComponent(val))
+    .then(function(r) {
+      if (r.status === 403) { document.getElementById('loginErr').textContent = 'Invalid token'; return; }
+      TOKEN = val;
+      sessionStorage.setItem('cz_token', val);
+      showApp();
+    })
+    .catch(function() { document.getElementById('loginErr').textContent = 'Server unreachable'; });
+}
+document.getElementById('pinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') tryLogin(); });
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  buildMonths();
+  loadMonth();
 }
 
-function skelBoxes(count) {
-  return Array(count).fill('<div class="skeleton skel-box"></div>').join('');
-}
-
-function apiUrl(path, params) {
-  const base = '/api/dashboard/' + path;
-  const p = new URLSearchParams(params || {});
-  if (TOKEN) p.set('token', TOKEN);
-  const qs = p.toString();
-  return qs ? base + '?' + qs : base;
-}
-
-async function apiFetch(path, params) {
-  const res = await fetch(apiUrl(path, params));
-  if (!res.ok) throw new Error('API error ' + res.status);
-  return res.json();
-}
-
-/* ═══════════════════ AUTH ═══════════════════ */
-function doLogin() {
-  const val = document.getElementById('token-input').value.trim();
-  if (!val) { document.getElementById('login-err').textContent = 'Token required'; return; }
-  TOKEN = val;
-  sessionStorage.setItem('dashboard_token', val);
-  enterApp();
-}
-
-function checkAuth() {
-  const params = new URLSearchParams(window.location.search);
-  const urlToken = params.get('token');
-  const stored = sessionStorage.getItem('dashboard_token');
-  if (urlToken) {
-    TOKEN = urlToken;
-    sessionStorage.setItem('dashboard_token', urlToken);
-    enterApp();
-  } else if (stored) {
-    TOKEN = stored;
-    enterApp();
-  } else {
-    // Try dev mode (no token)
-    fetch('/api/dashboard/kpis?month=1&year=2026').then(r => {
-      if (r.ok) { TOKEN = ''; enterApp(); }
-    }).catch(() => {});
+// Auto-login from URL token or session
+(function() {
+  var p = new URLSearchParams(location.search);
+  var t = p.get('token');
+  if (t) { TOKEN = t; sessionStorage.setItem('cz_token', t); }
+  if (TOKEN) { showApp(); }
+  // If no token env var set on server, try without token (dev mode)
+  else {
+    fetch('/api/dashboard/kpis').then(function(r) {
+      if (r.ok) { TOKEN = ''; showApp(); }
+    }).catch(function() {});
   }
+})();
+
+// ── API helper ──
+function api(path) {
+  var sep = path.includes('?') ? '&' : '?';
+  return fetch(path + sep + 'token=' + encodeURIComponent(TOKEN))
+    .then(function(r) {
+      if (r.status === 403) { sessionStorage.removeItem('cz_token'); location.reload(); }
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    });
 }
 
-function enterApp() {
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('app').classList.add('visible');
-  initMonthPicker();
-  refreshAll();
-}
-
-/* ═══════════════════ MONTH PICKER ═══════════════════ */
-function initMonthPicker() {
-  const sel = document.getElementById('month-picker');
-  sel.innerHTML = '';
-  const now = new Date();
-  for (let i = 0; i < 13; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const m = d.getMonth() + 1;
-    const y = d.getFullYear();
-    const label = d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-    const opt = document.createElement('option');
-    opt.value = m + '|' + y;
-    opt.textContent = label;
+// ── Month picker ──
+function buildMonths() {
+  var sel = document.getElementById('monthSel');
+  if (sel.options.length > 0) return;
+  var now = new Date();
+  for (var i = 0; i < 13; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    var opt = document.createElement('option');
+    opt.value = d.getFullYear() + '-' + (d.getMonth() + 1);
+    opt.textContent = d.toLocaleDateString('en-IN', {month: 'short', year: 'numeric'});
     sel.appendChild(opt);
   }
-  const parts = sel.value.split('|');
-  MONTH = parseInt(parts[0]);
-  YEAR = parseInt(parts[1]);
+  selMonth = now.getMonth() + 1;
+  selYear = now.getFullYear();
 }
 
-function onMonthChange() {
-  const parts = document.getElementById('month-picker').value.split('|');
-  MONTH = parseInt(parts[0]);
-  YEAR = parseInt(parts[1]);
-  refreshAll();
+// ── Load data ──
+function loadMonth() {
+  var parts = document.getElementById('monthSel').value.split('-');
+  selYear = parseInt(parts[0]) || new Date().getFullYear();
+  selMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
+
+  document.getElementById('loadingState').style.display = 'block';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('refreshBtn').textContent = '...';
+
+  Promise.all([
+    api('/api/dashboard/kpis?month=' + selMonth + '&year=' + selYear),
+    api('/api/dashboard/dues?month=' + selMonth + '&year=' + selYear)
+  ]).then(function(results) {
+    var kpis = results[0];
+    var dues = results[1];
+
+    // Map API response to same format as Apps Script dashboard
+    var occ = kpis.occupancy || {};
+    var props = kpis.properties || [];
+    var glance = kpis.at_a_glance || {};
+    var thorP = props.find(function(p) { return p.name === 'THOR'; }) || {occupied:0,total:0,vacant:0,pct:0};
+    var hulkP = props.find(function(p) { return p.name === 'HULK'; }) || {occupied:0,total:0,vacant:0,pct:0};
+
+    // Compute collection totals from rent_schedule payments
+    var totalDue = kpis.revenue + kpis.dues_outstanding; // approximate
+    var collected = kpis.revenue;
+    var collPct = glance.collection_pct || 0;
+
+    data = {
+      occupancy: {
+        beds: occ.beds_occupied || 0,
+        total: occ.beds_total || 291,
+        vacant: occ.beds_vacant || 0,
+        pct: occ.pct || 0,
+        regular: (occ.checked_in || 0) - (occ.premium || 0),
+        premium: occ.premium || 0,
+        noshow: occ.no_show || 0
+      },
+      collection: {
+        cash: 0, upi: 0, // not available from DB API — only bank data
+        total: collected,
+        outstanding: kpis.dues_outstanding || 0,
+        rentExpected: totalDue,
+        pct: collPct
+      },
+      status: {
+        paid: 0, partial: 0,
+        unpaid: dues.length,
+        exits: glance.checkouts || 0,
+        newCheckins: glance.new_checkins || 0
+      },
+      properties: {
+        thor: { beds: thorP.occupied || 0, tenants: thorP.occupied || 0, collected: 0, rent: 0 },
+        hulk: { beds: hulkP.occupied || 0, tenants: hulkP.occupied || 0, collected: 0, rent: 0 }
+      },
+      deposit: 0,
+      trend: [], // would need separate API call
+      unpaidList: dues.map(function(r) {
+        return {
+          room: r.room,
+          name: r.tenant,
+          building: (r.room || '').match(/^[1-4]|^G/) ? 'THOR' : 'HULK',
+          rent: r.outstanding,
+          balance: r.outstanding,
+          status: r.months_pending > 1 ? 'UNPAID' : 'UNPAID'
+        };
+      }),
+      timestamp: new Date().toLocaleString('en-IN')
+    };
+
+    onData(data);
+  }).catch(function(e) {
+    onError(e);
+  });
 }
 
-/* ═══════════════════ TABS ═══════════════════ */
-function switchTab(name, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  btn.classList.add('active');
+function onData(d) {
+  data = d;
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('refreshBtn').textContent = 'Refresh';
+
+  renderKPIs(d);
+  renderStatus(d);
+  renderProperties(d);
+  renderCollections(d);
+  renderTrend(d);
+  renderDues(d);
+  document.getElementById('footer').textContent = 'Last updated: ' + d.timestamp;
 }
 
-/* ═══════════════════ REFRESH ═══════════════════ */
-function refreshAll() {
-  loadKPIs();
-  loadDues();
-  loadPnL();
-  loadExpenses();
+function onError(e) {
+  document.getElementById('loadingState').innerHTML = '<div style="color:#dc2626;">Failed to load: ' + (e.message || e) + '</div>';
+  document.getElementById('refreshBtn').textContent = 'Retry';
 }
 
-/* ═══════════════════ KPIs ═══════════════════ */
-async function loadKPIs() {
-  const sec = document.getElementById('kpi-section');
-  const propSec = document.getElementById('prop-section');
-  const glanceSec = document.getElementById('glance-section');
-  sec.innerHTML = '<div class="kpi-grid">' + skelBoxes(6) + '</div>';
-  propSec.innerHTML = '<div class="prop-row">' + skelBoxes(2) + '</div>';
-  glanceSec.innerHTML = '<div class="glance-row">' + skelBoxes(3) + '</div>';
+// ── Render (identical to Apps Script version) ──
+function renderKPIs(d) {
+  var o = d.occupancy;
+  var c = d.collection;
+  var s = d.status;
+  document.getElementById('kpiGrid').innerHTML =
+    kpiCard('Occupancy', o.pct + '%', o.beds + ' / ' + o.total + ' beds', 'blue') +
+    kpiCard('Collection', c.pct + '%', fmt(c.total) + ' of ' + fmt(c.rentExpected), c.pct >= 80 ? 'green' : c.pct >= 50 ? '' : 'red') +
+    kpiCard('Outstanding', fmt(c.outstanding), s.unpaid + ' unpaid tenants', 'red') +
+    kpiCard('Collected', fmt(c.total), 'Cash ' + fmt(c.cash) + ' + UPI ' + fmt(c.upi), 'green') +
+    kpiCard('Check-ins', s.newCheckins, 'this month', '') +
+    kpiCard('Checkouts', s.exits, 'this month', '');
+}
 
-  try {
-    const d = await apiFetch('kpis', { month: MONTH, year: YEAR });
-    const occ = d.occupancy || {};
-    const g = d.at_a_glance || {};
+function kpiCard(label, val, sub, color) {
+  return '<div class="kpi"><div class="kpi-label">' + label + '</div>' +
+    '<div class="kpi-val ' + color + '">' + val + '</div>' +
+    '<div class="kpi-sub">' + sub + '</div></div>';
+}
 
-    // KPI cards
-    sec.innerHTML = `
-      <div class="kpi-grid">
-        <div class="kpi-card kpi-blue">
-          <div class="kpi-label">Occupancy</div>
-          <div class="kpi-value">${pct(occ.pct)}</div>
-          <div class="kpi-sub">${occ.beds_occupied || 0} / ${occ.beds_total || 0} beds</div>
-        </div>
-        <div class="kpi-card kpi-green">
-          <div class="kpi-label">Collection</div>
-          <div class="kpi-value">${pct(g.collection_pct)}</div>
-          <div class="kpi-sub">of expected rent</div>
-        </div>
-        <div class="kpi-card kpi-red">
-          <div class="kpi-label">Dues Outstanding</div>
-          <div class="kpi-value">${fmt(d.dues_outstanding)}</div>
-          <div class="kpi-sub">pending payments</div>
-        </div>
-        <div class="kpi-card ${(d.net || 0) >= 0 ? 'kpi-green' : 'kpi-red'}">
-          <div class="kpi-label">Net P&amp;L</div>
-          <div class="kpi-value">${fmt(d.net)}</div>
-          <div class="kpi-sub">Rev ${fmt(d.revenue)} - Exp ${fmt(d.expenses)}</div>
-        </div>
-        <div class="kpi-card kpi-blue">
-          <div class="kpi-label">New Checkins</div>
-          <div class="kpi-value">${g.new_checkins != null ? g.new_checkins : '--'}</div>
-          <div class="kpi-sub">this month</div>
-        </div>
-        <div class="kpi-card kpi-amber">
-          <div class="kpi-label">Checkouts</div>
-          <div class="kpi-value">${g.checkouts != null ? g.checkouts : '--'}</div>
-          <div class="kpi-sub">this month</div>
-        </div>
-      </div>`;
+function renderStatus(d) {
+  var s = d.status;
+  document.getElementById('statusRow').innerHTML =
+    '<div class="status-pill sp-green"><div class="sp-num">' + s.paid + '</div><div class="sp-label">Paid</div></div>' +
+    '<div class="status-pill sp-amber"><div class="sp-num">' + s.partial + '</div><div class="sp-label">Partial</div></div>' +
+    '<div class="status-pill sp-red"><div class="sp-num">' + s.unpaid + '</div><div class="sp-label">Unpaid</div></div>';
+}
 
-    // Property cards
-    const props = d.properties || [];
-    const thorP = props.find(p => p.name === 'THOR') || { name: 'THOR', occupied: 0, total: 0, vacant: 0, pct: 0 };
-    const hulkP = props.find(p => p.name === 'HULK') || { name: 'HULK', occupied: 0, total: 0, vacant: 0, pct: 0 };
-    propSec.innerHTML = `
-      <div class="prop-row">
-        <div class="prop-card thor">
-          <div class="prop-name">THOR</div>
-          <div class="prop-stat">${pct(thorP.pct)}</div>
-          <div class="prop-detail">${thorP.occupied} / ${thorP.total} beds | ${thorP.vacant} vacant</div>
-          <div class="prop-bar"><div class="prop-bar-fill" style="width:${thorP.pct || 0}%"></div></div>
-        </div>
-        <div class="prop-card hulk">
-          <div class="prop-name">HULK</div>
-          <div class="prop-stat">${pct(hulkP.pct)}</div>
-          <div class="prop-detail">${hulkP.occupied} / ${hulkP.total} beds | ${hulkP.vacant} vacant</div>
-          <div class="prop-bar"><div class="prop-bar-fill" style="width:${hulkP.pct || 0}%"></div></div>
-        </div>
-      </div>`;
+function renderProperties(d) {
+  var t = d.properties.thor;
+  var h = d.properties.hulk;
+  var tPct = t.rent > 0 ? Math.round(t.collected / t.rent * 100) : 0;
+  var hPct = h.rent > 0 ? Math.round(h.collected / h.rent * 100) : 0;
+  document.getElementById('propRow').innerHTML =
+    propCard('thor', 'THOR', t, tPct) + propCard('hulk', 'HULK', h, hPct);
+}
 
-    // At a glance
-    glanceSec.innerHTML = `
-      <div class="glance-row">
-        <div class="glance-item">
-          <div class="glance-val">${fmt(g.avg_rent)}</div>
-          <div class="glance-label">Avg Rent</div>
-        </div>
-        <div class="glance-item">
-          <div class="glance-val">${g.open_complaints != null ? g.open_complaints : '--'}</div>
-          <div class="glance-label">Open Complaints</div>
-        </div>
-        <div class="glance-item">
-          <div class="glance-val" style="font-size:13px">${d.bank_coverage || '--'}</div>
-          <div class="glance-label">Bank Coverage</div>
-        </div>
-      </div>`;
-  } catch (e) {
-    sec.innerHTML = '<div class="error-msg">Failed to load KPIs: ' + e.message + '</div>';
-    propSec.innerHTML = '';
-    glanceSec.innerHTML = '';
+function propCard(cls, name, p, pct) {
+  return '<div class="prop-card ' + cls + '">' +
+    '<div class="prop-name ' + cls + '">' + name + '</div>' +
+    '<div class="prop-stat"><span class="prop-key">Beds</span><span class="prop-val">' + p.beds + '</span></div>' +
+    '<div class="prop-stat"><span class="prop-key">Tenants</span><span class="prop-val">' + p.tenants + '</span></div>' +
+    '<div class="prop-stat"><span class="prop-key">Collected</span><span class="prop-val">' + fmt(p.collected) + '</span></div>' +
+    '<div class="prop-stat"><span class="prop-key">Expected</span><span class="prop-val">' + fmt(p.rent) + '</span></div>' +
+    '<div class="prop-bar"><div class="prop-bar-fill" style="width:' + pct + '%"></div></div>' +
+    '<div style="text-align:center;font-size:11px;color:' + (pct >= 80 ? 'var(--green)' : 'var(--amber)') + ';font-weight:700;margin-top:4px;">' + pct + '% collected</div>' +
+    '</div>';
+}
+
+function renderCollections(d) {
+  var c = d.collection;
+  document.getElementById('collCard').innerHTML =
+    '<div class="card-title">Collections Breakdown</div>' +
+    collRow('Cash', fmtFull(c.cash)) +
+    collRow('UPI', fmtFull(c.upi)) +
+    collRow('Total Collected', fmtFull(c.total)) +
+    collRow('Total Rent Due', fmtFull(c.rentExpected)) +
+    collRow('Outstanding', fmtFull(c.outstanding)) +
+    collRow('Deposits (active)', fmtFull(d.deposit));
+}
+
+function collRow(key, val) {
+  return '<div class="coll-row"><span class="coll-key">' + key + '</span><span class="coll-val">' + val + '</span></div>';
+}
+
+function renderTrend(d) {
+  if (!d.trend || d.trend.length === 0) {
+    document.getElementById('trendCard').innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px;">No trend data available from DB. Use the Google Sheet dashboard for month-on-month trends.</div>';
+    return;
   }
+  var html = '<div class="card-title">Month-on-Month</div>' +
+    '<table class="trend-table"><thead><tr><th>Month</th><th class="num">Beds</th><th class="num">Collected</th><th class="num">Dues</th><th class="num">Paid%</th></tr></thead><tbody>';
+  d.trend.forEach(function(t) {
+    html += '<tr class="' + (t.isCurrent ? 'current' : '') + '">' +
+      '<td>' + t.name + '</td>' +
+      '<td class="num">' + t.beds + '</td>' +
+      '<td class="num">' + fmtFull(t.collected) + '</td>' +
+      '<td class="num">' + fmtFull(t.dues) + '</td>' +
+      '<td class="num">' + t.paidPct + '%</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('trendCard').innerHTML = html;
 }
 
-/* ═══════════════════ DUES ═══════════════════ */
-async function loadDues() {
-  const el = document.getElementById('dues-content');
-  el.innerHTML = skelBoxes(3);
+function renderDues(d) {
+  document.getElementById('duesFilter').innerHTML =
+    '<button class="filter-btn ' + (duesFilter === 'all' ? 'active' : '') + '" onclick="setDuesFilter(\'all\')">All</button>' +
+    '<button class="filter-btn ' + (duesFilter === 'thor' ? 'active' : '') + '" onclick="setDuesFilter(\'thor\')">THOR</button>' +
+    '<button class="filter-btn ' + (duesFilter === 'hulk' ? 'active' : '') + '" onclick="setDuesFilter(\'hulk\')">HULK</button>';
 
-  try {
-    duesData = await apiFetch('dues', { month: MONTH, year: YEAR });
-    duesData.sort((a, b) => (b.outstanding || 0) - (a.outstanding || 0));
-    renderDues('all');
-  } catch (e) {
-    el.innerHTML = '<div class="error-msg">Failed to load dues: ' + e.message + '</div>';
-  }
-}
+  var list = d.unpaidList || [];
+  if (duesFilter === 'thor') list = list.filter(function(r) { return r.building === 'THOR'; });
+  else if (duesFilter === 'hulk') list = list.filter(function(r) { return r.building !== 'THOR'; });
 
-function filterDues(filter, btn) {
-  document.querySelectorAll('#dues-filters .pill').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  renderDues(filter);
-}
-
-function renderDues(filter) {
-  const el = document.getElementById('dues-content');
-  let rows = duesData;
-  if (filter === 'thor') rows = rows.filter(r => (r.room || '').startsWith('T-'));
-  else if (filter === 'hulk') rows = rows.filter(r => !(r.room || '').startsWith('T-'));
-
-  if (!rows.length) {
-    el.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;">No dues found</div>';
+  if (list.length === 0) {
+    document.getElementById('duesCard').innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px;">No unpaid tenants</div>';
     return;
   }
 
-  const total = rows.reduce((s, r) => s + (r.outstanding || 0), 0);
-  let html = `<div style="margin-bottom:10px;font-size:13px;color:var(--sub);">${rows.length} tenants | Total: <strong style="color:var(--red)">${fmt(total)}</strong></div>`;
-  html += '<table class="tbl"><thead><tr><th>Tenant</th><th>Room</th><th>Pending</th><th class="amt">Amount</th></tr></thead><tbody>';
-  for (const r of rows) {
-    html += `<tr>
-      <td>${r.tenant || '--'}</td>
-      <td>${r.room || '--'}</td>
-      <td>${r.months_pending || '--'}m</td>
-      <td class="amt" style="color:var(--red)">${fmt(r.outstanding)}</td>
-    </tr>`;
-  }
+  var total = list.reduce(function(s, r) { return s + r.balance; }, 0);
+  var html = '<div class="card-title">Unpaid Tenants (' + list.length + ') — Total: ' + fmtFull(total) + '</div>' +
+    '<table class="dues-table"><thead><tr><th>Tenant</th><th>Room</th><th class="num">Due</th><th>Status</th></tr></thead><tbody>';
+  list.forEach(function(r) {
+    var badge = r.status === 'PARTIAL' ? 'badge-amber' : 'badge-red';
+    html += '<tr><td>' + r.name + '</td><td>' + r.room + '</td>' +
+      '<td class="num" style="color:var(--red);">' + fmtFull(r.balance) + '</td>' +
+      '<td><span class="badge ' + badge + '">' + r.status + '</span></td></tr>';
+  });
   html += '</tbody></table>';
-  el.innerHTML = html;
+  document.getElementById('duesCard').innerHTML = html;
 }
 
-/* ═══════════════════ P&L ═══════════════════ */
-async function loadPnL() {
-  try {
-    const data = await apiFetch('pnl_trend', { months: 6 });
-    const labels = data.map(d => d.label);
-    const income = data.map(d => d.income || 0);
-    const expense = data.map(d => d.expense || 0);
-
-    if (pnlChart) pnlChart.destroy();
-    const ctx = document.getElementById('pnl-chart').getContext('2d');
-    pnlChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Income', data: income, backgroundColor: '#22c55e', borderRadius: 6, barPercentage: 0.7 },
-          { label: 'Expense', data: expense, backgroundColor: '#ef4444', borderRadius: 6, barPercentage: 0.7 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top', labels: { font: { family: 'Inter', size: 11, weight: '600' }, usePointStyle: true, pointStyle: 'circle' } },
-          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.parsed.y) } }
-        },
-        scales: {
-          y: { beginAtZero: true, ticks: { font: { family: 'Inter', size: 11 }, callback: v => fmt(v) }, grid: { color: '#f1f5f9' } },
-          x: { ticks: { font: { family: 'Inter', size: 11 } }, grid: { display: false } }
-        }
-      }
-    });
-  } catch (e) {
-    document.getElementById('pnl-chart').parentElement.innerHTML = '<div class="error-msg">Failed to load P&L: ' + e.message + '</div>';
-  }
+function setDuesFilter(f) {
+  duesFilter = f;
+  if (data) renderDues(data);
 }
 
-/* ═══════════════════ EXPENSES ═══════════════════ */
-async function loadExpenses() {
-  const tableEl = document.getElementById('expense-table-content');
-  tableEl.innerHTML = skelBoxes(2);
-
-  try {
-    const data = await apiFetch('expense_breakdown', { month: MONTH, year: YEAR });
-    data.sort((a, b) => (b.amount || 0) - (a.amount || 0));
-
-    const labels = data.map(d => d.category || 'Other');
-    const amounts = data.map(d => d.amount || 0);
-    const colors = labels.map((_, i) => EXPENSE_COLORS[i % EXPENSE_COLORS.length]);
-
-    // Donut chart
-    if (expenseChart) expenseChart.destroy();
-    const ctx = document.getElementById('expense-chart').getContext('2d');
-    expenseChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{ data: amounts, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ctx.label + ': ' + fmt(ctx.parsed) } }
-        }
-      }
-    });
-
-    // Table
-    const total = amounts.reduce((s, a) => s + a, 0);
-    let html = '<table class="tbl"><thead><tr><th>Category</th><th class="amt">Amount</th><th class="amt">%</th></tr></thead><tbody>';
-    for (let i = 0; i < data.length; i++) {
-      html += `<tr>
-        <td><span class="cat-dot" style="background:${colors[i]}"></span>${labels[i]}</td>
-        <td class="amt">${fmt(amounts[i])}</td>
-        <td class="amt">${total ? Math.round(amounts[i] / total * 100) : 0}%</td>
-      </tr>`;
-    }
-    html += '</tbody></table>';
-    tableEl.innerHTML = html;
-  } catch (e) {
-    tableEl.innerHTML = '<div class="error-msg">Failed to load expenses: ' + e.message + '</div>';
-  }
+function showTab(name, btn) {
+  document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('sec-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
 }
-
-/* ═══════════════════ INIT ═══════════════════ */
-document.addEventListener('DOMContentLoaded', checkAuth);
-document.getElementById('token-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>
 </body>
 </html>
