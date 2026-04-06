@@ -161,17 +161,18 @@ def read_history(excel_file=EXCEL_FILE):
             'maintenance': sn(ws.cell(row, 8).value),
             'staff': safe_str(ws.cell(row, 16).value),
             'comment': safe_str(ws.cell(row, 15).value),
-            'food': safe_str(ws.cell(row, 35).value),
-            'refund_status': safe_str(ws.cell(row, 39).value),
-            'refund_amount': sn(ws.cell(row, 40).value),
+            'food': safe_str(ws.cell(row, 36).value),          # Col 36 = veg/nonveg/egg
+            'refund_status': safe_str(ws.cell(row, 40).value),  # Col 40 = Refund Status
+            'refund_amount': sn(ws.cell(row, 41).value),        # Col 41 = Refund Amount
             # Raw payment values (cleaned later per-month)
-            'dec_st': rent_status(ws.cell(row, 21).value),
-            'jan_st': rent_status(ws.cell(row, 22).value),
-            'jan_bal': ws.cell(row, 23).value, 'jan_cash': ws.cell(row, 24).value, 'jan_upi': ws.cell(row, 25).value,
-            'feb_st': rent_status(ws.cell(row, 26).value),
-            'feb_bal': ws.cell(row, 28).value, 'feb_cash': ws.cell(row, 29).value, 'feb_upi': ws.cell(row, 30).value,
-            'mar_st': rent_status(ws.cell(row, 27).value),
-            'mar_bal': ws.cell(row, 31).value, 'mar_cash': ws.cell(row, 32).value, 'mar_upi': ws.cell(row, 33).value,
+            'dec_st': rent_status(ws.cell(row, 21).value),      # Col 21 = DEC RENT
+            'jan_st': rent_status(ws.cell(row, 22).value),      # Col 22 = JAN RENT
+            'jan_bal': ws.cell(row, 23).value, 'jan_cash': ws.cell(row, 24).value, 'jan_upi': ws.cell(row, 25).value,  # Col 23-25
+            'feb_st': rent_status(ws.cell(row, 26).value),      # Col 26 = FEB RENT
+            'feb_bal': ws.cell(row, 29).value, 'feb_cash': ws.cell(row, 30).value, 'feb_upi': ws.cell(row, 31).value,  # Col 29-31
+            'mar_st': rent_status(ws.cell(row, 27).value),      # Col 27 = MARCH RENT
+            'mar_bal': ws.cell(row, 32).value, 'mar_cash': ws.cell(row, 33).value, 'mar_upi': ws.cell(row, 34).value,  # Col 32-34
+            'apr_st_raw': rent_status(ws.cell(row, 28).value),  # Col 28 = April
         })
 
     # Generate April status from tenancy status (no Excel column yet)
