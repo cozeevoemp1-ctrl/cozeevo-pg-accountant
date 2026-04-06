@@ -100,7 +100,11 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Activity query — "activity today", "show activity", "activity log today", "activity this week"
     (re.compile(r"(?:activity\s+(?:log\s+)?(?:today|yesterday|this\s+week|last\s+\d+\s+days?|room\s+[\w-]+)|show\s+activit(?:y|ies)|activit(?:y|ies)\s+(?:today|yesterday|this\s+week|log)|^activit(?:y|ies)$|^activity\s+log$)", re.I), "QUERY_ACTIVITY", 0.94),
     # Add contact / save contact — MUST come before ADD_EXPENSE (phone numbers look like amounts)
-    (re.compile(r"(?:add|save|store|new)\s+(?:contact|vendor|supplier)|(?:add|save)\s+\w+.*(?:to\s+contacts?|as\s+contact)|(?:add|save)\s+\w+.*(?:plumber|electrician|carpenter|painter|vendor|supplier|cleaner|security|pest|internet|wifi|water|gas|furniture|gym|cctv|lift).*\d{7,}|(?:add|save)\s+\w+.*\d{7,}.*(?:to\s+contacts?|contact)", re.I), "ADD_CONTACT", 0.95),
+    # Matches: "add contact", "add plumber Ravi 9876543210", "add Ravi plumber 9876543210",
+    #          "save contact electrician Kumar 8765432109", "add Mahadevapura lineman 9886137766"
+    # Rule: "add/save" + any words + a 7+ digit phone number (and NOT "tenant/checkin/room" keywords)
+    (re.compile(r"(?:add|save|store|new)\s+(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.96),
+    (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
     # Log expense — step-by-step form OR "log <expense keyword>" (must be BEFORE ACTIVITY_LOG)
     (re.compile(r"^(?:log\s+(?:an?\s+)?expense|add\s+(?:an?\s+)?expense|record\s+expense|new\s+expense)\s*$", re.I), "ADD_EXPENSE", 0.95),
     (re.compile(r"^log\s+(?!received|delivered|got|bought)(?:.*?\b(?:eb|electricity|bill|water\s+bill|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)", re.I), "ADD_EXPENSE", 0.94),

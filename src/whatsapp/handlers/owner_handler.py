@@ -5524,6 +5524,10 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
         "cctv": "CCTV", "lift": "Lift/Elevator", "cook": "Cook", "maid": "Housekeeping",
         "housekeeping": "Housekeeping", "caretaker": "Caretaker", "watchman": "Security",
         "building": "Building Services", "maintenance": "Maintenance",
+        "lineman": "Electrician", "line man": "Electrician", "bescom": "Electricity",
+        "bwssb": "Water", "cable": "Cable/Internet", "ac": "AC Service",
+        "mason": "Mason", "welder": "Welder", "laundry": "Laundry",
+        "driver": "Driver", "transport": "Transport", "ambulance": "Emergency",
     }
     raw_lower = raw.lower()
     category = ""
