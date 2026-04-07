@@ -179,6 +179,38 @@ CREATE_TABLES: list[str] = [
     CREATE INDEX IF NOT EXISTS ix_conv_hist_phone_created
         ON conversation_history(phone, created_at DESC)
     """,
+    # ── Day-wise / short-stay table (added 2026-04-07) ──────────────────────
+    """
+    CREATE TABLE IF NOT EXISTS daywise_stays (
+        id              SERIAL PRIMARY KEY,
+        room_number     VARCHAR(10) NOT NULL,
+        guest_name      VARCHAR(200) NOT NULL,
+        phone           VARCHAR(20),
+        checkin_date    DATE NOT NULL,
+        checkout_date   DATE,
+        num_days        INTEGER,
+        stay_period     VARCHAR(100),
+        sharing         INTEGER,
+        occupancy       INTEGER,
+        booking_amount  NUMERIC(12,2) DEFAULT 0,
+        daily_rate      NUMERIC(10,2) DEFAULT 0,
+        total_amount    NUMERIC(12,2) DEFAULT 0,
+        maintenance     NUMERIC(10,2) DEFAULT 0,
+        payment_date    DATE,
+        assigned_staff  VARCHAR(50),
+        status          VARCHAR(20) DEFAULT 'EXIT',
+        comments        TEXT,
+        source_file     VARCHAR(100),
+        unique_hash     VARCHAR(64) UNIQUE,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_daywise_checkin ON daywise_stays(checkin_date)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_daywise_room ON daywise_stays(room_number)
+    """,
 ]
 
 

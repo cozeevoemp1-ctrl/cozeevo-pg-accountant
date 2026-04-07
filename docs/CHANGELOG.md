@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.19.0] — 2026-04-07 — April Import + Day-wise Stays
+
+### Added
+- **`scripts/import_april.py`** — April payment drop-and-reload importer from `April Month Collection.xlsx`
+  - Reads all rows (CHECKIN, NO SHOW, EXIT with payments), creates missing tenants/tenancies
+  - Extracts pure numeric from cash/UPI/balance cols; text saved as April notes
+  - Permanent comments → tenancy.notes, monthly comments → rent_schedule.notes
+  - Drop + reload safe (idempotent). Verified: Cash 7,44,050 + UPI 25,28,575 = 32,72,625 exact match
+- **`scripts/import_daywise.py`** — Day-wise short-stay importer merging both Excel files
+  - Reads "Daily Basis" (main Excel) + "Day wise" (April Excel), deduplicates by SHA-256
+  - 93 unique records, 88 inserted to DB, revenue 2,18,950
+  - New "DAY WISE" tab on Google Sheet
+- **`daywise_stays` DB table** — separate table for short-term guests (1-10 days), not in tenancy chain
+- **APRIL 2026 Google Sheet tab** — 234 rows with formulas, balance column as notes
+
+### Changed
+- `src/database/models.py` — added DaywiseStay model
+- `src/database/migrate_all.py` — added daywise_stays CREATE TABLE
+
 ## [1.18.1] — 2026-04-06 — Critical Fix: Pending State + Conversation Flow
 
 ### Fixed

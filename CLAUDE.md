@@ -22,7 +22,9 @@ Before closing any feature, run through this checklist:
 2. `src/database/excel_import.py` — DB import (uses read_history, must match parser)
 3. `src/database/models.py` — DB schema (new columns, enums)
 4. `src/database/migrate_all.py` — migrations (append only)
-5. `scripts/gsheet_apps_script.js` — Apps Script dashboard (reads monthly tabs)
+5. `scripts/import_april.py` — April monthly delta importer (DB + Sheet)
+6. `scripts/import_daywise.py` — Day-wise short-stay importer (DB + Sheet)
+7. `scripts/gsheet_apps_script.js` — Apps Script dashboard (reads monthly tabs)
 6. `scripts/gsheet_dashboard_webapp.js` — Apps Script web dashboard
 7. `src/api/dashboard_router.py` + `static/dashboard.html` — web dashboard
 8. `src/whatsapp/intent_detector.py` — new intents registered

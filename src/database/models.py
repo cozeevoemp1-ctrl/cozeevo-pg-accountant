@@ -502,6 +502,42 @@ class Refund(Base):
     )
 
 
+class DaywiseStay(Base):
+    """
+    Short-term / daily-rate stays — 1 to ~10 days.
+    Separate from monthly tenancies. One row per guest per visit.
+    Revenue tracked here, not in payments table.
+    """
+    __tablename__ = "daywise_stays"
+
+    id              = Column(Integer, primary_key=True)
+    room_number     = Column(String(10), nullable=False)
+    guest_name      = Column(String(200), nullable=False)
+    phone           = Column(String(20))
+    checkin_date    = Column(Date, nullable=False)
+    checkout_date   = Column(Date)
+    num_days        = Column(Integer)
+    stay_period     = Column(String(100))
+    sharing         = Column(Integer)
+    occupancy       = Column(Integer)
+    booking_amount  = Column(Numeric(12, 2), default=0)
+    daily_rate      = Column(Numeric(10, 2), default=0)
+    total_amount    = Column(Numeric(12, 2), default=0)
+    maintenance     = Column(Numeric(10, 2), default=0)
+    payment_date    = Column(Date)
+    assigned_staff  = Column(String(50))
+    status          = Column(String(20), default="EXIT")
+    comments        = Column(Text)
+    source_file     = Column(String(100))
+    unique_hash     = Column(String(64), unique=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_daywise_checkin", "checkin_date"),
+        Index("ix_daywise_room", "room_number"),
+    )
+
+
 class Expense(Base):
     """
     Operational expenses — electricity, water, staff salary, maintenance, etc.
