@@ -103,9 +103,14 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
 
     logger.info(f"[Webhook] From={from_number} | Body={body[:80]} | MsgId={msg_id[:20] if msg_id else '-'}")
 
+    # File-based debug log — journald not working
+    with open("/tmp/pg_webhook_debug.log", "a") as _wdbg:
+        _wdbg.write(f"[{from_number}] msg={body[:60]} msg_id={msg_id[:30] if msg_id else '-'}\n")
+
     # -- Dedup: skip if we've already processed this exact message ----------------
     if _is_duplicate(msg_id):
-        logger.info(f"[Webhook] DUPLICATE skipped: {msg_id}")
+        with open("/tmp/pg_webhook_debug.log", "a") as _wdbg:
+            _wdbg.write(f"  DUPLICATE SKIPPED: {msg_id}\n")
         return {"status": "ok"}
 
     # -- Master data approval replies ------------------------------------------
