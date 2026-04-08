@@ -104,6 +104,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     #          "save contact electrician Kumar 8765432109", "add Mahadevapura lineman 9886137766"
     # Rule: "add/save" + any words + a 7+ digit phone number (and NOT "tenant/checkin/room" keywords)
     (re.compile(r"(?:add|save|store|new)\s+(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.96),
+    (re.compile(r"(?:add|save|store|new)\s+(?:\w+\s+){0,5}(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.95),
     (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
     # Log expense — step-by-step form OR "log <expense keyword>" (must be BEFORE ACTIVITY_LOG)
     (re.compile(r"^(?:log\s+(?:an?\s+)?expense|add\s+(?:an?\s+)?expense|record\s+expense|new\s+expense)\s*$", re.I), "ADD_EXPENSE", 0.95),
