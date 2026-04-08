@@ -319,23 +319,40 @@ async def import_to_db(records, write=False):
                 stats['no_match'].append(f"{rec['name']} — no valid phone")
                 continue
 
-            # ── Find or create tenant ────────────────────────────────
+            # ── Find or create tenant (match by phone+name to handle shared phones) ─
+            norm_name = rec['name'].strip().title()
             tenant = await session.scalar(
-                select(Tenant).where(Tenant.phone == phone_db)
+                select(Tenant).where(Tenant.phone == phone_db, Tenant.name == norm_name)
             )
+            if not tenant:
+                # Fallback: phone-only match, but ONLY if name is similar (not a different person)
+                phone_match = await session.scalar(
+                    select(Tenant).where(Tenant.phone == phone_db)
+                )
+                if phone_match and phone_match.name.lower().split()[0] == norm_name.lower().split()[0]:
+                    tenant = phone_match  # minor name variation (e.g. casing)
+                # else: different person sharing same phone — will create new tenant below
 
             if not tenant and write:
-                # Create new tenant
+                # Create new tenant — use placeholder phone if phone already taken
+                existing_phone = await session.scalar(
+                    select(Tenant).where(Tenant.phone == phone_db)
+                )
+                actual_phone = phone_db
+                if existing_phone:
+                    # Shared phone — use placeholder
+                    safe = re.sub(r'[^a-zA-Z0-9]', '', rec['name'])[:12]
+                    actual_phone = f"NOPHONE_{rec['room']}_{safe}"
                 tenant = Tenant(
-                    name=rec['name'],
-                    phone=phone_db,
+                    name=norm_name,
+                    phone=actual_phone,
                     gender='female' if str(rec['gender']).strip().lower() == 'female' else 'male',
                     notes=rec['permanent_note'] or None,
                 )
                 session.add(tenant)
                 await session.flush()
                 stats['created_tenant'] += 1
-                print(f"    Created tenant: {rec['name']} ({phone_db})")
+                print(f"    Created tenant: {rec['name']} ({actual_phone})")
             elif not tenant:
                 stats['no_match'].append(f"{rec['name']} ({phone_db}) — not in DB, will create with --write")
                 # Still count payments for dry-run totals
@@ -475,7 +492,12 @@ async def import_to_db(records, write=False):
 
 
 def update_sheet(records):
-    """Update APRIL 2026 tab on Google Sheet."""
+    """Update APRIL 2026 tab on Google Sheet (new 17-col format matching gsheets.py).
+
+    Columns: Room, Name, Phone, Building, Sharing, Rent Due,
+             Cash, UPI, Total Paid, Balance, Status,
+             Check-in, Notice Date, Event, Notes, Prev Due, Entered By
+    """
     import gspread
     from google.oauth2.service_account import Credentials
 
@@ -491,12 +513,12 @@ def update_sheet(records):
         ws = sp.worksheet("APRIL 2026")
         ws.clear()
     except gspread.WorksheetNotFound:
-        ws = sp.add_worksheet("APRIL 2026", rows=300, cols=16)
+        ws = sp.add_worksheet("APRIL 2026", rows=300, cols=18)
 
-    headers = ["Room", "Name", "Building", "Sharing", "Rent",
-               "Cash", "UPI", "Balance Paid", "Total Paid", "Balance Due",
-               "Status", "Check-in", "Event", "Notes",
-               "March Balance"]
+    headers = ["Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
+               "Cash", "UPI", "Total Paid", "Balance", "Status",
+               "Check-in", "Notice Date", "Event", "Notes", "Prev Due",
+               "Entered By"]
 
     # Include all rows that have rent_schedule or payments (skip EXIT/CANCELLED with no payment)
     rows = []
@@ -507,41 +529,120 @@ def update_sheet(records):
         if (is_exit or is_cancelled) and not has_payment:
             continue
 
-        row_num = len(rows) + 5
+        cash = rec['apr_cash']
+        upi = rec['apr_upi']
+        tp = cash + upi
+        rent = rec['current_rent']
+        prev_due = 0
+        try:
+            prev_due = float(rec['mar_balance']) if rec['mar_balance'] else 0
+        except (ValueError, TypeError):
+            pass
+        bal = rent + prev_due - tp
+
+        # Use Excel status directly
+        status_raw = rec['apr_status_raw'].upper().strip() if rec['apr_status_raw'] else ''
+        if is_exit:
+            status = "EXIT"
+        elif 'NO SHOW' in rec['inout']:
+            status = "NO SHOW"
+        elif 'PAID' in status_raw and 'UNPAID' not in status_raw and 'NOT' not in status_raw:
+            status = "PAID"
+        elif 'PARTIAL' in status_raw:
+            status = "PARTIAL"
+        else:
+            status = "UNPAID"
+
         rows.append([
-            rec['room'], rec['name'], rec['block'], rec['sharing'],
-            rec['current_rent'], rec['apr_cash'], rec['apr_upi'], rec['apr_bal_num'],
-            f'=F{row_num}+G{row_num}+H{row_num}',
-            f'=E{row_num}-I{row_num}',
-            f'=IF(J{row_num}<=0,"PAID","UNPAID")',
-            rec['checkin_raw'], rec['inout'],
-            rec['comment'],
-            rec['mar_balance'],
+            rec['room'], rec['name'], rec['phone_raw'],
+            rec['block'], rec['sharing'], rent,
+            cash, upi, tp, bal, status,
+            rec['checkin_raw'], "",  # Notice Date — empty for import
+            rec['inout'], rec['comment'],
+            prev_due, "Excel Import",
         ])
 
     n = len(rows)
+
+    # Build summary from the rows we just prepared (using Excel statuses, not recalculated)
+    TOTAL_BEDS = 291
+    cash_total = sum(r[6] for r in rows)
+    upi_total = sum(r[7] for r in rows)
+    collected = cash_total + upi_total
+    balance_total = sum(r[9] for r in rows if r[10] not in ("EXIT", "NO SHOW"))
+
+    beds = 0
+    regular = 0
+    premium = 0
+    noshow_count = 0
+    paid = partial = unpaid = new_checkins = exits = 0
+    thor_beds = thor_t = hulk_beds = hulk_t = 0
+
+    for r in rows:
+        # r: [room, name, phone, building, sharing, rent, cash, upi, tp, bal, status, ...]
+        status = r[10]
+        building = str(r[3]).upper()
+        sharing = str(r[4]).lower()
+        event = str(r[13]).upper() if len(r) > 13 else ""
+
+        if status == "PAID": paid += 1
+        elif status == "PARTIAL": partial += 1
+        elif status == "UNPAID": unpaid += 1
+
+        if status == "EXIT":
+            exits += 1
+            continue
+        if status == "NO SHOW" or "NO SHOW" in event:
+            noshow_count += 1
+            continue
+
+        bed_count = 2 if sharing == "premium" else 1
+        beds += bed_count
+        if sharing == "premium":
+            premium += 1
+        else:
+            regular += 1
+        if building == "THOR":
+            thor_beds += bed_count
+            thor_t += 1
+        else:
+            hulk_beds += bed_count
+            hulk_t += 1
+
+    vacant = TOTAL_BEDS - beds - noshow_count
+    occ_pct = f"{beds / TOTAL_BEDS * 100:.1f}" if TOTAL_BEDS > 0 else "0"
+
+    row2 = [
+        "Checked-in", f"{beds} beds ({regular}+{premium}P)",
+        f"No-show: {noshow_count}", f"Vacant: {vacant}", f"Occ: {occ_pct}%",
+        "Cash", cash_total, "UPI", upi_total, "Total", collected,
+        f"Bal: {int(balance_total)}", "", "", "", "", "",
+    ]
+    row3 = [
+        f"THOR: {thor_beds}b ({thor_t}t)", f"HULK: {hulk_beds}b ({hulk_t}t)",
+        f"New: {new_checkins}", f"Exit: {exits}", "",
+        f"PAID:{paid}", f"PARTIAL:{partial}", f"UNPAID:{unpaid}",
+        "", "", "", "", "", "", "", "", "",
+    ]
+
     summary = [
-        ["APRIL 2026", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-        [
-            "Summary", "", "", "", "",
-            f"=SUM(F5:F{4+n})", f"=SUM(G5:G{4+n})", f"=SUM(H5:H{4+n})",
-            f"=SUM(I5:I{4+n})", f"=SUM(J5:J{4+n})",
-            f'=COUNTIF(K5:K{4+n},"PAID")', "", "", "", "",
-        ],
-        ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+        ["APRIL 2026"] + [""] * 16,
+        row2,
+        row3,
         headers,
     ]
 
     ws.update(values=summary + rows, range_name="A1", value_input_option="USER_ENTERED")
-    ws.format("A1:O1", {"textFormat": {"bold": True, "fontSize": 13}})
-    ws.format("A2:O3", {"textFormat": {"bold": True, "fontSize": 9},
+    ws.format("A1:Q1", {"textFormat": {"bold": True, "fontSize": 13}})
+    ws.format("A2:Q3", {"textFormat": {"bold": True, "fontSize": 9},
                          "numberFormat": {"type": "NUMBER", "pattern": "#,##0"}})
-    ws.format("A4:O4", {"textFormat": {"bold": True},
+    ws.format("A4:Q4", {"textFormat": {"bold": True},
                          "backgroundColor": {"red": 0.85, "green": 0.9, "blue": 1.0}})
     ws.freeze(rows=4)
-    try: ws.set_basic_filter(f"A4:O{4 + n}")
+    try: ws.set_basic_filter(f"A4:Q{4 + n}")
     except: pass
-    print(f"  APRIL 2026: {n} rows written to Sheet")
+
+    print(f"  APRIL 2026: {n} rows written to Sheet (17-col format)")
     return n
 
 

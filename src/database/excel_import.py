@@ -268,19 +268,24 @@ async def run_import(write: bool) -> None:
                 print(f"  WARN: room {room_num} not in DB — {rec['name']} → UNASSIGNED")
                 room = room_by_num["UNASSIGNED"]
 
-            # 3. Resolve or create tenant (dedup by phone)
+            # 3. Resolve or create tenant (dedup by phone+name)
+            #    Two people can share a phone (roommates/family) — use both as key
             phone = _norm_phone(rec['phone'])
             if not phone:
                 phone = _placeholder_phone(room_num, rec['name'])
+            norm_name = rec['name'].strip().title()
+            cache_key = f"{phone}|{norm_name}"
 
-            tenant = tenant_cache.get(phone)
+            tenant = tenant_cache.get(cache_key)
             if not tenant and write:
-                existing = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+                existing = await session.scalar(
+                    select(Tenant).where(Tenant.phone == phone, Tenant.name == norm_name)
+                )
                 if existing:
                     tenant = existing
                 else:
                     tenant = Tenant(
-                        name=rec['name'].strip().title(),
+                        name=norm_name,
                         phone=phone,
                         gender=_norm_gender(rec['gender']),
                         food_preference=_norm_food(rec.get('food', '')) or None,
@@ -288,7 +293,7 @@ async def run_import(write: bool) -> None:
                     session.add(tenant)
                     await session.flush()
                     stats["tenants"] += 1
-                tenant_cache[phone] = tenant
+                tenant_cache[cache_key] = tenant
             elif not tenant:
                 stats["tenants"] += 1
                 continue  # dry run — skip DB writes
