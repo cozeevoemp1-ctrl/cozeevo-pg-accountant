@@ -2539,20 +2539,15 @@ async def resolve_pending_action(
 
     # ── Numbered-choice disambiguation ────────────────────────────────────────
 
-    # Multi-step text flows that DON'T use numbered choices — skip the None check
-    _TEXT_STEP_INTENTS = {
-        "ADD_CONTACT_STEP", "UPDATE_TENANT_NOTES_STEP", "CONFIRM_ADD_TENANT",
-        "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "VOID_PAYMENT", "VOID_WHICH",
-        "VOID_EXPENSE", "VOID_WHO", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
-        "RENT_CHANGE", "RENT_CHANGE_WHO", "UPDATE_CHECKIN", "UPDATE_CHECKOUT_DATE",
-        "NOTICE_GIVEN", "QUERY_TENANT", "GET_TENANT_NOTES",
-    }
-    if chosen_idx is None and pending.intent not in _TEXT_STEP_INTENTS:
-        return None   # Not a valid numbered choice — let normal flow handle it
+    # ── Numbered-choice disambiguation ────────────────────────────────────────
+    # If chosen_idx is set, resolve the numbered choice.
+    # If chosen_idx is None, skip to intent-specific text handlers below.
+    if chosen_idx is not None:
+        chosen = choices[chosen_idx]
+    else:
+        chosen = None
 
-    chosen = choices[chosen_idx]
-
-    if pending.intent == "PAYMENT_LOG":
+    if chosen is not None and pending.intent == "PAYMENT_LOG":
         return await _do_log_payment_by_ids(
             tenant_id=chosen["tenant_id"],
             tenancy_id=chosen["tenancy_id"],
@@ -2563,7 +2558,7 @@ async def resolve_pending_action(
             session=session,
         )
 
-    if pending.intent in ("CHECKOUT", "SCHEDULE_CHECKOUT"):
+    if chosen is not None and pending.intent in ("CHECKOUT", "SCHEDULE_CHECKOUT"):
         # Redirect to RECORD_CHECKOUT checklist instead of instant checkout
         date_str = action_data.get("checkout_date", "")
         try:
@@ -2606,7 +2601,7 @@ async def resolve_pending_action(
             "Reply: *yes* or *no*"
         )
 
-    if pending.intent == "UPDATE_CHECKIN":
+    if chosen is not None and pending.intent == "UPDATE_CHECKIN":
         return await _do_update_checkin(
             tenancy_id=chosen["tenancy_id"],
             tenant_name=chosen["label"],
@@ -2614,7 +2609,7 @@ async def resolve_pending_action(
             session=session,
         )
 
-    if pending.intent == "UPDATE_CHECKOUT_DATE":
+    if chosen is not None and pending.intent == "UPDATE_CHECKOUT_DATE":
         new_checkout_str = action_data.get("new_checkout", "")
         if new_checkout_str:
             return await _do_update_checkout_date(
@@ -2637,7 +2632,7 @@ async def resolve_pending_action(
                 f"*New checkout date?* (e.g. *15 April* or *15/04/2026*)"
             )
 
-    if pending.intent == "NOTICE_GIVEN":
+    if chosen is not None and pending.intent == "NOTICE_GIVEN":
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
         if tenancy:
             notice_date_val = None
@@ -2678,7 +2673,7 @@ async def resolve_pending_action(
             )
         return "Tenancy not found."
 
-    if pending.intent == "RENT_CHANGE_WHO":
+    if chosen is not None and pending.intent == "RENT_CHANGE_WHO":
         # After picking the right tenant, ask one-time vs permanent
         tenant = await session.get(Tenant, chosen["tenant_id"])
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
@@ -2720,14 +2715,14 @@ async def resolve_pending_action(
             session=session,
         )
 
-    if pending.intent == "QUERY_TENANT":
+    if chosen is not None and pending.intent == "QUERY_TENANT":
         return await _do_query_tenant_by_id(
             tenant_id=chosen["tenant_id"],
             tenancy_id=chosen["tenancy_id"],
             session=session,
         )
 
-    if pending.intent == "GET_TENANT_NOTES":
+    if chosen is not None and pending.intent == "GET_TENANT_NOTES":
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
         tenant = await session.get(Tenant, chosen["tenant_id"])
         if not tenancy or not tenant:
