@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.20.0] — 2026-04-08 — Confirm Bug Fix + Contact Management + Benchmarks
+
+### Fixed (CRITICAL)
+- **Confirm steps broken for 2+ days** — `return None` at line 2542 in `resolve_pending_action` killed ALL text-based confirm flows (Yes/No). Every intent after that line was unreachable. Fixed with `chosen is not None` guards.
+- **Webhook dedup** — Meta sends 4-5 duplicate POSTs per message. Added in-memory msg_id cache (60s TTL) to skip duplicates.
+- **`_save_pending` import missing** — `resolve_pending_action` didn't import `_save_pending`, crashing all multi-step flows.
+- **Add Contact intent routing** — "Add building electrician contact" was matching QUERY_CONTACTS instead of ADD_CONTACT.
+- **Phone parsing** — strips spaces, +91 prefix, saves 10-digit only.
+- **Category matching** — word boundary regex prevents "contact" matching "ac" → false "AC Service".
+
+### Added
+- **Add Contact notes step** — asks "Any notes?" after category, saved to `contact_for` field.
+- **Update Contact command** — "update contact Shiva", "change Balu number", "edit plumber notes".
+- **Contact query filtering** — "send me electrician vinays contact" now returns only Vinay, not all electricians.
+- **VPS file-based logging** — `/tmp/pg_pending_debug.log` for tracing pending flows (journald doesn't work with uvicorn workers).
+
+### Benchmarked
+- 115 test cases: Regex 76.5%, Haiku 94.8%, Groq ~90%
+- Switched back to Groq (free) — Haiku cost $1+ in 2 days
+- **Next: PydanticAI integration** — structured output, self-correcting, learning flywheel
+
 ## [1.19.0] — 2026-04-07 — April Import + Day-wise Stays
 
 ### Added
