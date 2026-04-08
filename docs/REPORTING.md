@@ -46,13 +46,15 @@ Bank data cannot split these — they will be grouped as "Food & Kitchen" until 
 
 ### 1.2 Income Categories
 
-| # | Account / Category | Source |
-|---|---|---|
-| 1 | Rent Collection (THOR) | Supabase payments table (property_id filter) |
-| 2 | Rent Collection (HULK) | Supabase payments table (property_id filter) |
-| 3 | Security Deposits | Supabase payments (for_type = deposit) |
-| 4 | Other Income | Bank statement (unclassified income) |
-| | **Total Income** | |
+| # | Account / Category | Source | In Total Collection? |
+|---|---|---|---|
+| 1 | Rent Collection (THOR) | Supabase payments (for_type=rent, property_id) | YES |
+| 2 | Rent Collection (HULK) | Supabase payments (for_type=rent, property_id) | YES |
+| 3 | Maintenance Fees | Supabase tenancies (maintenance_fee, checkin month) | YES |
+| 4 | Security Deposits Received | Supabase payments (for_type=deposit) | NO — separate line |
+| 5 | Booking Advances | Supabase payments (for_type=booking) | NO — separate line |
+| 6 | Other Income | Bank statement (unclassified income) | NO |
+| | **Total Collection** | Rent + Maintenance | |
 
 ### 1.3 Report Layout
 
@@ -61,10 +63,15 @@ Bank data cannot split these — they will be grouped as "Food & Kitchen" until 
 ═══════════════════════════════════════════════════════════════════════════════════════════
 INCOME
   Rent Collection       XXX       XXX       XXX       XXX       XXX       XXX       XXX
+  Maintenance Fees      XXX       XXX       XXX       XXX       XXX       XXX       XXX
+───────────────────────────────────────────────────────────────────────────────────────────
+  TOTAL COLLECTION      XXX       XXX       XXX       XXX       XXX       XXX       XXX
+
   Security Deposits     XXX       XXX       XXX       XXX       XXX       XXX       XXX
+  Booking Advances      XXX       XXX       XXX       XXX       XXX       XXX       XXX
   Other Income          XXX       XXX       XXX       XXX       XXX       XXX       XXX
 ───────────────────────────────────────────────────────────────────────────────────────────
-  TOTAL INCOME          XXX       XXX       XXX       XXX       XXX       XXX       XXX
+  TOTAL INCOME (ALL)    XXX       XXX       XXX       XXX       XXX       XXX       XXX
 
 EXPENSES
   Food & Kitchen        XXX       XXX       XXX       XXX       XXX       XXX       XXX
@@ -137,23 +144,24 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 
 ## 3. OCCUPANCY CALCULATION
 
-### 3.1 Capacity (Canonical — from BRAIN.md)
+### 3.1 Capacity (Canonical — verified from DB 2026-04-08)
 
 ```
-TOTAL_BEDS = 305
-  THOR: 145 beds (78 revenue rooms)
-  HULK: 160 beds (81 revenue rooms)
+TOTAL_REVENUE_BEDS = 291
+  THOR: 145 beds (79 revenue rooms)
+  HULK: 146 beds (79 revenue rooms)
 
-Staff rooms EXCLUDED: G05, G06, 107, 108, 114, 701 (THOR) + G12, 702 (HULK)
-Premium rooms (HULK): x13, x24 per floor — max_occupancy = 2, but 1 person = 2 beds
+Staff rooms EXCLUDED (9 rooms):
+  THOR: G05(3), G06(2), 107(2), 108(2), 701(1), 702(1)
+  HULK: G12(3), 114(2), 618(2)
 ```
 
 ### 3.2 Formula
 
 ```
 occupied_beds = COUNT(Tenancy WHERE status IN [active, no_show] AND Room.is_staff_room = False)
-vacant_beds = TOTAL_BEDS - occupied_beds
-occupancy_pct = ROUND(occupied_beds / TOTAL_BEDS * 100, 1)
+vacant_beds = TOTAL_REVENUE_BEDS - occupied_beds
+occupancy_pct = ROUND(occupied_beds / TOTAL_REVENUE_BEDS * 100, 1)
 ```
 
 ### 3.3 Property-Level
@@ -161,7 +169,7 @@ occupancy_pct = ROUND(occupied_beds / TOTAL_BEDS * 100, 1)
 ```
 Per property (THOR/HULK):
   occupied = COUNT(tenancies for that property_id)
-  total = canonical beds (145 or 160)
+  total = canonical beds (THOR: 145, HULK: 146)
   pct = ROUND(occupied / total * 100, 1)
   vacant = total - occupied
 ```
@@ -181,6 +189,46 @@ dues_outstanding = (calculated per Section 2)
 collected = total_due - dues_outstanding
 collection_pct = ROUND(collected / total_due * 100)  IF total_due > 0 ELSE 0
 ```
+
+### 4.2 Total Collection (monthly report)
+
+```
+Total Collection = Rent Collected + Maintenance Collected
+  - Rent Collected = SUM(payments WHERE for_type = 'rent', period_month = M, is_void = False)
+  - Maintenance Collected = SUM(maintenance_fee) for tenancies with checkin_date in month M
+
+EXCLUDES: Security deposits (shown separately)
+INCLUDES: Maintenance fees (non-refundable, part of revenue)
+```
+
+### 4.3 Security Deposit Metrics
+
+**Monthly deposit received (for report):**
+```
+deposit_received_month = SUM(payments WHERE for_type = 'deposit', payment_date in month M, is_void = False)
+  — Shows new deposits collected that month only
+  — Separate line item in report, NOT included in Total Collection
+```
+
+**Total security deposit held (query: "total deposit held"):**
+```
+total_deposit_held = SUM(security_deposit) for ALL tenancies WHERE status = 'active'
+  — Full amount held from the start of each tenancy
+  — Includes maintenance portion (maintenance is non-refundable but deposit is held in full)
+```
+
+**Net refundable deposit (query: "refundable deposit"):**
+```
+net_refundable = SUM(security_deposit - maintenance_fee) for ALL tenancies WHERE status = 'active'
+  — What we'd actually return if everyone left today
+  — security_deposit includes maintenance; maintenance is deducted at exit
+```
+
+**Current values (as of 2026-04-08):**
+- Total deposit held: 32,67,425
+- Maintenance (non-refundable): 10,12,200
+- Net refundable: 22,55,225
+- Active tenants: 220
 
 ---
 
@@ -396,9 +444,9 @@ For month M:
 
 | Constant | Value | Where Used |
 |---|---|---|
-| TOTAL_BEDS | 305 | Occupancy KPI |
+| TOTAL_REVENUE_BEDS | 291 | Occupancy KPI |
 | THOR_BEDS | 145 | Property occupancy |
-| HULK_BEDS | 160 | Property occupancy |
+| HULK_BEDS | 146 | Property occupancy |
 | NOTICE_BY_DAY | 5 | Deposit eligibility |
 | OVERPAYMENT_NOISE_RS | 10 | Payment processing |
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection |
@@ -416,4 +464,4 @@ For month M:
 5. **Payments table is the source of truth for dues** — not bank statement
 6. **Classification rules: order matters** — Non-Operating MUST be first
 7. **Proration always rounds DOWN** — tenant pays less, not more
-8. **Maintenance = one-time check-in fee from deposit, NEVER monthly**
+8. **Maintenance = one-time check-in fee deducted from deposit, NEVER monthly. Non-refundable. Included in Total Collection.**
