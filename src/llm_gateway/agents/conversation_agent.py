@@ -131,12 +131,12 @@ async def _call_llm(system_prompt: str, user_message: str) -> ConversationResult
         agent = Agent(
             model="groq:llama-3.3-70b-versatile",
             system_prompt=system_prompt,
-            result_type=ConversationResult,
+            output_type=ConversationResult,
             retries=3,
         )
 
         result = await agent.run(user_message)
-        return result.data
+        return result.output
 
     except ImportError:
         logger.warning("[ConversationAgent] pydantic-ai not available, falling back to manual")
