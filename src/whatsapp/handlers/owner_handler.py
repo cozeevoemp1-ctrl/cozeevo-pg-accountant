@@ -5675,10 +5675,13 @@ async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSess
         "who", "is", "are", "was", "do", "did", "we", "use", "for", "of",
         "contact", "contacts", "number", "phone", "details", "detail",
         "vendor", "vendors", "supplier", "suppliers", "guy", "person",
-        "all", "every", "each",
+        "all", "every", "each", "send", "want", "need", "tell", "share",
+        "please", "can", "you", "i", "to", "my", "have", "whats", "what",
     }
     words = re.findall(r"[a-z]+", raw)
-    search_terms = [w for w in words if w not in _NOISE and len(w) > 1]
+    # Strip trailing 's' for fuzzy matching (vinays → vinay, plumbers → plumber)
+    search_terms = [w.rstrip("s") if len(w) > 3 and w.endswith("s") and w not in _NOISE else w
+                    for w in words if w not in _NOISE and len(w) > 1]
 
     # If nothing meaningful left, show all
     show_all = not search_terms
