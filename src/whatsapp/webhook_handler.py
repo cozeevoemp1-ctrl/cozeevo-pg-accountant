@@ -21,6 +21,28 @@ from loguru import logger
 router = APIRouter(prefix="/webhook", tags=["whatsapp"])
 
 
+# -- Message dedup cache (prevents duplicate webhook processing) ---------------
+# Meta sends the same message from multiple IPs. First one processes, rest skip.
+import time as _time
+_SEEN_MSG_IDS: dict[str, float] = {}  # msg_id → timestamp
+_DEDUP_TTL = 60  # seconds to remember a message ID
+
+
+def _is_duplicate(msg_id: str) -> bool:
+    """Return True if we've already processed this message ID."""
+    if not msg_id:
+        return False
+    now = _time.time()
+    # Purge old entries
+    stale = [k for k, v in _SEEN_MSG_IDS.items() if now - v > _DEDUP_TTL]
+    for k in stale:
+        del _SEEN_MSG_IDS[k]
+    if msg_id in _SEEN_MSG_IDS:
+        return True
+    _SEEN_MSG_IDS[msg_id] = now
+    return False
+
+
 # -- Webhook verification (Meta requires this one-time GET) --------------------
 
 @router.get("/whatsapp")
@@ -74,11 +96,17 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
 
     from_number = msg_data["from"]
     body        = msg_data.get("body", "")
+    msg_id      = msg_data.get("msg_id", "")
     media_id    = msg_data.get("media_id")
     media_mime  = msg_data.get("media_mime")
     media_name  = msg_data.get("media_name", "")   # original filename (for type sniffing)
 
-    logger.info(f"[Webhook] From={from_number} | Body={body[:80]}")
+    logger.info(f"[Webhook] From={from_number} | Body={body[:80]} | MsgId={msg_id[:20] if msg_id else '-'}")
+
+    # -- Dedup: skip if we've already processed this exact message ----------------
+    if _is_duplicate(msg_id):
+        logger.info(f"[Webhook] DUPLICATE skipped: {msg_id}")
+        return {"status": "ok"}
 
     # -- Master data approval replies ------------------------------------------
     import re
@@ -219,8 +247,10 @@ def _extract_message(payload: dict) -> Optional[dict]:
         from_num = msg["from"]
         msg_type = msg.get("type", "text")
 
+        msg_id = msg.get("id", "")  # wamid — unique per message, for dedup
+
         if msg_type == "text":
-            return {"from": from_num, "body": msg["text"]["body"]}
+            return {"from": from_num, "body": msg["text"]["body"], "msg_id": msg_id}
 
         # Interactive: button tap or list selection — extract the id as the body
         if msg_type == "interactive":
@@ -228,10 +258,10 @@ def _extract_message(payload: dict) -> Optional[dict]:
             itype = interactive.get("type", "")
             if itype == "button_reply":
                 btn_id = interactive.get("button_reply", {}).get("id", "")
-                return {"from": from_num, "body": btn_id}
+                return {"from": from_num, "body": btn_id, "msg_id": msg_id}
             if itype == "list_reply":
                 row_id = interactive.get("list_reply", {}).get("id", "")
-                return {"from": from_num, "body": row_id}
+                return {"from": from_num, "body": row_id, "msg_id": msg_id}
             return None  # unknown interactive subtype — ignore
 
         # Document / image / audio / video
@@ -241,7 +271,8 @@ def _extract_message(payload: dict) -> Optional[dict]:
             "body":       media_obj.get("caption", ""),
             "media_id":   media_obj.get("id"),
             "media_mime": media_obj.get("mime_type", ""),
-            "media_name": media_obj.get("filename", ""),   # filename WhatsApp sends for documents
+            "media_name": media_obj.get("filename", ""),
+            "msg_id":     msg_id,
         }
     except (KeyError, IndexError):
         return None
