@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.21.2] — 2026-04-08 — Phone Dedup Fix + April Sheet Sync
+
+### Fixed
+- **Phone dedup bug** — `excel_import.py` used phone-only as tenant cache key, causing shared-phone roommates (e.g. V. Bhanu Prakash + V. Sathya Priya in room 314) to be skipped. Now uses phone+name.
+- **import_april.py** — same phone+name matching for shared phones. Created V. Bhanu Prakash + Sanskar Bharadia who were previously missing.
+- **April Sheet format** — rewrote to 17-col format (with Phone column) matching gsheets.py. Was 15-col hybrid that broke bot write-back and Apps Script dashboard.
+- **April Sheet statuses** — uses Excel statuses directly instead of recalculating from Cash+UPI (which missed advance payments and cross-month balances).
+
+### Data
+- DB + Sheet now in sync: Rs 34,77,707 total April collections
+- 8 missing April rent_schedules generated, Adithya Reddy marked exit
+- Dashboard summary rows 2-3 now auto-generated with correct occupancy/collection stats
+
+### Open
+- 9 UNPAID showing on Sheet vs expected 5 checked-in unpaid — needs investigation (some may be no-shows miscategorized)
+
 ## [1.21.1] — 2026-04-08 — Report Revamp + April Delta Update + Groq 429 Fix
 
 ### Fixed
