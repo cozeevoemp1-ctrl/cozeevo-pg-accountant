@@ -531,7 +531,7 @@ async def run_tests(filter_group=None):
             errors.append((message, expected, f"ERROR: {e}", role))
             print(f"  [ERR]  \"{message}\" -> {e}")
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(2.5)  # Groq free tier: 30 req/min
 
     if current_group:
         pct = (group_pass / group_total * 100) if group_total else 0
