@@ -1186,7 +1186,7 @@ class PgConfig(Base):
     L0 — Master config per PG property.
     Single row per property; drives multi-tenant behaviour.
     """
-    __tablename__ = "pg_config"
+    __tablename__ = "property_config"
 
     id                  = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     pg_name             = Column(String(120), nullable=False)
@@ -1218,7 +1218,7 @@ class IntentExample(Base):
     __tablename__ = "intent_examples"
 
     id            = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    pg_id         = Column(String(36), ForeignKey("pg_config.id"), nullable=False)
+    pg_id         = Column(String(36), ForeignKey("property_config.id"), nullable=False)
     message_text  = Column(Text, nullable=False)
     intent        = Column(String(80), nullable=False)
     role          = Column(String(30), nullable=True)
@@ -1243,7 +1243,7 @@ class ClassificationLog(Base):
     __tablename__ = "classification_log"
 
     id                = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    pg_id             = Column(String(36), ForeignKey("pg_config.id"), nullable=False)
+    pg_id             = Column(String(36), ForeignKey("property_config.id"), nullable=False)
     message_text      = Column(Text, nullable=False)
     phone             = Column(String(20), nullable=True)
     role              = Column(String(30), nullable=True)
