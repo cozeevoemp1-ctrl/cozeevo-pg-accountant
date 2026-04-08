@@ -3115,7 +3115,9 @@ async def resolve_pending_action(
             )
 
         if step == "ask_name":
-            action_data["name"] = ans.strip().title()
+            # Strip parenthesized category hints like "(Electrician)" from name
+            clean_name = re.sub(r'\s*\([^)]*\)\s*', ' ', ans).strip()
+            action_data["name"] = clean_name.title()
             if action_data.get("phone"):
                 if action_data.get("category"):
                     action_data["step"] = "confirm"
@@ -3138,7 +3140,9 @@ async def resolve_pending_action(
                 )
 
         if step == "ask_phone":
-            phone_match = re.search(r'\d{7,15}', ans)
+            # Strip all non-digits, then match 7-15 digit phone
+            clean_digits = re.sub(r'[^\d]', '', ans)
+            phone_match = re.search(r'\d{7,15}', clean_digits)
             if not phone_match:
                 return "__KEEP_PENDING__Please enter a valid phone number (at least 7 digits):"
             action_data["phone"] = phone_match.group()
@@ -5548,9 +5552,10 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
     import hashlib
     raw = entities.get("_raw_message", "").strip()
 
-    # Extract phone number (7+ digits)
-    phone_match = re.search(r'\b(\d{7,15})\b', raw)
-    phone = phone_match.group(1) if phone_match else ""
+    # Extract phone number (7+ digits) — strip spaces/dashes first
+    raw_digits = re.sub(r'[^\d]', '', raw)
+    phone_match = re.search(r'\d{7,15}', raw_digits)
+    phone = phone_match.group() if phone_match else ""
 
     # Extract category — match known service keywords
     _CATEGORIES = {
