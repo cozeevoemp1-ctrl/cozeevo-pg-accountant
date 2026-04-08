@@ -98,6 +98,7 @@ async def handle_owner(
         "UPDATE_TENANT_NOTES": _update_tenant_notes,
         "QUERY_CONTACTS":     _query_contacts,
         "ADD_CONTACT":        _add_contact,
+        "UPDATE_CONTACT":     _update_contact,
         "ACTIVITY_LOG":       _activity_log,
         "QUERY_ACTIVITY":     _query_activity,
         "RULES":              _rules,
@@ -3123,7 +3124,7 @@ async def resolve_pending_action(
             action_data["name"] = clean_name.title()
             if action_data.get("phone"):
                 if action_data.get("category"):
-                    action_data["step"] = "confirm"
+                    action_data["step"] = "ask_notes"
                 else:
                     action_data["step"] = "ask_category"
             else:
@@ -3135,11 +3136,9 @@ async def resolve_pending_action(
                 return f"*{action_data['name']}* — {action_data['phone']}\n\n*What do they do?* (e.g. electrician, plumber)"
             else:
                 return (
-                    f"*Add Contact?*\n\n"
-                    f"Name: {action_data['name']}\n"
-                    f"Phone: {action_data['phone']}\n"
-                    f"Category: {action_data['category']}\n\n"
-                    "Reply *Yes* to save or *No* to cancel."
+                    f"*{action_data['name']}* — {action_data['category']}\n\n"
+                    "*Any notes?* (e.g. light installation, 20K agreed)\n"
+                    "Type notes or *skip*"
                 )
 
         if step == "ask_phone":
@@ -3154,29 +3153,40 @@ async def resolve_pending_action(
                 return "__KEEP_PENDING__Please enter a valid phone number (at least 7 digits):"
             action_data["phone"] = phone_match.group()
             if action_data.get("category"):
-                action_data["step"] = "confirm"
+                action_data["step"] = "ask_notes"
             else:
                 action_data["step"] = "ask_category"
             await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
             if action_data["step"] == "ask_category":
                 return f"*{action_data['name']}* — {action_data['phone']}\n\n*What do they do?* (e.g. electrician, plumber)"
             return (
-                f"*Add Contact?*\n\n"
-                f"Name: {action_data['name']}\n"
-                f"Phone: {action_data['phone']}\n"
-                f"Category: {action_data['category']}\n\n"
-                "Reply *Yes* to save or *No* to cancel."
+                f"*{action_data['name']}* — {action_data['category']}\n\n"
+                "*Any notes?* (e.g. light installation, 20K agreed)\n"
+                "Type notes or *skip*"
             )
 
         if step == "ask_category":
             action_data["category"] = ans.strip().title()
+            action_data["step"] = "ask_notes"
+            await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+            return (
+                f"*{action_data['name']}* — {action_data['category']}\n\n"
+                "*Any notes?* (e.g. light installation, 20K agreed)\n"
+                "Type notes or *skip*"
+            )
+
+        if step == "ask_notes":
+            if ans.lower() not in ("skip", "no", "none", "-"):
+                action_data["notes"] = ans
             action_data["step"] = "confirm"
             await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
+            notes_line = f"\nNotes: {action_data.get('notes', '')}" if action_data.get('notes') else ""
             return (
                 f"*Add Contact?*\n\n"
                 f"Name: {action_data['name']}\n"
                 f"Phone: {action_data['phone']}\n"
-                f"Category: {action_data['category']}\n\n"
+                f"Category: {action_data['category']}"
+                f"{notes_line}\n\n"
                 "Reply *Yes* to save or *No* to cancel."
             )
 
@@ -3209,16 +3219,19 @@ async def resolve_pending_action(
                     await _save_pending(pending.phone, "ADD_CONTACT_STEP", action_data, [], session)
                     return "\n".join(lines)
 
+                notes = action_data.get("notes", "")
+                contact_for = f"{category} — {notes}" if notes else category
                 contact = PgContact(
                     name=name,
                     phone=phone,
                     category=category,
-                    contact_for=category,
+                    contact_for=contact_for,
                     property="Whitefield",
                     unique_hash=dedup,
                 )
                 session.add(contact)
-                return f"Contact saved — *{name}* ({category}) {phone}"
+                notes_str = f"\n  _{notes}_" if notes else ""
+                return f"Contact saved — *{name}* ({category}) {phone}{notes_str}"
 
             return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
 
@@ -3257,6 +3270,165 @@ async def resolve_pending_action(
             return f"__KEEP_PENDING__Reply with a number (1-{n_options})."
 
     # APPROVE_ONBOARDING is handled at the TOP of resolve_pending_action (line ~132)
+
+    if pending.intent == "UPDATE_CONTACT_STEP":
+        ans = reply_text.strip()
+
+        if ans.lower() in ("cancel", "stop", "abort"):
+            return "Cancelled."
+
+        step = action_data.get("step", "")
+
+        if step == "ask_name":
+            # Search for the contact
+            from sqlalchemy import or_
+            like = f"%{ans.lower()}%"
+            contacts = (await session.execute(
+                select(PgContact).where(
+                    PgContact.property == "Whitefield",
+                    or_(
+                        func.lower(PgContact.name).like(like),
+                        func.lower(PgContact.category).like(like),
+                    ),
+                ).order_by(PgContact.name)
+            )).scalars().all()
+
+            if not contacts:
+                return f"__KEEP_PENDING__No contact found matching *{ans}*. Try another name:"
+
+            if len(contacts) == 1:
+                c = contacts[0]
+                action_data["step"] = "ask_field"
+                action_data["contact_id"] = c.id
+                action_data["contact_name"] = c.name
+                action_data["contact_phone"] = c.phone
+                action_data["contact_notes"] = c.contact_for or ""
+                await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+                return (
+                    f"*Update: {c.name}*\n"
+                    f"  Phone: {c.phone}\n"
+                    f"  Category: {c.category or ''}\n"
+                    f"  Notes: {c.contact_for or '—'}\n\n"
+                    "What to update?\n"
+                    "*1.* Phone number\n"
+                    "*2.* Notes/description\n"
+                    "*3.* Both\n"
+                    "*4.* Cancel"
+                )
+
+            lines = [f"*Found {len(contacts)} contacts:*\n"]
+            for i, c in enumerate(contacts, 1):
+                lines.append(f"*{i}.* {c.name} — {c.phone} ({c.category or ''})")
+            lines.append(f"\n*{len(contacts)+1}.* Cancel")
+            action_data["step"] = "pick_contact"
+            action_data["_contact_ids"] = [c.id for c in contacts]
+            await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+            return "\n".join(lines)
+
+        if step == "pick_contact":
+            ids = action_data.get("_contact_ids", [])
+            if ans.rstrip(".").isdigit():
+                choice = int(ans.rstrip("."))
+                if choice == len(ids) + 1:
+                    return "Cancelled."
+                if 1 <= choice <= len(ids):
+                    c = await session.get(PgContact, ids[choice - 1])
+                    if not c:
+                        return "Contact not found."
+                    action_data["step"] = "ask_field"
+                    action_data["contact_id"] = c.id
+                    action_data["contact_name"] = c.name
+                    action_data["contact_phone"] = c.phone
+                    action_data["contact_notes"] = c.contact_for or ""
+                    await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+                    return (
+                        f"*Update: {c.name}*\n"
+                        f"  Phone: {c.phone}\n"
+                        f"  Notes: {c.contact_for or '—'}\n\n"
+                        "What to update?\n"
+                        "*1.* Phone number\n"
+                        "*2.* Notes/description\n"
+                        "*3.* Both\n"
+                        "*4.* Cancel"
+                    )
+            return f"__KEEP_PENDING__Reply with a number (1-{len(ids)+1})."
+
+        if step == "ask_field":
+            if ans in ("4", "cancel"):
+                return "Cancelled."
+            if ans == "1":
+                action_data["step"] = "enter_phone"
+                action_data["update_what"] = "phone"
+            elif ans == "2":
+                action_data["step"] = "enter_notes"
+                action_data["update_what"] = "notes"
+            elif ans == "3":
+                action_data["step"] = "enter_phone"
+                action_data["update_what"] = "both"
+            else:
+                return "__KEEP_PENDING__Reply *1* (phone), *2* (notes), *3* (both), or *4* (cancel)."
+            await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+            if action_data["step"] == "enter_phone":
+                return f"*{action_data['contact_name']}*\nCurrent phone: {action_data['contact_phone']}\n\n*New phone number?*"
+            return f"*{action_data['contact_name']}*\nCurrent notes: {action_data['contact_notes'] or '—'}\n\n*New notes/description?*"
+
+        if step == "enter_phone":
+            clean_digits = re.sub(r'[^\d]', '', ans)
+            if clean_digits.startswith('91') and len(clean_digits) == 12:
+                clean_digits = clean_digits[2:]
+            if clean_digits.startswith('0') and len(clean_digits) == 11:
+                clean_digits = clean_digits[1:]
+            phone_match = re.search(r'\d{7,15}', clean_digits)
+            if not phone_match:
+                return "__KEEP_PENDING__Please enter a valid phone number:"
+            action_data["new_phone"] = phone_match.group()
+            if action_data.get("update_what") == "both":
+                action_data["step"] = "enter_notes"
+                await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+                return f"Phone: {action_data['new_phone']}\n\nNow enter *notes/description:*"
+            else:
+                action_data["step"] = "confirm_update"
+                await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+                return (
+                    f"*Update {action_data['contact_name']}?*\n"
+                    f"  Phone: {action_data['contact_phone']} → *{action_data['new_phone']}*\n\n"
+                    "Reply *Yes* to save or *No* to cancel."
+                )
+
+        if step == "enter_notes":
+            action_data["new_notes"] = ans
+            action_data["step"] = "confirm_update"
+            await _save_pending(pending.phone, "UPDATE_CONTACT_STEP", action_data, [], session)
+            changes = []
+            if action_data.get("new_phone"):
+                changes.append(f"  Phone: {action_data['contact_phone']} → *{action_data['new_phone']}*")
+            changes.append(f"  Notes: *{ans}*")
+            return (
+                f"*Update {action_data['contact_name']}?*\n"
+                + "\n".join(changes) + "\n\n"
+                "Reply *Yes* to save or *No* to cancel."
+            )
+
+        if step == "confirm_update":
+            if is_affirmative(ans):
+                contact = await session.get(PgContact, action_data["contact_id"])
+                if not contact:
+                    return "Contact not found."
+                changes = []
+                if action_data.get("new_phone"):
+                    contact.phone = action_data["new_phone"]
+                    changes.append(f"phone → {action_data['new_phone']}")
+                if action_data.get("new_notes"):
+                    contact.contact_for = action_data["new_notes"]
+                    changes.append(f"notes updated")
+                import hashlib
+                contact.unique_hash = hashlib.sha256(
+                    f"{contact.phone}:{contact.name}".encode()
+                ).hexdigest()
+                return f"Updated *{contact.name}* — {', '.join(changes)}"
+            if is_negative(ans):
+                return "Cancelled."
+            return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
 
     return None
 
@@ -5647,19 +5819,103 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
             "*What do they do?* (e.g. electrician, plumber, vendor, or type a description)"
         )
 
-    # All fields present — confirm
+    # All fields present — ask for notes
     await _save_pending(
         ctx.phone, "ADD_CONTACT_STEP",
-        {"step": "confirm", "name": name, "phone": phone, "category": category, "logged_by": ctx.name or ctx.phone},
+        {"step": "ask_notes", "name": name, "phone": phone, "category": category, "logged_by": ctx.name or ctx.phone},
         [], session,
     )
     return (
-        f"*Add Contact?*\n\n"
-        f"Name: {name}\n"
-        f"Phone: {phone}\n"
-        f"Category: {category}\n\n"
-        "Reply *Yes* to save or *No* to cancel."
+        f"*{name}* — {category}\n\n"
+        "*Any notes?* (e.g. light installation, 20K agreed)\n"
+        "Type notes or *skip*"
     )
+
+
+async def _update_contact(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    Update an existing vendor contact — phone, notes, or both.
+    "update contact Shiva — paid 5K more", "change Balu number to 9876543210"
+    """
+    raw = entities.get("_raw_message", "").strip()
+
+    # Extract search name — remove noise words
+    _NOISE = {
+        "update", "edit", "change", "modify", "contact", "contacts",
+        "vendor", "supplier", "number", "phone", "notes", "note",
+        "comment", "comments", "to", "for", "the",
+    }
+    words = raw.split()
+    name_parts = []
+    for w in words:
+        w_clean = re.sub(r'[^\w]', '', w)
+        if not w_clean:
+            continue
+        if w_clean.lower() in _NOISE:
+            continue
+        if w_clean.isdigit():
+            continue
+        name_parts.append(w_clean)
+    search_name = " ".join(name_parts).strip()
+
+    if not search_name:
+        await _save_pending(
+            ctx.phone, "UPDATE_CONTACT_STEP",
+            {"step": "ask_name", "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return "*Update Contact*\n\n*Name?* (which contact to update)"
+
+    # Search for matching contacts
+    from sqlalchemy import or_
+    like = f"%{search_name.lower()}%"
+    contacts = (await session.execute(
+        select(PgContact).where(
+            PgContact.property == "Whitefield",
+            or_(
+                func.lower(PgContact.name).like(like),
+                func.lower(PgContact.category).like(like),
+            ),
+        ).order_by(PgContact.name)
+    )).scalars().all()
+
+    if not contacts:
+        return f"No contact found matching *{search_name}*. Check the name and try again."
+
+    if len(contacts) == 1:
+        c = contacts[0]
+        await _save_pending(
+            ctx.phone, "UPDATE_CONTACT_STEP",
+            {"step": "ask_field", "contact_id": c.id, "contact_name": c.name,
+             "contact_phone": c.phone, "contact_notes": c.contact_for or "",
+             "logged_by": ctx.name or ctx.phone},
+            [], session,
+        )
+        return (
+            f"*Update: {c.name}*\n"
+            f"  Phone: {c.phone}\n"
+            f"  Category: {c.category or ''}\n"
+            f"  Notes: {c.contact_for or '—'}\n\n"
+            "What to update?\n"
+            "*1.* Phone number\n"
+            "*2.* Notes/description\n"
+            "*3.* Both\n"
+            "*4.* Cancel"
+        )
+
+    # Multiple matches — ask which one
+    lines = [f"*Found {len(contacts)} contacts matching \"{search_name}\":*\n"]
+    for i, c in enumerate(contacts, 1):
+        lines.append(f"*{i}.* {c.name} — {c.phone} ({c.category or ''})")
+    lines.append(f"\n*{len(contacts)+1}.* Cancel")
+    choices = [{"seq": i+1, "contact_id": c.id, "label": f"{c.name} — {c.phone}"}
+               for i, c in enumerate(contacts)]
+    await _save_pending(
+        ctx.phone, "UPDATE_CONTACT_STEP",
+        {"step": "pick_contact", "logged_by": ctx.name or ctx.phone},
+        choices, session,
+    )
+    return "\n".join(lines)
 
 
 async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:

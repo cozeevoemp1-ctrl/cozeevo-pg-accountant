@@ -106,6 +106,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:add|save|store|new)\s+(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.96),
     (re.compile(r"(?:add|save|store|new)\s+(?:\w+\s+){0,5}(?:contact|vendor|supplier)\b", re.I), "ADD_CONTACT", 0.95),
     (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
+    # UPDATE_CONTACT — change phone/notes for existing vendor contact
+    (re.compile(r"(?:update|edit|change|modify)\s+(?:contact|vendor|supplier)\b", re.I), "UPDATE_CONTACT", 0.95),
+    (re.compile(r"(?:update|edit|change|modify)\s+(?!tenant)(?:\w+\s+){0,5}(?:contact|number|phone|notes?|comment)\b", re.I), "UPDATE_CONTACT", 0.93),
     # Log expense — step-by-step form OR "log <expense keyword>" (must be BEFORE ACTIVITY_LOG)
     (re.compile(r"^(?:log\s+(?:an?\s+)?expense|add\s+(?:an?\s+)?expense|record\s+expense|new\s+expense)\s*$", re.I), "ADD_EXPENSE", 0.95),
     (re.compile(r"^log\s+(?!received|delivered|got|bought)(?:.*?\b(?:eb|electricity|bill|water\s+bill|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)", re.I), "ADD_EXPENSE", 0.94),
