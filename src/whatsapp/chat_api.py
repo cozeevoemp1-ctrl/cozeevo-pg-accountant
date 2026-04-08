@@ -148,6 +148,11 @@ async def _process_message_inner(
                           phone, "FOUND" if pending else "NONE",
                           pending.intent if pending else "-",
                           pending.resolved if pending else "-")
+        # File-based debug log for VPS tracing
+        import json as _dbg_json
+        with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+            _dbg.write(f"[{datetime.utcnow().isoformat()}] phone={ctx.phone} msg={message[:60]} "
+                       f"pending={'FOUND id=' + str(pending.id) + ' intent=' + pending.intent + ' step=' + _dbg_json.loads(pending.action_data or '{}').get('step','?') if pending else 'NONE'}\n")
         if pending:
             # ── Mid-flow breakout detection ────────────────────────────────────
             import json as _jbr
