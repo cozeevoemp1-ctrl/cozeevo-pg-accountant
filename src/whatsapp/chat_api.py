@@ -38,7 +38,25 @@ from src.whatsapp.handlers.owner_handler import resolve_pending_action, handle_l
 from src.whatsapp.handlers.tenant_handler import get_active_onboarding, handle_onboarding_step, resolve_tenant_complaint
 from src.llm_gateway.claude_client import get_claude_client
 
+# PydanticAI agent system (feature flag controlled)
+_USE_PYDANTIC_AGENTS = os.getenv("USE_PYDANTIC_AGENTS", "false").lower() == "true"
+_DEFAULT_PG_ID = os.getenv("DEFAULT_PG_ID", "")
+
 _chat_logger = logging.getLogger(__name__)
+
+
+async def _resolve_pg_id(session) -> str:
+    """Get the active pg_id. Returns DEFAULT_PG_ID or first active PG."""
+    if _DEFAULT_PG_ID:
+        return _DEFAULT_PG_ID
+    from src.database.models import PgConfig
+    from sqlalchemy import select as _sel
+    result = await session.execute(
+        _sel(PgConfig).where(PgConfig.is_active == True).limit(1)
+    )
+    pg = result.scalars().first()
+    return str(pg.id) if pg else ""
+
 
 router = APIRouter(prefix="/api/whatsapp", tags=["whatsapp"])
 
@@ -183,6 +201,18 @@ async def _process_message_inner(
                         resolved_entities = _extract_entities(original_msg, selected_intent)
                         # ── Learn: store this pattern→intent mapping ──────────────────
                         _learn_from_selection(original_msg, selected_intent)
+                        if _USE_PYDANTIC_AGENTS:
+                            _pg_id = await _resolve_pg_id(session)
+                            if _pg_id:
+                                from src.llm_gateway.agents.learning_agent import learn_from_interaction
+                                import asyncio as _asyncio
+                                _asyncio.create_task(learn_from_interaction(
+                                    pg_id=_pg_id, message=original_msg, phone=phone, role=ctx.role,
+                                    regex_result=None, regex_confidence=None,
+                                    llm_result=selected_intent, llm_confidence=0.8,
+                                    final_intent=selected_intent, entities=action_data.get("entities", {}),
+                                    source="user_selection", session=session,
+                                ))
                         # ── Route with the chosen intent ──────────────────────────────
                         if "description" not in resolved_entities:
                             resolved_entities["description"] = original_msg
@@ -330,6 +360,73 @@ async def _process_message_inner(
     # Try regex first for speed (instant, free)
     intent_result = detect_intent(message, ctx.role)
     intent = intent_result.intent
+
+    # ── PydanticAI agent path (feature flag) ─────────────────────────
+    if _USE_PYDANTIC_AGENTS and intent in ("UNKNOWN", "GENERAL"):
+        pg_id = await _resolve_pg_id(session)
+        if pg_id:
+            from src.llm_gateway.agents.conversation_agent import run_conversation_agent
+            from src.llm_gateway.agents.learning_agent import learn_from_interaction
+            import asyncio as _asyncio
+
+            agent_result = await run_conversation_agent(
+                message=message, role=ctx.role, phone=ctx.phone,
+                pg_id=pg_id, session=session,
+                chat_history="", pending_context="",
+            )
+
+            if agent_result.action == "classify" and agent_result.intent:
+                intent = agent_result.intent
+                entities = agent_result.entities or {}
+                entities.update(_extract_entities(message, intent))
+                intent_result = IntentResult(intent=intent, confidence=agent_result.confidence, entities=entities)
+                _asyncio.create_task(learn_from_interaction(
+                    pg_id=pg_id, message=message, phone=ctx.phone, role=ctx.role,
+                    regex_result=None, regex_confidence=None,
+                    llm_result=intent, llm_confidence=agent_result.confidence,
+                    final_intent=intent, entities=entities, source="auto_confirmed",
+                    session=session,
+                ))
+                # Fall through to gatekeeper routing
+
+            elif agent_result.action == "ask_options" and agent_result.options:
+                from src.whatsapp.handlers._shared import _save_pending
+                choices_list = [
+                    {"seq": i + 1, "intent": opt, "label": _INTENT_LABELS.get(opt, opt)}
+                    for i, opt in enumerate(agent_result.options)
+                ]
+                action_data = json.dumps({"original_message": message, "entities": agent_result.entities or {}})
+                await _save_pending(ctx.phone, "INTENT_AMBIGUOUS", action_data, choices_list, session)
+                _asyncio.create_task(learn_from_interaction(
+                    pg_id=pg_id, message=message, phone=ctx.phone, role=ctx.role,
+                    regex_result=None, regex_confidence=None,
+                    llm_result=str(agent_result.options), llm_confidence=agent_result.confidence,
+                    final_intent="INTENT_AMBIGUOUS", entities={}, source="pending_selection",
+                    session=session,
+                ))
+                reply = agent_result.reply or ("Did you mean:\n" + "\n".join(
+                    f"{c['seq']}. {c['label']}" for c in choices_list
+                ))
+                await _log(session, phone, message, ctx.role, "INTENT_AMBIGUOUS", reply)
+                await session.commit()
+                return OutboundReply(reply=reply, intent="INTENT_AMBIGUOUS", role=ctx.role)
+
+            elif agent_result.action == "converse" and agent_result.reply:
+                _asyncio.create_task(learn_from_interaction(
+                    pg_id=pg_id, message=message, phone=ctx.phone, role=ctx.role,
+                    regex_result=None, regex_confidence=None,
+                    llm_result="CONVERSE", llm_confidence=agent_result.confidence,
+                    final_intent="CONVERSE", entities={}, source="conversation",
+                    session=session,
+                ))
+                await _log(session, phone, message, ctx.role, "CONVERSE", agent_result.reply)
+                await session.commit()
+                return OutboundReply(reply=agent_result.reply, intent="CONVERSE", role=ctx.role)
+
+            elif agent_result.action == "clarify" and agent_result.reply:
+                await _log(session, phone, message, ctx.role, "CLARIFY", agent_result.reply)
+                await session.commit()
+                return OutboundReply(reply=agent_result.reply, intent="CLARIFY", role=ctx.role)
 
     # If regex is confident (>=0.90), use it. Otherwise, call Groq for better understanding.
     if intent == "UNKNOWN" or intent_result.confidence < 0.90:
