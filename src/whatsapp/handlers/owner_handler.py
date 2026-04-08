@@ -3136,8 +3136,9 @@ async def resolve_pending_action(
             elif action_data["step"] == "ask_category":
                 return f"*{action_data['name']}* — {action_data['phone']}\n\n*What do they do?* (e.g. electrician, plumber)"
             else:
+                phone_str = f"\nPhone: {action_data['phone']}" if action_data.get('phone') else ""
                 return (
-                    f"*{action_data['name']}* — {action_data['category']}\n\n"
+                    f"*{action_data['name']}* — {action_data['category']}{phone_str}\n\n"
                     "*Any notes?* (e.g. light installation, 20K agreed)\n"
                     "Type notes or *skip*"
                 )
@@ -5826,8 +5827,9 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
         {"step": "ask_notes", "name": name, "phone": phone, "category": category, "logged_by": ctx.name or ctx.phone},
         [], session,
     )
+    phone_str = f"\nPhone: {phone}" if phone else ""
     return (
-        f"*{name}* — {category}\n\n"
+        f"*{name}* — {category}{phone_str}\n\n"
         "*Any notes?* (e.g. light installation, 20K agreed)\n"
         "Type notes or *skip*"
     )
