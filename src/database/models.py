@@ -65,6 +65,7 @@ File Storage:
 from __future__ import annotations
 
 import enum
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
@@ -1175,4 +1176,86 @@ class BankTransaction(Base):
         Index("ix_btxn_category",   "category"),
         Index("ix_btxn_upload",     "upload_id"),
         UniqueConstraint("unique_hash", name="uq_btxn_hash"),
+    )
+
+
+# ── L0: Platform Config ────────────────────────────────────────────────────
+
+class PgConfig(Base):
+    """
+    L0 — Master config per PG property.
+    Single row per property; drives multi-tenant behaviour.
+    """
+    __tablename__ = "pg_config"
+
+    id                  = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    pg_name             = Column(String(120), nullable=False)
+    brand_name          = Column(String(120), nullable=True)
+    brand_voice         = Column(Text, nullable=True)
+    buildings           = Column(JSONB, nullable=True)
+    rooms               = Column(JSONB, nullable=True)
+    staff_rooms         = Column(JSONB, nullable=True)
+    staff               = Column(JSONB, nullable=True)
+    admin_phones        = Column(JSONB, nullable=True)
+    pricing             = Column(JSONB, nullable=True)
+    bank_config         = Column(JSONB, nullable=True)
+    expense_categories  = Column(JSONB, nullable=True)
+    custom_intents      = Column(JSONB, nullable=True)
+    business_rules      = Column(JSONB, nullable=True)
+    whatsapp_config     = Column(JSONB, nullable=True)
+    gsheet_config       = Column(JSONB, nullable=True)
+    timezone            = Column(String(60), default="Asia/Kolkata")
+    is_active           = Column(Boolean, default=True)
+    created_at          = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at          = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class IntentExample(Base):
+    """
+    L0 — Self-learning intent examples per PG.
+    Grows over time as the bot is corrected; used to fine-tune classification.
+    """
+    __tablename__ = "intent_examples"
+
+    id            = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    pg_id         = Column(String(36), ForeignKey("pg_config.id"), nullable=False)
+    message_text  = Column(Text, nullable=False)
+    intent        = Column(String(80), nullable=False)
+    role          = Column(String(30), nullable=True)
+    entities      = Column(JSONB, nullable=True)
+    confidence    = Column(Numeric(5, 4), nullable=True)
+    source        = Column(String(40), nullable=True)   # "regex" | "llm" | "manual"
+    confirmed_by  = Column(String(40), nullable=True)   # phone of admin who confirmed
+    is_active     = Column(Boolean, default=True)
+    created_at    = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at    = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_intent_examples_pg_id", "pg_id"),
+    )
+
+
+class ClassificationLog(Base):
+    """
+    L0 — Audit trail of every intent classification decision.
+    Stores regex vs LLM results, corrections, and final intent for analysis.
+    """
+    __tablename__ = "classification_log"
+
+    id                = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    pg_id             = Column(String(36), ForeignKey("pg_config.id"), nullable=False)
+    message_text      = Column(Text, nullable=False)
+    phone             = Column(String(20), nullable=True)
+    role              = Column(String(30), nullable=True)
+    regex_result      = Column(String(80), nullable=True)
+    regex_confidence  = Column(Numeric(5, 4), nullable=True)
+    llm_result        = Column(String(80), nullable=True)
+    llm_confidence    = Column(Numeric(5, 4), nullable=True)
+    final_intent      = Column(String(80), nullable=True)
+    was_corrected     = Column(Boolean, default=False)
+    corrected_to      = Column(String(80), nullable=True)
+    created_at        = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_classification_log_pg_id", "pg_id"),
     )
