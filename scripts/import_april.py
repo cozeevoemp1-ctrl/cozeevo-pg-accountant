@@ -65,6 +65,8 @@ COL_APR_CASH = 22
 COL_APR_UPI = 23
 COL_APR_BALANCE = 24
 COL_FOOD = 25
+COL_COMPLAINTS = 26
+COL_VACATION = 27
 
 
 # ── Comment classification ─────────────────────────────────────────────
@@ -218,6 +220,8 @@ def read_april(excel_file=APRIL_FILE):
             'booking': float(ws.cell(row, COL_BOOKING).value or 0) if isinstance(ws.cell(row, COL_BOOKING).value, (int, float)) else 0,
             'maintenance': float(ws.cell(row, COL_MAINTENANCE).value or 0) if isinstance(ws.cell(row, COL_MAINTENANCE).value, (int, float)) else 0,
             'food': safe_str(ws.cell(row, COL_FOOD).value),
+            'complaints': safe_str(ws.cell(row, COL_COMPLAINTS).value),
+            'vacation': safe_str(ws.cell(row, COL_VACATION).value),
             'staff': safe_str(ws.cell(row, COL_STAFF).value),
             'inout': inout,
             'apr_status': apr_status,

@@ -169,15 +169,33 @@ async def _call_llm_manual(system_prompt: str, user_message: str) -> Conversatio
         "max_tokens": 512,
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        resp.raise_for_status()
-        raw = resp.json()["choices"][0]["message"]["content"].strip()
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
 
-    clean = raw.lstrip("```json").lstrip("```").rstrip("```").strip()
-    data = json.loads(clean)
-    return ConversationResult(**data)
+        clean = raw.lstrip("```json").lstrip("```").rstrip("```").strip()
+        data = json.loads(clean)
+        return ConversationResult(**data)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            retry_after = e.response.headers.get("retry-after", "60")
+            logger.warning(f"[ConversationAgent] Groq rate limited (429), retry-after: {retry_after}s")
+            return ConversationResult(
+                action="converse",
+                reply="I'm a bit busy right now. Please try again in a minute.",
+                reasoning=f"Rate limited by Groq (429). Retry after {retry_after}s.",
+            )
+        raise
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.warning(f"[ConversationAgent] Failed to parse Groq response: {e}")
+        return ConversationResult(
+            action="converse",
+            reply="I didn't quite understand that. Could you rephrase?",
+            reasoning=f"JSON parse error: {e}",
+        )

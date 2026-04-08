@@ -1377,7 +1377,8 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     """Generate detailed report for a single month."""
     from src.database.models import BankTransaction, Refund, RefundStatus
 
-    collected = await session.scalar(
+    # Rent collection
+    rent_collected = await session.scalar(
         select(func.sum(Payment.amount)).where(
             Payment.period_month == current_month,
             Payment.for_type == PaymentFor.rent,
@@ -1402,6 +1403,27 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
             Payment.payment_mode == PaymentMode.upi,
         )
     ) or Decimal("0")
+
+    # Maintenance fees
+    maintenance_collected = await session.scalar(
+        select(func.sum(Payment.amount)).where(
+            Payment.period_month == current_month,
+            Payment.for_type == PaymentFor.maintenance,
+            Payment.is_void == False,
+        )
+    ) or Decimal("0")
+
+    # Security deposits received
+    deposits_received = await session.scalar(
+        select(func.sum(Payment.amount)).where(
+            Payment.period_month == current_month,
+            Payment.for_type == PaymentFor.deposit,
+            Payment.is_void == False,
+        )
+    ) or Decimal("0")
+
+    # Total Collection = Rent + Maintenance (per REPORTING.md)
+    collected = rent_collected + maintenance_collected
 
     last_day = date(
         current_month.year, current_month.month,
@@ -1515,9 +1537,17 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     elif bank_expenses > 0:
         exp_source = " (from bank statement)"
 
-    deposit_line = ""
+    deposit_refund_line = ""
     if deposits_returned > 0:
-        deposit_line = f"\nDeposits returned: Rs.{int(deposits_returned):,}"
+        deposit_refund_line = f"\n  Deposits Returned: Rs.{int(deposits_returned):,}"
+
+    deposit_recv_line = ""
+    if deposits_received > 0:
+        deposit_recv_line = f"\n  Security Deposits: Rs.{int(deposits_received):,}"
+
+    maintenance_line = ""
+    if maintenance_collected > 0:
+        maintenance_line = f"\n  Maintenance: Rs.{int(maintenance_collected):,}"
 
     month_tag = current_month.strftime("%B %Y")
 
@@ -1529,13 +1559,14 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
         + f"\n  Vacant: {vacant_beds} beds\n"
         f"{vacant_line}\n\n"
         f"*Income*\n"
-        f"  Cash: Rs.{int(cash_collected):,}\n"
-        f"  UPI:  Rs.{int(upi_collected):,}\n"
-        f"  Total: Rs.{int(collected):,}\n"
+        f"  Rent: Rs.{int(rent_collected):,} (Cash {int(cash_collected):,} | UPI {int(upi_collected):,})"
+        f"{maintenance_line}\n"
+        f"  *Total Collection: Rs.{int(collected):,}*\n"
+        f"{deposit_recv_line}"
         f"  Pending: Rs.{int(pending):,}\n\n"
         f"*Expenses*\n"
-        f"  Total: Rs.{int(total_expenses):,}{exp_source}\n"
-        f"{deposit_line}\n"
+        f"  Total: Rs.{int(total_expenses):,}{exp_source}"
+        f"{deposit_refund_line}\n\n"
         f"*Net: Rs.{net_income:,}*\n\n"
         f"Say *empty beds in thor* or *hulk vacant* for room details"
     )
@@ -1556,6 +1587,7 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
 
     lines = [f"*Yearly Report — {year}*\n"]
     total_cash = total_upi = total_pending = total_expenses = total_deposits = 0
+    total_maintenance = total_deposits_recv = 0
 
     for m in range(1, max_month + 1):
         period = date(year, m, 1)
@@ -1579,7 +1611,23 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
             )
         ) or 0)
 
-        collected = cash + upi
+        maint = int(await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.period_month == period,
+                Payment.for_type == PaymentFor.maintenance,
+                Payment.is_void == False,
+            )
+        ) or 0)
+
+        dep_recv = int(await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.period_month == period,
+                Payment.for_type == PaymentFor.deposit,
+                Payment.is_void == False,
+            )
+        ) or 0)
+
+        collected = cash + upi + maint
 
         last_day = date(year, m, calendar.monthrange(year, m)[1])
         pend = int(await session.scalar(
@@ -1629,26 +1677,31 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
         total_pending += pend
         total_expenses += exp
         total_deposits += dep_ret
+        total_maintenance += maint
+        total_deposits_recv += dep_recv
 
+        maint_note = f" | Maint {maint//1000}K" if maint > 0 else ""
         dep_note = f" | Dep.Ret: {dep_ret//1000}K" if dep_ret > 0 else ""
+        dep_recv_note = f" | Dep.In: {dep_recv//1000}K" if dep_recv > 0 else ""
         lines.append(
             f"*{month_label}* | Cash {cash//1000}K | UPI {upi//1000}K"
-            f" | Exp {exp//1000}K{dep_note}"
+            f"{maint_note} | Exp {exp//1000}K{dep_note}{dep_recv_note}"
             f" | Net {net//1000}K"
             + (f" | Pend {pend//1000}K" if pend > 0 else "")
         )
 
-    total_collected = total_cash + total_upi
+    total_collected = total_cash + total_upi + total_maintenance
     total_net = total_collected - total_expenses
 
     lines.append(f"\n{'─' * 30}")
     lines.append(
         f"*TOTAL*\n"
-        f"  Cash: Rs.{total_cash:,}\n"
-        f"  UPI:  Rs.{total_upi:,}\n"
-        f"  Collected: Rs.{total_collected:,}\n"
-        f"  Expenses:  Rs.{total_expenses:,}\n"
-        + (f"  Deposits returned: Rs.{total_deposits:,}\n" if total_deposits > 0 else "")
+        f"  Rent: Rs.{total_cash + total_upi:,} (Cash {total_cash:,} | UPI {total_upi:,})\n"
+        + (f"  Maintenance: Rs.{total_maintenance:,}\n" if total_maintenance > 0 else "")
+        + f"  *Total Collection: Rs.{total_collected:,}*\n"
+        + (f"  Security Deposits: Rs.{total_deposits_recv:,}\n" if total_deposits_recv > 0 else "")
+        + f"  Expenses:  Rs.{total_expenses:,}\n"
+        + (f"  Deposits Returned: Rs.{total_deposits:,}\n" if total_deposits > 0 else "")
         + f"  Pending: Rs.{total_pending:,}\n"
         f"  *Net Income: Rs.{total_net:,}*"
     )

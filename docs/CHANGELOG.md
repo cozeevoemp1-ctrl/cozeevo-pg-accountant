@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.21.1] — 2026-04-08 — Report Revamp + April Delta Update + Groq 429 Fix
+
+### Fixed
+- **Groq 429 fallback** — `_call_llm_manual` now returns graceful "try again" reply instead of crashing on rate limit. Also handles JSON parse errors.
+
+### Changed
+- **Monthly report** — Total Collection = Rent + Maintenance (per REPORTING.md). Security Deposits shown as separate line. Rent breakdown shows Cash/UPI split.
+- **Yearly report** — same: maintenance + deposits tracked per month, totals include maintenance in collection.
+
+### Added
+- **`scripts/update_april_delta.py`** — delta updater: compares Excel vs DB per-tenant, only updates changed records (payments, statuses, notes). No more drop-and-reload for incremental updates.
+- **April import columns** — complaints (col 26), vacation (col 27) now parsed from Excel.
+
+### Data
+- April delta applied: +20 payments, 4 corrected, 21 status updates, 11 notes synced, 3 new tenants (Kiran Koushik, Nihanth, Prableen). DB total matches Excel: Rs 34,77,707.
+
 ## [1.21.0] — 2026-04-08 — Kozzy AI Platform: PydanticAI + Multi-Tenant Foundation
 
 ### Added
