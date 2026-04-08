@@ -2539,7 +2539,15 @@ async def resolve_pending_action(
 
     # ── Numbered-choice disambiguation ────────────────────────────────────────
 
-    if chosen_idx is None:
+    # Multi-step text flows that DON'T use numbered choices — skip the None check
+    _TEXT_STEP_INTENTS = {
+        "ADD_CONTACT_STEP", "UPDATE_TENANT_NOTES_STEP", "CONFIRM_ADD_TENANT",
+        "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "VOID_PAYMENT", "VOID_WHICH",
+        "VOID_EXPENSE", "VOID_WHO", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
+        "RENT_CHANGE", "RENT_CHANGE_WHO", "UPDATE_CHECKIN", "UPDATE_CHECKOUT_DATE",
+        "NOTICE_GIVEN", "QUERY_TENANT", "GET_TENANT_NOTES",
+    }
+    if chosen_idx is None and pending.intent not in _TEXT_STEP_INTENTS:
         return None   # Not a valid numbered choice — let normal flow handle it
 
     chosen = choices[chosen_idx]
