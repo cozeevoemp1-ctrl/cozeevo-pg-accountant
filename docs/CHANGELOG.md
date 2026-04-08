@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.21.0] — 2026-04-08 — Kozzy AI Platform: PydanticAI + Multi-Tenant Foundation
+
+### Added
+- **PydanticAI ConversationAgent** — structured LLM output, few-shot examples, natural conversation, confidence routing (>0.9 execute / 0.6-0.9 options / <0.6 clarify)
+- **LearningAgent** — background async learning from corrections, selections, confirmations. Each PG learns independently.
+- **property_config table** — multi-tenant config: buildings, rooms, pricing, bank config, personality per PG
+- **intent_examples table** — self-learning intent database, scoped per PG, grows from user interactions
+- **classification_log table** — audit trail of every intent classification
+- **Dynamic system prompt** — built from property_config, role-aware, with injected few-shot examples
+- **Feature flag** — `USE_PYDANTIC_AGENTS=false` for safe rollout, instant rollback
+- **Cozeevo seeded** as first PG tenant (PG_ID: 58373135-5a92-4957-b11e-256d61f09441)
+- **SYSTEM_SPEC.md** — single-file platform specification (14 sections, replaces reading 16 docs)
+
+### Fixed
+- **pg_config name conflict** — PostgreSQL has a system view called pg_config. Renamed to property_config.
+- **PydanticAI API** — output_type (not result_type), result.output (not result.data)
+
+### Architecture
+- Regex stays as fast path (~97%). PydanticAI handles misses with structured output.
+- Every LLM classification feeds the learning flywheel (intent_examples grows autonomously).
+- All PG-specific config in property_config — no hardcoded strings in agent code.
+- Handlers unchanged — agents output same dict shape, zero handler modifications.
+
+### Smoke Test Results
+- "Raj paid 15000" → PAYMENT_LOG (conf=0.95) ✓
+- "Good morning!" → natural reply ✓
+- "Who are you?" → "I'm Cozeevo Help Desk..." ✓
+
 ## [1.20.0] — 2026-04-08 — Confirm Bug Fix + Contact Management + Benchmarks
 
 ### Fixed (CRITICAL)
