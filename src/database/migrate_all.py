@@ -782,7 +782,7 @@ async def run_simplify_roles_2026_04_01(engine) -> None:
 
 async def run_add_lokesh_receptionist(conn: AsyncConnection) -> None:
     """Add Lokesh (7680814628) as receptionist. Added 2026-04-06."""
-    print("\n── Add Lokesh receptionist ──")
+    print("\n-- Add Lokesh receptionist --")
     await conn.execute(text("""
         INSERT INTO authorized_users (phone, name, role, added_by, active)
         VALUES ('7680814628', 'Lokesh', 'receptionist', '7845952289', TRUE)
@@ -795,10 +795,10 @@ async def run_add_lokesh_receptionist(conn: AsyncConnection) -> None:
 
 
 async def run_create_pg_config(conn: AsyncConnection) -> None:
-    """Create pg_config table for multi-tenant PG configuration. Added 2026-04-08."""
-    print("\n── Create pg_config table ──")
+    """Create property_config table for multi-tenant PG configuration. Added 2026-04-08."""
+    print("\n-- Create property_config table --")
     await conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS pg_config (
+        CREATE TABLE IF NOT EXISTS property_config (
             id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             pg_name             TEXT NOT NULL,
             brand_name          TEXT,
@@ -821,16 +821,16 @@ async def run_create_pg_config(conn: AsyncConnection) -> None:
             updated_at          TIMESTAMPTZ DEFAULT NOW()
         )
     """))
-    print("  [ok] pg_config table ready")
+    print("  [ok] property_config table ready")
 
 
 async def run_create_intent_examples(conn: AsyncConnection) -> None:
     """Create intent_examples table for agentic learning. Added 2026-04-08."""
-    print("\n── Create intent_examples table ──")
+    print("\n-- Create intent_examples table --")
     await conn.execute(text("""
         CREATE TABLE IF NOT EXISTS intent_examples (
             id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            pg_id           UUID REFERENCES pg_config(id),
+            pg_id           UUID REFERENCES property_config(id),
             message_text    TEXT NOT NULL,
             intent          TEXT NOT NULL,
             role            TEXT,
@@ -856,11 +856,11 @@ async def run_create_intent_examples(conn: AsyncConnection) -> None:
 
 async def run_create_classification_log(conn: AsyncConnection) -> None:
     """Create classification_log table for tracking intent classification results. Added 2026-04-08."""
-    print("\n── Create classification_log table ──")
+    print("\n-- Create classification_log table --")
     await conn.execute(text("""
         CREATE TABLE IF NOT EXISTS classification_log (
             id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            pg_id               UUID REFERENCES pg_config(id),
+            pg_id               UUID REFERENCES property_config(id),
             message_text        TEXT,
             phone               TEXT,
             role                TEXT,
@@ -883,33 +883,39 @@ async def run_create_classification_log(conn: AsyncConnection) -> None:
 
 async def run_seed_cozeevo_pg_config(conn: AsyncConnection) -> None:
     """Seed Cozeevo Co-living as the first PG in pg_config. Added 2026-04-08."""
-    print("\n── Seed Cozeevo pg_config ──")
+    print("\n-- Seed Cozeevo property_config --")
     existing = await conn.execute(text("""
-        SELECT id FROM pg_config WHERE pg_name = 'Cozeevo Co-living' LIMIT 1
+        SELECT id FROM property_config WHERE pg_name = 'Cozeevo Co-living' LIMIT 1
     """))
     if existing.fetchone():
         print("  [skip] Cozeevo Co-living already exists")
         return
-    await conn.execute(text("""
-        INSERT INTO pg_config (
+    await conn.execute(
+        text("""
+        INSERT INTO property_config (
             pg_name, brand_name, brand_voice,
             buildings, staff_rooms, admin_phones,
             pricing, expense_categories, business_rules,
             timezone, is_active
         ) VALUES (
-            'Cozeevo Co-living',
-            'Cozeevo Help Desk',
-            'You are Cozeevo Help Desk, a friendly and efficient AI assistant for Cozeevo Co-living PG in Chennai. Be concise, professional, and helpful. Use simple English. No emojis unless the user uses them first.',
-            '[{"name":"THOR","floors":7,"type":"male"},{"name":"HULK","floors":6,"type":"female"}]',
-            '["G05","G06","107","108","701","702","G12","114","618"]',
-            '["+917845952289","+917358341775","+919444296681"]',
-            '{"sharing_3":7500,"sharing_2":9000,"single":12000,"single_ac":15000}',
-            '["Electricity","Water","Salaries","Food","Furniture","Maintenance","IT","Internet","Gas","Property Rent","Police/Govt","Marketing","Shopping","Bank Charges","Housekeeping","Security","Insurance","Legal","Other"]',
-            '{"proration":"first_month_standard_only","checkout_notice_day":5,"deposit_months":1,"billing_cycle":"monthly","checkout_full_month_charged":true}',
-            'Asia/Kolkata',
-            TRUE
+            :pg_name, :brand_name, :brand_voice,
+            cast(:buildings as jsonb), cast(:staff_rooms as jsonb), cast(:admin_phones as jsonb),
+            cast(:pricing as jsonb), cast(:expense_categories as jsonb), cast(:business_rules as jsonb),
+            :timezone, TRUE
         )
-    """))
+        """).bindparams(
+            pg_name="Cozeevo Co-living",
+            brand_name="Cozeevo Help Desk",
+            brand_voice="You are Cozeevo Help Desk, a friendly and efficient AI assistant for Cozeevo Co-living PG in Chennai. Be concise, professional, and helpful. Use simple English. No emojis unless the user uses them first.",
+            buildings='[{"name":"THOR","floors":7,"type":"male"},{"name":"HULK","floors":6,"type":"female"}]',
+            staff_rooms='["G05","G06","107","108","701","702","G12","114","618"]',
+            admin_phones='["+917845952289","+917358341775","+919444296681"]',
+            pricing='{"sharing_3":7500,"sharing_2":9000,"single":12000,"single_ac":15000}',
+            expense_categories='["Electricity","Water","Salaries","Food","Furniture","Maintenance","IT","Internet","Gas","Property Rent","Police/Govt","Marketing","Shopping","Bank Charges","Housekeeping","Security","Insurance","Legal","Other"]',
+            business_rules='{"proration":"first_month_standard_only","checkout_notice_day":5,"deposit_months":1,"billing_cycle":"monthly","checkout_full_month_charged":true}',
+            timezone="Asia/Kolkata",
+        )
+    )
     print("  [ok] Cozeevo Co-living seeded into pg_config")
 
 
