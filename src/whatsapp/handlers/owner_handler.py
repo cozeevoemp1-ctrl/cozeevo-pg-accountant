@@ -3140,8 +3140,12 @@ async def resolve_pending_action(
                 )
 
         if step == "ask_phone":
-            # Strip all non-digits, then match 7-15 digit phone
+            # Strip all non-digits, then extract 10-digit phone (drop country code)
             clean_digits = re.sub(r'[^\d]', '', ans)
+            if clean_digits.startswith('91') and len(clean_digits) == 12:
+                clean_digits = clean_digits[2:]
+            if clean_digits.startswith('0') and len(clean_digits) == 11:
+                clean_digits = clean_digits[1:]
             phone_match = re.search(r'\d{7,15}', clean_digits)
             if not phone_match:
                 return "__KEEP_PENDING__Please enter a valid phone number (at least 7 digits):"
@@ -5552,8 +5556,12 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
     import hashlib
     raw = entities.get("_raw_message", "").strip()
 
-    # Extract phone number (7+ digits) — strip spaces/dashes first
+    # Extract phone number (7+ digits) — strip spaces/dashes/country code
     raw_digits = re.sub(r'[^\d]', '', raw)
+    if raw_digits.startswith('91') and len(raw_digits) >= 12:
+        raw_digits = raw_digits[2:]
+    if raw_digits.startswith('0') and len(raw_digits) == 11:
+        raw_digits = raw_digits[1:]
     phone_match = re.search(r'\d{7,15}', raw_digits)
     phone = phone_match.group() if phone_match else ""
 
@@ -5575,7 +5583,7 @@ async def _add_contact(entities: dict, ctx: CallerContext, session: AsyncSession
     raw_lower = raw.lower()
     category = ""
     for keyword, cat in _CATEGORIES.items():
-        if keyword in raw_lower:
+        if re.search(r'\b' + re.escape(keyword) + r'\b', raw_lower):
             category = cat
             break
 
