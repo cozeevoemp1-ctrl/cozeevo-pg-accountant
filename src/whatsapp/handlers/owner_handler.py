@@ -124,6 +124,7 @@ async def resolve_pending_action(
     from src.whatsapp.handlers.account_handler import (
         _do_log_payment_by_ids, _do_void_payment, _do_rent_change, _do_query_tenant_by_id,
     )
+    from src.whatsapp.handlers._shared import _save_pending
     reply_text = reply_text.strip()
     choices = json.loads(pending.choices or "[]")
     action_data = json.loads(pending.action_data or "{}")
