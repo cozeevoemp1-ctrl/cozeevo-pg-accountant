@@ -794,6 +794,125 @@ async def run_add_lokesh_receptionist(conn: AsyncConnection) -> None:
     print("  [ok] Lokesh (7680814628) → receptionist")
 
 
+async def run_create_pg_config(conn: AsyncConnection) -> None:
+    """Create pg_config table for multi-tenant PG configuration. Added 2026-04-08."""
+    print("\n── Create pg_config table ──")
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS pg_config (
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            pg_name             TEXT NOT NULL,
+            brand_name          TEXT,
+            brand_voice         TEXT,
+            buildings           JSONB,
+            rooms               JSONB,
+            staff_rooms         JSONB,
+            staff               JSONB,
+            admin_phones        JSONB,
+            pricing             JSONB,
+            bank_config         JSONB,
+            expense_categories  JSONB,
+            custom_intents      JSONB,
+            business_rules      JSONB,
+            whatsapp_config     JSONB,
+            gsheet_config       JSONB,
+            timezone            TEXT DEFAULT 'Asia/Kolkata',
+            is_active           BOOLEAN DEFAULT TRUE,
+            created_at          TIMESTAMPTZ DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ DEFAULT NOW()
+        )
+    """))
+    print("  [ok] pg_config table ready")
+
+
+async def run_create_intent_examples(conn: AsyncConnection) -> None:
+    """Create intent_examples table for agentic learning. Added 2026-04-08."""
+    print("\n── Create intent_examples table ──")
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS intent_examples (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            pg_id           UUID REFERENCES pg_config(id),
+            message_text    TEXT NOT NULL,
+            intent          TEXT NOT NULL,
+            role            TEXT,
+            entities        JSONB,
+            confidence      FLOAT,
+            source          TEXT,
+            confirmed_by    TEXT,
+            is_active       BOOLEAN DEFAULT TRUE,
+            created_at      TIMESTAMPTZ DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_intent_examples_pg_id
+        ON intent_examples(pg_id)
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_intent_examples_intent
+        ON intent_examples(intent)
+    """))
+    print("  [ok] intent_examples table + indexes ready")
+
+
+async def run_create_classification_log(conn: AsyncConnection) -> None:
+    """Create classification_log table for tracking intent classification results. Added 2026-04-08."""
+    print("\n── Create classification_log table ──")
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS classification_log (
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            pg_id               UUID REFERENCES pg_config(id),
+            message_text        TEXT,
+            phone               TEXT,
+            role                TEXT,
+            regex_result        TEXT,
+            regex_confidence    FLOAT,
+            llm_result          TEXT,
+            llm_confidence      FLOAT,
+            final_intent        TEXT,
+            was_corrected       BOOLEAN DEFAULT FALSE,
+            corrected_to        TEXT,
+            created_at          TIMESTAMPTZ DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_classification_log_pg_id
+        ON classification_log(pg_id)
+    """))
+    print("  [ok] classification_log table + index ready")
+
+
+async def run_seed_cozeevo_pg_config(conn: AsyncConnection) -> None:
+    """Seed Cozeevo Co-living as the first PG in pg_config. Added 2026-04-08."""
+    print("\n── Seed Cozeevo pg_config ──")
+    existing = await conn.execute(text("""
+        SELECT id FROM pg_config WHERE pg_name = 'Cozeevo Co-living' LIMIT 1
+    """))
+    if existing.fetchone():
+        print("  [skip] Cozeevo Co-living already exists")
+        return
+    await conn.execute(text("""
+        INSERT INTO pg_config (
+            pg_name, brand_name, brand_voice,
+            buildings, staff_rooms, admin_phones,
+            pricing, expense_categories, business_rules,
+            timezone, is_active
+        ) VALUES (
+            'Cozeevo Co-living',
+            'Cozeevo Help Desk',
+            'You are Cozeevo Help Desk, a friendly and efficient AI assistant for Cozeevo Co-living PG in Chennai. Be concise, professional, and helpful. Use simple English. No emojis unless the user uses them first.',
+            '[{"name":"THOR","floors":7,"type":"male"},{"name":"HULK","floors":6,"type":"female"}]',
+            '["G05","G06","107","108","701","702","G12","114","618"]',
+            '["+917845952289","+917358341775","+919444296681"]',
+            '{"sharing_3":7500,"sharing_2":9000,"single":12000,"single_ac":15000}',
+            '["Electricity","Water","Salaries","Food","Furniture","Maintenance","IT","Internet","Gas","Property Rent","Police/Govt","Marketing","Shopping","Bank Charges","Housekeeping","Security","Insurance","Legal","Other"]',
+            '{"proration":"first_month_standard_only","checkout_notice_day":5,"deposit_months":1,"billing_cycle":"monthly","checkout_full_month_charged":true}',
+            'Asia/Kolkata',
+            TRUE
+        )
+    """))
+    print("  [ok] Cozeevo Co-living seeded into pg_config")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -813,6 +932,10 @@ async def main(args: argparse.Namespace) -> None:
             await run_activity_log_table(conn)
             await run_chat_messages_table(conn)
             await run_add_lokesh_receptionist(conn)
+            await run_create_pg_config(conn)
+            await run_create_intent_examples(conn)
+            await run_create_classification_log(conn)
+            await run_seed_cozeevo_pg_config(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         await run_simplify_roles_2026_04_01(engine)
         if args.seed:
