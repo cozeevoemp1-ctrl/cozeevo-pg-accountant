@@ -5114,17 +5114,32 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
             }
         room_data[room.id]["occupants"].append((tenant_name, (tenant_gender or "").lower()))
 
+    # Day-wise guests per room (reduce free bed count)
+    from src.database.models import DaywiseStay
+    from datetime import date as _date
+    _today = _date.today()
+    dw_per_room = {row[0]: row[1] for row in (await session.execute(
+        select(DaywiseStay.room_number, func.count())
+        .where(
+            DaywiseStay.checkin_date <= _today,
+            DaywiseStay.checkout_date >= _today,
+            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+        )
+        .group_by(DaywiseStay.room_number)
+    )).all()}
+
     # Filter: rooms where occupancy < max AND at least one occupant matches gender
     matching = []
     for rid, data in room_data.items():
         room = data["room"]
         occupants = data["occupants"]
         max_occ = room.max_occupancy or 2
-        if len(occupants) < max_occ:
-            # Check if any occupant matches the requested gender
+        dw_count = dw_per_room.get(room.room_number, 0)
+        total_occupied = len(occupants) + dw_count
+        if total_occupied < max_occ:
             genders = [g for _, g in occupants]
             if gender in genders:
-                free_beds = max_occ - len(occupants)
+                free_beds = max_occ - total_occupied
                 matching.append({
                     "room": room.room_number,
                     "prop": data["prop"],
@@ -5134,7 +5149,6 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
                 })
 
     # Also include fully vacant multi-bed rooms (anyone can go there)
-    all_room_ids_with_tenants = set(room_data.keys())
     vacant_q = (
         select(Room, Property.name)
         .join(Property, Property.id == Room.property_id)
@@ -5154,6 +5168,9 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
         vacant_q = vacant_q.where(Property.name.ilike(f"%{building_filter}%"))
 
     vacant_rows = (await session.execute(vacant_q)).all()
+    # Exclude vacant rooms occupied by daywise guests
+    vacant_rows = [(r, p) for r, p in vacant_rows
+                   if (r.max_occupancy or 2) - dw_per_room.get(r.room_number, 0) > 0]
 
     gender_label = gender.capitalize()
     bld_label = f" in {building_filter}" if building_filter else ""
@@ -5175,16 +5192,18 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
         lines.append(f"*Fully vacant rooms (any gender):*")
         for room, prop_name in sorted(vacant_rows, key=lambda x: x[0].room_number):
             block = "THOR" if "THOR" in prop_name.upper() else "HULK"
-            beds = room.max_occupancy or 2
+            beds = (room.max_occupancy or 2) - dw_per_room.get(room.room_number, 0)
             lines.append(f"  Room *{room.room_number}* ({block}) — {beds} beds free")
 
-    total_beds = sum(m["free_beds"] for m in matching) + sum((r.max_occupancy or 2) for r, _ in vacant_rows)
+    total_beds = sum(m["free_beds"] for m in matching) + sum(
+        (r.max_occupancy or 2) - dw_per_room.get(r.room_number, 0) for r, _ in vacant_rows)
     lines.append(f"\n*Total available: {total_beds} beds*")
 
     return "\n".join(lines)
 
 
 async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show ALL empty beds — fully vacant rooms + partial rooms with free beds."""
     from collections import defaultdict
     from src.database.models import Property
 
@@ -5202,107 +5221,130 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     elif any(w in desc for w in ("male", "boy", "man", "men", "gents")):
         gender_filter = "male"
 
-    # If gender filter → show PARTIALLY OCCUPIED rooms with matching gender
     if gender_filter:
         return await _query_beds_by_gender(gender_filter, building_filter, session)
 
-    q = select(Room, Property.name).join(Property, Property.id == Room.property_id).where(Room.active == True, Room.is_staff_room == False)
+    # ── Get all revenue rooms with their tenant counts ────────────────────
+    room_q = (
+        select(Room, Property.name)
+        .join(Property, Property.id == Room.property_id)
+        .where(Room.active == True, Room.is_staff_room == False)
+    )
     if building_filter:
-        q = q.where(Property.name.ilike(f"%{building_filter}%"))
-    q = q.order_by(Property.name, Room.room_number)
+        room_q = room_q.where(Property.name.ilike(f"%{building_filter}%"))
+    room_q = room_q.order_by(Property.name, Room.room_number)
+    all_rows = (await session.execute(room_q)).all()
 
-    all_rows = (await session.execute(q)).all()
-
-    occupied_ids = {row[0] for row in (await session.execute(
-        select(Tenancy.room_id)
+    # Count active + no-show tenants per room (no-shows are booked, bed reserved)
+    tenant_q = (
+        select(Tenancy.room_id, func.count().label("cnt"))
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
             Tenancy.room_id.isnot(None),
             Room.is_staff_room == False,
         )
-    )).all()}
+        .group_by(Tenancy.room_id)
+    )
+    tenant_counts = {row[0]: row[1] for row in (await session.execute(tenant_q)).all()}
 
-    total_rooms = len(all_rows)
-    total_beds  = sum(r.max_occupancy or 1 for r, _ in all_rows)
-    vacant      = [(r, prop) for r, prop in all_rows if r.id not in occupied_ids]
-    occupied_rooms = total_rooms - len(vacant)
-    vacant_beds    = sum(r.max_occupancy or 1 for r, _ in vacant)
-    occupied_beds  = total_beds - vacant_beds
-
-    if not vacant:
-        bld = f" in *{building_filter}*" if building_filter else ""
-        return (
-            f"All {total_rooms} rooms / {total_beds} beds{bld} are currently occupied.\n"
-            "No vacant rooms available."
+    # Count day-wise guests currently occupying beds (checkin <= today <= checkout)
+    from src.database.models import DaywiseStay
+    from datetime import date
+    today = date.today()
+    dw_q = (
+        select(DaywiseStay.room_number, func.count().label("cnt"))
+        .where(
+            DaywiseStay.checkin_date <= today,
+            DaywiseStay.checkout_date >= today,
+            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
         )
+        .group_by(DaywiseStay.room_number)
+    )
+    daywise_counts = {row[0]: row[1] for row in (await session.execute(dw_q)).all()}
+
+    # Map room_number -> room_id for daywise stays
+    room_number_to_id = {r.room_number: r.id for r, _ in all_rows}
+    for rn, cnt in daywise_counts.items():
+        rid = room_number_to_id.get(rn)
+        if rid:
+            tenant_counts[rid] = tenant_counts.get(rid, 0) + cnt
+
+    # ── Build list of rooms with empty beds ───────────────────────────────
+    total_rooms = len(all_rows)
+    total_beds = sum(r.max_occupancy or 1 for r, _ in all_rows)
+    total_tenants = sum(tenant_counts.get(r.id, 0) for r, _ in all_rows)
+    total_empty = total_beds - total_tenants
+
+    rooms_with_empty = []
+    for r, prop in all_rows:
+        max_occ = r.max_occupancy or 1
+        occupied = tenant_counts.get(r.id, 0)
+        free = max_occ - occupied
+        if free > 0:
+            rooms_with_empty.append((r, prop, occupied, free))
+
+    bld = f" in *{building_filter}*" if building_filter else ""
+    if not rooms_with_empty:
+        return f"All {total_beds} beds{bld} are occupied. No empty beds."
 
     _ICON = {"single": "🔵", "double": "🟢", "sharing": "🟡", "triple": "🟠", "premium": "⭐"}
 
     def _floor_label(rn: str) -> str:
         return "G" if rn.upper().startswith("G") else rn[0]
 
-    # Group by block → floor
-    blocks: dict = defaultdict(lambda: defaultdict(list))
-    type_counts: dict = defaultdict(int)
-    thor_rooms = thor_beds = hulk_rooms = hulk_beds = 0
-    for r, prop in vacant:
+    # Group: fully vacant vs partially occupied
+    fully_vacant = [(r, p, o, f) for r, p, o, f in rooms_with_empty if o == 0]
+    partial = [(r, p, o, f) for r, p, o, f in rooms_with_empty if o > 0]
+
+    # Stats by building
+    blocks: dict = defaultdict(lambda: {"rooms": 0, "beds": 0, "floors": defaultdict(list)})
+    for r, prop, occupied, free in rooms_with_empty:
         block = "THOR" if "THOR" in prop.upper() else "HULK"
+        blocks[block]["rooms"] += 1
+        blocks[block]["beds"] += free
         fl = _floor_label(r.room_number)
-        blocks[block][fl].append(r)
-        try:
-            rt = r.room_type.value if r.room_type else "double"
-        except (LookupError, AttributeError):
-            rt = "double"
-        type_counts[rt] += 1
-        beds = r.max_occupancy or 1
-        if block == "THOR":
-            thor_rooms += 1; thor_beds += beds
-        else:
-            hulk_rooms += 1; hulk_beds += beds
+        blocks[block]["floors"][fl].append((r, occupied, free))
 
     SEP = "─" * 28
+    thor = blocks.get("THOR", {"rooms": 0, "beds": 0})
+    hulk = blocks.get("HULK", {"rooms": 0, "beds": 0})
+
     lines = [
-        f"🛏 *Vacant Beds  — {vacant_beds} free  |  {occupied_beds} occupied*",
-        f"🏠 *Vacant Rooms — {len(vacant)} free  |  {occupied_rooms} occupied*",
-        f"   THOR {thor_rooms}r/{thor_beds}b  ·  HULK {hulk_rooms}r/{hulk_beds}b",
+        f"🛏 *Empty Beds: {total_empty}*  |  Occupied: {total_tenants} / {total_beds}{bld}",
+        f"   THOR: {thor['beds']} beds  |  HULK: {hulk['beds']} beds",
         "",
     ]
 
-    for block in ["THOR", "HULK"]:
-        if block not in blocks:
+    for block_name in ["THOR", "HULK"]:
+        if block_name not in blocks:
             continue
-        br = thor_rooms if block == "THOR" else hulk_rooms
-        bb = thor_beds  if block == "THOR" else hulk_beds
+        bd = blocks[block_name]
         lines.append(f"*{SEP}*")
-        lines.append(f"🏢 *{block} — {br} rooms / {bb} beds vacant*")
-        floor_keys = sorted(blocks[block].keys(),
+        lines.append(f"🏢 *{block_name} — {bd['beds']} empty beds in {bd['rooms']} rooms*")
+        floor_keys = sorted(bd["floors"].keys(),
                             key=lambda f: (0, f) if f == "G" else (int(f), f))
         for fl in floor_keys:
-            rooms = sorted(blocks[block][fl], key=lambda x: x.room_number)
+            rooms = sorted(bd["floors"][fl], key=lambda x: x[0].room_number)
             cells = []
-            for r in rooms:
+            for r, occupied, free in rooms:
                 try:
                     _rt = r.room_type.value if r.room_type else "double"
                 except (LookupError, AttributeError):
                     _rt = "double"
                 icon = _ICON.get(_rt, "⬜")
                 ac = "❄" if r.has_ac else ""
-                cells.append(f"{icon}{r.room_number}{ac}")
+                status = f"({free}free)" if occupied > 0 else ""
+                cells.append(f"{icon}{r.room_number}{ac}{status}")
             label = "GF" if fl == "G" else f"F{fl}"
             lines.append(f"  {label}  {'  '.join(cells)}")
         lines.append("")
 
-    # Bed summary by type
-    bed_line = "  ".join(
-        f"{_ICON.get(k,'⬜')}{v}b"
-        for k, v in [("single", type_counts["single"]), ("double", type_counts["double"]),
-                     ("triple", type_counts["triple"]), ("premium", type_counts["premium"])]
-        if v
-    )
+    # Summary
     lines.append(f"*{SEP}*")
+    lines.append(f"Fully vacant rooms: {len(fully_vacant)}  |  Partial: {len(partial)}")
     lines.append(f"🔵Single 🟢Double 🟠Triple ⭐Premium")
-    lines.append(f"Vacant beds: {bed_line}  = *{vacant_beds} total*")
+    lines.append(f"(Nfree) = partially occupied room")
     return "\n".join(lines)
 
 
@@ -5349,17 +5391,32 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         ))
     ) or 0
 
-    booked_beds  = physical_beds + noshow_beds
+    # Day-wise guests currently occupying beds
+    from src.database.models import DaywiseStay
+    from datetime import date as _date
+    _today = _date.today()
+    daywise_beds = await session.scalar(
+        select(func.count()).select_from(DaywiseStay).where(
+            DaywiseStay.checkin_date <= _today,
+            DaywiseStay.checkout_date >= _today,
+            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+        )
+    ) or 0
+
+    booked_beds  = physical_beds + noshow_beds + daywise_beds
     vacant_beds  = total_beds - booked_beds
     vacant_rooms = total_rooms - physical_rooms
     phys_pct     = int(physical_beds * 100 / total_beds)  if total_beds  else 0
     booked_pct   = int(booked_beds   * 100 / total_beds)  if total_beds  else 0
     room_pct     = int(physical_rooms * 100 / total_rooms) if total_rooms else 0
 
+    daywise_line = f"\nDay-wise     : {daywise_beds} beds  (short stays)\n" if daywise_beds else "\n"
+
     return (
         f"*Occupancy — {total_beds} total beds*\n\n"
         f"Checked-in   : {physical_beds} beds  ({phys_pct}%)\n"
-        f"No-show      : {noshow_beds} beds  (booked, not arrived)\n"
+        f"No-show      : {noshow_beds} beds  (booked, not arrived)"
+        f"{daywise_line}"
         f"*Booked total: {booked_beds} / {total_beds}  ({booked_pct}%)*\n"
         f"Vacant       : {vacant_beds} beds\n\n"
         f"Rooms: {physical_rooms} occupied / {total_rooms} total  ({room_pct}%)\n\n"

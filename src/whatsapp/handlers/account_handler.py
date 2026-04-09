@@ -1498,13 +1498,33 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
 
     regular = active_tenants - premium_count
     active_beds = regular + (premium_count * 2)
-    total_beds = 291
-    vacant_beds = total_beds - active_beds - no_show
     net_income = int(collected) - int(total_expenses)
 
-    # Vacant beds by building (THOR / HULK)
-    from src.database.models import Property
-    building_vacant = {}
+    # Total beds from DB (not hardcoded)
+    total_beds = await session.scalar(
+        select(func.sum(Room.max_occupancy)).where(Room.active == True, Room.is_staff_room == False)
+    ) or 291
+
+    # Day-wise guests currently occupying beds
+    from src.database.models import Property, DaywiseStay
+    from datetime import date as _date
+    _today = _date.today()
+    daywise_beds = 0
+    try:
+        daywise_beds = await session.scalar(
+            select(func.count()).select_from(DaywiseStay).where(
+                DaywiseStay.checkin_date <= _today,
+                DaywiseStay.checkout_date >= _today,
+                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            )
+        ) or 0
+    except Exception:
+        pass
+
+    vacant_beds = total_beds - active_beds - no_show - daywise_beds
+
+    # Vacant beds by building — count actual empty beds per room (including partials)
+    building_vacant = {"THOR": 0, "HULK": 0}
     try:
         all_rooms = (await session.execute(
             select(Room, Property.name)
@@ -1512,17 +1532,33 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
             .where(Room.active == True, Room.is_staff_room == False)
         )).all()
 
-        occupied_room_ids = {row[0] for row in (await session.execute(
-            select(Tenancy.room_id).where(
+        # Tenants per room
+        tenant_per_room = {row[0]: row[1] for row in (await session.execute(
+            select(Tenancy.room_id, func.count())
+            .where(
                 Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
                 Tenancy.room_id.isnot(None),
             )
+            .group_by(Tenancy.room_id)
+        )).all()}
+
+        # Daywise per room
+        dw_per_room = {row[0]: row[1] for row in (await session.execute(
+            select(DaywiseStay.room_number, func.count())
+            .where(
+                DaywiseStay.checkin_date <= _today,
+                DaywiseStay.checkout_date >= _today,
+                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            )
+            .group_by(DaywiseStay.room_number)
         )).all()}
 
         for room, prop_name in all_rooms:
-            if room.id not in occupied_room_ids:
-                block = "THOR" if "THOR" in prop_name.upper() else "HULK"
-                building_vacant[block] = building_vacant.get(block, 0) + (room.max_occupancy or 1)
+            block = "THOR" if "THOR" in prop_name.upper() else "HULK"
+            occupied = tenant_per_room.get(room.id, 0) + dw_per_room.get(room.room_number, 0)
+            free = (room.max_occupancy or 1) - occupied
+            if free > 0:
+                building_vacant[block] += free
     except Exception:
         pass
 
@@ -1556,6 +1592,7 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
         f"*Occupancy*\n"
         f"  Occupied: {active_beds} beds"
         + (f" | No-show: {no_show}" if no_show else "")
+        + (f" | Day-wise: {daywise_beds}" if daywise_beds else "")
         + f"\n  Vacant: {vacant_beds} beds\n"
         f"{vacant_line}\n\n"
         f"*Income*\n"

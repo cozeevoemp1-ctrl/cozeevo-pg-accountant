@@ -384,6 +384,8 @@ def _refresh_summary_sync(tab_name: str) -> None:
 
             tp = cash + upi
             bal = rent + prev_due - tp
+            if bal < 0:
+                bal = 0  # excess is deposit/advance, not overpayment
             st = "UNPAID" if tp == 0 else ("PAID" if bal <= 0 else "PARTIAL")
 
             sheet_row = i + 1  # 1-based

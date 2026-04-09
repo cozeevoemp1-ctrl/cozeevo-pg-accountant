@@ -413,7 +413,8 @@ function updateMonthSummary(sheet) {
     const rent = pn(data[i][ci.rent]);
     const prevDue = pn(data[i][ci.prevDue]);
     const tp = cash + upi;
-    const bal = rent + prevDue - tp;
+    let bal = rent + prevDue - tp;
+    if (bal < 0) bal = 0;  // excess is deposit/advance, not overpayment
     const st = (tp === 0) ? "UNPAID" : (bal <= 0 ? "PAID" : "PARTIAL");
     sheet.getRange(i + 1, ci.tp + 1).setValue(tp);
     sheet.getRange(i + 1, ci.bal + 1).setValue(bal);
