@@ -2,6 +2,36 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.22.0] — 2026-04-09 — PydanticAI Enabled + Vacant Beds Accuracy + Data Cleanup
+
+### Added
+- **PydanticAI enabled** — `USE_PYDANTIC_AGENTS=true`, handles UNKNOWN/GENERAL intents with structured LLM output, few-shot examples, confidence routing
+- **Day-wise stays** in occupancy — short-stay guests now subtracted from available beds (auto-expires on checkout_date)
+- **ANOMALIES sheet** — auto-generated in Google Sheet with 76 data quality issues (wrong PAID status, negative balances, date mismatches)
+
+### Fixed
+- **Vacant beds handler** — now shows ALL empty beds (partial + fully vacant rooms), not just fully vacant rooms
+- **Occupancy handler** — includes day-wise line item
+- **Monthly report** — total_beds from DB (not hardcoded 291), building vacant counts partials
+- **Gender filter** — accounts for day-wise occupants
+- **Balance clamp** — negative balances clamped to 0 on Sheet (deposit+rent = PAID, not -12000). Both gsheets.py and Apps Script
+- **ORM UUID types** — String(36) → PostgreSQL UUID to match Supabase schema
+
+### Removed
+- **LangGraph v2** — deleted `src/whatsapp/v2/` (dead code, replaced by PydanticAI). Removed langgraph, langchain, langchain-core, langchain-groq from requirements
+
+### Data
+- Synced 14 no-show→active tenancies (Sheet said CHECKIN, DB said no_show)
+- Cancelled Chinmay Pagey stale no-show (had active tenancy in different room)
+- Cancelled Shalini (not on April Sheet)
+- Remaining no-shows: 7 (all genuine, confirmed against Sheet)
+- SSH key auth configured for VPS deploys
+
+### Open
+- **76 anomalies** on ANOMALIES sheet — Kiran reviewing (34 PAID-but-underpaid, 38 negative balances, 4 date mismatches)
+- **Natural language flexible queries** via PydanticAI — not yet implemented (next session)
+- **DB/Sheet full re-sync** — waiting for Kiran's updated data
+
 ## [1.21.2] — 2026-04-08 — Phone Dedup Fix + April Sheet Sync
 
 ### Fixed
