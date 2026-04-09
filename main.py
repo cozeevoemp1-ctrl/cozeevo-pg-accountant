@@ -103,10 +103,6 @@ app.include_router(chat_router)
 from src.api.reminder_router import router as reminder_router
 app.include_router(reminder_router)
 
-# ── v2: LangGraph Supervisor Agent pipeline ────────────────────────────────
-from src.whatsapp.v2.chat_api_v2 import router as chat_v2_router
-app.include_router(chat_v2_router)
-
 # ── Ingest API ─────────────────────────────────────────────────────────────
 
 from fastapi import APIRouter, UploadFile, File, Form

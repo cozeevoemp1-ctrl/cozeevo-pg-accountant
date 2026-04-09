@@ -75,8 +75,10 @@ from sqlalchemy import (
 import os as _os
 if _os.getenv("DATABASE_URL", "sqlite").startswith("sqlite"):
     from sqlalchemy import JSON as JSONB  # SQLite fallback
+    _PG_UUID = String(36)  # SQLite has no native UUID
 else:
-    from sqlalchemy.dialects.postgresql import JSONB  # type: ignore[assignment]
+    from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID  # type: ignore[assignment]
+    _PG_UUID = PG_UUID(as_uuid=True)
 try:
     from pgvector.sqlalchemy import Vector
     _HAS_PGVECTOR = True
@@ -1188,7 +1190,7 @@ class PgConfig(Base):
     """
     __tablename__ = "property_config"
 
-    id                  = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id                  = Column(_PG_UUID, primary_key=True, default=uuid.uuid4)
     pg_name             = Column(String(120), nullable=False)
     brand_name          = Column(String(120), nullable=True)
     brand_voice         = Column(Text, nullable=True)
@@ -1217,8 +1219,8 @@ class IntentExample(Base):
     """
     __tablename__ = "intent_examples"
 
-    id            = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    pg_id         = Column(String(36), ForeignKey("property_config.id"), nullable=False)
+    id            = Column(_PG_UUID, primary_key=True, default=uuid.uuid4)
+    pg_id         = Column(_PG_UUID, ForeignKey("property_config.id"), nullable=False)
     message_text  = Column(Text, nullable=False)
     intent        = Column(String(80), nullable=False)
     role          = Column(String(30), nullable=True)
@@ -1242,8 +1244,8 @@ class ClassificationLog(Base):
     """
     __tablename__ = "classification_log"
 
-    id                = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    pg_id             = Column(String(36), ForeignKey("property_config.id"), nullable=False)
+    id                = Column(_PG_UUID, primary_key=True, default=uuid.uuid4)
+    pg_id             = Column(_PG_UUID, ForeignKey("property_config.id"), nullable=False)
     message_text      = Column(Text, nullable=False)
     phone             = Column(String(20), nullable=True)
     role              = Column(String(30), nullable=True)
