@@ -9,7 +9,6 @@ Safety: read-only (SELECT only), table whitelist, row limit, timeout.
 """
 from __future__ import annotations
 
-import json
 import os
 import re
 from typing import Optional
@@ -110,6 +109,7 @@ async def run_flexible_query(
     question: str,
     session: AsyncSession,
     role: str = "admin",
+    chat_history: str = "",
 ) -> str:
     """
     Answer a natural-language question by generating and executing SQL.
@@ -135,7 +135,7 @@ async def run_flexible_query(
         return "I can only answer questions about your PG data (tenants, rooms, payments, etc.)."
 
     # Step 1: Generate SQL from question
-    sql = await _generate_sql(question)
+    sql = await _generate_sql(question, chat_history)
     if not sql:
         return "I couldn't understand that query. Try rephrasing, e.g.:\n• _how many female tenants_\n• _vacant beds in THOR_\n• _total rent collected in April_"
 
@@ -170,7 +170,7 @@ async def run_flexible_query(
     return reply
 
 
-async def _generate_sql(question: str) -> Optional[str]:
+async def _generate_sql(question: str, chat_history: str = "") -> Optional[str]:
     """Use Groq LLM to generate SQL from natural language question."""
     import httpx
 
@@ -178,12 +178,20 @@ async def _generate_sql(question: str) -> Optional[str]:
     if not api_key:
         return None
 
+    # Add conversation context for follow-up questions
+    context_block = ""
+    if chat_history:
+        context_block = f"""
+CONVERSATION CONTEXT (use this to resolve "it", "those", "break it down", etc.):
+{chat_history}
+"""
+
     system_prompt = f"""You are a SQL query generator for a PG (paying guest) accommodation database.
 Given a natural language question, generate a PostgreSQL SELECT query.
 
 DATABASE SCHEMA:
 {DB_SCHEMA}
-
+{context_block}
 RULES:
 1. ONLY generate SELECT queries. Never INSERT/UPDATE/DELETE.
 2. Always add LIMIT {MAX_ROWS} at the end.

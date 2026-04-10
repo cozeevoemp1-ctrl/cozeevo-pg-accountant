@@ -369,10 +369,11 @@ async def _process_message_inner(
             from src.llm_gateway.agents.learning_agent import learn_from_interaction
             import asyncio as _asyncio
 
+            chat_context = await _load_chat_context(ctx.phone, session, limit=8)
             agent_result = await run_conversation_agent(
                 message=message, role=ctx.role, phone=ctx.phone,
                 pg_id=pg_id, session=session,
-                chat_history="", pending_context="",
+                chat_history=chat_context, pending_context="",
             )
 
             if agent_result.action == "classify" and agent_result.intent:
@@ -391,7 +392,7 @@ async def _process_message_inner(
                 # ── Flexible query: answer directly, don't route to gatekeeper ──
                 if intent == "QUERY_FLEXIBLE":
                     from src.llm_gateway.agents.flexible_query import run_flexible_query
-                    flex_reply = await run_flexible_query(message, session, ctx.role)
+                    flex_reply = await run_flexible_query(message, session, ctx.role, chat_context)
                     await _log(session, phone, message, ctx.role, "QUERY_FLEXIBLE", flex_reply)
                     await session.commit()
                     return OutboundReply(reply=flex_reply, intent="QUERY_FLEXIBLE", role=ctx.role)
