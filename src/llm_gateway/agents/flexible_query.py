@@ -118,6 +118,22 @@ async def run_flexible_query(
     if role not in ("admin", "owner", "receptionist", "power_user"):
         return "Flexible queries are only available for admins."
 
+    # Step 0: Basic guardrails on the question itself
+    q_lower = question.lower().strip()
+    if len(q_lower) < 5:
+        return "Please ask a more specific question about your PG data."
+    if len(q_lower) > 500:
+        return "Question too long. Please keep it concise."
+
+    # Reject questions that aren't about PG data
+    non_data_patterns = re.compile(
+        r"\b(weather|joke|recipe|news|stock|crypto|movie|song|game|translate|"
+        r"write.*code|create.*app|build.*website|what is AI|who are you)\b",
+        re.IGNORECASE,
+    )
+    if non_data_patterns.search(q_lower):
+        return "I can only answer questions about your PG data (tenants, rooms, payments, etc.)."
+
     # Step 1: Generate SQL from question
     sql = await _generate_sql(question)
     if not sql:
@@ -143,7 +159,15 @@ async def run_flexible_query(
     if not rows:
         return f"No results found for: _{question}_"
 
-    return await _format_result(question, columns, rows, sql)
+    reply = await _format_result(question, columns, rows, sql)
+
+    # Step 5: Log successful query for learning
+    try:
+        await _log_query(question, sql, len(rows), session)
+    except Exception:
+        pass  # never fail on logging
+
+    return reply
 
 
 async def _generate_sql(question: str) -> Optional[str]:
@@ -229,9 +253,16 @@ def _validate_sql(sql: str) -> Optional[str]:
     if limit_match and int(limit_match.group(1)) > MAX_ROWS:
         return f"LIMIT exceeds {MAX_ROWS}"
 
-    # Check only allowed tables — extract table names (first word after FROM/JOIN)
-    table_refs = re.findall(r"(?:FROM|JOIN)\s+(\w+)", sql, re.IGNORECASE)
+    # Check only allowed tables
+    # Extract table refs: FROM/JOIN followed by a word, but NOT inside functions like EXTRACT(... FROM col)
+    # Strategy: remove all content inside parentheses first, then find FROM/JOIN table refs
+    cleaned = re.sub(r"\([^)]*\)", "()", sql)  # collapse parenthesized content
+    table_refs = re.findall(r"(?:FROM|JOIN)\s+(\w+)", cleaned, re.IGNORECASE)
+    sql_keywords = {"select", "case", "when", "then", "else", "end", "current_date",
+                    "current_timestamp", "now", "lateral"}
     for table in table_refs:
+        if table.lower() in sql_keywords:
+            continue
         if table.lower() not in ALLOWED_TABLES:
             return f"Table '{table}' not allowed"
 
@@ -239,29 +270,89 @@ def _validate_sql(sql: str) -> Optional[str]:
 
 
 async def _format_result(question: str, columns: list, rows: list, sql: str) -> str:
-    """Format query results as a clean WhatsApp message."""
+    """Use LLM to format raw query results into a clean, natural WhatsApp reply."""
+    import httpx
+
     total_rows = len(rows)
 
-    # Single value result (e.g. COUNT query)
+    # Build raw data summary for LLM
+    raw_lines = []
+    for row in rows[:30]:
+        parts = []
+        for col, val in zip(columns, row):
+            if val is None:
+                continue
+            if isinstance(val, (int, float)):
+                try:
+                    val = f"{int(val):,}" if val == int(val) else f"{val:,.0f}"
+                except (ValueError, OverflowError):
+                    pass
+            parts.append(f"{col}={val}")
+        raw_lines.append(", ".join(parts))
+
+    raw_data = "\n".join(raw_lines)
+    if total_rows > 30:
+        raw_data += f"\n... and {total_rows - 30} more rows"
+
+    # Use LLM to format the answer naturally
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key:
+        return _format_fallback(question, columns, rows)
+
+    format_prompt = f"""You are a WhatsApp assistant for a PG (paying guest) accommodation.
+The user asked: "{question}"
+
+The database returned this data:
+{raw_data}
+
+Total rows: {total_rows}
+
+Write a clean, concise WhatsApp reply answering the user's question.
+RULES:
+1. Use WhatsApp formatting: *bold* for headers, no markdown links
+2. Be concise — summarize, don't dump raw data
+3. For lists > 10 items, show top entries and summarize the rest
+4. Use Rs. for currency with commas (Rs.15,000)
+5. If the data clearly answers the question, state the answer directly
+6. If the data seems wrong or incomplete, mention it
+7. NO preamble like "Based on the data..." — just answer directly
+8. Keep under 500 characters for simple answers, 1500 for lists
+"""
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [
+                        {"role": "system", "content": format_prompt},
+                        {"role": "user", "content": question},
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 400,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        logger.warning(f"[FlexQuery] Format LLM failed: {e}, using fallback")
+        return _format_fallback(question, columns, rows)
+
+
+def _format_fallback(question: str, columns: list, rows: list) -> str:
+    """Fallback formatter when LLM is unavailable."""
+    total_rows = len(rows)
+
     if len(columns) == 1 and total_rows == 1:
         val = rows[0][0]
         if isinstance(val, (int, float)):
             val = f"{int(val):,}" if val == int(val) else f"{val:,.2f}"
         return f"*{columns[0]}*: {val}"
 
-    # Single row result
-    if total_rows == 1 and len(columns) <= 6:
-        lines = [f"*Result for: {question}*\n"]
-        for col, val in zip(columns, rows[0]):
-            if isinstance(val, (int, float)) and val == int(val):
-                val = f"{int(val):,}"
-            lines.append(f"  {col}: {val}")
-        return "\n".join(lines)
-
-    # Table result
-    lines = [f"*{question}* ({total_rows} result{'s' if total_rows > 1 else ''})\n"]
-
-    for row in rows[:30]:  # Cap display at 30
+    lines = [f"*{question}* ({total_rows} results)\n"]
+    for row in rows[:20]:
         parts = []
         for col, val in zip(columns, row):
             if val is None:
@@ -274,7 +365,24 @@ async def _format_result(question: str, columns: list, rows: list, sql: str) -> 
             parts.append(f"{col}: {val}")
         lines.append("• " + " | ".join(parts))
 
-    if total_rows > 30:
-        lines.append(f"\n_...and {total_rows - 30} more rows_")
-
+    if total_rows > 20:
+        lines.append(f"\n_...{total_rows - 20} more_")
     return "\n".join(lines)
+
+
+async def _log_query(question: str, sql: str, row_count: int, session: AsyncSession) -> None:
+    """Log successful flexible queries for learning and audit."""
+    await session.execute(
+        text("""
+            INSERT INTO classification_log (id, pg_id, message_text, phone, role,
+                regex_result, llm_result, llm_confidence, final_intent, created_at)
+            VALUES (gen_random_uuid(), :pg_id, :msg, 'system', 'admin',
+                NULL, :sql, :conf, 'QUERY_FLEXIBLE', now())
+        """),
+        {
+            "pg_id": os.getenv("DEFAULT_PG_ID", ""),
+            "msg": question,
+            "sql": sql[:500],
+            "conf": 1.0 if row_count > 0 else 0.5,
+        },
+    )
