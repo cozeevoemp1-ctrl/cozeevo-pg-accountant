@@ -5128,10 +5128,23 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
         .group_by(DaywiseStay.room_number)
     )).all()}
 
+    # Check which rooms have a premium tenant (room is fully occupied regardless of max_occ)
+    premium_rooms = set()
+    premium_q = await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.room_id.isnot(None),
+            Tenancy.sharing_type == "premium",
+        )
+    )
+    premium_rooms = {row[0] for row in premium_q.all()}
+
     # Filter: rooms where occupancy < max AND at least one occupant matches gender
     matching = []
     for rid, data in room_data.items():
         room = data["room"]
+        if rid in premium_rooms:
+            continue  # premium tenant = room fully occupied
         occupants = data["occupants"]
         max_occ = room.max_occupancy or 2
         dw_count = dw_per_room.get(room.room_number, 0)
@@ -5234,6 +5247,20 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
         rid = room_number_to_id.get(rn)
         if rid:
             tenant_counts[rid] = tenant_counts.get(rid, 0) + cnt
+
+    # Rooms with premium tenants — fully occupied regardless of max_occ
+    premium_room_ids = {row[0] for row in (await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+            Tenancy.room_id.isnot(None),
+            Tenancy.sharing_type == "premium",
+        )
+    )).all()}
+
+    # For premium rooms, override tenant count to max_occ (room is full)
+    for r, _ in all_rows:
+        if r.id in premium_room_ids:
+            tenant_counts[r.id] = r.max_occupancy or 1
 
     # ── Build list of rooms with empty beds ───────────────────────────────
     total_rooms = len(all_rows)
