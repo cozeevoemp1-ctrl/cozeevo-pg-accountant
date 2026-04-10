@@ -82,7 +82,27 @@ async def handle_media_upload(
         # Very likely a receipt for the recent payment
         return await handle_receipt_upload(media_id, media_mime, "", phone, ctx, session)
 
-    # ── No caption, no recent payment → ask what it is ───────────────────
+    # ── No caption, no recent payment → use Gemini Vision to read the image ──
+    vision_result = await _gemini_read_image(media_id, media_mime)
+
+    if vision_result:
+        doc_type = vision_result.get("type", "other")
+        logger.info(f"[Media] Gemini classified as: {doc_type} | {vision_result}")
+
+        # Auto-route based on Gemini classification
+        if doc_type == "payment_receipt":
+            # Gemini extracted payment details — try to match and log
+            return await _handle_gemini_receipt(vision_result, media_id, media_mime, phone, ctx, session)
+        elif doc_type == "expense_bill":
+            return await _handle_expense_receipt(media_id, media_mime, vision_result.get("summary", ""), phone, ctx, session)
+        elif doc_type == "id_proof":
+            return await _handle_id_proof(media_id, media_mime, vision_result.get("summary", ""), phone, session)
+        elif doc_type == "license":
+            return await _handle_license_doc(media_id, media_mime, vision_result.get("summary", ""), phone, session)
+        elif doc_type == "vendor_slip":
+            return await _handle_vendor_slip(media_id, media_mime, vision_result.get("summary", ""), phone, session)
+
+    # ── Gemini failed or unavailable → fallback: ask the user ────────────
     import json
     action_data = json.dumps({"media_id": media_id, "media_mime": media_mime})
     choices = [
@@ -427,6 +447,155 @@ async def handle_media_classify_selection(
             session.add(doc)
             return "File saved to archive."
         return "Could not download the image."
+
+
+# ── Gemini Vision ────────────────────────────────────────────────────────────
+
+async def _gemini_read_image(media_id: str, media_mime: str) -> Optional[dict]:
+    """
+    Download image from WhatsApp, send to Gemini Flash for classification + extraction.
+    Returns dict with: type, amount, name, date, upi_ref, summary — or None on failure.
+    """
+    import httpx
+    import base64
+    import os
+    import json
+
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    wa_token = os.getenv("WHATSAPP_TOKEN", "")
+    if not api_key or not wa_token:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            # Step 1: Get media URL from WhatsApp
+            resp = await client.get(
+                f"https://graph.facebook.com/v21.0/{media_id}",
+                headers={"Authorization": f"Bearer {wa_token}"},
+            )
+            resp.raise_for_status()
+            media_url = resp.json().get("url")
+            if not media_url:
+                return None
+
+            # Step 2: Download image bytes
+            img_resp = await client.get(media_url, headers={"Authorization": f"Bearer {wa_token}"})
+            img_resp.raise_for_status()
+            img_bytes = img_resp.content
+            img_b64 = base64.b64encode(img_bytes).decode()
+
+            # Step 3: Send to Gemini Flash
+            gemini_resp = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+                json={
+                    "contents": [{
+                        "parts": [
+                            {"inline_data": {"mime_type": media_mime or "image/jpeg", "data": img_b64}},
+                            {"text": """Analyze this image and respond in JSON only. Classify it as one of:
+- payment_receipt (UPI screenshot, bank transfer, cash receipt, payment confirmation)
+- expense_bill (electricity bill, water bill, vendor invoice, plumber receipt)
+- id_proof (Aadhaar, passport, driving license, PAN card, voter ID)
+- license (FSSAI, trade license, fire safety certificate, NOC)
+- vendor_slip (delivery challan, stock receipt, order slip)
+- other (anything else)
+
+Extract whatever you can read from the image.
+
+Respond ONLY with this JSON:
+{
+  "type": "payment_receipt|expense_bill|id_proof|license|vendor_slip|other",
+  "amount": 0,
+  "name": "",
+  "date": "",
+  "upi_ref": "",
+  "payment_mode": "upi|cash|bank_transfer|unknown",
+  "summary": "one line description of what this image shows"
+}"""}
+                        ]
+                    }],
+                    "generationConfig": {"temperature": 0.0, "maxOutputTokens": 300},
+                },
+                timeout=15,
+            )
+            gemini_resp.raise_for_status()
+
+            # Parse response
+            text = gemini_resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            # Clean markdown fences
+            text = text.strip().strip("`").lstrip("json").strip()
+            if text.startswith("```"):
+                text = text.split("```")[1].strip()
+                if text.startswith("json"):
+                    text = text[4:].strip()
+
+            result = json.loads(text)
+            logger.info(f"[Gemini] Image classified: {result.get('type')} | {result.get('summary', '')}")
+            return result
+
+    except Exception as e:
+        logger.warning(f"[Gemini] Vision failed: {e}")
+        return None
+
+
+async def _handle_gemini_receipt(
+    vision: dict,
+    media_id: str,
+    media_mime: str,
+    phone: str,
+    ctx: CallerContext,
+    session: AsyncSession,
+) -> str:
+    """Handle a receipt identified by Gemini — try to match tenant and attach."""
+    from src.whatsapp.media_handler import download_whatsapp_media
+
+    amount = vision.get("amount", 0)
+    name = vision.get("name", "")
+    upi_ref = vision.get("upi_ref", "")
+    pay_mode = vision.get("payment_mode", "unknown")
+    summary = vision.get("summary", "")
+
+    # Save the image first
+    file_path = await download_whatsapp_media(media_id, media_mime, "receipts", filename_prefix="gemini")
+    if not file_path:
+        return "Could not download the image. Please try again."
+
+    # Try to match tenant by name
+    matched_payment = None
+    match_info = ""
+    if name:
+        matched_payment, match_info = await _match_from_caption(name, session)
+
+    if matched_payment:
+        await _attach_receipt(matched_payment, file_path, media_mime, phone, session)
+        lines = [
+            f"Receipt auto-detected and saved!\n",
+            f"*{match_info}*",
+            f"Amount: Rs.{int(amount):,}" if amount else "",
+            f"Mode: {pay_mode.upper()}" if pay_mode != "unknown" else "",
+            f"UPI Ref: {upi_ref}" if upi_ref else "",
+        ]
+        return "\n".join(l for l in lines if l)
+
+    # No tenant match — save receipt, show what Gemini found, ask to link
+    import json as _json
+    action_data = _json.dumps({
+        "file_path": file_path,
+        "gemini": vision,
+    })
+    await _save_pending(phone, "RECEIPT_NO_PAYMENT", action_data, [], session)
+
+    lines = [
+        f"Receipt detected:\n",
+        f"Amount: Rs.{int(amount):,}" if amount else "",
+        f"Name: {name}" if name else "",
+        f"Mode: {pay_mode.upper()}" if pay_mode != "unknown" else "",
+        f"UPI Ref: {upi_ref}" if upi_ref else "",
+        f"\n_{summary}_" if summary else "",
+        f"\nReceipt saved. To link it to a payment, type:",
+        f"*[Name] [Amount] [cash/upi] [month]*",
+        f"Example: _Raj 15000 upi april_",
+    ]
+    return "\n".join(l for l in lines if l)
 
 
 # ── Internal helpers ─────────────────────────────────────────────────────────
