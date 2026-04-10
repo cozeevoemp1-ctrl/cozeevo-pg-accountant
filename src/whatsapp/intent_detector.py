@@ -79,7 +79,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Record checkout / offboarding form
     (re.compile(r"(?:record checkout|offboard|checkout form|fill checkout|checkout record|handover|keys? (?:returned?|handed?)|mark checkout complete|complete checkout|process checkout|do checkout|finalize checkout|close checkout|checkout process for|start checkout for|begin checkout|checkout\s+process\s+\w+|do\s+\w+\s+checkout|\w+\s+ka\s+checkout|checkout\s+karo|chekout\s+\w+)", re.I), "RECORD_CHECKOUT", 0.95),
     # Void / reverse payment
-    (re.compile(r"(?:void|cancel|reverse|undo payment|mark void|failed payment|payment failed|wrong payment|duplicate payment)", re.I), "VOID_PAYMENT", 0.93),
+    (re.compile(r"(?:void\s+(?:(?:last|the|this|that)\s+)?(?:payment|txn|transaction)|cancel\s+(?:(?:last|the)\s+)?payment|reverse\s+(?:(?:last|the)\s+)?payment|undo\s+payment|mark\s+(?:payment\s+)?void|failed\s+payment|payment\s+failed|wrong\s+payment|duplicate\s+payment)", re.I), "VOID_PAYMENT", 0.93),
     # Void / reverse expense
     (re.compile(r"(?:void expense|cancel expense|reverse expense|undo expense|wrong expense|delete expense|remove expense|expense (?:void|cancel|wrong|mistake|error))", re.I), "VOID_EXPENSE", 0.93),
     # Room transfer — move tenant from one room to another
@@ -187,9 +187,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     #   3. Hindi: name ka paise/balance
     (re.compile(
         r"(?:"
-        r"(?:balance|dues|status)\s+(?:of\s+|for\s+)?(?!(?:my|all|total|pending|outstanding|show|the|everyone|all|this|last)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)"  # "balance of Raj"
+        r"(?:balance|dues|status)\s+(?:of\s+|for\s+)?(?!(?:my|all|total|pending|outstanding|show|the|everyone|all|this|last|complaint)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)"  # "balance of Raj"
         r"|"
-        r"(?!(?:my|all|total|pending|outstanding|show|the|everyone)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)'?s?\s+(?:balance|dues|status|outstanding|account\s+statement|details?)"  # "Raj balance", "Raj's account", "Vikram details"
+        r"\b(?!(?:my|all|total|pending|outstanding|show|the|everyone|complaint)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)'?s?\s+(?:balance|dues|status|outstanding|account\s+statement|details?)"  # "Raj balance", "Raj's account", "Vikram details"
         r"|"
         r"room\s+[\w-]+\s+(?:balance|dues|status|who|tenant|person|occupant)"  # "room 203 balance" (removed "details" — goes to ROOM_STATUS)
         r"|"
