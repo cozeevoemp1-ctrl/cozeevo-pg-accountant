@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.23.0] — 2026-04-10 — Flexible NL Queries + Conversation Memory + Regex Fixes
+
+### Added
+- **Flexible natural language queries** — ask any data question in plain English via WhatsApp. LLM generates SQL from DB schema, executes safely, and formats reply naturally. Examples: "top 5 highest paying tenants", "average rent per building", "which tenants haven't paid"
+- **LLM-formatted replies** — query results are summarized by LLM into clean WhatsApp messages instead of raw data dumps
+- **Conversation history** — last 8 messages loaded as context for PydanticAI agent. Follow-up queries work: "how many female tenants" → "break it down by building"
+- **Query logging** — every flexible query saved to classification_log for learning and audit
+- **Guardrails** — non-PG questions rejected, SELECT-only, table whitelist, row limits
+
+### Fixed
+- **Regex: void expense** — no longer matches VOID_PAYMENT (required 'payment' keyword)
+- **Regex: complaint status** — no longer matches QUERY_TENANT (word boundary fix)
+- **Regex: void last payment** — now correctly matches VOID_PAYMENT
+- **SQL validator** — EXTRACT(FROM col) no longer blocked as table reference
+- 30/30 regex intent tests pass with zero LLM calls
+
+### Architecture
+- `src/llm_gateway/agents/flexible_query.py` — new flexible query engine
+- `QUERY_FLEXIBLE` intent added to PydanticAI prompt builder
+- Short-term memory (chat_messages), long-term (property_config + intent_examples + classification_log)
+- Vector DB (pgvector/RAG) planned for receipts/bills collection phase
+
 ## [1.22.0] — 2026-04-09 — PydanticAI Enabled + Vacant Beds Accuracy + Data Cleanup
 
 ### Added
