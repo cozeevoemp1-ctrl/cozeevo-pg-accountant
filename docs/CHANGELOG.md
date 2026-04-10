@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.24.0] — 2026-04-10 — Media Upload Handler + Receipt Collection
+
+### Added
+- **Media upload handler** (`receipt_handler.py`) — classifies uploaded photos by caption keywords and routes to appropriate handler
+- **Receipt types:** payment receipt, expense bill, tenant ID proof, license/certificate, vendor delivery slip
+- **Payment receipt flow:** auto-attach to recent payment, disambiguate if multiple, ask user if no context
+- **Photo-first flow:** receipt saved, bot asks for payment details to link it
+- **Document archive:** all uploads stored in `documents` table with type tagging
+- **`receipt_url`** column on payments table — links payment to receipt image
+- **Pending states:** RECEIPT_SELECT, MEDIA_CLASSIFY, RECEIPT_NO_PAYMENT for multi-turn flows
+
+### Next
+- **Gemini Vision** — free multimodal AI to auto-read receipt images (amount, UPI ref, tenant name). Kiran getting API key.
+
 ## [1.23.0] — 2026-04-10 — Flexible NL Queries + Conversation Memory + Regex Fixes
 
 ### Added
