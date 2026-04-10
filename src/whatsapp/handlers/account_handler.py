@@ -406,6 +406,7 @@ async def _do_log_payment_by_ids(
         for_type=PaymentFor.rent,
         period_month=period_month,
         notes=f"Logged via WhatsApp by {ctx_name}",
+        receipt_url=entities.get("_receipt_file_path") or None,
     )
     session.add(payment)
 

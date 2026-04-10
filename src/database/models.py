@@ -467,6 +467,7 @@ class Payment(Base):
     received_by_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
     notes               = Column(Text)
     is_void             = Column(Boolean, default=False)
+    receipt_url         = Column(String(500), nullable=True)   # relative path to receipt image/PDF
     created_at          = Column(DateTime, default=datetime.utcnow)
 
     tenancy           = relationship("Tenancy", back_populates="payments")

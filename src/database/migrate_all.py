@@ -919,6 +919,15 @@ async def run_seed_cozeevo_pg_config(conn: AsyncConnection) -> None:
     print("  [ok] Cozeevo Co-living seeded into pg_config")
 
 
+async def run_add_receipt_url_column(conn: AsyncConnection) -> None:
+    """Add receipt_url column to payments table. Added 2026-04-10."""
+    print("\n── Add receipt_url to payments ──")
+    await conn.execute(text("""
+        ALTER TABLE payments ADD COLUMN IF NOT EXISTS receipt_url VARCHAR(500)
+    """))
+    print("  [ok] receipt_url column added")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -942,6 +951,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_create_intent_examples(conn)
             await run_create_classification_log(conn)
             await run_seed_cozeevo_pg_config(conn)
+            await run_add_receipt_url_column(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         await run_simplify_roles_2026_04_01(engine)
         if args.seed:

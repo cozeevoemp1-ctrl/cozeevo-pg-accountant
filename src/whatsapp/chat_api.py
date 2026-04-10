@@ -228,6 +228,51 @@ async def _process_message_inner(
                 await session.commit()
                 return OutboundReply(reply=re_prompt, intent="AMBIGUOUS", role=ctx.role)
 
+            # ── RECEIPT_SELECT: user picking which payment a receipt belongs to ──
+            if not pending.resolved and pending.intent == "RECEIPT_SELECT":
+                import json as _jr
+                choice = message.strip()
+                if choice.isdigit():
+                    choices_data = _jr.loads(pending.choices or "[]")
+                    action_data = _jr.loads(pending.action_data or "{}")
+                    idx = int(choice) - 1
+                    from src.whatsapp.handlers.receipt_handler import resolve_receipt_selection
+                    rcpt_reply = await resolve_receipt_selection(idx, choices_data, action_data, phone, session)
+                    pending.resolved = True
+                    await _log(session, phone, message, ctx.role, "ATTACH_RECEIPT", rcpt_reply)
+                    await session.commit()
+                    return OutboundReply(reply=rcpt_reply, intent="ATTACH_RECEIPT", role=ctx.role)
+
+            # ── MEDIA_CLASSIFY: user selecting document type for an uploaded photo ──
+            if not pending.resolved and pending.intent == "MEDIA_CLASSIFY":
+                import json as _jm
+                choice = message.strip()
+                if choice.isdigit():
+                    choices_data = _jm.loads(pending.choices or "[]")
+                    action_data = _jm.loads(pending.action_data or "{}")
+                    idx = int(choice) - 1
+                    from src.whatsapp.handlers.receipt_handler import handle_media_classify_selection
+                    cls_reply = await handle_media_classify_selection(idx, choices_data, action_data, phone, ctx, session)
+                    pending.resolved = True
+                    await _log(session, phone, message, ctx.role, "MEDIA_CLASSIFY", cls_reply)
+                    await session.commit()
+                    return OutboundReply(reply=cls_reply, intent="MEDIA_CLASSIFY", role=ctx.role)
+
+            # ── RECEIPT_NO_PAYMENT: receipt uploaded but no payment found, user typing payment details ──
+            if not pending.resolved and pending.intent == "RECEIPT_NO_PAYMENT":
+                # User should type "Raj 15000 cash april" — treat as PAYMENT_LOG
+                import json as _jn
+                action_data = _jn.loads(pending.action_data or "{}")
+                pending.resolved = True
+                # Re-inject as a payment log with the saved receipt
+                intent_result = detect_intent(message, ctx.role)
+                if intent_result.intent == "PAYMENT_LOG":
+                    intent_result.entities["_receipt_file_path"] = action_data.get("file_path", "")
+                    reply = await route("PAYMENT_LOG", intent_result.entities, ctx, message, session)
+                    await _log(session, phone, message, ctx.role, "PAYMENT_LOG", reply)
+                    await session.commit()
+                    return OutboundReply(reply=reply, intent="PAYMENT_LOG", role=ctx.role)
+
             # ── AWAITING_CLARIFICATION: bot asked follow-up, this is the answer ──
             if not pending.resolved and pending.intent == "AWAITING_CLARIFICATION":
                 import json as _jc
@@ -470,6 +515,17 @@ async def _process_message_inner(
             intent = "ADD_EXPENSE"
             intent_result = IntentResult(intent="ADD_EXPENSE", confidence=0.90, entities=intent_result.entities)
             _chat_logger.info("Image + expense keyword: forced ADD_EXPENSE for %s", phone)
+
+    # ── 3a2. Image with no specific intent → media classify + receipt handler ──
+    if body.media_id and body.media_type == "image" and intent in ("UNKNOWN", "GENERAL"):
+        from src.whatsapp.handlers.receipt_handler import handle_media_upload
+        media_reply = await handle_media_upload(
+            media_id=body.media_id, media_mime=body.media_mime or "image/jpeg",
+            caption=message, phone=phone, ctx=ctx, session=session,
+        )
+        await _log(session, phone, message, ctx.role, "MEDIA_UPLOAD", media_reply)
+        await session.commit()
+        return OutboundReply(reply=media_reply, intent="MEDIA_UPLOAD", role=ctx.role)
 
     # ── 3b. Duplicate-log prevention: if user just logged something similar, treat as query ──
     _LOG_INTENTS = {"ADD_EXPENSE", "LOG_EXPENSE", "PAYMENT_LOG"}
