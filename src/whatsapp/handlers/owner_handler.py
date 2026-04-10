@@ -5148,56 +5148,21 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
                     "max": max_occ,
                 })
 
-    # Also include fully vacant multi-bed rooms (anyone can go there)
-    vacant_q = (
-        select(Room, Property.name)
-        .join(Property, Property.id == Room.property_id)
-        .where(
-            Room.active == True,
-            Room.is_staff_room == False,
-            Room.max_occupancy > 1,
-            Room.id.notin_(
-                select(Tenancy.room_id).where(
-                    Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
-                    Tenancy.room_id.isnot(None),
-                )
-            ),
-        )
-    )
-    if building_filter:
-        vacant_q = vacant_q.where(Property.name.ilike(f"%{building_filter}%"))
-
-    vacant_rows = (await session.execute(vacant_q)).all()
-    # Exclude vacant rooms occupied by daywise guests
-    vacant_rows = [(r, p) for r, p in vacant_rows
-                   if (r.max_occupancy or 2) - dw_per_room.get(r.room_number, 0) > 0]
-
+    # Gender query: only show rooms with a matching gender occupant, not fully vacant rooms
     gender_label = gender.capitalize()
     bld_label = f" in {building_filter}" if building_filter else ""
 
-    if not matching and not vacant_rows:
-        return f"No rooms available for a {gender_label} tenant{bld_label}.\nAll double/triple rooms are either full or occupied by the other gender."
+    if not matching:
+        return f"No rooms with a {gender_label} occupant and an empty bed{bld_label}."
 
     lines = [f"*Beds available for {gender_label}{bld_label}*\n"]
+    for m in sorted(matching, key=lambda x: x["room"]):
+        block = "THOR" if "THOR" in m["prop"].upper() else "HULK"
+        names = ", ".join(n for n, _ in m["occupants"])
+        lines.append(f"  Room *{m['room']}* ({block}) — {names} | *{m['free_beds']} bed free*")
 
-    if matching:
-        lines.append(f"*Rooms with {gender_label} occupant + empty bed:*")
-        for m in sorted(matching, key=lambda x: x["room"]):
-            block = "THOR" if "THOR" in m["prop"].upper() else "HULK"
-            names = ", ".join(n for n, _ in m["occupants"])
-            lines.append(f"  Room *{m['room']}* ({block}) — {names} | *{m['free_beds']} bed free*")
-        lines.append("")
-
-    if vacant_rows:
-        lines.append(f"*Fully vacant rooms (any gender):*")
-        for room, prop_name in sorted(vacant_rows, key=lambda x: x[0].room_number):
-            block = "THOR" if "THOR" in prop_name.upper() else "HULK"
-            beds = (room.max_occupancy or 2) - dw_per_room.get(room.room_number, 0)
-            lines.append(f"  Room *{room.room_number}* ({block}) — {beds} beds free")
-
-    total_beds = sum(m["free_beds"] for m in matching) + sum(
-        (r.max_occupancy or 2) - dw_per_room.get(r.room_number, 0) for r, _ in vacant_rows)
-    lines.append(f"\n*Total available: {total_beds} beds*")
+    total_beds = sum(m["free_beds"] for m in matching)
+    lines.append(f"\n*Total: {total_beds} beds with {gender_label} roommate*")
 
     return "\n".join(lines)
 
