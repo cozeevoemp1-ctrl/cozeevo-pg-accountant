@@ -402,6 +402,7 @@ _INTENT_LABELS: dict[str, str] = {
     "QUERY_DUES":        "Check who owes dues",
     "QUERY_TENANT":      "View tenant details",
     "QUERY_CONTACTS":    "Look up vendor/supplier contacts",
+    "QUERY_FLEXIBLE":    "Answer a custom data question",
 }
 
 

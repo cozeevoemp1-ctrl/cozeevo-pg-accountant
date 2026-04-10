@@ -27,6 +27,7 @@ QUERY_CONTACTS: look up vendor contact
 REMINDER_SET: set a reminder
 ACTIVITY_LOG: log an activity
 QUERY_ACTIVITY: show activity log
+QUERY_FLEXIBLE: any data question not covered above — "how many female tenants", "rooms with AC on floor 3", "total rent collected in March", "which rooms have single occupant"
 HELP: help, menu, commands"""
 
 TENANT_INTENTS = """MY_BALANCE: how much do I owe, my dues

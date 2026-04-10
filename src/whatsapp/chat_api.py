@@ -387,6 +387,15 @@ async def _process_message_inner(
                     final_intent=intent, entities=entities, source="auto_confirmed",
                     session=session,
                 ))
+
+                # ── Flexible query: answer directly, don't route to gatekeeper ──
+                if intent == "QUERY_FLEXIBLE":
+                    from src.llm_gateway.agents.flexible_query import run_flexible_query
+                    flex_reply = await run_flexible_query(message, session, ctx.role)
+                    await _log(session, phone, message, ctx.role, "QUERY_FLEXIBLE", flex_reply)
+                    await session.commit()
+                    return OutboundReply(reply=flex_reply, intent="QUERY_FLEXIBLE", role=ctx.role)
+
                 # Fall through to gatekeeper routing
 
             elif agent_result.action == "ask_options" and agent_result.options:
