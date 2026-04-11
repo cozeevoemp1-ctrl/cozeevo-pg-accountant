@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.25.0] — 2026-04-11 — Audit Trail + Rent Revisions + Sheet Protection
+
+### Added
+- **`audit_log` table** — immutable trail for all field changes (who, when, old→new, room, source)
+- **`rent_revisions` table** — rent change history with effective dates, reason, and who authorized
+- **Audit logging** wired into all update handlers (sharing_type, rent, phone, gender, deposit, room AC/maintenance/staff)
+- **Deposit change** (`account_handler._do_deposit_change`) now writes audit log
+- **Sharing type → rent prompt** — after confirming sharing type change, bot asks "want to update rent too?"
+- **`QUERY_AUDIT` intent** — "show changes for Anukriti", "who changed room 402", "audit log"
+- **`QUERY_RENT_HISTORY` intent** — "rent history Anukriti", "show rent changes"
+- **`QUERY_STAFF_ROOMS` intent** — "list staff rooms", "non-revenue rooms"
+- **Staff room toggle** — "room G05 staff room" / "room 305 not staff" (with audit)
+- **`lockAllSheets()` function** in Apps Script — protects all Sheet tabs, bot-only edits
+- **Sheet locked via API** — all 10 tabs protected programmatically
+
+### Fixed
+- **Rent vs payment disambiguation** — "Anukriti rent 28000" no longer matches UPDATE_RENT (requires explicit keywords like change/update/set). Prevents confusion with payment collection.
+- **Removed duplicate UPDATE_DEPOSIT** intent — DEPOSIT_CHANGE in account_handler already handles this
+- **Anukriti rent corrected** — updated from 15,000 (old double rate) to 28,000 (premium rate) in DB + Sheet
+- **Saurabh Kumar 406 Sheet fix** — reverted manual edit (rent_due 123 → 15,500)
+- **Inactive room lookup** — room update handler now finds inactive rooms for "maintenance done" commands
+
+### Documented
+- **Data sync policy** (BRAIN.md §15b) — DB is source of truth, bot-only changes, Sheet is read-only mirror
+- **Data sync rule** added to CLAUDE.md dependency checklist
+
 ## [1.24.0] — 2026-04-10 — Media Upload Handler + Receipt Collection
 
 ### Added
