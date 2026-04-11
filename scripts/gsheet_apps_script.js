@@ -603,6 +603,21 @@ function createMonthTab(tabName, monthIdx, year) {
   [70, 180, 120, 70, 80, 90, 90, 90, 90, 90, 80, 100, 100, 100, 200, 90, 100].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
 
   updateMonthSummary(sheet);
+
+  // Auto-lock new tab (only bot + owner can edit)
+  _protectSheet(sheet);
+}
+
+function _protectSheet(sheet) {
+  var ss = SpreadsheetApp.getActive();
+  var botEmail = "cozeevo-sheets-bot@cozeevo-bot-491219.iam.gserviceaccount.com";
+  var protection = sheet.protect().setDescription("Read-only: " + sheet.getName());
+  protection.removeEditors(protection.getEditors());
+  protection.addEditor(botEmail);
+  protection.addEditor(ss.getOwner().getEmail());
+  if (protection.canDomainEdit()) {
+    protection.setDomainEdit(false);
+  }
 }
 
 function parseDate_(val) {
