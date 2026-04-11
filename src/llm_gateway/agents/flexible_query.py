@@ -203,7 +203,7 @@ async def run_flexible_query(
         logger.warning(f"[FlexQuery] Blocked unsafe SQL: {error} | {sql}")
         return "I couldn't run that query safely. Try a simpler question."
 
-    # Step 3: Execute
+    # Step 3: Execute (with rollback on error so session stays usable)
     try:
         logger.info(f"[FlexQuery] Q: {question} | SQL: {sql}")
         result = await session.execute(text(sql))
@@ -211,7 +211,8 @@ async def run_flexible_query(
         columns = list(result.keys())
     except Exception as e:
         logger.error(f"[FlexQuery] SQL error: {e} | {sql}")
-        return f"Query failed: {str(e)[:100]}. Try rephrasing."
+        await session.rollback()
+        return f"Query failed. Try rephrasing your question."
 
     # Step 4: Format result
     if not rows:
@@ -268,6 +269,8 @@ RULES:
 13. For aggregate questions ("how many", "total", "sum"), always return a single aggregated row, not per-row results.
 14. If user asks for "top N" or "first N", use LIMIT N (not LIMIT {MAX_ROWS}).
 15. For vacant/occupancy queries, DON'T use complex JOINs. Use subqueries: total beds = (SELECT SUM(max_occupancy) FROM rooms WHERE ...), occupied = (SELECT COUNT(*) FROM tenancies WHERE status='active' AND room_id IN (...)), vacant = total - occupied.
+16. NEVER use correlated subqueries in SELECT with GROUP BY — they cause errors. Use JOINs or CTEs instead.
+17. Keep queries simple. Prefer multiple simple JOINs over nested subqueries.
 """
 
     try:
