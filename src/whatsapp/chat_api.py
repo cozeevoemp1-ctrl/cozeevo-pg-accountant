@@ -168,13 +168,27 @@ async def _process_message_inner(
                           pending.resolved if pending else "-")
         # File-based debug log for VPS tracing
         import json as _dbg_json
+        def _safe_parse_ad(raw):
+            """Parse action_data, handling double-serialized strings."""
+            parsed = _dbg_json.loads(raw or '{}')
+            if isinstance(parsed, str):
+                try:
+                    parsed = _dbg_json.loads(parsed)
+                except Exception:
+                    return {}
+            return parsed if isinstance(parsed, dict) else {}
         with open("/tmp/pg_pending_debug.log", "a") as _dbg:
-            _dbg.write(f"[{datetime.utcnow().isoformat()}] phone={ctx.phone} msg={message[:60]} "
-                       f"pending={'FOUND id=' + str(pending.id) + ' intent=' + pending.intent + ' step=' + _dbg_json.loads(pending.action_data or '{}').get('step','?') if pending else 'NONE'}\n")
+            if pending:
+                _ad = _safe_parse_ad(pending.action_data)
+                _dbg.write(f"[{datetime.utcnow().isoformat()}] phone={ctx.phone} msg={message[:60]} "
+                           f"pending=FOUND id={pending.id} intent={pending.intent} step={_ad.get('step','?')}\n")
+            else:
+                _dbg.write(f"[{datetime.utcnow().isoformat()}] phone={ctx.phone} msg={message[:60]} pending=NONE\n")
         if pending:
             # ── Mid-flow breakout detection ────────────────────────────────────
             import json as _jbr
-            _step = _jbr.loads(pending.action_data or "{}").get("step", "")
+            _parsed_ad = _safe_parse_ad(pending.action_data)
+            _step = _parsed_ad.get("step", "")
             _free_text_steps = {"ask_notes", "ask_description"}
             _breakout = _detect_mid_flow_breakout(message, pending.intent, skip_new_intent=(_step in _free_text_steps))
             if _breakout == "cancel":

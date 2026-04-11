@@ -142,6 +142,12 @@ async def resolve_pending_action(
     reply_text = reply_text.strip()
     choices = json.loads(pending.choices or "[]")
     action_data = json.loads(pending.action_data or "{}")
+    # Handle double-serialized action_data (legacy bug: json.dumps called twice)
+    if isinstance(action_data, str):
+        try:
+            action_data = json.loads(action_data)
+        except (json.JSONDecodeError, TypeError):
+            action_data = {}
 
     # Parse user's choice: "1", "2", "1." etc.
     chosen_idx = None
