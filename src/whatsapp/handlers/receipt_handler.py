@@ -103,8 +103,7 @@ async def handle_media_upload(
             return await _handle_vendor_slip(media_id, media_mime, vision_result.get("summary", ""), phone, session)
 
     # ── Gemini failed or unavailable → fallback: ask the user ────────────
-    import json
-    action_data = json.dumps({"media_id": media_id, "media_mime": media_mime})
+    action_data = {"media_id": media_id, "media_mime": media_mime}
     choices = [
         {"seq": 1, "intent": "MEDIA_RECEIPT",  "label": "Payment receipt"},
         {"seq": 2, "intent": "MEDIA_EXPENSE",  "label": "Expense bill / invoice"},
@@ -193,11 +192,10 @@ async def handle_receipt_upload(
                 "payment_id": p.id,
             })
 
-        import json
-        action_data = json.dumps({
+        action_data = {
             "media_id": media_id,
             "media_mime": media_mime,
-        })
+        }
         await _save_pending(phone, "RECEIPT_SELECT", action_data, choices, session)
 
         lines = ["Which payment is this receipt for?\n"]
@@ -222,11 +220,10 @@ async def handle_receipt_upload(
                 "payment_id": p.id,
             })
 
-        import json
-        action_data = json.dumps({
+        action_data = {
             "media_id": media_id,
             "media_mime": media_mime,
-        })
+        }
         await _save_pending(phone, "RECEIPT_SELECT", action_data, choices, session)
 
         lines = ["No recent payment in the last 30 min. These payments from today have no receipt:\n"]
@@ -242,12 +239,11 @@ async def handle_receipt_upload(
     )
 
     if file_path:
-        import json
-        action_data = json.dumps({
+        action_data = {
             "media_id": media_id,
             "media_mime": media_mime,
             "file_path": file_path,
-        })
+        }
         await _save_pending(phone, "RECEIPT_NO_PAYMENT", action_data, [], session)
         return (
             "Receipt saved but no recent payment found to attach it to.\n\n"
@@ -577,11 +573,10 @@ async def _handle_gemini_receipt(
         return "\n".join(l for l in lines if l)
 
     # No tenant match — save receipt, show what Gemini found, ask to link
-    import json as _json
-    action_data = _json.dumps({
+    action_data = {
         "file_path": file_path,
         "gemini": vision,
-    })
+    }
     await _save_pending(phone, "RECEIPT_NO_PAYMENT", action_data, [], session)
 
     lines = [

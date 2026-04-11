@@ -461,7 +461,7 @@ async def _process_message_inner(
                     {"seq": i + 1, "intent": opt, "label": _INTENT_LABELS.get(opt, opt)}
                     for i, opt in enumerate(agent_result.options)
                 ]
-                action_data = json.dumps({"original_message": message, "entities": agent_result.entities or {}})
+                action_data = {"original_message": message, "entities": agent_result.entities or {}}
                 await _save_pending(ctx.phone, "INTENT_AMBIGUOUS", action_data, choices_list, session)
                 _asyncio.create_task(learn_from_interaction(
                     pg_id=pg_id, message=message, phone=ctx.phone, role=ctx.role,
