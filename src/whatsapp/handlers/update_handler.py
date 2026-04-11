@@ -68,14 +68,13 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
     room_label = f" (Room {room.room_number})" if room else ""
 
     # Confirm
-    import json
-    action_data = json.dumps({
+    action_data = {
         "tenancy_id": tenancy.id,
         "field": "sharing_type",
         "old_value": old_sharing,
         "new_value": new_sharing,
         "tenant_name": tenant.name,
-    })
+    }
     choices = [
         {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes, update"},
         {"seq": 2, "intent": "CANCEL_UPDATE", "label": "No, cancel"},
@@ -126,14 +125,13 @@ async def update_rent(entities: dict, ctx: CallerContext, session: AsyncSession)
     room = await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room.room_number})" if room else ""
 
-    import json
-    action_data = json.dumps({
+    action_data = {
         "tenancy_id": tenancy.id,
         "field": "agreed_rent",
         "old_value": old_rent,
         "new_value": new_rent,
         "tenant_name": tenant.name,
-    })
+    }
     choices = [
         {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes, update"},
         {"seq": 2, "intent": "CANCEL_UPDATE", "label": "No, cancel"},
@@ -174,8 +172,7 @@ async def update_phone(entities: dict, ctx: CallerContext, session: AsyncSession
 
     old_phone = tenant.phone or "not set"
 
-    import json
-    action_data = json.dumps({
+    action_data = {
         "tenant_id": tenant.id,
         "tenancy_id": tenancy.id,
         "field": "phone",
@@ -183,7 +180,7 @@ async def update_phone(entities: dict, ctx: CallerContext, session: AsyncSession
         "new_value": new_phone,
         "tenant_name": tenant.name,
         "table": "tenants",
-    })
+    }
     choices = [
         {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes, update"},
         {"seq": 2, "intent": "CANCEL_UPDATE", "label": "No, cancel"},
@@ -226,8 +223,7 @@ async def update_gender(entities: dict, ctx: CallerContext, session: AsyncSessio
 
     old_gender = tenant.gender or "not set"
 
-    import json
-    action_data = json.dumps({
+    action_data = {
         "tenant_id": tenant.id,
         "tenancy_id": tenancy.id,
         "field": "gender",
@@ -235,7 +231,7 @@ async def update_gender(entities: dict, ctx: CallerContext, session: AsyncSessio
         "new_value": new_gender,
         "tenant_name": tenant.name,
         "table": "tenants",
-    })
+    }
     choices = [
         {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes"},
         {"seq": 2, "intent": "CANCEL_UPDATE", "label": "Cancel"},
@@ -276,14 +272,13 @@ async def update_deposit(entities: dict, ctx: CallerContext, session: AsyncSessi
     old_dep = int(tenancy.security_deposit or 0)
     new_dep = int(amount)
 
-    import json
-    action_data = json.dumps({
+    action_data = {
         "tenancy_id": tenancy.id,
         "field": "security_deposit",
         "old_value": old_dep,
         "new_value": new_dep,
         "tenant_name": tenant.name,
-    })
+    }
     choices = [
         {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes"},
         {"seq": 2, "intent": "CANCEL_UPDATE", "label": "Cancel"},
