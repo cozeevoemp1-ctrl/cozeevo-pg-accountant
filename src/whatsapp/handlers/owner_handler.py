@@ -49,9 +49,11 @@ from src.whatsapp.handlers.update_handler import (
     update_rent as _update_rent,
     update_phone as _update_phone,
     update_gender as _update_gender,
-    update_deposit as _update_deposit,
     update_room as _update_room,
     resolve_field_update as _resolve_field_update,
+    query_audit as _query_audit,
+    query_rent_history as _query_rent_history,
+    query_staff_rooms as _query_staff_rooms,
 )
 from services.property_logic import (
     NOTICE_BY_DAY,
@@ -117,8 +119,10 @@ async def handle_owner(
         "UPDATE_RENT":        _update_rent,
         "UPDATE_PHONE":       _update_phone,
         "UPDATE_GENDER":      _update_gender,
-        "UPDATE_DEPOSIT":     _update_deposit,
         "UPDATE_ROOM":        _update_room,
+        "QUERY_AUDIT":        _query_audit,
+        "QUERY_RENT_HISTORY": _query_rent_history,
+        "QUERY_STAFF_ROOMS":  _query_staff_rooms,
         "UNKNOWN":            _unknown,
     }
     fn = handlers.get(intent, _unknown)
@@ -1084,9 +1088,9 @@ async def resolve_pending_action(
     if pending.intent == "CONFIRM_FIELD_UPDATE":
         choice = reply_text.strip()
         if choice in ("1", "yes", "y"):
-            result = await _resolve_field_update("1", action_data, session)
+            result = await _resolve_field_update("1", action_data, session, changed_by=pending.phone)
         else:
-            result = await _resolve_field_update("2", action_data, session)
+            result = await _resolve_field_update("2", action_data, session, changed_by=pending.phone)
         pending.resolved = True
         return result
 
@@ -2930,6 +2934,7 @@ async def resolve_pending_action(
                 new_amount=action_data["new_amount"],
                 tenant_name=action_data["tenant_name"],
                 session=session,
+                changed_by=pending.phone,
             )
         return "Deposit change cancelled."
 
@@ -2942,6 +2947,7 @@ async def resolve_pending_action(
                 new_amount=int(amt_str),
                 tenant_name=action_data["tenant_name"],
                 session=session,
+                changed_by=pending.phone,
             )
         return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
 

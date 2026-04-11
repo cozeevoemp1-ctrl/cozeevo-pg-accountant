@@ -928,6 +928,51 @@ async def run_add_receipt_url_column(conn: AsyncConnection) -> None:
     print("  [ok] receipt_url column added")
 
 
+async def run_audit_log_tables(conn: AsyncConnection) -> None:
+    """Create audit_log and rent_revisions tables. Added 2026-04-11."""
+    print("\n== Create audit_log + rent_revisions tables ==")
+
+    # audit_log
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id          SERIAL PRIMARY KEY,
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            changed_by  VARCHAR(30) NOT NULL,
+            entity_type VARCHAR(30) NOT NULL,
+            entity_id   INTEGER NOT NULL,
+            entity_name VARCHAR(120),
+            field       VARCHAR(60) NOT NULL,
+            old_value   VARCHAR(500),
+            new_value   VARCHAR(500),
+            room_number VARCHAR(20),
+            source      VARCHAR(20) DEFAULT 'whatsapp',
+            note        TEXT
+        )
+    """))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_audit_log_created ON audit_log(created_at)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_audit_log_entity ON audit_log(entity_type, entity_id)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_audit_log_changed_by ON audit_log(changed_by)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_audit_log_room ON audit_log(room_number)"))
+    print("  [ok] audit_log table created")
+
+    # rent_revisions
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS rent_revisions (
+            id              SERIAL PRIMARY KEY,
+            tenancy_id      INTEGER NOT NULL REFERENCES tenancies(id),
+            old_rent        NUMERIC(12,2) NOT NULL,
+            new_rent        NUMERIC(12,2) NOT NULL,
+            effective_date  DATE NOT NULL,
+            changed_by      VARCHAR(30) NOT NULL,
+            reason          VARCHAR(200),
+            created_at      TIMESTAMPTZ DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rent_rev_tenancy ON rent_revisions(tenancy_id)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rent_rev_effective ON rent_revisions(effective_date)"))
+    print("  [ok] rent_revisions table created")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -952,6 +997,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_create_classification_log(conn)
             await run_seed_cozeevo_pg_config(conn)
             await run_add_receipt_url_column(conn)
+            await run_audit_log_tables(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         await run_simplify_roles_2026_04_01(engine)
         if args.seed:

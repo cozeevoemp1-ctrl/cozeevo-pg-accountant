@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     Tenancy, Tenant, Room, TenancyStatus, Property,
+    AuditLog, RentRevision,
 )
 from src.whatsapp.role_service import CallerContext
 from src.whatsapp.handlers._shared import _save_pending
@@ -310,39 +311,81 @@ async def update_room(entities: dict, ctx: CallerContext, session: AsyncSession)
         select(Room).where(Room.room_number == room_num, Room.active == True)
     )
     if not room:
-        return f"Room {room_num} not found."
+        # Also check inactive rooms for maintenance-done
+        room = await session.scalar(
+            select(Room).where(Room.room_number == room_num)
+        )
+        if not room:
+            return f"Room {room_num} not found."
 
     desc_lower = desc.lower()
+
+    def _audit_room(field: str, old_val, new_val):
+        session.add(AuditLog(
+            changed_by=ctx.phone,
+            entity_type="room",
+            entity_id=room.id,
+            entity_name=f"Room {room_num}",
+            field=field,
+            old_value=str(old_val),
+            new_value=str(new_val),
+            room_number=room_num,
+            source="whatsapp",
+        ))
 
     # AC toggle
     if "ac" in desc_lower:
         if any(w in desc_lower for w in ("add ac", "has ac", "ac on", "ac yes", "with ac")):
+            old = room.has_ac
             room.has_ac = True
+            _audit_room("has_ac", old, True)
             return f"Room *{room_num}* updated: AC = *Yes*"
         elif any(w in desc_lower for w in ("no ac", "remove ac", "ac off", "without ac")):
+            old = room.has_ac
             room.has_ac = False
+            _audit_room("has_ac", old, False)
             return f"Room *{room_num}* updated: AC = *No*"
 
     # Room type
     for rt in ("single", "double", "triple", "premium"):
         if rt in desc_lower and "type" in desc_lower:
+            old = room.room_type
             room.room_type = rt
+            _audit_room("room_type", old, rt)
             return f"Room *{room_num}* updated: type = *{rt}*"
 
     # Maintenance mode
     if "maintenance" in desc_lower:
         if any(w in desc_lower for w in ("under maintenance", "maintenance on", "close", "block")):
+            old = room.active
             room.active = False
+            _audit_room("active", old, False)
             return f"Room *{room_num}* marked as *under maintenance* (inactive)."
         elif any(w in desc_lower for w in ("maintenance done", "maintenance off", "open", "unblock", "ready")):
+            old = room.active
             room.active = True
+            _audit_room("active", old, True)
             return f"Room *{room_num}* is now *active* again."
+
+    # Staff room toggle (no revenue)
+    if "staff" in desc_lower:
+        if any(w in desc_lower for w in ("staff room", "mark staff", "is staff", "make staff", "set staff", "staff yes")):
+            old = room.is_staff_room
+            room.is_staff_room = True
+            _audit_room("is_staff_room", old, True)
+            return f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations)."
+        elif any(w in desc_lower for w in ("not staff", "remove staff", "no staff", "unmark staff", "revenue room", "tenant room")):
+            old = room.is_staff_room
+            room.is_staff_room = False
+            _audit_room("is_staff_room", old, False)
+            return f"Room *{room_num}* is now a *revenue room* (included in calculations)."
 
     return (
         f"Room *{room_num}* — what to change?\n"
         "• _room {num} add AC_\n"
         "• _room {num} type single_\n"
         "• _room {num} under maintenance_\n"
+        "• _room {num} staff room_ / _not staff_\n"
     )
 
 
@@ -352,20 +395,24 @@ async def resolve_field_update(
     choice: str,
     action_data: dict,
     session: AsyncSession,
+    changed_by: str = "system",
 ) -> str:
     """Apply or cancel a field update after user confirms."""
-    import json
+    from datetime import date as _date
 
     if choice == "1":
         field = action_data["field"]
+        old_value = action_data.get("old_value")
         new_value = action_data["new_value"]
         tenant_name = action_data["tenant_name"]
         table = action_data.get("table", "tenancies")
         room_number = ""
+        entity_id = 0
 
         if table == "tenants":
             tenant_id = action_data["tenant_id"]
             tenancy_id = action_data.get("tenancy_id")
+            entity_id = tenant_id
             tenant = await session.get(Tenant, tenant_id)
             if tenant:
                 setattr(tenant, field, new_value)
@@ -379,6 +426,7 @@ async def resolve_field_update(
                 return "Record not found. Update failed."
         else:
             tenancy_id = action_data["tenancy_id"]
+            entity_id = tenancy_id
             tenancy = await session.get(Tenancy, tenancy_id)
             if tenancy:
                 if field in ("agreed_rent", "security_deposit", "maintenance_fee", "booking_amount"):
@@ -388,8 +436,32 @@ async def resolve_field_update(
                     room = await session.get(Room, tenancy.room_id)
                     room_number = room.room_number if room else ""
                 logger.info(f"[Update] {tenant_name}.{field} = {new_value}")
+
+                # ── Rent revision tracking ──────────────────────────────
+                if field == "agreed_rent":
+                    session.add(RentRevision(
+                        tenancy_id=tenancy_id,
+                        old_rent=Decimal(str(old_value or 0)),
+                        new_rent=Decimal(str(new_value)),
+                        effective_date=_date.today(),
+                        changed_by=changed_by,
+                        reason=action_data.get("reason", "manual update via bot"),
+                    ))
             else:
                 return "Record not found. Update failed."
+
+        # ── Audit log ───────────────────────────────────────────────────
+        session.add(AuditLog(
+            changed_by=changed_by,
+            entity_type="tenant" if table == "tenants" else "tenancy",
+            entity_id=entity_id,
+            entity_name=tenant_name,
+            field=field,
+            old_value=str(old_value) if old_value is not None else None,
+            new_value=str(new_value),
+            room_number=room_number or None,
+            source="whatsapp",
+        ))
 
         # ── Sync to Google Sheet ─────────────────────────────────────────
         if room_number:
@@ -406,9 +478,154 @@ async def resolve_field_update(
             except Exception as e:
                 logger.warning(f"[Update] Sheet sync failed for {tenant_name}.{field}: {e}")
 
-        return f"Updated *{tenant_name}*: {field} = *{new_value}*"
+        result = f"Updated *{tenant_name}*: {field} = *{new_value}*"
+
+        # ── If sharing type changed, prompt to update rent too ──────────
+        if field == "sharing_type":
+            tenancy_id = action_data.get("tenancy_id")
+            if tenancy_id:
+                tenancy = await session.get(Tenancy, tenancy_id)
+                if tenancy:
+                    current_rent = int(tenancy.agreed_rent or 0)
+                    result += (
+                        f"\n\nRent is currently *Rs.{current_rent:,}*.\n"
+                        f"Want to update rent too?\n"
+                        f"Reply: *{tenant_name} rent [new amount]*"
+                    )
+
+        return result
 
     return "Update cancelled."
+
+
+# ── QUERY STAFF ROOMS ──────────────────────────────────────────────────────
+
+async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """List all staff rooms (not counted in revenue)."""
+    from src.database.models import Property
+
+    rows = (await session.execute(
+        select(Room, Property.name)
+        .join(Property, Property.id == Room.property_id, isouter=True)
+        .where(Room.is_staff_room == True)
+        .order_by(Property.name, Room.room_number)
+    )).all()
+
+    if not rows:
+        return "No staff rooms configured."
+
+    lines = []
+    for room, bldg in rows:
+        status = "active" if room.active else "inactive"
+        lines.append(f"• Room *{room.room_number}* ({bldg or '?'}) — {status}")
+
+    return (
+        f"*Staff Rooms* ({len(rows)} rooms, excluded from revenue):\n\n"
+        + "\n".join(lines)
+        + "\n\nTo change: _room [num] not staff_ or _room [num] staff room_"
+    )
+
+
+# ── QUERY AUDIT LOG ─────────────────────────────────────────────────────────
+
+async def query_audit(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show recent changes for a tenant, room, or all."""
+    from datetime import datetime as _dt, timedelta
+
+    desc = (entities.get("description") or entities.get("_raw_message") or "").strip()
+    name = entities.get("name", "").strip()
+
+    # Extract room number
+    room_match = re.search(r"room\s*(\w+)", desc, re.I)
+    room_num = room_match.group(1) if room_match else ""
+
+    # Extract name from description
+    if not name:
+        clean = re.sub(
+            r"\b(show|changes|history|audit|log|who|changed|updated|modified|for|room|recent|last|all|\d+)\b",
+            "", desc, flags=re.I,
+        ).strip().strip(".,! ")
+        if len(clean) >= 2:
+            name = clean
+
+    # Build query
+    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(15)
+
+    if room_num:
+        q = q.where(AuditLog.room_number == room_num)
+    elif name:
+        q = q.where(AuditLog.entity_name.ilike(f"%{name}%"))
+
+    rows = (await session.execute(q)).scalars().all()
+
+    if not rows:
+        target = f"room {room_num}" if room_num else (name or "anything")
+        return f"No audit records found for *{target}*."
+
+    lines = []
+    for r in rows:
+        ts = r.created_at.strftime("%d-%b %H:%M") if r.created_at else "?"
+        room_tag = f" [Room {r.room_number}]" if r.room_number else ""
+        lines.append(
+            f"• {ts} — *{r.entity_name}*{room_tag}\n"
+            f"  {r.field}: {r.old_value} → *{r.new_value}*\n"
+            f"  by {r.changed_by}"
+        )
+
+    header = "Recent changes"
+    if room_num:
+        header = f"Changes for Room {room_num}"
+    elif name:
+        header = f"Changes for {name}"
+
+    return f"*{header}* (last {len(rows)}):\n\n" + "\n\n".join(lines)
+
+
+async def query_rent_history(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show rent revision history for a tenant."""
+    desc = (entities.get("description") or entities.get("_raw_message") or "").strip()
+    name = entities.get("name", "").strip()
+
+    if not name:
+        clean = re.sub(
+            r"\b(show|rent|history|revisions?|changes|for)\b",
+            "", desc, flags=re.I,
+        ).strip().strip(".,! ")
+        if len(clean) >= 2:
+            name = clean
+
+    if not name:
+        return "Which tenant? Reply: *rent history [name]*"
+
+    tenant, tenancy = await _find_active_tenant(name, session)
+    if not tenant:
+        return f"Couldn't find active tenant '{name}'."
+
+    revisions = (await session.execute(
+        select(RentRevision)
+        .where(RentRevision.tenancy_id == tenancy.id)
+        .order_by(RentRevision.effective_date.desc())
+        .limit(10)
+    )).scalars().all()
+
+    if not revisions:
+        current = int(tenancy.agreed_rent or 0)
+        return f"*{tenant.name}* — no rent changes on record. Current rent: *Rs.{current:,}*"
+
+    lines = []
+    for rev in revisions:
+        dt = rev.effective_date.strftime("%d-%b-%Y") if rev.effective_date else "?"
+        reason = f" ({rev.reason})" if rev.reason else ""
+        lines.append(
+            f"• {dt}: Rs.{int(rev.old_rent):,} → *Rs.{int(rev.new_rent):,}*{reason}"
+        )
+
+    current = int(tenancy.agreed_rent or 0)
+    return (
+        f"*{tenant.name}* — Rent History:\n"
+        f"Current: *Rs.{current:,}*\n\n"
+        + "\n".join(lines)
+    )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

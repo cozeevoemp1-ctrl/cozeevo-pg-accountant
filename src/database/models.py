@@ -1262,3 +1262,57 @@ class ClassificationLog(Base):
     __table_args__ = (
         Index("ix_classification_log_pg_id", "pg_id"),
     )
+
+
+class AuditLog(Base):
+    """
+    L0 — Immutable audit trail for ALL field-level changes.
+    Tracks who changed what, when, old→new value.
+    Never deleted. Used for accountability and dispute resolution.
+    """
+    __tablename__ = "audit_log"
+
+    id          = Column(Integer, primary_key=True)
+    created_at  = Column(DateTime(timezone=True), default=datetime.utcnow)
+    changed_by  = Column(String(30), nullable=False)      # phone number of person who made change
+    entity_type = Column(String(30), nullable=False)       # "tenant", "tenancy", "room", "payment"
+    entity_id   = Column(Integer, nullable=False)           # PK of changed record
+    entity_name = Column(String(120), nullable=True)        # human-readable (tenant name, room number)
+    field       = Column(String(60), nullable=False)        # field that changed
+    old_value   = Column(String(500), nullable=True)
+    new_value   = Column(String(500), nullable=True)
+    room_number = Column(String(20), nullable=True)         # for easy querying by room
+    source      = Column(String(20), default="whatsapp")    # whatsapp | dashboard | system | import
+    note        = Column(Text, nullable=True)               # optional context
+
+    __table_args__ = (
+        Index("ix_audit_log_created", "created_at"),
+        Index("ix_audit_log_entity", "entity_type", "entity_id"),
+        Index("ix_audit_log_changed_by", "changed_by"),
+        Index("ix_audit_log_room", "room_number"),
+    )
+
+
+class RentRevision(Base):
+    """
+    L1 — Rent change history with effective dates.
+    Tracks when rent changed, old/new amounts, reason, and who authorized it.
+    Used for billing proration and dispute resolution.
+    """
+    __tablename__ = "rent_revisions"
+
+    id             = Column(Integer, primary_key=True)
+    tenancy_id     = Column(Integer, ForeignKey("tenancies.id"), nullable=False)
+    old_rent       = Column(Numeric(12, 2), nullable=False)
+    new_rent       = Column(Numeric(12, 2), nullable=False)
+    effective_date = Column(Date, nullable=False)            # rent applies from this date
+    changed_by     = Column(String(30), nullable=False)      # phone number
+    reason         = Column(String(200), nullable=True)      # "sharing type change", "annual revision"
+    created_at     = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    tenancy = relationship("Tenancy", backref="rent_revisions")
+
+    __table_args__ = (
+        Index("ix_rent_rev_tenancy", "tenancy_id"),
+        Index("ix_rent_rev_effective", "effective_date"),
+    )

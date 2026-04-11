@@ -36,6 +36,14 @@ Before closing any feature, run through this checklist:
 
 **If you touch a field, grep the entire project for it. Update every file that reads or writes it.**
 
+## Data sync rule (CRITICAL)
+**DB is single source of truth. All changes go through the bot.**
+- Bot writes DB first (with audit_log), then mirrors to Sheet via `gsheets.update_tenant_field()`
+- Sheet is read-only mirror — never sync Sheet→DB
+- Every field change must: update DB + update Sheet + write audit_log entry
+- Rent changes also create rent_revisions entry with effective date
+- See `docs/BRAIN.md` section 15b for full policy
+
 ## Key commands
 ```bash
 # Local dev

@@ -445,6 +445,50 @@ data/raw/file.csv
 
 ---
 
+## 15b. Data Sync Policy — DB / Sheet / Dashboard
+
+**Rule: DB is the single source of truth. All changes go through the bot.**
+
+```
+WhatsApp Bot (only entry point for changes)
+    |
+    v
+Supabase DB  ──write-through──>  Google Sheet (read-only mirror)
+    |                                    |
+    v                                    v
+Dashboard (reads DB)            Kiran views (read-only)
+```
+
+**Why not sync Sheet→DB?**
+- Apps Script on-edit triggers fail silently (quota, auth expiry, no retry)
+- Two-way sync creates merge conflicts (bot + manual edit at same time)
+- No audit trail for manual Sheet edits
+
+**How it works:**
+1. Bot updates DB first (with audit_log entry + rent_revision if applicable)
+2. Bot mirrors change to Sheet via `gsheets.update_tenant_field()`
+3. Sheet is a read-only view — protect tabs via Google Sheets permissions
+4. Dashboard reads from DB — always in sync after bot changes
+5. If someone needs to change data, they message the bot
+
+**What gets audited (audit_log table):**
+- Every field change: who (phone), what (field, old→new), when, which room
+- Rent changes also tracked in rent_revisions with effective dates
+- Source: whatsapp / dashboard / system / import
+
+**Sheet protection (completely non-editable):**
+- Sheet is view-only + filters. Nobody edits it — not even Kiran.
+- Run `lockAllSheets()` from Apps Script menu (Cozeevo → Lock All Sheets)
+- Only the bot's service account (`pg-accountant@pg-accountant-whatsapp.iam.gserviceaccount.com`) can write
+- All humans: view + filter only. No editing, no manual overrides.
+- If data is wrong, fix it via WhatsApp bot → DB updates → Sheet mirrors automatically
+
+**If bulk correction is needed:**
+- Use `scripts/clean_and_load.py` to re-import from Excel → Sheet → DB
+- Never edit the Sheet directly
+
+---
+
 ## 16. Deduplication
 
 ```

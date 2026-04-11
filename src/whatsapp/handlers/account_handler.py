@@ -783,11 +783,31 @@ async def _deposit_change(entities: dict, ctx: CallerContext, session: AsyncSess
     )
 
 
-async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str, session: AsyncSession) -> str:
+async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str, session: AsyncSession, changed_by: str = "system") -> str:
+    from src.database.models import AuditLog
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
         return "Tenancy record not found."
+    old_amount = int(tenancy.security_deposit or 0)
     tenancy.security_deposit = new_amount
+
+    # Audit log
+    room_number = ""
+    if tenancy.room_id:
+        room = await session.get(Room, tenancy.room_id)
+        room_number = room.room_number if room else ""
+    session.add(AuditLog(
+        changed_by=changed_by,
+        entity_type="tenancy",
+        entity_id=tenancy_id,
+        entity_name=tenant_name,
+        field="security_deposit",
+        old_value=str(old_amount),
+        new_value=str(new_amount),
+        room_number=room_number or None,
+        source="whatsapp",
+    ))
+
     return f"Deposit updated — *{tenant_name}* ₹{new_amount:,}"
 
 

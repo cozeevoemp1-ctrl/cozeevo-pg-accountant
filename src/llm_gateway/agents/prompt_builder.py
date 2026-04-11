@@ -34,6 +34,8 @@ UPDATE_PHONE: update tenant phone number ("update Raj phone 9876543210")
 UPDATE_GENDER: change tenant gender ("Raj is male", "change gender to female")
 UPDATE_DEPOSIT: change tenant deposit amount ("Raj deposit 15000")
 UPDATE_ROOM: change room properties — AC, type, maintenance ("room 305 add AC", "room 305 under maintenance")
+QUERY_AUDIT: show change history for a tenant or room ("show changes for Anukriti", "who changed room 402", "audit log")
+QUERY_RENT_HISTORY: show rent revision history ("rent history Anukriti", "show rent changes for Raj")
 HELP: help, menu, commands"""
 
 TENANT_INTENTS = """MY_BALANCE: how much do I owe, my dues

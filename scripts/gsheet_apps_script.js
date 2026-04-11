@@ -39,7 +39,48 @@ function onOpen() {
     .addItem("Validate Totals", "validateTotals")
     .addSeparator()
     .addItem("Setup Triggers (first time)", "setupTriggers")
+    .addItem("Lock All Sheets (read-only)", "lockAllSheets")
     .addToUi();
+}
+
+/**
+ * Lock all sheets so only the bot service account can edit.
+ * Everyone else can view and use filters but cannot change data.
+ * Run once from Cozeevo menu > Lock All Sheets.
+ */
+function lockAllSheets() {
+  var ss = SpreadsheetApp.getActive();
+  // Bot service account — the only editor allowed
+  var botEmail = "cozeevo-sheets-bot@cozeevo-bot-491219.iam.gserviceaccount.com";
+  var sheets = ss.getSheets();
+  var count = 0;
+
+  sheets.forEach(function(sheet) {
+    var name = sheet.getName();
+
+    // Remove existing protections on this sheet
+    sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function(p) {
+      p.remove();
+    });
+
+    var protection = sheet.protect().setDescription("Read-only: " + name);
+    // Only bot + owner can edit. Owner access is required for Apps Script triggers.
+    // All other users (partner, staff, viewers) are fully locked out.
+    // Owner: DO NOT manually edit — all changes must go through the WhatsApp bot.
+    protection.removeEditors(protection.getEditors());
+    protection.addEditor(botEmail);
+    protection.addEditor(ss.getOwner().getEmail());
+
+    if (protection.canDomainEdit()) {
+      protection.setDomainEdit(false);
+    }
+    count++;
+  });
+
+  SpreadsheetApp.getActive().toast(
+    count + " sheets locked. Only bot service account can edit. Everyone else: view + filter only.",
+    "Sheets Locked", 10
+  );
 }
 
 function onSheetEdit(e) {
