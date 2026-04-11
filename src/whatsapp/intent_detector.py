@@ -125,6 +125,13 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:(?:how\s+many|empty|vacant|free|available)\s+(?:beds?|rooms?)?\s*(?:in\s+)?(?:thor|hulk)|(?:thor|hulk)\s+(?:vacant|empty|free|breakdown|beds?|rooms?|available|details?)|(?:beds?|rooms?)\s+in\s+(?:thor|hulk)|which\s+(?:rooms?|beds?)\s+(?:in\s+)?(?:thor|hulk))", re.I), "QUERY_VACANT_ROOMS", 0.94),
     # Gender-based bed search — "room for female", "female empty beds", "bed with female"
     (re.compile(r"(?:(?:room|bed|sharing|available|vacancy)\s+(?:for|with)\s+(?:female|male|girls?|boys?|lad(?:y|ies)|gents?|women?|men?)|(?:female|male|girls?|boys?|lad(?:y|ies)|gents?)\s+(?:sharing|rooms?|beds?|vacancy|available|empty|vacant|double|triple)|(?:any\s+)?(?:bed|room)s?\s+(?:available\s+)?(?:with|for)\s+(?:a\s+)?(?:female|male|girls?|boys?)|(?:female|male|girls?|boys?|lad(?:y|ies)|gents?)\s+(?:empty|vacant|free)\s+(?:room|bed)s?)", re.I), "QUERY_VACANT_ROOMS", 0.94),
+    # ── Update handlers ───────────────────────────────────────────────────
+    (re.compile(r"(?:change|update|set|modify|switch)\s+(?:\w+\s+)?(?:sharing\s*(?:type)?|sharing)\s+(?:to\s+)?(?:premium|single|double|triple)|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing", re.I), "UPDATE_SHARING_TYPE", 0.94),
+    (re.compile(r"(?:change|update|set|modify|revise)\s+(?:\w+\s+)?rent\s+(?:to\s+)?\d|(?:\w+)\s+rent\s+(?:is\s+|=\s*)?\d", re.I), "UPDATE_RENT", 0.93),
+    (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+)?(?:phone|mobile|number|cell)\s+(?:to\s+)?\+?\d", re.I), "UPDATE_PHONE", 0.93),
+    (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+)?gender\s+(?:to\s+)?(?:male|female)|(?:\w+)\s+(?:is\s+)?(?:male|female)", re.I), "UPDATE_GENDER", 0.93),
+    (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+)?(?:security\s+)?deposit\s+(?:to\s+)?\d", re.I), "UPDATE_DEPOSIT", 0.93),
+    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+)", re.I), "UPDATE_ROOM", 0.93),
     # Occupancy overview
     (re.compile(r"(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)

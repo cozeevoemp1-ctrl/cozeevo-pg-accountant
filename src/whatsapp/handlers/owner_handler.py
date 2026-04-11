@@ -44,6 +44,15 @@ from src.whatsapp.handlers._shared import (
 from src.whatsapp.handlers.account_handler import (
     _calc_outstanding_dues,       # needed by _room_status + _do_checkout
 )
+from src.whatsapp.handlers.update_handler import (
+    update_sharing_type as _update_sharing_type,
+    update_rent as _update_rent,
+    update_phone as _update_phone,
+    update_gender as _update_gender,
+    update_deposit as _update_deposit,
+    update_room as _update_room,
+    resolve_field_update as _resolve_field_update,
+)
 from services.property_logic import (
     NOTICE_BY_DAY,
     calc_checkin_prorate,
@@ -104,6 +113,12 @@ async def handle_owner(
         "RULES":              _rules,
         "HELP":               _help,
         "MORE_MENU":          _more_menu,
+        "UPDATE_SHARING_TYPE": _update_sharing_type,
+        "UPDATE_RENT":        _update_rent,
+        "UPDATE_PHONE":       _update_phone,
+        "UPDATE_GENDER":      _update_gender,
+        "UPDATE_DEPOSIT":     _update_deposit,
+        "UPDATE_ROOM":        _update_room,
         "UNKNOWN":            _unknown,
     }
     fn = handlers.get(intent, _unknown)
@@ -1060,6 +1075,15 @@ async def resolve_pending_action(
             f"• Amount: ₹{int(amount):,}\n\n"
             "Reply *Yes* to confirm or *No* to cancel."
         )
+
+    if pending.intent == "CONFIRM_FIELD_UPDATE":
+        choice = reply_text.strip()
+        if choice in ("1", "yes", "y"):
+            result = await _resolve_field_update("1", action_data, session)
+        else:
+            result = await _resolve_field_update("2", action_data, session)
+        pending.resolved = True
+        return result
 
     if pending.intent == "CONFIRM_DEPOSIT_REFUND":
         ans = reply_text.lower().strip()

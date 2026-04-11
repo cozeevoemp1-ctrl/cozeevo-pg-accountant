@@ -28,6 +28,12 @@ REMINDER_SET: set a reminder
 ACTIVITY_LOG: log an activity
 QUERY_ACTIVITY: show activity log
 QUERY_FLEXIBLE: any data question not covered above — "how many female tenants", "rooms with AC on floor 3", "total rent collected in March", "which rooms have single occupant"
+UPDATE_SHARING_TYPE: change tenant sharing type ("Anukriti is premium", "change Raj to double sharing")
+UPDATE_RENT: change tenant rent amount ("change Raj rent to 14000", "Raj rent 15000")
+UPDATE_PHONE: update tenant phone number ("update Raj phone 9876543210")
+UPDATE_GENDER: change tenant gender ("Raj is male", "change gender to female")
+UPDATE_DEPOSIT: change tenant deposit amount ("Raj deposit 15000")
+UPDATE_ROOM: change room properties — AC, type, maintenance ("room 305 add AC", "room 305 under maintenance")
 HELP: help, menu, commands"""
 
 TENANT_INTENTS = """MY_BALANCE: how much do I owe, my dues
