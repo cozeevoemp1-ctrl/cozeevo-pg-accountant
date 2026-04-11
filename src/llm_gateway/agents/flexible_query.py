@@ -104,12 +104,64 @@ FORBIDDEN_PATTERNS = re.compile(
 MAX_ROWS = 50
 QUERY_TIMEOUT = 10  # seconds
 
+# ── Per-phone query context cache (for follow-up questions) ──────────────────
+# Stores: {phone: {"question": ..., "sql": ..., "result_summary": ..., "timestamp": ...}}
+_query_context: dict[str, dict] = {}
+
+
+def save_query_context(phone: str, question: str, sql: str, columns: list, rows: list) -> None:
+    """Save the last query context for follow-up resolution."""
+    from datetime import datetime
+    # Build a short result summary (first 5 rows)
+    summary_lines = []
+    for row in rows[:5]:
+        parts = [f"{col}={val}" for col, val in zip(columns, row) if val is not None]
+        summary_lines.append(", ".join(parts))
+    summary = "\n".join(summary_lines)
+    if len(rows) > 5:
+        summary += f"\n... ({len(rows)} total rows)"
+
+    _query_context[phone] = {
+        "question": question,
+        "sql": sql,
+        "result_summary": summary,
+        "row_count": len(rows),
+        "columns": columns,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def get_query_context(phone: str) -> str:
+    """Get the previous query context for follow-up resolution."""
+    ctx = _query_context.get(phone)
+    if not ctx:
+        return ""
+    return (
+        f"\nPREVIOUS QUERY (user may be following up on this):\n"
+        f"Question: {ctx['question']}\n"
+        f"SQL used: {ctx['sql']}\n"
+        f"Result: {ctx['row_count']} rows. Sample:\n{ctx['result_summary']}\n"
+    )
+
+
+# ── Follow-up detection ─────────────────────────────────────────────────────
+
+_FOLLOWUP_PATTERNS = re.compile(
+    r"^(show|give|list|tell|display|get)\s+(me\s+)?(the\s+)?(list|details|more|all|them|those|it|names|breakdown|data|results?)\b"
+    r"|^(break|split)\s+(it\s+)?(down|by)\b"
+    r"|^(more\s+)?details?\b"
+    r"|^yes\s+(show|list|give)\b"
+    r"|^(what|which)\s+(are|were)\s+(they|those|the)\b",
+    re.IGNORECASE,
+)
+
 
 async def run_flexible_query(
     question: str,
     session: AsyncSession,
     role: str = "admin",
     chat_history: str = "",
+    phone: str = "",
 ) -> str:
     """
     Answer a natural-language question by generating and executing SQL.
@@ -134,8 +186,14 @@ async def run_flexible_query(
     if non_data_patterns.search(q_lower):
         return "I can only answer questions about your PG data (tenants, rooms, payments, etc.)."
 
+    # Step 0b: Inject previous query context for follow-ups
+    prev_context = get_query_context(phone) if phone else ""
+    combined_history = chat_history
+    if prev_context:
+        combined_history = (chat_history + "\n" + prev_context).strip()
+
     # Step 1: Generate SQL from question
-    sql = await _generate_sql(question, chat_history)
+    sql = await _generate_sql(question, combined_history)
     if not sql:
         return "I couldn't understand that query. Try rephrasing, e.g.:\n• _how many female tenants_\n• _vacant beds in THOR_\n• _total rent collected in April_"
 
@@ -161,7 +219,9 @@ async def run_flexible_query(
 
     reply = await _format_result(question, columns, rows, sql)
 
-    # Step 5: Log successful query for learning
+    # Step 5: Save query context for follow-ups + log for learning
+    if phone:
+        save_query_context(phone, question, sql, columns, rows)
     try:
         await _log_query(question, sql, len(rows), session)
     except Exception:

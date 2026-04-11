@@ -406,6 +406,17 @@ async def _process_message_inner(
     intent_result = detect_intent(message, ctx.role)
     intent = intent_result.intent
 
+    # ── Follow-up detection: "show me the list", "break it down" etc. ──
+    if intent in ("UNKNOWN", "GENERAL"):
+        from src.llm_gateway.agents.flexible_query import _FOLLOWUP_PATTERNS, get_query_context
+        if _FOLLOWUP_PATTERNS.search(message) and get_query_context(ctx.phone):
+            from src.llm_gateway.agents.flexible_query import run_flexible_query
+            chat_context = await _load_chat_context(ctx.phone, session, limit=8)
+            flex_reply = await run_flexible_query(message, session, ctx.role, chat_context, ctx.phone)
+            await _log(session, phone, message, ctx.role, "QUERY_FLEXIBLE", flex_reply)
+            await session.commit()
+            return OutboundReply(reply=flex_reply, intent="QUERY_FLEXIBLE", role=ctx.role)
+
     # ── PydanticAI agent path (feature flag) ─────────────────────────
     if _USE_PYDANTIC_AGENTS and intent in ("UNKNOWN", "GENERAL"):
         pg_id = await _resolve_pg_id(session)
@@ -437,7 +448,7 @@ async def _process_message_inner(
                 # ── Flexible query: answer directly, don't route to gatekeeper ──
                 if intent == "QUERY_FLEXIBLE":
                     from src.llm_gateway.agents.flexible_query import run_flexible_query
-                    flex_reply = await run_flexible_query(message, session, ctx.role, chat_context)
+                    flex_reply = await run_flexible_query(message, session, ctx.role, chat_context, ctx.phone)
                     await _log(session, phone, message, ctx.role, "QUERY_FLEXIBLE", flex_reply)
                     await session.commit()
                     return OutboundReply(reply=flex_reply, intent="QUERY_FLEXIBLE", role=ctx.role)
