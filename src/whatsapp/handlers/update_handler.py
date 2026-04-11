@@ -361,26 +361,52 @@ async def resolve_field_update(
         new_value = action_data["new_value"]
         tenant_name = action_data["tenant_name"]
         table = action_data.get("table", "tenancies")
+        room_number = ""
 
         if table == "tenants":
             tenant_id = action_data["tenant_id"]
+            tenancy_id = action_data.get("tenancy_id")
             tenant = await session.get(Tenant, tenant_id)
             if tenant:
                 setattr(tenant, field, new_value)
+                if tenancy_id:
+                    tenancy = await session.get(Tenancy, tenancy_id)
+                    if tenancy and tenancy.room_id:
+                        room = await session.get(Room, tenancy.room_id)
+                        room_number = room.room_number if room else ""
                 logger.info(f"[Update] {tenant_name}.{field} = {new_value}")
-                return f"Updated *{tenant_name}*: {field} = *{new_value}*"
+            else:
+                return "Record not found. Update failed."
         else:
             tenancy_id = action_data["tenancy_id"]
             tenancy = await session.get(Tenancy, tenancy_id)
             if tenancy:
-                # Type conversion
                 if field in ("agreed_rent", "security_deposit", "maintenance_fee", "booking_amount"):
                     new_value = Decimal(str(new_value))
                 setattr(tenancy, field, new_value)
+                if tenancy.room_id:
+                    room = await session.get(Room, tenancy.room_id)
+                    room_number = room.room_number if room else ""
                 logger.info(f"[Update] {tenant_name}.{field} = {new_value}")
-                return f"Updated *{tenant_name}*: {field} = *{new_value}*"
+            else:
+                return "Record not found. Update failed."
 
-        return "Record not found. Update failed."
+        # ── Sync to Google Sheet ─────────────────────────────────────────
+        if room_number:
+            try:
+                import asyncio as _aio
+                from src.integrations.gsheets import update_tenant_field
+                sheet_value = str(new_value)
+                if field == "sharing_type":
+                    sheet_value = str(new_value).replace("SharingType.", "").capitalize()
+                await _aio.wait_for(
+                    update_tenant_field(room_number, tenant_name, field, sheet_value),
+                    timeout=10,
+                )
+            except Exception as e:
+                logger.warning(f"[Update] Sheet sync failed for {tenant_name}.{field}: {e}")
+
+        return f"Updated *{tenant_name}*: {field} = *{new_value}*"
 
     return "Update cancelled."
 

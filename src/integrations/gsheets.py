@@ -1512,3 +1512,96 @@ async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:
     if tab_name is None:
         tab_name = _current_month_tab()
     return await asyncio.to_thread(_get_worksheet_sync, tab_name)
+
+
+# ── Column index map (0-based) for the 17-col monthly tab layout ─────────────
+T_ROOM = 0; T_NAME = 1; T_PHONE = 2; T_BUILDING = 3; T_SHARING = 4
+T_RENT = 5; T_CASH = 6; T_UPI = 7; T_TOTAL_PAID = 8; T_BALANCE = 9
+T_STATUS = 10; T_CHECKIN = 11; T_NOTICE_DATE = 12; T_EVENT = 13
+T_NOTES = 14; T_PREV_DUE = 15
+
+_FIELD_TO_COL = {
+    "sharing_type": T_SHARING,
+    "sharing": T_SHARING,
+    "agreed_rent": T_RENT,
+    "rent": T_RENT,
+    "phone": T_PHONE,
+    "notes": T_NOTES,
+    "status": T_STATUS,
+}
+
+
+def _update_tenant_field_sync(
+    room_number: str,
+    tenant_name: str,
+    field: str,
+    new_value: str,
+    tab_name: Optional[str] = None,
+) -> dict:
+    """
+    Update a single field for a tenant row on the monthly Sheet tab.
+    Finds the row by room_number + tenant_name match.
+    """
+    result = {"success": False, "error": None}
+
+    col_idx = _FIELD_TO_COL.get(field)
+    if col_idx is None:
+        result["error"] = f"Unknown field '{field}' — not mapped to a Sheet column"
+        return result
+
+    if tab_name is None:
+        tab_name = _current_month_tab()
+
+    try:
+        ws = _get_worksheet_sync(tab_name)
+        all_vals = ws.get_all_values()
+
+        # Find the row
+        target_row = None
+        for i in range(4, len(all_vals)):
+            row = all_vals[i]
+            if not row[0] or not row[1]:
+                continue
+            row_room = str(row[0]).strip()
+            row_name = str(row[1]).strip().lower()
+            if row_room == str(room_number) and tenant_name.lower() in row_name:
+                target_row = i + 1  # 1-based for gspread
+                break
+
+        if not target_row:
+            # Try name-only match
+            for i in range(4, len(all_vals)):
+                row = all_vals[i]
+                if not row[1]:
+                    continue
+                if tenant_name.lower() in str(row[1]).strip().lower():
+                    target_row = i + 1
+                    break
+
+        if not target_row:
+            result["error"] = f"Tenant '{tenant_name}' not found on {tab_name} tab"
+            return result
+
+        # Update the cell
+        ws.update_cell(target_row, col_idx + 1, new_value)  # gspread is 1-based
+        result["success"] = True
+        logger.info(f"[GSheets] Updated {tenant_name} row {target_row}: {field} = {new_value} on {tab_name}")
+
+    except Exception as e:
+        result["error"] = str(e)
+        logger.error(f"[GSheets] Failed to update {tenant_name}.{field}: {e}")
+
+    return result
+
+
+async def update_tenant_field(
+    room_number: str,
+    tenant_name: str,
+    field: str,
+    new_value: str,
+    tab_name: Optional[str] = None,
+) -> dict:
+    """Async entry point — update a tenant field on the Sheet."""
+    return await asyncio.to_thread(
+        _update_tenant_field_sync, room_number, tenant_name, field, new_value, tab_name,
+    )
