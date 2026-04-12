@@ -1518,7 +1518,6 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
         pass
 
     regular = active_tenants - premium_count
-    active_beds = regular + (premium_count * 2)
     net_income = int(collected) - int(total_expenses)
 
     # Total beds from DB (not hardcoded)
@@ -1526,8 +1525,21 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
         select(func.sum(Room.max_occupancy)).where(Room.active == True, Room.is_staff_room == False)
     ) or 291
 
-    # Day-wise guests currently occupying beds
+    # Premium beds: each premium tenant occupies full room (max_occupancy beds)
+    # Extra beds consumed = sum(max_occupancy) for premium rooms - premium_count
     from src.database.models import Property, DaywiseStay
+    premium_extra_beds = 0
+    if premium_count > 0:
+        premium_room_beds = await session.scalar(
+            select(func.sum(Room.max_occupancy))
+            .join(Tenancy, Tenancy.room_id == Room.id)
+            .where(Tenancy.status == TenancyStatus.active, Tenancy.sharing_type == "premium")
+        ) or 0
+        premium_extra_beds = premium_room_beds - premium_count  # extra beds blocked
+
+    active_beds = active_tenants + premium_extra_beds  # each tenant = 1 bed + premium extras
+
+    # Day-wise guests currently occupying beds
     from datetime import date as _date
     _today = _date.today()
     daywise_beds = 0

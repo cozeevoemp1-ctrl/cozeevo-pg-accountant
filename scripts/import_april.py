@@ -333,6 +333,23 @@ async def import_to_db(records, write=False):
                     tenant = phone_match  # minor name variation (e.g. casing)
                 # else: different person sharing same phone — will create new tenant below
 
+            if not tenant:
+                # Try matching by placeholder phone (from prior imports)
+                safe = re.sub(r'[^a-zA-Z0-9]', '', rec['name'])[:12]
+                tenant = await session.scalar(
+                    select(Tenant).where(Tenant.phone.like(f"NOPHONE_{rec['room']}_%"),
+                                         Tenant.name == norm_name)
+                )
+                if not tenant:
+                    # Also try name-only match in same room
+                    from sqlalchemy import and_
+                    tenant = await session.scalar(
+                        select(Tenant).where(Tenant.name == norm_name)
+                        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+                        .join(Room, Room.id == Tenancy.room_id)
+                        .where(Room.room_number == rec['room'])
+                    )
+
             if not tenant and write:
                 # Create new tenant — use placeholder phone if phone already taken
                 existing_phone = await session.scalar(
@@ -343,6 +360,12 @@ async def import_to_db(records, write=False):
                     # Shared phone — use placeholder
                     safe = re.sub(r'[^a-zA-Z0-9]', '', rec['name'])[:12]
                     actual_phone = f"NOPHONE_{rec['room']}_{safe}"
+                    # Check placeholder also not taken
+                    existing_placeholder = await session.scalar(
+                        select(Tenant).where(Tenant.phone == actual_phone)
+                    )
+                    if existing_placeholder:
+                        actual_phone = f"NOPHONE_{rec['room']}_{safe}_{int(datetime.now().timestamp()) % 10000}"
                 tenant = Tenant(
                     name=norm_name,
                     phone=actual_phone,
