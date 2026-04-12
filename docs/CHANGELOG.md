@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.25.1] — 2026-04-12 — April Import + Vacant Beds Fix
+
+### Fixed
+- **Vacant beds calculation** — was using broken summary formula (showed 4 instead of 27). Now uses room-by-room count: skips premium rooms, subtracts active + noshow + daywise per room. Single source of truth.
+- **Import script** — placeholder phone collision for tenants already imported with NOPHONE prefix
+
+### Added
+- **April 2026 data imported** — 324 rows from Excel, 19 new tenants created, 247 rent schedules + 235 payments loaded
+- **Error recovery guidance** — "try again or type hi to start fresh" instead of just "something went wrong"
+
 ## [1.25.0] — 2026-04-11 — Audit Trail + Rent Revisions + Sheet Protection
 
 ### Added
