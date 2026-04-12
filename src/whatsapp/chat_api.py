@@ -96,7 +96,7 @@ async def process_message(
         logging.getLogger(__name__).exception("Unhandled error in process_message")
         traceback.print_exc()  # ensure it goes to stderr
         return OutboundReply(
-            reply="Sorry, something went wrong. Please try again in a moment.",
+            reply="Sorry, something went wrong. Please try again or type *hi* to start fresh.",
             intent="ERROR", role="unknown",
         )
 
