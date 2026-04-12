@@ -514,6 +514,70 @@ async def import_to_db(records, write=False):
     return stats
 
 
+def sync_tenants_master(records, write=False):
+    """Add new tenants from import to TENANTS master tab.
+    Compares Excel names against existing TENANTS rows.
+    Only adds CHECKIN/NO SHOW — not EXIT/CANCELLED."""
+    import gspread
+    from google.oauth2.service_account import Credentials
+
+    SHEET_ID = "1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw"
+    CREDS_FILE = "credentials/gsheets_service_account.json"
+
+    creds = Credentials.from_service_account_file(CREDS_FILE,
+        scopes=['https://www.googleapis.com/auth/spreadsheets'])
+    gc = gspread.authorize(creds)
+    sp = gc.open_by_key(SHEET_ID)
+    ws = sp.worksheet("TENANTS")
+
+    data = ws.get_all_values()
+    existing = set()
+    for row in data[1:]:
+        if row[1]:
+            existing.add(str(row[1]).strip().lower())
+
+    # TENANTS columns: Room,Name,Phone,Gender,Building,Floor,Sharing,Check-in,Status,Agreed Rent,Deposit,Booking,Maintenance,Notice Date,Expected Exit
+    new_rows = []
+    for rec in records:
+        name = rec['name'].strip()
+        if name.lower() in existing:
+            continue
+        if 'EXIT' in rec['inout'] or 'CANCEL' in rec['inout']:
+            continue
+
+        status = 'Active'
+        if 'NO SHOW' in rec['inout']:
+            status = 'No-show'
+
+        new_rows.append([
+            rec['room'],
+            name,
+            rec['phone_raw'],
+            rec['gender'],
+            rec['block'],
+            rec['floor'],
+            rec['sharing'],
+            rec['checkin_raw'],
+            status,
+            rec['current_rent'],
+            rec['deposit'],
+            rec['booking'],
+            rec['maintenance'],
+            '',  # Notice Date
+            '',  # Expected Exit
+        ])
+        existing.add(name.lower())  # prevent duplicates within same import
+
+    if new_rows and write:
+        ws.append_rows(new_rows, value_input_option='USER_ENTERED')
+
+    if new_rows:
+        for r in new_rows:
+            print(f"    + {r[0]:5} {r[1]:25} {r[6]:10} {r[8]}")
+
+    return len(new_rows)
+
+
 def update_sheet(records):
     """Update APRIL 2026 tab on Google Sheet (new 17-col format matching gsheets.py).
 
@@ -543,14 +607,11 @@ def update_sheet(records):
                "Check-in", "Notice Date", "Event", "Notes", "Prev Due",
                "Entered By"]
 
-    # Include all rows that have rent_schedule or payments (skip EXIT/CANCELLED with no payment)
+    # Include ALL rows from Excel — exits, cancelled, no-shows, everything
     rows = []
     for rec in records:
         is_exit = 'EXIT' in rec['inout']
         is_cancelled = 'CANCEL' in rec['inout']
-        has_payment = rec['apr_cash'] > 0 or rec['apr_upi'] > 0
-        if (is_exit or is_cancelled) and not has_payment:
-            continue
 
         cash = rec['apr_cash']
         upi = rec['apr_upi']
@@ -567,6 +628,8 @@ def update_sheet(records):
         status_raw = rec['apr_status_raw'].upper().strip() if rec['apr_status_raw'] else ''
         if is_exit:
             status = "EXIT"
+        elif is_cancelled:
+            status = "CANCELLED"
         elif 'NO SHOW' in rec['inout']:
             status = "NO SHOW"
         elif 'PAID' in status_raw and 'UNPAID' not in status_raw and 'NOT' not in status_raw:
@@ -713,8 +776,12 @@ async def main():
             print(f"    - {nm}")
 
     if args.sheet:
-        print("\nStep 3: Updating Google Sheet...")
+        print("\nStep 3: Updating Google Sheet (APRIL 2026)...")
         update_sheet(records)
+
+        print("\nStep 4: Syncing new tenants to TENANTS master tab...")
+        new_count = sync_tenants_master(records, write=args.write)
+        print(f"  {new_count} new tenants added to TENANTS tab.")
 
     print("\nDone!")
 
