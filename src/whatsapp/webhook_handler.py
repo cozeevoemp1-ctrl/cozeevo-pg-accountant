@@ -213,7 +213,7 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         reply = result.reply if not result.skip else None
     except Exception as e:
         logger.error(f"[Webhook] Processing error: {e}", exc_info=True)
-        reply = None  # Never send error messages to users — log only
+        reply = "Sorry, something went wrong. Please try again or type *hi* to start fresh."
 
     if reply:
         if getattr(result, "interactive_payload", None):
