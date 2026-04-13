@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.26.0] — 2026-04-13 — Room Ops + Sheet Sync + Unhandled Logging
+
+### Added
+- **ASSIGN_ROOM intent** — assign rooms to unassigned/future bookings, blocks if already active, fuzzy name match with phone confirmation
+- **QUERY_UNHANDLED intent** — "show unhandled requests" shows messages bot couldn't understand
+- **`unhandled_requests` table** — logs every UNKNOWN intent with phone, message, role for future intent building
+- **Sheet retry queue** — failed Sheet writes saved to `data/sheet_write_queue.json`, retried on bot startup
+- **`scripts/sync_sheet_from_db.py`** — full DB-to-Sheet reconciliation (active + noshow only, no stale exits)
+- **Gender always required** during form image checkin (asks if not found in image)
+
+### Enhanced
+- **ROOM_TRANSFER** — shows who occupies target room (name + phone) instead of generic "choose vacant room"; adds Sheet sync + audit log
+- **Staff rooms regex** — now matches "staff rooms", "how many staff rooms", "labour rooms", "labor room"
+- **SCHEDULE_CHECKOUT** — catches "leaving tomorrow/today/next week" (was falling through to CHECKOUT)
+
+### Fixed
+- **Sheet synced to DB** — April tab now matches: 261 beds, 15 no-show, 14 vacant. Removed 59 stale EXIT + 11 CANCELLED rows
+- **Unicode in migrate_all.py** — arrow chars caused cp1252 errors on Windows
+
 ## [1.25.1] — 2026-04-12 — April Import + Vacant Beds Fix
 
 ### Fixed
