@@ -1316,3 +1316,24 @@ class RentRevision(Base):
         Index("ix_rent_rev_tenancy", "tenancy_id"),
         Index("ix_rent_rev_effective", "effective_date"),
     )
+
+
+class UnhandledRequest(Base):
+    """
+    Logs messages the bot couldn't understand (UNKNOWN intent).
+    Used to identify patterns for new intents/tools.
+    """
+    __tablename__ = "unhandled_requests"
+
+    id         = Column(Integer, primary_key=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    phone      = Column(String(20), nullable=False)
+    message    = Column(Text, nullable=False)
+    role       = Column(String(20), nullable=True)       # admin/power_user/tenant/lead
+    resolved   = Column(Boolean, default=False)           # marked when intent built
+    intent_created = Column(String(60), nullable=True)    # which intent was built from this
+
+    __table_args__ = (
+        Index("ix_unhandled_created", "created_at"),
+        Index("ix_unhandled_resolved", "resolved"),
+    )

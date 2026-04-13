@@ -83,7 +83,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Void / reverse expense
     (re.compile(r"(?:void expense|cancel expense|reverse expense|undo expense|wrong expense|delete expense|remove expense|expense (?:void|cancel|wrong|mistake|error))", re.I), "VOID_EXPENSE", 0.93),
     # Room transfer — move tenant from one room to another
-    (re.compile(r"(?:move|shift|transfer|relocate|change room for|room change for|room\s+(?:transfer|change|shift|move))\s+\w+.{0,30}(?:to|into)\s+(?:room\s+)?[\w-]+|(?:move|shift|transfer)\s+(?:room\s+)?[\w-]+\s+to\s+(?:room\s+)?[\w-]+|\w+\s+(?:ko\s+)?(?:room\s+)?[\w-]+\s+(?:mein|me)\s+(?:move|shift|transfer)\s+karo?", re.I), "ROOM_TRANSFER", 0.93),
+    (re.compile(r"(?:move|shift|transfer|relocate|swap|switch|change\s+room\s+(?:for|of)|room\s+(?:change|swap|switch)\s+(?:for\s+)?|room\s+(?:transfer|change|shift|move))\s+\w+.{0,30}(?:to|into|with)\s+(?:room\s+)?[\w-]+|(?:move|shift|transfer|swap)\s+(?:room\s+)?[\w-]+\s+to\s+(?:room\s+)?[\w-]+|swap\s+rooms?\b|room\s+badal|kamra\s+badal|\w+\s+(?:ko\s+)?(?:room\s+)?[\w-]+\s+(?:mein|me)\s+(?:move|shift|transfer)\s+karo?", re.I), "ROOM_TRANSFER", 0.93),
     # Deposit change
     (re.compile(r"(?:change|update|set|modify|correct)\s+deposit|deposit\s+(?:change|update|correction|set|for\s+\w+\s+is|\w+\s+\d{3,})|(?:increase|decrease|hike|reduce)\s+deposit", re.I), "DEPOSIT_CHANGE", 0.91),
     # Send reminder to ALL tenants
@@ -97,6 +97,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:refund|return deposit|give back deposit|deposit back|repay deposit|disburse deposit|pay\s*back\s+deposit|deposit\s+wapas|wapas\s+karo\b)", re.I), "ADD_REFUND", 0.92),
     # Floor plan / room layout — "thor floor plan", "hulk layout", "room diagram"
     (re.compile(r"(?:floor\s*plan|room\s*layout|room\s*diagram|block\s*layout|layout\s*of\s*(?:thor|hulk)|(?:thor|hulk)\s*(?:layout|diagram|floors?|rooms?|beds?)|beds?\s*per\s*floor|rooms?\s*per\s*floor|show\s*(?:me\s*)?(?:all\s*)?(?:thor|hulk|block)\s*rooms?)", re.I), "ROOM_LAYOUT", 0.95),
+    # Unhandled requests — admin only, "show unhandled", "what couldn't you handle"
+    (re.compile(r"(?:unhandled|unknown|missed|failed)\s+(?:requests?|messages?|queries?)|(?:show|list|what)\s+(?:couldn.?t|can.?t|didn.?t)\s+(?:you\s+)?(?:handle|understand)|unhandled\b", re.I), "QUERY_UNHANDLED", 0.93),
     # Activity query — "activity today", "show activity", "activity log today", "activity this week"
     (re.compile(r"(?:activity\s+(?:log\s+)?(?:today|yesterday|this\s+week|last\s+\d+\s+days?|room\s+[\w-]+)|show\s+activit(?:y|ies)|activit(?:y|ies)\s+(?:today|yesterday|this\s+week|log)|^activit(?:y|ies)$|^activity\s+log$)", re.I), "QUERY_ACTIVITY", 0.94),
     # Add contact / save contact — MUST come before ADD_EXPENSE (phone numbers look like amounts)
@@ -134,7 +136,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:show|check|view|get|who)\s+(?:changes?|audit|history|log|modified|updated)\s+(?:for|of|on|to)?\s*(?:room|tenant)?|(?:changes?|audit|history)\s+(?:for|of)\s+\w+|what\s+changed|audit\s+log|who\s+changed\s+\w+", re.I), "QUERY_AUDIT", 0.92),
     (re.compile(r"rent\s+(?:history|changes?|revisions?)\s*(?:for\s+)?\w*|(?:show|check)\s+rent\s+(?:changes?|revisions?|history)", re.I), "QUERY_RENT_HISTORY", 0.93),
     (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff))", re.I), "UPDATE_ROOM", 0.93),
-    (re.compile(r"(?:list|show|which)\s+(?:are\s+)?staff\s+rooms?|staff\s+rooms?\s+list|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
+    (re.compile(r"(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|(?:staff|labou?r)\s+rooms?\s*(?:list)?|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
     # Occupancy overview
     (re.compile(r"(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)
@@ -237,11 +239,15 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|\w+\s+leaving\s+(?:end\s+of|this|next)\s+month|plan(?:ned)?\s+to\s+(?:leave|vacate)\s+(?:on\s+)?\d"
         r"|\w+\s+\d{1,2}\s+(?:jan|feb|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b"
         r"|\w+\s+(?:jan|feb|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b"
-        r"|\w+\s+\d+\s+(?:jan|feb|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?)\s+ko\s+jayega|\w+\s+(?:ko|mein)\s+jayega\b",
+        r"|\w+\s+\d+\s+(?:jan|feb|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?)\s+ko\s+jayega|\w+\s+(?:ko|mein)\s+jayega\b"
+        r"|\w+\s+(?:leaving|vacating|moving\s*out|checkout|check\s*out)\s+(?:tomorrow|today|tonight|next\s+week|this\s+week|day\s+after)"
+        r"|(?:leaving|vacating|moving\s*out|checkout)\s+(?:tomorrow|today|tonight|next\s+week|this\s+week|day\s+after)",
         re.I
     ), "SCHEDULE_CHECKOUT", 0.93),
     # Notice period — "gave notice", "serving notice", "wants to leave", bare "notice"
     (re.compile(r"gave notice|giving notice|serving notice|\bnotice\b|notice period|plans? to (?:leave|vacate)|wants? to (?:leave|move)", re.I), "NOTICE_GIVEN", 0.92),
+    # Assign room to unassigned/future booking tenant
+    (re.compile(r"assign\s+(?:room\s+)?[\w-]+\s+to\s+\w+|assign\s+\w+\s+(?:to\s+)?room\s+[\w-]+|allocate\s+room|room\s+assign|allot\s+room", re.I), "ASSIGN_ROOM", 0.94),
     # Immediate checkout (no date)
     (re.compile(r"(?:check.?out|vacate|vacating|leaving|exit|moving out|ja\s+raha\s+hai\b|chhod\s+raha\s+hai\b)", re.I), "CHECKOUT", 0.95),
     # Add tenant
@@ -415,6 +421,8 @@ _INTENT_LABELS: dict[str, str] = {
     "QUERY_FLEXIBLE":    "Answer a custom data question",
     "QUERY_AUDIT":       "Show change history",
     "QUERY_RENT_HISTORY": "Show rent revision history",
+    "CHANGE_ROOM":       "Move/swap tenant to different room",
+    "ASSIGN_ROOM":       "Assign room to unassigned booking",
 }
 
 
@@ -422,7 +430,7 @@ _INTENT_LABELS: dict[str, str] = {
 # When a user taps a button or selects from a list, Meta sends the button id as
 # the message body verbatim. We bypass regex and route it directly.
 _OWNER_DIRECT: frozenset[str] = frozenset({
-    "ADD_TENANT", "CHECKOUT", "RECORD_CHECKOUT", "START_ONBOARDING",
+    "ADD_TENANT", "CHECKOUT", "RECORD_CHECKOUT", "START_ONBOARDING", "CHANGE_ROOM", "ASSIGN_ROOM",
     "PAYMENT_LOG", "ADD_EXPENSE", "ADD_REFUND",
     "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
     "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CONTACTS",

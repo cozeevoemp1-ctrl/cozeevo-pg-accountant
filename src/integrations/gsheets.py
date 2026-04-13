@@ -127,6 +127,86 @@ T_NOTES = 32
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
 TOTAL_BEDS = 291
 
+# -- Failed Sheet writes retry queue -------------------------------------------
+import json as _json
+_FAILED_WRITES_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "sheet_write_queue.json",
+)
+_failed_writes_lock = asyncio.Lock() if asyncio else None  # type: ignore
+
+def _queue_failed_write(operation: str, kwargs: dict) -> None:
+    """Queue a failed Sheet write for retry. Fire-and-forget, never raises."""
+    try:
+        os.makedirs(os.path.dirname(_FAILED_WRITES_PATH), exist_ok=True)
+        queue = []
+        if os.path.exists(_FAILED_WRITES_PATH):
+            with open(_FAILED_WRITES_PATH, "r") as f:
+                queue = _json.load(f)
+        queue.append({"op": operation, "kwargs": kwargs, "ts": time.time()})
+        # Cap at 200 entries to prevent unbounded growth
+        if len(queue) > 200:
+            queue = queue[-200:]
+        with open(_FAILED_WRITES_PATH, "w") as f:
+            _json.dump(queue, f)
+        logger.warning("Queued failed Sheet write: %s (%d in queue)", operation, len(queue))
+    except Exception as e:
+        logger.error("Could not queue failed Sheet write: %s", e)
+
+
+async def retry_failed_writes() -> dict:
+    """Retry all queued Sheet writes. Call on bot startup or periodically.
+    Returns {"retried": N, "failed": N, "remaining": N}."""
+    if not os.path.exists(_FAILED_WRITES_PATH):
+        return {"retried": 0, "failed": 0, "remaining": 0}
+    try:
+        with open(_FAILED_WRITES_PATH, "r") as f:
+            queue = _json.load(f)
+    except Exception:
+        return {"retried": 0, "failed": 0, "remaining": 0}
+
+    if not queue:
+        return {"retried": 0, "failed": 0, "remaining": 0}
+
+    logger.info("Retrying %d failed Sheet writes...", len(queue))
+    still_failed = []
+    retried = 0
+
+    # Map operation names to functions
+    op_map = {
+        "add_tenant": add_tenant,
+        "record_checkout": record_checkout,
+        "update_tenant_field": update_tenant_field,
+        "update_payment": update_payment,
+        "record_notice": record_notice,
+    }
+
+    for item in queue:
+        op = item.get("op", "")
+        kwargs = item.get("kwargs", {})
+        fn = op_map.get(op)
+        if not fn:
+            logger.warning("Unknown queued op: %s", op)
+            continue
+        try:
+            result = await fn(**kwargs)
+            if result and result.get("success"):
+                retried += 1
+            else:
+                still_failed.append(item)
+        except Exception as e:
+            logger.warning("Retry failed for %s: %s", op, e)
+            still_failed.append(item)
+
+    # Save remaining failures
+    if still_failed:
+        with open(_FAILED_WRITES_PATH, "w") as f:
+            _json.dump(still_failed, f)
+    elif os.path.exists(_FAILED_WRITES_PATH):
+        os.remove(_FAILED_WRITES_PATH)
+
+    return {"retried": retried, "failed": len(still_failed), "remaining": len(still_failed)}
+
 # -- Spreadsheet + worksheet cache --------------------------------------------
 
 _spreadsheet_cache: Optional[gspread.Spreadsheet] = None

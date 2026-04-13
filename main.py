@@ -63,6 +63,15 @@ async def lifespan(app: FastAPI):
     from src.dashboard.cleanup import start_cleanup_scheduler
     cleanup_scheduler = start_cleanup_scheduler()
 
+    # Retry any failed Sheet writes from previous session
+    try:
+        from src.integrations.gsheets import retry_failed_writes
+        result = await retry_failed_writes()
+        if result["retried"]:
+            logger.info("Retried %d failed Sheet writes (%d still pending)", result["retried"], result["remaining"])
+    except Exception as e:
+        logger.warning("Sheet retry failed: %s", e)
+
     # Business scheduler — rent reminders, reconciliation, backups (persisted in DB)
     from src.scheduler import start_scheduler, stop_scheduler
     pg_scheduler = start_scheduler()

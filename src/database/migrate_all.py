@@ -574,7 +574,7 @@ async def run_room_cleanup_2026_03_23(conn: AsyncConnection) -> None:
           AND property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
     """))
     if r.rowcount:
-        print(f"  [ok] Room 702 moved HULK→THOR + staff: {r.rowcount}")
+        print(f"  [ok] Room 702 moved HULK->THOR + staff: {r.rowcount}")
 
     # Ensure 702 is staff if already in THOR
     r = await conn.execute(text("""
@@ -756,20 +756,20 @@ async def run_simplify_roles_2026_04_01(engine) -> None:
         r = await conn.execute(text("""
             UPDATE authorized_users SET role = 'owner' WHERE role = 'power_user'
         """))
-        print(f"  [ok] power_user → owner: {r.rowcount} rows")
+        print(f"  [ok] power_user -> owner: {r.rowcount} rows")
 
         # Migrate key_user → owner
         r = await conn.execute(text("""
             UPDATE authorized_users SET role = 'owner' WHERE role = 'key_user'
         """))
-        print(f"  [ok] key_user → owner: {r.rowcount} rows")
+        print(f"  [ok] key_user -> owner: {r.rowcount} rows")
 
         # Update Lakshmi and Prabhakaran to owner
         r = await conn.execute(text("""
             UPDATE authorized_users SET role = 'owner'
             WHERE phone IN ('7358341775', '9444296681') AND role = 'admin'
         """))
-        print(f"  [ok] Lakshmi + Prabhakaran → owner: {r.rowcount} rows")
+        print(f"  [ok] Lakshmi + Prabhakaran -> owner: {r.rowcount} rows")
 
         # Remove test users
         r = await conn.execute(text("""
@@ -791,7 +791,7 @@ async def run_add_lokesh_receptionist(conn: AsyncConnection) -> None:
             active = TRUE,
             name = 'Lokesh'
     """))
-    print("  [ok] Lokesh (7680814628) → receptionist")
+    print("  [ok] Lokesh (7680814628) -> receptionist")
 
 
 async def run_create_pg_config(conn: AsyncConnection) -> None:
@@ -921,7 +921,7 @@ async def run_seed_cozeevo_pg_config(conn: AsyncConnection) -> None:
 
 async def run_add_receipt_url_column(conn: AsyncConnection) -> None:
     """Add receipt_url column to payments table. Added 2026-04-10."""
-    print("\n── Add receipt_url to payments ──")
+    print("\n-- Add receipt_url to payments --")
     await conn.execute(text("""
         ALTER TABLE payments ADD COLUMN IF NOT EXISTS receipt_url VARCHAR(500)
     """))
@@ -973,6 +973,25 @@ async def run_audit_log_tables(conn: AsyncConnection) -> None:
     print("  [ok] rent_revisions table created")
 
 
+async def run_unhandled_requests_table(conn) -> None:
+    """Create unhandled_requests table for logging unknown intents. Added 2026-04-13."""
+    print("\n== Create unhandled_requests table ==")
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS unhandled_requests (
+            id              SERIAL PRIMARY KEY,
+            created_at      TIMESTAMPTZ DEFAULT now(),
+            phone           VARCHAR(20) NOT NULL,
+            message         TEXT NOT NULL,
+            role            VARCHAR(20),
+            resolved        BOOLEAN DEFAULT FALSE,
+            intent_created  VARCHAR(60)
+        )
+    """))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_unhandled_created ON unhandled_requests(created_at)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_unhandled_resolved ON unhandled_requests(resolved)"))
+    print("  [ok] unhandled_requests table created")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -998,6 +1017,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_seed_cozeevo_pg_config(conn)
             await run_add_receipt_url_column(conn)
             await run_audit_log_tables(conn)
+            await run_unhandled_requests_table(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         await run_simplify_roles_2026_04_01(engine)
         if args.seed:

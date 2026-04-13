@@ -123,6 +123,9 @@ async def handle_owner(
         "QUERY_AUDIT":        _query_audit,
         "QUERY_RENT_HISTORY": _query_rent_history,
         "QUERY_STAFF_ROOMS":  _query_staff_rooms,
+        "CHANGE_ROOM":        _room_transfer_prompt,  # alias for ROOM_TRANSFER
+        "ASSIGN_ROOM":        _assign_room_prompt,
+        "QUERY_UNHANDLED":    _query_unhandled,
         "UNKNOWN":            _unknown,
     }
     fn = handlers.get(intent, _unknown)
@@ -399,8 +402,18 @@ async def resolve_pending_action(
 
                 # Note: step stays as "resolve_room_full", handled below
 
-            # Gender check
+            # Gender — ALWAYS require it. If not in form, ask before proceeding.
             gender_s = extracted.get("gender", "").lower()
+            if not gender_s:
+                action_data["step"] = "ask_gender_form"
+                action_data["room_id"] = room_row.id
+                action_data["room_number"] = room_row.room_number
+                action_data["room_type"] = rt_str
+                action_data["max_occupancy"] = max_occ
+                action_data["current_occupants"] = len(occupants)
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                return f"*Gender not found in form.* Please enter: *male* or *female*"
+
             if gender_s and occupants:
                 occ_t_ids = [tncy.tenant_id for tncy in occupants]
                 occ_g_res = await session.execute(select(Tenant.gender).where(Tenant.id.in_(occ_t_ids)))
@@ -440,6 +453,59 @@ async def resolve_pending_action(
 
             return (
                 f"*Room {room_row.room_number}* — {rt_str} sharing room ({len(occupants)}/{max_occ} occupied){occ_info}\n\n"
+                f"Checking in as:\n"
+                f"*1.* {rt_str.title()} sharing\n"
+                f"*2.* Premium (single occupancy — all beds)\n\n"
+                f"Reply *1* or *2*"
+            )
+
+        # ── Gender prompt from form extraction ──────────────────────────
+        if step == "ask_gender_form":
+            g = ans.strip().lower()
+            if g in ("male", "m", "boy", "man", "gents"):
+                extracted = action_data.get("extracted", {})
+                extracted["gender"] = "male"
+                action_data["extracted"] = extracted
+            elif g in ("female", "f", "girl", "woman", "ladies"):
+                extracted = action_data.get("extracted", {})
+                extracted["gender"] = "female"
+                action_data["extracted"] = extracted
+            else:
+                return "__KEEP_PENDING__Please enter *male* or *female*:"
+
+            # Resume: go to sharing type confirmation
+            room_row = await session.get(Room, action_data["room_id"])
+            rt_str = action_data.get("room_type", "double")
+            max_occ = action_data.get("max_occupancy", 1)
+            current_occ = action_data.get("current_occupants", 0)
+
+            # Check gender mismatch with existing occupants
+            if current_occ > 0:
+                active_res = await session.execute(
+                    select(Tenancy).where(Tenancy.room_id == room_row.id, Tenancy.status == TenancyStatus.active)
+                )
+                occupants = active_res.scalars().all()
+                occ_t_ids = [tncy.tenant_id for tncy in occupants]
+                occ_g_res = await session.execute(select(Tenant.gender).where(Tenant.id.in_(occ_t_ids)))
+                occ_genders = [gg for gg in occ_g_res.scalars().all() if gg]
+                gender_s = extracted["gender"]
+                if occ_genders and any(gg != gender_s for gg in occ_genders):
+                    action_data["step"] = "confirm_gender_mismatch"
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    return (
+                        f"*Gender mismatch:* New tenant is *{gender_s}*, "
+                        f"existing occupant(s) in Room {room_row.room_number} are *{', '.join(set(occ_genders))}*.\n\n"
+                        "Reply *yes* to proceed anyway, *edit room* to change room, or *no* to cancel."
+                    )
+
+            action_data["step"] = "confirm_sharing"
+            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+            if rt_str == "single":
+                return await _finalize_form_checkin(action_data, pending, session, sharing_type="single")
+
+            return (
+                f"*Room {room_row.room_number}* — {rt_str} sharing room ({current_occ}/{max_occ} occupied)\n\n"
                 f"Checking in as:\n"
                 f"*1.* {rt_str.title()} sharing\n"
                 f"*2.* Premium (single occupancy — all beds)\n\n"
@@ -2490,22 +2556,20 @@ async def resolve_pending_action(
             if is_affirmative(reply_text):
                 new_rent = action_data.get("new_rent")
                 extra_deposit = action_data.get("extra_deposit", 0)
+                action_data["changed_by"] = pending.phone
                 result = await _do_room_transfer(action_data, session)
 
                 if new_rent and new_rent != action_data["current_rent"]:
-                    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
-                    if tenancy:
-                        tenancy.agreed_rent = Decimal(str(new_rent))
-                        current_period = date.today().replace(day=1)
-                        rs = await session.scalar(
-                            select(RentSchedule).where(
-                                RentSchedule.tenancy_id == tenancy.id,
-                                RentSchedule.period_month == current_period,
-                            )
+                    # Update current month's RentSchedule (agreed_rent already set in _do_room_transfer)
+                    current_period = date.today().replace(day=1)
+                    rs = await session.scalar(
+                        select(RentSchedule).where(
+                            RentSchedule.tenancy_id == action_data["tenancy_id"],
+                            RentSchedule.period_month == current_period,
                         )
-                        if rs:
-                            rs.rent_due = Decimal(str(new_rent))
-                        result += f"\nRent updated to Rs.{int(new_rent):,}"
+                    )
+                    if rs:
+                        rs.rent_due = Decimal(str(new_rent))
 
                 if extra_deposit > 0:
                     tenancy = await session.get(Tenancy, action_data["tenancy_id"])
@@ -2518,6 +2582,136 @@ async def resolve_pending_action(
 
         return None
 
+    # ── Assign Room step-by-step ─────────────────────────────────────────────
+    if pending.intent == "ASSIGN_ROOM_STEP" and action_data.get("step"):
+        step = action_data["step"]
+        ans = reply_text.strip()
+
+        if is_negative(reply_text):
+            return "Room assignment cancelled."
+
+        if step == "pick_tenant":
+            try:
+                idx = int(ans) - 1
+                chosen = action_data["choices"][idx]
+            except (ValueError, IndexError):
+                return "__KEEP_PENDING__Reply with the number of the tenant."
+            action_data["tenant_id"] = chosen["tenant_id"]
+            action_data["tenant_name"] = chosen["label"]
+            if action_data.get("room"):
+                # Validate room
+                new_room = await session.scalar(
+                    select(Room).where(Room.room_number == action_data["room"].upper(), Room.active == True)
+                )
+                if not new_room:
+                    return f"Room *{action_data['room']}* not found."
+                occ = await session.scalar(
+                    select(func.count(Tenancy.id)).where(
+                        Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active))
+                if occ:
+                    return f"Room *{action_data['room']}* is occupied. Pick a vacant room."
+                action_data["step"] = "confirm"
+                action_data["room_id"] = new_room.id
+                action_data["room_number"] = new_room.room_number
+                await _save_pending(pending.phone, "ASSIGN_ROOM_STEP", action_data, [], session)
+                return (
+                    f"*Assign Room?*\n\n"
+                    f"Tenant: {chosen['label']}\n"
+                    f"Room: {new_room.room_number}\n\n"
+                    "Reply *yes* to confirm or *no* to cancel."
+                )
+            action_data["step"] = "ask_room"
+            await _save_pending(pending.phone, "ASSIGN_ROOM_STEP", action_data, [], session)
+            return f"Selected *{chosen['label']}*.\nWhich room? (e.g. 305-A)"
+
+        if step == "ask_room":
+            rm = re.search(r"(\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)", ans)
+            if not rm:
+                return "__KEEP_PENDING__Enter a valid room number (e.g. 305-A):"
+            room_str = rm.group(1).upper()
+            new_room = await session.scalar(
+                select(Room).where(Room.room_number == room_str, Room.active == True)
+            )
+            if not new_room:
+                return f"__KEEP_PENDING__Room *{room_str}* not found. Try again:"
+            occ = await session.scalar(
+                select(func.count(Tenancy.id)).where(
+                    Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active))
+            if occ:
+                return f"__KEEP_PENDING__Room *{room_str}* is occupied. Pick a vacant room:"
+            action_data["room_id"] = new_room.id
+            action_data["room_number"] = new_room.room_number
+            action_data["step"] = "confirm"
+            await _save_pending(pending.phone, "ASSIGN_ROOM_STEP", action_data, [], session)
+            tenant_name = action_data.get("tenant_name", "Tenant")
+            return (
+                f"*Assign Room?*\n\n"
+                f"Tenant: {tenant_name}\n"
+                f"Room: {new_room.room_number}\n\n"
+                "Reply *yes* to confirm or *no* to cancel."
+            )
+
+        if step == "confirm":
+            if is_affirmative(reply_text):
+                tenant_id = action_data["tenant_id"]
+                room_id = action_data["room_id"]
+                room_number = action_data["room_number"]
+
+                # Create new active tenancy
+                tenant = await session.get(Tenant, tenant_id)
+                if not tenant:
+                    return "Tenant not found in DB."
+
+                tenancy = Tenancy(
+                    tenant_id=tenant_id,
+                    room_id=room_id,
+                    checkin_date=date.today(),
+                    status=TenancyStatus.active,
+                    agreed_rent=Decimal("0"),  # will be set via rent flow
+                )
+                session.add(tenancy)
+                await session.flush()
+
+                # Audit log
+                from src.database.models import AuditLog
+                session.add(AuditLog(
+                    changed_by=pending.phone,
+                    entity_type="tenancy",
+                    entity_id=tenancy.id,
+                    entity_name=tenant.name,
+                    field="room_assigned",
+                    old_value=None,
+                    new_value=room_number,
+                    room_number=room_number,
+                    source="whatsapp",
+                    note=f"Room assigned via ASSIGN_ROOM",
+                ))
+
+                # Google Sheet sync
+                gsheets_note = ""
+                try:
+                    from src.integrations.gsheets import add_tenant as gsheets_add
+                    gs_r = await gsheets_add(
+                        room_number=room_number, name=tenant.name, phone=tenant.phone,
+                        gender=tenant.gender or "", building="", floor="", sharing="",
+                        checkin=date.today().strftime("%d/%m/%Y"),
+                        agreed_rent=0, deposit=0, booking=0, maintenance=0, notes="Assigned via bot",
+                    )
+                    if gs_r.get("success"):
+                        gsheets_note = "\nSheet updated"
+                except Exception:
+                    pass
+
+                return (
+                    f"Room assigned — *{tenant.name}* ({tenant.phone})\n"
+                    f"Room: *{room_number}*\n"
+                    f"Check-in: {date.today().strftime('%d %b %Y')}\n"
+                    f"_Set rent via: change {tenant.name} rent to [amount]_{gsheets_note}"
+                )
+            return "Room assignment cancelled."
+
+        return None
+
     # ── Cancel any pending confirmation with "no" ─────────────────────────────
 
     if is_negative(reply_text) and pending.intent in (
@@ -2525,7 +2719,7 @@ async def resolve_pending_action(
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
-        "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE",
+        "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
         return "❌ Cancelled. Nothing was changed."
 
@@ -3626,6 +3820,14 @@ async def _do_checkout(
         except Exception as e:
             import logging as _log
             _log.getLogger(__name__).error("GSheets checkout failed: %s", e)
+            try:
+                from src.integrations.gsheets import _queue_failed_write
+                _queue_failed_write("record_checkout", {
+                    "room_number": room_obj.room_number, "tenant_name": tenant_name,
+                    "notice_date": tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None,
+                })
+            except Exception:
+                pass
 
     return (
         f"*Checkout recorded — {tenant_name}*\n"
@@ -4813,6 +5015,19 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     except Exception as e:
         import logging as _log
         _log.getLogger(__name__).error("GSheets add_tenant failed: %s", e)
+        try:
+            from src.integrations.gsheets import _queue_failed_write
+            _queue_failed_write("add_tenant", {
+                "room_number": room_number, "name": name, "phone": phone,
+                "gender": data.get("gender", ""), "building": data.get("building", ""),
+                "floor": "", "sharing": data.get("sharing", ""),
+                "checkin": checkin_date.strftime("%d/%m/%Y"),
+                "agreed_rent": float(base_rent), "deposit": float(deposit),
+                "booking": float(advance), "maintenance": float(maintenance),
+                "notes": data.get("notes", ""),
+            })
+        except Exception:
+            pass
 
     # Auto-chain: start collect rent flow for this tenant
     # Save pending so next message goes into COLLECT_RENT_STEP
@@ -5061,15 +5276,23 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
     if not new_room:
         return f"Room *{to_room}* not found. Check the room number and try again."
 
-    # Check vacancy (no active tenancy in new room)
-    occupied = await session.scalar(
-        select(func.count(Tenancy.id)).where(
+    # Check vacancy — if occupied, show who's there and ask what to do
+    occupied_rows = (await session.execute(
+        select(Tenant.name, Tenant.phone, Tenancy.id).where(
             Tenancy.room_id == new_room.id,
             Tenancy.status == TenancyStatus.active,
+            Tenancy.tenant_id == Tenant.id,
         )
-    )
-    if occupied:
-        return f"Room *{to_room}* is currently occupied. Choose a vacant room."
+    )).all()
+    if occupied_rows:
+        occ_lines = "\n".join(f"  - {r[0]} ({r[1]})" for r in occupied_rows)
+        return (
+            f"Room *{to_room}* is occupied by:\n{occ_lines}\n\n"
+            f"Options:\n"
+            f"*1.* Checkout the current occupant(s) first, then retry\n"
+            f"*2.* Pick a different room\n\n"
+            f"_I can't auto-swap yet — checkout the occupant first, then move {name}._"
+        )
 
     # Fetch current rent
     rs = await session.scalar(
@@ -5108,10 +5331,54 @@ async def _do_room_transfer(action_data: dict, session: AsyncSession) -> str:
     tenancy = await session.get(Tenancy, action_data["tenancy_id"])
     if not tenancy:
         return "Tenancy record not found."
+
+    old_room = action_data["from_room"]
+    new_room_number = action_data["to_room_number"]
+    tenant_name = action_data["tenant_name"]
+
+    # Update DB
     tenancy.room_id = action_data["to_room_id"]
+
+    # Update rent if changed
+    new_rent = action_data.get("new_rent")
+    if new_rent:
+        tenancy.agreed_rent = Decimal(str(new_rent))
+
+    # Audit log
+    from src.database.models import AuditLog
+    session.add(AuditLog(
+        changed_by=action_data.get("changed_by", "system"),
+        entity_type="tenancy",
+        entity_id=tenancy.id,
+        entity_name=tenant_name,
+        field="room_id",
+        old_value=old_room,
+        new_value=new_room_number,
+        room_number=new_room_number,
+        source="whatsapp",
+        note=f"Room transfer: {old_room} -> {new_room_number}",
+    ))
+
+    # Google Sheet sync (fire-and-forget)
+    gsheets_note = ""
+    try:
+        from src.integrations.gsheets import update_tenant_field
+        gs_r = await update_tenant_field(
+            old_room, tenant_name, "Room", new_room_number
+        )
+        if gs_r and gs_r.get("success"):
+            gsheets_note = "\nSheet updated"
+    except Exception:
+        pass
+
+    rent_note = ""
+    if new_rent:
+        rent_note = f"\nNew rent: Rs.{int(new_rent):,}/mo"
+
     return (
-        f"Room transferred — *{action_data['tenant_name']}*\n"
-        f"Room *{action_data['from_room']}* → Room *{action_data['to_room_number']}*"
+        f"Room transferred — *{tenant_name}*\n"
+        f"Room *{old_room}* -> Room *{new_room_number}*"
+        f"{rent_note}{gsheets_note}"
     )
 
 
@@ -6105,7 +6372,147 @@ async def _query_contacts(entities: dict, ctx: CallerContext, session: AsyncSess
     return "\n".join(lines)
 
 
+# ── ASSIGN ROOM (unassigned/future booking → active with room) ────────────────
+
+async def _assign_room_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Assign a room to a tenant who has an unassigned/future booking."""
+    name = entities.get("name", "").strip()
+    room_str = entities.get("room", "").strip()
+
+    if not room_str:
+        desc = entities.get("description", "") or entities.get("_raw_message", "")
+        rm = re.search(r"(?:room\s*)?(\d{2,4}[A-Za-z]?(?:-[A-Za-z])?)", desc, re.I)
+        if rm:
+            room_str = rm.group(1)
+
+    if not name:
+        return (
+            "Who should be assigned a room?\n"
+            "Say: *assign room 305-A to Raj* or *assign Raj to room 305-A*"
+        )
+
+    # Find tenant — prefer unassigned/future bookings
+    from src.database.models import TenancyStatus
+    unassigned = (await session.execute(
+        select(Tenant, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id, isouter=True)
+        .where(
+            Tenant.name.ilike(f"%{name}%"),
+            Tenancy.status.in_([TenancyStatus.active]),
+        )
+        .order_by(Tenancy.checkin_date.desc())
+    )).all()
+
+    # Also check for tenants without any active tenancy (future booking with no room)
+    no_tenancy = (await session.execute(
+        select(Tenant).where(
+            Tenant.name.ilike(f"%{name}%"),
+            ~Tenant.id.in_(
+                select(Tenancy.tenant_id).where(Tenancy.status == TenancyStatus.active)
+            )
+        )
+    )).scalars().all()
+
+    # Check if any active tenancy already has a room assigned
+    for tenant, tenancy, room in unassigned:
+        if room and room.active:
+            return (
+                f"*{tenant.name}* ({tenant.phone}) already has active room *{room.room_number}*.\n"
+                f"Did you mean *move {tenant.name} to {room_str or 'new room'}*?"
+            )
+
+    # Match future bookings / unassigned
+    if no_tenancy:
+        if len(no_tenancy) == 1:
+            tenant = no_tenancy[0]
+        else:
+            choices = [{"label": f"{t.name} ({t.phone})", "tenant_id": t.id} for t in no_tenancy]
+            choice_lines = "\n".join(f"*{i+1}.* {c['label']}" for i, c in enumerate(choices))
+            await _save_pending(ctx.phone, "ASSIGN_ROOM_STEP",
+                                {"step": "pick_tenant", "room": room_str, "choices": choices}, [], session)
+            return f"Multiple matches for *{name}*:\n{choice_lines}\n\nReply with number."
+
+        if not room_str:
+            await _save_pending(ctx.phone, "ASSIGN_ROOM_STEP",
+                                {"step": "ask_room", "tenant_id": tenant.id, "tenant_name": tenant.name,
+                                 "tenant_phone": tenant.phone}, [], session)
+            return (
+                f"Assigning room to *{tenant.name}* ({tenant.phone}).\n"
+                "Which room? (e.g. 305-A)"
+            )
+
+        # Validate room
+        new_room = await session.scalar(
+            select(Room).where(Room.room_number == room_str.upper(), Room.active == True)
+        )
+        if not new_room:
+            return f"Room *{room_str}* not found. Check room number."
+
+        # Check vacancy
+        occupied = await session.scalar(
+            select(func.count(Tenancy.id)).where(
+                Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active,
+            )
+        )
+        if occupied:
+            return f"Room *{room_str}* is occupied. Pick a vacant room."
+
+        # Confirm
+        await _save_pending(ctx.phone, "ASSIGN_ROOM_STEP",
+                            {"step": "confirm", "tenant_id": tenant.id, "tenant_name": tenant.name,
+                             "tenant_phone": tenant.phone, "room_id": new_room.id,
+                             "room_number": new_room.room_number}, [], session)
+        return (
+            f"*Assign Room?*\n\n"
+            f"Tenant: {tenant.name} ({tenant.phone})\n"
+            f"Room: {new_room.room_number}\n\n"
+            "Reply *yes* to confirm or *no* to cancel."
+        )
+
+    if not unassigned and not no_tenancy:
+        return (
+            f"No unassigned tenant found matching *{name}*.\n"
+            "Use *add tenant* for new check-ins."
+        )
+
+    return f"Could not find an unassigned booking for *{name}*."
+
+
+async def _query_unhandled(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show recent unhandled requests (admin only)."""
+    from src.database.models import UnhandledRequest
+    rows = (await session.execute(
+        select(UnhandledRequest)
+        .where(UnhandledRequest.resolved == False)
+        .order_by(UnhandledRequest.created_at.desc())
+        .limit(20)
+    )).scalars().all()
+
+    if not rows:
+        return "No unhandled requests. The bot understood everything recently."
+
+    lines = [f"*Unhandled Requests* ({len(rows)} unresolved):\n"]
+    for r in rows:
+        ts = r.created_at.strftime("%d %b %H:%M") if r.created_at else "?"
+        lines.append(f"- _{ts}_ ({r.role or '?'}): {r.message[:80]}")
+
+    return "\n".join(lines)
+
+
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # Log unhandled request for future intent building
+    try:
+        from src.database.models import UnhandledRequest
+        msg = entities.get("description", "") or entities.get("raw_message", "")
+        if msg and len(msg) > 2:  # skip garbage like "sn"
+            session.add(UnhandledRequest(
+                phone=ctx.phone,
+                message=msg[:500],
+                role=ctx.role,
+            ))
+    except Exception:
+        pass  # don't break the reply over logging
     return (
         "I didn't understand that.\n\n"
         "Try:\n"
