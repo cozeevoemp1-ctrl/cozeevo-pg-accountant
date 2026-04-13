@@ -5298,10 +5298,7 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
             tenant_counts[r.id] = r.max_occupancy or 1
 
     # ── Build list of rooms with empty beds ───────────────────────────────
-    total_rooms = len(all_rows)
     total_beds = sum(r.max_occupancy or 1 for r, _ in all_rows)
-    total_tenants = sum(tenant_counts.get(r.id, 0) for r, _ in all_rows)
-    total_empty = total_beds - total_tenants
 
     rooms_with_empty = []
     for r, prop in all_rows:
@@ -5310,6 +5307,10 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
         free = max_occ - occupied
         if free > 0:
             rooms_with_empty.append((r, prop, occupied, free))
+
+    # Derive totals from room-by-room (single source of truth)
+    total_empty = sum(f for _, _, _, f in rooms_with_empty)
+    total_occupied = total_beds - total_empty
 
     bld = f" in *{building_filter}*" if building_filter else ""
     if not rooms_with_empty:
@@ -5338,7 +5339,7 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     hulk = blocks.get("HULK", {"rooms": 0, "beds": 0})
 
     lines = [
-        f"🛏 *Empty Beds: {total_empty}*  |  Occupied: {total_tenants} / {total_beds}{bld}",
+        f"🛏 *Empty Beds: {total_empty}*  |  Occupied: {total_occupied} / {total_beds}{bld}",
         f"   THOR: {thor['beds']} beds  |  HULK: {hulk['beds']} beds",
         "",
     ]
