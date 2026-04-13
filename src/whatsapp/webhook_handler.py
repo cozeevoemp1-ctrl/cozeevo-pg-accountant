@@ -23,24 +23,38 @@ router = APIRouter(prefix="/webhook", tags=["whatsapp"])
 
 # -- Message dedup cache (prevents duplicate webhook processing) ---------------
 # Meta sends the same message from multiple IPs. First one processes, rest skip.
+# Uses asyncio.Lock to prevent race condition where two duplicates both pass check.
 import time as _time
+import asyncio as _asyncio
 _SEEN_MSG_IDS: dict[str, float] = {}  # msg_id → timestamp
 _DEDUP_TTL = 60  # seconds to remember a message ID
+_DEDUP_LOCK = _asyncio.Lock()
+
+# Per-phone processing lock — ensures only one message processes at a time per phone
+_PHONE_LOCKS: dict[str, _asyncio.Lock] = {}
 
 
-def _is_duplicate(msg_id: str) -> bool:
-    """Return True if we've already processed this message ID."""
+async def _is_duplicate(msg_id: str) -> bool:
+    """Return True if we've already processed this message ID. Thread-safe."""
     if not msg_id:
         return False
-    now = _time.time()
-    # Purge old entries
-    stale = [k for k, v in _SEEN_MSG_IDS.items() if now - v > _DEDUP_TTL]
-    for k in stale:
-        del _SEEN_MSG_IDS[k]
-    if msg_id in _SEEN_MSG_IDS:
-        return True
-    _SEEN_MSG_IDS[msg_id] = now
-    return False
+    async with _DEDUP_LOCK:
+        now = _time.time()
+        # Purge old entries
+        stale = [k for k, v in _SEEN_MSG_IDS.items() if now - v > _DEDUP_TTL]
+        for k in stale:
+            del _SEEN_MSG_IDS[k]
+        if msg_id in _SEEN_MSG_IDS:
+            return True
+        _SEEN_MSG_IDS[msg_id] = now
+        return False
+
+
+def _get_phone_lock(phone: str) -> _asyncio.Lock:
+    """Get or create a per-phone lock to serialize message processing."""
+    if phone not in _PHONE_LOCKS:
+        _PHONE_LOCKS[phone] = _asyncio.Lock()
+    return _PHONE_LOCKS[phone]
 
 
 # -- Webhook verification (Meta requires this one-time GET) --------------------
@@ -108,7 +122,7 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         _wdbg.write(f"[{from_number}] msg={body[:60]} msg_id={msg_id[:30] if msg_id else '-'}\n")
 
     # -- Dedup: skip if we've already processed this exact message ----------------
-    if _is_duplicate(msg_id):
+    if await _is_duplicate(msg_id):
         with open("/tmp/pg_webhook_debug.log", "a") as _wdbg:
             _wdbg.write(f"  DUPLICATE SKIPPED: {msg_id}\n")
         return {"status": "ok"}
@@ -196,21 +210,24 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
             _media_type = "document"
 
     # -- Route through the v1 regex-first pipeline ----------------------------
+    # Per-phone lock prevents concurrent DB session corruption from Meta duplicates
+    phone_lock = _get_phone_lock(from_number)
     try:
-        from src.database.db_manager import _session_factory
-        from src.whatsapp.chat_api import process_message, InboundMessage
-        async with _session_factory() as session:
-            result = await process_message(
-                body=InboundMessage(
-                    phone=from_number, message=body, message_id=None,
-                    media_type=_media_type,
-                    media_id=media_id if _media_type else None,
-                    media_mime=media_mime if _media_type else None,
-                    media_filename=media_name if _media_type else None,
-                ),
-                session=session,
-            )
-        reply = result.reply if not result.skip else None
+        async with phone_lock:
+            from src.database.db_manager import _session_factory
+            from src.whatsapp.chat_api import process_message, InboundMessage
+            async with _session_factory() as session:
+                result = await process_message(
+                    body=InboundMessage(
+                        phone=from_number, message=body, message_id=None,
+                        media_type=_media_type,
+                        media_id=media_id if _media_type else None,
+                        media_mime=media_mime if _media_type else None,
+                        media_filename=media_name if _media_type else None,
+                    ),
+                    session=session,
+                )
+            reply = result.reply if not result.skip else None
     except Exception as e:
         logger.error(f"[Webhook] Processing error: {e}", exc_info=True)
         reply = "Sorry, something went wrong. Please try again or type *hi* to start fresh."
