@@ -476,6 +476,12 @@ Dashboard (reads DB)            Kiran views (read-only)
 - Rent changes also tracked in rent_revisions with effective dates
 - Source: whatsapp / dashboard / system / import
 
+**Premium bed rule (CRITICAL — do not change):**
+- Premium sharing = 1 person books BOTH beds in a double room
+- Premium tenant = 2 beds occupied, second bed CANNOT be sold
+- Vacant beds = total_beds - regular_count - (premium_count * 2) - noshow_count - daywise_count
+- Room-by-room: premium room = 0 free beds
+
 **Sheet protection (completely non-editable):**
 - Sheet is view-only + filters. Nobody edits it — not even Kiran.
 - Run `lockAllSheets()` from Apps Script menu (Cozeevo → Lock All Sheets)

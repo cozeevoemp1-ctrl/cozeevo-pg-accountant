@@ -21,7 +21,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, case as sa_case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -5163,11 +5163,21 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
         .group_by(DaywiseStay.room_number)
     )).all()}
 
+    # Premium rooms: fully occupied, no free beds
+    premium_rooms = {row[0] for row in (await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.room_id.isnot(None),
+            Tenancy.sharing_type == "premium",
+        )
+    )).all()}
+
     # Filter: rooms where occupancy < max AND at least one occupant matches gender
-    # Premium = 1 person = 1 bed, no special handling
     matching = []
     for rid, data in room_data.items():
         room = data["room"]
+        if rid in premium_rooms:
+            continue  # premium = both beds taken, not sellable
         occupants = data["occupants"]
         max_occ = room.max_occupancy or 2
         dw_count = dw_per_room.get(room.room_number, 0)
@@ -5271,9 +5281,21 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
         if rid:
             tenant_counts[rid] = tenant_counts.get(rid, 0) + cnt
 
+    # Premium rooms: 1 person = BOTH beds booked, second bed NOT sellable
+    premium_room_ids = {row[0] for row in (await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+            Tenancy.room_id.isnot(None),
+            Tenancy.sharing_type == "premium",
+        )
+    )).all()}
+
+    # For premium rooms, set occupied = max_occupancy (room is full, no free beds)
+    for r, _ in all_rows:
+        if r.id in premium_room_ids:
+            tenant_counts[r.id] = r.max_occupancy or 1
+
     # ── Build list of rooms with empty beds ───────────────────────────────
-    # Simple: each tenant (active/noshow) = 1 bed. Premium = 1 person = 1 bed.
-    # No inflation, no overrides. Room-by-room: free = max_occ - occupied.
     total_beds = sum(r.max_occupancy or 1 for r, _ in all_rows)
 
     rooms_with_empty = []
@@ -5366,10 +5388,11 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         select(func.count(Room.id)).where(revenue_filter)
     ) or 0
 
-    # Beds occupied: 1 tenant = 1 bed (premium or not, doesn't matter)
+    # Beds occupied: premium = 2 beds (full room), regular = 1 bed
     physical_beds = await session.scalar(
-        select(func.count()).select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
+        select(func.sum(
+            sa_case((Tenancy.sharing_type == "premium", Room.max_occupancy), else_=1)
+        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
         .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
     ) or 0
     physical_rooms = await session.scalar(
@@ -5378,10 +5401,11 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
         .where(Tenancy.status == TenancyStatus.active, Room.is_staff_room == False)
     ) or 0
 
-    # No-shows: booked + assigned a room but not yet arrived (1 person = 1 bed)
+    # No-shows: premium noshow = 2 beds reserved, regular = 1 bed
     noshow_beds = await session.scalar(
-        select(func.count()).select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
+        select(func.sum(
+            sa_case((Tenancy.sharing_type == "premium", Room.max_occupancy), else_=1)
+        )).select_from(Tenancy).join(Room, Room.id == Tenancy.room_id)
         .where(
             Tenancy.status == TenancyStatus.no_show,
             Tenancy.room_id.isnot(None),
