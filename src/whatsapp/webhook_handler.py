@@ -362,6 +362,39 @@ async def _send_whatsapp_interactive(to_number: str, payload: dict):
         logger.error(f"[Meta] Interactive send exception: {e}")
 
 
+async def _send_whatsapp_document(to_number: str, document_url: str, filename: str, caption: str = ""):
+    """Send a document via WhatsApp Cloud API."""
+    token    = os.getenv("WHATSAPP_TOKEN", "")
+    phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    if not (token and phone_id):
+        logger.warning("[Meta] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set")
+        return
+
+    to = to_number.lstrip("+").replace(" ", "")
+    url     = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "document",
+        "document": {
+            "link": document_url,
+            "filename": filename,
+            **({"caption": caption} if caption else {}),
+        },
+    }
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(url, json=body, headers=headers)
+        if resp.status_code == 200:
+            logger.info(f"[Meta] Document sent to {to}: {filename}")
+        else:
+            logger.error(f"[Meta] Document send failed {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"[Meta] Document send exception: {e}")
+
+
 # -- Meta media downloader -----------------------------------------------------
 
 async def _download_media(media_id: str, media_mime: Optional[str]) -> Optional[str]:
