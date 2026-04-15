@@ -2,6 +2,47 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.28.0] — 2026-04-15 — Digital Onboarding Form + 12 Checkin Fixes + Column Mapping
+
+### Digital Onboarding Form (NEW)
+- **Architecture:** Two-form system — receptionist creates session, tenant fills on phone, receptionist approves
+- New `OnboardingSession` model extended with token, status, room/rent fields, signature, PDF path
+- API router: `/api/onboarding/create`, `/{token}`, `/{token}/submit`, `/admin/pending`, `/{token}/approve`
+- Tenant mobile form: 5-step wizard (Personal → Family → Address → ID → Agreement + Signature)
+- Admin panel: create sessions, review queue, approve flow
+- PDF agreement generator using reportlab (branded, with embedded signature)
+- WhatsApp document sending helper added
+- Middleware updated: `/onboard/*` and tenant API endpoints are public
+- Step-by-step WhatsApp checkin flow removed (replaced by digital form)
+
+### 12 Checkin Flow Fixes
+1. Food step wired into photo checkin flow via `_next_form_step` + `ask_food_form` handler
+2. Cash/UPI prompt: always asked when advance > 0, never defaulted to cash
+3. Office phone doubling fixed in KYC display
+4. Monthly tab refactored to header-based mapping (same as TENANTS)
+5. Phone/ID fields: apostrophe prefix preserves format in Sheet
+6. Event column: "CHECKIN" populated on add
+7. Entered By column: "bot", "onboarding_form", "excel_load" (not phone numbers)
+8. Building auto-lookup: already working from room→property join
+9. NO-SHOW auto-flip: startup task flips no_show→active when checkin_date arrives
+10. Haiku OCR: room numbering corrected (THOR=01-12, HULK=13-24)
+11. Age field: asked after DOB if DOB skipped (stored in notes)
+12. Advance reflected in monthly tab (Cash/UPI column + calculated balance/status)
+
+### Column Mapping System
+- `MONTHLY_HEADERS` and `TENANTS_HEADERS` canonical lists (single source of truth)
+- `_build_header_map()` and `_header_index()` helpers
+- T_*/M_* constants auto-derived from header lists via `_derive_constants()`
+- `clean_and_load.py` imports canonical headers (no more duplicated lists)
+- Removed duplicate T_* constants at end of gsheets.py that overwrote TENANTS indices
+- Emergency Contact field mapping fixed (was swapped)
+- April+ monthly tabs use new 17-column format in clean_and_load.py
+
+### Known Issues
+- Digital form needs browser testing with real token flow
+- PDF generation not yet tested with real signature data
+- VPS deploy pending (needs `pip install reportlab` + migration)
+
 ## [1.27.0] — 2026-04-15 — RLS + Photo Checkin Improvements + Sheet Header Mapping
 
 ### Security
