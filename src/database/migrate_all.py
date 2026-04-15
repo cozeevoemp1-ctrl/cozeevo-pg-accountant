@@ -742,6 +742,7 @@ async def run_simplify_roles_2026_04_01(engine) -> None:
 
     # Step 1: Add 'owner' to enum in its own transaction
     async with engine.begin() as conn:
+        await conn.execute(text("SET statement_timeout = '120s'"))
         await conn.execute(text("""
             DO $$ BEGIN
                 ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'owner';
@@ -992,6 +993,36 @@ async def run_unhandled_requests_table(conn) -> None:
     print("  [ok] unhandled_requests table created")
 
 
+async def run_enable_rls_all_tables(conn) -> None:
+    """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
+    Uses pg_tables to discover all public-schema tables dynamically,
+    so new tables are covered automatically."""
+    print("\n-- Enable RLS on all tables --")
+    result = await conn.execute(text("""
+        SELECT tablename FROM pg_tables
+        WHERE schemaname = 'public'
+        ORDER BY tablename
+    """))
+    tables = [row[0] for row in result.fetchall()]
+    enabled = 0
+    for t in tables:
+        # Skip Postgres/Supabase internal tables and non-owned views
+        if t.startswith(('_', 'sql_')) or t in (
+            'schema_migrations', 'spatial_ref_sys', 'apscheduler_jobs',
+            'pg_config', 'pg_stat_statements', 'testing_audit',
+        ):
+            continue
+        try:
+            await conn.execute(text(f'SAVEPOINT rls_{enabled}'))
+            await conn.execute(text(f'ALTER TABLE "{t}" ENABLE ROW LEVEL SECURITY'))
+            await conn.execute(text(f'RELEASE SAVEPOINT rls_{enabled}'))
+            enabled += 1
+        except Exception as e:
+            await conn.execute(text(f'ROLLBACK TO SAVEPOINT rls_{enabled}'))
+            print(f"  [skip] {t} - {e}")
+    print(f"  [ok] RLS enabled on {enabled} tables")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1019,9 +1050,16 @@ async def main(args: argparse.Namespace) -> None:
             await run_audit_log_tables(conn)
             await run_unhandled_requests_table(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
-        await run_simplify_roles_2026_04_01(engine)
+        try:
+            await run_simplify_roles_2026_04_01(engine)
+        except Exception as e:
+            print(f"  [warn] simplify_roles failed (non-fatal): {e}")
         if args.seed:
-            await run_seed(conn)
+            async with engine.begin() as conn2:
+                await run_seed(conn2)
+    # RLS in its own transaction so it always commits independently
+    async with engine.begin() as conn:
+        await run_enable_rls_all_tables(conn)
     await engine.dispose()
     print("\nDone.\n")
 
