@@ -1,0 +1,149 @@
+"""
+src/services/pdf_generator.py
+Generate signed rental agreement PDF using reportlab.
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import io
+import os
+from datetime import datetime
+from pathlib import Path
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.lib import colors
+
+
+MEDIA_DIR = Path(os.getenv("MEDIA_DIR", "media"))
+AGREEMENT_DIR = MEDIA_DIR / "agreements"
+
+
+HOUSE_RULES = [
+    "Rent of {rent} is due on the 1st of every month. Late payment after 5th incurs Rs.100/day penalty.",
+    "Security deposit of {deposit} is refundable on checkout after deducting damages and outstanding dues.",
+    "Minimum stay period is {lock_in} months. Early exit forfeits the security deposit.",
+    "30-day written notice is required before checkout.",
+    "No smoking, alcohol, or illegal substances on premises.",
+    "Guests allowed only in common areas. No overnight guests.",
+    "Quiet hours: 10 PM - 7 AM.",
+    "Tenant is responsible for personal belongings. Management is not liable for theft or loss.",
+    "Room damage beyond normal wear will be deducted from deposit.",
+    "Management may reassign rooms with 7-day notice.",
+    "Food plan: {food} as per selected plan.",
+    "Violation of rules may lead to termination with 7-day notice.",
+]
+
+
+def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
+    """Generate agreement PDF. Returns relative path from MEDIA_DIR."""
+    save_dir = AGREEMENT_DIR / datetime.now().strftime("%Y-%m")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"agreement_{obs.token[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filepath = save_dir / filename
+
+    doc = SimpleDocTemplate(str(filepath), pagesize=A4,
+                            leftMargin=20*mm, rightMargin=20*mm,
+                            topMargin=15*mm, bottomMargin=15*mm)
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title2', parent=styles['Title'], fontSize=16,
+                                  textColor=colors.HexColor("#EF1F9C"))
+    subtitle_style = ParagraphStyle('Sub', parent=styles['Normal'], fontSize=10,
+                                     alignment=TA_CENTER, textColor=colors.grey)
+    heading_style = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=12,
+                                    textColor=colors.HexColor("#0095D9"))
+    normal = styles['Normal']
+    small = ParagraphStyle('Small', parent=normal, fontSize=9)
+
+    elements = []
+
+    # Header
+    elements.append(Paragraph("COZEEVO CO-LIVING", title_style))
+    elements.append(Paragraph("Rental Agreement", subtitle_style))
+    elements.append(Spacer(1, 8*mm))
+
+    # Details table
+    rent = f"Rs.{int(obs.agreed_rent or 0):,}"
+    deposit = f"Rs.{int(obs.security_deposit or 0):,}"
+    maint = f"Rs.{int(obs.maintenance_fee or 0):,}"
+    checkin = obs.checkin_date.strftime("%d %b %Y") if obs.checkin_date else ""
+
+    details = [
+        ["Tenant Name", tenant_data.get("name", ""), "Room", f"{room.room_number} ({building})"],
+        ["Phone", tenant_data.get("phone", ""), "Sharing", sharing],
+        ["Gender", tenant_data.get("gender", ""), "Floor", str(room.floor or "")],
+        ["Monthly Rent", rent, "Deposit", deposit],
+        ["Maintenance", maint, "Check-in", checkin],
+        ["Lock-in", f"{obs.lock_in_months or 0} months", "Food", tenant_data.get("food_preference", "")],
+    ]
+
+    t = Table(details, colWidths=[35*mm, 50*mm, 30*mm, 50*mm])
+    t.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor("#718096")),
+        ('TEXTCOLOR', (2, 0), (2, -1), colors.HexColor("#718096")),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#E8ECF0")),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 6*mm))
+
+    # Special terms
+    if obs.special_terms:
+        elements.append(Paragraph("Special Terms", heading_style))
+        elements.append(Paragraph(obs.special_terms, normal))
+        elements.append(Spacer(1, 4*mm))
+
+    # House Rules
+    elements.append(Paragraph("Terms &amp; Conditions", heading_style))
+    lock_in = str(obs.lock_in_months or 3)
+    food = tenant_data.get("food_preference", "Veg")
+    for i, rule in enumerate(HOUSE_RULES, 1):
+        formatted = rule.format(rent=rent, deposit=deposit, lock_in=lock_in, food=food)
+        elements.append(Paragraph(f"{i}. {formatted}", small))
+        elements.append(Spacer(1, 1.5*mm))
+
+    elements.append(Spacer(1, 8*mm))
+
+    # Signature
+    elements.append(Paragraph("Tenant Signature", heading_style))
+    elements.append(Paragraph(
+        f"I, {tenant_data.get('name', '')}, confirm that I have read and agree to all terms above.",
+        small
+    ))
+    elements.append(Spacer(1, 3*mm))
+
+    sig_data = obs.signature_image or ""
+    if sig_data and "base64," in sig_data:
+        try:
+            b64 = sig_data.split("base64,")[1]
+            img_bytes = base64.b64decode(b64)
+            img_buf = io.BytesIO(img_bytes)
+            sig_img = Image(img_buf, width=60*mm, height=20*mm)
+            elements.append(sig_img)
+        except Exception:
+            elements.append(Paragraph("[Signature on file]", small))
+    else:
+        elements.append(Paragraph("[Signature on file]", small))
+
+    elements.append(Spacer(1, 3*mm))
+    elements.append(Paragraph(
+        f"Date: {datetime.now().strftime('%d %b %Y')} | Ref: {obs.token[:8]}",
+        ParagraphStyle('Footer', parent=small, textColor=colors.grey)
+    ))
+
+    doc.build(elements)
+    return str(filepath.relative_to(MEDIA_DIR))
+
+
+async def generate_agreement_pdf(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
+    """Async wrapper for PDF generation."""
+    return await asyncio.to_thread(_generate_pdf_sync, obs, tenant_data, room, building, sharing)
