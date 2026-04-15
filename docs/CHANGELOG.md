@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.27.0] — 2026-04-15 — RLS + Photo Checkin Improvements + Sheet Header Mapping
+
+### Security
+- Enabled RLS on 42/43 public tables via `migrate_all.py` (runs every migration)
+- Only `pg_config` (Postgres system view) excluded
+
+### Photo Checkin Flow
+- Added advance payment step: bot asks "any advance paid?" after gender
+- Edit colon parsing fixed: `edit room : 609` now works correctly
+- `_next_form_step` helper started (food → advance → sharing chain, WIP)
+
+### Sheet Sync
+- TENANTS tab writes now use header-based column mapping (not positional)
+- Prevents data shift when columns are reordered or added
+
+### Infrastructure
+- `simplify_roles` migration wrapped in try/except (non-fatal on Supabase timeout)
+- Manual tenant insert: G.D. Abhishek to room 609 (THOR, premium)
+
+### Known Issues (queued for next session)
+- Food preference not asked in photo checkin flow (partially coded)
+- Cash/UPI not asked for advance payments
+- Office phone shows twice in confirmation display
+- Monthly tab still uses positional array (needs header mapping)
+- Phone/ID format inconsistency in Sheet
+
 ## [1.26.0] — 2026-04-13 — Room Ops + Sheet Sync + Unhandled Logging
 
 ### Added

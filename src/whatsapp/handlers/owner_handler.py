@@ -258,6 +258,53 @@ async def resolve_pending_action(
         else:
             return "__KEEP_PENDING__Reply *yes* to approve or *no* to reject."
 
+    # ── Helper: after gender resolved, check food → advance → sharing ───
+    async def _next_form_step(action_data, extracted, pending, session):
+        """Chain: food (if missing) → advance (if missing) → sharing."""
+        from src.whatsapp.handlers._shared import _save_pending
+
+        # 1. Food
+        food_val = (extracted.get("food_preference") or "").strip().lower()
+        if not food_val or food_val in ("", "none", "skip"):
+            action_data["step"] = "ask_food_form"
+            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+            return "*Food preference?*\n\n*1.* Veg\n*2.* Non-veg\n*3.* Egg\n\nOr type *skip*"
+
+        # 2. Advance
+        advance_val = extracted.get("advance", "")
+        if not advance_val or str(advance_val).strip().lower() in ("", "0", "skip", "none"):
+            action_data["step"] = "ask_advance_form"
+            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+            deposit_s = extracted.get("deposit", "0")
+            deposit_amt = int(re.sub(r"[^0-9]", "", str(deposit_s)) or "0")
+            deposit_note = f" (deposit: Rs.{deposit_amt:,})" if deposit_amt else ""
+            return f"*Any advance paid at check-in?*{deposit_note}\n\nEnter amount, *full* if fully paid, or *0* / *skip* if none."
+
+        # 3. Sharing
+        return await _goto_sharing(action_data, pending, session)
+
+    async def _goto_sharing(action_data, pending, session):
+        """Transition to sharing type confirmation."""
+        from src.whatsapp.handlers._shared import _save_pending
+        rt_str = action_data.get("room_type", "double")
+        max_occ = action_data.get("max_occupancy", 2)
+        current_occ = action_data.get("current_occupants", 0)
+        room_num = action_data.get("room_number", "?")
+
+        action_data["step"] = "confirm_sharing"
+        await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+        if rt_str == "single":
+            return await _finalize_form_checkin(action_data, pending, session, sharing_type="single")
+
+        return (
+            f"*Room {room_num}* — {rt_str} sharing room ({current_occ}/{max_occ} occupied)\n\n"
+            f"Checking in as:\n"
+            f"*1.* {rt_str.title()} sharing\n"
+            f"*2.* Premium (single occupancy — all beds)\n\n"
+            f"Reply *1* or *2*"
+        )
+
     # ── Form image extraction confirmation ────────────────────────────────
     if pending.intent == "FORM_EXTRACT_CONFIRM":
         from src.whatsapp.form_extractor import format_extracted_data
