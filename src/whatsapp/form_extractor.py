@@ -50,7 +50,7 @@ Required JSON structure:
 
 Rules:
 - Phone numbers: extract digits only, must be exactly 10 digits for Indian numbers. If you read more or fewer, re-examine carefully.
-- Room numbers: typically short like G17, T-201, 102, 301 etc. Not 5+ digit numbers.
+- Room numbers: typically short codes like G01, 102, 301, 609 etc. Format: {floor}{room} where floor=1-7, room=01-24. THOR rooms end in 01-12 (e.g. 101, 609, 312). HULK rooms end in 13-24 (e.g. 113, 624). Ground floor: G01-G10 (THOR), G11-G20 (HULK). Floor 7 is THOR only (701, 702). Double-check room numbers — OCR often misreads them (e.g. 609 as G69, 301 as 801). Not 5+ digit numbers.
 - Dates: use DD/MM/YYYY format. The PG opened in 2024, so admission dates should be 2024-2026 range.
 - Rent/deposit/maintenance: numbers only, no Rs. or commas
 - rent_remarks/deposit_remarks/maintenance_remarks: capture ANY handwritten notes, annotations, conditions, or special terms written near the rent/deposit/maintenance fields. Examples: "including maintenance", "21000 for April & May", "18000 refund on exit", "first 2 months 21k then 22k", "no damage refund". These are agreed terms — capture them exactly as written. If no remarks, use empty string.

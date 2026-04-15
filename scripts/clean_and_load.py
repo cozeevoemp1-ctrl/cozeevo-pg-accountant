@@ -212,34 +212,30 @@ def main():
     sp = gc.open_by_key(NEW_SHEET)
 
     # ── TENANTS tab (DB-aligned: tenants + tenancies + rooms) ────────────
-    ws_t = get_ws(sp, "TENANTS", 300, 32)
-    t_headers = [
-        "Room", "Name", "Phone", "Gender", "Building", "Floor",       # A-F
-        "Sharing", "Check-in", "Status", "Agreed Rent",                # G-J
-        "Deposit", "Booking", "Maintenance",                           # K-M
-        "Notice Date", "Expected Exit", "Checkout Date",               # N-P
-        "Refund Status", "Refund Amount",                              # Q-R
-        "Notes", "Food", "Staff", "Rent Updated",                      # S-V
-        "DOB", "Father Name", "Father Phone",                          # W-Y
-        "Address", "Email", "Occupation",                              # Z-AB
-        "Emergency Contact", "Emergency Phone", "ID Type", "ID Number" # AC-AF
-    ]
+    # Import canonical headers from gsheets (single source of truth)
+    from src.integrations.gsheets import TENANTS_HEADERS, MONTHLY_HEADERS
+
+    ws_t = get_ws(sp, "TENANTS", 300, len(TENANTS_HEADERS) + 1)
+    t_headers = TENANTS_HEADERS
     t_rows = [[
-        t['room'], t['name'], t['phone'], t['gender'], t['block'], t['floor'],
+        t['room'], t['name'], f"'{t['phone']}" if t['phone'] else '', t['gender'],
+        t['block'], t['floor'],
         t['sharing'], t['checkin_raw'], t['status'], t['current_rent'],
         t['deposit'], t['booking'], t['maintenance'],
         '', '', '',
         t.get('refund_status', ''), sn(t.get('refund_amount', 0)) or '',
-        t.get('comment', ''), t.get('food', ''),
-        t.get('staff', ''), t.get('rent_updated', ''),
-        '', '', '', '', '', '', '', '', '', '',  # KYC fields — filled via bot, not Excel
+        '', '', '', '',                                                 # DOB-Address (KYC — via bot)
+        '', '', '',                                                     # Emergency, Relationship, Email
+        '', '', '', '',                                                 # Occupation-Office Phone
+        '', '', t.get('food', ''),                                      # ID Type, ID Number, Food Pref
+        t.get('comment', ''), 'CHECKIN' if t['status'] == 'Active' else '',  # Notes, Event
     ] for t in tenants]
 
     ws_t.update(values=[t_headers] + t_rows, range_name="A1", value_input_option="USER_ENTERED")
-    ws_t.format("A1:AF1", {"textFormat": {"bold": True},
+    ws_t.format("A1:AH1", {"textFormat": {"bold": True},
                             "backgroundColor": {"red": 0.85, "green": 0.95, "blue": 0.85}})
     ws_t.freeze(rows=1)
-    try: ws_t.set_basic_filter(f"A1:AF{1 + len(t_rows)}")
+    try: ws_t.set_basic_filter(f"A1:AH{1 + len(t_rows)}")
     except: pass
     print(f"  TENANTS: {len(t_rows)} rows")
     time.sleep(8)
@@ -254,10 +250,17 @@ def main():
     ]
 
     for label, ms, me, stk, ck, uk, bk in months_cfg:
-        ws_m = get_ws(sp, label, 300, 16)
-        headers = ["Room", "Name", "Building", "Sharing", "Rent",
-                   "Cash", "UPI", "Total Paid", "Balance",
-                   "Status", "Check-in", "Event", "Notes", "Chandra", "Lakshmi"]
+        # April+ uses new 17-col format (from MONTHLY_HEADERS canonical source)
+        use_new_fmt = (ms >= date(2026, 4, 1))
+        if use_new_fmt:
+            headers = MONTHLY_HEADERS
+        else:
+            # Legacy format for Dec-Mar (no Phone, Notice Date, Entered By)
+            headers = ["Room", "Name", "Building", "Sharing", "Rent",
+                       "Cash", "UPI", "Total Paid", "Balance",
+                       "Status", "Check-in", "Event", "Notes", "Chandra", "Lakshmi"]
+        ncols = len(headers) + 1
+        ws_m = get_ws(sp, label, 300, ncols)
 
         # Clean payments for this month
         m_rows = []
@@ -332,7 +335,18 @@ def main():
             data_row_num = len(m_rows) + 5  # summary rows 1-3, header row 4, data starts row 5
             use_formulas = (ms >= date(2026, 4, 1))
 
-            if use_formulas:
+            if use_new_fmt:
+                # New 17-col format with Phone column, formulas for Apr+
+                f_total = f'=G{data_row_num}+H{data_row_num}'
+                f_bal   = f'=F{data_row_num}+P{data_row_num}-I{data_row_num}'
+                f_st    = f'=IF(I{data_row_num}=0,"UNPAID",IF(J{data_row_num}<=0,"PAID","PARTIAL"))'
+                m_rows.append([
+                    t['room'], t['name'], f"'{t['phone']}" if t['phone'] else '',
+                    t['block'], t['sharing'],
+                    t['current_rent'], cash, upi, f_total, f_bal,
+                    f_st, t['checkin_raw'], '', event, notes, 0, 'excel_load',
+                ])
+            elif use_formulas:
                 f_total = f'=F{data_row_num}+G{data_row_num}'
                 f_bal   = f'=E{data_row_num}-H{data_row_num}'
                 f_st    = f'=IF(I{data_row_num}<=0,"PAID","UNPAID")'
@@ -375,34 +389,56 @@ def main():
         collected = cash_total + upi_total
 
         # Summary rows (rows 1-4, then data from row 5)
-        summary = [
-            [label, "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-            [
-                "Checked-in", f"{a_beds} beds ({reg_a}+{prem_a}P)",
-                f"No-show: {ns_beds} beds ({len(month_noshow)}t)",
-                f"Vacant: {vacant}", f"Occ: {a_beds/TOTAL_BEDS*100:.1f}%",
-                "Cash", cash_total, "UPI", upi_total, "Total", collected,
-                f"Bal: {bal_total:,.0f}", f"Chandra: {chandra_total:,.0f}",
-                f"Lakshmi: {lakshmi_total:,.0f}", "",
-            ],
-            [
-                f"THOR: {tb}b ({len(thor)}t,{tp}P)", f"HULK: {hb}b ({len(hulk)}t,{hp}P)",
-                f"New: {new_checkins}", f"Exit: {exits}",
-                f"PAID:{stc.get('PAID',0)}", f"PARTIAL:{stc.get('PARTIAL',0)}",
-                f"UNPAID:{stc.get('UNPAID',0)}", f"NS:{stc.get('NO SHOW',0)}",
-                f"EXIT:{stc.get('EXIT',0)}", "", "", "", "", "", "",
-            ],
-            headers,
-        ]
+        pad = len(headers)
+        if use_new_fmt:
+            summary = [
+                [label] + [""] * (pad - 1),
+                [
+                    "Checked-in", f"{a_beds} beds ({reg_a}+{prem_a}P)",
+                    "", f"No-show: {ns_beds} beds ({len(month_noshow)}t)",
+                    f"Vacant: {vacant}", f"Occ: {a_beds/TOTAL_BEDS*100:.1f}%",
+                    "Cash", cash_total, "UPI", upi_total, "Total", collected,
+                    "", f"Bal: {bal_total:,.0f}", "", "", "",
+                ],
+                [
+                    f"THOR: {tb}b ({len(thor)}t,{tp}P)", f"HULK: {hb}b ({len(hulk)}t,{hp}P)",
+                    "", f"New: {new_checkins}", f"Exit: {exits}",
+                    f"PAID:{stc.get('PAID',0)}", f"PARTIAL:{stc.get('PARTIAL',0)}",
+                    f"UNPAID:{stc.get('UNPAID',0)}", f"NS:{stc.get('NO SHOW',0)}",
+                    f"EXIT:{stc.get('EXIT',0)}", "", "", "", "", "", "", "",
+                ],
+                headers,
+            ]
+        else:
+            summary = [
+                [label] + [""] * (pad - 1),
+                [
+                    "Checked-in", f"{a_beds} beds ({reg_a}+{prem_a}P)",
+                    f"No-show: {ns_beds} beds ({len(month_noshow)}t)",
+                    f"Vacant: {vacant}", f"Occ: {a_beds/TOTAL_BEDS*100:.1f}%",
+                    "Cash", cash_total, "UPI", upi_total, "Total", collected,
+                    f"Bal: {bal_total:,.0f}", f"Chandra: {chandra_total:,.0f}",
+                    f"Lakshmi: {lakshmi_total:,.0f}", "",
+                ],
+                [
+                    f"THOR: {tb}b ({len(thor)}t,{tp}P)", f"HULK: {hb}b ({len(hulk)}t,{hp}P)",
+                    f"New: {new_checkins}", f"Exit: {exits}",
+                    f"PAID:{stc.get('PAID',0)}", f"PARTIAL:{stc.get('PARTIAL',0)}",
+                    f"UNPAID:{stc.get('UNPAID',0)}", f"NS:{stc.get('NO SHOW',0)}",
+                    f"EXIT:{stc.get('EXIT',0)}", "", "", "", "", "", "",
+                ],
+                headers,
+            ]
 
+        last_col = chr(ord('A') + pad - 1) if pad <= 26 else 'Q'
         ws_m.update(values=summary + m_rows, range_name="A1", value_input_option="USER_ENTERED")
-        ws_m.format("A1:O1", {"textFormat": {"bold": True, "fontSize": 13}})
-        ws_m.format("A2:O3", {"textFormat": {"bold": True, "fontSize": 9},
+        ws_m.format(f"A1:{last_col}1", {"textFormat": {"bold": True, "fontSize": 13}})
+        ws_m.format(f"A2:{last_col}3", {"textFormat": {"bold": True, "fontSize": 9},
                                "numberFormat": {"type": "NUMBER", "pattern": "#,##0"}})
-        ws_m.format("A4:O4", {"textFormat": {"bold": True},
+        ws_m.format(f"A4:{last_col}4", {"textFormat": {"bold": True},
                                "backgroundColor": {"red": 0.85, "green": 0.9, "blue": 1.0}})
         ws_m.freeze(rows=4)
-        try: ws_m.set_basic_filter(f"A4:O{4 + len(m_rows)}")
+        try: ws_m.set_basic_filter(f"A4:{last_col}{4 + len(m_rows)}")
         except: pass
 
         print(f"  {label}: {len(m_rows)}t | Beds:{a_beds} NS:{ns_beds} V:{vacant} | "

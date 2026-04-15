@@ -68,61 +68,110 @@ MONTH_NAMES = [
     "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
 ]
 
-# -- Monthly tab column indices (0-indexed) ------------------------------------
+# -- Canonical header lists (single source of truth for column ordering) --------
+# All writes use header-based mapping. These lists define the expected headers.
+# Reads detect old vs new format by checking headers, never assume positions.
 
-M_ROOM = 0
-M_NAME = 1
-M_PHONE = 2
-M_BUILDING = 3
-M_SHARING = 4
-M_RENT_DUE = 5
-M_CASH = 6
-M_UPI = 7
-M_TOTAL_PAID = 8
-M_BALANCE = 9
-M_STATUS = 10
-M_CHECKIN = 11
-M_NOTICE_DATE = 12
-M_EVENT = 13
-M_NOTES = 14
-M_PREV_DUE = 15
-M_ENTERED_BY = 16
+MONTHLY_HEADERS = [
+    "Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
+    "Cash", "UPI", "Total Paid", "Balance", "Status",
+    "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
+]
 
-# -- TENANTS tab column indices (0-indexed) ------------------------------------
+TENANTS_HEADERS = [
+    "Room", "Name", "Phone", "Gender", "Building", "Floor",
+    "Sharing", "Check-in", "Status", "Agreed Rent", "Deposit",
+    "Booking", "Maintenance", "Notice Date", "Expected Exit", "Checkout Date",
+    "Refund Status", "Refund Amount",
+    "DOB", "Father Name", "Father Phone", "Address",
+    "Emergency Contact", "Emergency Relationship", "Email",
+    "Occupation", "Education", "Office Address", "Office Phone",
+    "ID Type", "ID Number", "Food Pref", "Notes", "Event",
+]
 
-T_ROOM = 0
-T_NAME = 1
-T_PHONE = 2
-T_GENDER = 3
-T_BUILDING = 4
-T_FLOOR = 5
-T_SHARING = 6
-T_CHECKIN = 7
-T_STATUS = 8
-T_AGREED_RENT = 9
-T_DEPOSIT = 10
-T_BOOKING = 11
-T_MAINTENANCE = 12
-T_NOTICE_DATE = 13
-T_EXPECTED_EXIT = 14
-T_CHECKOUT_DATE = 15
-T_REFUND_STATUS = 16
-T_REFUND_AMOUNT = 17
-T_DOB = 18
-T_FATHER_NAME = 19
-T_FATHER_PHONE = 20
-T_ADDRESS = 21
-T_EMERGENCY_CONTACT = 22
-T_EMERGENCY_RELATIONSHIP = 23
-T_EMAIL = 24
-T_OCCUPATION = 25
-T_EDUCATION = 26
-T_OFFICE_ADDRESS = 27
-T_OFFICE_PHONE = 28
-T_ID_TYPE = 29
-T_ID_NUMBER = 30
-T_FOOD_PREF = 31
-T_NOTES = 32
+
+def _header_index(headers: list[str], name: str) -> int:
+    """Find column index by header name (case-insensitive). Returns -1 if missing."""
+    name_l = name.strip().lower()
+    for i, h in enumerate(headers):
+        if h.strip().lower() == name_l:
+            return i
+    return -1
+
+
+def _build_header_map(headers: list[str]) -> dict[str, int]:
+    """Build {lowercase_header: index} map from a header row."""
+    return {h.strip().lower(): i for i, h in enumerate(headers) if h.strip()}
+
+
+# -- Derived index constants (auto-generated from canonical header lists) -------
+# Used for reads / old-format compat. All writes go through header-based mapping.
+
+def _derive_constants(headers, prefix):
+    """Generate index constants from header list. Returns dict of NAME: index."""
+    mapping = {}
+    for i, h in enumerate(headers):
+        key = prefix + h.upper().replace(" ", "_").replace("-", "_")
+        mapping[key] = i
+    return mapping
+
+_M = _derive_constants(MONTHLY_HEADERS, "M_")
+_T = _derive_constants(TENANTS_HEADERS, "T_")
+
+# Monthly tab column indices (derived from MONTHLY_HEADERS)
+M_ROOM = _M["M_ROOM"]
+M_NAME = _M["M_NAME"]
+M_PHONE = _M["M_PHONE"]
+M_BUILDING = _M["M_BUILDING"]
+M_SHARING = _M["M_SHARING"]
+M_RENT_DUE = _M["M_RENT_DUE"]
+M_CASH = _M["M_CASH"]
+M_UPI = _M["M_UPI"]
+M_TOTAL_PAID = _M["M_TOTAL_PAID"]
+M_BALANCE = _M["M_BALANCE"]
+M_STATUS = _M["M_STATUS"]
+M_CHECKIN = _M["M_CHECK_IN"]
+M_NOTICE_DATE = _M["M_NOTICE_DATE"]
+M_EVENT = _M["M_EVENT"]
+M_NOTES = _M["M_NOTES"]
+M_PREV_DUE = _M["M_PREV_DUE"]
+M_ENTERED_BY = _M["M_ENTERED_BY"]
+
+# TENANTS tab column indices (derived from TENANTS_HEADERS)
+T_ROOM = _T["T_ROOM"]
+T_NAME = _T["T_NAME"]
+T_PHONE = _T["T_PHONE"]
+T_GENDER = _T["T_GENDER"]
+T_BUILDING = _T["T_BUILDING"]
+T_FLOOR = _T["T_FLOOR"]
+T_SHARING = _T["T_SHARING"]
+T_CHECKIN = _T["T_CHECK_IN"]
+T_STATUS = _T["T_STATUS"]
+T_AGREED_RENT = _T["T_AGREED_RENT"]
+T_DEPOSIT = _T["T_DEPOSIT"]
+T_BOOKING = _T["T_BOOKING"]
+T_MAINTENANCE = _T["T_MAINTENANCE"]
+T_NOTICE_DATE = _T["T_NOTICE_DATE"]
+T_EXPECTED_EXIT = _T["T_EXPECTED_EXIT"]
+T_CHECKOUT_DATE = _T["T_CHECKOUT_DATE"]
+T_REFUND_STATUS = _T["T_REFUND_STATUS"]
+T_REFUND_AMOUNT = _T["T_REFUND_AMOUNT"]
+T_DOB = _T["T_DOB"]
+T_FATHER_NAME = _T["T_FATHER_NAME"]
+T_FATHER_PHONE = _T["T_FATHER_PHONE"]
+T_ADDRESS = _T["T_ADDRESS"]
+T_EMERGENCY_CONTACT = _T["T_EMERGENCY_CONTACT"]
+T_EMERGENCY_RELATIONSHIP = _T["T_EMERGENCY_RELATIONSHIP"]
+T_EMAIL = _T["T_EMAIL"]
+T_OCCUPATION = _T["T_OCCUPATION"]
+T_EDUCATION = _T["T_EDUCATION"]
+T_OFFICE_ADDRESS = _T["T_OFFICE_ADDRESS"]
+T_OFFICE_PHONE = _T["T_OFFICE_PHONE"]
+T_ID_TYPE = _T["T_ID_TYPE"]
+T_ID_NUMBER = _T["T_ID_NUMBER"]
+T_FOOD_PREF = _T["T_FOOD_PREF"]
+T_NOTES = _T["T_NOTES"]
+T_EVENT = _T["T_EVENT"]
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
 TOTAL_BEDS = 291
@@ -816,6 +865,9 @@ def _add_tenant_sync(
     id_type: str = "",
     id_number: str = "",
     food_pref: str = "",
+    entered_by: str = "",
+    advance_amount: float = 0,
+    advance_mode: str = "",
 ) -> dict:
     """
     Add tenant to TENANTS master tab AND current monthly tab.
@@ -856,10 +908,16 @@ def _add_tenant_sync(
         t_headers = [h.strip().lower() for h in t_data[0]] if t_data else []
 
         # Map header names to values — keys are lowercase header names
+        # Apostrophe prefix forces Sheet to treat as text (preserves + prefix, leading zeros)
+        phone_txt = f"'{phone}" if phone else ""
+        father_phone_txt = f"'{father_phone}" if father_phone else ""
+        office_phone_txt = f"'{office_phone}" if office_phone else ""
+        emergency_contact_txt = f"'{emergency_contact}" if emergency_contact else ""
+        id_number_txt = f"'{id_number}" if id_number else ""
         field_map = {
             "room": room_number,
             "name": name,
-            "phone": phone,
+            "phone": phone_txt,
             "gender": gender,
             "building": building,
             "floor": floor,
@@ -874,18 +932,20 @@ def _add_tenant_sync(
             "food": food_pref,
             "dob": dob,
             "father name": father_name,
-            "father phone": father_phone,
+            "father phone": father_phone_txt,
             "address": address,
             "email": email,
             "occupation": occupation,
             "education": education,
-            "emergency contact": emergency_relationship,  # name/relationship of contact
-            "emergency phone": emergency_contact,  # phone number
+            "emergency contact": emergency_contact_txt,
+            "emergency relationship": emergency_relationship,
+            "emergency phone": emergency_contact_txt,
             "id type": id_type,
-            "id number": id_number,
+            "id number": id_number_txt,
             "office address": office_address,
-            "office phone": office_phone,
+            "office phone": office_phone_txt,
             "event": "CHECKIN",
+            "entered by": entered_by,
         }
         # Also match alternate header names
         alt_names = {
@@ -936,24 +996,46 @@ def _add_tenant_sync(
             logger.warning("GSheets: %s", result["error"])
             return result
 
-        # Detect old vs new format
+        # Header-based mapping for monthly tab (same approach as TENANTS)
         all_vals = monthly_ws.get_all_values()
         header_row = all_vals[3] if len(all_vals) > 3 else []
-        is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
+        m_headers = [h.strip().lower() for h in header_row]
 
-        if is_new:
-            monthly_row = [
-                room_number, name, phone, building, sharing,
-                agreed_rent, "", "", 0, agreed_rent, "UNPAID",
-                checkin_display, "", "", notes, 0,
-            ]
-        else:
-            # Old format: no Phone column (15 cols)
-            monthly_row = [
-                room_number, name, building, sharing,
-                agreed_rent, "", "", 0, agreed_rent, "UNPAID",
-                checkin_display, "", notes, 0, 0,
-            ]
+        # Advance payment: put in Cash or UPI column based on mode
+        adv_cash = advance_amount if advance_mode == "cash" and advance_amount > 0 else ""
+        adv_upi = advance_amount if advance_mode == "upi" and advance_amount > 0 else ""
+        adv_total = advance_amount if advance_amount > 0 else 0
+        adv_balance = agreed_rent - advance_amount if advance_amount > 0 else agreed_rent
+        adv_status = "PAID" if adv_balance <= 0 else ("PARTIAL" if advance_amount > 0 else "UNPAID")
+
+        m_field_map = {
+            "room": room_number,
+            "name": name,
+            "phone": phone_txt,
+            "building": building,
+            "sharing": sharing,
+            "rent due": agreed_rent,
+            "rent": agreed_rent,
+            "cash": adv_cash,
+            "upi": adv_upi,
+            "total paid": adv_total,
+            "balance": adv_balance,
+            "status": adv_status,
+            "check-in": checkin_display,
+            "checkin": checkin_display,
+            "check in": checkin_display,
+            "notice date": "",
+            "event": "CHECKIN",
+            "notes": notes,
+            "prev due": 0,
+            "entered by": entered_by,
+        }
+
+        monthly_row = [""] * len(m_headers)
+        for i, header in enumerate(m_headers):
+            if header in m_field_map:
+                monthly_row[i] = m_field_map[header]
+
         # Use update (not append_row) because filters block append
         next_row = len(all_vals) + 1
         monthly_ws.update(values=[monthly_row], range_name=f"A{next_row}", value_input_option="USER_ENTERED")
@@ -1329,6 +1411,9 @@ async def add_tenant(
     id_type: str = "",
     id_number: str = "",
     food_pref: str = "",
+    entered_by: str = "",
+    advance_amount: float = 0,
+    advance_mode: str = "",
 ) -> dict:
     """
     Async entry point — add tenant to TENANTS tab + current monthly tab.
@@ -1340,7 +1425,8 @@ async def add_tenant(
         sharing, checkin, agreed_rent, deposit, booking, maintenance, notes,
         dob, father_name, father_phone, address, emergency_contact,
         emergency_relationship, email, occupation, education, office_address,
-        office_phone, id_type, id_number, food_pref,
+        office_phone, id_type, id_number, food_pref, entered_by,
+        advance_amount, advance_mode,
     )
 
 
@@ -1619,20 +1705,16 @@ async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:
     return await asyncio.to_thread(_get_worksheet_sync, tab_name)
 
 
-# ── Column index map (0-based) for the 17-col monthly tab layout ─────────────
-T_ROOM = 0; T_NAME = 1; T_PHONE = 2; T_BUILDING = 3; T_SHARING = 4
-T_RENT = 5; T_CASH = 6; T_UPI = 7; T_TOTAL_PAID = 8; T_BALANCE = 9
-T_STATUS = 10; T_CHECKIN = 11; T_NOTICE_DATE = 12; T_EVENT = 13
-T_NOTES = 14; T_PREV_DUE = 15
+# ── Field-to-column map for monthly tab (uses M_* constants from top of file) ──
 
 _FIELD_TO_COL = {
-    "sharing_type": T_SHARING,
-    "sharing": T_SHARING,
-    "agreed_rent": T_RENT,
-    "rent": T_RENT,
-    "phone": T_PHONE,
-    "notes": T_NOTES,
-    "status": T_STATUS,
+    "sharing_type": M_SHARING,
+    "sharing": M_SHARING,
+    "agreed_rent": M_RENT_DUE,
+    "rent": M_RENT_DUE,
+    "phone": M_PHONE,
+    "notes": M_NOTES,
+    "status": M_STATUS,
 }
 
 
