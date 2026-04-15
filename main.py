@@ -13,7 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -58,6 +58,24 @@ async def lifespan(app: FastAPI):
     from src.database.db_manager import init_db
     await init_db(db_url)
     logger.info("✓ Database initialized")
+
+    # Auto-flip no_show → active for tenancies whose checkin_date has arrived
+    try:
+        from src.database.db_manager import get_session
+        from src.database.models import Tenancy, TenancyStatus
+        from sqlalchemy import select, update
+        from datetime import date
+        async with get_session() as s:
+            result = await s.execute(
+                update(Tenancy)
+                .where(Tenancy.status == TenancyStatus.no_show, Tenancy.checkin_date <= date.today())
+                .values(status=TenancyStatus.active)
+            )
+            if result.rowcount:
+                await s.commit()
+                logger.info("Auto-flipped %d no_show tenancies to active", result.rowcount)
+    except Exception as e:
+        logger.warning("No-show auto-flip failed: %s", e)
 
     # Dashboard temp-file cleanup (existing lightweight scheduler)
     from src.dashboard.cleanup import start_cleanup_scheduler
@@ -111,6 +129,9 @@ app.include_router(chat_router)
 
 from src.api.reminder_router import router as reminder_router
 app.include_router(reminder_router)
+
+from src.api.onboarding_router import router as onboarding_router
+app.include_router(onboarding_router)
 
 # ── Ingest API ─────────────────────────────────────────────────────────────
 
@@ -236,6 +257,22 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 @app.get("/dashboard")
 async def dashboard_page():
     return FileResponse(str(static_dir / "dashboard.html"))
+
+@app.get("/onboard/{token}", response_class=HTMLResponse)
+async def serve_onboarding_form(token: str):
+    """Serve the tenant onboarding form."""
+    form_path = Path("static/onboarding.html")
+    if not form_path.exists():
+        return HTMLResponse("<h1>Form not available yet</h1>", status_code=404)
+    return HTMLResponse(form_path.read_text(encoding="utf-8"))
+
+@app.get("/admin/onboarding", response_class=HTMLResponse)
+async def serve_admin_onboarding():
+    """Serve the admin onboarding panel."""
+    form_path = Path("static/admin_onboarding.html")
+    if not form_path.exists():
+        return HTMLResponse("<h1>Admin panel not available yet</h1>", status_code=404)
+    return HTMLResponse(form_path.read_text(encoding="utf-8"))
 
 # ── Pending entity approval API ───────────────────────────────────────────
 
