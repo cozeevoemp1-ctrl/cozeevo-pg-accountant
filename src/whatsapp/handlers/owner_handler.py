@@ -309,8 +309,8 @@ async def resolve_pending_action(
                 parts = raw.split(None, 1)
                 if len(parts) < 2:
                     continue
-                field_key = parts[0].lower()
-                new_val = parts[1].strip()
+                field_key = parts[0].lower().rstrip(":")
+                new_val = parts[1].lstrip(": ").strip()
                 actual_key = key_aliases.get(field_key)
                 if actual_key:
                     extracted[actual_key] = new_val
@@ -430,17 +430,27 @@ async def resolve_pending_action(
                         "Reply *yes* to proceed anyway, *edit room* to change room, or *no* to cancel."
                     )
 
-            # Room has space — go to sharing type confirmation
-            action_data["step"] = "confirm_sharing"
+            # Room has space — ask advance if not in form, then sharing
             action_data["room_id"] = room_row.id
             action_data["room_number"] = room_row.room_number
             action_data["room_type"] = rt_str
             action_data["max_occupancy"] = max_occ
             action_data["current_occupants"] = len(occupants)
+
+            # Check if advance already provided
+            advance_val = extracted.get("advance", "")
+            if not advance_val or str(advance_val).strip().lower() in ("", "0", "skip", "none"):
+                action_data["step"] = "ask_advance_form"
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                deposit_s = extracted.get("deposit", "0")
+                deposit_amt = int(re.sub(r"[^0-9]", "", str(deposit_s)) or "0")
+                deposit_note = f" (deposit: Rs.{deposit_amt:,})" if deposit_amt else ""
+                return f"*Any advance paid at check-in?*{deposit_note}\n\nEnter amount, *full* if fully paid, or *0* / *skip* if none."
+
+            action_data["step"] = "confirm_sharing"
             await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
 
             if rt_str == "single":
-                # Single room — no sharing question needed, auto-proceed
                 return await _finalize_form_checkin(action_data, pending, session, sharing_type="single")
 
             occ_info = ""
@@ -498,6 +508,16 @@ async def resolve_pending_action(
                         "Reply *yes* to proceed anyway, *edit room* to change room, or *no* to cancel."
                     )
 
+            # Check if advance already provided
+            advance_val = extracted.get("advance", "")
+            if not advance_val or str(advance_val).strip().lower() in ("", "0", "skip", "none"):
+                action_data["step"] = "ask_advance_form"
+                await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                deposit_s = extracted.get("deposit", "0")
+                deposit_amt = int(re.sub(r"[^0-9]", "", str(deposit_s)) or "0")
+                deposit_note = f" (deposit: Rs.{deposit_amt:,})" if deposit_amt else ""
+                return f"*Any advance paid at check-in?*{deposit_note}\n\nEnter amount, *full* if fully paid, or *0* / *skip* if none."
+
             action_data["step"] = "confirm_sharing"
             await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
 
@@ -506,6 +526,42 @@ async def resolve_pending_action(
 
             return (
                 f"*Room {room_row.room_number}* — {rt_str} sharing room ({current_occ}/{max_occ} occupied)\n\n"
+                f"Checking in as:\n"
+                f"*1.* {rt_str.title()} sharing\n"
+                f"*2.* Premium (single occupancy — all beds)\n\n"
+                f"Reply *1* or *2*"
+            )
+
+        # ── Advance payment prompt from form extraction ────────────────
+        if step == "ask_advance_form":
+            extracted = action_data.get("extracted", {})
+            deposit_s = extracted.get("deposit", "0")
+            deposit_amt = int(re.sub(r"[^0-9]", "", str(deposit_s)) or "0")
+
+            a = ans.strip().lower()
+            if a in ("skip", "none", "no", "nil", "0"):
+                extracted["advance"] = "0"
+            elif a in ("full", "all", "complete", "paid", "yes"):
+                extracted["advance"] = str(deposit_amt) if deposit_amt else "0"
+            else:
+                amt_str = re.sub(r"[^0-9]", "", a)
+                if not amt_str:
+                    return "__KEEP_PENDING__Enter an amount, *full*, or *0* / *skip*."
+                extracted["advance"] = amt_str
+
+            action_data["extracted"] = extracted
+            rt_str = action_data.get("room_type", "double")
+            max_occ = action_data.get("max_occupancy", 2)
+            current_occ = action_data.get("current_occupants", 0)
+
+            action_data["step"] = "confirm_sharing"
+            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+
+            if rt_str == "single":
+                return await _finalize_form_checkin(action_data, pending, session, sharing_type="single")
+
+            return (
+                f"*Room {action_data.get('room_number', '?')}* — {rt_str} sharing room ({current_occ}/{max_occ} occupied)\n\n"
                 f"Checking in as:\n"
                 f"*1.* {rt_str.title()} sharing\n"
                 f"*2.* Premium (single occupancy — all beds)\n\n"
@@ -617,9 +673,21 @@ async def resolve_pending_action(
         # ── Gender mismatch confirmation ──────────────────────────────────
         if step == "confirm_gender_mismatch":
             if ans in ("yes", "y", "proceed", "ok"):
-                action_data["step"] = "confirm_sharing"
+                extracted = action_data.get("extracted", {})
                 rt_str = action_data.get("room_type", "double")
                 max_occ = action_data.get("max_occupancy", 2)
+
+                # Check if advance already provided
+                advance_val = extracted.get("advance", "")
+                if not advance_val or str(advance_val).strip().lower() in ("", "0", "skip", "none"):
+                    action_data["step"] = "ask_advance_form"
+                    await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+                    deposit_s = extracted.get("deposit", "0")
+                    deposit_amt = int(re.sub(r"[^0-9]", "", str(deposit_s)) or "0")
+                    deposit_note = f" (deposit: Rs.{deposit_amt:,})" if deposit_amt else ""
+                    return f"*Any advance paid at check-in?*{deposit_note}\n\nEnter amount, *full* if fully paid, or *0* / *skip* if none."
+
+                action_data["step"] = "confirm_sharing"
                 await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
 
                 if rt_str == "single":
@@ -4322,6 +4390,7 @@ async def _finalize_form_checkin(
         f"Room: {action_data.get('room_number', extracted.get('room_number', ''))}",
         f"Rent: {extracted.get('monthly_rent', 'skip')}",
         f"Deposit: {extracted.get('deposit', 'skip')}",
+        f"Advance: {extracted.get('advance', 'skip')}",
         f"Maintenance: {extracted.get('maintenance', 'skip')}",
         f"Checkin: {extracted.get('date_of_admission', '')}",
         f"Food: {extracted.get('food_preference', 'none')}",
