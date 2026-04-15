@@ -1,0 +1,338 @@
+"""
+src/api/onboarding_router.py
+Onboarding form API — receptionist creates session, tenant fills, receptionist approves.
+"""
+from __future__ import annotations
+
+import json
+import uuid
+from datetime import datetime, timedelta, date
+from decimal import Decimal
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import select, update
+from typing import Optional
+
+from src.database.db_manager import get_session
+from src.database.models import (
+    OnboardingSession, Room, Property, Tenant, Tenancy, TenancyStatus,
+    RentSchedule, RentStatus, Payment, PaymentMode, PaymentFor,
+)
+
+router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
+
+
+# ── Pydantic models ──────────────────────────────────────────────────────────
+
+class CreateSessionRequest(BaseModel):
+    room_number: str
+    agreed_rent: float
+    security_deposit: float = 0
+    maintenance_fee: float = 0
+    booking_amount: float = 0
+    advance_mode: str = ""
+    checkin_date: str  # ISO YYYY-MM-DD
+    stay_type: str = "monthly"
+    lock_in_months: int = 0
+    special_terms: str = ""
+    tenant_phone: str
+    created_by_phone: str = ""
+
+
+class TenantSubmitRequest(BaseModel):
+    name: str
+    phone: str
+    gender: str
+    date_of_birth: str = ""
+    age: str = ""
+    email: str = ""
+    food_preference: str
+    father_name: str = ""
+    father_phone: str = ""
+    emergency_contact_name: str
+    emergency_contact_phone: str
+    emergency_contact_relationship: str
+    permanent_address: str = ""
+    occupation: str = ""
+    educational_qualification: str = ""
+    office_address: str = ""
+    office_phone: str = ""
+    id_proof_type: str = ""
+    id_proof_number: str = ""
+    signature_image: str  # base64 PNG
+
+
+# ── Create session (receptionist) ────────────────────────────────────────────
+
+@router.post("/create")
+async def create_session(req: CreateSessionRequest):
+    if req.booking_amount > 0 and not req.advance_mode:
+        raise HTTPException(400, "Payment method (cash/upi) required when booking amount > 0")
+
+    async with get_session() as session:
+        room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
+        if not room:
+            raise HTTPException(404, f"Room {req.room_number} not found")
+
+        building = ""
+        if room.property_id:
+            prop = await session.get(Property, room.property_id)
+            building = prop.name if prop else ""
+
+        token = str(uuid.uuid4())
+        obs = OnboardingSession(
+            token=token,
+            status="pending_tenant",
+            created_by_phone=req.created_by_phone,
+            tenant_phone=req.tenant_phone,
+            room_id=room.id,
+            agreed_rent=Decimal(str(req.agreed_rent)),
+            security_deposit=Decimal(str(req.security_deposit)),
+            maintenance_fee=Decimal(str(req.maintenance_fee)),
+            booking_amount=Decimal(str(req.booking_amount)),
+            advance_mode=req.advance_mode if req.booking_amount > 0 else "",
+            checkin_date=date.fromisoformat(req.checkin_date),
+            stay_type=req.stay_type,
+            lock_in_months=req.lock_in_months,
+            special_terms=req.special_terms,
+            expires_at=datetime.utcnow() + timedelta(hours=48),
+        )
+        session.add(obs)
+        await session.flush()
+
+        rt = room.room_type
+        sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
+
+        return {
+            "token": token,
+            "link": f"/onboard/{token}",
+            "session_id": obs.id,
+            "room": {"number": room.room_number, "building": building, "floor": str(room.floor or ""), "sharing": sharing},
+        }
+
+
+# ── List pending sessions (admin) ────────────────────────────────────────────
+
+@router.get("/admin/pending")
+async def list_pending():
+    async with get_session() as session:
+        result = await session.execute(
+            select(OnboardingSession).where(
+                OnboardingSession.status.in_(["pending_tenant", "pending_review"])
+            ).order_by(OnboardingSession.created_at.desc())
+        )
+        sessions = result.scalars().all()
+        items = []
+        for obs in sessions:
+            room = await session.get(Room, obs.room_id) if obs.room_id else None
+            items.append({
+                "token": obs.token,
+                "status": obs.status,
+                "room": room.room_number if room else "",
+                "tenant_phone": obs.tenant_phone,
+                "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
+                "created_at": obs.created_at.isoformat() if obs.created_at else "",
+                "tenant_name": json.loads(obs.tenant_data).get("name", "") if obs.tenant_data else "",
+            })
+        return {"sessions": items}
+
+
+# ── Get session data (tenant form) ───────────────────────────────────────────
+
+@router.get("/{token}")
+async def get_session_data(token: str):
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status == "expired" or (obs.expires_at and obs.expires_at < datetime.utcnow()):
+            raise HTTPException(410, "This onboarding link has expired")
+        if obs.status not in ("pending_tenant", "pending_review"):
+            raise HTTPException(400, f"Session status: {obs.status}")
+
+        room = await session.get(Room, obs.room_id) if obs.room_id else None
+        building = ""
+        if room and room.property_id:
+            prop = await session.get(Property, room.property_id)
+            building = prop.name if prop else ""
+        rt = room.room_type if room else ""
+        sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
+
+        return {
+            "status": obs.status,
+            "room": {"number": room.room_number if room else "", "building": building, "floor": str(room.floor or "") if room else "", "sharing": sharing},
+            "agreed_rent": float(obs.agreed_rent or 0),
+            "security_deposit": float(obs.security_deposit or 0),
+            "maintenance_fee": float(obs.maintenance_fee or 0),
+            "booking_amount": float(obs.booking_amount or 0),
+            "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
+            "lock_in_months": obs.lock_in_months or 0,
+            "special_terms": obs.special_terms or "",
+            "tenant_data": json.loads(obs.tenant_data) if obs.tenant_data else None,
+        }
+
+
+# ── Tenant submits form ──────────────────────────────────────────────────────
+
+@router.post("/{token}/submit")
+async def tenant_submit(token: str, req: TenantSubmitRequest):
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status != "pending_tenant":
+            raise HTTPException(400, f"Cannot submit — status is {obs.status}")
+        if obs.expires_at and obs.expires_at < datetime.utcnow():
+            obs.status = "expired"
+            raise HTTPException(410, "This onboarding link has expired")
+
+        tenant_data = req.model_dump(exclude={"signature_image"})
+        obs.tenant_data = json.dumps(tenant_data)
+        obs.signature_image = req.signature_image
+        obs.status = "pending_review"
+        obs.completed_at = datetime.utcnow()
+
+        return {"status": "pending_review", "message": "Submitted. Receptionist will review."}
+
+
+# ── Approve session (admin) ──────────────────────────────────────────────────
+
+@router.post("/{token}/approve")
+async def approve_session(token: str):
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status != "pending_review":
+            raise HTTPException(400, f"Cannot approve — status is {obs.status}")
+
+        td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+        if not td.get("name") or not td.get("phone"):
+            raise HTTPException(400, "Tenant data incomplete")
+
+        room = await session.get(Room, obs.room_id)
+        if not room:
+            raise HTTPException(400, "Room not found")
+
+        building = ""
+        if room.property_id:
+            prop = await session.get(Property, room.property_id)
+            building = prop.name if prop else ""
+
+        phone = td["phone"].strip()
+        if len(phone) > 10:
+            phone = phone[-10:]
+
+        # Create or find tenant
+        tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+        if not tenant:
+            tenant = Tenant(
+                name=td["name"], phone=phone, gender=td.get("gender"),
+                food_preference=td.get("food_preference"), email=td.get("email"),
+                father_name=td.get("father_name"), father_phone=td.get("father_phone"),
+                emergency_contact_name=td.get("emergency_contact_name"),
+                emergency_contact_phone=td.get("emergency_contact_phone"),
+                emergency_contact_relationship=td.get("emergency_contact_relationship"),
+                permanent_address=td.get("permanent_address"), occupation=td.get("occupation"),
+                educational_qualification=td.get("educational_qualification"),
+                office_address=td.get("office_address"), office_phone=td.get("office_phone"),
+                id_proof_type=td.get("id_proof_type"), id_proof_number=td.get("id_proof_number"),
+            )
+            dob_str = td.get("date_of_birth", "")
+            if dob_str:
+                for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+                    try:
+                        tenant.date_of_birth = datetime.strptime(dob_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            session.add(tenant)
+            await session.flush()
+
+        rt = room.room_type
+        sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
+        checkin = obs.checkin_date or date.today()
+
+        tenancy = Tenancy(
+            tenant_id=tenant.id, room_id=room.id, checkin_date=checkin,
+            agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
+            booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
+            lock_in_months=obs.lock_in_months or 0,
+            status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
+        )
+        session.add(tenancy)
+        await session.flush()
+
+        # RentSchedule
+        period = checkin.replace(day=1)
+        current_month = date.today().replace(day=1)
+        while period <= current_month:
+            session.add(RentSchedule(
+                tenancy_id=tenancy.id, period_month=period,
+                rent_due=obs.agreed_rent or 0, maintenance_due=obs.maintenance_fee or 0,
+                status=RentStatus.pending, due_date=period,
+            ))
+            if period.month == 12:
+                period = date(period.year + 1, 1, 1)
+            else:
+                period = date(period.year, period.month + 1, 1)
+
+        # Advance payment
+        if obs.booking_amount and obs.booking_amount > 0:
+            adv_mode = PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash
+            session.add(Payment(
+                tenancy_id=tenancy.id, amount=obs.booking_amount,
+                payment_date=checkin, payment_mode=adv_mode,
+                for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
+                notes=f"Booking advance ({obs.advance_mode})",
+            ))
+
+        obs.status = "approved"
+        obs.approved_at = datetime.utcnow()
+        obs.tenant_id = tenant.id
+        obs.tenancy_id = tenancy.id
+
+        # GSheets (fire and forget)
+        gsheets_note = ""
+        try:
+            from src.integrations.gsheets import add_tenant as gsheets_add
+            gs_r = await gsheets_add(
+                room_number=room.room_number, name=td["name"], phone=phone,
+                gender=td.get("gender", ""), building=building,
+                floor=str(room.floor or ""), sharing=sharing,
+                checkin=checkin.strftime("%d/%m/%Y"),
+                agreed_rent=float(obs.agreed_rent or 0), deposit=float(obs.security_deposit or 0),
+                booking=float(obs.booking_amount or 0), maintenance=float(obs.maintenance_fee or 0),
+                notes=obs.special_terms or "",
+                dob=td.get("date_of_birth", ""), father_name=td.get("father_name", ""),
+                father_phone=td.get("father_phone", ""), address=td.get("permanent_address", ""),
+                emergency_contact=td.get("emergency_contact_phone", ""),
+                emergency_relationship=td.get("emergency_contact_relationship", ""),
+                email=td.get("email", ""), occupation=td.get("occupation", ""),
+                education=td.get("educational_qualification", ""),
+                office_address=td.get("office_address", ""), office_phone=td.get("office_phone", ""),
+                id_type=td.get("id_proof_type", ""), id_number=td.get("id_proof_number", ""),
+                food_pref=td.get("food_preference", ""), entered_by="onboarding_form",
+                advance_amount=float(obs.booking_amount or 0), advance_mode=obs.advance_mode or "",
+            )
+            if gs_r.get("success"):
+                gsheets_note = " | Sheet updated"
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("GSheets onboarding: %s", e)
+
+        # PDF generation
+        try:
+            from src.services.pdf_generator import generate_agreement_pdf
+            pdf_path = await generate_agreement_pdf(obs, td, room, building, sharing)
+            obs.agreement_pdf_path = pdf_path
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("PDF generation failed: %s", e)
+
+        return {
+            "status": "approved", "tenant_id": tenant.id, "tenancy_id": tenancy.id,
+            "message": f"Tenant {td['name']} created{gsheets_note}",
+        }
