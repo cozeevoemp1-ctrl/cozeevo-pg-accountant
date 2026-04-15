@@ -850,44 +850,69 @@ def _add_tenant_sync(
         pass
 
     try:
-        # -- TENANTS tab --
+        # -- TENANTS tab (header-based mapping) --
         tenants_ws = _get_worksheet_sync("TENANTS")
-        tenants_row = [
-            room_number,       # 0: Room
-            name,              # 1: Name
-            phone,             # 2: Phone
-            gender,            # 3: Gender
-            building,          # 4: Building
-            floor,             # 5: Floor
-            sharing,           # 6: Sharing
-            checkin_display,   # 7: Check-in (DD/MM/YYYY, Indian format)
-            status,            # 8: Status (active/no_show, matches DB enum)
-            agreed_rent,       # 9: Agreed Rent
-            deposit,           # 10: Deposit
-            booking,           # 11: Booking
-            maintenance,       # 12: Maintenance
-            "",                # 13: Notice Date
-            "",                # 14: Expected Exit
-            "",                # 15: Checkout Date
-            "",                # 16: Refund Status
-            "",                # 17: Refund Amount
-            dob,               # 18: DOB
-            father_name,       # 19: Father Name
-            father_phone,      # 20: Father Phone
-            address,           # 21: Address
-            emergency_contact, # 22: Emergency Contact
-            emergency_relationship,  # 23: Emergency Relationship
-            email,             # 24: Email
-            occupation,        # 25: Occupation
-            education,         # 26: Education
-            office_address,    # 27: Office Address
-            office_phone,      # 28: Office Phone
-            id_type,           # 29: ID Type
-            id_number,         # 30: ID Number
-            food_pref,         # 31: Food Pref
-            notes,             # 32: Notes
-        ]
         t_data = tenants_ws.get_all_values()
+        t_headers = [h.strip().lower() for h in t_data[0]] if t_data else []
+
+        # Map header names to values — keys are lowercase header names
+        field_map = {
+            "room": room_number,
+            "name": name,
+            "phone": phone,
+            "gender": gender,
+            "building": building,
+            "floor": floor,
+            "sharing": sharing,
+            "check-in": checkin_display,
+            "status": status,
+            "agreed rent": agreed_rent,
+            "deposit": deposit,
+            "booking": booking,
+            "maintenance": maintenance,
+            "notes": notes,
+            "food": food_pref,
+            "dob": dob,
+            "father name": father_name,
+            "father phone": father_phone,
+            "address": address,
+            "email": email,
+            "occupation": occupation,
+            "education": education,
+            "emergency contact": emergency_relationship,  # name/relationship of contact
+            "emergency phone": emergency_contact,  # phone number
+            "id type": id_type,
+            "id number": id_number,
+            "office address": office_address,
+            "office phone": office_phone,
+            "event": "CHECKIN",
+        }
+        # Also match alternate header names
+        alt_names = {
+            "emergency relationship": emergency_relationship,
+            "emergency rel": emergency_relationship,
+            "food preference": food_pref,
+            "food pref": food_pref,
+            "date of birth": dob,
+            "checkin": checkin_display,
+            "check in": checkin_display,
+            "rent": agreed_rent,
+            "agreed_rent": agreed_rent,
+            "office_phone": office_phone,
+            "office_address": office_address,
+            "father_name": father_name,
+            "father_phone": father_phone,
+            "id_type": id_type,
+            "id_number": id_number,
+        }
+        field_map.update(alt_names)
+
+        # Build row by matching headers
+        tenants_row = [""] * len(t_headers)
+        for i, header in enumerate(t_headers):
+            if header in field_map:
+                tenants_row[i] = field_map[header]
+
         t_next = len(t_data) + 1
         tenants_ws.update(values=[tenants_row], range_name=f"A{t_next}", value_input_option="USER_ENTERED")
         result["tenants_row"] = t_next
