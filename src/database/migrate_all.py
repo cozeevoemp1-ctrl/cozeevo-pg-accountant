@@ -1008,8 +1008,8 @@ async def run_enable_rls_all_tables(conn) -> None:
     for t in tables:
         # Skip Postgres/Supabase internal tables and non-owned views
         if t.startswith(('_', 'sql_')) or t in (
-            'schema_migrations', 'spatial_ref_sys', 'apscheduler_jobs',
-            'pg_config', 'pg_stat_statements', 'testing_audit',
+            'schema_migrations', 'spatial_ref_sys',
+            'pg_config', 'pg_stat_statements',
         ):
             continue
         try:
