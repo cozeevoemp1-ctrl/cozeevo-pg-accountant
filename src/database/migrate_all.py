@@ -993,6 +993,52 @@ async def run_unhandled_requests_table(conn) -> None:
     print("  [ok] unhandled_requests table created")
 
 
+async def run_extend_onboarding_sessions(conn) -> None:
+    """Extend onboarding_sessions table for digital form flow."""
+    print("\n-- Extend onboarding_sessions for digital form --")
+    new_cols = [
+        ("token", "VARCHAR(36)"),
+        ("status", "VARCHAR(20) DEFAULT 'draft'"),
+        ("created_by_phone", "VARCHAR(20)"),
+        ("tenant_phone", "VARCHAR(20)"),
+        ("room_id", "INTEGER REFERENCES rooms(id)"),
+        ("agreed_rent", "NUMERIC(12,2) DEFAULT 0"),
+        ("security_deposit", "NUMERIC(12,2) DEFAULT 0"),
+        ("maintenance_fee", "NUMERIC(10,2) DEFAULT 0"),
+        ("booking_amount", "NUMERIC(12,2) DEFAULT 0"),
+        ("advance_mode", "VARCHAR(10)"),
+        ("checkin_date", "DATE"),
+        ("stay_type", "VARCHAR(10) DEFAULT 'monthly'"),
+        ("lock_in_months", "INTEGER DEFAULT 0"),
+        ("special_terms", "TEXT"),
+        ("tenant_data", "TEXT"),
+        ("signature_image", "TEXT"),
+        ("agreement_pdf_path", "VARCHAR(255)"),
+        ("completed_at", "TIMESTAMP"),
+        ("approved_at", "TIMESTAMP"),
+    ]
+    for col_name, col_type in new_cols:
+        try:
+            await conn.execute(text(
+                f"ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+            ))
+        except Exception:
+            pass
+    await conn.execute(text(
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_onboarding_token ON onboarding_sessions(token)"
+    ))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_onboarding_status ON onboarding_sessions(status)"
+    ))
+    try:
+        await conn.execute(text(
+            "ALTER TABLE onboarding_sessions ALTER COLUMN tenant_id DROP NOT NULL"
+        ))
+    except Exception:
+        pass
+    print("  [ok] onboarding_sessions extended")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1049,6 +1095,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_receipt_url_column(conn)
             await run_audit_log_tables(conn)
             await run_unhandled_requests_table(conn)
+            await run_extend_onboarding_sessions(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

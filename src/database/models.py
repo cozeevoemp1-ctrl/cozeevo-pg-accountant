@@ -795,24 +795,43 @@ class PendingAction(Base):
 
 class OnboardingSession(Base):
     """
-    L3 — Tracks multi-step WhatsApp onboarding form for a new tenant.
-    Owner triggers START_ONBOARDING → bot walks tenant through KYC questions.
-    Expires after 48 hours if not completed.
-    step values: ask_gender → ask_emergency_name → ask_emergency_phone →
-                 ask_id_type → ask_id_number → done
+    Digital onboarding form session.
+    Receptionist creates (fills room/rent) → sends link to tenant →
+    tenant fills personal details + signs → receptionist approves → Tenant created.
     """
     __tablename__ = "onboarding_sessions"
 
-    id              = Column(Integer, primary_key=True)
-    tenant_id       = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    tenancy_id      = Column(Integer, ForeignKey("tenancies.id"), nullable=True)
-    step            = Column(String(40), default="ask_gender")
-    collected_data  = Column(Text)       # JSON: filled answers so far
-    expires_at      = Column(DateTime, nullable=False)
-    completed       = Column(Boolean, default=False)
-    created_at      = Column(DateTime, default=datetime.utcnow)
+    id                = Column(Integer, primary_key=True)
+    token             = Column(String(36), unique=True, nullable=False, index=True)
+    status            = Column(String(20), default="draft")
+    created_by_phone  = Column(String(20))
+    tenant_phone      = Column(String(20))
+    room_id           = Column(Integer, ForeignKey("rooms.id"), nullable=True)
+    agreed_rent       = Column(Numeric(12, 2), default=0)
+    security_deposit  = Column(Numeric(12, 2), default=0)
+    maintenance_fee   = Column(Numeric(10, 2), default=0)
+    booking_amount    = Column(Numeric(12, 2), default=0)
+    advance_mode      = Column(String(10))
+    checkin_date      = Column(Date)
+    stay_type         = Column(String(10), default="monthly")
+    lock_in_months    = Column(Integer, default=0)
+    special_terms     = Column(Text)
+    tenant_data       = Column(Text)
+    signature_image   = Column(Text)
+    agreement_pdf_path = Column(String(255))
+    tenant_id         = Column(Integer, ForeignKey("tenants.id"), nullable=True)
+    tenancy_id        = Column(Integer, ForeignKey("tenancies.id"), nullable=True)
+    step              = Column(String(40))
+    collected_data    = Column(Text)
+    completed         = Column(Boolean, default=False)
+    expires_at        = Column(DateTime)
+    completed_at      = Column(DateTime)
+    approved_at       = Column(DateTime)
+    created_at        = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
+        Index("ix_onboarding_token", "token"),
+        Index("ix_onboarding_status", "status"),
         Index("ix_onboarding_tenant", "tenant_id"),
         Index("ix_onboarding_expires", "expires_at"),
     )
