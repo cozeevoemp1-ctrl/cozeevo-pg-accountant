@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cozeevo — Onboarding Admin</title>
+  <style>
+    :root {
+      --pink: #EF1F9C;
+      --pink-dark: #c9167e;
+      --blue: #00AEED;
+      --bg: #F9FAFB;
+      --card: #FFFFFF;
+      --text: #2D3748;
+      --sub: #718096;
+      --muted: #A0AEC0;
+      --border: #E2E8F0;
+      --green: #38A169;
+      --green-dark: #2F855A;
+      --red: #E53E3E;
+      --red-light: #FFF5F5;
+      --red-border: #FC8181;
+      --green-light: #F0FFF4;
+      --green-border: #9AE6B4;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-lg: 0 4px 12px rgba(0,0,0,.1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    header img { height: 32px; width: auto; }
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    header h1 span { color: var(--pink); }
+
+    /* ── Layout ── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .card-body { padding: 20px; }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="date"],
+    select,
+    textarea {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      width: 100%;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--pink);
+      box-shadow: 0 0 0 3px rgba(239,31,156,.1);
+    }
+    textarea { resize: vertical; min-height: 72px; }
+    input.error { border-color: var(--red); }
+
+    /* Radio group */
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      padding: 4px 0;
+    }
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+    }
+    .radio-group input[type="radio"] {
+      width: auto;
+      accent-color: var(--pink);
+      cursor: pointer;
+    }
+
+    /* Payment mode field */
+    #payment-mode-field { display: none; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .15s, opacity .15s, transform .1s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+    .btn-pink { background: var(--pink); color: #fff; }
+    .btn-pink:hover:not(:disabled) { background: var(--pink-dark); }
+
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-green:hover:not(:disabled) { background: var(--green-dark); }
+
+    .btn-outline-red {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red-border);
+    }
+    .btn-outline-red:hover:not(:disabled) { background: var(--red-light); }
+
+    .btn-ghost {
+      background: var(--bg);
+      color: var(--sub);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--border); }
+
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-full { width: 100%; justify-content: center; margin-top: 4px; }
+
+    /* ── Alerts / banners ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-top: 14px;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error { background: var(--red-light); border: 1px solid var(--red-border); color: #c53030; }
+    .alert-success { background: var(--green-light); border: 1px solid var(--green-border); color: #276749; }
+
+    /* ── Result card (after create) ── */
+    #create-result {
+      margin-top: 16px;
+      display: none;
+    }
+    #create-result.show { display: block; }
+    .result-card {
+      background: linear-gradient(135deg, #FFF0F9, #FFF);
+      border: 1px solid #F9A8D4;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .result-card .label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--sub);
+      margin-bottom: 4px;
+    }
+    .result-room {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--pink);
+      margin-bottom: 12px;
+    }
+    .link-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: monospace;
+      font-size: 13px;
+      word-break: break-all;
+      color: var(--blue);
+      margin-bottom: 10px;
+    }
+    .result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ── Pending section ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 11px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-pink { background: var(--pink); color: #fff; }
+    .badge-blue { background: var(--blue); color: #fff; }
+    .badge-gray { background: var(--border); color: var(--sub); }
+
+    /* ── Session items ── */
+    .session-list { display: flex; flex-direction: column; gap: 12px; }
+    .session-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .session-summary {
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: background .1s;
+      user-select: none;
+    }
+    .session-summary:hover { background: var(--bg); }
+    .session-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #EF1F9C22, #00AEED22);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--pink);
+      flex-shrink: 0;
+    }
+    .session-info { flex: 1; min-width: 0; }
+    .session-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-meta {
+      font-size: 12px;
+      color: var(--sub);
+      margin-top: 2px;
+    }
+    .session-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .status-pill {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status-pending-tenant { background: #FFF3CD; color: #856404; border: 1px solid #FCEAA3; }
+    .status-pending-review { background: #D1FAE5; color: #065F46; border: 1px solid #6EE7B7; }
+    .session-date { font-size: 11px; color: var(--muted); }
+    .chevron { transition: transform .2s; color: var(--muted); font-size: 12px; }
+    .session-item.open .chevron { transform: rotate(180deg); }
+
+    /* Session detail */
+    .session-detail {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 16px;
+      background: var(--bg);
+    }
+    .session-item.open .session-detail { display: block; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .detail-field { display: flex; flex-direction: column; gap: 2px; }
+    .detail-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      color: var(--muted);
+    }
+    .detail-value { font-size: 13px; color: var(--text); font-weight: 500; }
+
+    .section-divider {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--sub);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin: 14px 0 10px;
+    }
+
+    .sig-preview {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+      margin-bottom: 14px;
+    }
+    .sig-preview img {
+      max-width: 100%;
+      max-height: 120px;
+      display: block;
+      border-radius: 4px;
+    }
+    .sig-missing {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail-actions { display: flex; gap: 8px; }
+    .inline-alert {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      display: none;
+    }
+    .inline-alert.show { display: block; }
+    .inline-alert-error { background: var(--red-light); border: 1px solid var(--red-border); color: #c53030; }
+    .inline-alert-success { background: var(--green-light); border: 1px solid var(--green-border); color: #276749; }
+
+    /* ── Loading / empty states ── */
+    .loading-state {
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--pink);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-state p { font-size: 13px; }
+
+    /* ── Room info chips ── */
+    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .chip {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--sub);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 800px) {
+      main { grid-template-columns: 1fr; padding: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: auto; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="/static/logo.svg" alt="Cozeevo" onerror="this.style.display='none'">
+  <h1>Onboarding <span>Management</span></h1>
+</header>
+
+<main>
+
+  <!-- ── Section 1: Create Session ── -->
+  <section id="create-section">
+    <div class="card">
+      <div class="card-header">
+        <h2>Create New Session</h2>
+      </div>
+      <div class="card-body">
+        <form id="create-form" autocomplete="off">
+          <div class="form-grid">
+
+            <div class="form-group">
+              <label for="room_number">Room Number</label>
+              <input type="text" id="room_number" name="room_number" placeholder="e.g. 101" required>
+            </div>
+
+            <div class="form-group">
+              <label for="tenant_phone">Tenant Phone</label>
+              <input type="tel" id="tenant_phone" name="tenant_phone" placeholder="10 digits" maxlength="10" required>
+            </div>
+
+            <div class="form-group">
+              <label for="agreed_rent">Agreed Rent (₹)</label>
+              <input type="number" id="agreed_rent" name="agreed_rent" placeholder="0" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="security_deposit">Security Deposit (₹)</label>
+              <input type="number" id="security_deposit" name="security_deposit" placeholder="0" min="0" value="0">
+            </div>
+
+            <div class="form-group">
+              <label for="maintenance_fee">Maintenance Fee (₹)</label>
+              <input type="number" id="maintenance_fee" name="maintenance_fee" placeholder="0" min="0" value="0">
+            </div>
+
+            <div class="form-group">
+              <label for="booking_amount">Booking Amount (₹)</label>
+              <input type="number" id="booking_amount" name="booking_amount" placeholder="0" min="0" value="0">
+            </div>
+
+            <div class="form-group full" id="payment-mode-field">
+              <label>Payment Mode</label>
+              <div class="radio-group">
+                <label><input type="radio" name="advance_mode" value="cash"> Cash</label>
+                <label><input type="radio" name="advance_mode" value="upi"> UPI</label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="checkin_date">Check-in Date</label>
+              <input type="date" id="checkin_date" name="checkin_date" required>
+            </div>
+
+            <div class="form-group">
+              <label for="stay_type">Stay Type</label>
+              <select id="stay_type" name="stay_type">
+                <option value="monthly">Monthly</option>
+                <option value="daily">Daily</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="lock_in_months">Lock-in Months</label>
+              <input type="number" id="lock_in_months" name="lock_in_months" min="0" value="0">
+            </div>
+
+            <div class="form-group full">
+              <label for="special_terms">Special Terms</label>
+              <textarea id="special_terms" name="special_terms" placeholder="Any special terms or notes..."></textarea>
+            </div>
+
+          </div>
+
+          <div id="create-error" class="alert alert-error"></div>
+
+          <button type="submit" class="btn btn-pink btn-full" id="create-btn" style="margin-top:16px;">
+            Create &amp; Generate Link
+          </button>
+        </form>
+
+        <!-- Result -->
+        <div id="create-result">
+          <div class="result-card">
+            <div class="label">Session Created</div>
+            <div id="result-room" class="result-room"></div>
+            <div id="result-chips" class="chip-row"></div>
+            <div class="label" style="margin-bottom:6px;">Onboarding Link</div>
+            <div class="link-box" id="result-link"></div>
+            <div class="result-actions">
+              <button class="btn btn-ghost btn-sm" onclick="copyLink()">Copy Link</button>
+              <button class="btn btn-ghost btn-sm" onclick="openWhatsApp()">Share via WhatsApp</button>
+              <button class="btn btn-ghost btn-sm" onclick="resetForm()">New Session</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Pending Reviews ── -->
+  <section id="review-section">
+    <div class="card">
+      <div class="card-header">
+        <h2>Pending Reviews</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="pending-badge" class="badge badge-gray">0</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadPending()">Refresh</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div id="pending-container">
+          <div class="loading-state">
+            <span class="spinner"></span> Loading sessions...
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let currentLink = '';
+  let currentPhone = '';
+
+  // ── On load ────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    loadPending();
+
+    // Default checkin date = today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('checkin_date').value = today;
+
+    // Booking amount change → show/hide payment mode
+    document.getElementById('booking_amount').addEventListener('input', onBookingAmountChange);
+  });
+
+  // ── Payment mode visibility ────────────────────────────────────────────────
+  function onBookingAmountChange() {
+    const val = parseFloat(document.getElementById('booking_amount').value) || 0;
+    const field = document.getElementById('payment-mode-field');
+    if (val > 0) {
+      field.style.display = 'flex';
+      field.style.flexDirection = 'column';
+      field.style.gap = '5px';
+    } else {
+      field.style.display = 'none';
+      // Clear selection
+      document.querySelectorAll('input[name="advance_mode"]').forEach(r => r.checked = false);
+    }
+  }
+
+  // ── Create form submit ─────────────────────────────────────────────────────
+  document.getElementById('create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('create-btn');
+    const errEl = document.getElementById('create-error');
+    errEl.classList.remove('show');
+
+    const phone = document.getElementById('tenant_phone').value.trim();
+    if (!/^\d{10}$/.test(phone)) {
+      showAlert(errEl, 'Tenant phone must be exactly 10 digits.');
+      return;
+    }
+
+    const bookingAmt = parseFloat(document.getElementById('booking_amount').value) || 0;
+    if (bookingAmt > 0) {
+      const mode = document.querySelector('input[name="advance_mode"]:checked');
+      if (!mode) {
+        showAlert(errEl, 'Select Cash or UPI for the booking amount.');
+        return;
+      }
+    }
+
+    const payload = {
+      room_number: document.getElementById('room_number').value.trim(),
+      tenant_phone: phone,
+      agreed_rent: parseFloat(document.getElementById('agreed_rent').value) || 0,
+      security_deposit: parseFloat(document.getElementById('security_deposit').value) || 0,
+      maintenance_fee: parseFloat(document.getElementById('maintenance_fee').value) || 0,
+      booking_amount: bookingAmt,
+      advance_mode: bookingAmt > 0 ? (document.querySelector('input[name="advance_mode"]:checked')?.value || '') : '',
+      checkin_date: document.getElementById('checkin_date').value,
+      stay_type: document.getElementById('stay_type').value,
+      lock_in_months: parseInt(document.getElementById('lock_in_months').value) || 0,
+      special_terms: document.getElementById('special_terms').value.trim(),
+    };
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating...';
+
+    try {
+      const res = await fetch('/api/onboarding/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showAlert(errEl, data.detail || 'Failed to create session.');
+        return;
+      }
+
+      // Show result
+      const fullLink = window.location.origin + data.link;
+      currentLink = fullLink;
+      currentPhone = phone;
+
+      document.getElementById('result-room').textContent = `Room ${data.room?.number || ''} — ${data.room?.building || ''}`;
+      document.getElementById('result-link').textContent = fullLink;
+
+      const chips = document.getElementById('result-chips');
+      chips.innerHTML = '';
+      if (data.room?.floor) chips.innerHTML += `<span class="chip">Floor ${data.room.floor}</span>`;
+      if (data.room?.sharing) chips.innerHTML += `<span class="chip">${data.room.sharing}</span>`;
+
+      document.getElementById('create-result').classList.add('show');
+      document.getElementById('create-form').style.display = 'none';
+
+      // Refresh pending list
+      loadPending();
+
+    } catch (err) {
+      showAlert(errEl, 'Network error. Please try again.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Create &amp; Generate Link';
+    }
+  });
+
+  // ── Copy link ──────────────────────────────────────────────────────────────
+  function copyLink() {
+    if (!currentLink) return;
+    navigator.clipboard.writeText(currentLink).then(() => {
+      showToast('Link copied!');
+    }).catch(() => {
+      // Fallback
+      const el = document.createElement('textarea');
+      el.value = currentLink;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast('Link copied!');
+    });
+  }
+
+  // ── WhatsApp share ─────────────────────────────────────────────────────────
+  function openWhatsApp() {
+    if (!currentLink || !currentPhone) return;
+    const msg = encodeURIComponent(`Hi! Please fill in your onboarding details here:\n${currentLink}`);
+    const wa = `https://wa.me/91${currentPhone}?text=${msg}`;
+    window.open(wa, '_blank');
+  }
+
+  // ── Reset form ─────────────────────────────────────────────────────────────
+  function resetForm() {
+    document.getElementById('create-form').reset();
+    document.getElementById('create-form').style.display = '';
+    document.getElementById('create-result').classList.remove('show');
+    document.getElementById('payment-mode-field').style.display = 'none';
+    document.getElementById('create-error').classList.remove('show');
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('checkin_date').value = today;
+    currentLink = '';
+    currentPhone = '';
+  }
+
+  // ── Load pending sessions ──────────────────────────────────────────────────
+  async function loadPending() {
+    const container = document.getElementById('pending-container');
+    container.innerHTML = '<div class="loading-state"><span class="spinner"></span> Loading sessions...</div>';
+
+    try {
+      const res = await fetch('/api/onboarding/admin/pending');
+      const data = await res.json();
+      if (!res.ok) {
+        container.innerHTML = `<div class="loading-state" style="color:#E53E3E;">Error: ${data.detail || 'Failed to load'}</div>`;
+        return;
+      }
+
+      const sessions = data.sessions || [];
+      document.getElementById('pending-badge').textContent = sessions.length;
+      document.getElementById('pending-badge').className = sessions.length > 0 ? 'badge badge-pink' : 'badge badge-gray';
+
+      if (sessions.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">✓</div>
+            <p>No pending sessions</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = `<div class="session-list" style="padding:16px;" id="session-list"></div>`;
+      const list = document.getElementById('session-list');
+      sessions.forEach(s => list.appendChild(buildSessionCard(s)));
+
+    } catch (err) {
+      container.innerHTML = '<div class="loading-state" style="color:#E53E3E;">Network error.</div>';
+    }
+  }
+
+  // ── Build session card ─────────────────────────────────────────────────────
+  function buildSessionCard(s) {
+    const item = document.createElement('div');
+    item.className = 'session-item';
+    item.dataset.token = s.token;
+
+    const name = s.tenant_name || 'Pending fill';
+    const initial = name !== 'Pending fill' ? name[0].toUpperCase() : '?';
+    const statusLabel = s.status === 'pending_review' ? 'Pending Review' : 'Awaiting Tenant';
+    const statusClass = s.status === 'pending_review' ? 'status-pending-review' : 'status-pending-tenant';
+    const dateStr = s.created_at ? formatDate(s.created_at) : '';
+
+    item.innerHTML = `
+      <div class="session-summary" onclick="toggleSession(this)">
+        <div class="session-avatar">${initial}</div>
+        <div class="session-info">
+          <div class="session-name">${escHtml(name)}</div>
+          <div class="session-meta">Room ${escHtml(s.room || '—')} · ${escHtml(s.tenant_phone || '')}${s.checkin_date ? ' · Checkin ' + formatDateShort(s.checkin_date) : ''}</div>
+        </div>
+        <div class="session-right">
+          <span class="status-pill ${statusClass}">${statusLabel}</span>
+          <span class="session-date">${dateStr}</span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="session-detail" id="detail-${s.token}">
+        <div class="loading-state"><span class="spinner"></span> Loading details...</div>
+      </div>`;
+
+    return item;
+  }
+
+  // ── Toggle session expand ──────────────────────────────────────────────────
+  async function toggleSession(summaryEl) {
+    const item = summaryEl.closest('.session-item');
+    const token = item.dataset.token;
+    const isOpen = item.classList.contains('open');
+
+    // Close all others
+    document.querySelectorAll('.session-item.open').forEach(el => {
+      if (el !== item) el.classList.remove('open');
+    });
+
+    item.classList.toggle('open', !isOpen);
+
+    if (!isOpen) {
+      await loadSessionDetail(token);
+    }
+  }
+
+  // ── Load session detail ────────────────────────────────────────────────────
+  async function loadSessionDetail(token) {
+    const detailEl = document.getElementById(`detail-${token}`);
+    if (detailEl.dataset.loaded === '1') return;
+
+    try {
+      const res = await fetch(`/api/onboarding/${token}`);
+      const data = await res.json();
+
+      // The GET /{token} endpoint only works for pending_tenant or pending_review
+      // Also fetch from admin/pending to get tenant_data — for now build from what we have
+      renderSessionDetail(detailEl, token, data);
+      detailEl.dataset.loaded = '1';
+
+    } catch (err) {
+      detailEl.innerHTML = `<div class="loading-state" style="color:#E53E3E;">Failed to load details.</div>`;
+    }
+  }
+
+  // ── Render session detail ──────────────────────────────────────────────────
+  function renderSessionDetail(el, token, data) {
+    const td = data.tenant_data || {};
+    const room = data.room || {};
+    const hasTenantData = Object.keys(td).length > 0;
+    const status = data.status;
+
+    let sigHtml = '';
+    if (data.signature_image) {
+      sigHtml = `<div class="section-divider">Signature</div>
+        <div class="sig-preview"><img src="data:image/png;base64,${data.signature_image}" alt="Signature"></div>`;
+    } else if (hasTenantData) {
+      sigHtml = `<div class="section-divider">Signature</div>
+        <div class="sig-preview"><div class="sig-missing">No signature captured</div></div>`;
+    }
+
+    const fmtMoney = (v) => v ? `₹${Number(v).toLocaleString('en-IN')}` : '—';
+
+    el.innerHTML = `
+      <div class="inline-alert inline-alert-error" id="err-${token}"></div>
+      <div class="inline-alert inline-alert-success" id="ok-${token}"></div>
+
+      <div class="section-divider">Room &amp; Booking</div>
+      <div class="detail-grid">
+        <div class="detail-field"><div class="detail-label">Room</div><div class="detail-value">${escHtml(room.number || '—')} ${room.building ? '· ' + escHtml(room.building) : ''}</div></div>
+        <div class="detail-field"><div class="detail-label">Floor / Type</div><div class="detail-value">${escHtml(room.floor || '—')} / ${escHtml(room.sharing || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Check-in</div><div class="detail-value">${data.checkin_date ? formatDateShort(data.checkin_date) : '—'}</div></div>
+        <div class="detail-field"><div class="detail-label">Stay Type</div><div class="detail-value">${escHtml(data.stay_type || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Agreed Rent</div><div class="detail-value">${fmtMoney(data.agreed_rent)}</div></div>
+        <div class="detail-field"><div class="detail-label">Security Deposit</div><div class="detail-value">${fmtMoney(data.security_deposit)}</div></div>
+        <div class="detail-field"><div class="detail-label">Maintenance</div><div class="detail-value">${fmtMoney(data.maintenance_fee)}</div></div>
+        <div class="detail-field"><div class="detail-label">Booking Amount</div><div class="detail-value">${fmtMoney(data.booking_amount)}</div></div>
+        ${data.lock_in_months ? `<div class="detail-field"><div class="detail-label">Lock-in</div><div class="detail-value">${data.lock_in_months} months</div></div>` : ''}
+        ${data.special_terms ? `<div class="detail-field full"><div class="detail-label">Special Terms</div><div class="detail-value">${escHtml(data.special_terms)}</div></div>` : ''}
+      </div>
+
+      ${hasTenantData ? `
+        <div class="section-divider">Tenant Information</div>
+        <div class="detail-grid">
+          <div class="detail-field"><div class="detail-label">Name</div><div class="detail-value">${escHtml(td.name || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-value">${escHtml(td.phone || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Gender</div><div class="detail-value">${escHtml(td.gender || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Date of Birth</div><div class="detail-value">${escHtml(td.date_of_birth || td.age || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Email</div><div class="detail-value">${escHtml(td.email || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Food Preference</div><div class="detail-value">${escHtml(td.food_preference || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Occupation</div><div class="detail-value">${escHtml(td.occupation || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Education</div><div class="detail-value">${escHtml(td.educational_qualification || '—')}</div></div>
+          ${td.father_name ? `<div class="detail-field"><div class="detail-label">Father's Name</div><div class="detail-value">${escHtml(td.father_name)}</div></div>` : ''}
+          ${td.father_phone ? `<div class="detail-field"><div class="detail-label">Father's Phone</div><div class="detail-value">${escHtml(td.father_phone)}</div></div>` : ''}
+          <div class="detail-field"><div class="detail-label">Emergency Contact</div><div class="detail-value">${escHtml(td.emergency_contact_name || '—')}</div></div>
+          <div class="detail-field"><div class="detail-label">Emergency Phone</div><div class="detail-value">${escHtml(td.emergency_contact_phone || '—')} ${td.emergency_contact_relationship ? '(' + escHtml(td.emergency_contact_relationship) + ')' : ''}</div></div>
+          ${td.permanent_address ? `<div class="detail-field" style="grid-column:1/-1"><div class="detail-label">Address</div><div class="detail-value">${escHtml(td.permanent_address)}</div></div>` : ''}
+          ${td.id_proof_type ? `<div class="detail-field"><div class="detail-label">ID Proof</div><div class="detail-value">${escHtml(td.id_proof_type)} — ${escHtml(td.id_proof_number || '—')}</div></div>` : ''}
+        </div>
+      ` : `
+        <div style="padding:12px 0;color:var(--muted);font-size:13px;">Tenant hasn't filled the form yet.</div>
+      `}
+
+      ${sigHtml}
+
+      <div class="detail-actions">
+        ${status === 'pending_review' ? `
+          <button class="btn btn-green btn-sm" onclick="approveSession('${token}')">Approve &amp; Create Tenant</button>
+          <button class="btn btn-outline-red btn-sm" onclick="cancelSession('${token}')">Cancel</button>
+        ` : `
+          <div style="font-size:12px;color:var(--muted);">Waiting for tenant to fill the form.</div>
+        `}
+      </div>`;
+  }
+
+  // ── Approve session ────────────────────────────────────────────────────────
+  async function approveSession(token) {
+    const errEl = document.getElementById(`err-${token}`);
+    const okEl = document.getElementById(`ok-${token}`);
+    errEl.classList.remove('show');
+    okEl.classList.remove('show');
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Approving...';
+
+    try {
+      const res = await fetch(`/api/onboarding/${token}/approve`, { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showInlineAlert(errEl, data.detail || 'Approval failed.');
+        btn.disabled = false;
+        btn.innerHTML = 'Approve &amp; Create Tenant';
+        return;
+      }
+
+      showInlineAlert(okEl, data.message || 'Tenant created successfully!', true);
+
+      // Update card status
+      const item = document.querySelector(`.session-item[data-token="${token}"]`);
+      if (item) {
+        const pill = item.querySelector('.status-pill');
+        if (pill) { pill.textContent = 'Approved'; pill.className = 'status-pill'; pill.style.cssText = 'background:#EBF8FF;color:#2B6CB0;border:1px solid #90CDF4;'; }
+      }
+
+      // Remove action buttons
+      const actions = document.querySelector(`#detail-${token} .detail-actions`);
+      if (actions) actions.innerHTML = '<span style="font-size:12px;color:var(--green);font-weight:600;">Approved</span>';
+
+      // Refresh list after short delay
+      setTimeout(loadPending, 1500);
+
+    } catch (err) {
+      showInlineAlert(errEl, 'Network error. Please try again.');
+      btn.disabled = false;
+      btn.innerHTML = 'Approve &amp; Create Tenant';
+    }
+  }
+
+  // ── Cancel session ─────────────────────────────────────────────────────────
+  async function cancelSession(token) {
+    if (!confirm('Cancel this onboarding session?')) return;
+
+    const errEl = document.getElementById(`err-${token}`);
+    errEl.classList.remove('show');
+
+    try {
+      // No cancel endpoint — remove from UI and note
+      const item = document.querySelector(`.session-item[data-token="${token}"]`);
+      if (item) item.style.opacity = '.4';
+      showInlineAlert(errEl, 'No cancel endpoint available. Refresh to restore.', false);
+    } catch (err) {
+      showInlineAlert(errEl, 'Error.');
+    }
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function showAlert(el, msg) {
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function showInlineAlert(el, msg, isSuccess = false) {
+    el.textContent = msg;
+    el.className = `inline-alert ${isSuccess ? 'inline-alert-success' : 'inline-alert-error'} show`;
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch { return iso; }
+  }
+
+  function formatDateShort(iso) {
+    try {
+      return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    } catch { return iso; }
+  }
+
+  // ── Toast notification ─────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = `position:fixed;bottom:24px;right:24px;background:#2D3748;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;animation:fadeIn .2s ease;box-shadow:0 4px 12px rgba(0,0,0,.2);`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+</script>
+
+</body>
+</html>
