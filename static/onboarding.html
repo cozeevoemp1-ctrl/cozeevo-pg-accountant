@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cozeevo — Tenant Registration</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #F9FAFB;
+      color: #2D3748;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #FFFFFF;
+      padding: 12px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header img { max-width: 200px; height: auto; }
+
+    /* Progress bar */
+    #progress-bar {
+      background: #FFFFFF;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+
+    .progress-track {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .progress-segment {
+      flex: 1;
+      height: 4px;
+      background: #E2E8F0;
+      border-radius: 2px;
+      margin: 0 2px;
+      transition: background 0.3s;
+    }
+
+    .progress-segment.done { background: #00AEED; }
+    .progress-segment.active { background: #EF1F9C; }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
+    .progress-label {
+      font-size: 10px;
+      color: #A0AEC0;
+      text-align: center;
+      flex: 1;
+      line-height: 1.2;
+      transition: color 0.3s;
+    }
+
+    .progress-label.done { color: #00AEED; }
+    .progress-label.active { color: #EF1F9C; font-weight: 600; }
+
+    /* Steps */
+    .step { display: none; padding: 20px; max-width: 540px; margin: 0 auto; }
+    .step.active { display: block; }
+
+    .step-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #1A202C;
+    }
+
+    .step-subtitle {
+      font-size: 13px;
+      color: #718096;
+      margin-bottom: 20px;
+    }
+
+    /* Room summary card */
+    .room-card {
+      background: #E8F7FD;
+      border: 1px solid #B3E5FC;
+      border-left: 4px solid #00AEED;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+
+    .room-card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #00AEED;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .room-card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+    }
+
+    .room-card-item { font-size: 13px; }
+    .room-card-label { color: #718096; font-size: 11px; }
+    .room-card-value { color: #2D3748; font-weight: 600; }
+
+    /* Form fields */
+    .field { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4A5568;
+      margin-bottom: 6px;
+    }
+
+    .required::after {
+      content: ' *';
+      color: #EF1F9C;
+    }
+
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="date"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #2D3748;
+      background: #FFFFFF;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: #EF1F9C;
+    }
+
+    input.error, textarea.error, select.error {
+      border-color: #E53E3E;
+    }
+
+    .error-msg {
+      font-size: 11px;
+      color: #E53E3E;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .error-msg.visible { display: block; }
+
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* Select wrapper for custom arrow */
+    .select-wrapper {
+      position: relative;
+    }
+
+    .select-wrapper::after {
+      content: '▾';
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: #718096;
+      font-size: 14px;
+    }
+
+    /* Radio groups */
+    .radio-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .radio-option {
+      flex: 1;
+      min-width: 80px;
+    }
+
+    .radio-option input[type="radio"] {
+      display: none;
+    }
+
+    .radio-option label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 8px;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4A5568;
+      background: #FFFFFF;
+      transition: all 0.2s;
+      text-align: center;
+      margin: 0;
+    }
+
+    .radio-option input[type="radio"]:checked + label {
+      border-color: #EF1F9C;
+      background: #FFF0F8;
+      color: #EF1F9C;
+      font-weight: 600;
+    }
+
+    .radio-group.error-group .radio-option label {
+      border-color: #E53E3E;
+    }
+
+    /* Divider */
+    .section-divider {
+      font-size: 12px;
+      font-weight: 700;
+      color: #A0AEC0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin: 20px 0 14px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #E2E8F0;
+    }
+
+    /* Navigation buttons */
+    .nav-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+      padding-bottom: 40px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: #EF1F9C;
+      color: #FFFFFF;
+    }
+
+    .btn-secondary {
+      background: #EDF2F7;
+      color: #4A5568;
+      flex: 0 0 90px;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Agreement step */
+    .agreement-card {
+      background: #E8F7FD;
+      border: 1px solid #B3E5FC;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .agreement-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #00AEED;
+      margin-bottom: 10px;
+    }
+
+    .agreement-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      padding: 4px 0;
+      border-bottom: 1px solid #BEE3F8;
+    }
+
+    .agreement-row:last-child { border-bottom: none; }
+    .agreement-row span:first-child { color: #718096; }
+    .agreement-row span:last-child { font-weight: 600; color: #2D3748; }
+
+    .terms-box {
+      background: #FFFFFF;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 14px;
+      height: 160px;
+      overflow-y: auto;
+      font-size: 12px;
+      color: #4A5568;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .terms-box p { margin-bottom: 8px; }
+
+    /* Signature */
+    .signature-area {
+      margin-bottom: 6px;
+    }
+
+    .signature-area label {
+      margin-bottom: 8px;
+    }
+
+    #signature-canvas {
+      width: 100%;
+      height: 150px;
+      border: 1.5px solid #E2E8F0;
+      border-radius: 8px;
+      background: #FFFFFF;
+      cursor: crosshair;
+      display: block;
+      touch-action: none;
+    }
+
+    #signature-canvas.error { border-color: #E53E3E; }
+
+    .sig-hint {
+      font-size: 11px;
+      color: #A0AEC0;
+      margin-top: 4px;
+    }
+
+    .clear-sig {
+      font-size: 12px;
+      color: #EF1F9C;
+      cursor: pointer;
+      text-decoration: underline;
+      background: none;
+      border: none;
+      padding: 4px 0;
+      display: inline-block;
+      margin-top: 4px;
+    }
+
+    /* Loading overlay */
+    #loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.85);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    #loading-overlay.visible { display: flex; }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #EDF2F7;
+      border-top-color: #EF1F9C;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text { font-size: 14px; color: #4A5568; font-weight: 500; }
+
+    /* Error banner */
+    #error-banner {
+      display: none;
+      background: #FFF5F5;
+      border: 1px solid #FEB2B2;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 16px 20px;
+      font-size: 13px;
+      color: #C53030;
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #error-banner.visible { display: block; }
+
+    /* Confirmation screen */
+    #confirmation {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .confirm-icon {
+      width: 72px;
+      height: 72px;
+      background: #F0FFF4;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 36px;
+    }
+
+    .confirm-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1A202C;
+      margin-bottom: 8px;
+    }
+
+    .confirm-subtitle {
+      font-size: 15px;
+      color: #718096;
+      line-height: 1.5;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+
+    /* Token error */
+    #token-error {
+      display: none;
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    #token-error.visible { display: block; }
+
+    .token-error-icon { font-size: 48px; margin-bottom: 16px; }
+
+    .token-error-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #C53030;
+      margin-bottom: 8px;
+    }
+
+    .token-error-msg { font-size: 14px; color: #718096; }
+
+    /* Utility */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 360px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading your registration...</div>
+</div>
+
+<div id="token-error">
+  <div class="token-error-icon">&#x26A0;</div>
+  <div class="token-error-title">Invalid or Expired Link</div>
+  <div class="token-error-msg">This registration link is invalid or has already been used. Please contact Cozeevo to get a new link.</div>
+</div>
+
+<div id="main-content" style="display:none;">
+  <header>
+    <img src="/static/logo.svg" alt="Cozeevo" onerror="this.src='/static/logo.png'">
+  </header>
+
+  <div id="progress-bar">
+    <div class="progress-track">
+      <div class="progress-segment active" id="seg-1"></div>
+      <div class="progress-segment" id="seg-2"></div>
+      <div class="progress-segment" id="seg-3"></div>
+      <div class="progress-segment" id="seg-4"></div>
+      <div class="progress-segment" id="seg-5"></div>
+    </div>
+    <div class="progress-labels">
+      <div class="progress-label active" id="lbl-1">Personal</div>
+      <div class="progress-label" id="lbl-2">Family</div>
+      <div class="progress-label" id="lbl-3">Address</div>
+      <div class="progress-label" id="lbl-4">ID Proof</div>
+      <div class="progress-label" id="lbl-5">Agreement</div>
+    </div>
+  </div>
+
+  <div id="error-banner"></div>
+
+  <!-- STEP 1: Personal -->
+  <div id="step-1" class="step active">
+    <div class="step-title">Personal Details</div>
+    <div class="step-subtitle">Let's start with your basic information</div>
+
+    <div id="room-summary-card" class="room-card" style="display:none;">
+      <h3>Your Room Booking</h3>
+      <div class="room-card-grid">
+        <div class="room-card-item">
+          <div class="room-card-label">Room</div>
+          <div class="room-card-value" id="card-room">—</div>
+        </div>
+        <div class="room-card-item">
+          <div class="room-card-label">Bed</div>
+          <div class="room-card-value" id="card-bed">—</div>
+        </div>
+        <div class="room-card-item">
+          <div class="room-card-label">Move-in Date</div>
+          <div class="room-card-value" id="card-checkin">—</div>
+        </div>
+        <div class="room-card-item">
+          <div class="room-card-label">Monthly Rent</div>
+          <div class="room-card-value" id="card-rent">—</div>
+        </div>
+        <div class="room-card-item">
+          <div class="room-card-label">Deposit</div>
+          <div class="room-card-value" id="card-deposit">—</div>
+        </div>
+        <div class="room-card-item">
+          <div class="room-card-label">Lock-in</div>
+          <div class="room-card-value" id="card-lockin">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="name" class="required">Full Name</label>
+      <input type="text" id="name" placeholder="As per ID proof" autocomplete="name">
+      <div class="error-msg" id="err-name">Please enter your full name</div>
+    </div>
+
+    <div class="field">
+      <label for="phone" class="required">Mobile Number</label>
+      <input type="tel" id="phone" placeholder="10-digit mobile number" maxlength="10" autocomplete="tel">
+      <div class="error-msg" id="err-phone">Enter a valid 10-digit mobile number</div>
+    </div>
+
+    <div class="field">
+      <label class="required">Gender</label>
+      <div class="radio-group" id="gender-group">
+        <div class="radio-option">
+          <input type="radio" name="gender" id="gender-male" value="Male">
+          <label for="gender-male">Male</label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" name="gender" id="gender-female" value="Female">
+          <label for="gender-female">Female</label>
+        </div>
+      </div>
+      <div class="error-msg" id="err-gender">Please select your gender</div>
+    </div>
+
+    <div class="two-col">
+      <div class="field">
+        <label for="dob">Date of Birth</label>
+        <input type="date" id="dob" autocomplete="bday">
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="Optional" autocomplete="email">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="required">Food Preference</label>
+      <div class="radio-group" id="food-group">
+        <div class="radio-option">
+          <input type="radio" name="food" id="food-veg" value="Veg">
+          <label for="food-veg">Veg</label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" name="food" id="food-nonveg" value="Non-veg">
+          <label for="food-nonveg">Non-veg</label>
+        </div>
+        <div class="radio-option">
+          <input type="radio" name="food" id="food-egg" value="Egg">
+          <label for="food-egg">Egg</label>
+        </div>
+      </div>
+      <div class="error-msg" id="err-food">Please select your food preference</div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-primary" onclick="nextStep(1)">Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Family -->
+  <div id="step-2" class="step">
+    <div class="step-title">Family & Emergency Contact</div>
+    <div class="step-subtitle">For safety and communication purposes</div>
+
+    <div class="section-divider">Father / Guardian</div>
+
+    <div class="field">
+      <label for="father-name">Father / Guardian Name</label>
+      <input type="text" id="father-name" placeholder="Optional" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="father-phone">Father / Guardian Phone</label>
+      <input type="tel" id="father-phone" placeholder="Optional" maxlength="10">
+      <div class="error-msg" id="err-father-phone">Enter a valid 10-digit number</div>
+    </div>
+
+    <div class="section-divider">Emergency Contact</div>
+
+    <div class="field">
+      <label for="emg-name" class="required">Contact Name</label>
+      <input type="text" id="emg-name" placeholder="Full name" autocomplete="off">
+      <div class="error-msg" id="err-emg-name">Please enter emergency contact name</div>
+    </div>
+
+    <div class="field">
+      <label for="emg-phone" class="required">Contact Phone</label>
+      <input type="tel" id="emg-phone" placeholder="10-digit mobile number" maxlength="10">
+      <div class="error-msg" id="err-emg-phone">Enter a valid 10-digit mobile number</div>
+    </div>
+
+    <div class="field">
+      <label for="emg-rel" class="required">Relationship</label>
+      <div class="select-wrapper">
+        <select id="emg-rel">
+          <option value="">Select relationship</option>
+          <option value="Father">Father</option>
+          <option value="Mother">Mother</option>
+          <option value="Spouse">Spouse</option>
+          <option value="Sibling">Sibling</option>
+          <option value="Friend">Friend</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="error-msg" id="err-emg-rel">Please select a relationship</div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="prevStep(2)">&larr;</button>
+      <button class="btn btn-primary" onclick="nextStep(2)">Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Address & Work -->
+  <div id="step-3" class="step">
+    <div class="step-title">Address & Occupation</div>
+    <div class="step-subtitle">Your permanent address and work details</div>
+
+    <div class="section-divider">Permanent Address</div>
+
+    <div class="field">
+      <label for="perm-address">Permanent Address</label>
+      <textarea id="perm-address" placeholder="House No, Street, City, State, PIN"></textarea>
+    </div>
+
+    <div class="section-divider">Work / Education</div>
+
+    <div class="field">
+      <label for="occupation">Occupation</label>
+      <input type="text" id="occupation" placeholder="e.g. Software Engineer, Student">
+    </div>
+
+    <div class="field">
+      <label for="education">Education</label>
+      <input type="text" id="education" placeholder="e.g. B.Tech, MBA">
+    </div>
+
+    <div class="field">
+      <label for="office-address">Office / College Address</label>
+      <textarea id="office-address" placeholder="Optional"></textarea>
+    </div>
+
+    <div class="field">
+      <label for="office-phone">Office / College Phone</label>
+      <input type="tel" id="office-phone" placeholder="Optional" maxlength="10">
+      <div class="error-msg" id="err-office-phone">Enter a valid 10-digit number</div>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="prevStep(3)">&larr;</button>
+      <button class="btn btn-primary" onclick="nextStep(3)">Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: ID Proof -->
+  <div id="step-4" class="step">
+    <div class="step-title">ID Proof</div>
+    <div class="step-subtitle">Government-issued photo ID for verification</div>
+
+    <div class="field">
+      <label for="id-type">ID Type</label>
+      <div class="select-wrapper">
+        <select id="id-type">
+          <option value="">Select ID type</option>
+          <option value="Aadhaar">Aadhaar Card</option>
+          <option value="PAN">PAN Card</option>
+          <option value="Passport">Passport</option>
+          <option value="Driving License">Driving License</option>
+          <option value="Voter ID">Voter ID</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="id-number">ID Number</label>
+      <input type="text" id="id-number" placeholder="Enter ID number" style="text-transform:uppercase;">
+    </div>
+
+    <div style="background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; padding:12px 14px; font-size:12px; color:#7B5E00; line-height:1.5; margin-top:4px;">
+      Your ID will only be used for verification and is stored securely. We do not share it with any third party.
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="prevStep(4)">&larr;</button>
+      <button class="btn btn-primary" onclick="nextStep(4)">Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: Agreement & Signature -->
+  <div id="step-5" class="step">
+    <div class="step-title">Agreement & Signature</div>
+    <div class="step-subtitle">Review terms and sign to complete registration</div>
+
+    <div class="agreement-card">
+      <h3>Booking Summary</h3>
+      <div class="agreement-row"><span>Tenant Name</span><span id="agree-name">—</span></div>
+      <div class="agreement-row"><span>Room</span><span id="agree-room">—</span></div>
+      <div class="agreement-row"><span>Move-in Date</span><span id="agree-checkin">—</span></div>
+      <div class="agreement-row"><span>Monthly Rent</span><span id="agree-rent">—</span></div>
+      <div class="agreement-row"><span>Security Deposit</span><span id="agree-deposit">—</span></div>
+      <div class="agreement-row"><span>Lock-in Period</span><span id="agree-lockin">—</span></div>
+    </div>
+
+    <div class="terms-box" id="terms-box">
+      <p><strong>Cozeevo Co-living — Resident Agreement</strong></p>
+      <p>By signing below, I confirm that I have read and agree to the following terms and conditions:</p>
+      <p><strong>1. Rent Payment:</strong> Monthly rent of <span id="terms-rent">—</span> is due by the 5th of each month. Late payments attract a penalty of ₹100 per day after the 10th.</p>
+      <p><strong>2. Security Deposit:</strong> A refundable security deposit of <span id="terms-deposit">—</span> has been collected. It will be refunded within 15 days of vacating, subject to deductions for damages.</p>
+      <p><strong>3. Lock-in Period:</strong> A minimum stay of <span id="terms-lockin">—</span> is required. Early exit within the lock-in period will result in forfeiture of the security deposit.</p>
+      <p><strong>4. Notice Period:</strong> A minimum 30-day written notice is required before vacating. Failure to provide notice will result in one month's rent being deducted from the deposit.</p>
+      <p><strong>5. Property Care:</strong> Residents are responsible for maintaining cleanliness in their rooms and shared spaces. Damage beyond normal wear and tear will be charged to the resident.</p>
+      <p><strong>6. Guests:</strong> Overnight guests are not permitted without prior approval from management. Day visitors must leave by 10 PM.</p>
+      <p><strong>7. Noise & Conduct:</strong> Quiet hours are 11 PM – 7 AM. Residents must respect fellow occupants and maintain decorum in all common areas.</p>
+      <p><strong>8. Prohibited Items:</strong> Cooking appliances, alcohol, tobacco products, and pets are not permitted inside the premises.</p>
+      <p><strong>9. Management Access:</strong> Management reserves the right to inspect rooms with 24-hour notice, or immediately in cases of emergency.</p>
+      <p><strong>10. Termination:</strong> Cozeevo reserves the right to terminate residency for violation of house rules, without refund of deposit.</p>
+      <p>I confirm that all information provided in this registration form is true and accurate to the best of my knowledge.</p>
+    </div>
+
+    <div class="signature-area">
+      <label class="required">Signature</label>
+      <canvas id="signature-canvas"></canvas>
+      <div class="error-msg" id="err-signature">Please sign before submitting</div>
+      <div class="sig-hint">Draw your signature above using your finger or stylus</div>
+      <button type="button" class="clear-sig" onclick="clearSignature()">Clear &amp; redraw</button>
+    </div>
+
+    <div class="nav-buttons">
+      <button class="btn btn-secondary" onclick="prevStep(5)">&larr;</button>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitForm()">Submit Registration</button>
+    </div>
+  </div>
+
+  <!-- Confirmation -->
+  <div id="confirmation" class="step">
+    <div class="confirm-icon">&#10003;</div>
+    <div class="confirm-title">Registration Complete!</div>
+    <div class="confirm-subtitle">
+      Welcome to Cozeevo! Your registration has been submitted successfully.<br><br>
+      Our team will review your details and get in touch via WhatsApp shortly.
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let token = null;
+  let sessionData = {};
+  let currentStep = 1;
+  let sigDrawn = false;
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    token = extractToken();
+    if (!token) {
+      showTokenError();
+      return;
+    }
+    loadSession(token);
+    initSignatureCanvas();
+  });
+
+  function extractToken() {
+    // Support /onboard/{token} path or ?token= query param
+    const path = window.location.pathname;
+    const m = path.match(/\/onboard\/([^/?#]+)/);
+    if (m) return m[1];
+    const params = new URLSearchParams(window.location.search);
+    return params.get('token') || null;
+  }
+
+  function showTokenError() {
+    document.getElementById('token-error').classList.add('visible');
+  }
+
+  // ── API calls ──────────────────────────────────────────────────────────────
+  function showLoading(msg) {
+    const el = document.getElementById('loading-overlay');
+    el.querySelector('.loading-text').textContent = msg || 'Loading...';
+    el.classList.add('visible');
+  }
+
+  function hideLoading() {
+    document.getElementById('loading-overlay').classList.remove('visible');
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-banner');
+    el.textContent = msg;
+    el.classList.add('visible');
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => el.classList.remove('visible'), 8000);
+  }
+
+  async function loadSession(t) {
+    showLoading('Loading your registration...');
+    try {
+      const res = await fetch('/api/onboarding/' + t);
+      if (!res.ok) throw new Error('Session not found or expired');
+      const data = await res.json();
+      sessionData = data;
+      populateRoomCard(data);
+      document.getElementById('main-content').style.display = 'block';
+    } catch (e) {
+      hideLoading();
+      showTokenError();
+      return;
+    }
+    hideLoading();
+  }
+
+  function populateRoomCard(data) {
+    const fmt = (v) => v || '—';
+    const fmtMoney = (v) => v ? '₹' + Number(v).toLocaleString('en-IN') : '—';
+
+    document.getElementById('card-room').textContent = fmt(data.room_number);
+    document.getElementById('card-bed').textContent = fmt(data.bed_label);
+    document.getElementById('card-checkin').textContent = fmt(data.checkin_date);
+    document.getElementById('card-rent').textContent = fmtMoney(data.monthly_rent);
+    document.getElementById('card-deposit').textContent = fmtMoney(data.deposit);
+    document.getElementById('card-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : '—';
+
+    // Show card if we have any data
+    if (data.room_number || data.monthly_rent) {
+      document.getElementById('room-summary-card').style.display = 'block';
+    }
+
+    // Agreement step values
+    document.getElementById('agree-room').textContent = fmt(data.room_number) + (data.bed_label ? ' / ' + data.bed_label : '');
+    document.getElementById('agree-checkin').textContent = fmt(data.checkin_date);
+    document.getElementById('agree-rent').textContent = fmtMoney(data.monthly_rent);
+    document.getElementById('agree-deposit').textContent = fmtMoney(data.deposit);
+    document.getElementById('agree-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : '—';
+
+    // Terms placeholders
+    document.getElementById('terms-rent').textContent = fmtMoney(data.monthly_rent);
+    document.getElementById('terms-deposit').textContent = fmtMoney(data.deposit);
+    document.getElementById('terms-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : 'agreed period';
+  }
+
+  // ── Step navigation ────────────────────────────────────────────────────────
+  function nextStep(from) {
+    if (!validateStep(from)) return;
+    goToStep(from + 1);
+  }
+
+  function prevStep(from) {
+    goToStep(from - 1);
+  }
+
+  function goToStep(n) {
+    document.getElementById('step-' + currentStep).classList.remove('active');
+    currentStep = n;
+    const next = document.getElementById('step-' + n) || document.getElementById('confirmation');
+    next.classList.add('active');
+    updateProgress(n);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Update agree-name from name field when reaching step 5
+    if (n === 5) {
+      const name = document.getElementById('name').value.trim();
+      document.getElementById('agree-name').textContent = name || '—';
+    }
+  }
+
+  function updateProgress(step) {
+    for (let i = 1; i <= 5; i++) {
+      const seg = document.getElementById('seg-' + i);
+      const lbl = document.getElementById('lbl-' + i);
+      seg.className = 'progress-segment';
+      lbl.className = 'progress-label';
+      if (i < step) { seg.classList.add('done'); lbl.classList.add('done'); }
+      else if (i === step) { seg.classList.add('active'); lbl.classList.add('active'); }
+    }
+  }
+
+  // ── Validation ─────────────────────────────────────────────────────────────
+  function validateStep(step) {
+    clearErrors();
+    let ok = true;
+
+    if (step === 1) {
+      const name = document.getElementById('name').value.trim();
+      const phone = stripDigits(document.getElementById('phone').value);
+      const gender = document.querySelector('input[name="gender"]:checked');
+      const food = document.querySelector('input[name="food"]:checked');
+
+      if (!name) { setError('name', 'err-name'); ok = false; }
+      if (phone.length !== 10) { setError('phone', 'err-phone'); ok = false; }
+      if (!gender) { setGroupError('gender-group', 'err-gender'); ok = false; }
+      if (!food) { setGroupError('food-group', 'err-food'); ok = false; }
+    }
+
+    if (step === 2) {
+      const emgName = document.getElementById('emg-name').value.trim();
+      const emgPhone = stripDigits(document.getElementById('emg-phone').value);
+      const emgRel = document.getElementById('emg-rel').value;
+      const fatherPhone = document.getElementById('father-phone').value.trim();
+
+      if (!emgName) { setError('emg-name', 'err-emg-name'); ok = false; }
+      if (emgPhone.length !== 10) { setError('emg-phone', 'err-emg-phone'); ok = false; }
+      if (!emgRel) { setError('emg-rel', 'err-emg-rel'); ok = false; }
+      if (fatherPhone && stripDigits(fatherPhone).length !== 10) {
+        setError('father-phone', 'err-father-phone'); ok = false;
+      }
+    }
+
+    if (step === 3) {
+      const officePhone = document.getElementById('office-phone').value.trim();
+      if (officePhone && stripDigits(officePhone).length !== 10) {
+        setError('office-phone', 'err-office-phone'); ok = false;
+      }
+    }
+
+    return ok;
+  }
+
+  function stripDigits(v) {
+    return (v || '').replace(/\D/g, '');
+  }
+
+  function setError(fieldId, errId) {
+    const field = document.getElementById(fieldId);
+    if (field) field.classList.add('error');
+    const msg = document.getElementById(errId);
+    if (msg) msg.classList.add('visible');
+  }
+
+  function setGroupError(groupId, errId) {
+    const group = document.getElementById(groupId);
+    if (group) group.classList.add('error-group');
+    const msg = document.getElementById(errId);
+    if (msg) msg.classList.add('visible');
+  }
+
+  function clearErrors() {
+    document.querySelectorAll('.error').forEach(el => el.classList.remove('error'));
+    document.querySelectorAll('.error-msg.visible').forEach(el => el.classList.remove('visible'));
+    document.querySelectorAll('.error-group').forEach(el => el.classList.remove('error-group'));
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  async function submitForm() {
+    clearErrors();
+
+    // Validate signature
+    if (!sigDrawn) {
+      document.getElementById('signature-canvas').classList.add('error');
+      document.getElementById('err-signature').classList.add('visible');
+      return;
+    }
+
+    const payload = {
+      // Step 1
+      name: document.getElementById('name').value.trim(),
+      phone: stripDigits(document.getElementById('phone').value),
+      gender: (document.querySelector('input[name="gender"]:checked') || {}).value || '',
+      dob: document.getElementById('dob').value,
+      email: document.getElementById('email').value.trim(),
+      food_preference: (document.querySelector('input[name="food"]:checked') || {}).value || '',
+      // Step 2
+      father_name: document.getElementById('father-name').value.trim(),
+      father_phone: stripDigits(document.getElementById('father-phone').value),
+      emergency_contact_name: document.getElementById('emg-name').value.trim(),
+      emergency_contact_phone: stripDigits(document.getElementById('emg-phone').value),
+      emergency_contact_relationship: document.getElementById('emg-rel').value,
+      // Step 3
+      permanent_address: document.getElementById('perm-address').value.trim(),
+      occupation: document.getElementById('occupation').value.trim(),
+      education: document.getElementById('education').value.trim(),
+      office_address: document.getElementById('office-address').value.trim(),
+      office_phone: stripDigits(document.getElementById('office-phone').value),
+      // Step 4
+      id_type: document.getElementById('id-type').value,
+      id_number: document.getElementById('id-number').value.trim().toUpperCase(),
+      // Signature
+      signature_data: document.getElementById('signature-canvas').toDataURL('image/png')
+    };
+
+    showLoading('Submitting registration...');
+
+    try {
+      const res = await fetch('/api/onboarding/' + token + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      hideLoading();
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showError(err.detail || 'Submission failed. Please try again.');
+        return;
+      }
+
+      // Show confirmation
+      document.getElementById('step-5').classList.remove('active');
+      document.getElementById('progress-bar').style.display = 'none';
+      document.getElementById('confirmation').classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (e) {
+      hideLoading();
+      showError('Network error. Please check your connection and try again.');
+    }
+  }
+
+  // ── Signature canvas ───────────────────────────────────────────────────────
+  function initSignatureCanvas() {
+    const canvas = document.getElementById('signature-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set actual pixel dimensions
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      ctx.strokeStyle = '#EF1F9C';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+
+    resizeCanvas();
+
+    let drawing = false;
+    let lastX = 0, lastY = 0;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      if (e.touches) {
+        return {
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top
+        };
+      }
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
+      drawing = true;
+      const pos = getPos(e);
+      lastX = pos.x;
+      lastY = pos.y;
+      canvas.classList.remove('error');
+      document.getElementById('err-signature').classList.remove('visible');
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      lastX = pos.x;
+      lastY = pos.y;
+      sigDrawn = true;
+    }
+
+    function endDraw(e) {
+      drawing = false;
+    }
+
+    // Mouse events
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+
+    // Touch events
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', endDraw);
+  }
+
+  function clearSignature() {
+    const canvas = document.getElementById('signature-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    sigDrawn = false;
+  }
+
+  // ── Phone field enforcement ────────────────────────────────────────────────
+  document.querySelectorAll('input[type="tel"]').forEach(function (input) {
+    input.addEventListener('input', function () {
+      this.value = this.value.replace(/\D/g, '').slice(0, 10);
+    });
+  });
+</script>
+
+</body>
+</html>
