@@ -236,6 +236,38 @@ async def onboarding_stats(request: Request, date_from: str = "", date_to: str =
         }
 
 
+@router.get("/admin/all")
+async def list_all_sessions(request: Request, status: str = "", date_from: str = "", date_to: str = ""):
+    """List all sessions with optional filters."""
+    _check_admin_pin(request)
+    async with get_session() as session:
+        q = select(OnboardingSession).order_by(OnboardingSession.created_at.desc())
+        if status:
+            q = q.where(OnboardingSession.status == status)
+        if date_from:
+            q = q.where(OnboardingSession.created_at >= date.fromisoformat(date_from))
+        if date_to:
+            q = q.where(OnboardingSession.created_at < date.fromisoformat(date_to) + timedelta(days=1))
+        result = await session.execute(q.limit(100))
+        sessions = result.scalars().all()
+        items = []
+        for obs in sessions:
+            room = await session.get(Room, obs.room_id) if obs.room_id else None
+            td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+            items.append({
+                "token": obs.token,
+                "status": obs.status,
+                "room": room.room_number if room else "",
+                "tenant_phone": obs.tenant_phone,
+                "tenant_name": td.get("name", ""),
+                "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
+                "created_at": obs.created_at.isoformat() if obs.created_at else "",
+                "approved_at": obs.approved_at.isoformat() if obs.approved_at else "",
+                "agreed_rent": float(obs.agreed_rent or 0),
+            })
+        return {"sessions": items}
+
+
 @router.get("/admin/pending")
 async def list_pending(request: Request):
     _check_admin_pin(request)
