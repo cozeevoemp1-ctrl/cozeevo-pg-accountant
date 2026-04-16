@@ -493,6 +493,11 @@
             </div>
 
             <div class="form-group">
+              <label for="created_by_phone">Your Phone (for notifications)</label>
+              <input type="tel" id="created_by_phone" name="created_by_phone" placeholder="10 digits" maxlength="10">
+            </div>
+
+            <div class="form-group">
               <label for="agreed_rent">Agreed Rent (₹)</label>
               <input type="number" id="agreed_rent" name="agreed_rent" placeholder="0" min="0" required>
             </div>
@@ -662,6 +667,7 @@
       room_number: document.getElementById('room_number').value.trim(),
       sharing_type: document.getElementById('sharing_type').value,
       tenant_phone: phone,
+      created_by_phone: document.getElementById('created_by_phone').value.trim(),
       agreed_rent: parseFloat(document.getElementById('agreed_rent').value) || 0,
       security_deposit: parseFloat(document.getElementById('security_deposit').value) || 0,
       maintenance_fee: parseFloat(document.getElementById('maintenance_fee').value) || 0,

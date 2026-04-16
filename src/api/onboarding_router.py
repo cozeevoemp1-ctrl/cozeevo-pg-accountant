@@ -117,7 +117,7 @@ async def create_session(req: CreateSessionRequest):
             stay_type=req.stay_type,
             lock_in_months=req.lock_in_months,
             special_terms=req.special_terms,
-            expires_at=datetime.utcnow() + timedelta(hours=48),
+            expires_at=datetime.utcnow() + timedelta(hours=2),
         )
         session.add(obs)
         await session.flush()
@@ -153,7 +153,7 @@ async def create_session(req: CreateSessionRequest):
                 if booking_str: summary_lines.append(f"Advance Paid: {booking_str}")
                 summary_lines.append(f"\n*Amount due at check-in: {dues_str}*")
                 summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
-                summary_lines.append(f"\nThis link is valid for 48 hours.\nFor any questions, contact us on this number.")
+                summary_lines.append(f"\nThis link is valid for 2 hours.\nFor any questions, contact us on this number.")
 
                 await _send_whatsapp(phone_wa, "\n".join(summary_lines))
                 whatsapp_sent = True
@@ -238,7 +238,7 @@ async def resend_link(token: str):
             phone_wa,
             f"Reminder from *Cozeevo Co-living*\n\n"
             f"Please complete your registration:\n{onboard_link}\n\n"
-            f"This link is valid for 48 hours."
+            f"This link is valid for 2 hours."
         )
         return {"status": "sent", "token": token}
 
@@ -342,6 +342,27 @@ async def tenant_submit(token: str, req: TenantSubmitRequest):
         obs.signature_image = req.signature_image
         obs.status = "pending_review"
         obs.completed_at = datetime.utcnow()
+
+        # Notify receptionist via WhatsApp
+        if obs.created_by_phone:
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                notify_phone = obs.created_by_phone.strip()
+                if not notify_phone.startswith("91"):
+                    notify_phone = "91" + notify_phone
+                room = await session.get(Room, obs.room_id) if obs.room_id else None
+                room_str = room.room_number if room else "—"
+                await _send_whatsapp(
+                    notify_phone,
+                    f"*Onboarding form submitted*\n\n"
+                    f"Tenant: *{req.name}*\n"
+                    f"Phone: {req.phone}\n"
+                    f"Room: {room_str}\n\n"
+                    f"Please review and approve:\n"
+                    f"{os.getenv('BASE_URL', 'https://api.getkozzy.com')}/admin/onboarding"
+                )
+            except Exception:
+                pass  # non-fatal
 
         return {"status": "pending_review", "message": "Submitted. Receptionist will review."}
 
