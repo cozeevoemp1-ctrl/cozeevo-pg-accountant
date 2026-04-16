@@ -948,7 +948,9 @@
           <button class="btn btn-green btn-sm" onclick="approveSession('${token}')">Approve &amp; Create Tenant</button>
           <button class="btn btn-outline-red btn-sm" onclick="cancelSession('${token}')">Cancel</button>
         ` : `
-          <div style="font-size:12px;color:var(--muted);">Waiting for tenant to fill the form.</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Waiting for tenant to fill the form.</div>
+          <button class="btn btn-sm" style="background:var(--blue);color:#fff;" onclick="resendLink('${token}')">Resend WhatsApp Link</button>
+          <button class="btn btn-outline-red btn-sm" onclick="cancelSession('${token}')">Cancel</button>
         `}
       </div>`;
 
@@ -1081,12 +1083,34 @@
     errEl.classList.remove('show');
 
     try {
-      // No cancel endpoint — remove from UI and note
+      const res = await fetch(`/api/onboarding/admin/${token}/cancel`, { method: 'POST' });
+      if (res.ok) {
+        showInlineAlert(okEl, 'Session cancelled.', true);
+        setTimeout(() => loadPending(), 1000);
+        return;
+      }
+      const d = await res.json();
       const item = document.querySelector(`.session-item[data-token="${token}"]`);
       if (item) item.style.opacity = '.4';
-      showInlineAlert(errEl, 'No cancel endpoint available. Refresh to restore.', false);
+      showInlineAlert(errEl, d.detail || 'Cancel failed', false);
     } catch (err) {
       showInlineAlert(errEl, 'Error.');
+    }
+  }
+
+  async function resendLink(token) {
+    const okEl = document.getElementById(`ok-${token}`);
+    const errEl = document.getElementById(`err-${token}`);
+    try {
+      const res = await fetch(`/api/onboarding/admin/${token}/resend`, { method: 'POST' });
+      if (res.ok) {
+        showInlineAlert(okEl, 'WhatsApp link resent!', true);
+      } else {
+        const d = await res.json();
+        showInlineAlert(errEl, d.detail || 'Resend failed', false);
+      }
+    } catch (err) {
+      showInlineAlert(errEl, 'Error resending.');
     }
   }
 

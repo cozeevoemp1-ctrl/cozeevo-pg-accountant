@@ -170,6 +170,51 @@ async def list_pending():
         return {"sessions": items}
 
 
+# ── Cancel session (admin) ─────────────────────────────────────────────────────
+
+@router.post("/admin/{token}/cancel")
+async def cancel_session(token: str):
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status in ("approved", "cancelled"):
+            raise HTTPException(400, f"Cannot cancel — status is {obs.status}")
+        obs.status = "cancelled"
+        await session.commit()
+        return {"status": "cancelled", "token": token}
+
+
+# ── Resend WhatsApp link (admin) ───────────────────────────────────────────────
+
+@router.post("/admin/{token}/resend")
+async def resend_link(token: str):
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status not in ("pending_tenant", "pending_review"):
+            raise HTTPException(400, f"Cannot resend — status is {obs.status}")
+
+        base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
+        onboard_link = f"{base_url}/onboard/{token}"
+
+        if not obs.tenant_phone:
+            raise HTTPException(400, "No tenant phone on this session")
+
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        phone_wa = obs.tenant_phone.strip()
+        if not phone_wa.startswith("91"):
+            phone_wa = "91" + phone_wa
+        await _send_whatsapp(
+            phone_wa,
+            f"Reminder from *Cozeevo Co-living*\n\n"
+            f"Please complete your registration:\n{onboard_link}\n\n"
+            f"This link is valid for 48 hours."
+        )
+        return {"status": "sent", "token": token}
+
+
 # ── Get session data (tenant form) ───────────────────────────────────────────
 
 @router.get("/{token}")
@@ -198,6 +243,8 @@ async def get_session_data(token: str):
             "security_deposit": float(obs.security_deposit or 0),
             "maintenance_fee": float(obs.maintenance_fee or 0),
             "booking_amount": float(obs.booking_amount or 0),
+            "advance_mode": obs.advance_mode or "",
+            "stay_type": obs.stay_type or "",
             "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
             "lock_in_months": obs.lock_in_months or 0,
             "special_terms": obs.special_terms or "",
