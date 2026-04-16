@@ -2,6 +2,37 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.30.0] — 2026-04-16 — Dues Logic + Monthly Rollover + Sheet Consistency
+
+### Dues Calculation (FINAL)
+- First month: Rent Due = rent + deposit (deposit includes maintenance, no double count)
+- Month 2+: Rent Due = rent only, Prev Due carries unpaid balance
+- Balance = Rent Due + Prev Due - Total Paid (consistent everywhere)
+- Notes auto-populated with "Deposit due: Rs.X" for first-month check-ins
+- No separate Deposit Due column — 17-column format preserved
+- Maintenance never in dues — only relevant at checkout/refund
+
+### Monthly Tab Rollover (NEW)
+- `scripts/create_month.py` rewritten: header-based mapping, 17-col format, prev due carry-forward
+- Auto-scheduled on 1st of every month at 12:30am via `_monthly_tab_rollover` in scheduler
+- Only active + no-show tenants carried (exited excluded)
+- Auto-note "Deposit due: Rs.X pending" when deposit unpaid from previous month
+- First month check-ins get prorated rent + deposit in Rent Due
+
+### Sheet Consistency Fixes
+- Removed hardcoded column indices from `_refresh_summary_sync` — now uses derived M_* constants
+- Phone format: +91XXXXXXXXXX for all onboarding writes
+- Sheet retry: 3 attempts with 2s/4s backoff on approve (was fire-and-forget)
+- `saved_files` key fix (was `_saved_files` — stripped by JSON serializer)
+- Cleaned test data from DB
+
+### Onboarding Fixes
+- Filterable sessions table (status + date range) replaces static stats
+- Lightbox for selfie/ID/signature — click to enlarge, Escape to close
+- Camera selfie with face oval guide, fallback to file picker
+- Selfie/ID/signature all mandatory before submit
+- Mobile scroll fix on Step 5
+
 ## [1.29.0] — 2026-04-16 — Live Onboarding Testing + Security + UX Fixes
 
 ### Admin Panel
