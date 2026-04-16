@@ -130,9 +130,6 @@ def create_month(month_name, year):
         checkin = parse_date(checkin_str)
         event = ""
         rent_due = agreed_rent
-        deposit_due = 0  # only first month
-
-        # First month check-in: deposit in separate column
         is_first_month = checkin and m_start <= checkin <= m_end
         if is_first_month:
             if status in ("no-show", "no_show"):
@@ -141,7 +138,8 @@ def create_month(month_name, year):
                 event = "CHECKIN"
                 # Prorate rent for mid-month check-in
                 rent_due = math.floor(agreed_rent * (days - checkin.day + 1) / days)
-            deposit_due = deposit  # separate column
+            # First month: rent + deposit combined in Rent Due
+            rent_due += deposit
 
         # Skip no-shows whose check-in is after this month
         if status in ("no-show", "no_show") and (not checkin or checkin > m_end):
@@ -166,11 +164,10 @@ def create_month(month_name, year):
             "building": building,
             "sharing": sharing,
             "rent due": rent_due,
-            "deposit due": deposit_due,
             "cash": "",
             "upi": "",
             "total paid": 0,
-            "balance": rent_due + deposit_due + prev_due,
+            "balance": rent_due + prev_due,
             "status": "UNPAID",
             "check-in": checkin_str,
             "notice date": "",
