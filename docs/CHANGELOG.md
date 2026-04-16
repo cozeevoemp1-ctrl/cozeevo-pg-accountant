@@ -2,6 +2,47 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.29.0] — 2026-04-16 — Live Onboarding Testing + Security + UX Fixes
+
+### Admin Panel
+- PIN authentication on all admin endpoints (env: `ONBOARDING_ADMIN_PIN`)
+- Room auto-lookup from master data when typing room number
+- Sharing type dropdown with premium option + master data mismatch warning
+- Live dues calculator (rent + deposit - advance)
+- Filterable sessions table (status, date range) replaces static stats
+- Lightbox for selfie/ID/signature — click to enlarge, Escape to close
+- Cancel and Resend WhatsApp Link buttons
+- Default reception phone 8548884455
+- Stats refresh on Refresh button
+
+### Tenant Form
+- Live camera selfie with face oval guide (getUserMedia API), fallback to file picker
+- Selfie, ID proof, signature all mandatory before submit
+- Fixed selfie preview ID bug (`selfie-preview` vs `selfie-preview-wrap`)
+- Fixed mobile scroll on Step 5 (terms box 30vh, body padding)
+- Fixed camera modal showing before permission granted (prevented black screen freeze)
+- Outer try-catch on submit to show errors instead of freezing
+- Late payment penalty updated to Rs.200/day after 5th
+
+### Security
+- Admin PIN auth on all `/api/onboarding/admin/*` endpoints
+- Rate limiting: create 10/min, submit 5/min, token lookup 20/min, room lookup 30/min
+- File upload size limit: 5MB per file
+- Generic error messages to prevent token enumeration
+- 2-hour form expiry (was 48 hours)
+- One-time use: form rejects resubmission after status change
+
+### Flow Improvements
+- WhatsApp notification to receptionist when tenant submits form
+- WhatsApp message to tenant includes full booking summary + dues
+- Auto-cancel old pending sessions when creating new one for same phone
+- Deposit includes maintenance — no double counting in dues
+- Fixed `_saved_files` key stripped by JSON serializer (renamed to `saved_files`)
+- Middleware updated: admin panel + all onboarding APIs publicly accessible
+
+### Deployed to VPS
+- reportlab installed, migrations run, service active
+
 ## [1.28.0] — 2026-04-15 — Digital Onboarding Form + 12 Checkin Fixes + Column Mapping
 
 ### Digital Onboarding Form (NEW)
