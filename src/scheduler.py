@@ -131,8 +131,16 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        _monthly_tab_rollover,
+        trigger=CronTrigger(day=1, hour=0, minute=30),  # 1st of every month at 12:30am
+        id="monthly_tab_rollover",
+        name="Monthly Sheet Tab Rollover — 1st of month",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info("[Scheduler] Started — 5 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 6 jobs registered (jobs persist in Supabase)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -398,6 +406,29 @@ def _prune_old_backups(max_keep: int = 8) -> None:
         import shutil
         shutil.rmtree(old, ignore_errors=True)
         logger.info(f"[Scheduler] pruned old backup: {old.name}")
+
+
+# ── Job: Monthly Sheet Tab Rollover ───────────────────────────────────────────
+
+async def _monthly_tab_rollover() -> None:
+    """Create new month's tab in Google Sheet on 1st of every month.
+    Copies active tenants, carries forward prev dues, includes deposit for first-month."""
+    import asyncio
+    from datetime import date
+    MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY",
+              "AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"]
+    today = date.today()
+    month_name = MONTHS[today.month - 1]
+    year = today.year
+
+    try:
+        import sys, os
+        sys.path.insert(0, os.getcwd())
+        from scripts.create_month import create_month
+        await asyncio.to_thread(create_month, month_name, year)
+        logger.info("[Scheduler] Monthly tab rollover: created %s %d", month_name, year)
+    except Exception as e:
+        logger.error("[Scheduler] Monthly tab rollover failed: %s", e)
 
 
 # ── Job: Checkout Deposit Alerts ───────────────────────────────────────────────
