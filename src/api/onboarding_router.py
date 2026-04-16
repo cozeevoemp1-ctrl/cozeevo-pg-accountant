@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 
@@ -23,6 +25,30 @@ from src.database.models import (
 )
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
+
+# ── Security: Rate limiting + Admin auth ────────────────────────────────────
+
+ADMIN_PIN = os.getenv("ONBOARDING_ADMIN_PIN", "cozeevo2026")
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB per file (base64)
+
+# Simple in-memory rate limiter
+_rate_limits: dict[str, list[float]] = defaultdict(list)
+
+def _rate_check(key: str, max_requests: int, window_secs: int):
+    """Raise 429 if key exceeds max_requests in window_secs."""
+    now = time.time()
+    hits = _rate_limits[key]
+    # Prune old entries
+    _rate_limits[key] = [t for t in hits if now - t < window_secs]
+    if len(_rate_limits[key]) >= max_requests:
+        raise HTTPException(429, "Too many requests. Please wait and try again.")
+    _rate_limits[key].append(now)
+
+def _check_admin_pin(request: Request):
+    """Check admin PIN from header or query param."""
+    pin = request.headers.get("X-Admin-Pin") or request.query_params.get("pin")
+    if pin != ADMIN_PIN:
+        raise HTTPException(403, "Invalid admin PIN")
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
@@ -71,7 +97,9 @@ class TenantSubmitRequest(BaseModel):
 # ── Create session (receptionist) ────────────────────────────────────────────
 
 @router.get("/room-lookup/{room_number}")
-async def room_lookup(room_number: str):
+async def room_lookup(room_number: str, request: Request):
+    _check_admin_pin(request)
+    _rate_check(f"lookup:{request.client.host}", 30, 60)  # 30/min
     """Look up room info for the create form."""
     async with get_session() as session:
         room = await session.scalar(select(Room).where(Room.room_number.ilike(room_number)))
@@ -87,7 +115,9 @@ async def room_lookup(room_number: str):
 
 
 @router.post("/create")
-async def create_session(req: CreateSessionRequest):
+async def create_session(req: CreateSessionRequest, request: Request):
+    _check_admin_pin(request)
+    _rate_check(f"create:{request.client.host}", 10, 60)  # 10/min
     if req.booking_amount > 0 and not req.advance_mode:
         raise HTTPException(400, "Payment method (cash/upi) required when booking amount > 0")
 
@@ -174,7 +204,8 @@ async def create_session(req: CreateSessionRequest):
 # ── List pending sessions (admin) ────────────────────────────────────────────
 
 @router.get("/admin/stats")
-async def onboarding_stats(date_from: str = "", date_to: str = ""):
+async def onboarding_stats(request: Request, date_from: str = "", date_to: str = ""):
+    _check_admin_pin(request)
     """Onboarding stats with optional date filter."""
     from sqlalchemy import func
     async with get_session() as session:
@@ -206,7 +237,8 @@ async def onboarding_stats(date_from: str = "", date_to: str = ""):
 
 
 @router.get("/admin/pending")
-async def list_pending():
+async def list_pending(request: Request):
+    _check_admin_pin(request)
     async with get_session() as session:
         result = await session.execute(
             select(OnboardingSession).where(
@@ -232,7 +264,8 @@ async def list_pending():
 # ── Cancel session (admin) ─────────────────────────────────────────────────────
 
 @router.post("/admin/{token}/cancel")
-async def cancel_session(token: str):
+async def cancel_session(token: str, request: Request):
+    _check_admin_pin(request)
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
@@ -247,7 +280,8 @@ async def cancel_session(token: str):
 # ── Resend WhatsApp link (admin) ───────────────────────────────────────────────
 
 @router.post("/admin/{token}/resend")
-async def resend_link(token: str):
+async def resend_link(token: str, request: Request):
+    _check_admin_pin(request)
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
@@ -277,11 +311,12 @@ async def resend_link(token: str):
 # ── Get session data (tenant form) ───────────────────────────────────────────
 
 @router.get("/{token}")
-async def get_session_data(token: str):
+async def get_session_data(token: str, request: Request):
+    _rate_check(f"token:{request.client.host}", 20, 60)  # 20/min per IP
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
-            raise HTTPException(404, "Session not found")
+            raise HTTPException(404, "Not found")  # generic error to prevent enumeration
         if obs.status == "expired" or (obs.expires_at and obs.expires_at < datetime.utcnow()):
             raise HTTPException(410, "This onboarding link has expired")
         if obs.status not in ("pending_tenant", "pending_review"):
@@ -315,7 +350,12 @@ async def get_session_data(token: str):
 # ── Tenant submits form ──────────────────────────────────────────────────────
 
 @router.post("/{token}/submit")
-async def tenant_submit(token: str, req: TenantSubmitRequest):
+async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
+    _rate_check(f"submit:{request.client.host}", 5, 60)  # 5/min per IP
+    # File size check (base64 ~1.37x original, 5MB limit)
+    for field_name, data in [("selfie", req.selfie_photo), ("id_proof", req.id_photo), ("signature", req.signature_image)]:
+        if data and len(data) > MAX_UPLOAD_SIZE:
+            raise HTTPException(413, f"{field_name} file too large (max 5MB)")
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
@@ -405,7 +445,8 @@ class ApproveRequest(BaseModel):
 
 
 @router.post("/{token}/approve")
-async def approve_session(token: str, req: ApproveRequest = None):
+async def approve_session(token: str, request: Request, req: ApproveRequest = None):
+    _check_admin_pin(request)
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:

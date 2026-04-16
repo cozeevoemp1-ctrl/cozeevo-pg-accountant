@@ -634,10 +634,21 @@
   let currentLink = '';
   let currentPhone = '';
 
+  // ── Admin PIN ──────────────────────────────────────────────────────────────
+  const ADMIN_PIN = new URLSearchParams(window.location.search).get('pin') || prompt('Enter admin PIN:') || '';
+  if (!ADMIN_PIN) document.body.innerHTML = '<h2 style="padding:40px;color:#E53E3E;">Access denied. PIN required.</h2>';
+
+  function pinHeaders(extra = {}) {
+    return { 'X-Admin-Pin': ADMIN_PIN, ...extra };
+  }
+  function pinUrl(url) {
+    return url + (url.includes('?') ? '&' : '?') + 'pin=' + encodeURIComponent(ADMIN_PIN);
+  }
+
   // ── On load ────────────────────────────────────────────────────────────────
   async function loadStats() {
     try {
-      const res = await fetch('/api/onboarding/admin/stats');
+      const res = await fetch('/api/onboarding/admin/stats', { headers: pinHeaders() });
       if (!res.ok) return;
       const d = await res.json();
       document.getElementById('stat-today').textContent = d.today_approved;
@@ -718,7 +729,7 @@
     try {
       const res = await fetch('/api/onboarding/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: pinHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const data = await res.json();
@@ -816,7 +827,7 @@
     if (!val) { infoEl.textContent = ''; return; }
     roomLookupTimer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/onboarding/room-lookup/${encodeURIComponent(val)}`);
+        const res = await fetch(`/api/onboarding/room-lookup/${encodeURIComponent(val)}`, { headers: pinHeaders() });
         if (res.ok) {
           const d = await res.json();
           infoEl.innerHTML = `<span style="color:var(--green);font-weight:600;">${d.building}</span> · Floor ${d.floor} · <b>${d.sharing}</b>`;
@@ -861,7 +872,7 @@
     container.innerHTML = '<div class="loading-state"><span class="spinner"></span> Loading sessions...</div>';
 
     try {
-      const res = await fetch('/api/onboarding/admin/pending');
+      const res = await fetch('/api/onboarding/admin/pending', { headers: pinHeaders() });
       const data = await res.json();
       if (!res.ok) {
         container.innerHTML = `<div class="loading-state" style="color:#E53E3E;">Error: ${data.detail || 'Failed to load'}</div>`;
@@ -946,7 +957,7 @@
     if (detailEl.dataset.loaded === '1') return;
 
     try {
-      const res = await fetch(`/api/onboarding/${token}`);
+      const res = await fetch(`/api/onboarding/${token}`, { headers: pinHeaders() });
       const data = await res.json();
 
       // The GET /{token} endpoint only works for pending_tenant or pending_review
@@ -1165,7 +1176,7 @@
     try {
       const res = await fetch(`/api/onboarding/${token}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: pinHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ staff_signature: staffSig }),
       });
       const data = await res.json();
@@ -1209,7 +1220,7 @@
     errEl.classList.remove('show');
 
     try {
-      const res = await fetch(`/api/onboarding/admin/${token}/cancel`, { method: 'POST' });
+      const res = await fetch(`/api/onboarding/admin/${token}/cancel`, { method: 'POST', headers: pinHeaders() });
       if (res.ok) {
         showInlineAlert(okEl, 'Session cancelled.', true);
         setTimeout(() => loadPending(), 1000);
@@ -1228,7 +1239,7 @@
     const okEl = document.getElementById(`ok-${token}`);
     const errEl = document.getElementById(`err-${token}`);
     try {
-      const res = await fetch(`/api/onboarding/admin/${token}/resend`, { method: 'POST' });
+      const res = await fetch(`/api/onboarding/admin/${token}/resend`, { method: 'POST', headers: pinHeaders() });
       if (res.ok) {
         showInlineAlert(okEl, 'WhatsApp link resent!', true);
       } else {
