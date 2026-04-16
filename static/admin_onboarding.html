@@ -1080,6 +1080,7 @@
     if (!confirm('Cancel this onboarding session?')) return;
 
     const errEl = document.getElementById(`err-${token}`);
+    const okEl = document.getElementById(`ok-${token}`);
     errEl.classList.remove('show');
 
     try {
