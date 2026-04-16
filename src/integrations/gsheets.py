@@ -74,7 +74,7 @@ MONTH_NAMES = [
 
 MONTHLY_HEADERS = [
     "Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
-    "Cash", "UPI", "Total Paid", "Balance", "Status",
+    "Deposit Due", "Cash", "UPI", "Total Paid", "Balance", "Status",
     "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
 ]
 
@@ -125,6 +125,7 @@ M_PHONE = _M["M_PHONE"]
 M_BUILDING = _M["M_BUILDING"]
 M_SHARING = _M["M_SHARING"]
 M_RENT_DUE = _M["M_RENT_DUE"]
+M_DEPOSIT_DUE = _M["M_DEPOSIT_DUE"]
 M_CASH = _M["M_CASH"]
 M_UPI = _M["M_UPI"]
 M_TOTAL_PAID = _M["M_TOTAL_PAID"]
@@ -490,11 +491,11 @@ def _refresh_summary_sync(tab_name: str) -> None:
         hdr = all_vals[3] if len(all_vals) > 3 else []
         is_new = "phone" in str(hdr[2] if len(hdr) > 2 else "").lower()
         if is_new:
-            ci = {"rent": M_RENT_DUE,
+            ci = {"rent": M_RENT_DUE, "dep": M_DEPOSIT_DUE,
                   "cash": M_CASH, "upi": M_UPI, "tp": M_TOTAL_PAID, "bal": M_BALANCE, "st": M_STATUS,
                   "building": M_BUILDING, "sharing": M_SHARING, "event": M_EVENT, "prev": M_PREV_DUE}
         else:
-            ci = {"rent": 4,
+            ci = {"rent": 4, "dep": -1,
                   "cash": 5, "upi": 6, "tp": 7, "bal": 8, "st": 9,
                   "building": 2, "sharing": 3, "event": 11, "prev": 15}
 
@@ -511,10 +512,11 @@ def _refresh_summary_sync(tab_name: str) -> None:
             cash = _safe_parse_numeric(_cell(row, ci["cash"]))
             upi = _safe_parse_numeric(_cell(row, ci["upi"]))
             rent = _safe_parse_numeric(_cell(row, ci["rent"]))
+            dep = _safe_parse_numeric(_cell(row, ci["dep"])) if ci["dep"] >= 0 and ci["dep"] < len(row) else 0.0
             prev_due = _safe_parse_numeric(_cell(row, ci["prev"])) if ci["prev"] < len(row) else 0.0
 
             tp = cash + upi
-            bal = rent + prev_due - tp
+            bal = rent + dep + prev_due - tp
             if bal < 0:
                 bal = 0  # excess is deposit/advance, not overpayment
             st = "UNPAID" if tp == 0 else ("PAID" if bal <= 0 else "PARTIAL")
@@ -726,12 +728,12 @@ def _update_payment_sync(
     is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
 
     if is_new:
-        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
-            M_CASH, M_UPI, M_RENT_DUE, M_PREV_DUE, M_TOTAL_PAID, M_BALANCE, M_STATUS, M_NOTES)
+        col_cash, col_upi, col_rent, col_dep, col_prev, col_tp, col_bal, col_st, col_notes = (
+            M_CASH, M_UPI, M_RENT_DUE, M_DEPOSIT_DUE, M_PREV_DUE, M_TOTAL_PAID, M_BALANCE, M_STATUS, M_NOTES)
     else:
         # Old format: no Phone column, no deposit/maint columns
-        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
-            5, 6, 4, 15, 7, 8, 9, 12)
+        col_cash, col_upi, col_rent, col_dep, col_prev, col_tp, col_bal, col_st, col_notes = (
+            5, -1, 6, 4, 15, 7, 8, 9, 12)
 
     # Determine target column
     method_lower = method.lower()
@@ -751,14 +753,16 @@ def _update_payment_sync(
 
     existing_other = _safe_parse_numeric(_cell(row_data, other_col))
     rent_due = _safe_parse_numeric(_cell(row_data, col_rent))
+    deposit_due = _safe_parse_numeric(_cell(row_data, col_dep)) if col_dep >= 0 else 0
     prev_due = _safe_parse_numeric(_cell(row_data, col_prev))
 
     new_target = existing_target + amount
     new_total_paid = new_target + existing_other
-    total_due = rent_due + prev_due
+    total_due = rent_due + deposit_due + prev_due
     new_balance = total_due - new_total_paid
 
     result["rent_due"] = rent_due
+    result["deposit_due"] = deposit_due
     result["total_paid"] = new_total_paid
     result["balance"] = new_balance
 
@@ -1007,9 +1011,9 @@ def _add_tenant_sync(
         adv_cash = advance_amount if advance_mode == "cash" and advance_amount > 0 else ""
         adv_upi = advance_amount if advance_mode == "upi" and advance_amount > 0 else ""
         adv_total = advance_amount if advance_amount > 0 else 0
-        # First month: Rent Due = rent + deposit (deposit includes maintenance)
-        first_month_due = agreed_rent + deposit
-        adv_balance = first_month_due - advance_amount
+        # First month: Rent Due = rent, Deposit Due = deposit (separate column)
+        first_month_total = agreed_rent + deposit
+        adv_balance = first_month_total - advance_amount
         adv_status = "PAID" if adv_balance <= 0 else ("PARTIAL" if advance_amount > 0 else "UNPAID")
 
         m_field_map = {
@@ -1018,7 +1022,8 @@ def _add_tenant_sync(
             "phone": phone_txt,
             "building": building,
             "sharing": sharing,
-            "rent due": first_month_due,
+            "rent due": agreed_rent,
+            "deposit due": deposit,
             "rent": agreed_rent,
             "deposit due": deposit,
             "cash": adv_cash,
@@ -1310,11 +1315,11 @@ def _void_payment_sync(
     is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
 
     if is_new:
-        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
-            M_CASH, M_UPI, M_RENT_DUE, M_PREV_DUE, M_TOTAL_PAID, M_BALANCE, M_STATUS, M_NOTES)
+        col_cash, col_upi, col_rent, col_dep, col_prev, col_tp, col_bal, col_st, col_notes = (
+            M_CASH, M_UPI, M_RENT_DUE, M_DEPOSIT_DUE, M_PREV_DUE, M_TOTAL_PAID, M_BALANCE, M_STATUS, M_NOTES)
     else:
-        col_cash, col_upi, col_rent, col_prev, col_tp, col_bal, col_st, col_notes = (
-            5, 6, 4, 15, 7, 8, 9, 12)
+        col_cash, col_upi, col_rent, col_dep, col_prev, col_tp, col_bal, col_st, col_notes = (
+            5, -1, 6, 4, 15, 7, 8, 9, 12)
 
     target_col = col_cash if method == "cash" else col_upi
     other_col = col_upi if method == "cash" else col_cash
@@ -1322,11 +1327,12 @@ def _void_payment_sync(
     existing_target = _safe_parse_numeric(_cell(row_data, target_col))
     existing_other = _safe_parse_numeric(_cell(row_data, other_col))
     rent_due = _safe_parse_numeric(_cell(row_data, col_rent))
+    deposit_due = _safe_parse_numeric(_cell(row_data, col_dep)) if col_dep >= 0 else 0
     prev_due = _safe_parse_numeric(_cell(row_data, col_prev))
 
     new_target = max(0, existing_target - amount)  # never go negative
     new_total_paid = new_target + existing_other
-    total_due = rent_due + prev_due
+    total_due = rent_due + deposit_due + prev_due
     new_balance = total_due - new_total_paid
 
     if new_total_paid >= total_due and total_due > 0:
