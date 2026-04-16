@@ -284,47 +284,53 @@
     }
 
     /* Agreement step */
+    /* Compact booking summary */
     .agreement-card {
       background: #E8F7FD;
       border: 1px solid #B3E5FC;
-      border-radius: 10px;
-      padding: 16px;
-      margin-bottom: 16px;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
     }
 
     .agreement-card h3 {
-      font-size: 14px;
+      font-size: 11px;
       font-weight: 700;
       color: #00AEED;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .agreement-row {
       display: flex;
       justify-content: space-between;
-      font-size: 13px;
-      padding: 4px 0;
-      border-bottom: 1px solid #BEE3F8;
+      font-size: 12px;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(0,174,237,0.15);
     }
 
     .agreement-row:last-child { border-bottom: none; }
-    .agreement-row span:first-child { color: #718096; }
-    .agreement-row span:last-child { font-weight: 600; color: #2D3748; }
+    .agreement-row span:first-child { color: #718096; font-size: 11px; }
+    .agreement-row span:last-child { font-weight: 600; color: #2D3748; font-size: 12px; }
 
+    /* Spacious, readable terms */
     .terms-box {
       background: #FFFFFF;
       border: 1.5px solid #E2E8F0;
-      border-radius: 8px;
-      padding: 14px;
-      height: 160px;
+      border-radius: 10px;
+      padding: 18px 16px;
+      max-height: 50vh;
       overflow-y: auto;
-      font-size: 12px;
+      font-size: 13px;
       color: #4A5568;
-      line-height: 1.6;
+      line-height: 1.75;
       margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
     }
 
-    .terms-box p { margin-bottom: 8px; }
+    .terms-box p { margin-bottom: 12px; }
+    .terms-box p strong { color: #2D3748; }
 
     /* Signature */
     .signature-area {
