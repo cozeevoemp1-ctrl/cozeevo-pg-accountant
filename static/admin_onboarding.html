@@ -943,7 +943,9 @@
     // Uploaded photos (selfie + ID proof) — stored as file paths in _saved_files
     let photosHtml = '';
     const savedFiles = td._saved_files || {};
-    if (savedFiles.selfie || savedFiles.id_proof) {
+    if (hasTenantData && !savedFiles.selfie && !savedFiles.id_proof) {
+      photosHtml = `<div class="section-divider">Uploaded Documents</div><div style="padding:8px 0;color:#E53E3E;font-size:12px;font-weight:600;">No selfie or ID proof uploaded by tenant.</div>`;
+    } else if (savedFiles.selfie || savedFiles.id_proof) {
       photosHtml = `<div class="section-divider">Uploaded Documents</div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">`;
       if (savedFiles.selfie) {
         const selfieUrl = '/media/' + savedFiles.selfie;
