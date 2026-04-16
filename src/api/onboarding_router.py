@@ -173,6 +173,38 @@ async def create_session(req: CreateSessionRequest):
 
 # ── List pending sessions (admin) ────────────────────────────────────────────
 
+@router.get("/admin/stats")
+async def onboarding_stats(date_from: str = "", date_to: str = ""):
+    """Onboarding stats with optional date filter."""
+    from sqlalchemy import func
+    async with get_session() as session:
+        q = select(OnboardingSession.status, func.count()).group_by(OnboardingSession.status)
+        if date_from:
+            q = q.where(OnboardingSession.created_at >= date.fromisoformat(date_from))
+        if date_to:
+            q = q.where(OnboardingSession.created_at < date.fromisoformat(date_to) + timedelta(days=1))
+        result = await session.execute(q)
+        counts = {row[0]: row[1] for row in result.all()}
+
+        # Today's approved count
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_q = select(func.count()).where(
+            OnboardingSession.status == "approved",
+            OnboardingSession.approved_at >= today_start
+        )
+        today_approved = await session.scalar(today_q) or 0
+
+        return {
+            "total": sum(counts.values()),
+            "approved": counts.get("approved", 0),
+            "pending_tenant": counts.get("pending_tenant", 0),
+            "pending_review": counts.get("pending_review", 0),
+            "cancelled": counts.get("cancelled", 0),
+            "expired": counts.get("expired", 0),
+            "today_approved": today_approved,
+        }
+
+
 @router.get("/admin/pending")
 async def list_pending():
     async with get_session() as session:
