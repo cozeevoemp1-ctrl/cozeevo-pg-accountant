@@ -162,13 +162,14 @@
     }
 
     .error-msg {
+      visibility: hidden;
+      height: 18px;
       font-size: 11px;
       color: #E53E3E;
       margin-top: 4px;
-      display: none;
     }
 
-    .error-msg.visible { display: block; }
+    .error-msg.visible { visibility: visible; }
 
     textarea { resize: vertical; min-height: 80px; }
 
@@ -344,6 +345,30 @@
       display: block;
       touch-action: none;
     }
+
+    /* Selfie circle upload */
+    .selfie-upload {
+      width: 90px; height: 90px; border-radius: 50%; border: 2px dashed #E8ECF0;
+      margin: 0 auto; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; overflow: hidden; transition: border-color 0.2s; background: #F9FAFB;
+    }
+    .selfie-upload:hover { border-color: #EF1F9C; }
+    .selfie-upload.has-photo { border: 3px solid #00AEED; }
+    .selfie-upload img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Upload areas */
+    .upload-area {
+      border: 2px dashed #E8ECF0; border-radius: 10px; padding: 20px;
+      text-align: center; cursor: pointer; transition: border-color 0.2s;
+      min-height: 120px; display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .upload-area:hover { border-color: #EF1F9C; }
+    .upload-area.has-file { border-color: #00AEED; border-style: solid; padding: 8px; }
+    .upload-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #718096; font-size: 13px; }
+    .upload-preview { display: none; }
+    .upload-preview.visible { display: block; width: 100%; }
+    .upload-preview img { max-width: 100%; max-height: 200px; border-radius: 6px; object-fit: contain; }
 
     #signature-canvas.error { border-color: #E53E3E; }
 
@@ -547,6 +572,17 @@
       </div>
     </div>
 
+    <!-- Selfie / Profile Photo -->
+    <div style="text-align:center; margin-bottom:16px;">
+      <div class="selfie-upload" id="selfie-upload-area" onclick="document.getElementById('selfie-input').click()">
+        <input type="file" id="selfie-input" accept="image/*"  style="display:none;" onchange="handleSelfieUpload(this)">
+        <div id="selfie-preview-wrap">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+        </div>
+      </div>
+      <div style="font-size:12px; color:#718096; margin-top:6px;">Tap to take photo or upload</div>
+    </div>
+
     <div class="field">
       <label for="name" class="required">Full Name</label>
       <input type="text" id="name" placeholder="As per ID proof" autocomplete="name">
@@ -605,7 +641,7 @@
     </div>
 
     <div class="nav-buttons">
-      <button class="btn btn-primary" onclick="nextStep(1)">Next &rarr;</button>
+      <button type="button" class="btn btn-primary" onclick="nextStep(1)">Next &rarr;</button>
     </div>
   </div>
 
@@ -658,8 +694,8 @@
     </div>
 
     <div class="nav-buttons">
-      <button class="btn btn-secondary" onclick="prevStep(2)">&larr;</button>
-      <button class="btn btn-primary" onclick="nextStep(2)">Next &rarr;</button>
+      <button type="button" class="btn btn-secondary" onclick="prevStep(2)">&larr;</button>
+      <button type="button" class="btn btn-primary" onclick="nextStep(2)">Next &rarr;</button>
     </div>
   </div>
 
@@ -699,8 +735,8 @@
     </div>
 
     <div class="nav-buttons">
-      <button class="btn btn-secondary" onclick="prevStep(3)">&larr;</button>
-      <button class="btn btn-primary" onclick="nextStep(3)">Next &rarr;</button>
+      <button type="button" class="btn btn-secondary" onclick="prevStep(3)">&larr;</button>
+      <button type="button" class="btn btn-primary" onclick="nextStep(3)">Next &rarr;</button>
     </div>
   </div>
 
@@ -728,13 +764,27 @@
       <input type="text" id="id-number" placeholder="Enter ID number" style="text-transform:uppercase;">
     </div>
 
+    <div class="field">
+      <label>Upload ID Photo *</label>
+      <div class="upload-area" id="id-upload-area" onclick="document.getElementById('id-photo-input').click()">
+        <input type="file" id="id-photo-input" accept="image/*"  style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
+        <div id="id-photo-preview" class="upload-preview"></div>
+        <div class="upload-placeholder" id="id-upload-placeholder">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Tap to upload ID photo</span>
+          <span style="font-size:11px; color:#A0AEC0;">Front side of your ID card</span>
+        </div>
+      </div>
+      <div class="error-msg" id="err-id-photo">Please upload a photo of your ID</div>
+    </div>
+
     <div style="background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; padding:12px 14px; font-size:12px; color:#7B5E00; line-height:1.5; margin-top:4px;">
-      Your ID will only be used for verification and is stored securely. We do not share it with any third party.
+      Your ID and photo are used only for verification and stored securely. We do not share them with any third party.
     </div>
 
     <div class="nav-buttons">
-      <button class="btn btn-secondary" onclick="prevStep(4)">&larr;</button>
-      <button class="btn btn-primary" onclick="nextStep(4)">Next &rarr;</button>
+      <button type="button" class="btn btn-secondary" onclick="prevStep(4)">&larr;</button>
+      <button type="button" class="btn btn-primary" onclick="nextStep(4)">Next &rarr;</button>
     </div>
   </div>
 
@@ -778,8 +828,8 @@
     </div>
 
     <div class="nav-buttons">
-      <button class="btn btn-secondary" onclick="prevStep(5)">&larr;</button>
-      <button class="btn btn-primary" id="submit-btn" onclick="submitForm()">Submit Registration</button>
+      <button type="button" class="btn btn-secondary" onclick="prevStep(5)">&larr;</button>
+      <button type="button" class="btn btn-primary" id="submit-btn" onclick="submitForm()">Submit Registration</button>
     </div>
   </div>
 
@@ -851,7 +901,16 @@
       if (!res.ok) throw new Error('Session not found or expired');
       const data = await res.json();
       sessionData = data;
-      populateRoomCard(data);
+      // Map API response to card field names
+      populateRoomCard({
+        room_number: data.room ? data.room.number : '',
+        bed_label: data.room ? (data.room.building + ', Floor ' + data.room.floor + ' — ' + data.room.sharing) : '',
+        checkin_date: data.checkin_date || '',
+        monthly_rent: data.agreed_rent || 0,
+        deposit: data.security_deposit || 0,
+        lockin_months: data.lock_in_months || 0,
+        maintenance: data.maintenance_fee || 0,
+      });
       document.getElementById('main-content').style.display = 'block';
     } catch (e) {
       hideLoading();
@@ -971,6 +1030,46 @@
     return (v || '').replace(/\D/g, '');
   }
 
+  function handleSelfieUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image'); return; }
+    if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const wrap = document.getElementById('selfie-preview-wrap');
+      wrap.innerHTML = '<img src="' + e.target.result + '" alt="Your photo">';
+      document.getElementById('selfie-upload-area').classList.add('has-photo');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function getUploadDataUrl(previewId) {
+    const img = document.querySelector('#' + previewId + ' img');
+    return img ? img.src : '';
+  }
+
+  // ── File upload handler ───────────────────────────────────────────────────
+  function handleFileUpload(input, previewId, areaId) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image file'); return; }
+    if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const preview = document.getElementById(previewId);
+      preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
+      preview.classList.add('visible');
+      // Hide placeholder
+      const area = document.getElementById(areaId);
+      area.classList.add('has-file');
+      const placeholder = area.querySelector('.upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
   function setError(fieldId, errId) {
     const field = document.getElementById(fieldId);
     if (field) field.classList.add('error');
@@ -1003,13 +1102,13 @@
     }
 
     const payload = {
-      // Step 1
+      // Step 1 — match API field names exactly (TenantSubmitRequest)
       name: document.getElementById('name').value.trim(),
       phone: stripDigits(document.getElementById('phone').value),
-      gender: (document.querySelector('input[name="gender"]:checked') || {}).value || '',
-      dob: document.getElementById('dob').value,
+      gender: ((document.querySelector('input[name="gender"]:checked') || {}).value || '').toLowerCase(),
+      date_of_birth: document.getElementById('dob').value,
       email: document.getElementById('email').value.trim(),
-      food_preference: (document.querySelector('input[name="food"]:checked') || {}).value || '',
+      food_preference: ((document.querySelector('input[name="food"]:checked') || {}).value || '').toLowerCase(),
       // Step 2
       father_name: document.getElementById('father-name').value.trim(),
       father_phone: stripDigits(document.getElementById('father-phone').value),
@@ -1019,14 +1118,17 @@
       // Step 3
       permanent_address: document.getElementById('perm-address').value.trim(),
       occupation: document.getElementById('occupation').value.trim(),
-      education: document.getElementById('education').value.trim(),
+      educational_qualification: document.getElementById('education').value.trim(),
       office_address: document.getElementById('office-address').value.trim(),
       office_phone: stripDigits(document.getElementById('office-phone').value),
       // Step 4
-      id_type: document.getElementById('id-type').value,
-      id_number: document.getElementById('id-number').value.trim().toUpperCase(),
+      id_proof_type: document.getElementById('id-type').value,
+      id_proof_number: document.getElementById('id-number').value.trim().toUpperCase(),
+      // Uploads
+      id_photo: getUploadDataUrl('id-photo-preview'),
+      selfie_photo: getUploadDataUrl('selfie-preview'),
       // Signature
-      signature_data: document.getElementById('signature-canvas').toDataURL('image/png')
+      signature_image: document.getElementById('signature-canvas').toDataURL('image/png')
     };
 
     showLoading('Submitting registration...');
