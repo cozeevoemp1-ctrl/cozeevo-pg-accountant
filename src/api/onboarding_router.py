@@ -585,8 +585,9 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
 
         # GSheets with retry (3 attempts, 2s/4s backoff)
         gsheets_note = ""
+        phone_sheet = f"+91{phone}" if len(phone) == 10 else phone
         gsheet_kwargs = dict(
-            room_number=room.room_number, name=td["name"], phone=phone,
+            room_number=room.room_number, name=td["name"], phone=phone_sheet,
             gender=td.get("gender", ""), building=building,
             floor=str(room.floor or ""), sharing=sharing,
             checkin=checkin.strftime("%d/%m/%Y"),
