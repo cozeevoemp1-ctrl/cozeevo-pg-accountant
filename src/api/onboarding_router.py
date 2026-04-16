@@ -451,7 +451,7 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
                 pass
 
         tenant_data = req.model_dump(exclude={"signature_image", "id_photo", "selfie_photo"})
-        tenant_data["_saved_files"] = saved_files  # paths for approve step
+        tenant_data["saved_files"] = saved_files  # paths for approve step
         obs.tenant_data = json.dumps(tenant_data)
         obs.signature_image = req.signature_image
         obs.status = "pending_review"
@@ -642,7 +642,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
 
         # Save documents (selfie, ID proof, signature, agreement PDF) linked to tenant
         from src.database.models import Document, DocumentType
-        saved_files = td.get("_saved_files", {})
+        saved_files = td.get("saved_files", {})
         doc_map = {
             "selfie": DocumentType.photo,
             "id_proof": DocumentType.id_proof,
