@@ -320,7 +320,7 @@ async def get_session_data(token: str, request: Request):
         if obs.status == "expired" or (obs.expires_at and obs.expires_at < datetime.utcnow()):
             raise HTTPException(410, "This onboarding link has expired")
         if obs.status not in ("pending_tenant", "pending_review"):
-            raise HTTPException(400, f"Session status: {obs.status}")
+            raise HTTPException(400, "This form is no longer available")
 
         room = await session.get(Room, obs.room_id) if obs.room_id else None
         building = ""
