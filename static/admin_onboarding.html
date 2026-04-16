@@ -666,7 +666,7 @@
       }
 
       // Show result
-      const fullLink = window.location.origin + data.link;
+      const fullLink = data.full_link || (window.location.origin + data.link);
       currentLink = fullLink;
       currentPhone = phone;
 
@@ -677,6 +677,8 @@
       chips.innerHTML = '';
       if (data.room?.floor) chips.innerHTML += `<span class="chip">Floor ${data.room.floor}</span>`;
       if (data.room?.sharing) chips.innerHTML += `<span class="chip">${data.room.sharing}</span>`;
+      if (data.whatsapp_sent) chips.innerHTML += `<span class="chip" style="background:#dcfce7;color:#166534;">WhatsApp sent</span>`;
+      else chips.innerHTML += `<span class="chip" style="background:#fef3c7;color:#92400e;">WhatsApp not sent — share link manually</span>`;
 
       document.getElementById('create-result').classList.add('show');
       document.getElementById('create-form').style.display = 'none';

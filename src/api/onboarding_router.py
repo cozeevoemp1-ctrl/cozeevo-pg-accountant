@@ -108,10 +108,38 @@ async def create_session(req: CreateSessionRequest):
         rt = room.room_type
         sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
 
+        # Auto-send onboarding link to tenant via WhatsApp
+        base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
+        onboard_link = f"{base_url}/onboard/{token}"
+        whatsapp_sent = False
+        if req.tenant_phone:
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                phone_wa = req.tenant_phone.strip()
+                if not phone_wa.startswith("91"):
+                    phone_wa = "91" + phone_wa
+                rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else ""
+                await _send_whatsapp(
+                    phone_wa,
+                    f"Hello! Welcome to *Cozeevo Co-living*\n\n"
+                    f"Room *{room.room_number}* ({building}) has been reserved for you.\n"
+                    + (f"Rent: {rent_str}/month\n" if rent_str else "")
+                    + f"\nPlease complete your registration using the link below:\n\n"
+                    f"{onboard_link}\n\n"
+                    f"This link is valid for 48 hours.\n"
+                    f"For any questions, contact us on this number."
+                )
+                whatsapp_sent = True
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error("WhatsApp onboarding link send failed: %s", e)
+
         return {
             "token": token,
             "link": f"/onboard/{token}",
+            "full_link": onboard_link,
             "session_id": obs.id,
+            "whatsapp_sent": whatsapp_sent,
             "room": {"number": room.room_number, "building": building, "floor": str(room.floor or ""), "sharing": sharing},
         }
 
