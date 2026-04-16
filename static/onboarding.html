@@ -1194,6 +1194,7 @@
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   async function submitForm() {
+   try {
     clearErrors();
 
     // Validate signature
@@ -1236,11 +1237,6 @@
     // Validate mandatory uploads
     if (!payload.selfie_photo) { showError('Please upload your selfie photo (Step 1).'); return; }
     if (!payload.id_photo) { showError('Please upload your ID proof document (Step 4).'); return; }
-    const sigCanvas = document.getElementById('signature-canvas');
-    const sigCtx = sigCanvas.getContext('2d');
-    const sigPixels = sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height).data;
-    let sigDrawn = false;
-    for (let i = 3; i < sigPixels.length; i += 4) { if (sigPixels[i] > 0) { sigDrawn = true; break; } }
     if (!sigDrawn) { showError('Please draw your signature (Step 5).'); return; }
 
     showLoading('Submitting registration...');
@@ -1270,6 +1266,10 @@
       hideLoading();
       showError('Network error. Please check your connection and try again.');
     }
+   } catch (outerErr) {
+      hideLoading();
+      showError('Error: ' + (outerErr.message || 'Something went wrong'));
+   }
   }
 
   // ── Signature canvas ───────────────────────────────────────────────────────
