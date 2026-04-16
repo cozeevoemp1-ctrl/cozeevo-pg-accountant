@@ -1036,6 +1036,18 @@ async def run_extend_onboarding_sessions(conn) -> None:
         ))
     except Exception:
         pass
+    # Daily stay fields
+    for col_name, col_type in [
+        ("checkout_date", "DATE"),
+        ("num_days", "INTEGER DEFAULT 0"),
+        ("daily_rate", "NUMERIC(10,2) DEFAULT 0"),
+    ]:
+        try:
+            await conn.execute(text(
+                f"ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+            ))
+        except Exception:
+            pass
     print("  [ok] onboarding_sessions extended")
 
 

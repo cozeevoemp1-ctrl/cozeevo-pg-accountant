@@ -1386,6 +1386,59 @@ async def void_payment(
     )
 
 
+# ── Day-wise stay Sheet writer ────────────────────────────────────────────────
+
+def _add_daywise_stay_sync(
+    room_number: str, guest_name: str, phone: str, checkin: str,
+    stay_period: str, num_days: int, daily_rate: float, booking_amount: float,
+    total: float, maintenance: float, sharing: str, status: str, comments: str,
+) -> dict:
+    """Add a row to the DAY WISE tab. Header-based mapping."""
+    result = {"success": False, "row": None, "error": None}
+    try:
+        ws = _get_worksheet_sync("DAY WISE")
+        all_vals = ws.get_all_values()
+        # Headers at row 2
+        headers = [h.strip().lower() for h in all_vals[1]] if len(all_vals) > 1 else []
+        phone_txt = f"'{phone}" if phone else ""
+        field_map = {
+            "room": room_number,
+            "guest name": guest_name,
+            "phone": phone_txt,
+            "check-in": checkin,
+            "checkin": checkin,
+            "stay period": stay_period,
+            "days": num_days,
+            "daily rate": daily_rate,
+            "booking amt": booking_amount,
+            "booking amount": booking_amount,
+            "total": total,
+            "maintenance": maintenance,
+            "sharing": sharing,
+            "staff": "",
+            "status": status,
+            "comments": comments,
+            "source": "onboarding_form",
+        }
+        row = [""] * len(headers)
+        for i, h in enumerate(headers):
+            if h in field_map:
+                row[i] = field_map[h]
+        next_row = len(all_vals) + 1
+        ws.update(values=[row], range_name=f"A{next_row}", value_input_option="USER_ENTERED")
+        result["success"] = True
+        result["row"] = next_row
+    except Exception as e:
+        result["error"] = str(e)
+    return result
+
+
+async def add_daywise_stay(**kwargs) -> dict:
+    """Async wrapper for _add_daywise_stay_sync."""
+    import asyncio
+    return await asyncio.to_thread(_add_daywise_stay_sync, **kwargs)
+
+
 async def add_tenant(
     room_number: str,
     name: str,

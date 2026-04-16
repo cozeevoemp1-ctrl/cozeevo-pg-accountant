@@ -538,9 +538,24 @@
               </select>
             </div>
 
-            <div class="form-group">
+            <!-- Monthly-only fields -->
+            <div class="form-group monthly-field">
               <label for="lock_in_months">Lock-in Months</label>
               <input type="number" id="lock_in_months" name="lock_in_months" min="0" value="0">
+            </div>
+
+            <!-- Daily-only fields -->
+            <div class="form-group daily-field" style="display:none;">
+              <label for="checkout_date">Check-out Date</label>
+              <input type="date" id="checkout_date" name="checkout_date">
+            </div>
+            <div class="form-group daily-field" style="display:none;">
+              <label for="num_days">Number of Days</label>
+              <input type="number" id="num_days" name="num_days" min="1" value="1">
+            </div>
+            <div class="form-group daily-field" style="display:none;">
+              <label for="daily_rate">Daily Rate (₹)</label>
+              <input type="number" id="daily_rate" name="daily_rate" min="0" value="0">
             </div>
 
             <div class="form-group full">
@@ -759,6 +774,9 @@
       checkin_date: document.getElementById('checkin_date').value,
       stay_type: document.getElementById('stay_type').value,
       lock_in_months: parseInt(document.getElementById('lock_in_months').value) || 0,
+      checkout_date: document.getElementById('checkout_date').value || "",
+      num_days: parseInt(document.getElementById('num_days').value) || 0,
+      daily_rate: parseFloat(document.getElementById('daily_rate').value) || 0,
       special_terms: document.getElementById('special_terms').value.trim(),
     };
 
@@ -831,6 +849,43 @@
     const wa = `https://wa.me/91${currentPhone}?text=${msg}`;
     window.open(wa, '_blank');
   }
+
+  // ── Stay type toggle ────────────────────────────────────────────────────────
+  document.getElementById('stay_type').addEventListener('change', function() {
+    const isDaily = this.value === 'daily';
+    document.querySelectorAll('.monthly-field').forEach(el => el.style.display = isDaily ? 'none' : '');
+    document.querySelectorAll('.daily-field').forEach(el => el.style.display = isDaily ? '' : 'none');
+    // Update labels
+    if (isDaily) {
+      document.querySelector('label[for="agreed_rent"]').textContent = 'Total Amount (₹)';
+      document.querySelector('label[for="security_deposit"]').textContent = 'Not applicable';
+      document.getElementById('security_deposit').value = 0;
+      document.getElementById('security_deposit').closest('.form-group').style.display = 'none';
+      document.getElementById('maintenance_fee').closest('.form-group').style.display = 'none';
+    } else {
+      document.querySelector('label[for="agreed_rent"]').textContent = 'Agreed Rent (₹)';
+      document.getElementById('security_deposit').closest('.form-group').style.display = '';
+      document.getElementById('maintenance_fee').closest('.form-group').style.display = '';
+    }
+    updateDues();
+  });
+
+  // Auto-calc daily total and num_days
+  ['checkout_date', 'num_days', 'daily_rate'].forEach(id => {
+    document.getElementById(id).addEventListener('input', function() {
+      const checkin = document.getElementById('checkin_date').value;
+      const checkout = document.getElementById('checkout_date').value;
+      const rate = parseFloat(document.getElementById('daily_rate').value) || 0;
+      if (checkin && checkout) {
+        const days = Math.max(1, Math.round((new Date(checkout) - new Date(checkin)) / 86400000));
+        document.getElementById('num_days').value = days;
+        document.getElementById('agreed_rent').value = days * rate;
+      } else if (document.getElementById('num_days').value && rate) {
+        document.getElementById('agreed_rent').value = parseInt(document.getElementById('num_days').value) * rate;
+      }
+      updateDues();
+    });
+  });
 
   // ── Dues calculator (live) ──────────────────────────────────────────────────
   function updateDues() {

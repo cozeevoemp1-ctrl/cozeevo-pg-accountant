@@ -64,6 +64,10 @@ class CreateSessionRequest(BaseModel):
     checkin_date: str  # ISO YYYY-MM-DD
     stay_type: str = "monthly"
     lock_in_months: int = 0
+    # Daily stay fields
+    checkout_date: str = ""
+    num_days: int = 0
+    daily_rate: float = 0
     special_terms: str = ""
     tenant_phone: str
     created_by_phone: str = ""
@@ -157,6 +161,9 @@ async def create_session(req: CreateSessionRequest, request: Request):
             checkin_date=date.fromisoformat(req.checkin_date),
             stay_type=req.stay_type,
             lock_in_months=req.lock_in_months,
+            checkout_date=date.fromisoformat(req.checkout_date) if req.checkout_date else None,
+            num_days=req.num_days,
+            daily_rate=Decimal(str(req.daily_rate)) if req.daily_rate else 0,
             special_terms=req.special_terms,
             expires_at=datetime.utcnow() + timedelta(hours=2),
         )
@@ -543,86 +550,142 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
         rt = room.room_type
         sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
         checkin = obs.checkin_date or date.today()
+        is_daily = obs.stay_type == "daily"
 
-        tenancy = Tenancy(
-            tenant_id=tenant.id, room_id=room.id, checkin_date=checkin,
-            agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
-            booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
-            lock_in_months=obs.lock_in_months or 0,
-            status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
-        )
-        session.add(tenancy)
-        await session.flush()
-
-        # RentSchedule
-        period = checkin.replace(day=1)
-        current_month = date.today().replace(day=1)
-        while period <= current_month:
-            session.add(RentSchedule(
-                tenancy_id=tenancy.id, period_month=period,
-                rent_due=obs.agreed_rent or 0, maintenance_due=obs.maintenance_fee or 0,
-                status=RentStatus.pending, due_date=period,
-            ))
-            if period.month == 12:
-                period = date(period.year + 1, 1, 1)
-            else:
-                period = date(period.year, period.month + 1, 1)
-
-        # Advance payment
-        if obs.booking_amount and obs.booking_amount > 0:
-            adv_mode = PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash
-            session.add(Payment(
-                tenancy_id=tenancy.id, amount=obs.booking_amount,
-                payment_date=checkin, payment_mode=adv_mode,
-                for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
-                notes=f"Booking advance ({obs.advance_mode})",
-            ))
-
-        obs.status = "approved"
-        obs.approved_at = datetime.utcnow()
-        obs.tenant_id = tenant.id
-        obs.tenancy_id = tenancy.id
-
-        # GSheets with retry (3 attempts, 2s/4s backoff)
-        gsheets_note = ""
-        phone_sheet = f"+91{phone}" if len(phone) == 10 else phone
-        gsheet_kwargs = dict(
-            room_number=room.room_number, name=td["name"], phone=phone_sheet,
-            gender=td.get("gender", ""), building=building,
-            floor=str(room.floor or ""), sharing=sharing,
-            checkin=checkin.strftime("%d/%m/%Y"),
-            agreed_rent=float(obs.agreed_rent or 0), deposit=float(obs.security_deposit or 0),
-            booking=float(obs.booking_amount or 0), maintenance=float(obs.maintenance_fee or 0),
-            notes=obs.special_terms or "",
-            dob=td.get("date_of_birth", ""), father_name=td.get("father_name", ""),
-            father_phone=td.get("father_phone", ""), address=td.get("permanent_address", ""),
-            emergency_contact=td.get("emergency_contact_phone", ""),
-            emergency_relationship=td.get("emergency_contact_relationship", ""),
-            email=td.get("email", ""), occupation=td.get("occupation", ""),
-            education=td.get("educational_qualification", ""),
-            office_address=td.get("office_address", ""), office_phone=td.get("office_phone", ""),
-            id_type=td.get("id_proof_type", ""), id_number=td.get("id_proof_number", ""),
-            food_pref=td.get("food_preference", ""), entered_by="onboarding_form",
-            advance_amount=float(obs.booking_amount or 0), advance_mode=obs.advance_mode or "",
-        )
         import asyncio as _aio
         import logging as _log
         _logger = _log.getLogger(__name__)
-        for attempt in range(3):
-            try:
-                from src.integrations.gsheets import add_tenant as gsheets_add
-                gs_r = await gsheets_add(**gsheet_kwargs)
-                if gs_r.get("success"):
-                    gsheets_note = " | Sheet updated"
-                    break
+        gsheets_note = ""
+        phone_sheet = f"+91{phone}" if len(phone) == 10 else phone
+
+        if is_daily:
+            # ── Daily stay path ────────────────────────────────────────────
+            from src.database.models import DaywiseStay
+            checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
+            num_days = obs.num_days or max(1, (checkout - checkin).days)
+            total_amount = float(obs.agreed_rent or 0)  # agreed_rent stores total for daily
+
+            dw = DaywiseStay(
+                room_number=room.room_number,
+                guest_name=td["name"],
+                phone=phone,
+                checkin_date=checkin,
+                checkout_date=checkout,
+                num_days=num_days,
+                stay_period=f"{checkin.strftime('%d/%m')}-{checkout.strftime('%d/%m')}",
+                sharing=1,
+                booking_amount=obs.booking_amount or 0,
+                daily_rate=obs.daily_rate or 0,
+                total_amount=total_amount,
+                maintenance=obs.maintenance_fee or 0,
+                status="ACTIVE",
+                comments=obs.special_terms or "",
+            )
+            session.add(dw)
+            await session.flush()
+
+            obs.status = "approved"
+            obs.approved_at = datetime.utcnow()
+            obs.tenant_id = tenant.id
+
+            # GSheets DAY WISE tab (retry 3x)
+            for attempt in range(3):
+                try:
+                    from src.integrations.gsheets import add_daywise_stay as gsheets_dw
+                    gs_r = await gsheets_dw(
+                        room_number=room.room_number, guest_name=td["name"], phone=phone_sheet,
+                        checkin=checkin.strftime("%d/%m/%Y"),
+                        stay_period=dw.stay_period, num_days=num_days,
+                        daily_rate=float(obs.daily_rate or 0),
+                        booking_amount=float(obs.booking_amount or 0),
+                        total=total_amount, maintenance=float(obs.maintenance_fee or 0),
+                        sharing=sharing, status="ACTIVE",
+                        comments=obs.special_terms or "",
+                    )
+                    if gs_r.get("success"):
+                        gsheets_note = " | DAY WISE Sheet updated"
+                        break
+                except Exception as e:
+                    _logger.warning("GSheets DAY WISE attempt %d error: %s", attempt + 1, e)
+                if attempt < 2:
+                    await _aio.sleep(2 * (attempt + 1))
+
+        else:
+            # ── Monthly stay path ──────────────────────────────────────────
+            tenancy = Tenancy(
+                tenant_id=tenant.id, room_id=room.id, checkin_date=checkin,
+                agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
+                booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
+                lock_in_months=obs.lock_in_months or 0,
+                status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
+            )
+            session.add(tenancy)
+            await session.flush()
+
+            # RentSchedule
+            period = checkin.replace(day=1)
+            current_month = date.today().replace(day=1)
+            while period <= current_month:
+                session.add(RentSchedule(
+                    tenancy_id=tenancy.id, period_month=period,
+                    rent_due=obs.agreed_rent or 0, maintenance_due=obs.maintenance_fee or 0,
+                    status=RentStatus.pending, due_date=period,
+                ))
+                if period.month == 12:
+                    period = date(period.year + 1, 1, 1)
                 else:
-                    _logger.warning("GSheets attempt %d failed: %s", attempt + 1, gs_r.get("error"))
-            except Exception as e:
-                _logger.warning("GSheets attempt %d error: %s", attempt + 1, e)
-            if attempt < 2:
-                await _aio.sleep(2 * (attempt + 1))  # 2s, 4s backoff
-        if not gsheets_note:
-            _logger.error("GSheets FAILED after 3 attempts for token %s — needs manual retry", obs.token[:8])
+                    period = date(period.year, period.month + 1, 1)
+
+            # Advance payment
+            if obs.booking_amount and obs.booking_amount > 0:
+                adv_mode = PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=obs.booking_amount,
+                    payment_date=checkin, payment_mode=adv_mode,
+                    for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
+                    notes=f"Booking advance ({obs.advance_mode})",
+                ))
+
+            obs.status = "approved"
+            obs.approved_at = datetime.utcnow()
+            obs.tenant_id = tenant.id
+            obs.tenancy_id = tenancy.id
+
+            # GSheets TENANTS + monthly tab (retry 3x)
+            gsheet_kwargs = dict(
+                room_number=room.room_number, name=td["name"], phone=phone_sheet,
+                gender=td.get("gender", ""), building=building,
+                floor=str(room.floor or ""), sharing=sharing,
+                checkin=checkin.strftime("%d/%m/%Y"),
+                agreed_rent=float(obs.agreed_rent or 0), deposit=float(obs.security_deposit or 0),
+                booking=float(obs.booking_amount or 0), maintenance=float(obs.maintenance_fee or 0),
+                notes=obs.special_terms or "",
+                dob=td.get("date_of_birth", ""), father_name=td.get("father_name", ""),
+                father_phone=td.get("father_phone", ""), address=td.get("permanent_address", ""),
+                emergency_contact=td.get("emergency_contact_phone", ""),
+                emergency_relationship=td.get("emergency_contact_relationship", ""),
+                email=td.get("email", ""), occupation=td.get("occupation", ""),
+                education=td.get("educational_qualification", ""),
+                office_address=td.get("office_address", ""), office_phone=td.get("office_phone", ""),
+                id_type=td.get("id_proof_type", ""), id_number=td.get("id_proof_number", ""),
+                food_pref=td.get("food_preference", ""), entered_by="onboarding_form",
+                advance_amount=float(obs.booking_amount or 0), advance_mode=obs.advance_mode or "",
+            )
+            for attempt in range(3):
+                try:
+                    from src.integrations.gsheets import add_tenant as gsheets_add
+                    gs_r = await gsheets_add(**gsheet_kwargs)
+                    if gs_r.get("success"):
+                        gsheets_note = " | Sheet updated"
+                        break
+                    else:
+                        _logger.warning("GSheets attempt %d failed: %s", attempt + 1, gs_r.get("error"))
+                except Exception as e:
+                    _logger.warning("GSheets attempt %d error: %s", attempt + 1, e)
+                if attempt < 2:
+                    await _aio.sleep(2 * (attempt + 1))
+            if not gsheets_note:
+                _logger.error("GSheets FAILED after 3 attempts for token %s", obs.token[:8])
 
         # Save staff signature to disk
         staff_sig_path = ""
