@@ -77,6 +77,7 @@ def create_month(month_name, year):
 
     # ── Read previous month's balance for carry-forward ─────────────────────
     prev_balances = {}  # key: (room, name) → balance
+    prev_deposit_unpaid = {}  # key: (room, name) → True if deposit was due but not fully paid
     prev_mi = mi - 1
     prev_year = year
     if prev_mi < 0:
@@ -98,8 +99,11 @@ def create_month(month_name, year):
                 status = str(row[_col(ph, "status", 10)] if _col(ph, "status") >= 0 and _col(ph, "status") < len(row) else "").upper().strip()
                 if status in ("EXIT", "CANCELLED"):
                     continue
+                dep_due = _safe_parse_numeric(row[_col(ph, "deposit due")] if _col(ph, "deposit due") >= 0 and _col(ph, "deposit due") < len(row) else "0")
                 if bal > 0:
                     prev_balances[(room, name)] = bal
+                if dep_due > 0:
+                    prev_deposit_unpaid[(room, name)] = dep_due
         print(f"Loaded {len(prev_balances)} carry-forward balances from {prev_tab_name}")
     except gspread.WorksheetNotFound:
         print(f"No previous month tab '{prev_tab_name}' — prev dues = 0 for all")
@@ -146,6 +150,12 @@ def create_month(month_name, year):
         # Carry forward previous month's balance
         prev_due = prev_balances.get((room, name), 0)
 
+        # Auto-note if deposit is still unpaid from previous month
+        notes = ""
+        unpaid_dep = prev_deposit_unpaid.get((room, name), 0)
+        if unpaid_dep > 0:
+            notes = f"Deposit due: Rs.{int(unpaid_dep):,} pending"
+
         # Phone with apostrophe prefix (text format)
         phone_txt = f"'{phone}" if phone else ""
 
@@ -165,7 +175,7 @@ def create_month(month_name, year):
             "check-in": checkin_str,
             "notice date": "",
             "event": event,
-            "notes": "",
+            "notes": notes,
             "prev due": prev_due if prev_due > 0 else 0,
             "entered by": "",
         })
