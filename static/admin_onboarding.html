@@ -473,6 +473,16 @@
             <div class="form-group">
               <label for="room_number">Room Number</label>
               <input type="text" id="room_number" name="room_number" placeholder="e.g. 101" required>
+              <div id="room-info" style="font-size:11px;margin-top:4px;color:var(--muted);min-height:16px;"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="sharing_type">Sharing Type</label>
+              <select id="sharing_type" name="sharing_type">
+                <option value="single">Single</option>
+                <option value="double" selected>Double</option>
+                <option value="triple">Triple</option>
+              </select>
             </div>
 
             <div class="form-group">
@@ -638,6 +648,7 @@
 
     const payload = {
       room_number: document.getElementById('room_number').value.trim(),
+      sharing_type: document.getElementById('sharing_type').value,
       tenant_phone: phone,
       agreed_rent: parseFloat(document.getElementById('agreed_rent').value) || 0,
       security_deposit: parseFloat(document.getElementById('security_deposit').value) || 0,
@@ -718,6 +729,30 @@
     const wa = `https://wa.me/91${currentPhone}?text=${msg}`;
     window.open(wa, '_blank');
   }
+
+  // ── Room auto-lookup ───────────────────────────────────────────────────────
+  let roomLookupTimer = null;
+  document.getElementById('room_number').addEventListener('input', function() {
+    clearTimeout(roomLookupTimer);
+    const val = this.value.trim();
+    const infoEl = document.getElementById('room-info');
+    if (!val) { infoEl.textContent = ''; return; }
+    roomLookupTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/onboarding/room-lookup/${encodeURIComponent(val)}`);
+        if (res.ok) {
+          const d = await res.json();
+          infoEl.innerHTML = `<span style="color:var(--green);font-weight:600;">${d.building}</span> · Floor ${d.floor} · <b>${d.sharing}</b>`;
+          // Auto-set sharing dropdown
+          const sel = document.getElementById('sharing_type');
+          const sharing = d.sharing.toLowerCase();
+          if ([...sel.options].some(o => o.value === sharing)) sel.value = sharing;
+        } else {
+          infoEl.innerHTML = `<span style="color:#E53E3E;">Room not found</span>`;
+        }
+      } catch(e) { infoEl.textContent = ''; }
+    }, 400);
+  });
 
   // ── Reset form ─────────────────────────────────────────────────────────────
   function resetForm() {

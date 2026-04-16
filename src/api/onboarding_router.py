@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 class CreateSessionRequest(BaseModel):
     room_number: str
+    sharing_type: str = ""  # single/double/triple — override room default
     agreed_rent: float
     security_deposit: float = 0
     maintenance_fee: float = 0
@@ -69,6 +70,22 @@ class TenantSubmitRequest(BaseModel):
 
 # ── Create session (receptionist) ────────────────────────────────────────────
 
+@router.get("/room-lookup/{room_number}")
+async def room_lookup(room_number: str):
+    """Look up room info for the create form."""
+    async with get_session() as session:
+        room = await session.scalar(select(Room).where(Room.room_number.ilike(room_number)))
+        if not room:
+            raise HTTPException(404, "Room not found")
+        building = ""
+        if room.property_id:
+            prop = await session.get(Property, room.property_id)
+            building = prop.name if prop else ""
+        rt = room.room_type
+        sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
+        return {"room_number": room.room_number, "building": building, "floor": str(room.floor or ""), "sharing": sharing}
+
+
 @router.post("/create")
 async def create_session(req: CreateSessionRequest):
     if req.booking_amount > 0 and not req.advance_mode:
@@ -106,7 +123,7 @@ async def create_session(req: CreateSessionRequest):
         await session.flush()
 
         rt = room.room_type
-        sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
+        sharing = req.sharing_type if req.sharing_type else (rt.value if hasattr(rt, 'value') else str(rt or ""))
 
         # Auto-send onboarding link to tenant via WhatsApp
         base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
