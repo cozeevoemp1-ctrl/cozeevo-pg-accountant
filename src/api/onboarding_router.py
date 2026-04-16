@@ -122,6 +122,17 @@ async def create_session(req: CreateSessionRequest, request: Request):
         raise HTTPException(400, "Payment method (cash/upi) required when booking amount > 0")
 
     async with get_session() as session:
+        # Auto-cancel old pending sessions for same tenant phone
+        if req.tenant_phone:
+            old = await session.execute(
+                select(OnboardingSession).where(
+                    OnboardingSession.tenant_phone == req.tenant_phone,
+                    OnboardingSession.status.in_(["pending_tenant", "pending_review"])
+                )
+            )
+            for old_obs in old.scalars().all():
+                old_obs.status = "cancelled"
+
         room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
         if not room:
             raise HTTPException(404, f"Room {req.room_number} not found")
