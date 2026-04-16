@@ -126,7 +126,8 @@ async def create_session(req: CreateSessionRequest):
         sharing = req.sharing_type if req.sharing_type else (rt.value if hasattr(rt, 'value') else str(rt or ""))
 
         # Calculate dues
-        total_due = float(req.agreed_rent + req.security_deposit + req.maintenance_fee - req.booking_amount)
+        # Deposit already includes maintenance — don't double count
+        total_due = float(req.agreed_rent + req.security_deposit - req.booking_amount)
         dues_due = max(0, total_due)
 
         # Auto-send onboarding link to tenant via WhatsApp
@@ -141,15 +142,13 @@ async def create_session(req: CreateSessionRequest):
                     phone_wa = "91" + phone_wa
                 rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else ""
                 deposit_str = f"Rs.{int(req.security_deposit):,}" if req.security_deposit else ""
-                maint_str = f"Rs.{int(req.maintenance_fee):,}" if req.maintenance_fee else ""
                 booking_str = f"Rs.{int(req.booking_amount):,}" if req.booking_amount else ""
                 dues_str = f"Rs.{int(dues_due):,}"
 
                 summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
                 summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
                 if rent_str: summary_lines.append(f"Rent: {rent_str}/month")
-                if deposit_str: summary_lines.append(f"Security Deposit: {deposit_str}")
-                if maint_str: summary_lines.append(f"Maintenance: {maint_str}")
+                if deposit_str: summary_lines.append(f"Security Deposit (incl. maintenance): {deposit_str}")
                 if booking_str: summary_lines.append(f"Advance Paid: {booking_str}")
                 summary_lines.append(f"\n*Amount due at check-in: {dues_str}*")
                 summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")

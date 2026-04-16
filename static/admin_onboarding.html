@@ -753,14 +753,13 @@
   function updateDues() {
     const rent = parseFloat(document.getElementById('agreed_rent').value) || 0;
     const deposit = parseFloat(document.getElementById('security_deposit').value) || 0;
-    const maintenance = parseFloat(document.getElementById('maintenance_fee').value) || 0;
     const booking = parseFloat(document.getElementById('booking_amount').value) || 0;
-    const total = rent + deposit + maintenance - booking;
+    // Deposit already includes maintenance — don't double count
+    const total = rent + deposit - booking;
     const fmt = (v) => `₹${v.toLocaleString('en-IN')}`;
     let lines = [];
     if (rent) lines.push(`First month rent: ${fmt(rent)}`);
-    if (deposit) lines.push(`Security deposit: ${fmt(deposit)}`);
-    if (maintenance) lines.push(`Maintenance: ${fmt(maintenance)}`);
+    if (deposit) lines.push(`Security deposit (incl. maintenance): ${fmt(deposit)}`);
     if (booking) lines.push(`Less advance paid: <span style="color:var(--green);">-${fmt(booking)}</span>`);
     document.getElementById('dues-breakdown').innerHTML = lines.join('<br>') || 'Enter amounts above';
     document.getElementById('dues-total').textContent = fmt(Math.max(0, total));
