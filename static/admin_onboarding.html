@@ -482,7 +482,9 @@
                 <option value="single">Single</option>
                 <option value="double" selected>Double</option>
                 <option value="triple">Triple</option>
+                <option value="premium">Premium</option>
               </select>
+              <div id="sharing-warning" style="font-size:11px;margin-top:4px;color:#E53E3E;min-height:16px;"></div>
             </div>
 
             <div class="form-group">
@@ -732,10 +734,15 @@
 
   // ── Room auto-lookup ───────────────────────────────────────────────────────
   let roomLookupTimer = null;
+  let roomMasterSharing = '';  // master data sharing for current room
+
   document.getElementById('room_number').addEventListener('input', function() {
     clearTimeout(roomLookupTimer);
     const val = this.value.trim();
     const infoEl = document.getElementById('room-info');
+    const warnEl = document.getElementById('sharing-warning');
+    roomMasterSharing = '';
+    warnEl.textContent = '';
     if (!val) { infoEl.textContent = ''; return; }
     roomLookupTimer = setTimeout(async () => {
       try {
@@ -743,15 +750,26 @@
         if (res.ok) {
           const d = await res.json();
           infoEl.innerHTML = `<span style="color:var(--green);font-weight:600;">${d.building}</span> · Floor ${d.floor} · <b>${d.sharing}</b>`;
+          roomMasterSharing = d.sharing.toLowerCase();
           // Auto-set sharing dropdown
           const sel = document.getElementById('sharing_type');
-          const sharing = d.sharing.toLowerCase();
-          if ([...sel.options].some(o => o.value === sharing)) sel.value = sharing;
+          if ([...sel.options].some(o => o.value === roomMasterSharing)) sel.value = roomMasterSharing;
+          warnEl.textContent = '';
         } else {
-          infoEl.innerHTML = `<span style="color:#E53E3E;">Room not found</span>`;
+          infoEl.innerHTML = `<span style="color:#E53E3E;">Room not found in master data</span>`;
         }
       } catch(e) { infoEl.textContent = ''; }
     }, 400);
+  });
+
+  // Warn if sharing override differs from master data
+  document.getElementById('sharing_type').addEventListener('change', function() {
+    const warnEl = document.getElementById('sharing-warning');
+    if (roomMasterSharing && this.value !== roomMasterSharing) {
+      warnEl.textContent = `Master data says "${roomMasterSharing}" — you are overriding to "${this.value}"`;
+    } else {
+      warnEl.textContent = '';
+    }
   });
 
   // ── Reset form ─────────────────────────────────────────────────────────────
