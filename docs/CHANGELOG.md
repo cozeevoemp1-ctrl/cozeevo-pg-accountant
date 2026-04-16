@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.31.0] — 2026-04-16 — Day-wise Onboarding + Consistency Audit
+
+### Day-wise Onboarding (NEW)
+- Admin form: Stay Type toggle (Monthly/Daily) — daily shows checkout date, num days, daily rate
+- Approve branches: daily → DaywiseStay DB + DAY WISE sheet; monthly → Tenancy + TENANTS + monthly tab
+- `add_daywise_stay()` in gsheets.py — header-based mapping to DAY WISE tab
+- Migration: added checkout_date, num_days, daily_rate to onboarding_sessions table
+- Both paths share: tenant creation, selfie/ID/signature, PDF, WhatsApp
+
+### Consistency Audit (3 parallel agents)
+- **Day-wise:** Was not wired — dropdown existed but approve always created monthly Tenancy. Fixed.
+- **Dues:** tenant_handler.py MY_BALANCE ignores prev_due (bug noted, fix next session)
+- **Bot path:** DB keeps deposit separate (correct for accounting), Sheet combines (correct for receptionist)
+
 ## [1.30.0] — 2026-04-16 — Dues Logic + Monthly Rollover + Sheet Consistency
 
 ### Dues Calculation (FINAL)
