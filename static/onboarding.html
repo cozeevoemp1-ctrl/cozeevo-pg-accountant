@@ -1389,12 +1389,9 @@
   async function openCamera() {
     const modal = document.getElementById('camera-modal');
     const video = document.getElementById('camera-video');
-    modal.classList.add('active');
-    document.getElementById('camera-live').style.display = '';
-    document.getElementById('camera-preview').style.display = 'none';
 
     try {
-      // Request high-quality front camera
+      // Request camera FIRST, before showing modal
       cameraStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
@@ -1405,9 +1402,14 @@
         audio: false
       });
       video.srcObject = cameraStream;
+      // Only show modal after camera is ready
+      modal.classList.add('active');
+      document.getElementById('camera-live').style.display = '';
+      document.getElementById('camera-preview').style.display = 'none';
     } catch (err) {
       // Camera not available — fallback to file input
       modal.classList.remove('active');
+      if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
       document.getElementById('selfie-input').click();
     }
   }
