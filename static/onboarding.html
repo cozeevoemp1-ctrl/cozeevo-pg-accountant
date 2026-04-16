@@ -346,6 +346,22 @@
       touch-action: none;
     }
 
+    /* Room + Photo side by side */
+    .room-photo-row {
+      display: flex; gap: 16px; align-items: stretch; margin-bottom: 16px;
+    }
+    .room-photo-row .room-card {
+      flex: 1; margin-bottom: 0;
+    }
+    .photo-upload-col {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-width: 100px; padding: 12px 0;
+    }
+    @media (max-width: 480px) {
+      .room-photo-row { flex-direction: column; align-items: stretch; }
+      .photo-upload-col { flex-direction: row; gap: 10px; padding: 8px 0; }
+    }
+
     /* Selfie circle upload */
     .selfie-upload {
       width: 90px; height: 90px; border-radius: 50%; border: 2px dashed #E8ECF0;
@@ -542,45 +558,46 @@
     <div class="step-title">Personal Details</div>
     <div class="step-subtitle">Let's start with your basic information</div>
 
-    <div id="room-summary-card" class="room-card" style="display:none;">
-      <h3>Your Room Booking</h3>
-      <div class="room-card-grid">
-        <div class="room-card-item">
-          <div class="room-card-label">Room</div>
-          <div class="room-card-value" id="card-room">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Bed</div>
-          <div class="room-card-value" id="card-bed">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Move-in Date</div>
-          <div class="room-card-value" id="card-checkin">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Monthly Rent</div>
-          <div class="room-card-value" id="card-rent">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Deposit</div>
-          <div class="room-card-value" id="card-deposit">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Lock-in</div>
-          <div class="room-card-value" id="card-lockin">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Selfie / Profile Photo -->
-    <div style="text-align:center; margin-bottom:16px;">
-      <div class="selfie-upload" id="selfie-upload-area" onclick="document.getElementById('selfie-input').click()">
-        <input type="file" id="selfie-input" accept="image/*"  style="display:none;" onchange="handleSelfieUpload(this)">
-        <div id="selfie-preview-wrap">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+    <!-- Room card + Selfie side by side -->
+    <div id="room-summary-card" class="room-photo-row" style="display:none;">
+      <div class="room-card">
+        <h3>Your Room Booking</h3>
+        <div class="room-card-grid">
+          <div class="room-card-item">
+            <div class="room-card-label">Room</div>
+            <div class="room-card-value" id="card-room">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Bed</div>
+            <div class="room-card-value" id="card-bed">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Move-in Date</div>
+            <div class="room-card-value" id="card-checkin">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Monthly Rent</div>
+            <div class="room-card-value" id="card-rent">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Deposit</div>
+            <div class="room-card-value" id="card-deposit">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Lock-in</div>
+            <div class="room-card-value" id="card-lockin">—</div>
+          </div>
         </div>
       </div>
-      <div style="font-size:12px; color:#718096; margin-top:6px;">Tap to take photo or upload</div>
+      <div class="photo-upload-col">
+        <div class="selfie-upload" id="selfie-upload-area">
+          <input type="file" id="selfie-input" accept="image/*" style="display:none;" onchange="handleSelfieUpload(this)">
+          <div id="selfie-preview-wrap">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+          </div>
+        </div>
+        <div style="font-size:11px; color:#718096; margin-top:6px; text-align:center;">Your Photo</div>
+      </div>
     </div>
 
     <div class="field">
@@ -766,7 +783,7 @@
 
     <div class="field">
       <label>Upload ID Photo *</label>
-      <div class="upload-area" id="id-upload-area" onclick="document.getElementById('id-photo-input').click()">
+      <div class="upload-area" id="id-upload-area">
         <input type="file" id="id-photo-input" accept="image/*"  style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
         <div id="id-photo-preview" class="upload-preview"></div>
         <div class="upload-placeholder" id="id-upload-placeholder">
@@ -1029,6 +1046,16 @@
   function stripDigits(v) {
     return (v || '').replace(/\D/g, '');
   }
+
+  // Wire up upload clicks via JS (not inline onclick — avoids auto-trigger on display change)
+  document.getElementById('selfie-upload-area').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('selfie-input').click();
+  });
+  document.getElementById('id-upload-area').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('id-photo-input').click();
+  });
 
   function handleSelfieUpload(input) {
     const file = input.files && input.files[0];
