@@ -5,6 +5,7 @@ Onboarding form API — receptionist creates session, tenant fills, receptionist
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from datetime import datetime, timedelta, date
 from decimal import Decimal
@@ -61,7 +62,9 @@ class TenantSubmitRequest(BaseModel):
     office_phone: str = ""
     id_proof_type: str = ""
     id_proof_number: str = ""
-    signature_image: str  # base64 PNG
+    id_photo: str = ""       # base64 image or PDF data URL
+    selfie_photo: str = ""   # base64 image data URL
+    signature_image: str     # base64 PNG
 
 
 # ── Create session (receptionist) ────────────────────────────────────────────
@@ -188,7 +191,49 @@ async def tenant_submit(token: str, req: TenantSubmitRequest):
             obs.status = "expired"
             raise HTTPException(410, "This onboarding link has expired")
 
-        tenant_data = req.model_dump(exclude={"signature_image"})
+        # Save uploaded files to disk
+        from pathlib import Path
+        import base64 as b64mod
+        media_dir = Path(os.getenv("MEDIA_DIR", "media"))
+        token_short = obs.token[:8]
+        saved_files = {}
+
+        for field_name, data_url in [("selfie", req.selfie_photo), ("id_proof", req.id_photo)]:
+            if not data_url or "base64," not in data_url:
+                continue
+            try:
+                header, b64_data = data_url.split("base64,", 1)
+                # Detect file type
+                if "pdf" in header:
+                    ext = ".pdf"
+                elif "png" in header:
+                    ext = ".png"
+                elif "webp" in header:
+                    ext = ".webp"
+                else:
+                    ext = ".jpg"
+                save_dir = media_dir / "onboarding" / token_short
+                save_dir.mkdir(parents=True, exist_ok=True)
+                file_path = save_dir / f"{field_name}{ext}"
+                file_path.write_bytes(b64mod.b64decode(b64_data))
+                saved_files[field_name] = str(file_path.relative_to(media_dir))
+            except Exception:
+                pass  # non-fatal — form still submits
+
+        # Save signature to disk too
+        if req.signature_image and "base64," in req.signature_image:
+            try:
+                _, sig_b64 = req.signature_image.split("base64,", 1)
+                save_dir = media_dir / "onboarding" / token_short
+                save_dir.mkdir(parents=True, exist_ok=True)
+                sig_path = save_dir / "signature.png"
+                sig_path.write_bytes(b64mod.b64decode(sig_b64))
+                saved_files["signature"] = str(sig_path.relative_to(media_dir))
+            except Exception:
+                pass
+
+        tenant_data = req.model_dump(exclude={"signature_image", "id_photo", "selfie_photo"})
+        tenant_data["_saved_files"] = saved_files  # paths for approve step
         obs.tenant_data = json.dumps(tenant_data)
         obs.signature_image = req.signature_image
         obs.status = "pending_review"
@@ -332,7 +377,77 @@ async def approve_session(token: str):
             import logging
             logging.getLogger(__name__).error("PDF generation failed: %s", e)
 
+        # Save documents (selfie, ID proof, signature, agreement PDF) linked to tenant
+        from src.database.models import Document, DocumentType
+        saved_files = td.get("_saved_files", {})
+        doc_map = {
+            "selfie": DocumentType.photo,
+            "id_proof": DocumentType.id_proof,
+            "signature": DocumentType.photo,
+        }
+        for file_key, doc_type in doc_map.items():
+            file_path = saved_files.get(file_key)
+            if file_path:
+                session.add(Document(
+                    doc_type=doc_type,
+                    file_path=file_path,
+                    original_name=f"{file_key}_{td.get('name', 'tenant')}",
+                    mime_type="image/png" if file_key == "signature" else "image/jpeg",
+                    tenant_id=tenant.id,
+                    tenancy_id=tenancy.id,
+                ))
+        # Agreement PDF as document
+        if obs.agreement_pdf_path:
+            session.add(Document(
+                doc_type=DocumentType.agreement,
+                file_path=obs.agreement_pdf_path,
+                original_name=f"agreement_{td.get('name', 'tenant')}",
+                mime_type="application/pdf",
+                tenant_id=tenant.id,
+                tenancy_id=tenancy.id,
+            ))
+
+        # Send signed PDF to tenant via WhatsApp
+        whatsapp_note = ""
+        if obs.agreement_pdf_path and obs.tenant_phone:
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp_document, _send_whatsapp
+                from pathlib import Path
+                # Build public URL for the PDF
+                base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
+                pdf_url = f"{base_url}/static/agreements/{obs.agreement_pdf_path}"
+                # Also copy PDF to static dir so it's accessible
+                media_dir = Path(os.getenv("MEDIA_DIR", "media"))
+                src_pdf = media_dir / obs.agreement_pdf_path
+                static_pdf_dir = Path("static/agreements") / Path(obs.agreement_pdf_path).parent.name
+                static_pdf_dir.mkdir(parents=True, exist_ok=True)
+                static_pdf = static_pdf_dir / Path(obs.agreement_pdf_path).name
+                if src_pdf.exists():
+                    import shutil
+                    shutil.copy2(str(src_pdf), str(static_pdf))
+
+                phone_wa = obs.tenant_phone.strip()
+                if not phone_wa.startswith("91"):
+                    phone_wa = "91" + phone_wa
+                await _send_whatsapp(
+                    phone_wa,
+                    f"Welcome to Cozeevo, {td.get('name', '')}! 🏠\n\n"
+                    f"Your registration for Room {room.room_number} is confirmed.\n"
+                    f"Check-in: {checkin.strftime('%d %b %Y')}\n\n"
+                    f"Your signed rental agreement is attached below."
+                )
+                await _send_whatsapp_document(
+                    phone_wa,
+                    pdf_url,
+                    f"Cozeevo_Agreement_{td.get('name', '').replace(' ', '_')}.pdf",
+                    "Your signed rental agreement"
+                )
+                whatsapp_note = " | WhatsApp sent"
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error("WhatsApp PDF delivery failed: %s", e)
+
         return {
             "status": "approved", "tenant_id": tenant.id, "tenancy_id": tenancy.id,
-            "message": f"Tenant {td['name']} created{gsheets_note}",
+            "message": f"Tenant {td['name']} created{gsheets_note}{whatsapp_note}",
         }
