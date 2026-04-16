@@ -202,6 +202,7 @@ async def get_session_data(token: str):
             "lock_in_months": obs.lock_in_months or 0,
             "special_terms": obs.special_terms or "",
             "tenant_data": json.loads(obs.tenant_data) if obs.tenant_data else None,
+            "signature_image": obs.signature_image or "",
         }
 
 

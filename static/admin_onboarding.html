@@ -843,13 +843,47 @@
     const hasTenantData = Object.keys(td).length > 0;
     const status = data.status;
 
+    // Signature preview
     let sigHtml = '';
     if (data.signature_image) {
+      // signature_image is a full data URL (data:image/png;base64,...) or raw base64
+      const sigSrc = data.signature_image.startsWith('data:') ? data.signature_image : `data:image/png;base64,${data.signature_image}`;
       sigHtml = `<div class="section-divider">Signature</div>
-        <div class="sig-preview"><img src="data:image/png;base64,${data.signature_image}" alt="Signature"></div>`;
+        <div class="sig-preview"><img src="${sigSrc}" alt="Signature" style="max-width:300px;max-height:80px;border:1px solid #E2E8F0;border-radius:6px;padding:4px;background:#fff;"></div>`;
     } else if (hasTenantData) {
       sigHtml = `<div class="section-divider">Signature</div>
         <div class="sig-preview"><div class="sig-missing">No signature captured</div></div>`;
+    }
+
+    // Uploaded photos (selfie + ID proof) — stored as file paths in _saved_files
+    let photosHtml = '';
+    const savedFiles = td._saved_files || {};
+    if (savedFiles.selfie || savedFiles.id_proof) {
+      photosHtml = `<div class="section-divider">Uploaded Documents</div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">`;
+      if (savedFiles.selfie) {
+        const selfieUrl = '/media/' + savedFiles.selfie;
+        photosHtml += `<div style="text-align:center;">
+          <img src="${selfieUrl}" alt="Selfie" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid #00AEED;">
+          <div style="font-size:10px;color:#718096;margin-top:4px;">Selfie</div>
+        </div>`;
+      }
+      if (savedFiles.id_proof) {
+        const idUrl = '/media/' + savedFiles.id_proof;
+        if (savedFiles.id_proof.endsWith('.pdf')) {
+          photosHtml += `<div style="text-align:center;">
+            <div style="width:80px;height:80px;background:#FEF2F2;border:2px solid #E53E3E;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+              <a href="${idUrl}" target="_blank" style="color:#E53E3E;font-size:11px;font-weight:600;">PDF<br>View</a>
+            </div>
+            <div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div>
+          </div>`;
+        } else {
+          photosHtml += `<div style="text-align:center;">
+            <img src="${idUrl}" alt="ID Proof" style="width:100px;height:70px;object-fit:cover;border-radius:8px;border:2px solid #00AEED;">
+            <div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div>
+          </div>`;
+        }
+      }
+      photosHtml += `</div>`;
     }
 
     const fmtMoney = (v) => v ? `₹${Number(v).toLocaleString('en-IN')}` : '—';
@@ -893,6 +927,8 @@
       ` : `
         <div style="padding:12px 0;color:var(--muted);font-size:13px;">Tenant hasn't filled the form yet.</div>
       `}
+
+      ${photosHtml}
 
       ${sigHtml}
 

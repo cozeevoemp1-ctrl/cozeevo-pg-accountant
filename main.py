@@ -37,7 +37,7 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
         # Dashboard API is token-protected at the endpoint level
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
                 or path.startswith("/dashboard") or path.startswith("/api/dashboard")
-                or path.startswith("/static")
+                or path.startswith("/static") or path.startswith("/media")
                 or path.startswith("/onboard")):  # tenant onboarding form (public)
             return await call_next(request)
 
@@ -258,6 +258,11 @@ app.mount("/dashboards", StaticFiles(directory=str(dashboard_dir), html=True), n
 static_dir = Path("./static")
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Media files (uploaded photos, PDFs, agreements)
+media_dir = Path(os.getenv("MEDIA_DIR", "./media"))
+media_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
 
 @app.get("/dashboard")
 async def dashboard_page():
