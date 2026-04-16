@@ -111,7 +111,6 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 12px;
-      padding-right: 70px; /* leave space for selfie circle */
     }
 
     .room-card-item { font-size: 13px; }
@@ -347,11 +346,23 @@
       touch-action: none;
     }
 
-    /* Selfie photo inside room card — top right */
-    .selfie-in-card {
-      position: absolute; top: 10px; right: 12px;
-      display: flex; flex-direction: column; align-items: center;
+    /* Room card + Photo card side by side, matched height */
+    .room-photo-row {
+      display: flex; gap: 10px; align-items: stretch; margin-bottom: 20px;
     }
+    .room-photo-row .room-card {
+      flex: 1; margin-bottom: 0;
+    }
+    .photo-card {
+      width: 90px; flex-shrink: 0;
+      background: #F9FAFB; border: 2px dashed #E8ECF0; border-radius: 10px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; transition: border-color 0.2s; gap: 6px;
+    }
+    .photo-card:hover { border-color: #EF1F9C; }
+    .photo-card.has-photo { border: 2px solid #00AEED; background: #fff; padding: 4px; }
+    .photo-card.has-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+    .photo-card-label { font-size: 10px; color: #718096; text-align: center; }
 
     /* Selfie circle upload */
     .selfie-upload {
@@ -549,44 +560,43 @@
     <div class="step-title">Personal Details</div>
     <div class="step-subtitle">Let's start with your basic information</div>
 
-    <!-- Room card with photo overlay -->
-    <div id="room-summary-card" class="room-card" style="display:none; position:relative;">
-      <h3>Your Room Booking</h3>
-      <!-- Selfie circle — top right of the card -->
-      <div class="selfie-in-card">
-        <div class="selfie-upload" id="selfie-upload-area">
-          <input type="file" id="selfie-input" accept="image/*" style="display:none;" onchange="handleSelfieUpload(this)">
-          <div id="selfie-preview-wrap">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
+    <!-- Room card + Photo card side by side, same height -->
+    <div id="room-summary-card" class="room-photo-row" style="display:none;">
+      <div class="room-card">
+        <h3>Your Room Booking</h3>
+        <div class="room-card-grid">
+          <div class="room-card-item">
+            <div class="room-card-label">Room</div>
+            <div class="room-card-value" id="card-room">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Bed</div>
+            <div class="room-card-value" id="card-bed">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Move-in Date</div>
+            <div class="room-card-value" id="card-checkin">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Monthly Rent</div>
+            <div class="room-card-value" id="card-rent">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Deposit</div>
+            <div class="room-card-value" id="card-deposit">—</div>
+          </div>
+          <div class="room-card-item">
+            <div class="room-card-label">Lock-in</div>
+            <div class="room-card-value" id="card-lockin">—</div>
           </div>
         </div>
-        <div style="font-size:9px; color:#718096; text-align:center; margin-top:3px;">Your Photo</div>
       </div>
-      <div class="room-card-grid">
-        <div class="room-card-item">
-          <div class="room-card-label">Room</div>
-          <div class="room-card-value" id="card-room">—</div>
+      <div class="photo-card" id="selfie-upload-area">
+        <input type="file" id="selfie-input" accept="image/*" style="display:none;" onchange="handleSelfieUpload(this)">
+        <div id="selfie-preview-wrap">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
         </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Bed</div>
-          <div class="room-card-value" id="card-bed">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Move-in Date</div>
-          <div class="room-card-value" id="card-checkin">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Monthly Rent</div>
-          <div class="room-card-value" id="card-rent">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Deposit</div>
-          <div class="room-card-value" id="card-deposit">—</div>
-        </div>
-        <div class="room-card-item">
-          <div class="room-card-label">Lock-in</div>
-          <div class="room-card-value" id="card-lockin">—</div>
-        </div>
+        <div class="photo-card-label">Your Photo</div>
       </div>
     </div>
 
@@ -731,8 +741,12 @@
     </div>
 
     <div class="field">
+      <label for="office-name">Office / College Name</label>
+      <input type="text" id="office-name" placeholder="Company or institution name">
+    </div>
+    <div class="field">
       <label for="office-address">Office / College Address</label>
-      <textarea id="office-address" placeholder="Optional"></textarea>
+      <textarea id="office-address" placeholder="Full address (optional)"></textarea>
     </div>
 
     <div class="field">
@@ -774,12 +788,12 @@
     <div class="field">
       <label>Upload ID Photo *</label>
       <div class="upload-area" id="id-upload-area">
-        <input type="file" id="id-photo-input" accept="image/*"  style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
+        <input type="file" id="id-photo-input" accept="image/*,application/pdf" style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
         <div id="id-photo-preview" class="upload-preview"></div>
         <div class="upload-placeholder" id="id-upload-placeholder">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span>Tap to upload ID photo</span>
-          <span style="font-size:11px; color:#A0AEC0;">Front side of your ID card</span>
+          <span>Tap to upload ID proof</span>
+          <span style="font-size:11px; color:#A0AEC0;">Photo or PDF of your ID</span>
         </div>
       </div>
       <div class="error-msg" id="err-id-photo">Please upload a photo of your ID</div>
@@ -940,7 +954,7 @@
 
     // Show card if we have any data
     if (data.room_number || data.monthly_rent) {
-      document.getElementById('room-summary-card').style.display = 'block';
+      document.getElementById('room-summary-card').style.display = 'flex';
     }
 
     // Agreement step values
@@ -974,10 +988,12 @@
     updateProgress(n);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Update agree-name from name field when reaching step 5
+    // Update agree-name and reinit signature canvas when reaching step 5
     if (n === 5) {
       const name = document.getElementById('name').value.trim();
       document.getElementById('agree-name').textContent = name || '—';
+      // Reinit canvas now that step 5 is visible (getBoundingClientRect works)
+      setTimeout(initSignatureCanvas, 50);
     }
   }
 
@@ -1056,7 +1072,11 @@
     reader.onload = function(e) {
       const wrap = document.getElementById('selfie-preview-wrap');
       wrap.innerHTML = '<img src="' + e.target.result + '" alt="Your photo">';
-      document.getElementById('selfie-upload-area').classList.add('has-photo');
+      const card = document.getElementById('selfie-upload-area');
+      card.classList.add('has-photo');
+      // Hide the label once photo is uploaded
+      const label = card.querySelector('.photo-card-label');
+      if (label) label.style.display = 'none';
     };
     reader.readAsDataURL(file);
   }
@@ -1070,15 +1090,20 @@
   function handleFileUpload(input, previewId, areaId) {
     const file = input.files && input.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) { alert('Please select an image file'); return; }
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) { alert('Please select an image or PDF file'); return; }
     if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
 
     const reader = new FileReader();
     reader.onload = function(e) {
       const preview = document.getElementById(previewId);
-      preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
+      if (isPdf) {
+        preview.innerHTML = '<div style="text-align:center;padding:12px;"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div style="font-size:12px;color:#2D3748;margin-top:4px;word-break:break-all;">' + file.name + '</div></div>';
+      } else {
+        preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
+      }
       preview.classList.add('visible');
-      // Hide placeholder
       const area = document.getElementById(areaId);
       area.classList.add('has-file');
       const placeholder = area.querySelector('.upload-placeholder');
@@ -1136,7 +1161,7 @@
       permanent_address: document.getElementById('perm-address').value.trim(),
       occupation: document.getElementById('occupation').value.trim(),
       educational_qualification: document.getElementById('education').value.trim(),
-      office_address: document.getElementById('office-address').value.trim(),
+      office_address: [document.getElementById('office-name').value.trim(), document.getElementById('office-address').value.trim()].filter(Boolean).join(', '),
       office_phone: stripDigits(document.getElementById('office-phone').value),
       // Step 4
       id_proof_type: document.getElementById('id-type').value,
