@@ -125,6 +125,10 @@ async def create_session(req: CreateSessionRequest):
         rt = room.room_type
         sharing = req.sharing_type if req.sharing_type else (rt.value if hasattr(rt, 'value') else str(rt or ""))
 
+        # Calculate dues
+        total_due = float(req.agreed_rent + req.security_deposit + req.maintenance_fee - req.booking_amount)
+        dues_due = max(0, total_due)
+
         # Auto-send onboarding link to tenant via WhatsApp
         base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
         onboard_link = f"{base_url}/onboard/{token}"
@@ -136,16 +140,22 @@ async def create_session(req: CreateSessionRequest):
                 if not phone_wa.startswith("91"):
                     phone_wa = "91" + phone_wa
                 rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else ""
-                await _send_whatsapp(
-                    phone_wa,
-                    f"Hello! Welcome to *Cozeevo Co-living*\n\n"
-                    f"Room *{room.room_number}* ({building}) has been reserved for you.\n"
-                    + (f"Rent: {rent_str}/month\n" if rent_str else "")
-                    + f"\nPlease complete your registration using the link below:\n\n"
-                    f"{onboard_link}\n\n"
-                    f"This link is valid for 48 hours.\n"
-                    f"For any questions, contact us on this number."
-                )
+                deposit_str = f"Rs.{int(req.security_deposit):,}" if req.security_deposit else ""
+                maint_str = f"Rs.{int(req.maintenance_fee):,}" if req.maintenance_fee else ""
+                booking_str = f"Rs.{int(req.booking_amount):,}" if req.booking_amount else ""
+                dues_str = f"Rs.{int(dues_due):,}"
+
+                summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
+                summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
+                if rent_str: summary_lines.append(f"Rent: {rent_str}/month")
+                if deposit_str: summary_lines.append(f"Security Deposit: {deposit_str}")
+                if maint_str: summary_lines.append(f"Maintenance: {maint_str}")
+                if booking_str: summary_lines.append(f"Advance Paid: {booking_str}")
+                summary_lines.append(f"\n*Amount due at check-in: {dues_str}*")
+                summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
+                summary_lines.append(f"\nThis link is valid for 48 hours.\nFor any questions, contact us on this number.")
+
+                await _send_whatsapp(phone_wa, "\n".join(summary_lines))
                 whatsapp_sent = True
             except Exception as e:
                 import logging
@@ -157,6 +167,7 @@ async def create_session(req: CreateSessionRequest):
             "full_link": onboard_link,
             "session_id": obs.id,
             "whatsapp_sent": whatsapp_sent,
+            "dues_due": dues_due,
             "room": {"number": room.room_number, "building": building, "floor": str(room.floor or ""), "sharing": sharing},
         }
 
