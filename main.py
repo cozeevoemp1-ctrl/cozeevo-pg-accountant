@@ -38,11 +38,9 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
                 or path.startswith("/dashboard") or path.startswith("/api/dashboard")
                 or path.startswith("/static") or path.startswith("/media")
-                or path.startswith("/onboard")):  # tenant onboarding form (public)
-            return await call_next(request)
-
-        # Onboarding API: tenant endpoints are public, admin endpoints are local-only
-        if path.startswith("/api/onboarding/") and "/admin/" not in path:
+                or path.startswith("/onboard")  # tenant onboarding form (public)
+                or path.startswith("/admin/onboarding")  # admin onboarding panel
+                or path.startswith("/api/onboarding")):  # all onboarding API endpoints
             return await call_next(request)
 
         # Everything else (/api/*, /docs, /redoc, /openapi.json) — localhost only
