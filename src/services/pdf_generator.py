@@ -24,7 +24,7 @@ AGREEMENT_DIR = MEDIA_DIR / "agreements"
 
 
 HOUSE_RULES = [
-    "Rent of {rent} is due on the 1st of every month. Late payment after 5th incurs Rs.100/day penalty.",
+    "Rent of {rent} is due on the 1st of every month. Late payment after the 5th incurs Rs.200/day penalty.",
     "Security deposit of {deposit} is refundable on checkout after deducting damages and outstanding dues.",
     "Minimum stay period is {lock_in} months. Early exit forfeits the security deposit.",
     "30-day written notice is required before checkout.",
