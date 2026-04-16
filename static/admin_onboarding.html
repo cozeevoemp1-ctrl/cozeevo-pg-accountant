@@ -1022,7 +1022,7 @@
       // signature_image is a full data URL (data:image/png;base64,...) or raw base64
       const sigSrc = data.signature_image.startsWith('data:') ? data.signature_image : `data:image/png;base64,${data.signature_image}`;
       sigHtml = `<div class="section-divider">Signature</div>
-        <div class="sig-preview"><img src="${sigSrc}" alt="Signature" style="max-width:300px;max-height:80px;border:1px solid #E2E8F0;border-radius:6px;padding:4px;background:#fff;"></div>`;
+        <div class="sig-preview" style="cursor:pointer;" onclick="openLightbox('${sigSrc}')"><img src="${sigSrc}" alt="Signature" style="max-width:300px;max-height:80px;border:1px solid #E2E8F0;border-radius:6px;padding:4px;background:#fff;"></div>`;
     } else if (hasTenantData) {
       sigHtml = `<div class="section-divider">Signature</div>
         <div class="sig-preview"><div class="sig-missing">No signature captured</div></div>`;
@@ -1037,9 +1037,9 @@
       photosHtml = `<div class="section-divider">Uploaded Documents</div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">`;
       if (savedFiles.selfie) {
         const selfieUrl = '/media/' + savedFiles.selfie;
-        photosHtml += `<div style="text-align:center;">
+        photosHtml += `<div style="text-align:center;cursor:pointer;" onclick="openLightbox('${selfieUrl}')">
           <img src="${selfieUrl}" alt="Selfie" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid #00AEED;">
-          <div style="font-size:10px;color:#718096;margin-top:4px;">Selfie</div>
+          <div style="font-size:10px;color:#718096;margin-top:4px;">Selfie (click to enlarge)</div>
         </div>`;
       }
       if (savedFiles.id_proof) {
@@ -1052,9 +1052,9 @@
             <div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div>
           </div>`;
         } else {
-          photosHtml += `<div style="text-align:center;">
+          photosHtml += `<div style="text-align:center;cursor:pointer;" onclick="openLightbox('${idUrl}')">
             <img src="${idUrl}" alt="ID Proof" style="width:100px;height:70px;object-fit:cover;border-radius:8px;border:2px solid #00AEED;">
-            <div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div>
+            <div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof (click to enlarge)</div>
           </div>`;
         }
       }
@@ -1329,6 +1329,20 @@
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 2200);
   }
+
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+  function openLightbox(src) {
+    const lb = document.createElement('div');
+    lb.id = 'lightbox';
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    lb.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+      <div style="position:absolute;top:16px;right:20px;color:#fff;font-size:14px;opacity:0.7;">Press Esc or click to close</div>`;
+    lb.onclick = () => lb.remove();
+    document.body.appendChild(lb);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { const lb = document.getElementById('lightbox'); if (lb) lb.remove(); }
+  });
 </script>
 
 </body>
