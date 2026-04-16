@@ -273,8 +273,12 @@ async def tenant_submit(token: str, req: TenantSubmitRequest):
 
 # ── Approve session (admin) ──────────────────────────────────────────────────
 
+class ApproveRequest(BaseModel):
+    staff_signature: str = ""  # base64 PNG data URL
+
+
 @router.post("/{token}/approve")
-async def approve_session(token: str):
+async def approve_session(token: str, req: ApproveRequest = None):
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
@@ -397,10 +401,29 @@ async def approve_session(token: str):
             import logging
             logging.getLogger(__name__).error("GSheets onboarding: %s", e)
 
-        # PDF generation
+        # Save staff signature to disk
+        staff_sig_path = ""
+        if req and req.staff_signature and "base64," in req.staff_signature:
+            try:
+                import base64 as b64mod
+                from pathlib import Path
+                media_dir = Path(os.getenv("MEDIA_DIR", "media"))
+                _, sig_b64 = req.staff_signature.split("base64,", 1)
+                save_dir = media_dir / "onboarding" / obs.token[:8]
+                save_dir.mkdir(parents=True, exist_ok=True)
+                sig_file = save_dir / "staff_signature.png"
+                sig_file.write_bytes(b64mod.b64decode(sig_b64))
+                staff_sig_path = str(sig_file.relative_to(media_dir))
+            except Exception:
+                pass
+
+        # PDF generation (includes both tenant + staff signatures)
         try:
             from src.services.pdf_generator import generate_agreement_pdf
-            pdf_path = await generate_agreement_pdf(obs, td, room, building, sharing)
+            pdf_path = await generate_agreement_pdf(
+                obs, td, room, building, sharing,
+                staff_signature=req.staff_signature if req else "",
+            )
             obs.agreement_pdf_path = pdf_path
         except Exception as e:
             import logging

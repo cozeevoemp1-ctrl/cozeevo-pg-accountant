@@ -39,7 +39,7 @@ HOUSE_RULES = [
 ]
 
 
-def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
+def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str, staff_signature: str = "") -> str:
     """Generate agreement PDF. Returns relative path from MEDIA_DIR."""
     save_dir = AGREEMENT_DIR / datetime.now().strftime("%Y-%m")
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -113,28 +113,52 @@ def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str
 
     elements.append(Spacer(1, 8*mm))
 
-    # Signature
-    elements.append(Paragraph("Tenant Signature", heading_style))
+    # ── Signatures (side by side: tenant left, staff right) ──
+    elements.append(Paragraph("Signatures", heading_style))
     elements.append(Paragraph(
         f"I, {tenant_data.get('name', '')}, confirm that I have read and agree to all terms above.",
         small
     ))
     elements.append(Spacer(1, 3*mm))
 
+    # Build signature images
+    tenant_sig_el = Paragraph("[Signature on file]", small)
     sig_data = obs.signature_image or ""
     if sig_data and "base64," in sig_data:
         try:
             b64 = sig_data.split("base64,")[1]
             img_bytes = base64.b64decode(b64)
-            img_buf = io.BytesIO(img_bytes)
-            sig_img = Image(img_buf, width=60*mm, height=20*mm)
-            elements.append(sig_img)
+            tenant_sig_el = Image(io.BytesIO(img_bytes), width=55*mm, height=18*mm)
         except Exception:
-            elements.append(Paragraph("[Signature on file]", small))
-    else:
-        elements.append(Paragraph("[Signature on file]", small))
+            pass
 
-    elements.append(Spacer(1, 3*mm))
+    staff_sig_el = Paragraph("[Awaiting staff signature]", small)
+    if staff_signature and "base64," in staff_signature:
+        try:
+            b64 = staff_signature.split("base64,")[1]
+            img_bytes = base64.b64decode(b64)
+            staff_sig_el = Image(io.BytesIO(img_bytes), width=55*mm, height=18*mm)
+        except Exception:
+            pass
+
+    # Two-column signature table
+    sig_table_data = [
+        [Paragraph("<b>Tenant</b>", small), Paragraph("<b>Authorized Staff</b>", small)],
+        [tenant_sig_el, staff_sig_el],
+        [Paragraph(tenant_data.get('name', ''), small), Paragraph("Cozeevo Co-living", small)],
+    ]
+    sig_table = Table(sig_table_data, colWidths=[80*mm, 80*mm])
+    sig_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LINEBELOW', (0, 1), (0, 1), 0.5, colors.HexColor("#EF1F9C")),
+        ('LINEBELOW', (1, 1), (1, 1), 0.5, colors.HexColor("#00AEED")),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    elements.append(sig_table)
+
+    elements.append(Spacer(1, 5*mm))
     elements.append(Paragraph(
         f"Date: {datetime.now().strftime('%d %b %Y')} | Ref: {obs.token[:8]}",
         ParagraphStyle('Footer', parent=small, textColor=colors.grey)
@@ -144,6 +168,6 @@ def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str
     return str(filepath.relative_to(MEDIA_DIR))
 
 
-async def generate_agreement_pdf(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
+async def generate_agreement_pdf(obs, tenant_data: dict, room, building: str, sharing: str, staff_signature: str = "") -> str:
     """Async wrapper for PDF generation."""
-    return await asyncio.to_thread(_generate_pdf_sync, obs, tenant_data, room, building, sharing)
+    return await asyncio.to_thread(_generate_pdf_sync, obs, tenant_data, room, building, sharing, staff_signature)

@@ -932,6 +932,17 @@
 
       ${sigHtml}
 
+      ${status === 'pending_review' ? `
+        <div class="section-divider">Staff Signature (Required to Approve)</div>
+        <div style="margin-bottom:12px;">
+          <canvas id="staff-sig-${token}" width="400" height="100" style="border:1.5px dashed #E2E8F0;border-radius:8px;cursor:crosshair;background:#fff;display:block;width:100%;max-width:400px;height:100px;touch-action:none;"></canvas>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+            <span style="font-size:11px;color:#718096;">Sign as authorized staff</span>
+            <a href="#" onclick="clearStaffSig('${token}');return false;" style="font-size:11px;color:#EF1F9C;text-decoration:none;">Clear</a>
+          </div>
+        </div>
+      ` : ''}
+
       <div class="detail-actions">
         ${status === 'pending_review' ? `
           <button class="btn btn-green btn-sm" onclick="approveSession('${token}')">Approve &amp; Create Tenant</button>
@@ -940,6 +951,70 @@
           <div style="font-size:12px;color:var(--muted);">Waiting for tenant to fill the form.</div>
         `}
       </div>`;
+
+    // Initialize staff signature canvas if pending_review
+    if (status === 'pending_review') {
+      setTimeout(() => initStaffSigCanvas(token), 50);
+    }
+  }
+
+  // ── Staff signature canvas ─────────────────────────────────────────────────
+  const staffSigState = {};  // token -> {drawn: bool}
+
+  function initStaffSigCanvas(token) {
+    const canvas = document.getElementById(`staff-sig-${token}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Set pixel dimensions from CSS size
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * (window.devicePixelRatio || 1);
+    canvas.height = rect.height * (window.devicePixelRatio || 1);
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    ctx.strokeStyle = '#00AEED';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    staffSigState[token] = { drawn: false };
+    let drawing = false, lastX = 0, lastY = 0;
+
+    function getPos(e) {
+      const r = canvas.getBoundingClientRect();
+      if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function start(e) { e.preventDefault(); drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; }
+    function draw(e) {
+      if (!drawing) return; e.preventDefault();
+      const p = getPos(e);
+      ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+      lastX = p.x; lastY = p.y;
+      staffSigState[token].drawn = true;
+    }
+    function end() { drawing = false; }
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', end);
+  }
+
+  function clearStaffSig(token) {
+    const canvas = document.getElementById(`staff-sig-${token}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (staffSigState[token]) staffSigState[token].drawn = false;
+  }
+
+  function getStaffSigDataUrl(token) {
+    const canvas = document.getElementById(`staff-sig-${token}`);
+    if (!canvas || !staffSigState[token]?.drawn) return '';
+    return canvas.toDataURL('image/png');
   }
 
   // ── Approve session ────────────────────────────────────────────────────────
@@ -949,12 +1024,23 @@
     errEl.classList.remove('show');
     okEl.classList.remove('show');
 
+    // Require staff signature
+    const staffSig = getStaffSigDataUrl(token);
+    if (!staffSig) {
+      showInlineAlert(errEl, 'Please sign as staff before approving.');
+      return;
+    }
+
     const btn = event.target;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Approving...';
 
     try {
-      const res = await fetch(`/api/onboarding/${token}/approve`, { method: 'POST' });
+      const res = await fetch(`/api/onboarding/${token}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staff_signature: staffSig }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
