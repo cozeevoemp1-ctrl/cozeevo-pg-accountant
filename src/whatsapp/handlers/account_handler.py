@@ -235,13 +235,14 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
             remaining = pm["remaining"]
             clears = amount_dec >= remaining
             status = "clears balance" if clears else "partial"
+            new_balance = remaining - amount_dec
             mismatch_note = ""
             if amount_dec > remaining:
-                overpay = amount_dec - remaining
-                mismatch_note = f"\n*Note: Overpayment of Rs.{int(overpay):,}* (due was Rs.{int(remaining):,})"
+                mismatch_note = f"\n*Overpayment: Rs.{int(abs(new_balance)):,} extra* (due was Rs.{int(remaining):,})\n*Balance after payment: Rs.0 + Rs.{int(abs(new_balance)):,} overpaid*"
             elif amount_dec < remaining:
-                underpay = remaining - amount_dec
-                mismatch_note = f"\n*Note: Rs.{int(underpay):,} will remain unpaid* (due is Rs.{int(remaining):,})"
+                mismatch_note = f"\n*Underpayment: Rs.{int(new_balance):,} will remain unpaid*\n*Balance after payment: Rs.{int(new_balance):,}*"
+            else:
+                mismatch_note = f"\n*Balance after payment: Rs.0 (fully paid)*"
             return (
                 snapshot["text"] + "\n\n"
                 f"*Confirm Payment?*\n"
