@@ -193,7 +193,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
                 # Try template first (works without 24hr window)
                 try:
                     await _send_whatsapp_template(
-                        phone_wa, "onboarding_checkin",
+                        phone_wa, "cozeevo_checkin_form",
                         [room.room_number, rent_str, onboard_link]
                     )
                     whatsapp_sent = True
