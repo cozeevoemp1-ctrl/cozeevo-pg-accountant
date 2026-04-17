@@ -2497,6 +2497,8 @@ async def resolve_pending_action(
 
     if pending.intent == "RENT_CHANGE":
         # choices here are option-picks: seq 1=one-time, seq 2=permanent
+        if chosen is None:
+            return "__KEEP_PENDING__Reply *1* for one-time or *2* for permanent change."
         permanent = (chosen.get("seq", 1) == 2)
         return await _do_rent_change(
             tenancy_id=action_data["tenancy_id"],
