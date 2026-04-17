@@ -232,14 +232,23 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
         if len(pending_months) == 1:
             # Single month — simple confirmation, no "Suggested allocation" noise
             pm = pending_months[0]
-            clears = amount_dec >= pm["remaining"]
+            remaining = pm["remaining"]
+            clears = amount_dec >= remaining
             status = "clears balance" if clears else "partial"
+            mismatch_note = ""
+            if amount_dec > remaining:
+                overpay = amount_dec - remaining
+                mismatch_note = f"\n*Note: Overpayment of Rs.{int(overpay):,}* (due was Rs.{int(remaining):,})"
+            elif amount_dec < remaining:
+                underpay = remaining - amount_dec
+                mismatch_note = f"\n*Note: Rs.{int(underpay):,} will remain unpaid* (due is Rs.{int(remaining):,})"
             return (
                 snapshot["text"] + "\n\n"
                 f"*Confirm Payment?*\n"
                 f"- Amount : Rs.{int(amount):,}\n"
                 f"- Mode   : {mode_label}\n"
-                f"- Month  : {pm['period'].strftime('%B %Y')} ({status})\n\n"
+                f"- Month  : {pm['period'].strftime('%B %Y')} ({status})\n"
+                f"{mismatch_note}\n\n"
                 "Reply *Yes* to log or *No* to cancel."
             )
         else:
