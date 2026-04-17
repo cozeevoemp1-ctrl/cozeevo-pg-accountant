@@ -184,26 +184,28 @@ async def create_session(req: CreateSessionRequest, request: Request):
         whatsapp_sent = False
         if req.tenant_phone:
             try:
-                from src.whatsapp.webhook_handler import _send_whatsapp
+                from src.whatsapp.webhook_handler import _send_whatsapp_template, _send_whatsapp
                 phone_wa = req.tenant_phone.strip()
                 if not phone_wa.startswith("91"):
                     phone_wa = "91" + phone_wa
-                rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else ""
-                deposit_str = f"Rs.{int(req.security_deposit):,}" if req.security_deposit else ""
-                booking_str = f"Rs.{int(req.booking_amount):,}" if req.booking_amount else ""
-                dues_str = f"Rs.{int(dues_due):,}"
+                rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else "Rs.0"
 
-                summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
-                summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
-                if rent_str: summary_lines.append(f"Rent: {rent_str}/month")
-                if deposit_str: summary_lines.append(f"Security Deposit (incl. maintenance): {deposit_str}")
-                if booking_str: summary_lines.append(f"Advance Paid: {booking_str}")
-                summary_lines.append(f"\n*Amount due at check-in: {dues_str}*")
-                summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
-                summary_lines.append(f"\nThis link is valid for 2 hours.\nFor any questions, contact us on this number.")
-
-                await _send_whatsapp(phone_wa, "\n".join(summary_lines))
-                whatsapp_sent = True
+                # Try template first (works without 24hr window)
+                try:
+                    await _send_whatsapp_template(
+                        phone_wa, "onboarding_checkin",
+                        [room.room_number, rent_str, onboard_link]
+                    )
+                    whatsapp_sent = True
+                except Exception:
+                    # Fallback to regular message (needs 24hr window)
+                    summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
+                    summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
+                    summary_lines.append(f"Rent: {rent_str}/month")
+                    summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
+                    summary_lines.append(f"\nThis link is valid for 2 hours.")
+                    await _send_whatsapp(phone_wa, "\n".join(summary_lines))
+                    whatsapp_sent = True
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error("WhatsApp onboarding link send failed: %s", e)

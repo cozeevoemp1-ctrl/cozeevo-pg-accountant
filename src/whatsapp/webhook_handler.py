@@ -334,6 +334,40 @@ async def _send_whatsapp(to_number: str, message: str):
         logger.error(f"[Meta] Send exception: {e}")
 
 
+async def _send_whatsapp_template(to_number: str, template_name: str, parameters: list[str]):
+    """Send WhatsApp template message — works without 24hr window."""
+    token    = os.getenv("WHATSAPP_TOKEN", "")
+    phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    if not (token and phone_id):
+        return
+    to = to_number.lstrip("+").replace(" ", "")
+    import httpx
+    url     = f"https://graph.facebook.com/v25.0/{phone_id}/messages"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    body    = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "template",
+        "template": {
+            "name": template_name,
+            "language": {"code": "en"},
+            "components": [{
+                "type": "body",
+                "parameters": [{"type": "text", "text": p} for p in parameters]
+            }]
+        }
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(url, json=body, headers=headers)
+        if resp.status_code == 200:
+            logger.info(f"[Meta] Template '{template_name}' sent to {to}")
+        else:
+            logger.error(f"[Meta] Template send failed {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"[Meta] Template send exception: {e}")
+
+
 # -- Meta interactive message sender ------------------------------------------
 
 async def _send_whatsapp_interactive(to_number: str, payload: dict):
