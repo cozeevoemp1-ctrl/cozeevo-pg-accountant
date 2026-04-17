@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.database.models import (
-    Expense, Payment, PaymentFor, PaymentMode,
+    AuditLog, Expense, Payment, PaymentFor, PaymentMode,
     PendingAction, Refund, RefundStatus, RentSchedule, RentStatus,
     Room, SharingType, Tenant, Tenancy, TenancyStatus,
 )
@@ -419,6 +419,21 @@ async def _do_log_payment_by_ids(
         receipt_url=None,
     )
     session.add(payment)
+    await session.flush()  # get payment.id
+
+    # ── Audit trail ──────────────────────────────────────────────────────────
+    room_obj_audit = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+    session.add(AuditLog(
+        changed_by=ctx_name or "bot",
+        entity_type="payment",
+        entity_id=payment.id,
+        field_name="amount",
+        old_value=None,
+        new_value=str(float(amount_dec)),
+        room_number=room_obj_audit.room_number if room_obj_audit else None,
+        source="whatsapp",
+        note=f"Payment Rs.{int(amount_dec):,} {mode} for {period_month.strftime('%b %Y')} — {tenant.name}",
+    ))
 
     total_paid = prev_paid + amount_dec
     rent_due = (rs.rent_due if rs else tenancy.agreed_rent) or Decimal("0")
@@ -436,8 +451,16 @@ async def _do_log_payment_by_ids(
     underpayment_note = ""
     if Decimal("0") < remaining <= effective_due:
         underpayment_note = (
-            f"\n💡 Rs.{int(remaining):,} still outstanding for {period_month.strftime('%b %Y')}. "
-            "Log the rest when received."
+            f"\n💡 Rs.{int(remaining):,} still outstanding for {period_month.strftime('%b %Y')}.\n"
+            "Want to add a note? Reply with the reason or *skip* to continue."
+        )
+        await _save_pending(
+            tenant.phone or ctx_name, "UNDERPAYMENT_NOTE",
+            {
+                "payment_id": payment.id, "tenant_name": tenant.name,
+                "remaining": float(remaining),
+            },
+            [], session,
         )
 
     # ── Overpayment check ──────────────────────────────────────────────────────
@@ -449,6 +472,7 @@ async def _do_log_payment_by_ids(
             {"seq": 1, "label": f"Advance for {next_m.strftime('%b %Y')}"},
             {"seq": 2, "label": "Add to security deposit"},
             {"seq": 3, "label": "Ask tenant what it's for"},
+            {"seq": 4, "label": "Add a note"},
         ]
         await _save_pending(
             tenant.phone or ctx_name, "OVERPAYMENT_RESOLVE",
@@ -463,8 +487,9 @@ async def _do_log_payment_by_ids(
             f"\n\n⚠️ *Overpayment: Rs.{int(extra):,} extra*\n"
             f"1. Advance for {next_m.strftime('%b %Y')}\n"
             "2. Add to security deposit\n"
-            "3. Ask tenant\n\n"
-            "Reply *1*, *2*, or *3*."
+            "3. Ask tenant\n"
+            "4. Add a note\n\n"
+            "Reply *1*, *2*, *3*, or *4*."
         )
 
     status_str = "Paid ✅" if rs and rs.status == RentStatus.paid else "Partial ⏳"
@@ -628,6 +653,25 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
         return "Payment record not found."
 
     payment.is_void = True
+
+    # ── Audit trail ──────────────────────────────────────────────────────────
+    _audit_room = None
+    if payment.tenancy_id:
+        _t = await session.get(Tenancy, payment.tenancy_id)
+        if _t and _t.room_id:
+            _r = await session.get(Room, _t.room_id)
+            _audit_room = _r.room_number if _r else None
+    session.add(AuditLog(
+        changed_by="bot",
+        entity_type="payment",
+        entity_id=payment_id,
+        field_name="is_void",
+        old_value="false",
+        new_value="true",
+        room_number=_audit_room,
+        source="whatsapp",
+        note=f"Voided Rs.{int(payment.amount):,} payment for {tenant_name}",
+    ))
 
     if payment.period_month:
         rs = await session.scalar(

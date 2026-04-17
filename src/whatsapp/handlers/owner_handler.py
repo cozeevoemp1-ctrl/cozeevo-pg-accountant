@@ -2283,6 +2283,7 @@ async def resolve_pending_action(
         "CHECKOUT", "SCHEDULE_CHECKOUT", "PAYMENT_LOG", "QUERY_TENANT",
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
+        "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
@@ -2579,11 +2580,68 @@ async def resolve_pending_action(
                 f"Rs.{int(extra):,} added to security deposit.\n"
                 f"New deposit: Rs.{int(tenancy.security_deposit or 0):,}"
             )
+        elif seq == 4:  # Add a note
+            await _save_pending(
+                pending.phone, "OVERPAYMENT_ADD_NOTE",
+                {"tenancy_id": tenancy_id, "tenant_name": tenant_name, "extra_amount": extra},
+                [], session,
+            )
+            return (
+                f"Rs.{int(extra):,} overpayment for {tenant_name}.\n"
+                "Reply with your note (e.g. reason for overpayment):"
+            )
         else:  # Keep as credit / ask tenant
             return (
                 f"Rs.{int(extra):,} extra for {tenant_name} left as unallocated credit.\n"
                 "Confirm with tenant what it's for."
             )
+
+    if pending.intent == "OVERPAYMENT_ADD_NOTE":
+        # Free-text note for overpayment
+        from src.database.models import AuditLog
+        tenancy_id = action_data["tenancy_id"]
+        tenant_name = action_data["tenant_name"]
+        extra = action_data["extra_amount"]
+        session.add(AuditLog(
+            changed_by=pending.phone,
+            entity_type="payment",
+            entity_id=tenancy_id,
+            field_name="overpayment_note",
+            old_value=None,
+            new_value=reply_text,
+            source="whatsapp",
+            note=f"Overpayment Rs.{int(extra):,} for {tenant_name}: {reply_text}",
+        ))
+        return (
+            f"Note saved for {tenant_name}'s overpayment (Rs.{int(extra):,}):\n"
+            f"_{reply_text}_"
+        )
+
+    if pending.intent == "UNDERPAYMENT_NOTE":
+        # Free-text note for underpayment (or skip)
+        payment_id = action_data["payment_id"]
+        tenant_name = action_data["tenant_name"]
+        remaining = action_data["remaining"]
+        if reply_text.lower().strip() in ("skip", "no", "n"):
+            return "OK, no note added."
+        from src.database.models import Payment as _Pay, AuditLog
+        pay = await session.get(_Pay, payment_id)
+        if pay:
+            pay.notes = (pay.notes or "") + f" | Note: {reply_text}"
+        session.add(AuditLog(
+            changed_by=pending.phone,
+            entity_type="payment",
+            entity_id=payment_id,
+            field_name="underpayment_note",
+            old_value=None,
+            new_value=reply_text,
+            source="whatsapp",
+            note=f"Underpayment Rs.{int(remaining):,} for {tenant_name}: {reply_text}",
+        ))
+        return (
+            f"Note saved for {tenant_name}'s underpayment (Rs.{int(remaining):,} remaining):\n"
+            f"_{reply_text}_"
+        )
 
     if pending.intent == "VOID_PAYMENT":
         if chosen.get("seq") == 1:

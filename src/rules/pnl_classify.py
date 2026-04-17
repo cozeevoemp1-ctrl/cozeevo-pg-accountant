@@ -25,7 +25,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Property Rent",        "Vakkal Sravani",               ["vakkal", "sravani"]),
     ("Property Rent",        "R Suma",                       ["r suma", "rsuma"]),
     ("Property Rent",        "Raghu Nandha Mandadi",         ["raghu nandha"]),
-    ("Property Rent",        "Sri Lakshmi Chandrasekhar",    ["lakshmi chandrasekhar"]),
+    ("Property Rent",        "Sri Lakshmi Chandrasekhar",    ["lakshmi chandrasekhar","lakshmi chandrasekar"]),
     ("Property Rent",        "Other Rent Payments",          ["jan rent","feb rent","mar rent","rent pay"]),
 
     # ── ELECTRICITY ───────────────────────────────────────────────────────────
@@ -44,6 +44,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
 
     # ── INTERNET & WIFI ───────────────────────────────────────────────────────
     ("Internet & WiFi",      "Airwire Broadband",            ["airwire"]),
+    ("Internet & WiFi",      "Jio Recharge",                 ["jioinappdirect","jio"]),
+    ("Internet & WiFi",      "Vi / Vodafone Recharge",       ["viinappguj","vodafone","vi "]),
+    ("Internet & WiFi",      "Airtel Recharge",              ["airtelpredirect","airtel"]),
     ("Internet & WiFi",      "WiFi Vendor",                  ["wifi","wi-fi","broadband"]),
 
     # ── FURNITURE & FITTINGS ──────────────────────────────────────────────────
@@ -72,6 +75,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Food & Groceries",     "D-Mart / Retail",              ["dmart","d-mart","innovdmart"]),
     ("Food & Groceries",     "Cooking Oil / Masala",         ["oil","ruchi gold","basmati rice","rice"]),
     ("Food & Groceries",     "HP Gas",                       ["hp gas","q947171136"]),
+    ("Food & Groceries",     "Drumstick / Fresh Veg",        ["drumstick"]),
+    ("Food & Groceries",     "Batter / Idli Mix",            ["batter","idli"]),
     ("Food & Groceries",     "Other Groceries / Provisions", ["grocer","kirana","milk","food","provision"]),
 
     # ── FUEL & DIESEL ─────────────────────────────────────────────────────────
@@ -109,10 +114,11 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Govt & Regulatory",    "BBMP Tax / Property Bill",     ["bbmp","bbpsbp"]),
     ("Govt & Regulatory",    "Directorate / Reg Fees",       ["edcs","directorate"]),
     ("Govt & Regulatory",    "GST Charges",                  ["sdb_gst","gst"]),
+    ("Govt & Regulatory",    "Police / Station",             ["police"]),
 
     # ── TENANT DEPOSIT REFUND ─────────────────────────────────────────────────
     ("Tenant Deposit Refund","Booking Cancellation Refund",  ["booking cancellation"]),
-    ("Tenant Deposit Refund","Other Refund / Exit",          ["refund","exit refund","checkout refund"]),
+    ("Tenant Deposit Refund","Other Refund / Exit",          ["refund","exit refund","checkout refund","rishwanth refund","hafiz refund","gotham refund","lakshmi priya refund"]),
 
     # ── MARKETING ─────────────────────────────────────────────────────────────
     ("Marketing",            "Logo T-shirts",                ["logo tshirt","logo t-shirt","tshirt"]),
@@ -123,10 +129,10 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
 
     # ── CLEANING & HOUSEKEEPING SUPPLIES ──────────────────────────────────────
     ("Cleaning Supplies",    "Garbage Bags / Bins",          ["garbage bag","garbage"]),
-    ("Cleaning Supplies",    "Phenyl / Disinfectant",        ["phenyl","disinfect","toilet adour","toilet filter"]),
+    ("Cleaning Supplies",    "Phenyl / Disinfectant",        ["phenyl","disinfect","toilet adour","toilet filter","bleaching powder"]),
     ("Cleaning Supplies",    "Mop / Cleaning Tools",         ["mop","broom","knife sharpen"]),
     ("Cleaning Supplies",    "Room Freshener / Hooks",       ["room freshner","freshner","hooks"]),
-    ("Cleaning Supplies",    "AdBlue (DG Exhaust Fluid)",    ["adblue","ad blu"]),
+    ("Cleaning Supplies",    "AdBlue (DG Exhaust Fluid)",    ["adblue","ad blu","as blue"]),
 
     # ── SHOPPING & SUPPLIES ───────────────────────────────────────────────────
     ("Furniture & Fittings", "Elgis Fitness — Gym CAPEX",     ["elgis"]),
@@ -141,9 +147,11 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
 
     # ── MAINTENANCE & REPAIRS ─────────────────────────────────────────────────
     ("Maintenance & Repairs","Plumbing",                     ["plumbing","plumber"]),
-    ("Maintenance & Repairs","Electrician / Electrical",     ["electrician","electrical"]),
+    ("Maintenance & Repairs","Electrician / Electrical",     ["electrician","electrical","electric"]),
+    ("Maintenance & Repairs","Carpenter",                    ["carpenter","r61865951"]),
     ("Maintenance & Repairs","Repairs / Handyman",           ["repair","handyman"]),
-    ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith"]),
+    ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith","seals"]),
+    ("Maintenance & Repairs","Fridge Delivery / Appliance",  ["fridge delivery","fridge"]),
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain"]),
 
     # ── BANK CHARGES ──────────────────────────────────────────────────────────

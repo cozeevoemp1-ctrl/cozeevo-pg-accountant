@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.32.0] — 2026-04-17 — Payment Audit Trails + Bank Statement P&L
+
+### Payment Flow Improvements
+- Over/underpayment now prompts for notes (free-text reason)
+- Overpayment: added option 4 "Add a note" alongside advance/deposit/ask tenant
+- Underpayment: asks for note after logging partial payment (reply or "skip")
+- Audit log entries for every payment creation and void (who, amount, room, timestamp)
+- AuditLog import added to account_handler
+
+### Bank Statement Classification
+- New CSV reader for YES Bank CSV format (Statement-*.csv)
+- Fixed duplicate Jan 2026 data (Excel + CSV overlap)
+- Fixed misclassification: Rs.6L RTGS to Sri Lakshmi Chandrasekar was "Bank Charges" → now "Property Rent"
+- Added classification rules: carpenter, fridge, bleaching powder, drumstick, batter, Jio/Airtel/Vi recharges, police, tenant refund names
+- `pnl_report.py` rewritten: uses shared `pnl_classify.py` rules, reads all sources (Excel + CSV), no duplicate rules
+- `export_classified.py`: added CSV reader, P&L sheet includes income + expenses + net profit
+- `classify_new_statement.py`: standalone classifier for quick runs
+- Output: `PnL_Report.xlsx` (3 sheets: P&L Summary, Income Detail, Expense Detail)
+
+### P&L Summary (Oct 2025 – Mar 2026)
+- Total Income: Rs.91.8L | Total Expenses: Rs.91.2L | Net: +Rs.57K
+- 70 unclassified transactions (Rs.4.4L) — generic UPI with no description
+
 ## [1.31.0] — 2026-04-16 — Day-wise Onboarding + Consistency Audit
 
 ### Day-wise Onboarding (NEW)

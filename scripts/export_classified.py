@@ -52,12 +52,41 @@ def read_yes_bank(path):
         if dep > 0: out.append((dt, desc, 'income',  dep))
     return out
 
+# ── CSV reader (YES Bank CSV format) ──────────────────────────────────────
+import csv as _csv
+
+def read_yes_bank_csv(path):
+    out = []
+    with open(path, 'r') as f:
+        for line in f:
+            if line.startswith('Transaction Date'):
+                break
+        reader = _csv.reader(f)
+        for row in reader:
+            if len(row) < 7: continue
+            dt_str, _, desc, ref, wd, dep, bal = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
+            dt = parse_date(dt_str)
+            if not dt: continue
+            wd_val = parse_amt(wd)
+            dep_val = parse_amt(dep)
+            if wd_val > 0: out.append((dt, desc.strip(), 'expense', wd_val))
+            if dep_val > 0: out.append((dt, desc.strip(), 'income', dep_val))
+    return out
+
 # ── load data ──────────────────────────────────────────────────────────────
 txns = []
 for f in ['2025 statement.xlsx', '2026 statment.xlsx']:
     t = read_yes_bank(f)
     print('Loaded %d from %s' % (len(t), f))
     txns += t
+
+# CSV statements
+import glob as _glob
+for f in _glob.glob('Statement-*.csv'):
+    t = read_yes_bank_csv(f)
+    print('Loaded %d from %s' % (len(t), f))
+    txns += t
+
 print('Total: %d txns' % len(txns))
 
 classified = []
@@ -137,54 +166,146 @@ print('Saved: %s' % out1)
 # EXCEL 2: Full classified breakdown
 # ════════════════════════════════════════════════════════════════════════════
 months = sorted(set(dt.strftime('%Y-%m') for dt, *_ in classified))
-monthly_cat = defaultdict(lambda: defaultdict(float))
+monthly_exp = defaultdict(lambda: defaultdict(float))
+monthly_inc = defaultdict(lambda: defaultdict(float))
 monthly_sub = defaultdict(float)  # (month, cat, sub) -> amt
 
+INCOME_CATS = ['Rent Income', 'Advance Deposit', 'Other Income']
+
 for dt, desc, typ, amt, cat, sub in classified:
+    m = dt.strftime('%Y-%m')
     if typ == 'expense':
-        m = dt.strftime('%Y-%m')
-        monthly_cat[m][cat] += amt
+        monthly_exp[m][cat] += amt
         monthly_sub[(m, cat, sub)] += amt
+    else:
+        monthly_inc[m][cat] += amt
 
 wb2 = openpyxl.Workbook()
 wb2.remove(wb2.active)
 
-# ── Sheet 1: Monthly category summary ─────────────────────────────────────
-ws_sum = wb2.create_sheet('Monthly Summary')
-hdr_row = ['Category'] + months + ['TOTAL']
+# ── Styles for P&L ───────────────────────────────────────────────────────
+SEC_FILL  = PatternFill('solid', fgColor='2d2d44')
+SEC_FONT  = Font(bold=True, color='FFFFFF', size=11)
+TOT_FONT  = Font(bold=True, size=11)
+TOT_FONT_R = Font(bold=True, size=11, color='FF0000')
+TOT_FONT_G = Font(bold=True, size=11, color='008B00')
+NUM_FMT   = '#,##0'
+
+def _write_row(ws, ri, label, vals, font=None, fill=None, indent=False):
+    """Write a label + monthly values row."""
+    lbl = ('  ' + label) if indent else label
+    c = ws.cell(row=ri, column=1, value=lbl)
+    if font: c.font = font
+    if fill: c.fill = fill
+    for ci, v in enumerate(vals, 2):
+        c = ws.cell(row=ri, column=ci, value=round(v) if v else '')
+        c.number_format = NUM_FMT
+        if font: c.font = font
+        if fill: c.fill = fill
+
+# ── Sheet 1: Monthly P&L ────────────────────────────────────────────────
+ws_sum = wb2.create_sheet('Monthly P&L')
+hdr_row = [''] + months + ['TOTAL']
 for col, h in enumerate(hdr_row, 1):
     c = ws_sum.cell(row=1, column=col, value=h)
     c.fill = HDR_FILL; c.font = HDR_FONT; c.alignment = CTR
 ws_sum.row_dimensions[1].height = 22
 
 ri = 2
-for cat in CATS:
-    rt = sum(monthly_cat[m].get(cat, 0) for m in months)
-    if rt == 0: continue
+
+# ── INCOME section ───────────────────────────────────────────────────────
+c = ws_sum.cell(row=ri, column=1, value='INCOME')
+c.fill = SEC_FILL; c.font = SEC_FONT
+for col in range(2, len(months)+3):
+    ws_sum.cell(row=ri, column=col).fill = SEC_FILL
+ri += 1
+
+inc_month_totals = [0.0] * (len(months) + 1)
+for cat in INCOME_CATS:
+    vals = []
+    for m in months:
+        v = monthly_inc[m].get(cat, 0)
+        vals.append(v)
+    vals.append(sum(vals))
+    if sum(vals) == 0: continue
+    for i, v in enumerate(vals): inc_month_totals[i] += v
     fill = ALT_FILL if ri % 2 == 0 else WHT_FILL
-    ws_sum.cell(row=ri, column=1, value=cat).fill = fill
-    for ci, m in enumerate(months, 2):
-        v = monthly_cat[m].get(cat, 0)
-        c = ws_sum.cell(row=ri, column=ci, value=round(v) if v else 0)
-        c.fill = fill; c.number_format = '#,##0'
-    c = ws_sum.cell(row=ri, column=len(months)+2, value=round(rt))
-    c.fill = fill; c.number_format = '#,##0'; c.font = Font(bold=True)
+    _write_row(ws_sum, ri, cat, vals, indent=True, fill=fill)
     ri += 1
 
-# Total row
-ws_sum.cell(row=ri, column=1, value='TOTAL').font = Font(bold=True)
-for ci, m in enumerate(months, 2):
-    v = sum(monthly_cat[m].values())
-    c = ws_sum.cell(row=ri, column=ci, value=round(v))
-    c.number_format = '#,##0'; c.font = Font(bold=True)
-gt = sum(sum(monthly_cat[m].values()) for m in months)
-c = ws_sum.cell(row=ri, column=len(months)+2, value=round(gt))
-c.number_format = '#,##0'; c.font = Font(bold=True)
+_write_row(ws_sum, ri, 'TOTAL INCOME', inc_month_totals, font=TOT_FONT_G)
+ri += 2
 
-ws_sum.column_dimensions['A'].width = 26
+# ── OPERATING EXPENSES section ───────────────────────────────────────────
+c = ws_sum.cell(row=ri, column=1, value='OPERATING EXPENSES')
+c.fill = SEC_FILL; c.font = SEC_FONT
+for col in range(2, len(months)+3):
+    ws_sum.cell(row=ri, column=col).fill = SEC_FILL
+ri += 1
+
+op_cats = [c for c in CATS if c != 'Non-Operating']
+exp_month_totals = [0.0] * (len(months) + 1)
+for cat in op_cats:
+    vals = []
+    for m in months:
+        v = monthly_exp[m].get(cat, 0)
+        vals.append(v)
+    vals.append(sum(vals))
+    if sum(vals) == 0: continue
+    for i, v in enumerate(vals): exp_month_totals[i] += v
+    fill = ALT_FILL if ri % 2 == 0 else WHT_FILL
+    _write_row(ws_sum, ri, cat, vals, indent=True, fill=fill)
+    ri += 1
+
+_write_row(ws_sum, ri, 'TOTAL OPERATING EXPENSES', exp_month_totals, font=TOT_FONT_R)
+ri += 2
+
+# ── OPERATING PROFIT ─────────────────────────────────────────────────────
+op_profit = [inc_month_totals[i] - exp_month_totals[i] for i in range(len(inc_month_totals))]
+_write_row(ws_sum, ri, 'OPERATING PROFIT (EBITDA)', op_profit, font=TOT_FONT)
+ri += 2
+
+# ── NON-OPERATING section ────────────────────────────────────────────────
+nonop_vals = []
+for m in months:
+    v = monthly_exp[m].get('Non-Operating', 0)
+    nonop_vals.append(v)
+nonop_vals.append(sum(nonop_vals))
+
+if sum(nonop_vals) > 0:
+    c = ws_sum.cell(row=ri, column=1, value='NON-OPERATING EXPENSES')
+    c.fill = SEC_FILL; c.font = SEC_FONT
+    for col in range(2, len(months)+3):
+        ws_sum.cell(row=ri, column=col).fill = SEC_FILL
+    ri += 1
+    _write_row(ws_sum, ri, 'Loan Repayment / Transfers', nonop_vals, indent=True, fill=ALT_FILL)
+    ri += 2
+
+# ── NET PROFIT ───────────────────────────────────────────────────────────
+net = [op_profit[i] - nonop_vals[i] for i in range(len(op_profit))]
+_write_row(ws_sum, ri, 'NET PROFIT / (LOSS)', net, font=Font(bold=True, size=12))
+ri += 2
+
+# ── MARGINS ──────────────────────────────────────────────────────────────
+c = ws_sum.cell(row=ri, column=1, value='OPERATING MARGIN %')
+c.font = Font(bold=True, italic=True)
+for ci, m in enumerate(months, 2):
+    inc = inc_month_totals[ci-2]
+    margin = (op_profit[ci-2] / inc * 100) if inc else 0
+    c = ws_sum.cell(row=ri, column=ci, value=f'{margin:.1f}%')
+    c.font = Font(italic=True)
+inc = inc_month_totals[-1]
+margin = (op_profit[-1] / inc * 100) if inc else 0
+c = ws_sum.cell(row=ri, column=len(months)+2, value=f'{margin:.1f}%')
+c.font = Font(bold=True, italic=True)
+
+ws_sum.column_dimensions['A'].width = 32
 for i in range(2, len(months)+3):
-    ws_sum.column_dimensions[get_column_letter(i)].width = 14
+    ws_sum.column_dimensions[get_column_letter(i)].width = 15
 ws_sum.freeze_panes = 'B2'
+
+# ── Keep old monthly_cat for sub-category sheet ──────────────────────────
+monthly_cat = monthly_exp
 
 # ── Sheet 2: Sub-category breakdown ───────────────────────────────────────
 ws_sub = wb2.create_sheet('Sub-category Breakdown')
@@ -285,5 +406,5 @@ for cat in CATS:
 print('-'*95)
 row = '%-26s' % 'TOTAL'
 for m in months: row += '%13s' % ('%d' % int(sum(monthly_cat[m].values())))
-row += '%13s' % ('%d' % int(gt))
+row += '%13s' % ('%d' % int(sum(sum(monthly_cat[m].values()) for m in months)))
 print(row)
