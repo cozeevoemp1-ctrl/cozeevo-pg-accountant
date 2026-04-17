@@ -683,10 +683,24 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
             _logging.getLogger(__name__).error("GSheets void failed: %s", e)
 
     period_str = payment.period_month.strftime("%b %Y") if payment.period_month else ""
+    # Show updated balance
+    new_balance_note = ""
+    if rs:
+        remaining_paid_final = await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.tenancy_id == payment.tenancy_id,
+                Payment.period_month == payment.period_month,
+                Payment.is_void == False,
+                Payment.id != payment_id,
+            )
+        ) or Decimal("0")
+        new_bal = (rs.rent_due or 0) + (rs.adjustment or 0) - remaining_paid_final
+        new_balance_note = f"\n*Updated balance: Rs.{int(max(0, new_bal)):,}*"
     return (
         f"*Payment voided — {tenant_name}*\n"
-        f"Rs.{int(payment.amount):,} for {period_str} reversed.\n"
-        f"Rent schedule updated. Log correct payment if needed."
+        f"Rs.{int(payment.amount):,} for {period_str} reversed."
+        f"{new_balance_note}\n"
+        f"Log correct payment if needed."
     )
 
 
