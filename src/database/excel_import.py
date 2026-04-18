@@ -284,6 +284,8 @@ async def run_import(write: bool) -> None:
                 if existing:
                     tenant = existing
                 else:
+                    # Partners/family in same room can share phone — DB allows duplicate phones
+                    # if (phone, name) is unique. Drop the unique-on-phone-only constraint.
                     tenant = Tenant(
                         name=norm_name,
                         phone=phone,

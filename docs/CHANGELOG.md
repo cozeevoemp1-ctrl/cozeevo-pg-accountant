@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.33.0] — 2026-04-18 — Rent Reconciliation + Data Architecture
+
+### Rent Reconciliation (drop + reload)
+- Wiped L1+L2 data (payments, rent_schedule, tenancies, tenants) — L0 preserved
+- Re-imported Jan-Mar from Cozeevo Monthly stay.xlsx (294 tenants, 1014 payments)
+- Re-imported April from April Month Collection.xlsx (239 payments)
+- DB now matches Excel exactly for Cash + UPI per month
+- Fixed `excel_import.py` phone constraint — partners sharing phone allowed (was failing on unique constraint)
+- Confirmed: **zero duplicates in DB** (exact-match grouping on tenancy + date + amount + mode + for_type + notes)
+
+### Documentation
+- `docs/RENT_RECONCILIATION.md` — 7-step monthly process (Excel ↔ DB ↔ Bank), anti-duplicate rule, Chandra off-book tracking (Mar 1.6L + Apr 15.5K)
+- `docs/DATA_ARCHITECTURE.md` — canonical data model (L0-L3 layers), 6 golden rules, ETL flow, 6-step migration plan from hardcoded columns → Pydantic schemas
+
+### Cash Report Tool
+- `scripts/cash_report.py` — DB cash by month filtered by for_type (rent/deposit/booking)
+- Prevents inflation from counting deposits as cash (was 3-5x inflated before)
+
+### Feedback Memory
+- `feedback_no_false_alarms.md` — never claim DB duplicates without exact-match grouping (incl. for_type + notes); rent reports must filter for_type='rent'
+
 ## [1.32.0] — 2026-04-17 — Payment Audit Trails + Bank Statement P&L
 
 ### Payment Flow Improvements
