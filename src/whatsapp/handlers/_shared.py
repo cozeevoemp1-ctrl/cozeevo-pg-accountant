@@ -21,6 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus, WhatsappLog, RentSchedule, RentStatus, Payment, PaymentFor
+from src.whatsapp.role_service import _normalize as _norm_phone
 
 BOT_NAME = "Cozeevo Help Desk"
 _IST_OFFSET = timedelta(hours=5, minutes=30)
@@ -314,6 +315,7 @@ def _make_choices(rows) -> list[dict]:
 
 async def _save_pending(phone: str, intent: str, action_data: dict, choices: list, session: AsyncSession):
     """Save a pending disambiguation action with 30-minute expiry."""
+    phone = _norm_phone(phone)  # canonical 10-digit form so get/save always match
     # Clear any existing unresolved pending actions for this phone
     existing = await session.execute(
         select(PendingAction).where(

@@ -177,7 +177,7 @@ async def _process_message_inner(
                 except Exception:
                     return {}
             return parsed if isinstance(parsed, dict) else {}
-        with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+        with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
             if pending:
                 _ad = _safe_parse_ad(pending.action_data)
                 _dbg.write(f"[{datetime.utcnow().isoformat()}] phone={ctx.phone} msg={message[:60]} "
@@ -377,17 +377,17 @@ async def _process_message_inner(
                     )
                 except Exception as _resolve_err:
                     resolved_reply = None
-                    with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+                    with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                         _dbg.write(f"  RESOLVE ERROR: {_resolve_err}\n")
                     import traceback
                     traceback.print_exc()
                 _chat_logger.info("resolve_pending_action returned: %s", repr(resolved_reply[:100]) if resolved_reply else "None")
-                with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                     _dbg.write(f"  resolve_reply={'None' if resolved_reply is None else repr(resolved_reply[:100])}\n")
             else:
                 resolved_reply = None
                 _chat_logger.info("Pending already resolved, skipping resolve_pending_action")
-                with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                     _dbg.write(f"  ALREADY RESOLVED — skipped\n")
             if resolved_reply:
                 # Prefix "__KEEP_PENDING__" means correction re-prompt — keep pending alive
@@ -399,11 +399,11 @@ async def _process_message_inner(
                 pending.resolved = True
                 await _log(session, phone, message, ctx.role, "CONFIRMATION", resolved_reply)
                 await session.commit()
-                with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                     _dbg.write(f"  RETURNED: {resolved_reply[:80]}\n")
                 return OutboundReply(reply=resolved_reply, intent="CONFIRMATION", role=ctx.role)
             pending.resolved = True
-            with open("/tmp/pg_pending_debug.log", "a") as _dbg:
+            with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                 _dbg.write(f"  FELL THROUGH — resolved_reply was None, pending killed\n")
 
     if ctx.role == "tenant":
@@ -1004,6 +1004,8 @@ def _detect_followup_context(message: str, chat_context: str) -> Optional[dict]:
 async def _get_active_pending(phone: str, session: AsyncSession) -> Optional[PendingAction]:
     """Return the most recent unresolved pending action for this phone, if not expired.
     APPROVE_ONBOARDING is prioritized over other intents (created by tenant session)."""
+    from src.whatsapp.role_service import _normalize
+    phone = _normalize(phone)  # canonical form so _save_pending and _get_active_pending always match
     # Check for high-priority approval pendings first
     approval = await session.scalar(
         select(PendingAction).where(

@@ -131,7 +131,7 @@ async def learn_from_interaction(
     llm_result: Optional[str],
     llm_confidence: Optional[float],
     final_intent: str,
-    entities: dict,
+    entities: dict,  # session arg is ignored — we open our own to avoid racing main handler's commit
     source: str,
     session: AsyncSession,
 ) -> None:
@@ -139,23 +139,33 @@ async def learn_from_interaction(
     Main entry point — called after every LLM classification.
     Logs the classification and saves examples when appropriate.
     Runs as fire-and-forget background task (non-blocking).
-    """
-    await log_classification(
-        pg_id=pg_id, message=message, phone=phone, role=role,
-        regex_result=regex_result, regex_confidence=regex_confidence,
-        llm_result=llm_result, llm_confidence=llm_confidence,
-        final_intent=final_intent, session=session,
-    )
 
-    if source in ("user_correction", "user_selection", "user_clarification", "manual_teach"):
-        await save_example(
-            pg_id=pg_id, message=message, intent=final_intent, role=role,
-            entities=entities, confidence=llm_confidence or 0.0,
-            source=source, confirmed_by=phone, session=session,
-        )
-    elif source == "auto_confirmed" and should_auto_confirm(llm_confidence or 0.0, was_corrected=False):
-        await save_example(
-            pg_id=pg_id, message=message, intent=final_intent, role=role,
-            entities=entities, confidence=llm_confidence or 0.0,
-            source="auto_confirmed", confirmed_by="system", session=session,
-        )
+    Opens its OWN session to avoid racing the main handler's commit
+    (previous design shared the caller's session, which caused
+    ResourceClosedError when the main handler committed while this
+    task was mid-flush).
+    """
+    from src.database.db_manager import get_session
+    async with get_session() as own_session:
+        try:
+            await log_classification(
+                pg_id=pg_id, message=message, phone=phone, role=role,
+                regex_result=regex_result, regex_confidence=regex_confidence,
+                llm_result=llm_result, llm_confidence=llm_confidence,
+                final_intent=final_intent, session=own_session,
+            )
+
+            if source in ("user_correction", "user_selection", "user_clarification", "manual_teach"):
+                await save_example(
+                    pg_id=pg_id, message=message, intent=final_intent, role=role,
+                    entities=entities, confidence=llm_confidence or 0.0,
+                    source=source, confirmed_by=phone, session=own_session,
+                )
+            elif source == "auto_confirmed" and should_auto_confirm(llm_confidence or 0.0, was_corrected=False):
+                await save_example(
+                    pg_id=pg_id, message=message, intent=final_intent, role=role,
+                    entities=entities, confidence=llm_confidence or 0.0,
+                    source="auto_confirmed", confirmed_by="system", session=own_session,
+                )
+        except Exception as e:
+            logger.error(f"[LearningAgent] learn_from_interaction failed: {e}")
