@@ -1891,6 +1891,114 @@ async def update_tenant_field(
     )
 
 
+# ── Generic TENANTS-master-tab field update ───────────────────────────────────
+# Maps short field names used by handlers to TENANTS_HEADERS column names.
+# Lookup is case-insensitive — keys must be lowercase.
+_TENANTS_FIELD_TO_HEADER = {
+    "deposit": "Deposit",
+    "security_deposit": "Deposit",
+    "agreed_rent": "Agreed Rent",
+    "rent": "Agreed Rent",
+    "maintenance": "Maintenance",
+    "maintenance_fee": "Maintenance",
+    "booking": "Booking",
+    "booking_amount": "Booking",
+    "sharing": "Sharing",
+    "sharing_type": "Sharing",
+    "phone": "Phone",
+    "status": "Status",
+    "notice_date": "Notice Date",
+    "expected_exit": "Expected Exit",
+    "expected_checkout": "Expected Exit",
+    "checkout_date": "Checkout Date",
+    "notes": "Notes",
+    "gender": "Gender",
+    "food_pref": "Food Pref",
+    "food_preference": "Food Pref",
+}
+
+
+def _update_tenants_tab_field_sync(
+    room_number: str,
+    tenant_name: str,
+    field: str,
+    new_value: Any,
+) -> dict:
+    """
+    Update one column for a tenant row in the TENANTS master tab.
+    Field names are looked up via _TENANTS_FIELD_TO_HEADER → TENANTS_HEADERS.
+    Locates the row by room_number + tenant_name (substring, case-insensitive).
+    """
+    result: dict[str, Any] = {"success": False, "error": None}
+    header_name = _TENANTS_FIELD_TO_HEADER.get(field.strip().lower())
+    if not header_name:
+        result["error"] = f"Unknown TENANTS field '{field}'"
+        return result
+
+    try:
+        ws = _get_worksheet_sync("TENANTS")
+        all_vals = ws.get_all_values()
+        if not all_vals:
+            result["error"] = "TENANTS tab is empty"
+            return result
+
+        headers = [h.strip().lower() for h in all_vals[0]]
+        try:
+            col_idx = headers.index(header_name.lower())
+        except ValueError:
+            result["error"] = f"Header '{header_name}' not found in TENANTS tab"
+            return result
+
+        room_clean = str(room_number).strip().upper()
+        name_lower = str(tenant_name).strip().lower()
+        target_row = None
+        for i in range(1, len(all_vals)):
+            r = all_vals[i]
+            if not r or len(r) < 2:
+                continue
+            row_room = str(r[T_ROOM]).strip().upper() if T_ROOM < len(r) else ""
+            row_name = str(r[T_NAME]).strip().lower() if T_NAME < len(r) else ""
+            if row_room == room_clean and name_lower in row_name:
+                target_row = i + 1  # gspread is 1-based
+                break
+        # Fallback — match by name only if room+name didn't hit
+        if target_row is None:
+            for i in range(1, len(all_vals)):
+                r = all_vals[i]
+                if not r or len(r) < 2:
+                    continue
+                row_name = str(r[T_NAME]).strip().lower() if T_NAME < len(r) else ""
+                if name_lower and name_lower == row_name:
+                    target_row = i + 1
+                    break
+
+        if target_row is None:
+            result["error"] = f"Tenant '{tenant_name}' not found in TENANTS tab"
+            return result
+
+        cell = gspread.utils.rowcol_to_a1(target_row, col_idx + 1)
+        ws.update(values=[[new_value]], range_name=cell, value_input_option="USER_ENTERED")
+        result["success"] = True
+        logger.info("GSheets: TENANTS tab — %s row %d, %s = %s",
+                    tenant_name, target_row, header_name, new_value)
+    except Exception as e:
+        result["error"] = f"TENANTS field update failed: {e}"
+        logger.warning("GSheets: TENANTS update failed for %s.%s: %s", tenant_name, field, e)
+    return result
+
+
+async def update_tenants_tab_field(
+    room_number: str,
+    tenant_name: str,
+    field: str,
+    new_value: Any,
+) -> dict:
+    """Async entry point — update one column on the TENANTS master tab."""
+    return await asyncio.to_thread(
+        _update_tenants_tab_field_sync, room_number, tenant_name, field, new_value
+    )
+
+
 def trigger_monthly_sheet_sync(month: int, year: int) -> None:
     """
     Fire `scripts/sync_sheet_from_db.py --month M --year Y --write` in the
