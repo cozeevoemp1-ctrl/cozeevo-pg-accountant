@@ -614,11 +614,22 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
 
         else:
             # ── Monthly stay path ──────────────────────────────────────────
+            # Auto-fill sharing_type from the room's room_type when the form
+            # didn't explicitly select one. Memory rule: sharing_type must be
+            # set on every tenancy so monthly sheet + bed counts are correct.
+            from src.database.models import SharingType
+            sharing_default = None
+            if sharing in ("single", "double", "triple", "premium"):
+                try:
+                    sharing_default = SharingType(sharing)
+                except ValueError:
+                    sharing_default = None
             tenancy = Tenancy(
                 tenant_id=tenant.id, room_id=room.id, checkin_date=checkin,
                 agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
                 booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
                 lock_in_months=obs.lock_in_months or 0,
+                sharing_type=sharing_default,
                 status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
             )
             session.add(tenancy)

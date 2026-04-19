@@ -817,10 +817,22 @@ async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str,
         source="whatsapp",
     ))
 
-    # Mirror change into the current monthly sheet tab (Deposit + recalculated
-    # first-month Rent Due). Subprocess startup outpaces caller's commit, so by
-    # the time the sync queries the DB the change is visible.
+    # ── Instant sheet update ──────────────────────────────────────────────
+    # 1. Write the Deposit cell directly (~1s, single-cell update)
+    # 2. Fire full sync in background to refresh Rent Due / Balance / summary
+    # The bot reply does NOT wait for either — both are scheduled and the
+    # function returns immediately so Lokesh sees confirmation right away.
     today = date.today()
+
+    async def _instant_cell_update():
+        try:
+            await _gs.update_tenant_field(room_number, tenant_name, "deposit", new_amount)
+        except Exception as _e:
+            import logging as _l
+            _l.getLogger(__name__).warning("Instant deposit cell write failed: %s", _e)
+
+    import asyncio as _aio
+    _aio.create_task(_instant_cell_update())
     _gs.trigger_monthly_sheet_sync(today.month, today.year)
 
     return f"Deposit updated — *{tenant_name}* ₹{new_amount:,}"
@@ -1263,10 +1275,33 @@ async def _do_rent_change(
     except ValueError:
         period_month = date.today().replace(day=1)
 
+    # Look up room number once for the instant cell write below.
+    rent_room_number = ""
+    if tenancy.room_id:
+        _r = await session.get(Room, tenancy.room_id)
+        rent_room_number = _r.room_number if _r else ""
+
     # Mirror change into the affected month's sheet tab + current month if
-    # the change is permanent (so future months reflect the new base rent
-    # whenever they're regenerated). Fired after function body returns.
+    # the change is permanent. Two paths:
+    # 1. Instant per-cell update (Rent column) — fires async, ~1s.
+    # 2. Background full sync — recalcs Rent Due / Balance / summary.
+    # Bot reply does NOT wait for either.
     def _queue_sheet_sync():
+        import asyncio as _aio
+        async def _instant():
+            try:
+                # For permanent rent changes, the Rent column reflects the
+                # new agreed_rent. For one-month changes, leave the Rent
+                # info column alone (it's the base rate, unchanged) — full
+                # sync will update Rent Due for the affected month only.
+                if permanent and not is_discount:
+                    await _gs.update_tenant_field(
+                        rent_room_number, tenant_name, "rent", int(new_amount)
+                    )
+            except Exception as _e:
+                import logging as _l
+                _l.getLogger(__name__).warning("Instant rent cell write failed: %s", _e)
+        _aio.create_task(_instant())
         _gs.trigger_monthly_sheet_sync(period_month.month, period_month.year)
         today = date.today()
         if permanent and (today.year, today.month) != (period_month.year, period_month.month):
