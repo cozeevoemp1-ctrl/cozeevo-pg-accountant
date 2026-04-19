@@ -582,25 +582,59 @@ async def _process_message_inner(
         await session.commit()
         return OutboundReply(reply=media_reply, intent="MEDIA_UPLOAD", role=ctx.role)
 
-    # ── 3b. Duplicate-log prevention: if user just logged something similar, treat as query ──
+    # ── 3b. Duplicate-log prevention ─────────────────────────────────────
+    # If the user sent a near-identical log message within the last 5 min
+    # AND the bot replied "saved/logged/recorded", they're probably confused
+    # about whether it saved. Reroute to QUERY_EXPENSES so they see the list.
+    #
+    # Earlier version of this check fired too eagerly — any PAYMENT_LOG after
+    # any recent "saved" reply got rerouted, breaking legitimate sequential
+    # payments (Raj paid X → Krishnan paid Y). Now we require the CURRENT
+    # user message to match a RECENT user message ≥85% (sequence similarity).
     _LOG_INTENTS = {"ADD_EXPENSE", "LOG_EXPENSE", "PAYMENT_LOG"}
     if intent in _LOG_INTENTS and not re.search(r"\b(log|add|record|save|enter)\b", message, re.I):
         from src.database.models import WhatsappLog, MessageDirection
+        from difflib import SequenceMatcher
         five_min_ago = datetime.utcnow() - timedelta(minutes=5)
-        recent_reply = await session.scalar(
+        # Find a recent INBOUND message from this user that got a saved reply
+        recent_inbound = (await session.execute(
             select(WhatsappLog).where(
-                WhatsappLog.to_number == phone,
-                WhatsappLog.direction == MessageDirection.outbound,
+                WhatsappLog.from_number == phone,
+                WhatsappLog.direction == MessageDirection.inbound,
                 WhatsappLog.created_at >= five_min_ago,
                 WhatsappLog.intent.in_(list(_LOG_INTENTS) + ["CONFIRMATION"]),
-            ).order_by(WhatsappLog.created_at.desc()).limit(1)
-        )
-        if recent_reply and recent_reply.message_text:
-            reply_lower = recent_reply.message_text.lower()
-            if any(w in reply_lower for w in ("saved", "logged", "recorded", "added", "expense saved")):
-                _chat_logger.info("Duplicate-log prevention: %s -> QUERY_EXPENSES for %s", intent, phone)
-                intent = "QUERY_EXPENSES"
-                intent_result = IntentResult(intent="QUERY_EXPENSES", confidence=0.8, entities=intent_result.entities)
+            ).order_by(WhatsappLog.created_at.desc()).limit(5)
+        )).scalars().all()
+        for prev_msg in recent_inbound:
+            prev_text = (prev_msg.message_text or "").strip().lower()
+            curr_text = message.strip().lower()
+            if not prev_text or prev_text == curr_text:
+                # Exact match → definitely duplicate
+                similarity = 1.0
+            else:
+                similarity = SequenceMatcher(None, prev_text, curr_text).ratio()
+            if similarity >= 0.85:
+                # Confirm the bot actually saved it (reply contains "saved"/"logged")
+                reply_row = await session.scalar(
+                    select(WhatsappLog).where(
+                        WhatsappLog.to_number == phone,
+                        WhatsappLog.direction == MessageDirection.outbound,
+                        WhatsappLog.created_at >= prev_msg.created_at,
+                        WhatsappLog.created_at <= prev_msg.created_at + timedelta(minutes=1),
+                    ).order_by(WhatsappLog.created_at.asc()).limit(1)
+                )
+                if reply_row and reply_row.message_text and any(
+                    w in reply_row.message_text.lower()
+                    for w in ("saved", "logged", "recorded", "added")
+                ):
+                    _chat_logger.info(
+                        "Duplicate-log: current msg %.0f%% similar to recent log → QUERY_EXPENSES",
+                        similarity * 100
+                    )
+                    intent = "QUERY_EXPENSES"
+                    intent_result = IntentResult(intent="QUERY_EXPENSES", confidence=0.8,
+                                                 entities=intent_result.entities)
+                    break
 
     # ── 3c. Follow-up detection: pronoun-style messages referencing last turn ──
     if intent == "UNKNOWN" and chat_context:

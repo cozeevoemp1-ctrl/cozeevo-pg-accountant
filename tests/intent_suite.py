@@ -39,12 +39,19 @@ from tests.chat_harness import Session, _boot, POWER_USER_PHONE
 
 
 # ── Failure markers — any of these in the reply = FAIL ──────────────────────
+# (Deliberately NOT including "Please reply with a number" because it's a
+# legitimate re-prompt for gibberish/out-of-range input. For the specific
+# "user replied with valid number but bot re-prompted" bug, use the
+# `expected_substring` assertion on that turn instead.)
 FAILURE_MARKERS = (
     "Sorry, something went wrong",
     "sorry, something went wrong",
     "I don't understand",
     "i don't understand",
-    "Please reply with a number",  # re-prompt after user gave a number = bug
+    "No expenses recorded",        # PAYMENT_LOG mis-routed to QUERY_EXPENSES
+    "This transaction is closed",  # DB session bug
+    "type object",                 # AttributeError leaking to reply
+    "'charmap' codec",             # Windows unicode encode errors
 )
 
 
@@ -113,26 +120,28 @@ SINGLE_TURN_CASES: list[Case] = [
 
 # ── Multi-turn cases ────────────────────────────────────────────────────────
 MULTI_TURN_CASES: list[Case] = [
-    # The flagship bug: disambiguation "1 or 2" → user replies "1"
+    # The flagship bug: disambiguation "which tenant?" → user replies "1"
+    # Turn 1 must produce a disambig list (contains "Reply"/"which")
+    # Turn 2 must pick option (must NOT just return the list again)
     Case("payment disambig 1",   [
-        ("room 112 paid rent", None),   # expect bot to either ask 1/2 or log
-        ("1", None),                    # user picks first option
+        ("Krishnan paid 15000 cash", "matching"),  # 2 Krishnans → disambig
+        ("1", None),                                # should pick #1
     ], ["payment", "disambig"]),
     Case("payment disambig 2",   [
-        ("room 112 paid rent", None),
+        ("Krishnan paid 15000 cash", "matching"),
         ("2", None),
     ], ["payment", "disambig"]),
 
-    # Quick payment → disambig (2 Krishnans) → pick 1 → then confirm yes/no
+    # Krishnan has 2 matches → first turn MUST show disambig → "1" picks one
     Case("payment confirm yes",  [
-        ("Krishnan paid 20000 cash", None),
-        ("1", None),                   # pick Krishnan (Room 101)
-        ("yes", None),                 # confirm the payment
+        ("Krishnan paid 20000 cash", "matching"),   # "2 tenants matching"
+        ("1", None),                                 # resolves choice
+        ("yes", None),                               # confirms
     ], ["payment", "confirm"]),
     Case("payment confirm no",   [
-        ("Krishnan paid 20000 cash", None),
+        ("Krishnan paid 20000 cash", "matching"),
         ("1", None),
-        ("no", None),                  # cancel at confirm step
+        ("no", None),
     ], ["payment", "confirm"]),
 
     # Collect-rent step-by-step
@@ -231,8 +240,8 @@ def _passed(reply: str, expected_substring: Optional[str]) -> tuple[bool, str]:
         if marker in reply:
             return False, f"failure-marker: {marker!r}"
     if expected_substring and expected_substring.lower() not in reply.lower():
-        # Soft expectation — warn but pass if no failure marker
-        return True, f"note: expected {expected_substring!r} missing"
+        # Strict expectation — missing expected content = FAIL
+        return False, f"missing expected substring: {expected_substring!r}"
     return True, ""
 
 

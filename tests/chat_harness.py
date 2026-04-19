@@ -67,13 +67,32 @@ class Session:
 
     async def clear_pending(self) -> None:
         """Wipe any leftover pending_actions for this phone — ensures tests start clean.
+        Also deletes recent whatsapp_log entries to avoid cross-test pollution
+        from the duplicate-log-prevention heuristic in chat_api (which reroutes
+        PAYMENT_LOG → QUERY_EXPENSES if last reply said 'saved/logged' within 5 min).
         Clears BOTH the normalized and raw form to handle legacy rows."""
         from src.whatsapp.role_service import _normalize
+        from src.database.models import WhatsappLog
+        from datetime import datetime, timedelta
         normalized = _normalize(self.phone)
+        cutoff = datetime.utcnow() - timedelta(minutes=10)
         async with get_session() as sess:
             await sess.execute(
                 delete(PendingAction).where(
                     PendingAction.phone.in_([self.phone, normalized])
+                )
+            )
+            # Purge recent whatsapp_log rows that match either phone format
+            await sess.execute(
+                delete(WhatsappLog).where(
+                    WhatsappLog.from_number.in_([self.phone, normalized]),
+                    WhatsappLog.created_at >= cutoff,
+                )
+            )
+            await sess.execute(
+                delete(WhatsappLog).where(
+                    WhatsappLog.to_number.in_([self.phone, normalized]),
+                    WhatsappLog.created_at >= cutoff,
                 )
             )
             await sess.commit()
