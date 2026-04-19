@@ -364,42 +364,34 @@ async def _do_log_payment_by_ids(
                 note += f" Did you mean *{current_month.strftime('%b %Y')}* (currently pending)?"
             wrong_month_note = note
 
-    # ── Update rent schedule ───────────────────────────────────────────────────
+    # ── Insert payment + update rent_schedule + audit (via shared service) ──────
+    from src.services.payments import log_payment as _log_payment
+    pay_result = await _log_payment(
+        tenancy_id=tenancy.id,
+        amount=amount_dec,
+        method=mode,
+        for_type="rent",
+        period_month=period_month.isoformat(),
+        recorded_by=ctx_name or "bot",
+        session=session,
+        notes=f"Logged via WhatsApp by {ctx_name}",
+        source="whatsapp",
+    )
+    payment_id = pay_result.payment_id
+    remaining_balance = pay_result.new_balance
+
+    # Re-fetch the Payment and RentSchedule objects that the service just wrote
+    # (needed for downstream: payment.id for pending state, rs.status for display)
+    from sqlalchemy import select as _select
+    payment = await session.get(Payment, payment_id)
     rs = await session.scalar(
-        select(RentSchedule).where(
+        _select(RentSchedule).where(
             RentSchedule.tenancy_id == tenancy.id,
             RentSchedule.period_month == period_month,
         )
     )
 
-    if not rs:
-        # Auto-generate rent_schedule for this month with notes carry-over
-        prev_month = period_month.replace(day=1)
-        if prev_month.month == 1:
-            prev_month = date(prev_month.year - 1, 12, 1)
-        else:
-            prev_month = date(prev_month.year, prev_month.month - 1, 1)
-
-        prev_rs = await session.scalar(
-            select(RentSchedule).where(
-                RentSchedule.tenancy_id == tenancy.id,
-                RentSchedule.period_month == prev_month,
-            )
-        )
-        carry_notes = prev_rs.notes if prev_rs else None
-
-        rs = RentSchedule(
-            tenancy_id=tenancy.id,
-            period_month=period_month,
-            rent_due=tenancy.agreed_rent or Decimal("0"),
-            maintenance_due=tenancy.maintenance_fee or Decimal("0"),
-            status=RentStatus.pending,
-            due_date=period_month,
-            notes=carry_notes,
-        )
-        session.add(rs)
-        await session.flush()
-
+    # Reconstruct the effective_due + total_paid values for the over/under checks
     prev_paid = await session.scalar(
         select(func.sum(Payment.amount)).where(
             Payment.tenancy_id == tenancy.id,
@@ -407,45 +399,10 @@ async def _do_log_payment_by_ids(
             Payment.is_void == False,
         )
     ) or Decimal("0")
-
-    # ── Create payment (AFTER prev_paid query to avoid double-counting) ───────
-    payment = Payment(
-        tenancy_id=tenancy.id,
-        amount=amount_dec,
-        payment_date=date.today(),
-        payment_mode=pay_mode,
-        for_type=PaymentFor.rent,
-        period_month=period_month,
-        notes=f"Logged via WhatsApp by {ctx_name}",
-        receipt_url=None,
-    )
-    session.add(payment)
-    await session.flush()  # get payment.id
-
-    # ── Audit trail ──────────────────────────────────────────────────────────
-    room_obj_audit = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
-    session.add(AuditLog(
-        changed_by=ctx_name or "bot",
-        entity_type="payment",
-        entity_id=payment.id,
-        field="amount",
-        old_value=None,
-        new_value=str(float(amount_dec)),
-        room_number=room_obj_audit.room_number if room_obj_audit else None,
-        source="whatsapp",
-        note=f"Payment Rs.{int(amount_dec):,} {mode} for {period_month.strftime('%b %Y')} — {tenant.name}",
-    ))
-
-    total_paid = prev_paid + amount_dec
+    total_paid = prev_paid  # prev_paid now includes this payment (after flush)
     rent_due = (rs.rent_due if rs else tenancy.agreed_rent) or Decimal("0")
     adj = (rs.adjustment if rs else Decimal("0")) or Decimal("0")
     effective_due = rent_due + adj  # negative adj = discount
-
-    if rs:
-        if total_paid >= effective_due:
-            rs.status = RentStatus.paid
-        else:
-            rs.status = RentStatus.partial
 
     # ── Underpayment note ──────────────────────────────────────────────────────
     remaining = effective_due - total_paid

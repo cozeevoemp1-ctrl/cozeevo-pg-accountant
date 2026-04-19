@@ -1,0 +1,241 @@
+"""
+src/services/payments.py
+========================
+Payment business logic — shared between WhatsApp bot and owner PWA.
+
+Public API:
+    log_payment(...)  → PaymentResult
+
+Responsibilities of this module:
+    1. Insert a Payment row into the DB.
+    2. Upsert the RentSchedule row (auto-create if missing, update status).
+    3. Write an AuditLog entry via src.services.audit.write_audit_entry().
+    4. Compute and return the new outstanding balance.
+
+Out of scope (handled by callers):
+    - Duplicate detection / wrong-month warnings (conversation concerns).
+    - Google Sheets write-back (WhatsApp handler concern).
+    - Overpayment / underpayment prompts (conversation concerns).
+    - Message formatting (WhatsApp handler concern).
+
+NOTE: Do NOT write org_id — that column does not exist yet (Task 2 adds it).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Optional
+
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.database.models import (
+    AuditLog,
+    Payment,
+    PaymentFor,
+    PaymentMode,
+    RentSchedule,
+    RentStatus,
+    Tenancy,
+)
+from src.services.audit import write_audit_entry
+
+
+# ── Public result type ─────────────────────────────────────────────────────────
+
+@dataclass
+class PaymentResult:
+    """Returned by log_payment().
+
+    Attributes:
+        payment_id:  PK of the newly created Payment row.
+        new_balance: Remaining amount owed for the period month after this
+                     payment. Zero or negative means fully paid / overpaid.
+    """
+    payment_id: int
+    new_balance: Decimal
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+_UPI_KEYWORDS = frozenset(
+    {"upi", "gpay", "phonepe", "paytm", "online", "transfer",
+     "netbanking", "net banking", "neft", "imps", "bank"}
+)
+
+
+def _resolve_payment_mode(method: str) -> PaymentMode:
+    """Map a free-text method string to a PaymentMode enum value."""
+    return PaymentMode.upi if (method or "").lower().strip() in _UPI_KEYWORDS else PaymentMode.cash
+
+
+def _resolve_for_type(for_type: str) -> PaymentFor:
+    """Map a for_type string to PaymentFor enum value."""
+    try:
+        return PaymentFor(for_type.lower())
+    except (ValueError, AttributeError):
+        return PaymentFor.rent
+
+
+def _parse_period_month(period_month: Optional[str]) -> date:
+    """Parse 'YYYY-MM' or 'YYYY-MM-DD' to first-of-month date."""
+    if not period_month:
+        return date.today().replace(day=1)
+    try:
+        # Accept YYYY-MM or YYYY-MM-DD
+        raw = period_month.strip()
+        if len(raw) == 7:  # YYYY-MM
+            raw = raw + "-01"
+        d = date.fromisoformat(raw)
+        return d.replace(day=1)
+    except ValueError:
+        return date.today().replace(day=1)
+
+
+# ── Core service function ──────────────────────────────────────────────────────
+
+async def log_payment(
+    *,
+    tenancy_id: int,
+    amount,
+    method: str,
+    for_type: str,
+    period_month: Optional[str],
+    recorded_by: str,
+    session: AsyncSession,
+    notes: Optional[str] = None,
+    source: str = "service",
+) -> PaymentResult:
+    """Insert a payment and update rent schedule status.
+
+    Args:
+        tenancy_id:    PK of the Tenancy this payment is for.
+        amount:        Payment amount (int, float, or Decimal).
+        method:        Payment method string ("UPI", "cash", "GPay", …).
+        for_type:      Payment type ("rent", "deposit", "maintenance", …).
+        period_month:  Month string "YYYY-MM" (or "YYYY-MM-DD"). Defaults to
+                       current month.
+        recorded_by:   Phone number or identifier of whoever is logging this.
+        session:       SQLAlchemy async session. Caller owns the transaction.
+        notes:         Optional free-text notes to store on the payment row.
+        source:        audit_log source field ("whatsapp", "pwa", "system", …).
+
+    Returns:
+        PaymentResult with payment_id and new_balance.
+
+    Raises:
+        ValueError: If tenancy_id is not found.
+    """
+    amount_dec = Decimal(str(amount))
+    pay_mode = _resolve_payment_mode(method)
+    pay_for = _resolve_for_type(for_type)
+    period = _parse_period_month(period_month)
+
+    tenancy: Optional[Tenancy] = await session.get(Tenancy, tenancy_id)
+    if tenancy is None:
+        raise ValueError(f"Tenancy {tenancy_id} not found")
+
+    # ── Upsert RentSchedule (only for rent payments) ───────────────────────
+    rs: Optional[RentSchedule] = None
+    if pay_for == PaymentFor.rent:
+        rs = await session.scalar(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy.id,
+                RentSchedule.period_month == period,
+            )
+        )
+
+        if not rs:
+            # Auto-create, carrying over notes from the previous month
+            prev_month = _prev_month(period)
+            prev_rs = await session.scalar(
+                select(RentSchedule).where(
+                    RentSchedule.tenancy_id == tenancy.id,
+                    RentSchedule.period_month == prev_month,
+                )
+            )
+            carry_notes = prev_rs.notes if prev_rs else None
+
+            rs = RentSchedule(
+                tenancy_id=tenancy.id,
+                period_month=period,
+                rent_due=tenancy.agreed_rent or Decimal("0"),
+                maintenance_due=tenancy.maintenance_fee or Decimal("0"),
+                status=RentStatus.pending,
+                due_date=period,
+                notes=carry_notes,
+            )
+            session.add(rs)
+            await session.flush()
+
+    # ── Sum already-paid this period (before this payment) ────────────────
+    prev_paid: Decimal = (
+        await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.tenancy_id == tenancy.id,
+                Payment.period_month == period,
+                Payment.is_void == False,
+            )
+        )
+        or Decimal("0")
+    )
+
+    # ── Create Payment row ─────────────────────────────────────────────────
+    payment = Payment(
+        tenancy_id=tenancy.id,
+        amount=amount_dec,
+        payment_date=date.today(),
+        payment_mode=pay_mode,
+        for_type=pay_for,
+        period_month=period if pay_for == PaymentFor.rent else None,
+        notes=notes or f"Logged by {recorded_by}",
+        is_void=False,
+        receipt_url=None,
+    )
+    session.add(payment)
+    await session.flush()  # get payment.id
+
+    # ── Update RentSchedule status ─────────────────────────────────────────
+    if rs is not None:
+        total_paid = prev_paid + amount_dec
+        rent_due = rs.rent_due or Decimal("0")
+        adjustment = rs.adjustment or Decimal("0")
+        effective_due = rent_due + adjustment  # negative adj = discount
+
+        rs.status = RentStatus.paid if total_paid >= effective_due else RentStatus.partial
+
+    # ── Compute new_balance ────────────────────────────────────────────────
+    if rs is not None:
+        rent_due_val = rs.rent_due or Decimal("0")
+        adj_val = rs.adjustment or Decimal("0")
+        effective_due_val = rent_due_val + adj_val
+        new_balance = effective_due_val - (prev_paid + amount_dec)
+    else:
+        new_balance = Decimal("0")
+
+    # ── Audit entry ────────────────────────────────────────────────────────
+    await write_audit_entry(
+        session=session,
+        changed_by=recorded_by,
+        entity_type="payment",
+        entity_id=payment.id,
+        field="payment.log",
+        old_value=None,
+        new_value=str(float(amount_dec)),
+        source=source,
+        note=(
+            f"Payment Rs.{int(amount_dec):,} {method} "
+            f"for {period.strftime('%b %Y') if pay_for == PaymentFor.rent else for_type}"
+        ),
+    )
+
+    return PaymentResult(payment_id=payment.id, new_balance=new_balance)
+
+
+# ── Internal helpers ───────────────────────────────────────────────────────────
+
+def _prev_month(d: date) -> date:
+    if d.month == 1:
+        return date(d.year - 1, 12, 1)
+    return date(d.year, d.month - 1, 1)
