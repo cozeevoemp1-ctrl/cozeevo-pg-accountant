@@ -2,6 +2,50 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.35.0] — 2026-04-19 — Systemic DB → Sheet invariant + architecture cleanup
+
+### Added
+- **Deposit column + Rent column** on every monthly sheet tab. First-month `Rent Due = agreed_rent + security_deposit`; booking advance counted in Total Paid. Enforced in `scripts/sync_sheet_from_db.py` + `gsheets._add_tenant_sync`.
+- **`sync_tenant_all_fields(tenant_id)`** helper in `src/integrations/gsheets.py` — single entry-point that reads a tenant's full DB state and pushes every visible column to BOTH the TENANTS master tab and the current monthly tab in one batch per sheet. Rule: DB and sheet must never diverge. Wired into all 4 previously-uncovered mutation sites (onboarding KYC, extra-deposit add at room transfer, overpayment → deposit, CONFIRM_ADD_TENANT KYC extras).
+- **`trigger_monthly_sheet_sync(month, year)`** + **`update_tenants_tab_field(room, name, field, value)`** helpers in gsheets.py — instant per-cell writes (~1s) for deposit/rent changes plus a background full re-sync for ripple effects. Bot reply returns immediately.
+- **`cozeevo_checkout_confirmation`** template spec in `docs/WHATSAPP_TEMPLATES.md` (5 vars). Extended `cozeevo_booking_confirmation` to 5 vars (adds Deposit + modified-field reconciliation note).
+- **Instant sheet update** on `_do_deposit_change` and `_do_rent_change` (both monthly-tab cell and TENANTS-tab cell fire as `asyncio.create_task`).
+- **AuditLog at all 4 return paths** of `_do_rent_change` (was silent — no accountability trail).
+- **EDIT_NOTES** now writes AuditLog + syncs to BOTH tabs (was TENANTS-only).
+- **`_locate_monthly_header(all_vals)`** helper in gsheets.py — replaces 6 hardcoded `range(4, len(all_vals))` / `all_vals[3]` sites that broke on tabs created by sync_sheet_from_db.py (header at row 7, not row 4). Checkout, notice, checkin-date, void-payment, update-tenant-field, notes-update all now work on both layouts.
+
+### Changed (Apps Script v5 — header-driven rewrite)
+- `scripts/gsheet_apps_script.js` → every read/write now uses header-name lookup via `_findRow_` / `_colMap_` / `_col_`. Dashboard reads correct columns regardless of layout drift.
+- `onSheetEdit` no-ops on new 7-row-header layout (was overwriting summary rows 2-6 with the legacy 2-row summary, corrupting the cards).
+- `updateMonthSummary`, `getTotalDeposit_`, `validateTotals`, `createMonthTab` all header-driven; old positional indices removed.
+
+### Fixed
+- **Sharing type** now auto-fills from `room.room_type` when the onboarding form doesn't explicitly set it. Backfilled the 2 existing NULL rows (Pooja + Arun → double). Fix in `src/api/onboarding_router.py::approve_session`.
+- **No-shows** now appear only in their own check-in month, never carried forward to past/future tabs. Enforced in `sync_sheet_from_db.py` section-1 filter.
+- **Pooja TENANTS deposit stale** — Lokesh changed 6,750→6,500 at 18:02 via bot; TENANTS tab retained 6,750 until the sync-to-both-tabs wiring shipped. Backfilled via SQL + new propagation ensures this class of bug is eliminated.
+
+### Memory
+- New rule: `feedback_db_sheet_invariant.md` — DB mutation → `sync_tenant_all_fields` must fire.
+- Updated `feedback_deposit_dues_logic.md` with "first month = rent + deposit − advance" and enforcement locations.
+- New project: `project_field_registry.md` — planned Phase-1 refactor for PWA readiness.
+- New project: `project_booking_diff_notification.md` — flag receptionist modifications to tenant.
+
+### Commits (all deployed to VPS)
+- `b8a9345` `_refresh_summary_sync` header detection + building/no-show parsing
+- `ea21409` Deposit column + first-month dues + instant sync trigger
+- `2f05144` Rent column + restrict no-shows to checkin month
+- `2b2d56b` Instant sheet update on deposit/rent + auto sharing_type
+- `0515de4` Deposit/rent change propagates to TENANTS master tab
+- `d736d0b` Header-driven sheets everywhere + end-to-end gap closure
+- `3c27560` `sync_tenant_all_fields` — systemic DB → sheet invariant
+
+### User actions required (manual)
+- Register `cozeevo_booking_confirmation` (5 vars) in Meta Business Manager
+- Register `cozeevo_checkout_confirmation` (new spec) when ready
+- Apps Script v5 pasted into Cozeevo Operations v2 → Extensions → Apps Script (DONE per Kiran)
+
+---
+
 ## [1.34.1] — 2026-04-19 — Missing-resolver audit (Lokesh incident)
 
 ### Fixed
