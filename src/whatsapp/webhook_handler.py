@@ -102,15 +102,6 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    # Log WABA ID from entry[0].id — one-shot capture for template creation.
-    try:
-        _waba_id = (payload.get("entry") or [{}])[0].get("id", "")
-        if _waba_id:
-            with open("/tmp/pg_waba_capture.log", "a", encoding="utf-8") as _wlog:
-                _wlog.write(f"{_waba_id}\n")
-    except Exception:
-        pass
-
     # Extract message from Meta's nested structure
     msg_data = _extract_message(payload)
     if not msg_data:
