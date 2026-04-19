@@ -486,8 +486,22 @@ def _refresh_summary_sync(tab_name: str) -> None:
         if len(all_vals) < 5:
             return
 
-        # Detect column layout
-        hdr = all_vals[3] if len(all_vals) > 3 else []
+        # Detect column layout AND header row position. The new layout has 5
+        # summary rows (R2-R6), header at R7, data from R8. The legacy layout
+        # had 2 summary rows (R2-R3), header at R4, data from R5.
+        # Locate the column-header row by finding "Room" in column A.
+        header_row_idx = None
+        for idx in range(0, min(10, len(all_vals))):
+            if str(all_vals[idx][0] if all_vals[idx] else "").strip().lower() == "room":
+                header_row_idx = idx
+                break
+        if header_row_idx is None:
+            # Tab not initialised by sync_sheet_from_db — skip refresh
+            logger.warning("GSheets refresh: no 'Room' header found in %s — skipping", tab_name)
+            return
+        data_start_idx = header_row_idx + 1  # 0-indexed list index where data rows begin
+
+        hdr = all_vals[header_row_idx]
         is_new = "phone" in str(hdr[2] if len(hdr) > 2 else "").lower()
         if is_new:
             ci = {"rent": M_RENT_DUE,
@@ -498,9 +512,9 @@ def _refresh_summary_sync(tab_name: str) -> None:
                   "cash": 5, "upi": 6, "tp": 7, "bal": 8, "st": 9,
                   "building": 2, "sharing": 3, "event": 11, "prev": 15}
 
-        # ── Per-row recalculation ──
+        # ── Per-row recalculation (only true data rows, never header/summary) ──
         row_updates = []  # list of batch update dicts
-        for i in range(4, len(all_vals)):
+        for i in range(data_start_idx, len(all_vals)):
             row = all_vals[i]
             if not row[0]:
                 continue
@@ -547,7 +561,7 @@ def _refresh_summary_sync(tab_name: str) -> None:
         thor_tenants = 0
         hulk_tenants = 0
 
-        for i in range(4, len(all_vals)):
+        for i in range(data_start_idx, len(all_vals)):
             row = all_vals[i]
             if not row[0] or not row[1]:
                 continue
@@ -576,9 +590,10 @@ def _refresh_summary_sync(tab_name: str) -> None:
             if "EXIT" in event or status == "EXIT":
                 exits += 1
 
-            if status == "EXIT":
+            if status == "EXIT" or "EXIT" in event:
                 continue
-            if event == "NO-SHOW" or status == "NO SHOW":
+            # event is "NO SHOW" (space) in the data; older code looked for "NO-SHOW" (dash)
+            if "NO SHOW" in event or "NO-SHOW" in event or "NO SHOW" in status or "NO-SHOW" in status:
                 noshow += 1
                 continue
 
@@ -589,10 +604,15 @@ def _refresh_summary_sync(tab_name: str) -> None:
             else:
                 regular += 1
 
-            if building == "THOR":
+            # building cell is "Cozeevo THOR" / "Cozeevo HULK" — substring match
+            if "THOR" in building:
                 thor_beds += bed_count
                 thor_tenants += 1
+            elif "HULK" in building:
+                hulk_beds += bed_count
+                hulk_tenants += 1
             else:
+                # Unknown building — count somewhere so the totals don't drop
                 hulk_beds += bed_count
                 hulk_tenants += 1
 
