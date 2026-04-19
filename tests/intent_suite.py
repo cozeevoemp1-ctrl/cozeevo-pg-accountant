@@ -144,6 +144,61 @@ MULTI_TURN_CASES: list[Case] = [
     ], ["payment", "multistep"]),
 ]
 
+# ── Framework edge-case tests: things the new router must handle cleanly ───
+# These exercise the PAYMENT_LOG / AWAITING_CHOICE handler specifically.
+EDGE_CASES: list[Case] = [
+    # Cancel at disambiguation
+    Case("cancel at disambig",   [
+        ("Krishnan paid 20000 cash", None),
+        ("cancel", "Cancelled"),
+    ], ["edge", "cancel"]),
+
+    # Numeric with trailing punctuation
+    Case("choice with period",   [
+        ("Krishnan paid 20000 cash", None),
+        ("1.", None),
+    ], ["edge", "parsing"]),
+    Case("choice with paren",    [
+        ("Krishnan paid 20000 cash", None),
+        ("1)", None),
+    ], ["edge", "parsing"]),
+
+    # Out-of-range numeric
+    Case("choice out of range",  [
+        ("Krishnan paid 20000 cash", None),
+        ("9", "number"),             # should reprompt
+        ("1", None),                  # recover with valid choice
+    ], ["edge", "out-of-range"]),
+
+    # Correction mid-disambiguation (new mode)
+    Case("mode correction at disambig", [
+        ("Krishnan paid 20000 cash", None),
+        ("actually upi", "Updated"),
+        ("1", None),
+    ], ["edge", "correction"]),
+
+    # Gibberish at disambig — should reprompt not crash
+    Case("gibberish at disambig", [
+        ("Krishnan paid 20000 cash", None),
+        ("xyz??", "number"),
+        ("1", None),
+    ], ["edge", "gibberish"]),
+
+    # Case-insensitive YES
+    Case("confirm uppercase",    [
+        ("Krishnan paid 20000 cash", None),
+        ("1", None),
+        ("YES", None),                # must match despite case
+    ], ["edge", "case"]),
+
+    # "skip" at disambig — should reprompt
+    Case("skip at disambig",     [
+        ("Krishnan paid 20000 cash", None),
+        ("skip", "number"),
+        ("1", None),
+    ], ["edge", "skip"]),
+]
+
 
 # ── Runner ─────────────────────────────────────────────────────────────────
 def _passed(reply: str, expected_substring: Optional[str]) -> tuple[bool, str]:
@@ -207,6 +262,7 @@ async def main():
         cases.extend(SINGLE_TURN_CASES)
     if not args.only_single:
         cases.extend(MULTI_TURN_CASES)
+        cases.extend(EDGE_CASES)
     if args.filter:
         cases = [c for c in cases if args.filter.lower() in c.label.lower()]
 

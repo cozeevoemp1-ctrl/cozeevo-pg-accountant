@@ -270,6 +270,7 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
             "logged_by": ctx.name or ctx.phone,
         },
         choices, session,
+        state="awaiting_choice",  # routed by src/whatsapp/conversation/
     )
     return _format_choices_message(search_term, choices, f"log Rs.{int(amount):,} payment")
 

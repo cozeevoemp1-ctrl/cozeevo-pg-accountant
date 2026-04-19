@@ -313,8 +313,13 @@ def _make_choices(rows) -> list[dict]:
     return choices
 
 
-async def _save_pending(phone: str, intent: str, action_data: dict, choices: list, session: AsyncSession):
-    """Save a pending disambiguation action with 30-minute expiry."""
+async def _save_pending(phone: str, intent: str, action_data: dict, choices: list, session: AsyncSession, state: str | None = None):
+    """Save a pending disambiguation action with 30-minute expiry.
+
+    `state` is a ConversationState value (e.g. "awaiting_choice"). Framework-
+    managed intents set this; legacy callers leave it None and rely on the
+    legacy resolve_pending_action cascade.
+    """
     phone = _norm_phone(phone)  # canonical 10-digit form so get/save always match
     # Clear any existing unresolved pending actions for this phone
     existing = await session.execute(
@@ -329,6 +334,7 @@ async def _save_pending(phone: str, intent: str, action_data: dict, choices: lis
     pa = PendingAction(
         phone=phone,
         intent=intent,
+        state=state,   # None = legacy cascade; set = framework-routed
         action_data=json.dumps(action_data),
         choices=json.dumps(choices),
         expires_at=datetime.utcnow() + timedelta(minutes=30),

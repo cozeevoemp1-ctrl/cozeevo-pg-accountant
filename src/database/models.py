@@ -781,6 +781,7 @@ class PendingAction(Base):
     id          = Column(Integer, primary_key=True)
     phone       = Column(String(40), nullable=False)
     intent      = Column(String(40), nullable=False)   # PAYMENT_LOG, CHECKOUT, etc.
+    state       = Column(String(40))                    # ConversationState value (None = legacy pending)
     action_data = Column(Text)                          # JSON: {amount, mode, ...}
     choices     = Column(Text)                          # JSON: [{seq, tenant_id, tenancy_id, label}, ...]
     expires_at  = Column(DateTime, nullable=False)

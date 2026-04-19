@@ -161,6 +161,36 @@ async def _process_message_inner(
 
     # ── 2b. Check pending disambiguation (owner) or complaint follow-up (tenant) ──
     if ctx.role in ("admin", "owner", "receptionist"):
+        # ── Framework-routed pending (state field set) ───────────────────────
+        # Try the new state-based router first. If no handler registered for
+        # (intent, state), fall through to the legacy cascade below.
+        framework_pending = await _get_active_pending(ctx.phone, session)
+        if framework_pending and getattr(framework_pending, "state", None):
+            from src.whatsapp.conversation.router import route as fw_route, is_framework_intent
+            from src.whatsapp.conversation.state import parse as fw_parse
+            from src.whatsapp.conversation import memory as fw_memory
+            if is_framework_intent(framework_pending.intent, framework_pending.state):
+                mem = await fw_memory.load(
+                    phone=ctx.phone, role=ctx.role, name=ctx.name,
+                    session=session,
+                    tenant_id=ctx.tenant_id, auth_user_id=ctx.auth_user_id,
+                )
+                inp = fw_parse(message, media_id=body.media_id, media_type=body.media_type)
+                result = await fw_route(mem, inp, session)
+                if result is not None:
+                    if result.keep_pending:
+                        if result.next_state:
+                            framework_pending.state = result.next_state.value
+                        if result.next_intent:
+                            framework_pending.intent = result.next_intent
+                        await _log(session, phone, message, ctx.role, "CONFIRMATION", result.reply)
+                        await session.commit()
+                        return OutboundReply(reply=result.reply, intent="CONFIRMATION", role=ctx.role)
+                    framework_pending.resolved = True
+                    await _log(session, phone, message, ctx.role, framework_pending.intent, result.reply)
+                    await session.commit()
+                    return OutboundReply(reply=result.reply, intent=framework_pending.intent, role=ctx.role)
+
         pending = await _get_active_pending(ctx.phone, session)
         _chat_logger.info("Pending check for %s: %s (intent=%s, resolved=%s)",
                           phone, "FOUND" if pending else "NONE",
