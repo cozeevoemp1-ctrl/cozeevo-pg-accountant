@@ -364,6 +364,9 @@ async def _do_log_payment_by_ids(
                 note += f" Did you mean *{current_month.strftime('%b %Y')}* (currently pending)?"
             wrong_month_note = note
 
+    # ── Load room for audit context ────────────────────────────────────────────
+    _room_obj = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+
     # ── Insert payment + update rent_schedule + audit (via shared service) ──────
     from src.services.payments import log_payment as _log_payment
     pay_result = await _log_payment(
@@ -376,33 +379,12 @@ async def _do_log_payment_by_ids(
         session=session,
         notes=f"Logged via WhatsApp by {ctx_name}",
         source="whatsapp",
+        room_number=_room_obj.room_number if _room_obj else None,
+        entity_name=tenant.name,
     )
     payment_id = pay_result.payment_id
-    remaining_balance = pay_result.new_balance
-
-    # Re-fetch the Payment and RentSchedule objects that the service just wrote
-    # (needed for downstream: payment.id for pending state, rs.status for display)
-    from sqlalchemy import select as _select
-    payment = await session.get(Payment, payment_id)
-    rs = await session.scalar(
-        _select(RentSchedule).where(
-            RentSchedule.tenancy_id == tenancy.id,
-            RentSchedule.period_month == period_month,
-        )
-    )
-
-    # Reconstruct the effective_due + total_paid values for the over/under checks
-    prev_paid = await session.scalar(
-        select(func.sum(Payment.amount)).where(
-            Payment.tenancy_id == tenancy.id,
-            Payment.period_month == period_month,
-            Payment.is_void == False,
-        )
-    ) or Decimal("0")
-    total_paid = prev_paid  # prev_paid now includes this payment (after flush)
-    rent_due = (rs.rent_due if rs else tenancy.agreed_rent) or Decimal("0")
-    adj = (rs.adjustment if rs else Decimal("0")) or Decimal("0")
-    effective_due = rent_due + adj  # negative adj = discount
+    effective_due = pay_result.effective_due
+    total_paid = pay_result.total_paid
 
     # ── Underpayment note ──────────────────────────────────────────────────────
     remaining = effective_due - total_paid
@@ -415,7 +397,7 @@ async def _do_log_payment_by_ids(
         await _save_pending(
             tenant.phone or ctx_name, "UNDERPAYMENT_NOTE",
             {
-                "payment_id": payment.id, "tenant_name": tenant.name,
+                "payment_id": payment_id, "tenant_name": tenant.name,
                 "remaining": float(remaining),
             },
             [], session,
@@ -450,8 +432,8 @@ async def _do_log_payment_by_ids(
             "Reply *1*, *2*, *3*, or *4*."
         )
 
-    status_str = "Paid ✅" if rs and rs.status == RentStatus.paid else "Partial ⏳"
-    room_obj = await session.get(Room, tenancy.room_id)
+    status_str = "Paid ✅" if pay_result.status == RentStatus.paid else "Partial ⏳"
+    room_obj = _room_obj or await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room_obj.room_number})" if room_obj else ""
 
     # ── Google Sheets write-back (with 10s timeout — never hangs) ────────────

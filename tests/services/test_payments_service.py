@@ -226,3 +226,122 @@ class TestLogPayment:
         )
 
         assert result.payment_id == 42
+
+    @pytest.mark.asyncio
+    async def test_result_has_status_and_dues_fields_for_rent(self):
+        """PaymentResult must include status, effective_due, total_paid for rent payments."""
+        from src.services.payments import log_payment
+        from src.database.models import RentStatus
+
+        session, tenancy = _make_session(tenancy_rent=Decimal("8000"), existing_paid=Decimal("0"))
+
+        result = await log_payment(
+            tenancy_id=99,
+            amount=8000,
+            method="cash",
+            for_type="rent",
+            period_month="2026-04",
+            recorded_by="kiran@cozeevo",
+            session=session,
+        )
+
+        assert result.status == RentStatus.paid
+        assert result.effective_due == Decimal("8000")
+        assert result.total_paid == Decimal("8000")
+
+    @pytest.mark.asyncio
+    async def test_result_status_partial_when_underpaid(self):
+        """PaymentResult.status must be partial when amount < rent_due."""
+        from src.services.payments import log_payment
+        from src.database.models import RentStatus
+
+        session, tenancy = _make_session(tenancy_rent=Decimal("8000"), existing_paid=Decimal("0"))
+
+        result = await log_payment(
+            tenancy_id=99,
+            amount=5000,
+            method="cash",
+            for_type="rent",
+            period_month="2026-04",
+            recorded_by="kiran@cozeevo",
+            session=session,
+        )
+
+        assert result.status == RentStatus.partial
+        assert result.effective_due == Decimal("8000")
+        assert result.total_paid == Decimal("5000")
+
+    @pytest.mark.asyncio
+    async def test_result_fields_none_for_non_rent(self):
+        """PaymentResult.status must be None and dues fields zero for non-rent payments."""
+        from src.services.payments import log_payment
+
+        session, tenancy = _make_session()
+
+        result = await log_payment(
+            tenancy_id=99,
+            amount=2000,
+            method="cash",
+            for_type="maintenance",
+            period_month=None,
+            recorded_by="kiran@cozeevo",
+            session=session,
+        )
+
+        assert result.status is None
+        assert result.effective_due == Decimal("0")
+        assert result.total_paid == Decimal("0")
+
+    @pytest.mark.asyncio
+    async def test_audit_log_carries_room_number_and_entity_name(self):
+        """When room_number and entity_name are passed, audit row must carry them."""
+        from src.services.payments import log_payment
+        from src.database.models import AuditLog
+
+        session, tenancy = _make_session()
+        added_objects = []
+        session.add = MagicMock(side_effect=added_objects.append)
+
+        await log_payment(
+            tenancy_id=99,
+            amount=8000,
+            method="UPI",
+            for_type="rent",
+            period_month="2026-04",
+            recorded_by="kiran@cozeevo",
+            session=session,
+            room_number="101",
+            entity_name="Ravi Kumar",
+        )
+
+        audit_rows = [o for o in added_objects if isinstance(o, AuditLog)]
+        assert audit_rows, "Expected at least one AuditLog row"
+        audit = audit_rows[0]
+        assert audit.room_number == "101", f"Expected room_number='101', got '{audit.room_number}'"
+        assert audit.entity_name == "Ravi Kumar", f"Expected entity_name='Ravi Kumar', got '{audit.entity_name}'"
+
+    @pytest.mark.asyncio
+    async def test_audit_log_room_number_defaults_to_none(self):
+        """When room_number/entity_name are omitted, audit row must have None values."""
+        from src.services.payments import log_payment
+        from src.database.models import AuditLog
+
+        session, tenancy = _make_session()
+        added_objects = []
+        session.add = MagicMock(side_effect=added_objects.append)
+
+        await log_payment(
+            tenancy_id=99,
+            amount=8000,
+            method="UPI",
+            for_type="rent",
+            period_month="2026-04",
+            recorded_by="kiran@cozeevo",
+            session=session,
+        )
+
+        audit_rows = [o for o in added_objects if isinstance(o, AuditLog)]
+        assert audit_rows
+        audit = audit_rows[0]
+        assert audit.room_number is None
+        assert audit.entity_name is None

@@ -49,12 +49,20 @@ class PaymentResult:
     """Returned by log_payment().
 
     Attributes:
-        payment_id:  PK of the newly created Payment row.
-        new_balance: Remaining amount owed for the period month after this
-                     payment. Zero or negative means fully paid / overpaid.
+        payment_id:   PK of the newly created Payment row.
+        new_balance:  Remaining amount owed for the period month after this
+                      payment. Zero or negative means fully paid / overpaid.
+        status:       RentSchedule status after this payment (None for
+                      non-rent payments where no RentSchedule is touched).
+        effective_due: Effective rent due for the period (0 for non-rent).
+        total_paid:   Total paid for the period including this payment
+                      (0 for non-rent).
     """
     payment_id: int
     new_balance: Decimal
+    status: Optional[RentStatus]
+    effective_due: Decimal
+    total_paid: Decimal
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -106,6 +114,8 @@ async def log_payment(
     session: AsyncSession,
     notes: Optional[str] = None,
     source: str = "service",
+    room_number: Optional[str] = None,
+    entity_name: Optional[str] = None,
 ) -> PaymentResult:
     """Insert a payment and update rent schedule status.
 
@@ -196,21 +206,23 @@ async def log_payment(
     session.add(payment)
     await session.flush()  # get payment.id
 
-    # ── Update RentSchedule status ─────────────────────────────────────────
+    # ── Update RentSchedule status + compute result fields ────────────────
+    rs_status: Optional[RentStatus] = None
+    effective_due_val: Decimal = Decimal("0")
+    total_paid_val: Decimal = Decimal("0")
+
     if rs is not None:
-        total_paid = prev_paid + amount_dec
+        total_paid_val = prev_paid + amount_dec
         rent_due = rs.rent_due or Decimal("0")
         adjustment = rs.adjustment or Decimal("0")
-        effective_due = rent_due + adjustment  # negative adj = discount
+        effective_due_val = rent_due + adjustment  # negative adj = discount
 
-        rs.status = RentStatus.paid if total_paid >= effective_due else RentStatus.partial
+        rs.status = RentStatus.paid if total_paid_val >= effective_due_val else RentStatus.partial
+        rs_status = rs.status
 
     # ── Compute new_balance ────────────────────────────────────────────────
     if rs is not None:
-        rent_due_val = rs.rent_due or Decimal("0")
-        adj_val = rs.adjustment or Decimal("0")
-        effective_due_val = rent_due_val + adj_val
-        new_balance = effective_due_val - (prev_paid + amount_dec)
+        new_balance = effective_due_val - total_paid_val
     else:
         new_balance = Decimal("0")
 
@@ -224,13 +236,21 @@ async def log_payment(
         old_value=None,
         new_value=str(float(amount_dec)),
         source=source,
+        room_number=room_number,
+        entity_name=entity_name,
         note=(
             f"Payment Rs.{int(amount_dec):,} {method} "
             f"for {period.strftime('%b %Y') if pay_for == PaymentFor.rent else for_type}"
         ),
     )
 
-    return PaymentResult(payment_id=payment.id, new_balance=new_balance)
+    return PaymentResult(
+        payment_id=payment.id,
+        new_balance=new_balance,
+        status=rs_status,
+        effective_due=effective_due_val,
+        total_paid=total_paid_val,
+    )
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
