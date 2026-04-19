@@ -2285,6 +2285,7 @@ async def resolve_pending_action(
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
         "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "DEPOSIT_CHANGE_WHO",
+        "ROOM_TRANSFER_WHO", "ROOM_TRANSFER_DEST",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
         return "❌ Cancelled. Nothing was changed."
@@ -2743,6 +2744,43 @@ async def resolve_pending_action(
             "1. Yes, void it\n"
             "2. No, keep it\n\n"
             "Reply *1* or *2*."
+        )
+
+    if chosen is not None and pending.intent == "ROOM_TRANSFER_WHO":
+        tenant = await session.get(Tenant, chosen["tenant_id"])
+        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+        if not tenant or not tenancy:
+            return "Tenant not found."
+        current_room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+        from_room = current_room.room_number if current_room else ""
+        to_room = (action_data.get("to_room") or "").strip()
+
+        if not to_room:
+            await _save_pending(
+                pending.phone, "ROOM_TRANSFER_DEST",
+                {"tenancy_id": tenancy.id, "tenant_name": tenant.name,
+                 "from_room": from_room}, [], session,
+            )
+            return (
+                f"Moving *{tenant.name}* from Room *{from_room}*.\n\n"
+                "Which room should they move to? (Reply with room number)"
+            )
+        return await _finalize_room_transfer(
+            pending.phone, tenancy.id, tenant.name,
+            from_room, to_room, session,
+        )
+
+    if pending.intent == "ROOM_TRANSFER_DEST":
+        to_room = reply_text.strip()
+        if not to_room:
+            return "__KEEP_PENDING__Reply with the destination room number."
+        return await _finalize_room_transfer(
+            pending.phone,
+            action_data["tenancy_id"],
+            action_data["tenant_name"],
+            action_data.get("from_room", ""),
+            to_room,
+            session,
         )
 
     if chosen is not None and pending.intent == "DEPOSIT_CHANGE_WHO":
@@ -4958,13 +4996,34 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
             "Which room should they move to? (Reply with room number)"
         )
 
+    return await _finalize_room_transfer(
+        ctx.phone, tenancy.id, tenant.name,
+        current_room.room_number, to_room, session,
+    )
+
+
+async def _finalize_room_transfer(
+    phone: str, tenancy_id: int, tenant_name: str,
+    from_room: str, to_room: str, session: AsyncSession,
+) -> str:
+    """Shared tail of room-transfer flow: validate destination, check vacancy,
+    fetch current rent/deposit, save ROOM_TRANSFER pending, return confirm prompt.
+
+    Used by:
+      - _room_transfer_prompt (direct single-match path)
+      - resolve_pending_action ROOM_TRANSFER_WHO branch (after tenant picked)
+      - resolve_pending_action ROOM_TRANSFER_DEST branch (after room typed)
+    """
+    tenancy = await session.get(Tenancy, tenancy_id)
+    if not tenancy:
+        return "Tenancy record not found."
+
     new_room = await session.scalar(
         select(Room).where(Room.room_number == to_room.upper(), Room.active == True)
     )
     if not new_room:
         return f"Room *{to_room}* not found. Check the room number and try again."
 
-    # Check vacancy — if occupied, show who's there and ask what to do
     occupied_rows = (await session.execute(
         select(Tenant.name, Tenant.phone, Tenancy.id).where(
             Tenancy.room_id == new_room.id,
@@ -4979,10 +5038,9 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
             f"Options:\n"
             f"*1.* Checkout the current occupant(s) first, then retry\n"
             f"*2.* Pick a different room\n\n"
-            f"_I can't auto-swap yet — checkout the occupant first, then move {name}._"
+            f"_I can't auto-swap yet — checkout the occupant first, then move {tenant_name}._"
         )
 
-    # Fetch current rent
     rs = await session.scalar(
         select(RentSchedule).where(
             RentSchedule.tenancy_id == tenancy.id,
@@ -4990,22 +5048,22 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
         ).order_by(RentSchedule.period_month.asc()).limit(1)
     )
     current_rent = int(rs.rent_due) if rs else int(tenancy.booking_amount or 0)
-
     current_deposit = int(tenancy.security_deposit or 0)
+
     action_data = {
         "tenancy_id": tenancy.id,
-        "tenant_name": tenant.name,
-        "from_room": current_room.room_number,
+        "tenant_name": tenant_name,
+        "from_room": from_room,
         "to_room_id": new_room.id,
         "to_room_number": new_room.room_number,
         "current_rent": current_rent,
         "current_deposit": current_deposit,
         "step": "confirm",
     }
-    await _save_pending(ctx.phone, "ROOM_TRANSFER", action_data, [], session)
+    await _save_pending(phone, "ROOM_TRANSFER", action_data, [], session)
     return (
-        f"*Room Transfer — {tenant.name}*\n"
-        f"From: Room *{current_room.room_number}*\n"
+        f"*Room Transfer — {tenant_name}*\n"
+        f"From: Room *{from_room}*\n"
         f"To:   Room *{new_room.room_number}*\n"
         f"Current rent: Rs.{current_rent:,}/mo\n\n"
         "*Rent for new room?*\n"
