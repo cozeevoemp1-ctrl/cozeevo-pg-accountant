@@ -2,6 +2,35 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.34.0] — 2026-04-19 — Owner PWA Foundation (Plan 1 · partial)
+
+### Brainstorm → Spec → Plan
+- Brainstormed full vision for Owner PWA (mobile-first, voice-first, complements WhatsApp bot, evolves into Kozzy SaaS)
+- Locked 7 design principles (numbers-hero, speed-over-beauty, fool-proof-by-structure, voice-first, one-screen-one-answer, thumb-reachable, trust-signals)
+- Design spec: `docs/superpowers/specs/2026-04-19-owner-pwa-design.md` (16 sections: purpose, users, scope, architecture, voice pipeline, security, home screen, design system, build sequence, existing-rules alignment, mockup-before-build cadence)
+- Implementation plan: `docs/superpowers/plans/2026-04-19-owner-pwa-foundation.md` (25 tasks across 6 phases for weeks 1-2; Plans 2+3 written after Plan 1 ships)
+- Decomposition: PWA → 3 plans (Foundation+Rent / Modifications+Check-in / Check-out+Comms+Polish) — each produces working software
+
+### Backend (FastAPI · `src/`)
+- **Services layer** (`src/services/`): lifted `log_payment` from WhatsApp handler into `payments.py` + `audit.py` — shared single source of truth for bot + PWA. `PaymentResult` expanded with `status`/`effective_due`/`total_paid` so handler drops redundant re-queries. 11/11 tests pass. Commits `e818c33`, `650ddf7`.
+- **Multi-tenant data model** (`src/database/migrations/add_org_id_2026_04_19.py`): added `org_id INTEGER NOT NULL DEFAULT 1` to 8 tables (tenancies, payments, rooms, rent_revisions, rent_schedule, expenses, leads, audit_log). Idempotent, SQLite+Postgres, per-table index `idx_<table>_org_id`. ORM `index=True` dropped (migration is source of truth). Cozeevo = org_id 1. 4/4 tests pass. Commits `d410166`, `110303e`.
+- **New API surface** (`src/api/v2/app_router.py`): `/api/v2/app/*` router with Supabase JWT middleware (HS256, audience=authenticated). `get_current_user` dependency returns `AppUser(user_id, phone, role, org_id)`. Generic "invalid token" 401 message (server-side logs the real error). Defensive `int()` on `org_id`. `/health` endpoint. `LocalOnlyMiddleware` whitelist for `/api/v2/app` (JWT replaces localhost restriction for public-facing mobile API). 8/8 tests pass. Commits `dca0a1f`, `7c2fb68`.
+
+### Frontend (PWA · `/web/`)
+- **Next.js 15 scaffold** (`cd9d5ac`, `ffc2089`): App Router + TypeScript strict + Tailwind + Serwist PWA service worker + manifest (name "Kozzy · Cozeevo Help Desk", theme `#EF1F9C`, bg `#F6F5F0`). PIL-generated icon-192/512 placeholders. DM Sans (weights 400-800) via `next/font/google`. `lib/format.ts` with Indian number grouping (₹2,40,000). 4/4 Vitest tests pass. Clean build (104kB first load JS).
+- **Design tokens** (`web/tailwind.config.ts`): brand colors + pastel tiles + status colors + borderRadius (card/tile/pill).
+- **Playwright verification**: PWA boots at http://localhost:3100, renders pink K logo on cream bg with correct Indian rupee formatting. Screenshot: `.playwright-mcp/pwa-scaffold-first-boot.png`.
+
+### Process / memory
+- Subagent-driven-development workflow: per-task implementer + spec-compliance review + code-quality review, applied loops for fixes. ~10 subagent dispatches total.
+- Saved memory: UI approval + interactive Playwright testing requirement, test-data isolation (never write to live Cozeevo DB), PWA tech-debt backlog, updated pending-tasks list.
+
+### Known follow-ups (deferred, documented)
+- PWA: Tailwind semantic token rename, manifest `purpose` fix, `.gitignore` PNG negation, favicon, role vocabulary alignment — see `memory/project_pwa_tech_debt.md`.
+- Plan 1 remaining: Tasks 4 (payments endpoint), 5 (collection endpoint), 6 (Supabase dashboard — manual), 9 (UI primitives), 10 (Supabase client), 11 (Login screen with mockup gate).
+
+---
+
 ## [1.33.0] — 2026-04-18 — Rent Reconciliation + Data Architecture
 
 ### Rent Reconciliation (drop + reload)
