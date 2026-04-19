@@ -104,8 +104,14 @@ async def main(args):
                     ),
                     # Any tenancy with payment or rent schedule for this month
                     Tenancy.id.in_(tids_with_activity) if tids_with_activity else False,
-                    # All current no-shows (until they checkin or are cancelled)
-                    Tenancy.status == TenancyStatus.no_show,
+                    # No-shows ONLY in their own checkin month — never carry
+                    # forward to past or future months. Memory:
+                    # feedback_noshow_filtering.md.
+                    and_(
+                        Tenancy.status == TenancyStatus.no_show,
+                        Tenancy.checkin_date >= period,
+                        Tenancy.checkin_date < last_day,
+                    ),
                 )
             )
             .order_by(Room.room_number, Tenant.name)
@@ -260,7 +266,10 @@ async def main(args):
             rs = rent_map.get(tenancy.id)
             pays = payment_map.get(tenancy.id, {"cash": Decimal("0"), "upi": Decimal("0")})
 
-            # First-month detection: tenancy's checkin_date falls inside this period.
+            # First-month-style billing: tenancy's checkin_date falls inside
+            # this period. Applies to both active and no-show rows — no-shows
+            # are only included in their own checkin month (filter in section 1),
+            # so this single check covers them too.
             is_first_month = bool(
                 tenancy.checkin_date
                 and period <= tenancy.checkin_date < next_period
@@ -269,16 +278,19 @@ async def main(args):
             # Deposit (security deposit only — maintenance kept separate per memory rule).
             deposit_amt = int(tenancy.security_deposit or 0)
 
-            # Rent due — base rent from rent_schedule, falls back to agreed_rent.
-            base_rent = int((rs.rent_due or 0) + (rs.adjustment or 0)) if rs else int(tenancy.agreed_rent or 0)
-            # First month: Rent Due = rent + deposit (the full first-month bill).
+            # Base monthly rent — info column (always agreed_rent or schedule override).
+            agreed_rent_amt = int(tenancy.agreed_rent or 0)
+            base_rent = int((rs.rent_due or 0) + (rs.adjustment or 0)) if rs else agreed_rent_amt
+            # Rent Due = full first-month bill (rent + deposit) when this is
+            # their checkin month. Otherwise just the base rent.
             # Memory: feedback_deposit_dues_logic.md — enforced here AND in create_month.py.
             rent_due = base_rent + deposit_amt if is_first_month else base_rent
 
             cash = int(pays["cash"])
             upi = int(pays["upi"])
 
-            # First month also gets the booking advance applied to Total Paid.
+            # First-month rows also get the booking advance applied to Total
+            # Paid (advance reduces the first-month outstanding).
             if is_first_month:
                 bk = booking_pay_map.get(tenancy.id, {"cash": Decimal("0"), "upi": Decimal("0")})
                 cash += int(bk["cash"])
@@ -343,6 +355,7 @@ async def main(args):
                 "phone": tenant.phone or "",
                 "building": bldg or "",
                 "sharing": sharing,
+                "rent": agreed_rent_amt if agreed_rent_amt else "",
                 "deposit": deposit_amt if deposit_amt else "",
                 "rent due": rent_due,
                 "cash": cash,

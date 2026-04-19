@@ -73,7 +73,7 @@ MONTH_NAMES = [
 # Reads detect old vs new format by checking headers, never assume positions.
 
 MONTHLY_HEADERS = [
-    "Room", "Name", "Phone", "Building", "Sharing", "Deposit", "Rent Due",
+    "Room", "Name", "Phone", "Building", "Sharing", "Rent", "Deposit", "Rent Due",
     "Cash", "UPI", "Total Paid", "Balance", "Status",
     "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
 ]
@@ -124,6 +124,7 @@ M_NAME = _M["M_NAME"]
 M_PHONE = _M["M_PHONE"]
 M_BUILDING = _M["M_BUILDING"]
 M_SHARING = _M["M_SHARING"]
+M_RENT = _M["M_RENT"]
 M_DEPOSIT = _M["M_DEPOSIT"]
 M_RENT_DUE = _M["M_RENT_DUE"]
 M_CASH = _M["M_CASH"]
@@ -1054,9 +1055,9 @@ def _add_tenant_sync(
             "phone": phone_txt,
             "building": building,
             "sharing": sharing,
+            "rent": int(agreed_rent) if agreed_rent else "",
             "deposit": int(deposit) if deposit else "",
             "rent due": first_month_total,
-            "rent": first_month_total,
             "cash": adv_cash,
             "upi": adv_upi,
             "total paid": adv_total,
@@ -1806,8 +1807,8 @@ _FIELD_TO_COL = {
     "sharing": M_SHARING,
     "deposit": M_DEPOSIT,
     "security_deposit": M_DEPOSIT,
-    "agreed_rent": M_RENT_DUE,
-    "rent": M_RENT_DUE,
+    "agreed_rent": M_RENT,
+    "rent": M_RENT,
     "phone": M_PHONE,
     "notes": M_NOTES,
     "status": M_STATUS,

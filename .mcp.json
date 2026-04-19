@@ -24,6 +24,13 @@
     "sequential-thinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "eraser-io": {
+      "command": "npx",
+      "args": ["-y", "@eraserlabs/eraser-mcp"],
+      "env": {
+        "ERASER_API_KEY": "${ERASER_API_KEY}"
+      }
     }
   }
 }
