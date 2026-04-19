@@ -2050,6 +2050,226 @@ async def update_tenants_tab_field(
     )
 
 
+# ── SYSTEMIC: push every DB field of a tenant to both sheet tabs ──────────────
+# The rule (per Kiran, 2026-04-19): whenever ANY attribute of a tenant or
+# tenancy changes in DB, every sheet column that shows that attribute must
+# auto-update so the receptionist never sees stale data. This helper does
+# that wholesale — pass it a tenant_id, it reads the current DB state and
+# writes every tenant+tenancy+room column to both TENANTS and the current
+# monthly tab in ONE batch per sheet. Call after any mutation.
+
+
+def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None) -> dict:
+    """
+    Push every DB field of a tenant (and their active tenancy) to
+    TENANTS master tab + current monthly tab.
+
+    Single batch update per sheet — fast (~1.5s for both tabs).
+    Safe to call from fire-and-forget background tasks; never raises.
+    """
+    import os as _os
+    from datetime import date as _date
+    result: dict[str, Any] = {"success": False, "tenants_written": 0, "monthly_written": 0, "error": None}
+
+    # Work on our own DB session so we're safe in background tasks.
+    try:
+        from sqlalchemy import create_engine as _ce, select as _sel
+        from sqlalchemy.orm import sessionmaker as _sm
+        from src.database.models import (
+            Tenant as _Tenant, Tenancy as _Tenancy, Room as _Room,
+            Property as _Property, TenancyStatus as _TS,
+        )
+        db_url = _os.environ.get("DATABASE_URL", "")
+        if db_url.startswith("postgresql+asyncpg://"):
+            db_url = db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        if not db_url:
+            result["error"] = "DATABASE_URL not set"
+            return result
+        engine = _ce(db_url, pool_pre_ping=True)
+        Session = _sm(engine, expire_on_commit=False)
+        with Session() as s:
+            tenant = s.get(_Tenant, tenant_id)
+            if not tenant:
+                result["error"] = f"Tenant {tenant_id} not found"
+                return result
+            tenancy = s.scalar(_sel(_Tenancy).where(
+                _Tenancy.tenant_id == tenant_id,
+                _Tenancy.status.in_([_TS.active, _TS.no_show]),
+            ).order_by(_Tenancy.created_at.desc()))
+            room = s.get(_Room, tenancy.room_id) if tenancy and tenancy.room_id else None
+            prop = s.get(_Property, room.property_id) if room and room.property_id else None
+
+        engine.dispose()
+    except Exception as e:
+        result["error"] = f"DB read failed: {e}"
+        return result
+
+    if not tenancy or not room:
+        result["error"] = f"No active/no-show tenancy for tenant {tenant_id}"
+        return result
+
+    skip = set(f.strip().lower() for f in (skip_fields or []))
+
+    def _date_str(d):
+        if d is None:
+            return ""
+        if isinstance(d, _date):
+            return d.strftime("%d/%m/%Y")
+        return str(d)
+
+    def _enum_str(v):
+        return v.value if hasattr(v, "value") else (v or "")
+
+    # ── Build TENANTS tab row values keyed by header name ─────────────────
+    tenants_row = {
+        "room": room.room_number,
+        "name": tenant.name or "",
+        "phone": tenant.phone or "",
+        "gender": tenant.gender or "",
+        "building": prop.name if prop else "",
+        "floor": str(room.floor or ""),
+        "sharing": _enum_str(tenancy.sharing_type),
+        "check-in": _date_str(tenancy.checkin_date),
+        "status": _enum_str(tenancy.status).lower() or "",
+        "agreed rent": int(tenancy.agreed_rent or 0),
+        "deposit": int(tenancy.security_deposit or 0),
+        "booking": int(tenancy.booking_amount or 0),
+        "maintenance": int(tenancy.maintenance_fee or 0),
+        "notice date": _date_str(tenancy.notice_date),
+        "expected exit": _date_str(tenancy.expected_checkout),
+        "checkout date": _date_str(tenancy.checkout_date),
+        "dob": _date_str(tenant.date_of_birth),
+        "father name": tenant.father_name or "",
+        "father phone": tenant.father_phone or "",
+        "address": tenant.permanent_address or "",
+        "emergency contact": tenant.emergency_contact_name or tenant.emergency_contact_phone or "",
+        "emergency relationship": tenant.emergency_contact_relationship or "",
+        "email": tenant.email or "",
+        "occupation": tenant.occupation or "",
+        "education": tenant.educational_qualification or "",
+        "office address": tenant.office_address or "",
+        "office phone": tenant.office_phone or "",
+        "id type": tenant.id_proof_type or "",
+        "id number": tenant.id_proof_number or "",
+        "food pref": tenant.food_preference or "",
+        "notes": tenancy.notes or "",
+    }
+
+    # Write TENANTS tab — locate row by room+name, batch-update only
+    # cells whose value differs from current.
+    try:
+        t_ws = _get_worksheet_sync("TENANTS")
+        t_vals = t_ws.get_all_values()
+        t_headers = [h.strip().lower() for h in t_vals[0]] if t_vals else []
+        name_lower = (tenant.name or "").strip().lower()
+        room_upper = str(room.room_number).strip().upper()
+        target_row = None
+        for i in range(1, len(t_vals)):
+            r = t_vals[i]
+            if not r or len(r) < 2:
+                continue
+            if (str(r[T_ROOM]).strip().upper() == room_upper and
+                    name_lower in str(r[T_NAME]).strip().lower()):
+                target_row = i + 1  # 1-based
+                break
+        if target_row is None:
+            for i in range(1, len(t_vals)):
+                r = t_vals[i]
+                if r and len(r) > 1 and name_lower == str(r[T_NAME]).strip().lower():
+                    target_row = i + 1
+                    break
+        if target_row is not None:
+            # Build batch of {range, values} only for fields that changed.
+            existing = t_vals[target_row - 1] if target_row - 1 < len(t_vals) else []
+            batch = []
+            for i, hdr in enumerate(t_headers):
+                if hdr not in tenants_row:
+                    continue
+                if hdr in skip:
+                    continue
+                new_v = tenants_row[hdr]
+                cur_v = str(existing[i]).strip() if i < len(existing) else ""
+                if str(new_v).strip() == cur_v:
+                    continue
+                cell = gspread.utils.rowcol_to_a1(target_row, i + 1)
+                batch.append({"range": cell, "values": [[new_v]]})
+            if batch:
+                t_ws.batch_update(batch, value_input_option="USER_ENTERED")
+                result["tenants_written"] = len(batch)
+                logger.info("sync_tenant_all_fields: TENANTS — wrote %d cells for %s", len(batch), tenant.name)
+    except Exception as e:
+        logger.warning("sync_tenant_all_fields: TENANTS write failed: %s", e)
+
+    # ── Monthly tab row: per-cell diff update, same pattern ───────────────
+    # Only sync the CURRENT month tab. Other months stay historical.
+    tab_name = _current_month_tab()
+    try:
+        m_ws = _get_worksheet_sync(tab_name)
+        m_vals = m_ws.get_all_values()
+        hdr_idx, data_start = _locate_monthly_header(m_vals)
+        if hdr_idx >= 0:
+            m_headers = [h.strip().lower() for h in m_vals[hdr_idx]]
+            target_row = None
+            for i in range(data_start, len(m_vals)):
+                r = m_vals[i]
+                if not r or len(r) < 2 or not r[0]:
+                    continue
+                if (str(r[0]).strip().upper() == room_upper and
+                        name_lower in str(r[1]).strip().lower()):
+                    target_row = i + 1
+                    break
+            if target_row is not None:
+                existing = m_vals[target_row - 1]
+                # Monthly tab fields it covers (rest recomputed by full sync)
+                monthly_row = {
+                    "room": room.room_number,
+                    "name": tenant.name or "",
+                    "phone": tenant.phone or "",
+                    "building": prop.name if prop else "",
+                    "sharing": _enum_str(tenancy.sharing_type),
+                    "rent": int(tenancy.agreed_rent or 0),
+                    "deposit": int(tenancy.security_deposit or 0),
+                    "check-in": _date_str(tenancy.checkin_date),
+                    "notice date": _date_str(tenancy.notice_date),
+                    "notes": tenancy.notes or "",
+                }
+                batch = []
+                for i, hdr in enumerate(m_headers):
+                    if hdr not in monthly_row:
+                        continue
+                    if hdr in skip:
+                        continue
+                    new_v = monthly_row[hdr]
+                    cur_v = str(existing[i]).strip() if i < len(existing) else ""
+                    if str(new_v).strip() == cur_v:
+                        continue
+                    cell = gspread.utils.rowcol_to_a1(target_row, i + 1)
+                    batch.append({"range": cell, "values": [[new_v]]})
+                if batch:
+                    m_ws.batch_update(batch, value_input_option="USER_ENTERED")
+                    result["monthly_written"] = len(batch)
+                    logger.info("sync_tenant_all_fields: %s — wrote %d cells for %s",
+                                tab_name, len(batch), tenant.name)
+    except Exception as e:
+        logger.warning("sync_tenant_all_fields: monthly write failed: %s", e)
+
+    result["success"] = True
+    return result
+
+
+async def sync_tenant_all_fields(tenant_id: int, skip_fields: list | None = None) -> dict:
+    """
+    Async entry point for the systemic per-tenant sheet sync.
+
+    Call this after ANY mutation of tenant.* or tenancy.* fields so the
+    sheet cells shown to the receptionist stay in lock-step with the DB.
+
+    Fire-and-forget pattern is expected — schedule via asyncio.create_task
+    if you don't need to await. Never raises.
+    """
+    return await asyncio.to_thread(_sync_tenant_all_fields_sync, tenant_id, skip_fields)
+
+
 def trigger_monthly_sheet_sync(month: int, year: int) -> None:
     """
     Fire `scripts/sync_sheet_from_db.py --month M --year Y --write` in the

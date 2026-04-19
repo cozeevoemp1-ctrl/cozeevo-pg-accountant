@@ -214,6 +214,14 @@ async def resolve_pending_action(
             if data.get("food_pref"):
                 tenant.food_preference = data["food_pref"]
 
+            # Systemic rule: DB changed → sheet must follow. Fire-and-forget.
+            try:
+                import asyncio as _aio
+                from src.integrations.gsheets import sync_tenant_all_fields as _sta
+                _aio.create_task(_sta(tenant.id))
+            except Exception:
+                pass
+
             # Mark onboarding complete
             from src.database.models import OnboardingSession
             ob = await session.get(OnboardingSession, onboarding_id)
@@ -2141,6 +2149,13 @@ async def resolve_pending_action(
                     if tenancy:
                         tenancy.security_deposit = (tenancy.security_deposit or 0) + Decimal(str(extra_deposit))
                         result += f"\nDeposit increased by Rs.{int(extra_deposit):,}"
+                        # Systemic rule: any tenancy field change → sheet sync.
+                        try:
+                            import asyncio as _aio
+                            from src.integrations.gsheets import sync_tenant_all_fields as _sta
+                            _aio.create_task(_sta(tenancy.tenant_id))
+                        except Exception:
+                            pass
 
                 return result
             return "Room transfer cancelled."
@@ -2576,6 +2591,13 @@ async def resolve_pending_action(
             tenancy = await session.get(Tenancy, tenancy_id)
             if tenancy:
                 tenancy.security_deposit = (tenancy.security_deposit or Decimal("0")) + Decimal(str(extra))
+                # Systemic rule: any tenancy field change → sheet sync.
+                try:
+                    import asyncio as _aio
+                    from src.integrations.gsheets import sync_tenant_all_fields as _sta
+                    _aio.create_task(_sta(tenancy.tenant_id))
+                except Exception:
+                    pass
             return (
                 f"*Overpayment allocated — {tenant_name}*\n"
                 f"Rs.{int(extra):,} added to security deposit.\n"
@@ -2905,6 +2927,13 @@ async def resolve_pending_action(
                         if kyc.get("id_proof_number"):
                             tenant.id_proof_number = kyc["id_proof_number"]
                         result += "\nKYC data saved."
+                        # Systemic rule: DB mutation → sheet sync.
+                        try:
+                            import asyncio as _aio
+                            from src.integrations.gsheets import sync_tenant_all_fields as _sta
+                            _aio.create_task(_sta(tenant.id))
+                        except Exception:
+                            pass
 
             # Save registration form image as Document + start doc collection
             form_image_path = action_data.get("form_image_path")
