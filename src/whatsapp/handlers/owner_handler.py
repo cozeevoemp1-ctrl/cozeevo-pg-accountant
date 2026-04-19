@@ -2284,7 +2284,7 @@ async def resolve_pending_action(
         "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
         "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
-        "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT",
+        "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "DEPOSIT_CHANGE_WHO",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
         return "❌ Cancelled. Nothing was changed."
@@ -2743,6 +2743,43 @@ async def resolve_pending_action(
             "1. Yes, void it\n"
             "2. No, keep it\n\n"
             "Reply *1* or *2*."
+        )
+
+    if chosen is not None and pending.intent == "DEPOSIT_CHANGE_WHO":
+        tenant = await session.get(Tenant, chosen["tenant_id"])
+        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+        if not tenant or not tenancy:
+            return "Tenant not found."
+        room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+        room_num = room.room_number if room else ""
+        current = int(tenancy.security_deposit or 0)
+        amount = action_data.get("amount")
+
+        if not amount:
+            await _save_pending(
+                pending.phone, "DEPOSIT_CHANGE_AMT",
+                {"tenancy_id": tenancy.id, "tenant_name": tenant.name},
+                [], session,
+            )
+            return (
+                f"*{tenant.name}* — Room {room_num}\n"
+                f"Current deposit: Rs.{current:,}\n\n"
+                "Reply with the new deposit amount:"
+            )
+
+        new_amt = int(amount)
+        option_choices = [{"seq": 1, "label": "Yes, update"}, {"seq": 2, "label": "No, cancel"}]
+        await _save_pending(
+            pending.phone, "DEPOSIT_CHANGE",
+            {"tenancy_id": tenancy.id, "tenant_name": tenant.name,
+             "new_amount": new_amt, "old_amount": current},
+            option_choices, session,
+        )
+        return (
+            f"*Change deposit — {tenant.name}*\n"
+            f"Room {room_num}\n"
+            f"Current: Rs.{current:,}  ->  New: Rs.{new_amt:,}\n\n"
+            "Reply *Yes* to confirm or *No* to cancel."
         )
 
     if pending.intent == "DEPOSIT_CHANGE":
