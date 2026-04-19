@@ -165,15 +165,51 @@ async def main(args):
         # Keep only positive balances (unpaid amounts carry forward)
         prev_due_map = {tid: max(0, bal) for tid, bal in prev_due_map.items() if bal > 0}
 
+        # ── 3c. Notice / upcoming exits ──
+        next_period = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        next_end = date(year + 1, 2, 1) if month == 12 else (
+            date(year, month + 2, 1) if month < 11 else date(year + 1, 1, 1)
+        )
+        # Active tenancies with expected_checkout in next month
+        exit_next_rows = (await session.execute(
+            select(Tenancy).where(
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.expected_checkout >= next_period,
+                Tenancy.expected_checkout < next_end,
+            )
+        )).scalars().all()
+        # Active tenancies with notice_date in this month (formal notice given)
+        notice_this_month_rows = (await session.execute(
+            select(Tenancy).where(
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.notice_date >= period,
+                Tenancy.notice_date < last_day,
+            )
+        )).scalars().all()
+        notice_count = len(notice_this_month_rows)
+        # Beds vacating = count of exits next month, premium = 2 beds
+        exit_next_beds = 0
+        for t in exit_next_rows:
+            exit_next_beds += 2 if (t.sharing_type and str(t.sharing_type.value if hasattr(t.sharing_type, 'value') else t.sharing_type) == "premium") else 1
+
         # ── 4. Read existing Sheet to preserve any data not in DB ──
         from src.integrations.gsheets import _get_worksheet_sync
-        ws = _get_worksheet_sync(tab_name)
-        existing = ws.get_all_values()
+        import gspread
+        try:
+            ws = _get_worksheet_sync(tab_name)
+            existing = ws.get_all_values()
+        except (gspread.exceptions.WorksheetNotFound, gspread.exceptions.APIError):
+            # Auto-create tab if missing (new month rollover)
+            from src.integrations.gsheets import _get_spreadsheet_sync
+            ss = _get_spreadsheet_sync()
+            ws = ss.add_worksheet(title=tab_name, rows=300, cols=17)
+            print(f"  [new] Created tab '{tab_name}'")
+            existing = []
 
         # Build lookup from existing sheet: (room, name_lower) -> row data
         sheet_lookup = {}
-        for row in existing[4:]:  # skip header rows
-            if not row[0] or not row[1]:
+        for row in existing[7:]:  # skip 7 header rows (title + 5 summary + column header)
+            if len(row) < 2 or not row[0] or not row[1]:
                 continue
             key = (row[0].strip(), row[1].strip().lower())
             sheet_lookup[key] = row
@@ -312,40 +348,45 @@ async def main(args):
             n = float(n)
             return f"{n/100000:.2f}L" if abs(n) >= 100000 else f"{int(n):,}"
 
-        # 4-row labeled card summary: label | metric | metric | metric ...
-        summary_row1 = [
+        # 5 summary rows. One cell = one metric. No merging.
+        # Section label in col A, metrics in cols B onward.
+        def pad(cells, n=17):
+            return cells + [""] * (n - len(cells))
+
+        summary_row1 = pad([
             "OCCUPANCY",
             f"Active: {len(active_rows)}",
             f"Beds: {beds} ({regular}+{premium}P)",
             f"No-show: {len(noshow_rows)}",
             f"Vacant: {vacant_beds}/{int(total_rev_beds)}",
             f"Occupancy: {occ_pct:.1f}%",
-            "", "", "", "", "", "", "", "", "", "", "",
-        ]
-        summary_row2 = [
+        ])
+        summary_row2 = pad([
             "BUILDINGS",
             f"THOR: {thor_beds} beds ({thor_t}t)",
             f"HULK: {hulk_beds} beds ({hulk_t}t)",
             f"Exits: {len(exit_rows)}",
-            "", "", "", "", "", "", "", "", "", "", "", "", "",
-        ]
-        summary_row3 = [
+        ])
+        summary_row3 = pad([
             "COLLECTION",
             f"Cash: {fmt_lakh(total_cash)}",
             f"UPI: {fmt_lakh(total_upi)}",
             f"Collected: {fmt_lakh(total_collected)}",
             f"Rent Billed: {fmt_lakh(total_rent_due)}",
             f"Prev Due: {fmt_lakh(total_prev_due)}",
-            "", "", "", "", "", "", "", "", "", "", "",
-        ]
-        summary_row4 = [
+        ])
+        summary_row4 = pad([
             "STATUS",
             f"PAID: {paid_count}",
             f"PARTIAL: {partial_count}",
             f"UNPAID: {unpaid_count}",
             f"Pending: {fmt_lakh(total_pending)}",
-            "", "", "", "", "", "", "", "", "", "", "", "",
-        ]
+        ])
+        summary_row5 = pad([
+            "NOTICE",
+            f"On notice: {notice_count} tenants",
+            f"Vacating next month: {exit_next_beds} beds",
+        ])
 
         header_row = [
             "Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
@@ -359,6 +400,7 @@ async def main(args):
         print(f"BUILDINGS  THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)  Exits: {len(exit_rows)}")
         print(f"COLLECTION Cash: {fmt_lakh(total_cash)}  UPI: {fmt_lakh(total_upi)}  Collected: {fmt_lakh(total_collected)}  Rent Billed: {fmt_lakh(total_rent_due)}  Prev Due: {fmt_lakh(total_prev_due)}")
         print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  Pending: {fmt_lakh(total_pending)}")
+        print(f"NOTICE     {notice_count} tenants gave notice  •  {exit_next_beds} beds vacating next month")
 
         if not args.write:
             print(f"\n[DRY RUN] Would write {len(data_rows) + 6} rows to '{tab_name}'")
@@ -367,37 +409,84 @@ async def main(args):
             # ── 8. Write to Sheet ──
             print(f"\nWriting {len(data_rows) + 6} rows to '{tab_name}'...")
 
-            # Row 1: title | Rows 2-5: summary cards | Row 6: header | Rows 7+: data
+            # Row 1: title | Rows 2-6: summary cards | Row 7: header | Rows 8+: data
             title_row = [f"{MONTH_NAMES[month].title()} {year}"] + [""] * 16
-            all_rows = [title_row, summary_row1, summary_row2, summary_row3, summary_row4, header_row] + data_rows
+            all_rows = [title_row, summary_row1, summary_row2, summary_row3,
+                        summary_row4, summary_row5, header_row] + data_rows
 
             # Pad all rows to 17 columns
             for i, row in enumerate(all_rows):
                 while len(row) < 17:
                     all_rows[i] = list(row) + [""]
 
-            # Clear and write
+            # Clear, unmerge anything from previous runs, then write
             ws.clear()
+            try:
+                ws.unmerge_cells("A1:Q6")
+            except Exception:
+                pass
             ws.update(range_name="A1", values=all_rows)
 
-            # Format: title bold 14pt; summary rows with color by section; header bold
+            # One-cell-per-value layout. No merging. Borders on each cell.
             try:
-                ws.format("A1:Q1", {"textFormat": {"bold": True, "fontSize": 14},
-                                     "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
-                                     "horizontalAlignment": "LEFT"})
-                ws.format("A1:Q1", {"textFormat": {"foregroundColor": {"red": 1, "green": 1, "blue": 1}}})
-                # Summary section label column A — bold, color-coded
-                ws.format("A2:A5", {"textFormat": {"bold": True}})
-                ws.format("A2:Q2", {"backgroundColor": {"red": 0.90, "green": 0.96, "blue": 1.00}})  # occupancy - blue
-                ws.format("A3:Q3", {"backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.98}})  # buildings - grey
-                ws.format("A4:Q4", {"backgroundColor": {"red": 0.88, "green": 0.98, "blue": 0.88}})  # collection - green
-                ws.format("A5:Q5", {"backgroundColor": {"red": 1.00, "green": 0.96, "blue": 0.85}})  # status - amber
-                # Header row bold
-                ws.format("A6:Q6", {"textFormat": {"bold": True},
-                                     "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
-                                     "horizontalAlignment": "CENTER"})
-                ws.format("A6:Q6", {"textFormat": {"foregroundColor": {"red": 1, "green": 1, "blue": 1}}})
-                ws.freeze(rows=6)
+                # Title row (row 1): centered bold banner — merge only this row
+                ws.merge_cells("A1:Q1")
+                ws.format("A1:Q1", {
+                    "textFormat": {"bold": True, "fontSize": 14,
+                                   "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                    "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
+                    "horizontalAlignment": "CENTER",
+                    "verticalAlignment": "MIDDLE",
+                })
+
+                # Summary rows 2-6: each cell separate, color-coded per section,
+                # bold + light background. Non-empty cells get a visible border.
+                section_colors = [
+                    ("A2:Q2", {"red": 0.90, "green": 0.96, "blue": 1.00}),  # OCCUPANCY  - light blue
+                    ("A3:Q3", {"red": 0.95, "green": 0.95, "blue": 0.98}),  # BUILDINGS  - grey
+                    ("A4:Q4", {"red": 0.88, "green": 0.98, "blue": 0.88}),  # COLLECTION - light green
+                    ("A5:Q5", {"red": 1.00, "green": 0.96, "blue": 0.85}),  # STATUS     - amber
+                    ("A6:Q6", {"red": 0.98, "green": 0.92, "blue": 0.92}),  # NOTICE     - light pink
+                ]
+                for rng, color in section_colors:
+                    ws.format(rng, {
+                        "textFormat": {"bold": True, "fontSize": 11},
+                        "backgroundColor": color,
+                        "horizontalAlignment": "LEFT",
+                        "verticalAlignment": "MIDDLE",
+                    })
+
+                # Add thin grey borders around every summary cell (including empties)
+                # via batch_update (sheet-level API, more reliable than format).
+                sheet_id = ws.id
+                border_style = {"style": "SOLID", "width": 1,
+                                "color": {"red": 0.70, "green": 0.72, "blue": 0.78}}
+                ws.spreadsheet.batch_update({
+                    "requests": [{
+                        "updateBorders": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": 1, "endRowIndex": 6,
+                                "startColumnIndex": 0, "endColumnIndex": 17,
+                            },
+                            "top": border_style,
+                            "bottom": border_style,
+                            "left": border_style,
+                            "right": border_style,
+                            "innerHorizontal": border_style,
+                            "innerVertical": border_style,
+                        }
+                    }]
+                })
+
+                # Column header row (row 7)
+                ws.format("A7:Q7", {
+                    "textFormat": {"bold": True,
+                                   "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                    "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
+                    "horizontalAlignment": "CENTER",
+                })
+                ws.freeze(rows=7)
             except Exception as e:
                 print(f"  [warn] formatting failed: {e}")
             print(f"  [ok] Wrote {len(all_rows)} rows")
