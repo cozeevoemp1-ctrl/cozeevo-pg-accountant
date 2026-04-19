@@ -1118,20 +1118,47 @@
 
     const fmtMoney = (v) => v ? `₹${Number(v).toLocaleString('en-IN')}` : '—';
 
+    // Editable input style — only used when status === 'pending_review'.
+    // Fields tagged data-field=key get read by collectOverrides() at submit.
+    const editable = (status === 'pending_review');
+    const inpStyle = 'width:100%;padding:6px 8px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;font-family:inherit;background:#F8FAFC;';
+    const inp = (key, val, type) => editable
+      ? `<input data-field="${key}" data-token="${token}" type="${type || 'text'}" value="${escHtml(val == null ? '' : val)}" style="${inpStyle}">`
+      : `<div class="detail-value">${escHtml(val || '—')}</div>`;
+    const inpMoney = (key, val) => editable
+      ? `<input data-field="${key}" data-token="${token}" type="number" min="0" step="1" value="${val == null ? '' : Number(val)}" style="${inpStyle}">`
+      : `<div class="detail-value">${fmtMoney(val)}</div>`;
+    const inpSelect = (key, val, options) => editable
+      ? `<select data-field="${key}" data-token="${token}" style="${inpStyle}">${options.map(o => `<option value="${o}" ${o === (val || '') ? 'selected' : ''}>${o || '—'}</option>`).join('')}</select>`
+      : `<div class="detail-value">${escHtml(val || '—')}</div>`;
+    // Date input expects YYYY-MM-DD
+    const isoDate = (v) => {
+      if (!v) return '';
+      const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+      const d = new Date(v); return isNaN(d) ? '' : d.toISOString().slice(0, 10);
+    };
+
     el.innerHTML = `
       <div class="inline-alert inline-alert-error" id="err-${token}"></div>
       <div class="inline-alert inline-alert-success" id="ok-${token}"></div>
+
+      ${editable ? `<div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#78350F;">
+        <strong>Review mode:</strong> any field below can be edited before approval. Changes will be sent to the tenant as a follow-up message and recorded in the audit log.
+      </div>` : ''}
 
       <div class="section-divider">Room &amp; Booking</div>
       <div class="detail-grid">
         <div class="detail-field"><div class="detail-label">Room</div><div class="detail-value">${escHtml(room.number || '—')} ${room.building ? '· ' + escHtml(room.building) : ''}</div></div>
         <div class="detail-field"><div class="detail-label">Floor / Type</div><div class="detail-value">${escHtml(room.floor || '—')} / ${escHtml(room.sharing || '—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Check-in</div><div class="detail-value">${data.checkin_date ? formatDateShort(data.checkin_date) : '—'}</div></div>
+        <div class="detail-field"><div class="detail-label">Check-in</div>${editable
+          ? `<input data-field="checkin_date" data-token="${token}" type="date" value="${isoDate(data.checkin_date)}" style="${inpStyle}">`
+          : `<div class="detail-value">${data.checkin_date ? formatDateShort(data.checkin_date) : '—'}</div>`}</div>
         <div class="detail-field"><div class="detail-label">Stay Type</div><div class="detail-value">${escHtml(data.stay_type || '—')}</div></div>
-        <div class="detail-field"><div class="detail-label">Agreed Rent</div><div class="detail-value">${fmtMoney(data.agreed_rent)}</div></div>
-        <div class="detail-field"><div class="detail-label">Security Deposit</div><div class="detail-value">${fmtMoney(data.security_deposit)}</div></div>
-        <div class="detail-field"><div class="detail-label">Maintenance</div><div class="detail-value">${fmtMoney(data.maintenance_fee)}</div></div>
-        <div class="detail-field"><div class="detail-label">Booking Amount</div><div class="detail-value">${fmtMoney(data.booking_amount)}</div></div>
+        <div class="detail-field"><div class="detail-label">Agreed Rent</div>${inpMoney('agreed_rent', data.agreed_rent)}</div>
+        <div class="detail-field"><div class="detail-label">Security Deposit</div>${inpMoney('security_deposit', data.security_deposit)}</div>
+        <div class="detail-field"><div class="detail-label">Maintenance</div>${inpMoney('maintenance_fee', data.maintenance_fee)}</div>
+        <div class="detail-field"><div class="detail-label">Booking Amount</div>${inpMoney('booking_amount', data.booking_amount)}</div>
         ${data.lock_in_months ? `<div class="detail-field"><div class="detail-label">Lock-in</div><div class="detail-value">${data.lock_in_months} months</div></div>` : ''}
         ${data.special_terms ? `<div class="detail-field full"><div class="detail-label">Special Terms</div><div class="detail-value">${escHtml(data.special_terms)}</div></div>` : ''}
       </div>
@@ -1139,20 +1166,24 @@
       ${hasTenantData ? `
         <div class="section-divider">Tenant Information</div>
         <div class="detail-grid">
-          <div class="detail-field"><div class="detail-label">Name</div><div class="detail-value">${escHtml(td.name || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Phone</div><div class="detail-value">${escHtml(td.phone || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Gender</div><div class="detail-value">${escHtml(td.gender || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Date of Birth</div><div class="detail-value">${escHtml(td.date_of_birth || td.age || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Email</div><div class="detail-value">${escHtml(td.email || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Food Preference</div><div class="detail-value">${escHtml(td.food_preference || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Occupation</div><div class="detail-value">${escHtml(td.occupation || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Education</div><div class="detail-value">${escHtml(td.educational_qualification || '—')}</div></div>
-          ${td.father_name ? `<div class="detail-field"><div class="detail-label">Father's Name</div><div class="detail-value">${escHtml(td.father_name)}</div></div>` : ''}
-          ${td.father_phone ? `<div class="detail-field"><div class="detail-label">Father's Phone</div><div class="detail-value">${escHtml(td.father_phone)}</div></div>` : ''}
-          <div class="detail-field"><div class="detail-label">Emergency Contact</div><div class="detail-value">${escHtml(td.emergency_contact_name || '—')}</div></div>
-          <div class="detail-field"><div class="detail-label">Emergency Phone</div><div class="detail-value">${escHtml(td.emergency_contact_phone || '—')} ${td.emergency_contact_relationship ? '(' + escHtml(td.emergency_contact_relationship) + ')' : ''}</div></div>
-          ${td.permanent_address ? `<div class="detail-field" style="grid-column:1/-1"><div class="detail-label">Address</div><div class="detail-value">${escHtml(td.permanent_address)}</div></div>` : ''}
-          ${td.id_proof_type ? `<div class="detail-field"><div class="detail-label">ID Proof</div><div class="detail-value">${escHtml(td.id_proof_type)} — ${escHtml(td.id_proof_number || '—')}</div></div>` : ''}
+          <div class="detail-field"><div class="detail-label">Name</div>${inp('name', td.name)}</div>
+          <div class="detail-field"><div class="detail-label">Phone</div>${inp('phone', td.phone, 'tel')}</div>
+          <div class="detail-field"><div class="detail-label">Gender</div>${inpSelect('gender', td.gender, ['', 'male', 'female', 'other'])}</div>
+          <div class="detail-field"><div class="detail-label">Date of Birth</div>${editable
+            ? `<input data-field="date_of_birth" data-token="${token}" type="date" value="${isoDate(td.date_of_birth)}" style="${inpStyle}">`
+            : `<div class="detail-value">${escHtml(td.date_of_birth || td.age || '—')}</div>`}</div>
+          <div class="detail-field"><div class="detail-label">Email</div>${inp('email', td.email, 'email')}</div>
+          <div class="detail-field"><div class="detail-label">Food Preference</div>${inpSelect('food_preference', td.food_preference, ['', 'veg', 'egg', 'non-veg'])}</div>
+          <div class="detail-field"><div class="detail-label">Occupation</div>${inp('occupation', td.occupation)}</div>
+          <div class="detail-field"><div class="detail-label">Education</div>${inp('educational_qualification', td.educational_qualification)}</div>
+          <div class="detail-field"><div class="detail-label">Father's Name</div>${inp('father_name', td.father_name)}</div>
+          <div class="detail-field"><div class="detail-label">Father's Phone</div>${inp('father_phone', td.father_phone, 'tel')}</div>
+          <div class="detail-field"><div class="detail-label">Emergency Contact</div>${inp('emergency_contact_name', td.emergency_contact_name)}</div>
+          <div class="detail-field"><div class="detail-label">Emergency Phone</div>${inp('emergency_contact_phone', td.emergency_contact_phone, 'tel')}</div>
+          <div class="detail-field"><div class="detail-label">Emergency Relationship</div>${inp('emergency_contact_relationship', td.emergency_contact_relationship)}</div>
+          <div class="detail-field" style="grid-column:1/-1"><div class="detail-label">Address</div>${inp('permanent_address', td.permanent_address)}</div>
+          <div class="detail-field"><div class="detail-label">ID Type</div>${inpSelect('id_proof_type', td.id_proof_type, ['', 'Aadhaar', 'PAN', 'Driving License', 'Passport', 'Voter ID'])}</div>
+          <div class="detail-field"><div class="detail-label">ID Number</div>${inp('id_proof_number', td.id_proof_number)}</div>
         </div>
       ` : `
         <div style="padding:12px 0;color:var(--muted);font-size:13px;">Tenant hasn't filled the form yet.</div>
@@ -1250,6 +1281,27 @@
   }
 
   // ── Approve session ────────────────────────────────────────────────────────
+  // Walk all editable inputs in this session's detail block, build a
+  // {field: value} dict. Only includes non-empty values; backend treats
+  // missing keys as "no change".
+  function collectOverrides(token) {
+    const overrides = {};
+    document.querySelectorAll(`[data-token="${token}"][data-field]`).forEach(el => {
+      const k = el.dataset.field;
+      let v = el.value;
+      if (v === undefined || v === null) return;
+      v = String(v).trim();
+      if (v === '') return;
+      // Numbers stay as numbers — backend coerces via Decimal()
+      if (el.type === 'number') {
+        const n = Number(v);
+        if (!isNaN(n)) v = n;
+      }
+      overrides[k] = v;
+    });
+    return overrides;
+  }
+
   async function approveSession(token) {
     const errEl = document.getElementById(`err-${token}`);
     const okEl = document.getElementById(`ok-${token}`);
@@ -1267,11 +1319,13 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Approving...';
 
+    const overrides = collectOverrides(token);
+
     try {
       const res = await fetch(`/api/onboarding/${token}/approve`, {
         method: 'POST',
         headers: pinHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ staff_signature: staffSig }),
+        body: JSON.stringify({ staff_signature: staffSig, overrides }),
       });
       const data = await res.json();
 

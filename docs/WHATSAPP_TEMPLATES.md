@@ -31,10 +31,15 @@ Check-in: *{{3}}*
 Monthly rent: *{{4}}*
 Deposit: *{{5}}*
 
-Your signed rental agreement is on the way.
-
-If any amount shown differs from what you submitted in the form, please reply to this message and the receptionist will reconcile it.
+If any amount shown differs from what was agreed in the form, please contact the receptionist or call 8548884455.
 ```
+
+> **Note:** v1 of this template was submitted with a different body that
+> mentioned the rental agreement. Meta does not allow editing PENDING
+> templates. Once Meta approves v1 (~15-60 min after submission at
+> 2026-04-19), edit via `POST /v21.0/1303194515065555` with the body
+> above. Code already references `cozeevo_booking_confirmation` — no
+> code change needed after the edit.
 
 - **Footer:** `Cozeevo Co-living • getkozzy.com`
 - **Sample values for Meta review submission:**
@@ -87,7 +92,7 @@ Checkout date: *{{3}}*
 Deposit refund: *{{4}}*
 Final balance: *{{5}}*
 
-Thank you for staying with Cozeevo. If any amount here looks wrong, please reply — the receptionist will reconcile.
+Thank you for staying with Cozeevo — it was a pleasure having you. If you enjoyed your stay, we'd love a quick review and a recommendation to friends. And whenever you're in town again, our doors are open to welcome you back.
 ```
 
 - **Footer:** `Cozeevo Co-living • getkozzy.com`
@@ -104,34 +109,41 @@ AuditLog, add a `_send_whatsapp_template("cozeevo_checkout_confirmation", [name,
 
 ---
 
-## Template 4 (recommended): `cozeevo_payment_received`
+## Template 4: `cozeevo_payment_received`
 
 **Future use:** auto-send a receipt summary to the tenant when the
-receptionist logs a payment via the bot.
+receptionist logs a payment via the bot. Mode of payment (cash/UPI)
+is intentionally omitted — tenants only care about what they've paid
+for the month and what's still owed.
 
 - **Name:** `cozeevo_payment_received`
 - **Category:** UTILITY
+- **Language:** English (en)
+- **Header:** None
 - **Body** (4 variables):
 
 ```
-Payment received — thank you, {{1}}.
+Hi {{1}}, payment received — thank you.
 
-Amount: *{{2}}*
-For: *{{3}}*
-Balance: *{{4}}*
+Towards: *{{2}}*
+Paid this month so far: *{{3}}*
+Balance remaining: *{{4}}*
 
 — Cozeevo Help Desk
 ```
 
-- **Sample values:**
+- **Footer:** `Cozeevo Co-living • getkozzy.com`
+- **Sample values for Meta review submission:**
   - `{{1}}` = `Krishnan`
-  - `{{2}}` = `Rs.14,000`
-  - `{{3}}` = `April 2026 rent`
+  - `{{2}}` = `April 2026 rent`
+  - `{{3}}` = `Rs.14,000`
   - `{{4}}` = `Rs.0 (paid in full)`
 
-Not yet wired. Plan: add inside
-`src/whatsapp/handlers/account_handler.py::_do_log_payment_by_ids`
-after the AuditLog write.
+**Wiring** (not yet in code): after `account_handler.py::_do_log_payment_by_ids` writes its AuditLog, compute:
+- `paid_so_far` = sum of `Payment.amount` for this tenancy + period_month where `is_void=False` and `for_type='rent'`
+- `balance` = `rent_schedule.rent_due + adjustment − paid_so_far` (≥0)
+- Format balance as `"Rs.0 (paid in full)"` if balance ≤ 0, else `f"Rs.{balance:,}"`
+- `_send_whatsapp_template("cozeevo_payment_received", [name, period_label, paid_so_far, balance_str])` with free-text fallback.
 
 ---
 

@@ -494,6 +494,52 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
 
 class ApproveRequest(BaseModel):
     staff_signature: str = ""  # base64 PNG data URL
+    # Optional receptionist overrides — any field name in this dict replaces
+    # the tenant-submitted value. Editable from the admin review screen.
+    # Supported keys (financial): agreed_rent, security_deposit, maintenance_fee,
+    # booking_amount, checkin_date.
+    # Supported keys (KYC): name, phone, gender, date_of_birth, email,
+    # father_name, father_phone, emergency_contact_name,
+    # emergency_contact_phone, emergency_contact_relationship,
+    # permanent_address, occupation, educational_qualification,
+    # food_preference, id_proof_type, id_proof_number.
+    overrides: dict = {}
+
+
+_KYC_FIELD_LABELS = {
+    "name": "Name", "phone": "Phone", "gender": "Gender",
+    "date_of_birth": "Date of Birth", "email": "Email",
+    "father_name": "Father Name", "father_phone": "Father Phone",
+    "emergency_contact_name": "Emergency Contact",
+    "emergency_contact_phone": "Emergency Phone",
+    "emergency_contact_relationship": "Emergency Relationship",
+    "permanent_address": "Address", "occupation": "Occupation",
+    "educational_qualification": "Education",
+    "food_preference": "Food Preference",
+    "id_proof_type": "ID Type", "id_proof_number": "ID Number",
+}
+_FINANCIAL_FIELD_LABELS = {
+    "agreed_rent": "Monthly Rent", "security_deposit": "Deposit",
+    "maintenance_fee": "Maintenance", "booking_amount": "Booking Advance",
+    "checkin_date": "Check-in Date",
+}
+
+
+def _format_diff_value(field: str, value) -> str:
+    """Pretty-print a value for the diff message (Rs. for money, dd-mmm for dates)."""
+    if value is None or value == "":
+        return "—"
+    if field in ("agreed_rent", "security_deposit", "maintenance_fee", "booking_amount"):
+        try:
+            return f"Rs.{int(float(value)):,}"
+        except (TypeError, ValueError):
+            return str(value)
+    if field == "checkin_date":
+        try:
+            return date.fromisoformat(str(value)).strftime("%d %b %Y")
+        except (TypeError, ValueError):
+            return str(value)
+    return str(value)
 
 
 @router.post("/{token}/approve")
@@ -507,6 +553,39 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
             raise HTTPException(400, f"Cannot approve — status is {obs.status}")
 
         td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+        # Snapshot ORIGINAL submitted values before overrides — used for diff.
+        # KYC came from the tenant's form fill; financial came from the
+        # receptionist's session-create call.
+        original_kyc = {k: td.get(k, "") for k in _KYC_FIELD_LABELS.keys()}
+        original_financial = {
+            "agreed_rent": float(obs.agreed_rent or 0),
+            "security_deposit": float(obs.security_deposit or 0),
+            "maintenance_fee": float(obs.maintenance_fee or 0),
+            "booking_amount": float(obs.booking_amount or 0),
+            "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
+        }
+
+        # Apply receptionist overrides
+        overrides = (req.overrides if req and req.overrides else {}) or {}
+        # Financial overrides go onto obs (used by tenancy creation below)
+        if "agreed_rent" in overrides:
+            obs.agreed_rent = Decimal(str(overrides["agreed_rent"]))
+        if "security_deposit" in overrides:
+            obs.security_deposit = Decimal(str(overrides["security_deposit"]))
+        if "maintenance_fee" in overrides:
+            obs.maintenance_fee = Decimal(str(overrides["maintenance_fee"]))
+        if "booking_amount" in overrides:
+            obs.booking_amount = Decimal(str(overrides["booking_amount"]))
+        if "checkin_date" in overrides:
+            try:
+                obs.checkin_date = date.fromisoformat(overrides["checkin_date"])
+            except ValueError:
+                pass
+        # KYC overrides patch td so the tenant/tenancy creation downstream
+        # uses the corrected values.
+        for k in _KYC_FIELD_LABELS.keys():
+            if k in overrides:
+                td[k] = overrides[k]
         if not td.get("name") or not td.get("phone"):
             raise HTTPException(400, "Tenant data incomplete")
 
@@ -790,27 +869,87 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                 checkin_str = checkin.strftime('%d %b %Y')
 
                 # 1. Booking confirmation TEMPLATE (works for first-time contact)
-                # Template name: cozeevo_booking_confirmation
-                # Body parameters (4): {{1}}=name {{2}}=room {{3}}=checkin date {{4}}=rent amount
+                # Template name: cozeevo_booking_confirmation (5 vars)
+                # Body params: {{1}}=name {{2}}=room {{3}}=checkin date
+                #              {{4}}=rent amount {{5}}=deposit amount
                 rent_str = f"Rs.{int(obs.agreed_rent or 0):,}"
+                deposit_str = f"Rs.{int(obs.security_deposit or 0):,}"
                 tpl_sent = await _send_whatsapp_template(
                     phone_wa,
                     "cozeevo_booking_confirmation",
-                    [tenant_name, room.room_number, checkin_str, rent_str],
+                    [tenant_name, room.room_number, checkin_str, rent_str, deposit_str],
                 )
                 # Fallback: if template not approved yet, send free text
                 # (works only if tenant messaged us in the last 24h).
                 if tpl_sent is False or tpl_sent is None:
                     await _send_whatsapp(
                         phone_wa,
-                        f"Welcome to Cozeevo, {tenant_name}! 🏠\n\n"
-                        f"Your registration for Room {room.room_number} is confirmed.\n"
+                        f"Welcome to Cozeevo, {tenant_name}!\n\n"
+                        f"Your booking is confirmed.\n"
+                        f"Room: {room.room_number}\n"
                         f"Check-in: {checkin_str}\n"
-                        f"Monthly rent: {rent_str}\n\n"
-                        f"Your signed rental agreement is attached below.",
+                        f"Monthly rent: {rent_str}\n"
+                        f"Deposit: {deposit_str}\n\n"
+                        f"If any amount shown differs from what was agreed in the form, please contact the receptionist or call 8548884455.",
                         intent="BOOKING_CONFIRMATION",
                     )
-                # 2. Signed agreement PDF
+
+                # 2. Diff message — only if receptionist modified any
+                # tenant-submitted value during review. Free text (24-hr
+                # window already opened by template above).
+                final_kyc = {k: td.get(k, "") for k in _KYC_FIELD_LABELS.keys()}
+                final_financial = {
+                    "agreed_rent": float(obs.agreed_rent or 0),
+                    "security_deposit": float(obs.security_deposit or 0),
+                    "maintenance_fee": float(obs.maintenance_fee or 0),
+                    "booking_amount": float(obs.booking_amount or 0),
+                    "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
+                }
+                diff_lines = []
+                for k, label in _FINANCIAL_FIELD_LABELS.items():
+                    if str(original_financial.get(k, "")) != str(final_financial.get(k, "")):
+                        diff_lines.append(
+                            f"• {label}: {_format_diff_value(k, original_financial.get(k))}"
+                            f" → {_format_diff_value(k, final_financial.get(k))}"
+                        )
+                for k, label in _KYC_FIELD_LABELS.items():
+                    if str(original_kyc.get(k, "") or "") != str(final_kyc.get(k, "") or ""):
+                        diff_lines.append(
+                            f"• {label}: {_format_diff_value(k, original_kyc.get(k))}"
+                            f" → {_format_diff_value(k, final_kyc.get(k))}"
+                        )
+                if diff_lines:
+                    diff_msg = (
+                        f"Hi {tenant_name}, the receptionist updated some details after "
+                        f"reviewing your form:\n\n" + "\n".join(diff_lines) +
+                        f"\n\nIf anything looks wrong, please call 8548884455."
+                    )
+                    await _send_whatsapp(phone_wa, diff_msg, intent="BOOKING_DIFF")
+                    # Audit log — one entry per changed field
+                    from src.database.models import AuditLog as _AL
+                    for k in _FINANCIAL_FIELD_LABELS.keys():
+                        if str(original_financial.get(k, "")) != str(final_financial.get(k, "")):
+                            session.add(_AL(
+                                changed_by="receptionist", entity_type="tenancy",
+                                entity_id=tenancy.id if 'tenancy' in dir() and not is_daily else 0,
+                                entity_name=tenant_name, field=k,
+                                old_value=str(original_financial.get(k, "")),
+                                new_value=str(final_financial.get(k, "")),
+                                room_number=room.room_number, source="onboarding_review",
+                                note="receptionist override at approve",
+                            ))
+                    for k in _KYC_FIELD_LABELS.keys():
+                        if str(original_kyc.get(k, "") or "") != str(final_kyc.get(k, "") or ""):
+                            session.add(_AL(
+                                changed_by="receptionist", entity_type="tenant",
+                                entity_id=tenant.id, entity_name=tenant_name, field=k,
+                                old_value=str(original_kyc.get(k, "") or ""),
+                                new_value=str(final_kyc.get(k, "") or ""),
+                                room_number=room.room_number, source="onboarding_review",
+                                note="receptionist override at approve",
+                            ))
+
+                # 3. Signed agreement PDF
                 await _send_whatsapp_document(
                     phone_wa, pdf_url,
                     f"Cozeevo_Agreement_{tenant_name.replace(' ', '_')}.pdf",
