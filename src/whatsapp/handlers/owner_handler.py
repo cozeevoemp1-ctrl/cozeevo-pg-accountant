@@ -2974,17 +2974,34 @@ async def resolve_pending_action(
                 new_notes = action_data.get("new_notes", "")
                 tenancy.notes = new_notes if notes_action == "update" else None
 
-                # Sync to Sheet TENANTS tab
+                # Audit log — note edits matter for accountability.
+                from src.database.models import AuditLog
+                session.add(AuditLog(
+                    changed_by=action_data.get("changed_by", "system"),
+                    entity_type="tenancy",
+                    entity_id=tenancy.id,
+                    entity_name=action_data["tenant_name"],
+                    field="notes",
+                    old_value=None,
+                    new_value=new_notes if notes_action == "update" else None,
+                    room_number=action_data["room_number"],
+                    source="whatsapp",
+                ))
+
+                # Sync BOTH sheet tabs: TENANTS (master) + current monthly tab.
+                _notes_value = new_notes if notes_action == "update" else ""
                 try:
-                    from src.integrations.gsheets import sync_tenants_tab_notes
-                    await sync_tenants_tab_notes(
-                        action_data["room_number"],
-                        action_data["tenant_name"],
-                        new_notes if notes_action == "update" else "",
-                    )
+                    from src.integrations.gsheets import sync_tenants_tab_notes, update_notes
+                    import asyncio as _aio
+                    _aio.create_task(sync_tenants_tab_notes(
+                        action_data["room_number"], action_data["tenant_name"], _notes_value,
+                    ))
+                    _aio.create_task(update_notes(
+                        action_data["room_number"], action_data["tenant_name"], _notes_value,
+                    ))
                 except Exception as e:
                     import logging as _log
-                    _log.getLogger(__name__).error("TENANTS tab sync failed: %s", e)
+                    _log.getLogger(__name__).error("Notes sheet sync failed: %s", e)
 
                 return f"Tenant agreement updated for *{action_data['tenant_name']}*."
 
@@ -5030,15 +5047,25 @@ async def _do_room_transfer(action_data: dict, session: AsyncSession) -> str:
         note=f"Room transfer: {old_room} -> {new_room_number}",
     ))
 
-    # Google Sheet sync (fire-and-forget)
+    # Google Sheet sync — fire-and-forget but covers BOTH tabs:
+    # 1. TENANTS master tab Room column (uses old name match, sets new room)
+    # 2. Trigger full monthly sheet sync (handles row-key change correctly,
+    #    far easier than patching cell-by-cell when the lookup key itself
+    #    is what's changing). Same approach for rent if changed.
     gsheets_note = ""
+    import asyncio as _aio
+    from src.integrations import gsheets as _gs
     try:
-        from src.integrations.gsheets import update_tenant_field
-        gs_r = await update_tenant_field(
-            old_room, tenant_name, "Room", new_room_number
-        )
-        if gs_r and gs_r.get("success"):
-            gsheets_note = "\nSheet updated"
+        _aio.create_task(_gs.update_tenants_tab_field(
+            old_room, tenant_name, "room", new_room_number
+        ))
+        if new_rent:
+            _aio.create_task(_gs.update_tenants_tab_field(
+                new_room_number, tenant_name, "agreed_rent", int(new_rent)
+            ))
+        today = date.today()
+        _gs.trigger_monthly_sheet_sync(today.month, today.year)
+        gsheets_note = "\nSheet update queued"
     except Exception:
         pass
 

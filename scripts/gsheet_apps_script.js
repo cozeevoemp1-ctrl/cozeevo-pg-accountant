@@ -1,8 +1,14 @@
 /**
- * Cozeevo Operations — Google Apps Script v4
- * ============================================
+ * Cozeevo Operations — Google Apps Script v5 (header-driven)
+ * ===========================================================
  * Paste into: Extensions > Apps Script
  * Run setupTriggers() once.
+ *
+ * v5 changes (2026-04-19):
+ *   - All sheet reads/writes use header-name lookup, never positional.
+ *   - Supports both legacy (4-row header) and new sync_sheet_from_db.py
+ *     layout (7-row header + Rent + Deposit columns) on the same script.
+ *   - Header row is detected by scanning column A for "Room".
  *
  * FEATURES:
  *   - Month dropdown on dashboard — switch between any month
@@ -11,17 +17,51 @@
  *   - THOR vs HULK comparison per selected month
  *   - Month-on-month trend table
  *
- * COLUMN LAYOUT (monthly tabs, row 5+, DB-aligned):
- *   A=Room, B=Name, C=Phone, D=Building, E=Sharing, F=Rent Due,
- *   G=Cash, H=UPI, I=Total Paid, J=Balance, K=Status,
- *   L=Check-in, M=Notice Date, N=Event, O=Notes, P=Prev Due,
- *   Q=Entered By
+ * Canonical monthly-tab columns are defined by Python's MONTHLY_HEADERS
+ * (src/integrations/gsheets.py). This script READS those headers and
+ * looks up data by name — never by position.
  */
 
 const TOTAL_BEDS = 291;
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/i;
 const DROPDOWN_CELL = "E1";  // Where the month picker lives on DASHBOARD
+
+// ── Header-detection helpers (used everywhere — DRY single source) ──────────
+
+/**
+ * Scan column A of a 2D array (data) for a row whose A-cell equals expected
+ * (case-insensitive, trimmed). Returns 0-indexed row index, or -1 if not found.
+ * Use to locate header rows without assuming a fixed position.
+ */
+function _findRow_(data, expectedColA, maxScan) {
+  const limit = Math.min(maxScan || 12, data.length);
+  const want = String(expectedColA).trim().toLowerCase();
+  for (let i = 0; i < limit; i++) {
+    const cell = data[i] && data[i][0];
+    if (String(cell || "").trim().toLowerCase() === want) return i;
+  }
+  return -1;
+}
+
+/**
+ * Build a {lowercase_header_name: 0-indexed-col} map from a header row array.
+ * Used for column lookup by name — never by position.
+ */
+function _colMap_(headerRow) {
+  const map = {};
+  (headerRow || []).forEach((h, i) => {
+    const key = String(h || "").trim().toLowerCase();
+    if (key) map[key] = i;
+  });
+  return map;
+}
+
+/** Get column 0-indexed by name from a colMap. -1 if missing. */
+function _col_(colMap, name) {
+  const v = colMap[String(name).trim().toLowerCase()];
+  return (v === undefined) ? -1 : v;
+}
 
 // ── TRIGGERS & MENU ─────────────────────────────────────────────────────────
 
@@ -144,12 +184,17 @@ function getTotalDeposit_() {
   const tenants = ss.getSheetByName("TENANTS");
   if (!tenants) return 0;
   const data = tenants.getDataRange().getValues();
-  // TENANTS: 0=Room,1=Name,...,8=Status,...,11=Deposit
+  if (data.length < 2) return 0;
+  // Header-driven — TENANTS tab row 1 is the header. Look up by name.
+  const cm = _colMap_(data[0]);
+  const cStatus = _col_(cm, "Status");
+  const cDeposit = _col_(cm, "Deposit");
+  if (cStatus < 0 || cDeposit < 0) return 0;
   let total = 0;
   for (let i = 1; i < data.length; i++) {
-    const status = String(data[i][8]).trim();
-    if (status === "Active") {
-      total += pn(data[i][11]);
+    const status = String(data[i][cStatus] || "").trim().toLowerCase();
+    if (status === "active") {
+      total += pn(data[i][cDeposit]);
     }
   }
   return total;
@@ -168,29 +213,34 @@ function readMonthData(sheet) {
     thorRent: 0, hulkRent: 0,
     thorCash: 0, hulkCash: 0, thorUpi: 0, hulkUpi: 0,
   };
-  if (data.length < 5) return r;
+  // Header-driven — locate "Room" header row (row 4 in legacy, row 7 in new
+  // sync_sheet_from_db.py layout). Column lookup by name, not position.
+  const headerIdx = _findRow_(data, "Room", 12);
+  if (headerIdx < 0) return r;
+  const cm = _colMap_(data[headerIdx]);
+  const dataStart = headerIdx + 1;
 
-  // Detect column layout: new format has Phone in col 2 (header row check)
-  const headers = data.length > 3 ? data[3] : [];
-  const isNew = String(headers[2] || "").toUpperCase().includes("PHONE");
-  // Old: A=Room,B=Name,C=Building,D=Sharing,E=Rent,F=Cash,G=UPI,H=TotalPaid,I=Balance,J=Status,K=Checkin,L=Event,M=Notes,N=Chandra,O=Lakshmi
-  // New: A=Room,B=Name,C=Phone,D=Building,E=Sharing,F=Rent,G=Cash,H=UPI,I=TotalPaid,J=Balance,K=Status,L=Checkin,M=Notice,N=Event,O=Notes,P=PrevDue
-  const C = isNew
-    ? { building: 3, sharing: 4, rent: 5, cash: 6, upi: 7, bal: 9, status: 10, event: 13 }
-    : { building: 2, sharing: 3, rent: 4, cash: 5, upi: 6, bal: 8, status: 9, event: 11 };
+  const cBuilding = _col_(cm, "Building");
+  const cSharing = _col_(cm, "Sharing");
+  const cRent = _col_(cm, "Rent Due");  // billed amount (incl. first-month deposit)
+  const cCash = _col_(cm, "Cash");
+  const cUpi = _col_(cm, "UPI");
+  const cBal = _col_(cm, "Balance");
+  const cStatus = _col_(cm, "Status");
+  const cEvent = _col_(cm, "Event");
 
-  for (let i = 4; i < data.length; i++) {
+  for (let i = dataStart; i < data.length; i++) {
     const row = data[i];
     if (!row[0] || !row[1]) continue;
 
-    const building = String(row[C.building]).toUpperCase().trim();
-    const sharing = String(row[C.sharing]).toLowerCase().trim();
-    const rentDue = pn(row[C.rent]);
-    const cash = pn(row[C.cash]);
-    const upi = pn(row[C.upi]);
-    const bal = pn(row[C.bal]);
-    const status = String(row[C.status]).toUpperCase().trim();
-    const event = String(row[C.event]).toUpperCase().trim();
+    const building = String(row[cBuilding] || "").toUpperCase().trim();
+    const sharing = String(row[cSharing] || "").toLowerCase().trim();
+    const rentDue = pn(row[cRent]);
+    const cash = pn(row[cCash]);
+    const upi = pn(row[cUpi]);
+    const bal = pn(row[cBal]);
+    const status = String(row[cStatus] || "").toUpperCase().trim();
+    const event = String(row[cEvent] || "").toUpperCase().trim();
 
     r.tenants++;
     r.cash += cash;
@@ -198,26 +248,31 @@ function readMonthData(sheet) {
     r.balance += bal;
     r.rentExpected += rentDue;
 
-    if (building === "THOR") { r.thorRent += rentDue; r.thorCash += cash; r.thorUpi += upi; }
-    else { r.hulkRent += rentDue; r.hulkCash += cash; r.hulkUpi += upi; }
+    // Building cell may be "THOR" or "Cozeevo THOR" — substring match
+    if (building.indexOf("THOR") >= 0) { r.thorRent += rentDue; r.thorCash += cash; r.thorUpi += upi; }
+    else if (building.indexOf("HULK") >= 0) { r.hulkRent += rentDue; r.hulkCash += cash; r.hulkUpi += upi; }
 
     if (status === "PAID") r.paid++;
     else if (status === "PARTIAL") r.partial++;
     else if (status === "UNPAID") r.unpaid++;
 
-    if (event.includes("NEW CHECK-IN")) r.newCheckins++;
-    if (event.includes("EXITED") || status === "EXIT") r.exits++;
+    if (event.indexOf("NEW CHECK-IN") >= 0 || event === "CHECKIN") r.newCheckins++;
+    if (event.indexOf("EXIT") >= 0 || status === "EXIT") r.exits++;
 
-    if (status === "EXIT") continue;
-    if (event === "NO-SHOW" || status === "NO SHOW") { r.noshow++; continue; }
+    if (status === "EXIT" || event.indexOf("EXIT") >= 0) continue;
+    // Event values: "NO SHOW" (space, new) or "NO-SHOW" (dash, legacy)
+    if (event.indexOf("NO SHOW") >= 0 || event.indexOf("NO-SHOW") >= 0 ||
+        status.indexOf("NO SHOW") >= 0 || status.indexOf("NO-SHOW") >= 0) {
+      r.noshow++; continue;
+    }
 
     const bedCount = (sharing === "premium") ? 2 : 1;
     r.beds += bedCount;
     if (sharing === "premium") r.premium++;
     else r.regular++;
 
-    if (building === "THOR") { r.thorBeds += bedCount; r.thorTenants++; }
-    else { r.hulkBeds += bedCount; r.hulkTenants++; }
+    if (building.indexOf("THOR") >= 0) { r.thorBeds += bedCount; r.thorTenants++; }
+    else if (building.indexOf("HULK") >= 0) { r.hulkBeds += bedCount; r.hulkTenants++; }
   }
 
   return r;
@@ -401,81 +456,82 @@ function refreshDashboardContent_() {
 // ── UPDATE MONTH SUMMARY (called on edit) ───────────────────────────────────
 
 function updateMonthSummary(sheet) {
+  // ONLY runs on legacy (4-row header) tabs. New layout has 5 summary cards
+  // at rows 2-6 written directly by sync_sheet_from_db.py — touching them
+  // here would corrupt them. The caller (onSheetEdit) gates this with
+  // isLegacyLayout_(); we re-check defensively in case it's called directly.
+  const data = sheet.getDataRange().getValues();
+  const headerIdx = _findRow_(data, "Room", 12);
+  if (headerIdx !== 3) return;  // not legacy → don't touch summary rows
+
+  const cm = _colMap_(data[headerIdx]);
+  const cRent = _col_(cm, "Rent Due");
+  const cCash = _col_(cm, "Cash");
+  const cUpi = _col_(cm, "UPI");
+  const cTp = _col_(cm, "Total Paid");
+  const cBal = _col_(cm, "Balance");
+  const cSt = _col_(cm, "Status");
+  const cPrev = _col_(cm, "Prev Due");
+  const lastColIdx = data[headerIdx].length;
+  const lastCol = _colLetter_(lastColIdx);
+
   const d = readMonthData(sheet);
   const collected = d.cash + d.upi;
   const vacant = TOTAL_BEDS - d.beds - d.noshow;
   const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(1);
 
-  // Detect column layout
-  const hdr = sheet.getRange("A4:P4").getValues()[0];
-  const isNew = String(hdr[2] || "").toUpperCase().includes("PHONE");
-
-  // Summary rows — clean formatting, no grids
-  const lastCol = isNew ? "Q" : "O";
-
-  // Row 2: Occupancy + Collections
-  const r2 = isNew
-    ? ["Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
-       "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
-       "Cash", d.cash, "UPI", d.upi, "Total", collected,
-       "Bal: " + d.balance, "", "", "", "", ""]
-    : ["Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
-       "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
-       "Cash", d.cash, "UPI", d.upi, "Total", collected,
-       "Bal: " + d.balance, "", "", ""];
+  // Build row arrays sized to last column
+  function _padRow(arr) {
+    const out = arr.slice();
+    while (out.length < lastColIdx) out.push("");
+    return out;
+  }
+  const r2 = _padRow([
+    "Checked-in", d.beds + " beds (" + d.regular + "+" + d.premium + "P)",
+    "No-show: " + d.noshow, "Vacant: " + vacant, "Occ: " + occPct + "%",
+    "Cash", d.cash, "UPI", d.upi, "Total", collected, "Bal: " + d.balance,
+  ]);
+  const r3 = _padRow([
+    "THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)",
+    "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
+    "New: " + d.newCheckins, "Exit: " + d.exits, "",
+    "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
+  ]);
   sheet.getRange("A2:" + lastCol + "2").setValues([r2]);
-
-  // Row 3: Status + Movement
-  const r3 = isNew
-    ? ["THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)", "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
-       "New: " + d.newCheckins, "Exit: " + d.exits, "",
-       "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
-       "", "", "", "", "", "", "", "", ""]
-    : ["THOR: " + d.thorBeds + "b (" + d.thorTenants + "t)", "HULK: " + d.hulkBeds + "b (" + d.hulkTenants + "t)",
-       "New: " + d.newCheckins, "Exit: " + d.exits, "",
-       "PAID:" + d.paid, "PARTIAL:" + d.partial, "UNPAID:" + d.unpaid,
-       "", "", "", "", "", "", ""];
   sheet.getRange("A3:" + lastCol + "3").setValues([r3]);
-
-  // Format rows 1-3: bold, smaller font, no gridlines
   sheet.getRange("A2:" + lastCol + "3").setFontSize(9).setFontWeight("bold")
     .setFontColor("#444444").setBackground("#F8F9FA")
     .setBorder(false, false, false, false, false, false);
-  // Number formatting for financial cells in row 2
-  if (isNew) {
-    sheet.getRange("G2").setNumberFormat("#,##0");
-    sheet.getRange("I2").setNumberFormat("#,##0");
-    sheet.getRange("K2").setNumberFormat("#,##0");
-  } else {
-    sheet.getRange("G2").setNumberFormat("#,##0");
-    sheet.getRange("I2").setNumberFormat("#,##0");
-    sheet.getRange("K2").setNumberFormat("#,##0");
-  }
 
-  // Recalculate Total Paid, Balance, Status per row
-  const data = sheet.getDataRange().getValues();
-  // Column indices
-  const ci = isNew
-    ? { rent: 5, cash: 6, upi: 7, tp: 8, bal: 9, st: 10, prevDue: 15 }
-    : { rent: 4, cash: 5, upi: 6, tp: 7, bal: 8, st: 9, prevDue: 15 };
-
-  for (let i = 4; i < data.length; i++) {
+  // Per-row recalc: Total Paid, Balance, Status (legacy layout only)
+  for (let i = headerIdx + 1; i < data.length; i++) {
     if (!data[i][0]) continue;
-    const curSt = String(data[i][ci.st]).toUpperCase().trim();
-    if (curSt === "EXIT" || curSt === "NO SHOW" || curSt === "ADVANCE" || curSt === "CANCELLED") continue;
-
-    const cash = pn(data[i][ci.cash]);
-    const upi = pn(data[i][ci.upi]);
-    const rent = pn(data[i][ci.rent]);
-    const prevDue = pn(data[i][ci.prevDue]);
+    const curSt = String(data[i][cSt] || "").toUpperCase().trim();
+    if (["EXIT", "NO SHOW", "NO-SHOW", "ADVANCE", "CANCELLED"].indexOf(curSt) >= 0) continue;
+    const cash = pn(data[i][cCash]);
+    const upi = pn(data[i][cUpi]);
+    const rent = pn(data[i][cRent]);
+    const prevDue = (cPrev >= 0) ? pn(data[i][cPrev]) : 0;
     const tp = cash + upi;
     let bal = rent + prevDue - tp;
     if (bal < 0) bal = 0;  // excess is deposit/advance, not overpayment
     const st = (tp === 0) ? "UNPAID" : (bal <= 0 ? "PAID" : "PARTIAL");
-    sheet.getRange(i + 1, ci.tp + 1).setValue(tp);
-    sheet.getRange(i + 1, ci.bal + 1).setValue(bal);
-    sheet.getRange(i + 1, ci.st + 1).setValue(st);
+    if (cTp >= 0) sheet.getRange(i + 1, cTp + 1).setValue(tp);
+    if (cBal >= 0) sheet.getRange(i + 1, cBal + 1).setValue(bal);
+    if (cSt >= 0) sheet.getRange(i + 1, cSt + 1).setValue(st);
   }
+}
+
+// 0-indexed col → letter (A, B, ..., Z, AA, AB, ...). Apps Script-friendly.
+function _colLetter_(colIdx) {
+  let n = colIdx;
+  let s = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s || "A";
 }
 
 // ── NEW MONTH ───────────────────────────────────────────────────────────────
@@ -500,9 +556,17 @@ function createNextMonth() {
 }
 
 function createMonthTab(tabName, monthIdx, year) {
+  // DEPRECATED: New month tabs are created by Python's
+  // scripts/sync_sheet_from_db.py (header-driven, 19 cols, matches DB).
+  // This legacy creator builds a 17-col tab with old layout — only kept as
+  // a fallback when the script is run from the Cozeevo menu without server
+  // access. Do not call from new code.
   const ss = SpreadsheetApp.getActive();
   const tenants = ss.getSheetByName("TENANTS");
   if (!tenants) { SpreadsheetApp.getUi().alert("TENANTS tab not found!"); return; }
+  SpreadsheetApp.getActive().toast(
+    "Legacy month creator — prefer running scripts/sync_sheet_from_db.py.",
+    "Heads up", 5);
 
   // ── Find previous month tab to get dues + notes ──
   const prevIdx = monthIdx === 0 ? 11 : monthIdx - 1;
@@ -653,28 +717,36 @@ function parseDate_(val) {
 // ── VALIDATION ──────────────────────────────────────────────────────────────
 
 function validateTotals() {
+  // Header-driven validation: sum data rows by header name, compare against
+  // the readMonthData() aggregate. Works on legacy AND new layouts.
   const ss = SpreadsheetApp.getActive();
   const issues = [];
 
   ss.getSheets().forEach(sheet => {
     if (!MONTH_TAB_RE.test(sheet.getName())) return;
     const data = sheet.getDataRange().getValues();
-    if (data.length < 5) return;
+    const headerIdx = _findRow_(data, "Room", 12);
+    if (headerIdx < 0) return;
+
+    const cm = _colMap_(data[headerIdx]);
+    const cRent = _col_(cm, "Rent Due");
+    const cCash = _col_(cm, "Cash");
+    const cUpi = _col_(cm, "UPI");
+    if (cRent < 0 || cCash < 0 || cUpi < 0) return;
 
     let sumCash = 0, sumUpi = 0, sumRent = 0;
-    for (let i = 4; i < data.length; i++) {
+    for (let i = headerIdx + 1; i < data.length; i++) {
       if (!data[i][0]) continue;
-      sumRent += pn(data[i][4]);
-      sumCash += pn(data[i][5]);
-      sumUpi += pn(data[i][6]);
+      sumRent += pn(data[i][cRent]);
+      sumCash += pn(data[i][cCash]);
+      sumUpi += pn(data[i][cUpi]);
     }
 
-    const hRent = pn(data[1][6]);
-    const hColl = pn(data[1][8]);
-    const calc = sumCash + sumUpi;
-
-    if (Math.abs(hRent - sumRent) > 1) issues.push(sheet.getName() + ": Rent header " + hRent + " != rows " + sumRent);
-    if (Math.abs(hColl - calc) > 1) issues.push(sheet.getName() + ": Collected header " + hColl + " != rows " + calc);
+    const d = readMonthData(sheet);
+    if (Math.abs(d.rentExpected - sumRent) > 1)
+      issues.push(sheet.getName() + ": readMonth Rent " + d.rentExpected + " != row sum " + sumRent);
+    if (Math.abs((d.cash + d.upi) - (sumCash + sumUpi)) > 1)
+      issues.push(sheet.getName() + ": readMonth Collected " + (d.cash + d.upi) + " != row sum " + (sumCash + sumUpi));
   });
 
   SpreadsheetApp.getUi().alert(issues.length === 0

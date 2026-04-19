@@ -1269,7 +1269,9 @@ async def _do_rent_change(
     is_discount: bool,
     reason: str,
     session: AsyncSession,
+    changed_by: str = "system",
 ) -> str:
+    from src.database.models import AuditLog
     from src.integrations import gsheets as _gs
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
@@ -1280,11 +1282,33 @@ async def _do_rent_change(
     except ValueError:
         period_month = date.today().replace(day=1)
 
-    # Look up room number once for the instant cell write below.
+    # Look up room number once for audit log + instant cell write below.
     rent_room_number = ""
     if tenancy.room_id:
         _r = await session.get(Room, tenancy.room_id)
         rent_room_number = _r.room_number if _r else ""
+
+    # Capture old value BEFORE mutation for accurate audit log.
+    old_rent_audit = int(tenancy.agreed_rent or 0)
+    audit_field = (
+        "agreed_rent_concession" if is_discount and permanent else
+        "rent_schedule_one_off" if (is_discount or not permanent) else
+        "agreed_rent"
+    )
+
+    def _write_audit(new_val):
+        session.add(AuditLog(
+            changed_by=changed_by,
+            entity_type="tenancy",
+            entity_id=tenancy.id,
+            entity_name=tenant_name,
+            field=audit_field,
+            old_value=str(old_rent_audit),
+            new_value=str(int(new_val)),
+            room_number=rent_room_number or None,
+            source="whatsapp",
+            note=reason or (f"effective {period_month.strftime('%b %Y')}" if not permanent else None),
+        ))
 
     # Mirror change into the affected month's sheet tab + current month if
     # the change is permanent. Two paths:
@@ -1340,12 +1364,14 @@ async def _do_rent_change(
             ))
         if permanent:
             tenancy.agreed_rent = (tenancy.agreed_rent or Decimal("0")) - Decimal(str(new_amount))
+            _write_audit(int(tenancy.agreed_rent))
             _queue_sheet_sync()
             return (
                 f"*Permanent concession applied — {tenant_name}*\n"
                 f"Rent reduced by Rs.{int(new_amount):,} every month.\n"
                 f"New rent: Rs.{int(tenancy.agreed_rent):,}/month"
             )
+        _write_audit(int(new_amount))
         _queue_sheet_sync()
         return (
             f"*Concession applied — {tenant_name}*\n"
@@ -1372,12 +1398,14 @@ async def _do_rent_change(
             ))
         if permanent:
             tenancy.agreed_rent = Decimal(str(new_amount))
+            _write_audit(int(new_amount))
             _queue_sheet_sync()
             return (
                 f"*Rent updated — {tenant_name}*\n"
                 f"Was: Rs.{old_rent:,}/month\n"
                 f"Now: Rs.{int(new_amount):,}/month (permanent from {period_month.strftime('%b %Y')})"
             )
+        _write_audit(int(new_amount))
         _queue_sheet_sync()
         return (
             f"*One-time rent change — {tenant_name}*\n"

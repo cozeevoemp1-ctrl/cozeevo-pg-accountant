@@ -175,8 +175,29 @@ T_FOOD_PREF = _T["T_FOOD_PREF"]
 T_NOTES = _T["T_NOTES"]
 T_EVENT = _T["T_EVENT"]
 
-MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers
+MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers (legacy default)
 TOTAL_BEDS = 291
+
+
+def _locate_monthly_header(all_vals: list[list]) -> tuple[int, int]:
+    """
+    Find the column-header row of a monthly tab by scanning column A for "Room".
+
+    Works for both layouts:
+      - Legacy: header at row 4 (index 3), data from row 5 (index 4)
+      - New (sync_sheet_from_db.py): header at row 7 (index 6), data from row 8 (index 7)
+
+    Returns (header_idx_0based, data_start_idx_0based). Returns (-1, -1) if
+    no "Room" header found in the first 12 rows.
+
+    Use everywhere we need to read or write data rows of a monthly tab —
+    never assume a fixed offset.
+    """
+    for idx in range(0, min(12, len(all_vals))):
+        cell = all_vals[idx][0] if all_vals[idx] else ""
+        if str(cell or "").strip().lower() == "room":
+            return idx, idx + 1
+    return -1, -1
 
 # -- Failed Sheet writes retry queue -------------------------------------------
 import json as _json
@@ -390,12 +411,13 @@ def _get_prev_month_info(room_number: str, tenant_name: str) -> dict:
         found = _find_row_in_monthly(ws, room_number, tenant_name)
         if found:
             _, row_data = found
-            # Detect format
+            # Detect format via header row + look up columns by name
             all_vals = ws.get_all_values()
-            hdr = all_vals[3] if len(all_vals) > 3 else []
-            is_new = "phone" in str(hdr[2] if len(hdr) > 2 else "").lower()
-            bal_col = 9 if is_new else 8
-            notes_col = 14 if is_new else 12
+            hdr_idx, _ = _locate_monthly_header(all_vals)
+            hdr = all_vals[hdr_idx] if hdr_idx >= 0 else []
+            hmap = _build_header_map(hdr)
+            bal_col = hmap.get("balance", 9)
+            notes_col = hmap.get("notes", 14)
             return {
                 "balance": _safe_parse_numeric(_cell(row_data, bal_col)),
                 "notes": _cell(row_data, notes_col),
@@ -728,11 +750,18 @@ def _update_payment_sync(
     # Read ALL data once (avoid multiple API calls)
     all_vals = ws.get_all_values()
 
+    # Locate header row dynamically (legacy: row 4, new: row 7)
+    header_idx, data_start = _locate_monthly_header(all_vals)
+    if data_start < 0:
+        result["error"] = f"No 'Room' header found in {tab_name}"
+        return result
+    header_row = all_vals[header_idx]
+
     # Find row
     room_clean = room_number.strip().upper()
     name_lower = tenant_name.strip().lower()
     found = None
-    for i in range(4, len(all_vals)):  # skip rows 0-3 (title/summary/headers)
+    for i in range(data_start, len(all_vals)):
         r_data = all_vals[i]
         if not r_data or not r_data[0]:
             continue
@@ -750,8 +779,7 @@ def _update_payment_sync(
     row, row_data = found
     result["row"] = row
 
-    # Detect old vs new column layout
-    header_row = all_vals[3] if len(all_vals) > 3 else []
+    # Old vs new column layout (header_row already located above)
     is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
 
     if is_new:
@@ -1324,10 +1352,15 @@ def _void_payment_sync(
         return result
 
     all_vals = ws.get_all_values()
+    header_idx, data_start = _locate_monthly_header(all_vals)
+    if data_start < 0:
+        result["error"] = f"No 'Room' header found in {tab_name}"
+        return result
+
     room_clean = room_number.strip().upper()
     name_lower = tenant_name.strip().lower()
     found = None
-    for i in range(4, len(all_vals)):
+    for i in range(data_start, len(all_vals)):
         r_data = all_vals[i]
         if not r_data or not r_data[0]:
             continue
@@ -1343,7 +1376,7 @@ def _void_payment_sync(
 
     row, row_data = found
 
-    header_row = all_vals[3] if len(all_vals) > 3 else []
+    header_row = all_vals[header_idx]
     is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
 
     if is_new:
@@ -1596,12 +1629,17 @@ def _update_checkin_sync(room_number: str, tenant_name: str, new_checkin: str) -
             try:
                 ws = _get_worksheet_sync(tab)
                 all_vals = ws.get_all_values()
-                header_row = all_vals[3] if len(all_vals) > 3 else []
+                header_idx, data_start = _locate_monthly_header(all_vals)
+                if data_start < 0:
+                    continue
+                header_row = all_vals[header_idx]
                 is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
                 col_checkin = M_CHECKIN if is_new else 10  # old format
 
-                for j in range(4, len(all_vals)):
+                for j in range(data_start, len(all_vals)):
                     r = all_vals[j]
+                    if not r or not r[0] or len(r) < 2:
+                        continue
                     if (str(r[0]).strip().upper() == room_clean and
                             name_lower in str(r[1]).strip().lower()):
                         cell = gspread.utils.rowcol_to_a1(j + 1, col_checkin + 1)
@@ -1643,15 +1681,21 @@ def _update_notes_sync(room_number: str, tenant_name: str, notes: str,
     try:
         ws = _get_worksheet_sync(tab_name)
         all_vals = ws.get_all_values()
-        header_row = all_vals[3] if len(all_vals) > 3 else []
+        header_idx, data_start = _locate_monthly_header(all_vals)
+        if data_start < 0:
+            result["error"] = f"No 'Room' header found in {tab_name}"
+            return result
+        header_row = all_vals[header_idx]
         is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
         col_notes = M_NOTES if is_new else 12
 
         room_clean = room_number.strip().upper()
         name_lower = tenant_name.strip().lower()
 
-        for i in range(4, len(all_vals)):
+        for i in range(data_start, len(all_vals)):
             r = all_vals[i]
+            if not r or not r[0] or len(r) < 2:
+                continue
             if (str(r[0]).strip().upper() == room_clean and
                     name_lower in str(r[1]).strip().lower()):
                 cell = gspread.utils.rowcol_to_a1(i + 1, col_notes + 1)
@@ -1840,11 +1884,17 @@ def _update_tenant_field_sync(
         ws = _get_worksheet_sync(tab_name)
         all_vals = ws.get_all_values()
 
-        # Find the row
+        # Locate header row dynamically — works on legacy AND new layouts.
+        _hdr_idx, data_start = _locate_monthly_header(all_vals)
+        if data_start < 0:
+            result["error"] = f"No 'Room' header found in {tab_name}"
+            return result
+
+        # Find the row by room+name, fall back to name-only
         target_row = None
-        for i in range(4, len(all_vals)):
+        for i in range(data_start, len(all_vals)):
             row = all_vals[i]
-            if not row[0] or not row[1]:
+            if not row or not row[0] or len(row) < 2 or not row[1]:
                 continue
             row_room = str(row[0]).strip()
             row_name = str(row[1]).strip().lower()
@@ -1853,10 +1903,9 @@ def _update_tenant_field_sync(
                 break
 
         if not target_row:
-            # Try name-only match
-            for i in range(4, len(all_vals)):
+            for i in range(data_start, len(all_vals)):
                 row = all_vals[i]
-                if not row[1]:
+                if not row or len(row) < 2 or not row[1]:
                     continue
                 if tenant_name.lower() in str(row[1]).strip().lower():
                     target_row = i + 1
@@ -1895,6 +1944,8 @@ async def update_tenant_field(
 # Maps short field names used by handlers to TENANTS_HEADERS column names.
 # Lookup is case-insensitive — keys must be lowercase.
 _TENANTS_FIELD_TO_HEADER = {
+    "room": "Room",
+    "room_number": "Room",
     "deposit": "Deposit",
     "security_deposit": "Deposit",
     "agreed_rent": "Agreed Rent",
