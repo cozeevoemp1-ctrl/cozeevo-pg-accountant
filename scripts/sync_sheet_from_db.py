@@ -70,6 +70,20 @@ async def main(args):
         # No-show tenancies (checkin in this month)
         last_day = date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
 
+        # Include tenancies that had payments or rent schedule for this month
+        # (catches exited tenants who paid in this month even without checkout_date)
+        tids_with_activity = set()
+        for row in (await session.execute(
+            select(Payment.tenancy_id).where(
+                Payment.period_month == period, Payment.is_void == False
+            )
+        )).all():
+            tids_with_activity.add(row[0])
+        for row in (await session.execute(
+            select(RentSchedule.tenancy_id).where(RentSchedule.period_month == period)
+        )).all():
+            tids_with_activity.add(row[0])
+
         rows = (await session.execute(
             select(Tenancy, Tenant, Room, Property.name)
             .join(Tenant, Tenant.id == Tenancy.tenant_id)
@@ -77,15 +91,17 @@ async def main(args):
             .join(Property, Property.id == Room.property_id)
             .where(
                 or_(
-                    # All active tenancies (regardless of checkin date)
+                    # All active tenancies
                     Tenancy.status == TenancyStatus.active,
-                    # Exited in this month
+                    # Exited in this month (checkout date set)
                     and_(
                         Tenancy.status == TenancyStatus.exited,
                         Tenancy.checkout_date >= period,
                         Tenancy.checkout_date < last_day,
                     ),
-                    # All current no-shows (they stay until they checkin or cancel)
+                    # Any tenancy with payment or rent schedule for this month
+                    Tenancy.id.in_(tids_with_activity) if tids_with_activity else False,
+                    # All current no-shows (until they checkin or are cancelled)
                     Tenancy.status == TenancyStatus.no_show,
                 )
             )
@@ -155,15 +171,8 @@ async def main(args):
             key = (room.room_number, tenant.name.lower())
             existing_row = sheet_lookup.get(key, [])
 
-            # If sheet has payments but DB doesn't, use sheet values
-            # (payments may not have been recorded in DB yet)
-            if not cash and not upi and existing_row:
-                sheet_cash = pn(existing_row[6]) if len(existing_row) > 6 else 0
-                sheet_upi = pn(existing_row[7]) if len(existing_row) > 7 else 0
-                if sheet_cash or sheet_upi:
-                    cash = int(sheet_cash)
-                    upi = int(sheet_upi)
-                    total_paid = cash + upi
+            # DB is source of truth — never preserve sheet cash/UPI values
+            # (previous logic did this but caused stale data to persist after voids)
 
             # Previous balance from sheet (col 16, index 15)
             prev_due = ""
@@ -251,14 +260,15 @@ async def main(args):
         thor_beds = (thor_t - thor_prem) + (thor_prem * 2)
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
-        total_cash = sum(pn(r[6]) for r in active_rows)
-        total_upi = sum(pn(r[7]) for r in active_rows)
+        # Totals include ALL rows (active + exited + no-show) — every payment counts
+        total_cash = sum(pn(r[6]) for r in data_rows)
+        total_upi = sum(pn(r[7]) for r in data_rows)
         total_all = total_cash + total_upi
-        total_bal = sum(pn(r[9]) for r in active_rows)
+        total_bal = sum(pn(r[9]) for r in data_rows)
 
-        paid_count = sum(1 for r in active_rows if r[10] == "PAID")
-        partial_count = sum(1 for r in active_rows if r[10] == "PARTIAL")
-        unpaid_count = sum(1 for r in active_rows if r[10] == "UNPAID")
+        paid_count = sum(1 for r in data_rows if r[10] == "PAID")
+        partial_count = sum(1 for r in data_rows if r[10] == "PARTIAL")
+        unpaid_count = sum(1 for r in data_rows if r[10] == "UNPAID")
 
         # Vacant beds
         from src.database.models import Room as RoomModel

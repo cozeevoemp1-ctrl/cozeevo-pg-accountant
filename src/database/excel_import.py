@@ -38,8 +38,21 @@ from scripts.clean_and_load import read_history, sn, clean_num  # noqa: E402 —
 from src.database.models import (  # noqa: E402
     Payment, PaymentFor, PaymentMode,
     Property, RentSchedule, RentStatus, Room,
-    Staff, Tenancy, TenancyStatus, Tenant,
+    SharingType, Staff, Tenancy, TenancyStatus, Tenant,
 )
+
+
+def _norm_sharing(raw: str) -> SharingType | None:
+    s = str(raw or "").strip().lower()
+    if "prem" in s:
+        return SharingType.premium
+    if "single" in s:
+        return SharingType.single
+    if "double" in s:
+        return SharingType.double
+    if "triple" in s:
+        return SharingType.triple
+    return None
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -352,6 +365,7 @@ async def run_import(write: bool) -> None:
                 security_deposit=_to_dec(rec['deposit']),
                 booking_amount=_to_dec(rec['booking']),
                 maintenance_fee=_to_dec(rec['maintenance']),
+                sharing_type=_norm_sharing(rec.get('sharing', '')),
                 status=_status_to_enum(rec['status']),
                 assigned_staff_id=staff_obj.id if staff_obj else None,
                 notes=tenancy_notes,

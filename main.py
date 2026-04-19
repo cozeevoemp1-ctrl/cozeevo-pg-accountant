@@ -40,7 +40,8 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
                 or path.startswith("/static") or path.startswith("/media")
                 or path.startswith("/onboard")  # tenant onboarding form (public)
                 or path.startswith("/admin/onboarding")  # admin onboarding panel
-                or path.startswith("/api/onboarding")):  # all onboarding API endpoints
+                or path.startswith("/api/onboarding")  # all onboarding API endpoints
+                or path.startswith("/api/sync")):  # live source sheet sync (token-protected)
             return await call_next(request)
 
         # Everything else (/api/*, /docs, /redoc, /openapi.json) — localhost only
@@ -135,6 +136,9 @@ app.include_router(reminder_router)
 
 from src.api.onboarding_router import router as onboarding_router
 app.include_router(onboarding_router)
+
+from src.api.sync_router import router as sync_router
+app.include_router(sync_router)
 
 # ── Ingest API ─────────────────────────────────────────────────────────────
 

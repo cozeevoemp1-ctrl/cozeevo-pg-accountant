@@ -443,6 +443,21 @@ async def import_to_db(records, write=False):
 
             stats['matched'] += 1
 
+            # ── Update tenancy status + sharing_type from Excel ─────
+            new_status = _clean_status(rec['inout'])
+            if tenancy.status != new_status:
+                tenancy.status = new_status
+            # Update sharing_type
+            sharing_raw = str(rec.get('sharing', '') or '').lower()
+            from src.database.models import SharingType as _ST
+            new_sharing = None
+            if 'prem' in sharing_raw: new_sharing = _ST.premium
+            elif 'single' in sharing_raw: new_sharing = _ST.single
+            elif 'double' in sharing_raw: new_sharing = _ST.double
+            elif 'triple' in sharing_raw: new_sharing = _ST.triple
+            if new_sharing and tenancy.sharing_type != new_sharing:
+                tenancy.sharing_type = new_sharing
+
             # ── Dry run: just count ──────────────────────────────────
             if not write:
                 if gets_rent_schedule and rec['apr_status']:

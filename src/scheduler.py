@@ -139,8 +139,16 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        _overnight_source_sync,
+        trigger=CronTrigger(hour=3, minute=0),   # every day at 3am IST
+        id="overnight_source_sync",
+        name="Overnight Source Sheet Reconciliation — 3am daily",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info("[Scheduler] Started — 6 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 7 jobs registered (jobs persist in Supabase)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -429,6 +437,41 @@ async def _monthly_tab_rollover() -> None:
         logger.info("[Scheduler] Monthly tab rollover: created %s %d", month_name, year)
     except Exception as e:
         logger.error("[Scheduler] Monthly tab rollover failed: %s", e)
+
+
+# ── Job: Overnight Source Sheet Reconciliation ─────────────────────────────────
+
+async def _overnight_source_sync() -> None:
+    """
+    Runs every day at 03:00 IST.
+    Pull source sheet (Kiran's April Month Collection) → DB → re-sync Operations sheet.
+    Catches anything the live webhook missed during the day.
+    """
+    import asyncio
+    import subprocess
+    try:
+        # 1. Pull source → DB
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["venv/Scripts/python", "scripts/sync_from_source_sheet.py", "--write"],
+            capture_output=True, text=True, timeout=600,
+        )
+        if result.returncode != 0:
+            logger.error("[Scheduler] Overnight source sync (pull) failed: %s", result.stderr[-500:])
+            return
+        logger.info("[Scheduler] Overnight source sync — DB updated")
+
+        # 2. Re-sync current month Operations sheet
+        today = date.today()
+        await asyncio.to_thread(
+            subprocess.run,
+            ["venv/Scripts/python", "scripts/sync_sheet_from_db.py",
+             "--month", str(today.month), "--year", str(today.year), "--write"],
+            capture_output=True, text=True, timeout=600,
+        )
+        logger.info("[Scheduler] Overnight reconciliation complete — Operations sheet refreshed")
+    except Exception as e:
+        logger.error("[Scheduler] Overnight source sync failed: %s", e)
 
 
 # ── Job: Checkout Deposit Alerts ───────────────────────────────────────────────
