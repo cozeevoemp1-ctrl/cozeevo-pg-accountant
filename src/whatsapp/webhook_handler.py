@@ -302,8 +302,13 @@ def _extract_message(payload: dict) -> Optional[dict]:
 
 # -- Meta Graph API sender -----------------------------------------------------
 
-async def _send_whatsapp(to_number: str, message: str):
-    """Send WhatsApp reply via Meta Graph API (free, no Twilio needed)."""
+async def _send_whatsapp(to_number: str, message: str, *, intent: str = "OUTBOUND"):
+    """Send WhatsApp reply via Meta Graph API and persist to whatsapp_log.
+
+    Every outbound send (welcome PDFs, receptionist pings, system alerts)
+    goes through here. Logging to DB ensures auditability — without it,
+    'did the customer get the message?' is unanswerable from the DB.
+    """
     token    = os.getenv("WHATSAPP_TOKEN", "")
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
@@ -323,15 +328,36 @@ async def _send_whatsapp(to_number: str, message: str):
         "type": "text",
         "text": {"body": message[:4096]},
     }
+    success = False
+    err_text = None
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(url, json=body, headers=headers)
         if resp.status_code == 200:
             logger.info(f"[Meta] Sent to {to}")
+            success = True
         else:
-            logger.error(f"[Meta] Send failed {resp.status_code}: {resp.text[:200]}")
+            err_text = f"{resp.status_code}: {resp.text[:200]}"
+            logger.error(f"[Meta] Send failed {err_text}")
     except Exception as e:
+        err_text = str(e)
         logger.error(f"[Meta] Send exception: {e}")
+
+    # Audit log — even failures are recorded so missing-message diagnoses are possible
+    try:
+        from src.database.db_manager import get_session
+        from src.database.models import WhatsappLog, MessageDirection
+        async with get_session() as _sess:
+            _sess.add(WhatsappLog(
+                direction=MessageDirection.outbound,
+                from_number=phone_id,
+                to_number=to,
+                message_text=message[:4096],
+                intent=intent if success else f"{intent}_FAILED",
+            ))
+            await _sess.commit()
+    except Exception as _log_err:
+        logger.warning(f"[Meta] whatsapp_log write failed: {_log_err}")
 
 
 async def _send_whatsapp_template(to_number: str, template_name: str, parameters: list[str]):
@@ -357,15 +383,34 @@ async def _send_whatsapp_template(to_number: str, template_name: str, parameters
             }]
         }
     }
+    success = False
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(url, json=body, headers=headers)
         if resp.status_code == 200:
             logger.info(f"[Meta] Template '{template_name}' sent to {to}")
+            success = True
         else:
             logger.error(f"[Meta] Template send failed {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
         logger.error(f"[Meta] Template send exception: {e}")
+
+    # Audit log
+    try:
+        from src.database.db_manager import get_session
+        from src.database.models import WhatsappLog, MessageDirection
+        async with get_session() as _sess:
+            _sess.add(WhatsappLog(
+                direction=MessageDirection.outbound,
+                from_number=phone_id, to_number=to,
+                message_text=f"[TEMPLATE:{template_name}] params={parameters}"[:4096],
+                intent="TEMPLATE" if success else "TEMPLATE_FAILED",
+            ))
+            await _sess.commit()
+    except Exception as _e:
+        logger.warning(f"[Meta] template log failed: {_e}")
+
+    return success  # callers can branch on this for fallback
 
 
 # -- Meta interactive message sender ------------------------------------------
@@ -418,15 +463,32 @@ async def _send_whatsapp_document(to_number: str, document_url: str, filename: s
         },
     }
     import httpx
+    success = False
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(url, json=body, headers=headers)
         if resp.status_code == 200:
             logger.info(f"[Meta] Document sent to {to}: {filename}")
+            success = True
         else:
             logger.error(f"[Meta] Document send failed {resp.status_code}: {resp.text[:200]}")
     except Exception as e:
         logger.error(f"[Meta] Document send exception: {e}")
+
+    # Audit log
+    try:
+        from src.database.db_manager import get_session
+        from src.database.models import WhatsappLog, MessageDirection
+        async with get_session() as _sess:
+            _sess.add(WhatsappLog(
+                direction=MessageDirection.outbound,
+                from_number=phone_id, to_number=to,
+                message_text=f"[DOCUMENT:{filename}] {caption}"[:4096],
+                intent="DOCUMENT" if success else "DOCUMENT_FAILED",
+            ))
+            await _sess.commit()
+    except Exception as _e:
+        logger.warning(f"[Meta] document log failed: {_e}")
 
 
 # -- Meta media downloader -----------------------------------------------------

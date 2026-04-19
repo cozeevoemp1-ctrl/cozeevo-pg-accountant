@@ -747,11 +747,16 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                 tenancy_id=tenancy.id,
             ))
 
-        # Send signed PDF to tenant via WhatsApp
+        # Send booking confirmation to tenant via WhatsApp.
+        # Uses an approved Meta template first (works even when the
+        # tenant has never messaged us — needed for first-time check-ins),
+        # then sends the signed PDF as a document.
         whatsapp_note = ""
         if obs.agreement_pdf_path and obs.tenant_phone:
             try:
-                from src.whatsapp.webhook_handler import _send_whatsapp_document, _send_whatsapp
+                from src.whatsapp.webhook_handler import (
+                    _send_whatsapp_document, _send_whatsapp, _send_whatsapp_template,
+                )
                 from pathlib import Path
                 # Build public URL for the PDF
                 base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
@@ -769,25 +774,72 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                 phone_wa = obs.tenant_phone.strip()
                 if not phone_wa.startswith("91"):
                     phone_wa = "91" + phone_wa
-                await _send_whatsapp(
+
+                tenant_name = td.get('name', '')
+                checkin_str = checkin.strftime('%d %b %Y')
+
+                # 1. Booking confirmation TEMPLATE (works for first-time contact)
+                # Template name: cozeevo_booking_confirmation
+                # Body parameters (4): {{1}}=name {{2}}=room {{3}}=checkin date {{4}}=rent amount
+                rent_str = f"Rs.{int(obs.agreed_rent or 0):,}"
+                tpl_sent = await _send_whatsapp_template(
                     phone_wa,
-                    f"Welcome to Cozeevo, {td.get('name', '')}! 🏠\n\n"
-                    f"Your registration for Room {room.room_number} is confirmed.\n"
-                    f"Check-in: {checkin.strftime('%d %b %Y')}\n\n"
-                    f"Your signed rental agreement is attached below."
+                    "cozeevo_booking_confirmation",
+                    [tenant_name, room.room_number, checkin_str, rent_str],
                 )
+                # Fallback: if template not approved yet, send free text
+                # (works only if tenant messaged us in the last 24h).
+                if tpl_sent is False or tpl_sent is None:
+                    await _send_whatsapp(
+                        phone_wa,
+                        f"Welcome to Cozeevo, {tenant_name}! 🏠\n\n"
+                        f"Your registration for Room {room.room_number} is confirmed.\n"
+                        f"Check-in: {checkin_str}\n"
+                        f"Monthly rent: {rent_str}\n\n"
+                        f"Your signed rental agreement is attached below.",
+                        intent="BOOKING_CONFIRMATION",
+                    )
+                # 2. Signed agreement PDF
                 await _send_whatsapp_document(
-                    phone_wa,
-                    pdf_url,
-                    f"Cozeevo_Agreement_{td.get('name', '').replace(' ', '_')}.pdf",
+                    phone_wa, pdf_url,
+                    f"Cozeevo_Agreement_{tenant_name.replace(' ', '_')}.pdf",
                     "Your signed rental agreement"
                 )
-                whatsapp_note = " | WhatsApp sent"
+                whatsapp_note = " | Booking confirmation + PDF sent"
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error("WhatsApp PDF delivery failed: %s", e)
+                whatsapp_note = f" | WhatsApp send FAILED: {e}"
+
+        # Trigger full sheet sync in background so the monthly tab summary
+        # rows (Active/Beds/Collection/Status) reflect the new tenant
+        # without waiting for the 3am nightly cron. Per-row write done
+        # earlier via add_tenant; this updates the aggregate counts.
+        try:
+            import asyncio as _aio
+            import subprocess as _sp
+            today = date.today()
+
+            def _run_sync():
+                try:
+                    _sp.run(
+                        ["venv/bin/python", "scripts/sync_sheet_from_db.py",
+                         "--month", str(today.month), "--year", str(today.year), "--write"],
+                        capture_output=True, text=True, timeout=300, cwd="/opt/pg-accountant",
+                    )
+                except Exception as _e:
+                    import logging as _l
+                    _l.getLogger(__name__).warning("Post-onboarding sheet sync failed: %s", _e)
+
+            _aio.get_event_loop().run_in_executor(None, _run_sync)
+        except Exception as _e:
+            import logging as _l
+            _l.getLogger(__name__).warning("Could not schedule post-onboarding sync: %s", _e)
+
+        # Fallback: tenancy_id may not be set in the daily-stay branch
+        _tenancy_id = getattr(obs, "tenancy_id", None) or (tenancy.id if 'tenancy' in dir() and not is_daily else None)
 
         return {
-            "status": "approved", "tenant_id": tenant.id, "tenancy_id": tenancy.id,
-            "message": f"Tenant {td['name']} created{gsheets_note}{whatsapp_note}",
+            "status": "approved", "tenant_id": tenant.id, "tenancy_id": _tenancy_id,
+            "message": f"Tenant {td['name']} created{gsheets_note}{whatsapp_note} | Sheet summary refresh queued",
         }
