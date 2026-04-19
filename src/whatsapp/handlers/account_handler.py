@@ -439,7 +439,7 @@ async def _do_log_payment_by_ids(
                 "extra_amount": float(extra), "mode": mode,
                 "next_month": next_m.isoformat(),
             },
-            choices, session,
+            choices, session, state="awaiting_choice",
         )
         overpayment_pending = (
             f"\n\n⚠️ *Overpayment: Rs.{int(extra):,} extra*\n"
@@ -569,7 +569,7 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
             await _save_pending(
                 ctx.phone, "VOID_WHICH",
                 {"tenant_name": tenant.name, "payments": choices},
-                choices, session,
+                choices, session, state="awaiting_choice",
             )
             return "\n".join(lines)
 
@@ -589,7 +589,7 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
             "amount": float(payment.amount),
             "period_month": payment.period_month.isoformat() if payment.period_month else "",
         },
-        choices, session,
+        choices, session, state="awaiting_choice",
     )
     period_str = payment.period_month.strftime("%b %Y") if payment.period_month else "unknown month"
     return (

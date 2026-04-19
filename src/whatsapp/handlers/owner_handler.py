@@ -2673,7 +2673,7 @@ async def resolve_pending_action(
         await _save_pending(
             pending.phone, "VOID_PAYMENT",
             {"payment_id": p_id, "tenant_name": t_name, "amount": amt, "period_month": pm},
-            confirm_choices, session,
+            confirm_choices, session, state="awaiting_choice",
         )
         return (
             f"__KEEP_PENDING__"
@@ -3568,7 +3568,7 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         "last_day": last_day.isoformat(),
         "deposit_note": deposit_note,
     }
-    await _save_pending(ctx.phone, "NOTICE_GIVEN", action_data, choices, session)
+    await _save_pending(ctx.phone, "NOTICE_GIVEN", action_data, choices, session, state="awaiting_choice")
     return _format_choices_message(search_term, choices, f"record notice (last day: {last_day.strftime('%d %b %Y')})")
 
 

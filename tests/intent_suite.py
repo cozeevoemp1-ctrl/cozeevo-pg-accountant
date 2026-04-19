@@ -231,6 +231,25 @@ EDGE_CASES: list[Case] = [
         ("electricity 4500", None),
         ("cancel", "Cancelled"),
     ], ["expense", "cancel"]),
+
+    # NOTICE_GIVEN disambig — cancel path (safe, no DB mutation)
+    Case("notice given cancel", [
+        ("Krishnan gave notice", None),
+        ("cancel", "Cancelled"),
+    ], ["notice", "cancel"]),
+
+    # VOID_PAYMENT disambig — cancel before selection
+    Case("void payment cancel", [
+        ("void payment Krishnan", None),
+        ("cancel", "Cancelled"),
+    ], ["void", "cancel"]),
+
+    # Gibberish at NOTICE_GIVEN disambig — reprompt (framework guards against bug)
+    Case("notice gibberish reprompt", [
+        ("Krishnan gave notice", None),
+        ("xyz", None),                   # reprompt, don't crash
+        ("cancel", "Cancelled"),          # cancel to keep side-effect-free
+    ], ["notice", "gibberish"]),
 ]
 
 
