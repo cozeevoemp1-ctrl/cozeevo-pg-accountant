@@ -974,6 +974,45 @@ async def run_audit_log_tables(conn: AsyncConnection) -> None:
     print("  [ok] rent_revisions table created")
 
 
+async def run_add_org_id_2026_04_19(conn) -> None:
+    """Add org_id column + index to all multi-tenant tables. Added 2026-04-19.
+
+    The canonical logic lives in migrations/add_org_id_2026_04_19.py and uses
+    sync SQLAlchemy so it can also be exercised in unit tests (SQLite in-memory).
+    Here we replicate the same idempotent DDL directly on the async connection.
+    """
+    print("\n-- Add org_id to multi-tenant tables (2026-04-19) --")
+    from database.migrations.add_org_id_2026_04_19 import TABLES
+
+    for table in TABLES:
+        # Skip if table doesn't exist
+        exists = await conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE tablename=:t"
+        ), {"t": table})
+        if not exists.fetchone():
+            print(f"  [skip] {table} — table not found")
+            continue
+
+        # Check column existence
+        has_col = await conn.execute(text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name=:t AND column_name='org_id'"
+        ), {"t": table})
+        if not has_col.fetchone():
+            await conn.execute(text(
+                f"ALTER TABLE {table} ADD COLUMN org_id INTEGER NOT NULL DEFAULT 1"
+            ))
+            print(f"  [added] {table}.org_id")
+        else:
+            print(f"  [skip] {table}.org_id already exists")
+
+        await conn.execute(text(
+            f"CREATE INDEX IF NOT EXISTS idx_{table}_org_id ON {table}(org_id)"
+        ))
+
+    print("  [ok] org_id migration complete")
+
+
 async def run_unhandled_requests_table(conn) -> None:
     """Create unhandled_requests table for logging unknown intents. Added 2026-04-13."""
     print("\n== Create unhandled_requests table ==")
@@ -1108,6 +1147,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_audit_log_tables(conn)
             await run_unhandled_requests_table(conn)
             await run_extend_onboarding_sessions(conn)
+            await run_add_org_id_2026_04_19(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

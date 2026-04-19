@@ -246,6 +246,8 @@ class Room(Base):
     active            = Column(Boolean, default=True)
     notes             = Column(Text)
 
+    org_id          = Column(Integer, nullable=False, default=1, server_default="1", index=True)
+
     property    = relationship("Property", back_populates="rooms")
     rate_cards  = relationship("RateCard", back_populates="room")
     tenancies   = relationship("Tenancy", back_populates="room")
@@ -395,6 +397,7 @@ class Tenancy(Base):
     notes               = Column(Text)
     created_at          = Column(DateTime, default=datetime.utcnow)
     updated_at          = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    org_id              = Column(Integer, nullable=False, default=1, server_default="1", index=True)
 
     tenant          = relationship("Tenant", back_populates="tenancies")
     room            = relationship("Room", back_populates="tenancies")
@@ -438,6 +441,8 @@ class RentSchedule(Base):
     due_date         = Column(Date)                      # usually 1st of month
     notes            = Column(Text)
 
+    org_id           = Column(Integer, nullable=False, default=1, server_default="1", index=True)
+
     tenancy = relationship("Tenancy", back_populates="rent_schedule")
 
     __table_args__ = (
@@ -469,6 +474,7 @@ class Payment(Base):
     is_void             = Column(Boolean, default=False)
     receipt_url         = Column(String(500), nullable=True)   # relative path to receipt image/PDF
     created_at          = Column(DateTime, default=datetime.utcnow)
+    org_id              = Column(Integer, nullable=False, default=1, server_default="1", index=True)
 
     tenancy           = relationship("Tenancy", back_populates="payments")
     received_by_staff = relationship("Staff", back_populates="payments")
@@ -562,6 +568,7 @@ class Expense(Base):
     is_void           = Column(Boolean, default=False)
     notes             = Column(Text)
     created_at        = Column(DateTime, default=datetime.utcnow)
+    org_id            = Column(Integer, nullable=False, default=1, server_default="1", index=True)
 
     property       = relationship("Property", back_populates="expenses")
     category       = relationship("ExpenseCategory", back_populates="expenses")
@@ -594,6 +601,7 @@ class Lead(Base):
     converted       = Column(Boolean, default=False)  # True when they become a tenant
     notes           = Column(Text)
     created_at      = Column(DateTime, default=datetime.utcnow)
+    org_id          = Column(Integer, nullable=False, default=1, server_default="1", index=True)
 
     __table_args__ = (
         Index("ix_leads_phone", "phone"),
@@ -1307,6 +1315,7 @@ class AuditLog(Base):
     room_number = Column(String(20), nullable=True)         # for easy querying by room
     source      = Column(String(20), default="whatsapp")    # whatsapp | dashboard | system | import
     note        = Column(Text, nullable=True)               # optional context
+    org_id      = Column(Integer, nullable=False, default=1, server_default="1", index=True)
 
     __table_args__ = (
         Index("ix_audit_log_created", "created_at"),
@@ -1332,6 +1341,8 @@ class RentRevision(Base):
     changed_by     = Column(String(30), nullable=False)      # phone number
     reason         = Column(String(200), nullable=True)      # "sharing type change", "annual revision"
     created_at     = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    org_id         = Column(Integer, nullable=False, default=1, server_default="1", index=True)
 
     tenancy = relationship("Tenancy", backref="rent_revisions")
 
