@@ -3,6 +3,7 @@
 *.env.*
 !.env.template
 !.env.example
+!web/.env.local.example
 
 # Database files (use Supabase — no local DB)
 *.db
@@ -60,6 +61,9 @@ workflows/n8n/*.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Superpowers / brainstorm mockups (local-only)
+.superpowers/
 
 # WhatsApp media exports (too large for git)
 data/whatsapp_chats/**/*.mp4
