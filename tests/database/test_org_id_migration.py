@@ -53,4 +53,5 @@ def test_upgrade_creates_indices(engine):
     insp = inspect(engine)
     for table in [t for t in TABLES if t in insp.get_table_names()]:
         idx_names = [i["name"] for i in insp.get_indexes(table)]
-        assert any("org_id" in n for n in idx_names), f"{table} missing org_id index"
+        # Migration's naming convention — ORM index=True (ix_*) must NOT be present
+        assert f"idx_{table}_org_id" in idx_names, f"{table} missing idx_{table}_org_id"
