@@ -197,6 +197,31 @@ EDGE_CASES: list[Case] = [
         ("skip", "number"),
         ("1", None),
     ], ["edge", "skip"]),
+
+    # CHECKOUT disambig — multiple matches, user picks 1, sees Q1/5 checklist
+    Case("checkout disambig pick 1", [
+        ("checkout Krishnan", None),   # 2 Krishnans → disambig
+        ("1", "Q1"),                    # should see checklist question
+    ], ["checkout", "disambig"]),
+
+    # CHECKOUT cancel mid-disambig
+    Case("checkout cancel mid", [
+        ("checkout Krishnan", None),
+        ("cancel", "Cancelled"),
+    ], ["checkout", "cancel"]),
+
+    # CONFIRM_ADD_EXPENSE — amount correction
+    Case("expense amount correction", [
+        ("electricity 4500", None),     # creates CONFIRM_ADD_EXPENSE pending
+        ("5500", "Updated"),             # correct amount before yes
+        ("no", "change"),               # "no" re-prompts for another correction
+    ], ["expense", "correction"]),
+
+    # CONFIRM_ADD_EXPENSE — straight no cancels
+    Case("expense cancel via cancel", [
+        ("electricity 4500", None),
+        ("cancel", "Cancelled"),
+    ], ["expense", "cancel"]),
 ]
 
 

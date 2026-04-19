@@ -107,4 +107,7 @@ async def route(
 
 # Import all handlers here so they self-register at module load.
 # Keep this import list in sync with files under handlers/.
-from .handlers import payment_log  # noqa: E402,F401
+from .handlers import payment_log          # noqa: E402,F401
+from .handlers import checkout             # noqa: E402,F401
+from .handlers import confirm_add_tenant   # noqa: E402,F401
+from .handlers import confirm_add_expense  # noqa: E402,F401

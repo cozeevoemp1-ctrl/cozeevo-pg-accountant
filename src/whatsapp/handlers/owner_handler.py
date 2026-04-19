@@ -3343,7 +3343,7 @@ async def _checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSes
             )
         # Save pending so user replies "1" to confirm
         choices = _make_choices(rows)
-        await _save_pending(ctx.phone, intent_type, action_data, choices, session)
+        await _save_pending(ctx.phone, intent_type, action_data, choices, session, state="awaiting_choice")
 
         date_line = f"\nCheckout date: {checkout_date_val.strftime('%d %b %Y')}" if checkout_date_val else ""
         schedule_note = " *(tenancy stays active until then)*" if is_future_checkout else ""
@@ -3357,7 +3357,7 @@ async def _checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSes
         )
 
     choices = _make_choices(rows)
-    await _save_pending(ctx.phone, intent_type, action_data, choices, session)
+    await _save_pending(ctx.phone, intent_type, action_data, choices, session, state="awaiting_choice")
     label = f"schedule checkout on {checkout_date_val.strftime('%d %b %Y')}" if checkout_date_val else "initiate checkout"
     return _format_choices_message(search_term, choices, label)
 
@@ -4470,6 +4470,7 @@ async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSessi
     session.add(PendingAction(
         phone=ctx.phone,
         intent="CONFIRM_ADD_TENANT",
+        state="awaiting_confirmation",  # routed via conversation framework
         action_data=json.dumps(pending_data),
         choices=json.dumps([]),
         expires_at=datetime.utcnow() + timedelta(minutes=15),

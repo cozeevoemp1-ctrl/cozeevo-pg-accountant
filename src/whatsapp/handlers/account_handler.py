@@ -1392,6 +1392,7 @@ async def _add_expense_prompt(entities: dict, ctx: CallerContext, session: Async
         pending = PendingAction(
             phone=ctx.phone,
             intent="CONFIRM_ADD_EXPENSE",
+            state="awaiting_confirmation",  # routed via conversation framework
             action_data=json.dumps({"amount": amount, "category": category, "description": description}),
             expires_at=datetime.utcnow() + timedelta(minutes=5),
         )

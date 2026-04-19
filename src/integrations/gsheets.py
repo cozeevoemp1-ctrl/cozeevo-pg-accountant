@@ -599,42 +599,43 @@ def _refresh_summary_sync(tab_name: str) -> None:
         collected = cash_total + upi_total
         vacant = TOTAL_BEDS - beds - noshow
         occ_pct = f"{beds / TOTAL_BEDS * 100:.1f}" if TOTAL_BEDS > 0 else "0"
+        pending = max(0, int(balance_total))
+
+        # Format number as lakh string for summary rows
+        def _lk(n):
+            n = float(n or 0)
+            return f"{n/100000:.2f}L" if abs(n) >= 100000 else f"{int(n):,}"
 
         last_col = "Q" if is_new else "O"
         num_cols = 17 if is_new else 15
 
-        # Row 2: Occupancy + Collections
-        r2 = [
-            "Checked-in",
-            f"{beds} beds ({regular}+{premium}P)",
-            f"No-show: {noshow}",
-            f"Vacant: {vacant}",
-            f"Occ: {occ_pct}%",
-            "Cash", cash_total, "UPI", upi_total, "Total", collected,
-            f"Bal: {int(balance_total)}", "", "", "",
-        ]
-        if is_new:
-            r2 += ["", ""]  # 16th + 17th col
+        # 5-row labeled summary (matches sync_sheet_from_db.py layout).
+        # Each cell is independent so users can click/copy values.
+        r2_occ = ["OCCUPANCY", f"Active: {regular + premium}",
+                  f"Beds: {beds} ({regular}+{premium}P)",
+                  f"No-show: {noshow}", f"Vacant: {vacant}/{TOTAL_BEDS}",
+                  f"Occupancy: {occ_pct}%"]
+        r3_bld = ["BUILDINGS", f"THOR: {thor_beds} beds ({thor_tenants}t)",
+                  f"HULK: {hulk_beds} beds ({hulk_tenants}t)",
+                  f"Exits: {exits}"]
+        r4_col = ["COLLECTION", f"Cash: {_lk(cash_total)}",
+                  f"UPI: {_lk(upi_total)}", f"Collected: {_lk(collected)}",
+                  f"Pending: {_lk(pending)}"]
+        r5_sts = ["STATUS", f"PAID: {paid}", f"PARTIAL: {partial}",
+                  f"UNPAID: {unpaid}", f"New: {new_checkins}"]
+        r6_notice = ["NOTICE", "On notice: see full sync",
+                     "Vacating next month: see full sync"]
 
-        # Row 3: Building split + status
-        r3 = [
-            f"THOR: {thor_beds}b ({thor_tenants}t)",
-            f"HULK: {hulk_beds}b ({hulk_tenants}t)",
-            f"New: {new_checkins}",
-            f"Exit: {exits}",
-            "",
-            f"PAID:{paid}", f"PARTIAL:{partial}", f"UNPAID:{unpaid}",
-            "", "", "", "", "", "", "",
-        ]
-        if is_new:
-            r3 += ["", ""]  # 16th + 17th col
+        def _pad(row):
+            return (row + [""] * num_cols)[:num_cols]
 
-        ws.update(values=[r2[:num_cols]], range_name=f"A2:{last_col}2", value_input_option="USER_ENTERED")
-        ws.update(values=[r3[:num_cols]], range_name=f"A3:{last_col}3", value_input_option="USER_ENTERED")
+        summary_rows = [_pad(r2_occ), _pad(r3_bld), _pad(r4_col), _pad(r5_sts), _pad(r6_notice)]
+        ws.update(values=summary_rows, range_name=f"A2:{last_col}6",
+                  value_input_option="USER_ENTERED")
 
         logger.info(
-            "GSheets: refreshed summary for %s — %d beds, %d paid, %d partial, %d unpaid, collected=%d, balance=%d",
-            tab_name, beds, paid, partial, unpaid, int(collected), int(balance_total),
+            "GSheets: refreshed summary for %s — %d beds, %d paid, %d partial, %d unpaid, collected=%d",
+            tab_name, beds, paid, partial, unpaid, int(collected),
         )
     except Exception as e:
         logger.warning("GSheets: summary refresh failed for %s: %s", tab_name, e)
