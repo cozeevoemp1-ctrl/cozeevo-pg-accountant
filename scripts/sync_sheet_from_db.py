@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, selectinload
 from src.database.models import (
     Tenancy, Tenant, Room, Property, TenancyStatus,
-    RentSchedule, RentStatus, Payment,
+    RentSchedule, RentStatus, Payment, PaymentFor,
 )
 
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -126,12 +126,13 @@ async def main(args):
         for rs in rs_rows:
             rent_map[rs.tenancy_id] = rs
 
-        # ── 3. Get payments for this month ──
+        # ── 3. Get RENT payments for this month (exclude deposit/booking/maintenance) ──
         payment_map = {}  # tenancy_id -> {cash, upi}
         pay_rows = (await session.execute(
             select(Payment).where(
                 Payment.period_month == period,
                 Payment.is_void == False,
+                Payment.for_type == PaymentFor.rent,
             )
         )).scalars().all()
         for p in pay_rows:
@@ -142,6 +143,27 @@ async def main(args):
                 payment_map[p.tenancy_id]["upi"] += p.amount
             else:
                 payment_map[p.tenancy_id]["cash"] += p.amount
+
+        # ── 3b. Compute prev-month outstanding from DB (not sheet) ──
+        prev_period = date(year - 1, 12, 1) if month == 1 else date(year, month - 1, 1)
+        prev_rs = (await session.execute(
+            select(RentSchedule).where(RentSchedule.period_month == prev_period)
+        )).scalars().all()
+        prev_pays = (await session.execute(
+            select(Payment).where(
+                Payment.period_month == prev_period,
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.rent,
+            )
+        )).scalars().all()
+        prev_due_map = {}  # tenancy_id -> outstanding
+        for rs in prev_rs:
+            prev_due_map[rs.tenancy_id] = float(rs.rent_due or 0)
+        for p in prev_pays:
+            if p.tenancy_id in prev_due_map:
+                prev_due_map[p.tenancy_id] -= float(p.amount)
+        # Keep only positive balances (unpaid amounts carry forward)
+        prev_due_map = {tid: max(0, bal) for tid, bal in prev_due_map.items() if bal > 0}
 
         # ── 4. Read existing Sheet to preserve any data not in DB ──
         from src.integrations.gsheets import _get_worksheet_sync
@@ -162,23 +184,19 @@ async def main(args):
             rs = rent_map.get(tenancy.id)
             pays = payment_map.get(tenancy.id, {"cash": Decimal("0"), "upi": Decimal("0")})
 
-            rent_due = int(rs.rent_due + (rs.maintenance_due or 0) + (rs.adjustment or 0)) if rs else int(tenancy.agreed_rent or 0)
+            # Rent due = rent only (maintenance never in dues, per memory rule)
+            rent_due = int((rs.rent_due or 0) + (rs.adjustment or 0)) if rs else int(tenancy.agreed_rent or 0)
             cash = int(pays["cash"])
             upi = int(pays["upi"])
             total_paid = cash + upi
 
-            # Check existing sheet row for preserved data
+            # Check existing sheet row for preserved data (notes, notice, entered-by)
             key = (room.room_number, tenant.name.lower())
             existing_row = sheet_lookup.get(key, [])
 
-            # DB is source of truth — never preserve sheet cash/UPI values
-            # (previous logic did this but caused stale data to persist after voids)
-
-            # Previous balance from sheet (col 16, index 15)
-            prev_due = ""
-            if existing_row and len(existing_row) > 15:
-                prev_due = existing_row[15]
-            prev_due_num = pn(prev_due)
+            # Prev due from DB (previous month's unpaid rent), not from sheet
+            prev_due_num = prev_due_map.get(tenancy.id, 0)
+            prev_due = int(prev_due_num) if prev_due_num else ""
 
             balance = rent_due + int(prev_due_num) - total_paid
 
@@ -248,6 +266,7 @@ async def main(args):
         # ── 6. Build summary rows ──
         active_rows = [r for r in data_rows if r[13] == "CHECKIN"]
         noshow_rows = [r for r in data_rows if r[13] == "NO SHOW"]
+        exit_rows = [r for r in data_rows if r[13] == "EXIT"]
 
         regular = sum(1 for r in active_rows if r[4] != "premium")
         premium = sum(1 for r in active_rows if r[4] == "premium")
@@ -260,22 +279,22 @@ async def main(args):
         thor_beds = (thor_t - thor_prem) + (thor_prem * 2)
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
-        # Totals include ALL rows (active + exited + no-show) — every payment counts
+        # Billing and collection — rent only, all rows
+        total_rent_due = sum(pn(r[5]) for r in data_rows)
+        total_prev_due = sum(pn(r[15]) for r in data_rows)
         total_cash = sum(pn(r[6]) for r in data_rows)
         total_upi = sum(pn(r[7]) for r in data_rows)
-        total_all = total_cash + total_upi
-        total_bal = sum(pn(r[9]) for r in data_rows)
+        total_collected = total_cash + total_upi
+        total_pending = max(0, total_rent_due + total_prev_due - total_collected)
 
         paid_count = sum(1 for r in data_rows if r[10] == "PAID")
         partial_count = sum(1 for r in data_rows if r[10] == "PARTIAL")
         unpaid_count = sum(1 for r in data_rows if r[10] == "UNPAID")
 
         # Vacant beds
-        from src.database.models import Room as RoomModel
         total_rev_beds = (await session.execute(
             select(func.sum(Room.max_occupancy)).where(Room.active == True, Room.is_staff_room == False)
         )).scalar() or 0
-        # Daywise guests currently occupying beds
         from src.database.models import DaywiseStay
         daywise_beds = (await session.execute(
             select(func.count()).select_from(DaywiseStay).where(
@@ -285,24 +304,47 @@ async def main(args):
             )
         )).scalar() or 0
 
-        # Vacant = total - checked_in - noshow - daywise
         booked_beds = beds + len(noshow_rows) + daywise_beds
         vacant_beds = int(total_rev_beds) - booked_beds
-
         occ_pct = (beds / int(total_rev_beds) * 100) if total_rev_beds else 0
 
+        def fmt_lakh(n):
+            n = float(n)
+            return f"{n/100000:.2f}L" if abs(n) >= 100000 else f"{int(n):,}"
+
+        # 4-row labeled card summary: label | metric | metric | metric ...
         summary_row1 = [
-            "Checked-in", f"{beds} beds ({regular}+{premium}P)",
-            f"No-show: {len(noshow_rows)}", f"Vacant: {vacant_beds}",
-            f"Occ: {occ_pct:.1f}%", "Cash", f"{int(total_cash):,}",
-            "UPI", f"{int(total_upi):,}", "Total", f"{int(total_all):,}",
-            f"Bal: {int(total_bal)}", "", "", "", "", "",
+            "OCCUPANCY",
+            f"Active: {len(active_rows)}",
+            f"Beds: {beds} ({regular}+{premium}P)",
+            f"No-show: {len(noshow_rows)}",
+            f"Vacant: {vacant_beds}/{int(total_rev_beds)}",
+            f"Occupancy: {occ_pct:.1f}%",
+            "", "", "", "", "", "", "", "", "", "", "",
         ]
         summary_row2 = [
-            f"THOR: {thor_beds}b ({thor_t}t)", f"HULK: {hulk_beds}b ({hulk_t}t)",
-            f"New: 0", f"Exit: 0",
-            "", f"PAID:{paid_count}", f"PARTIAL:{partial_count}", f"UNPAID:{unpaid_count}",
-            "", "", "", "", "", "", "", "", "",
+            "BUILDINGS",
+            f"THOR: {thor_beds} beds ({thor_t}t)",
+            f"HULK: {hulk_beds} beds ({hulk_t}t)",
+            f"Exits: {len(exit_rows)}",
+            "", "", "", "", "", "", "", "", "", "", "", "", "",
+        ]
+        summary_row3 = [
+            "COLLECTION",
+            f"Cash: {fmt_lakh(total_cash)}",
+            f"UPI: {fmt_lakh(total_upi)}",
+            f"Collected: {fmt_lakh(total_collected)}",
+            f"Rent Billed: {fmt_lakh(total_rent_due)}",
+            f"Prev Due: {fmt_lakh(total_prev_due)}",
+            "", "", "", "", "", "", "", "", "", "", "",
+        ]
+        summary_row4 = [
+            "STATUS",
+            f"PAID: {paid_count}",
+            f"PARTIAL: {partial_count}",
+            f"UNPAID: {unpaid_count}",
+            f"Pending: {fmt_lakh(total_pending)}",
+            "", "", "", "", "", "", "", "", "", "", "", "",
         ]
 
         header_row = [
@@ -313,24 +355,21 @@ async def main(args):
 
         # ── 7. Print summary ──
         print(f"\n=== Summary ===")
-        print(f"Active: {len(active_rows)} ({regular} reg + {premium} prem = {beds} beds)")
-        print(f"Exit: 0 (exits go in their exit month only)")
-        print(f"No-show: {len(noshow_rows)}")
-        print(f"THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)")
-        print(f"Vacant: {vacant_beds}/{int(total_rev_beds)}")
-        print(f"Cash: {int(total_cash):,}  UPI: {int(total_upi):,}  Total: {int(total_all):,}  Bal: {int(total_bal)}")
-        print(f"PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}")
+        print(f"OCCUPANCY  Active: {len(active_rows)}  Beds: {beds} ({regular}+{premium}P)  No-show: {len(noshow_rows)}  Vacant: {vacant_beds}/{int(total_rev_beds)}  Occ: {occ_pct:.1f}%")
+        print(f"BUILDINGS  THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)  Exits: {len(exit_rows)}")
+        print(f"COLLECTION Cash: {fmt_lakh(total_cash)}  UPI: {fmt_lakh(total_upi)}  Collected: {fmt_lakh(total_collected)}  Rent Billed: {fmt_lakh(total_rent_due)}  Prev Due: {fmt_lakh(total_prev_due)}")
+        print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  Pending: {fmt_lakh(total_pending)}")
 
         if not args.write:
-            print(f"\n[DRY RUN] Would write {len(data_rows) + 4} rows to '{tab_name}'")
+            print(f"\n[DRY RUN] Would write {len(data_rows) + 6} rows to '{tab_name}'")
             print("Run with --write to apply.")
         else:
             # ── 8. Write to Sheet ──
-            print(f"\nWriting {len(data_rows) + 4} rows to '{tab_name}'...")
+            print(f"\nWriting {len(data_rows) + 6} rows to '{tab_name}'...")
 
-            # Clear existing data (keep row 1 title)
-            title_row = existing[0] if existing else [f"April {year}"]
-            all_rows = [title_row, summary_row1, summary_row2, header_row] + data_rows
+            # Row 1: title | Rows 2-5: summary cards | Row 6: header | Rows 7+: data
+            title_row = [f"{MONTH_NAMES[month].title()} {year}"] + [""] * 16
+            all_rows = [title_row, summary_row1, summary_row2, summary_row3, summary_row4, header_row] + data_rows
 
             # Pad all rows to 17 columns
             for i, row in enumerate(all_rows):
@@ -340,6 +379,27 @@ async def main(args):
             # Clear and write
             ws.clear()
             ws.update(range_name="A1", values=all_rows)
+
+            # Format: title bold 14pt; summary rows with color by section; header bold
+            try:
+                ws.format("A1:Q1", {"textFormat": {"bold": True, "fontSize": 14},
+                                     "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
+                                     "horizontalAlignment": "LEFT"})
+                ws.format("A1:Q1", {"textFormat": {"foregroundColor": {"red": 1, "green": 1, "blue": 1}}})
+                # Summary section label column A — bold, color-coded
+                ws.format("A2:A5", {"textFormat": {"bold": True}})
+                ws.format("A2:Q2", {"backgroundColor": {"red": 0.90, "green": 0.96, "blue": 1.00}})  # occupancy - blue
+                ws.format("A3:Q3", {"backgroundColor": {"red": 0.95, "green": 0.95, "blue": 0.98}})  # buildings - grey
+                ws.format("A4:Q4", {"backgroundColor": {"red": 0.88, "green": 0.98, "blue": 0.88}})  # collection - green
+                ws.format("A5:Q5", {"backgroundColor": {"red": 1.00, "green": 0.96, "blue": 0.85}})  # status - amber
+                # Header row bold
+                ws.format("A6:Q6", {"textFormat": {"bold": True},
+                                     "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
+                                     "horizontalAlignment": "CENTER"})
+                ws.format("A6:Q6", {"textFormat": {"foregroundColor": {"red": 1, "green": 1, "blue": 1}}})
+                ws.freeze(rows=6)
+            except Exception as e:
+                print(f"  [warn] formatting failed: {e}")
             print(f"  [ok] Wrote {len(all_rows)} rows")
 
             # Summary rows already written correctly above — do NOT call

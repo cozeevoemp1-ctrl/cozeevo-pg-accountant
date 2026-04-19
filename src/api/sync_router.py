@@ -86,6 +86,20 @@ async def _run_sync() -> dict:
         result["msg"] = str(e)
         return result
 
+    # 3. Refresh DAY WISE tab
+    try:
+        await asyncio.to_thread(
+            subprocess.run,
+            ["venv/Scripts/python", "scripts/sync_daywise_from_db.py", "--write"],
+            capture_output=True, text=True, timeout=300,
+        )
+        logger.info("[SyncWebhook] DAY WISE sheet refreshed")
+    except Exception as e:
+        logger.exception("[SyncWebhook] Daywise refresh exception")
+        result["stage"] = "daywise"
+        result["msg"] = str(e)
+        return result
+
     result["ok"] = True
     result["stage"] = "complete"
     return result

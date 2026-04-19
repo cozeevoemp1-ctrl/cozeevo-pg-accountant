@@ -469,7 +469,15 @@ async def _overnight_source_sync() -> None:
              "--month", str(today.month), "--year", str(today.year), "--write"],
             capture_output=True, text=True, timeout=600,
         )
-        logger.info("[Scheduler] Overnight reconciliation complete — Operations sheet refreshed")
+        logger.info("[Scheduler] Operations sheet refreshed")
+
+        # 3. Re-sync DAY WISE tab
+        await asyncio.to_thread(
+            subprocess.run,
+            ["venv/Scripts/python", "scripts/sync_daywise_from_db.py", "--write"],
+            capture_output=True, text=True, timeout=300,
+        )
+        logger.info("[Scheduler] DAY WISE refreshed — overnight reconciliation complete")
     except Exception as e:
         logger.error("[Scheduler] Overnight source sync failed: %s", e)
 
