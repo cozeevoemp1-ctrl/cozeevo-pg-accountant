@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.34.1] — 2026-04-19 — Missing-resolver audit (Lokesh incident)
+
+### Fixed
+- `DEPOSIT_CHANGE_WHO` — numeric disambiguation ("1 or 2") silently killed pending. Resolver was never wired (pre-existing since `2959c0f`). Lokesh hit this in production 18:03 IST. Fix in commit `bcbccbf`.
+- `ROOM_TRANSFER_WHO` + `ROOM_TRANSFER_DEST` — same missing-resolver bug class; both saved via `_save_pending` but had no branch in `resolve_pending_action`. Extracted `_finalize_room_transfer()` helper to share the validate-destination/check-vacancy/save-confirm tail across all entry paths. Fix in commit `f977e7b`.
+- Both intents added to the cancel-list so "no" aborts cleanly.
+
+### Audit
+Grep of every `_save_pending(intent)` call vs every `pending.intent ==` resolver:
+- 33 intents saved. All 33 now have a resolver (owner_handler cascade × 29, chat_api early dispatch × 4).
+- Zero remaining gaps of the "save pending, never resolve" bug class.
+
+### Verification status
+Ran golden suite (73/100 pass) against live local API + TEST_MODE=1. 27 failures remain, of which 16 are state-management (correction_mid_flow × 7, state_guard × 6, ambiguous_name × 3). Same bug class as Lokesh's, but triggered by different handlers — scheduled for next session's triage (see `memory/project_pending_tasks.md` top section).
+
+### Lessons
+- Added `memory/feedback_pattern_generalize.md` — when one handler has bug X, grep for X across all handlers before claiming fix. Triggered by overclaim that "state management is there" when only 5 of ~33 intents were ported to the framework.
+
 ## [1.34.0] — 2026-04-19 — Owner PWA Foundation (Plan 1 · partial)
 
 ### Brainstorm → Spec → Plan
