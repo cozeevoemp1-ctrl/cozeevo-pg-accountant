@@ -2,6 +2,36 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.36.0] — 2026-04-19 — Editable onboarding review + Meta templates submitted
+
+### Added
+- **Editable review screen** (`static/admin_onboarding.html`). Pending-review sessions now render every KYC + financial field as an inline input (text / number / date / select). Yellow banner reminds the receptionist that changes are tracked.
+- **`overrides` parameter** on `POST /api/onboarding/{token}/approve`. 16 KYC + 5 financial keys supported; backend applies them to `Tenant` / `Tenancy` / `OnboardingSession` before creating records.
+- **Diff notification to tenant** — if the receptionist modifies any tenant-submitted value during review, a follow-up free-text WhatsApp message lists exactly the changed fields (old → new) with a call-receptionist fallback. Sent right after the booking-confirmation template so the 24-hr window is already open.
+- **AuditLog per overridden field** — `source="onboarding_review"`, `changed_by="receptionist"`, one entry per change, links to tenant / tenancy entity.
+- **`cozeevo_booking_confirmation` now 5 vars** — added Deposit as {{5}}. Code path at `src/api/onboarding_router.py::approve_session` passes both rent and deposit values.
+- **`WHATSAPP_WABA_ID=1026995743235229`** persisted to `.env` on both local and VPS.
+
+### Submitted to Meta (PENDING review)
+- `cozeevo_booking_confirmation` (Template ID `1303194515065555`) — 5 vars. NOTE: submitted body still has the old "rental agreement" line; once Meta approves, edit via `POST /v21.0/1303194515065555` with the corrected body in `docs/WHATSAPP_TEMPLATES.md`.
+- `cozeevo_checkout_confirmation` (Template ID `1313261294060481`) — 5 vars, review/return-visit messaging.
+- `cozeevo_payment_received` (Template ID `2454482531646516`) — 4 vars, no payment-mode, focuses on "paid this month" + balance.
+
+### Fixed
+- `approveSession()` in admin UI now harvests edited inputs via `collectOverrides(token)` helper and sends them in the approve POST body.
+
+### Commits
+- `a6afbfa` → `879f3bb` — one-shot WABA capture and cleanup
+- `b69e6cc` — editable review form + diff message
+
+### Still pending (next session)
+- Edit the live `cozeevo_booking_confirmation` body via API once Meta flips it to APPROVED (remove rental-agreement line; add call-receptionist number).
+- Wire `cozeevo_checkout_confirmation` into `_do_checkout`.
+- Wire `cozeevo_payment_received` into `_do_log_payment_by_ids`.
+- Field registry Phase 1 + 2 (`project_field_registry.md`).
+
+---
+
 ## [1.35.0] — 2026-04-19 — Systemic DB → Sheet invariant + architecture cleanup
 
 ### Added
