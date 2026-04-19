@@ -31,6 +31,9 @@ from src.database.models import (
     Tenancy, Tenant, Room, Property, TenancyStatus,
     RentSchedule, RentStatus, Payment, PaymentFor,
 )
+# Canonical column list (single source of truth). Row width and column
+# letters are derived from this — never hardcoded.
+from src.integrations.gsheets import MONTHLY_HEADERS
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 if DATABASE_URL.startswith("postgresql://"):
@@ -126,7 +129,9 @@ async def main(args):
         for rs in rs_rows:
             rent_map[rs.tenancy_id] = rs
 
-        # ── 3. Get RENT payments for this month (exclude deposit/booking/maintenance) ──
+        # ── 3. Get RENT payments for this month (exclude deposit/maintenance) ──
+        # Booking advances are also collected here only for tenants whose first
+        # month == this period, since the advance counts against first-month dues.
         payment_map = {}  # tenancy_id -> {cash, upi}
         pay_rows = (await session.execute(
             select(Payment).where(
@@ -143,6 +148,25 @@ async def main(args):
                 payment_map[p.tenancy_id]["upi"] += p.amount
             else:
                 payment_map[p.tenancy_id]["cash"] += p.amount
+
+        # Booking-advance payments — keyed by tenancy_id. Applied to first-month
+        # tenants only (decided in row builder below), so we fetch *all* booking
+        # payments and let the row builder decide whether they count for this tab.
+        booking_pay_map = {}  # tenancy_id -> {cash, upi}
+        booking_rows = (await session.execute(
+            select(Payment).where(
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.booking,
+            )
+        )).scalars().all()
+        for p in booking_rows:
+            if p.tenancy_id not in booking_pay_map:
+                booking_pay_map[p.tenancy_id] = {"cash": Decimal("0"), "upi": Decimal("0")}
+            mode = (p.payment_mode.value if hasattr(p.payment_mode, 'value') else str(p.payment_mode or "cash")).lower()
+            if mode in ("upi", "bank", "online", "neft", "imps"):
+                booking_pay_map[p.tenancy_id]["upi"] += p.amount
+            else:
+                booking_pay_map[p.tenancy_id]["cash"] += p.amount
 
         # ── 3b. Compute prev-month outstanding from DB (not sheet) ──
         prev_period = date(year - 1, 12, 1) if month == 1 else date(year, month - 1, 1)
@@ -195,6 +219,7 @@ async def main(args):
         # ── 4. Read existing Sheet to preserve any data not in DB ──
         from src.integrations.gsheets import _get_worksheet_sync
         import gspread
+        ncols = len(MONTHLY_HEADERS)
         try:
             ws = _get_worksheet_sync(tab_name)
             existing = ws.get_all_values()
@@ -202,33 +227,71 @@ async def main(args):
             # Auto-create tab if missing (new month rollover)
             from src.integrations.gsheets import _get_spreadsheet_sync
             ss = _get_spreadsheet_sync()
-            ws = ss.add_worksheet(title=tab_name, rows=300, cols=17)
+            ws = ss.add_worksheet(title=tab_name, rows=300, cols=ncols)
             print(f"  [new] Created tab '{tab_name}'")
             existing = []
 
-        # Build lookup from existing sheet: (room, name_lower) -> row data
-        sheet_lookup = {}
-        for row in existing[7:]:  # skip 7 header rows (title + 5 summary + column header)
-            if len(row) < 2 or not row[0] or not row[1]:
-                continue
-            key = (row[0].strip(), row[1].strip().lower())
-            sheet_lookup[key] = row
+        # Locate existing column-header row by finding "Room" in column A.
+        # Build (room, name_lower) -> {header_lower: cell_value} lookup so
+        # we can preserve fields by name even if column order changed.
+        existing_header_idx = None
+        for _idx in range(0, min(10, len(existing))):
+            if str(existing[_idx][0] if existing[_idx] else "").strip().lower() == "room":
+                existing_header_idx = _idx
+                break
+        existing_headers = (
+            [h.strip().lower() for h in existing[existing_header_idx]]
+            if existing_header_idx is not None else []
+        )
+        sheet_lookup: dict[tuple[str, str], dict[str, str]] = {}
+        if existing_header_idx is not None:
+            for row in existing[existing_header_idx + 1:]:
+                if len(row) < 2 or not row[0] or not row[1]:
+                    continue
+                key = (row[0].strip(), row[1].strip().lower())
+                sheet_lookup[key] = {
+                    h: (row[i] if i < len(row) else "")
+                    for i, h in enumerate(existing_headers) if h
+                }
 
-        # ── 5. Build new rows ──
+        # ── 5. Build new rows (header-keyed dicts → positional via MONTHLY_HEADERS) ──
         data_rows = []
         for tenancy, tenant, room, bldg in rows:
             rs = rent_map.get(tenancy.id)
             pays = payment_map.get(tenancy.id, {"cash": Decimal("0"), "upi": Decimal("0")})
 
-            # Rent due = rent only (maintenance never in dues, per memory rule)
-            rent_due = int((rs.rent_due or 0) + (rs.adjustment or 0)) if rs else int(tenancy.agreed_rent or 0)
+            # First-month detection: tenancy's checkin_date falls inside this period.
+            is_first_month = bool(
+                tenancy.checkin_date
+                and period <= tenancy.checkin_date < next_period
+            )
+
+            # Deposit (security deposit only — maintenance kept separate per memory rule).
+            deposit_amt = int(tenancy.security_deposit or 0)
+
+            # Rent due — base rent from rent_schedule, falls back to agreed_rent.
+            base_rent = int((rs.rent_due or 0) + (rs.adjustment or 0)) if rs else int(tenancy.agreed_rent or 0)
+            # First month: Rent Due = rent + deposit (the full first-month bill).
+            # Memory: feedback_deposit_dues_logic.md — enforced here AND in create_month.py.
+            rent_due = base_rent + deposit_amt if is_first_month else base_rent
+
             cash = int(pays["cash"])
             upi = int(pays["upi"])
+
+            # First month also gets the booking advance applied to Total Paid.
+            if is_first_month:
+                bk = booking_pay_map.get(tenancy.id, {"cash": Decimal("0"), "upi": Decimal("0")})
+                cash += int(bk["cash"])
+                upi += int(bk["upi"])
+
             total_paid = cash + upi
 
-            # Check existing sheet row for preserved data (notes, notice, entered-by)
+            # Existing-sheet preserved fields, looked up by header name (not position)
             key = (room.room_number, tenant.name.lower())
-            existing_row = sheet_lookup.get(key, [])
+            preserved = sheet_lookup.get(key, {})
+            notice = preserved.get("notice date", "")
+            existing_notes = preserved.get("notes", "")
+            entered = preserved.get("entered by", "")
 
             # Prev due from DB (previous month's unpaid rent), not from sheet
             prev_due_num = prev_due_map.get(tenancy.id, 0)
@@ -263,69 +326,79 @@ async def main(args):
 
             checkin_str = tenancy.checkin_date.strftime("%d/%m/%Y") if tenancy.checkin_date else ""
 
-            # Notice date from sheet
-            notice = ""
-            if existing_row and len(existing_row) > 12:
-                notice = existing_row[12]
+            # Auto-note for first month so receptionist sees the breakdown.
+            auto_note = (
+                f"First month: rent {base_rent:,} + deposit {deposit_amt:,}"
+                if is_first_month and deposit_amt > 0 else ""
+            )
+            if auto_note and existing_notes and auto_note not in existing_notes:
+                notes_val = f"{auto_note} | {existing_notes}"
+            else:
+                notes_val = existing_notes or auto_note
 
-            # Notes from sheet (prefer sheet, it may have manually added notes)
-            notes = ""
-            if existing_row and len(existing_row) > 14:
-                notes = existing_row[14]
-
-            entered = ""
-            if existing_row and len(existing_row) > 16:
-                entered = existing_row[16]
-
-            data_rows.append([
-                room.room_number,       # A: Room
-                tenant.name,            # B: Name
-                tenant.phone or "",     # C: Phone
-                bldg or "",             # D: Building
-                sharing,                # E: Sharing
-                rent_due,               # F: Rent Due
-                cash,                   # G: Cash
-                upi,                    # H: UPI
-                total_paid,             # I: Total Paid
-                balance,                # J: Balance
-                status,                 # K: Status
-                checkin_str,            # L: Check-in
-                notice,                 # M: Notice Date
-                event,                  # N: Event
-                notes,                  # O: Notes
-                prev_due,               # P: Prev Due
-                entered,                # Q: Entered By
-            ])
+            # Header-keyed value map. Final positional row built by walking MONTHLY_HEADERS.
+            row_map = {
+                "room": room.room_number,
+                "name": tenant.name,
+                "phone": tenant.phone or "",
+                "building": bldg or "",
+                "sharing": sharing,
+                "deposit": deposit_amt if deposit_amt else "",
+                "rent due": rent_due,
+                "cash": cash,
+                "upi": upi,
+                "total paid": total_paid,
+                "balance": balance,
+                "status": status,
+                "check-in": checkin_str,
+                "notice date": notice,
+                "event": event,
+                "notes": notes_val,
+                "prev due": prev_due,
+                "entered by": entered,
+            }
+            data_rows.append([row_map.get(h.strip().lower(), "") for h in MONTHLY_HEADERS])
 
         # No EXIT/CANCELLED rows carried forward — they belong in their exit month only.
 
         # ── 6. Build summary rows ──
-        active_rows = [r for r in data_rows if r[13] == "CHECKIN"]
-        noshow_rows = [r for r in data_rows if r[13] == "NO SHOW"]
-        exit_rows = [r for r in data_rows if r[13] == "EXIT"]
+        # Header-position lookup so column shifts don't break aggregation.
+        H = {h.strip().lower(): i for i, h in enumerate(MONTHLY_HEADERS)}
+        i_event = H["event"]
+        i_sharing = H["sharing"]
+        i_building = H["building"]
+        i_rent = H["rent due"]
+        i_prev = H["prev due"]
+        i_cash = H["cash"]
+        i_upi = H["upi"]
+        i_status = H["status"]
 
-        regular = sum(1 for r in active_rows if r[4] != "premium")
-        premium = sum(1 for r in active_rows if r[4] == "premium")
+        active_rows = [r for r in data_rows if r[i_event] == "CHECKIN"]
+        noshow_rows = [r for r in data_rows if r[i_event] == "NO SHOW"]
+        exit_rows = [r for r in data_rows if r[i_event] == "EXIT"]
+
+        regular = sum(1 for r in active_rows if r[i_sharing] != "premium")
+        premium = sum(1 for r in active_rows if r[i_sharing] == "premium")
         beds = regular + (premium * 2)
 
-        thor_t = sum(1 for r in active_rows if "THOR" in str(r[3]).upper())
-        hulk_t = sum(1 for r in active_rows if "HULK" in str(r[3]).upper())
-        thor_prem = sum(1 for r in active_rows if "THOR" in str(r[3]).upper() and r[4] == "premium")
-        hulk_prem = sum(1 for r in active_rows if "HULK" in str(r[3]).upper() and r[4] == "premium")
+        thor_t = sum(1 for r in active_rows if "THOR" in str(r[i_building]).upper())
+        hulk_t = sum(1 for r in active_rows if "HULK" in str(r[i_building]).upper())
+        thor_prem = sum(1 for r in active_rows if "THOR" in str(r[i_building]).upper() and r[i_sharing] == "premium")
+        hulk_prem = sum(1 for r in active_rows if "HULK" in str(r[i_building]).upper() and r[i_sharing] == "premium")
         thor_beds = (thor_t - thor_prem) + (thor_prem * 2)
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
-        # Billing and collection — rent only, all rows
-        total_rent_due = sum(pn(r[5]) for r in data_rows)
-        total_prev_due = sum(pn(r[15]) for r in data_rows)
-        total_cash = sum(pn(r[6]) for r in data_rows)
-        total_upi = sum(pn(r[7]) for r in data_rows)
+        # Billing and collection — Rent Due column already includes first-month deposit
+        total_rent_due = sum(pn(r[i_rent]) for r in data_rows)
+        total_prev_due = sum(pn(r[i_prev]) for r in data_rows)
+        total_cash = sum(pn(r[i_cash]) for r in data_rows)
+        total_upi = sum(pn(r[i_upi]) for r in data_rows)
         total_collected = total_cash + total_upi
         total_pending = max(0, total_rent_due + total_prev_due - total_collected)
 
-        paid_count = sum(1 for r in data_rows if r[10] == "PAID")
-        partial_count = sum(1 for r in data_rows if r[10] == "PARTIAL")
-        unpaid_count = sum(1 for r in data_rows if r[10] == "UNPAID")
+        paid_count = sum(1 for r in data_rows if r[i_status] == "PAID")
+        partial_count = sum(1 for r in data_rows if r[i_status] == "PARTIAL")
+        unpaid_count = sum(1 for r in data_rows if r[i_status] == "UNPAID")
 
         # Vacant beds
         total_rev_beds = (await session.execute(
@@ -350,7 +423,7 @@ async def main(args):
 
         # 5 summary rows. One cell = one metric. No merging.
         # Section label in col A, metrics in cols B onward.
-        def pad(cells, n=17):
+        def pad(cells, n=ncols):
             return cells + [""] * (n - len(cells))
 
         summary_row1 = pad([
@@ -388,11 +461,7 @@ async def main(args):
             f"Vacating next month: {exit_next_beds} beds",
         ])
 
-        header_row = [
-            "Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
-            "Cash", "UPI", "Total Paid", "Balance", "Status",
-            "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
-        ]
+        header_row = list(MONTHLY_HEADERS)
 
         # ── 7. Print summary ──
         print(f"\n=== Summary ===")
@@ -410,19 +479,23 @@ async def main(args):
             print(f"\nWriting {len(data_rows) + 6} rows to '{tab_name}'...")
 
             # Row 1: title | Rows 2-6: summary cards | Row 7: header | Rows 8+: data
-            title_row = [f"{MONTH_NAMES[month].title()} {year}"] + [""] * 16
+            title_row = [f"{MONTH_NAMES[month].title()} {year}"] + [""] * (ncols - 1)
             all_rows = [title_row, summary_row1, summary_row2, summary_row3,
                         summary_row4, summary_row5, header_row] + data_rows
 
-            # Pad all rows to 17 columns
+            # Pad all rows to the canonical column count
             for i, row in enumerate(all_rows):
-                while len(row) < 17:
+                while len(row) < ncols:
                     all_rows[i] = list(row) + [""]
+
+            # Last column letter derived from MONTHLY_HEADERS, no hardcoding.
+            import gspread.utils as _gsu
+            last_col = _gsu.rowcol_to_a1(1, ncols).rstrip("0123456789")
 
             # Clear, unmerge anything from previous runs, then write
             ws.clear()
             try:
-                ws.unmerge_cells("A1:Q6")
+                ws.unmerge_cells(f"A1:{last_col}6")
             except Exception:
                 pass
             ws.update(range_name="A1", values=all_rows)
@@ -430,8 +503,8 @@ async def main(args):
             # One-cell-per-value layout. No merging. Borders on each cell.
             try:
                 # Title row (row 1): centered bold banner — merge only this row
-                ws.merge_cells("A1:Q1")
-                ws.format("A1:Q1", {
+                ws.merge_cells(f"A1:{last_col}1")
+                ws.format(f"A1:{last_col}1", {
                     "textFormat": {"bold": True, "fontSize": 14,
                                    "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                     "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
@@ -442,11 +515,11 @@ async def main(args):
                 # Summary rows 2-6: each cell separate, color-coded per section,
                 # bold + light background. Non-empty cells get a visible border.
                 section_colors = [
-                    ("A2:Q2", {"red": 0.90, "green": 0.96, "blue": 1.00}),  # OCCUPANCY  - light blue
-                    ("A3:Q3", {"red": 0.95, "green": 0.95, "blue": 0.98}),  # BUILDINGS  - grey
-                    ("A4:Q4", {"red": 0.88, "green": 0.98, "blue": 0.88}),  # COLLECTION - light green
-                    ("A5:Q5", {"red": 1.00, "green": 0.96, "blue": 0.85}),  # STATUS     - amber
-                    ("A6:Q6", {"red": 0.98, "green": 0.92, "blue": 0.92}),  # NOTICE     - light pink
+                    (f"A2:{last_col}2", {"red": 0.90, "green": 0.96, "blue": 1.00}),  # OCCUPANCY  - light blue
+                    (f"A3:{last_col}3", {"red": 0.95, "green": 0.95, "blue": 0.98}),  # BUILDINGS  - grey
+                    (f"A4:{last_col}4", {"red": 0.88, "green": 0.98, "blue": 0.88}),  # COLLECTION - light green
+                    (f"A5:{last_col}5", {"red": 1.00, "green": 0.96, "blue": 0.85}),  # STATUS     - amber
+                    (f"A6:{last_col}6", {"red": 0.98, "green": 0.92, "blue": 0.92}),  # NOTICE     - light pink
                 ]
                 for rng, color in section_colors:
                     ws.format(rng, {
@@ -467,7 +540,7 @@ async def main(args):
                             "range": {
                                 "sheetId": sheet_id,
                                 "startRowIndex": 1, "endRowIndex": 6,
-                                "startColumnIndex": 0, "endColumnIndex": 17,
+                                "startColumnIndex": 0, "endColumnIndex": ncols,
                             },
                             "top": border_style,
                             "bottom": border_style,
@@ -480,7 +553,7 @@ async def main(args):
                 })
 
                 # Column header row (row 7)
-                ws.format("A7:Q7", {
+                ws.format(f"A7:{last_col}7", {
                     "textFormat": {"bold": True,
                                    "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                     "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},

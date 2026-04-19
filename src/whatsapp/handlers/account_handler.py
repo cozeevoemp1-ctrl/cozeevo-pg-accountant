@@ -793,6 +793,7 @@ async def _deposit_change(entities: dict, ctx: CallerContext, session: AsyncSess
 
 async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str, session: AsyncSession, changed_by: str = "system") -> str:
     from src.database.models import AuditLog
+    from src.integrations import gsheets as _gs
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
         return "Tenancy record not found."
@@ -815,6 +816,12 @@ async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str,
         room_number=room_number or None,
         source="whatsapp",
     ))
+
+    # Mirror change into the current monthly sheet tab (Deposit + recalculated
+    # first-month Rent Due). Subprocess startup outpaces caller's commit, so by
+    # the time the sync queries the DB the change is visible.
+    today = date.today()
+    _gs.trigger_monthly_sheet_sync(today.month, today.year)
 
     return f"Deposit updated — *{tenant_name}* ₹{new_amount:,}"
 
@@ -1246,6 +1253,7 @@ async def _do_rent_change(
     reason: str,
     session: AsyncSession,
 ) -> str:
+    from src.integrations import gsheets as _gs
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
         return "Tenancy record not found."
@@ -1254,6 +1262,15 @@ async def _do_rent_change(
         period_month = date.fromisoformat(month_str) if month_str else date.today().replace(day=1)
     except ValueError:
         period_month = date.today().replace(day=1)
+
+    # Mirror change into the affected month's sheet tab + current month if
+    # the change is permanent (so future months reflect the new base rent
+    # whenever they're regenerated). Fired after function body returns.
+    def _queue_sheet_sync():
+        _gs.trigger_monthly_sheet_sync(period_month.month, period_month.year)
+        today = date.today()
+        if permanent and (today.year, today.month) != (period_month.year, period_month.month):
+            _gs.trigger_monthly_sheet_sync(today.month, today.year)
 
     if is_discount:
         rs = await session.scalar(
@@ -1276,11 +1293,13 @@ async def _do_rent_change(
             ))
         if permanent:
             tenancy.agreed_rent = (tenancy.agreed_rent or Decimal("0")) - Decimal(str(new_amount))
+            _queue_sheet_sync()
             return (
                 f"*Permanent concession applied — {tenant_name}*\n"
                 f"Rent reduced by Rs.{int(new_amount):,} every month.\n"
                 f"New rent: Rs.{int(tenancy.agreed_rent):,}/month"
             )
+        _queue_sheet_sync()
         return (
             f"*Concession applied — {tenant_name}*\n"
             f"Rs.{int(new_amount):,} off for {period_month.strftime('%b %Y')} only.\n"
@@ -1306,11 +1325,13 @@ async def _do_rent_change(
             ))
         if permanent:
             tenancy.agreed_rent = Decimal(str(new_amount))
+            _queue_sheet_sync()
             return (
                 f"*Rent updated — {tenant_name}*\n"
                 f"Was: Rs.{old_rent:,}/month\n"
                 f"Now: Rs.{int(new_amount):,}/month (permanent from {period_month.strftime('%b %Y')})"
             )
+        _queue_sheet_sync()
         return (
             f"*One-time rent change — {tenant_name}*\n"
             f"Rs.{int(new_amount):,} for {period_month.strftime('%b %Y')} only.\n"

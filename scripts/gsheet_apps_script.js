@@ -94,12 +94,27 @@ function onSheetEdit(e) {
         refreshDashboardContent_();
       }
     } else if (MONTH_TAB_RE.test(name.toUpperCase())) {
+      // New layout (sync_sheet_from_db.py) puts header at row 7, with 5
+      // summary cards at rows 2-6. The legacy updateMonthSummary writes to
+      // rows 2-3 — skip it on the new layout to avoid corrupting cards.
+      if (!isLegacyLayout_(sheet)) return;
       updateMonthSummary(sheet);
       refreshDashboardContent_();
     } else if (name === "TENANTS") {
       refreshDashboard();
     }
   } catch (err) { }
+}
+
+// Returns true only if the tab uses the OLD 4-row-header layout. The new
+// sync_sheet_from_db.py layout has "Room" header at row 7, not row 4.
+function isLegacyLayout_(sheet) {
+  try {
+    const r4a = String(sheet.getRange("A4").getValue() || "").trim().toLowerCase();
+    return r4a === "room";
+  } catch (err) {
+    return false;
+  }
 }
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────

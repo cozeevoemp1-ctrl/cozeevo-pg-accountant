@@ -73,7 +73,7 @@ MONTH_NAMES = [
 # Reads detect old vs new format by checking headers, never assume positions.
 
 MONTHLY_HEADERS = [
-    "Room", "Name", "Phone", "Building", "Sharing", "Rent Due",
+    "Room", "Name", "Phone", "Building", "Sharing", "Deposit", "Rent Due",
     "Cash", "UPI", "Total Paid", "Balance", "Status",
     "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
 ]
@@ -124,6 +124,7 @@ M_NAME = _M["M_NAME"]
 M_PHONE = _M["M_PHONE"]
 M_BUILDING = _M["M_BUILDING"]
 M_SHARING = _M["M_SHARING"]
+M_DEPOSIT = _M["M_DEPOSIT"]
 M_RENT_DUE = _M["M_RENT_DUE"]
 M_CASH = _M["M_CASH"]
 M_UPI = _M["M_UPI"]
@@ -626,8 +627,14 @@ def _refresh_summary_sync(tab_name: str) -> None:
             n = float(n or 0)
             return f"{n/100000:.2f}L" if abs(n) >= 100000 else f"{int(n):,}"
 
-        last_col = "Q" if is_new else "O"
-        num_cols = 17 if is_new else 15
+        # New layout uses canonical MONTHLY_HEADERS (header-driven, no hardcoding).
+        # Old layout was a fixed 15-column legacy format.
+        if is_new:
+            num_cols = len(MONTHLY_HEADERS)
+            last_col = gspread.utils.rowcol_to_a1(1, num_cols).rstrip("0123456789")
+        else:
+            num_cols = 15
+            last_col = "O"
 
         # 5-row labeled summary (matches sync_sheet_from_db.py layout).
         # Each cell is independent so users can click/copy values.
@@ -1019,9 +1026,17 @@ def _add_tenant_sync(
             logger.warning("GSheets: %s", result["error"])
             return result
 
-        # Header-based mapping for monthly tab (same approach as TENANTS)
+        # Header-based mapping for monthly tab (same approach as TENANTS).
+        # Locate the column-header row by finding "Room" in column A —
+        # works for both old layout (row 4) and new sync_sheet_from_db
+        # layout (row 7) without hardcoding.
         all_vals = monthly_ws.get_all_values()
-        header_row = all_vals[3] if len(all_vals) > 3 else []
+        header_row_idx = None
+        for _idx in range(0, min(10, len(all_vals))):
+            if str(all_vals[_idx][0] if all_vals[_idx] else "").strip().lower() == "room":
+                header_row_idx = _idx
+                break
+        header_row = all_vals[header_row_idx] if header_row_idx is not None else []
         m_headers = [h.strip().lower() for h in header_row]
 
         # Advance payment: put in Cash or UPI column based on mode
@@ -1039,6 +1054,7 @@ def _add_tenant_sync(
             "phone": phone_txt,
             "building": building,
             "sharing": sharing,
+            "deposit": int(deposit) if deposit else "",
             "rent due": first_month_total,
             "rent": first_month_total,
             "cash": adv_cash,
@@ -1051,7 +1067,7 @@ def _add_tenant_sync(
             "check in": checkin_display,
             "notice date": "",
             "event": "CHECKIN",
-            "notes": (notes + " | " if notes else "") + (f"Deposit due: Rs.{int(deposit):,}" if deposit > 0 else ""),
+            "notes": (notes + " | " if notes else "") + (f"First month: rent {int(agreed_rent):,} + deposit {int(deposit):,}" if deposit > 0 else ""),
             "prev due": 0,
             "entered by": entered_by,
         }
@@ -1788,6 +1804,8 @@ async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:
 _FIELD_TO_COL = {
     "sharing_type": M_SHARING,
     "sharing": M_SHARING,
+    "deposit": M_DEPOSIT,
+    "security_deposit": M_DEPOSIT,
     "agreed_rent": M_RENT_DUE,
     "rent": M_RENT_DUE,
     "phone": M_PHONE,
@@ -1870,3 +1888,36 @@ async def update_tenant_field(
     return await asyncio.to_thread(
         _update_tenant_field_sync, room_number, tenant_name, field, new_value, tab_name,
     )
+
+
+def trigger_monthly_sheet_sync(month: int, year: int) -> None:
+    """
+    Fire `scripts/sync_sheet_from_db.py --month M --year Y --write` in the
+    background. Project root + python interpreter resolved from runtime so it
+    works locally and on the VPS without hardcoded paths.
+
+    Fire-and-forget — never raises. Used after deposit/rent/field changes so
+    the monthly tab summary reflects DB state without waiting for the cron.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    try:
+        project_root = Path(__file__).resolve().parents[2]
+        script = project_root / "scripts" / "sync_sheet_from_db.py"
+        if not script.exists():
+            logger.warning("trigger_monthly_sheet_sync: script not found at %s", script)
+            return
+        # sys.executable is the running interpreter (venv on both local + VPS)
+        subprocess.Popen(
+            [sys.executable, str(script),
+             "--month", str(month), "--year", str(year), "--write"],
+            cwd=str(project_root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+        logger.info("trigger_monthly_sheet_sync: queued sync for %02d/%d", month, year)
+    except Exception as e:
+        logger.warning("trigger_monthly_sheet_sync failed: %s", e)
