@@ -60,6 +60,8 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
     ("tenants", "educational_qualification",      "VARCHAR(120)"),
     ("tenants", "office_address",                 "TEXT"),
     ("tenants", "office_phone",                   "VARCHAR(20)"),
+    # Staff→room assignment (added 2026-04-20)
+    ("staff",   "room_id",                        "INTEGER REFERENCES rooms(id)"),
 ]
 
 # -- Tables to create if missing -----------------------------------------------
@@ -982,7 +984,10 @@ async def run_add_org_id_2026_04_19(conn) -> None:
     Here we replicate the same idempotent DDL directly on the async connection.
     """
     print("\n-- Add org_id to multi-tenant tables (2026-04-19) --")
-    from database.migrations.add_org_id_2026_04_19 import TABLES
+    try:
+        from src.database.migrations.add_org_id_2026_04_19 import TABLES
+    except ImportError:
+        from database.migrations.add_org_id_2026_04_19 import TABLES  # VPS import path
 
     for table in TABLES:
         # Skip if table doesn't exist
@@ -1011,6 +1016,29 @@ async def run_add_org_id_2026_04_19(conn) -> None:
         ))
 
     print("  [ok] org_id migration complete")
+
+
+async def run_add_staff_room_id_2026_04_20(conn) -> None:
+    """Add staff.room_id FK so staff can be linked to the room they live in.
+    Added 2026-04-20. Many staff can share one room — no max_occupancy / sharing cap."""
+    print("\n-- Add staff.room_id (2026-04-20) --")
+
+    has_col = await conn.execute(text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name='staff' AND column_name='room_id'"
+    ))
+    if has_col.fetchone():
+        print("  [skip] staff.room_id already exists")
+    else:
+        await conn.execute(text(
+            "ALTER TABLE staff ADD COLUMN room_id INTEGER REFERENCES rooms(id)"
+        ))
+        print("  [added] staff.room_id")
+
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_staff_room_id ON staff(room_id)"
+    ))
+    print("  [ok] staff.room_id migration complete")
 
 
 async def run_unhandled_requests_table(conn) -> None:
@@ -1149,6 +1177,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_unhandled_requests_table(conn)
             await run_extend_onboarding_sessions(conn)
             await run_add_org_id_2026_04_19(conn)
+            await run_add_staff_room_id_2026_04_20(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

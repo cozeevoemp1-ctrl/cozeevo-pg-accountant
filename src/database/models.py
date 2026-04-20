@@ -323,6 +323,7 @@ class Staff(Base):
 
     id          = Column(Integer, primary_key=True)
     property_id = Column(Integer, ForeignKey("properties.id"))
+    room_id     = Column(Integer, ForeignKey("rooms.id"), nullable=True)  # room the staff lives in
     name        = Column(String(120), nullable=False)
     phone       = Column(String(20))
     role        = Column(String(60))     # Manager / Housekeeping / Security
@@ -331,6 +332,7 @@ class Staff(Base):
     active      = Column(Boolean, default=True)
 
     property  = relationship("Property", back_populates="staff")
+    room      = relationship("Room", foreign_keys=[room_id])
     tenancies = relationship("Tenancy", back_populates="assigned_staff")
     payments  = relationship("Payment", back_populates="received_by_staff")
     refunds   = relationship("Refund", back_populates="processed_by_staff")
