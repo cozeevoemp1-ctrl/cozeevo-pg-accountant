@@ -750,7 +750,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
             gsheet_kwargs = dict(
                 room_number=room.room_number, name=td["name"], phone=phone_sheet,
                 gender=td.get("gender", ""), building=building,
-                floor=str(room.floor or ""), sharing=sharing,
+                floor=str(room.floor or ""), sharing=effective_sharing or sharing,
                 checkin=checkin.strftime("%d/%m/%Y"),
                 agreed_rent=float(obs.agreed_rent or 0), deposit=float(obs.security_deposit or 0),
                 booking=float(obs.booking_amount or 0), maintenance=float(obs.maintenance_fee or 0),
