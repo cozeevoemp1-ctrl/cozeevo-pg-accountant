@@ -3576,6 +3576,65 @@ async def _do_checkout(
             except Exception:
                 pass
 
+    # ── Checkout confirmation WhatsApp template (fire-and-forget) ──
+    # Template: cozeevo_checkout_confirmation — 5 vars
+    # Falls back to free-text inside the 24-hr session window if PENDING.
+    try:
+        tenant_obj = await session.get(Tenant, tenancy.tenant_id)
+        tenant_phone = (tenant_obj.phone or "").strip() if tenant_obj else ""
+        if tenant_phone:
+            phone_wa = tenant_phone.lstrip("+").replace(" ", "")
+            if not phone_wa.startswith("91"):
+                phone_wa = "91" + phone_wa
+            room_str = room_obj.room_number if room_obj else "-"
+            date_str = checkout_date_val.strftime("%d %b %Y")
+            if net > 0:
+                refund_str = f"Rs.{int(net):,}"
+                balance_str = "Rs.0 (settled)"
+            elif net == 0:
+                refund_str = "Rs.0"
+                balance_str = "Rs.0 (settled)"
+            else:
+                refund_str = "Rs.0"
+                balance_str = f"Rs.{int(abs(net)):,}"
+
+            async def _send_checkout_msg() -> None:
+                try:
+                    from src.whatsapp.webhook_handler import (
+                        _send_whatsapp_template, _send_whatsapp,
+                    )
+                    tpl_sent = await _send_whatsapp_template(
+                        phone_wa,
+                        "cozeevo_checkout_confirmation",
+                        [tenant_name, room_str, date_str, refund_str, balance_str],
+                    )
+                    if not tpl_sent:
+                        await _send_whatsapp(
+                            phone_wa,
+                            f"Hi {tenant_name}, your check-out is recorded.\n\n"
+                            f"Room: {room_str}\n"
+                            f"Checkout date: {date_str}\n"
+                            f"Deposit refund: {refund_str}\n"
+                            f"Final balance: {balance_str}\n\n"
+                            f"Thank you for staying with Cozeevo — it was a pleasure having you. "
+                            f"If you enjoyed your stay, we'd love a quick review and a recommendation "
+                            f"to friends. And whenever you're in town again, our doors are open to "
+                            f"welcome you back.",
+                            intent="CHECKOUT_CONFIRMATION",
+                        )
+                except Exception as _e:
+                    import logging as _log
+                    _log.getLogger(__name__).warning(
+                        "Checkout confirmation send failed: %s", _e
+                    )
+
+            asyncio.create_task(_send_checkout_msg())
+    except Exception as _e:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "Checkout confirmation prep failed: %s", _e
+        )
+
     return (
         f"*Checkout recorded — {tenant_name}*\n"
         f"Date: {checkout_date_val.strftime('%d %b %Y')}"

@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.37.0] — 2026-04-20 — Checkout + Payment WhatsApp templates wired
+
+### Added
+- **`cozeevo_checkout_confirmation` wired into `_do_checkout`** (`src/whatsapp/handlers/owner_handler.py`). Fires template with 5 vars (name, room, checkout date, deposit refund, final balance) as a fire-and-forget `asyncio.create_task`; falls back to free-text inside the 24-hr window if template still PENDING at Meta. Net settlement drives `refund` / `balance` formatting — settled case shows `Rs.0 (settled)`.
+- **`cozeevo_payment_received` wired into `_do_log_payment_by_ids`** (`src/whatsapp/handlers/account_handler.py`). Fires template with 4 vars (name, period label e.g. "April 2026 rent", paid this month so far, balance remaining) right after the sheet write-back. Balance ≤ 0 renders as `Rs.0 (paid in full)`. Payment mode intentionally omitted — tenants only care about month-paid + balance.
+
+### Status
+- All 3 templates (`cozeevo_booking_confirmation`, `cozeevo_checkout_confirmation`, `cozeevo_payment_received`) still PENDING at Meta (~15-60 min typical, submitted 2026-04-19). Free-text fallbacks keep existing 24-hr-window sends working until approval flips.
+
+### Still pending
+- Edit the live `cozeevo_booking_confirmation` body via API once Meta flips it to APPROVED (remove rental-agreement line; add call-receptionist number).
+- Field registry Phase 1 + 2 (`project_field_registry.md`).
+- 16 state-management golden failures (from previous session).
+
+---
+
 ## [1.36.0] — 2026-04-19 — Editable onboarding review + Meta templates submitted
 
 ### Added

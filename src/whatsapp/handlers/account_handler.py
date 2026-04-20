@@ -457,6 +457,51 @@ async def _do_log_payment_by_ids(
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
 
+    # ── Payment-received WhatsApp template (fire-and-forget) ──
+    # Template: cozeevo_payment_received — 4 vars (no payment mode)
+    # Falls back to free-text inside the 24-hr session window if PENDING.
+    tenant_phone = (tenant.phone or "").strip()
+    if tenant_phone:
+        phone_wa = tenant_phone.lstrip("+").replace(" ", "")
+        if not phone_wa.startswith("91"):
+            phone_wa = "91" + phone_wa
+        period_label = f"{period_month.strftime('%B %Y')} rent"
+        paid_so_far_str = f"Rs.{int(total_paid):,}"
+        bal = effective_due - total_paid
+        if bal <= Decimal("0"):
+            balance_str = "Rs.0 (paid in full)"
+        else:
+            balance_str = f"Rs.{int(bal):,}"
+        tenant_name_snap = tenant.name
+
+        async def _send_payment_msg() -> None:
+            try:
+                from src.whatsapp.webhook_handler import (
+                    _send_whatsapp_template, _send_whatsapp,
+                )
+                tpl_sent = await _send_whatsapp_template(
+                    phone_wa,
+                    "cozeevo_payment_received",
+                    [tenant_name_snap, period_label, paid_so_far_str, balance_str],
+                )
+                if not tpl_sent:
+                    await _send_whatsapp(
+                        phone_wa,
+                        f"Hi {tenant_name_snap}, payment received — thank you.\n\n"
+                        f"Towards: {period_label}\n"
+                        f"Paid this month so far: {paid_so_far_str}\n"
+                        f"Balance remaining: {balance_str}\n\n"
+                        f"— Cozeevo Help Desk",
+                        intent="PAYMENT_RECEIVED",
+                    )
+            except Exception as _e:
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "Payment-received send failed: %s", _e
+                )
+
+        _aio.create_task(_send_payment_msg())
+
     return (
         f"*Payment logged — {tenant.name}{room_label}*\n"
         f"Amount: Rs.{int(amount_dec):,} ({mode.upper()})\n"
