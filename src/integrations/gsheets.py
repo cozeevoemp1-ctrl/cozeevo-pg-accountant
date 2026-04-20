@@ -1631,6 +1631,7 @@ def _update_checkin_sync(room_number: str, tenant_name: str, new_checkin: str) -
                 is_new = "phone" in str(header_row[2] if len(header_row) > 2 else "").lower()
                 col_checkin = M_CHECKIN if is_new else 10  # old format
 
+                updated_here = False
                 for j in range(data_start, len(all_vals)):
                     r = all_vals[j]
                     if not r or not r[0] or len(r) < 2:
@@ -1640,7 +1641,13 @@ def _update_checkin_sync(room_number: str, tenant_name: str, new_checkin: str) -
                         cell = gspread.utils.rowcol_to_a1(j + 1, col_checkin + 1)
                         ws.update(values=[[checkin_display]], range_name=cell, value_input_option="USER_ENTERED")
                         logger.info("GSheets: updated checkin in '%s' row %d", tab, j + 1)
+                        updated_here = True
                         break
+                if updated_here:
+                    try:
+                        _refresh_summary_sync(tab)
+                    except Exception as _re:
+                        logger.warning("GSheets: summary refresh after checkin change on %s failed: %s", tab, _re)
             except Exception:
                 continue
 
@@ -1906,6 +1913,14 @@ def _update_tenant_field_sync(
         ws.update_cell(target_row, col_idx + 1, new_value)  # gspread is 1-based
         result["success"] = True
         logger.info(f"[GSheets] Updated {tenant_name} row {target_row}: {field} = {new_value} on {tab_name}")
+
+        # Dashboard banner (Active / Beds / Vacant / Occupancy / per-row
+        # Balance / Status) must reflect this write — API cell writes don't
+        # fire the Apps Script onEdit trigger, so refresh it from here.
+        try:
+            _refresh_summary_sync(tab_name)
+        except Exception as _re:
+            logger.warning(f"[GSheets] Summary refresh after {field} on {tab_name} failed: {_re}")
 
     except Exception as e:
         result["error"] = str(e)
@@ -2238,6 +2253,10 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
                     result["monthly_written"] = len(batch)
                     logger.info("sync_tenant_all_fields: %s — wrote %d cells for %s",
                                 tab_name, len(batch), tenant.name)
+                    try:
+                        _refresh_summary_sync(tab_name)
+                    except Exception as _re:
+                        logger.warning("sync_tenant_all_fields: summary refresh on %s failed: %s", tab_name, _re)
     except Exception as e:
         logger.warning("sync_tenant_all_fields: monthly write failed: %s", e)
 
