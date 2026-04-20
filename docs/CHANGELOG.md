@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.38.0] — 2026-04-20 — Field registry (Phase 1) + refund audit gap closed
+
+### Added
+- **`src/database/field_registry.py`** — single-source-of-truth `FIELDS` tuple of `Field(key, display, source, db_attr, tenants_header, monthly_header, type, options, editable_via_bot, editable_via_form, aliases)` covering every tenant + tenancy attribute visible to the receptionist. 40+ entries. Drives sheet headers, bot→sheet field maps, and (next phase) the `/api/v2/app/field-registry` endpoint for PWA form generation.
+- **Derivation helpers** in the registry: `monthly_headers()`, `tenants_headers()`, `tenants_field_to_header()`, `field_to_col()`, `fields_for_pwa()`.
+- **Emergency Contact split** — new TENANTS column `"Emergency Contact Phone"` (additive, positioned immediately after `"Emergency Contact"`). `emergency_contact_name` now feeds the legacy `"Emergency Contact"` column (name only; phone moves to new column). Sheet-side change required: add the new column header manually in TENANTS tab — sync skips missing headers gracefully until then.
+- **Refund audit gap closed** — `sync_tenant_all_fields` now loads the latest `Refund` row per tenancy and populates `"Refund Status"` + `"Refund Amount"` on the TENANTS tab. Previously those cells stayed blank after any DB mutation even though the columns existed.
+- **10 parity + invariant tests** (`tests/test_field_registry.py`) locking in derived outputs against the prior hardcoded constants, uniqueness of keys/headers, and required `db_attr` / `options` on non-computed / select fields.
+
+### Changed
+- `src/integrations/gsheets.py`: `MONTHLY_HEADERS`, `TENANTS_HEADERS`, `_TENANTS_FIELD_TO_HEADER`, `_FIELD_TO_COL` now derive from the registry (previously 30+ lines of hardcoded literals). Positional column indices `T_REFUND_STATUS` / `T_REFUND_AMOUNT` / `M_*` unchanged so callers in `owner_handler.py` (refund write path at line 4289) keep working.
+- TENANTS tab now has 35 headers (was 34) — single additive column.
+
+### Fixed
+- `sync_tenant_all_fields`: `"Emergency Contact"` column was using name-or-phone fallback which conflated two distinct attributes. Now strictly populates name only; phone routes to the dedicated new column.
+
+### Still pending
+- Edit `cozeevo_booking_confirmation` body via API once Meta flips it to APPROVED.
+- Phase 2 of the registry: `GET /api/v2/app/field-registry` endpoint (~30 min).
+- 16 state-management golden failures (from prior session).
+
+---
+
 ## [1.37.0] — 2026-04-20 — Checkout + Payment WhatsApp templates wired
 
 ### Added

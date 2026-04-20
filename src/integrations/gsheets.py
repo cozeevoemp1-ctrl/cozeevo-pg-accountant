@@ -68,26 +68,21 @@ MONTH_NAMES = [
     "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER",
 ]
 
-# -- Canonical header lists (single source of truth for column ordering) --------
-# All writes use header-based mapping. These lists define the expected headers.
-# Reads detect old vs new format by checking headers, never assume positions.
+# -- Canonical header lists — derived from src/database/field_registry.py --------
+# Every header and the bot→sheet field-name map come from FIELDS, so
+# adding a field server-side auto-appears in the PWA, the onboarding form,
+# and the Apps Script dashboard without duplicated hardcoded lists.
+# All writes use header-based mapping.
 
-MONTHLY_HEADERS = [
-    "Room", "Name", "Phone", "Building", "Sharing", "Rent", "Deposit", "Rent Due",
-    "Cash", "UPI", "Total Paid", "Balance", "Status",
-    "Check-in", "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
-]
+from src.database.field_registry import (
+    monthly_headers as _monthly_headers,
+    tenants_headers as _tenants_headers,
+    tenants_field_to_header as _tenants_field_to_header,
+    field_to_col as _field_to_col,
+)
 
-TENANTS_HEADERS = [
-    "Room", "Name", "Phone", "Gender", "Building", "Floor",
-    "Sharing", "Check-in", "Status", "Agreed Rent", "Deposit",
-    "Booking", "Maintenance", "Notice Date", "Expected Exit", "Checkout Date",
-    "Refund Status", "Refund Amount",
-    "DOB", "Father Name", "Father Phone", "Address",
-    "Emergency Contact", "Emergency Relationship", "Email",
-    "Occupation", "Education", "Office Address", "Office Phone",
-    "ID Type", "ID Number", "Food Pref", "Notes", "Event",
-]
+MONTHLY_HEADERS = _monthly_headers()
+TENANTS_HEADERS = _tenants_headers()
 
 
 def _header_index(headers: list[str], name: str) -> int:
@@ -1846,17 +1841,9 @@ async def get_sheet(tab_name: Optional[str] = None) -> gspread.Worksheet:
 
 # ── Field-to-column map for monthly tab (uses M_* constants from top of file) ──
 
-_FIELD_TO_COL = {
-    "sharing_type": M_SHARING,
-    "sharing": M_SHARING,
-    "deposit": M_DEPOSIT,
-    "security_deposit": M_DEPOSIT,
-    "agreed_rent": M_RENT,
-    "rent": M_RENT,
-    "phone": M_PHONE,
-    "notes": M_NOTES,
-    "status": M_STATUS,
-}
+# Derived from field registry — any field with a monthly_header becomes
+# addressable here. Previously hardcoded; see src/database/field_registry.py.
+_FIELD_TO_COL = _field_to_col()
 
 
 def _update_tenant_field_sync(
@@ -1942,31 +1929,10 @@ async def update_tenant_field(
 
 # ── Generic TENANTS-master-tab field update ───────────────────────────────────
 # Maps short field names used by handlers to TENANTS_HEADERS column names.
+# Derived from field registry — adding a Field with a tenants_header auto
+# exposes it here (plus any declared aliases).
 # Lookup is case-insensitive — keys must be lowercase.
-_TENANTS_FIELD_TO_HEADER = {
-    "room": "Room",
-    "room_number": "Room",
-    "deposit": "Deposit",
-    "security_deposit": "Deposit",
-    "agreed_rent": "Agreed Rent",
-    "rent": "Agreed Rent",
-    "maintenance": "Maintenance",
-    "maintenance_fee": "Maintenance",
-    "booking": "Booking",
-    "booking_amount": "Booking",
-    "sharing": "Sharing",
-    "sharing_type": "Sharing",
-    "phone": "Phone",
-    "status": "Status",
-    "notice_date": "Notice Date",
-    "expected_exit": "Expected Exit",
-    "expected_checkout": "Expected Exit",
-    "checkout_date": "Checkout Date",
-    "notes": "Notes",
-    "gender": "Gender",
-    "food_pref": "Food Pref",
-    "food_preference": "Food Pref",
-}
+_TENANTS_FIELD_TO_HEADER = _tenants_field_to_header()
 
 
 def _update_tenants_tab_field_sync(
@@ -2078,6 +2044,7 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
         from src.database.models import (
             Tenant as _Tenant, Tenancy as _Tenancy, Room as _Room,
             Property as _Property, TenancyStatus as _TS,
+            Refund as _Refund,
         )
         db_url = _os.environ.get("DATABASE_URL", "")
         if db_url.startswith("postgresql+asyncpg://"):
@@ -2098,6 +2065,14 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
             ).order_by(_Tenancy.created_at.desc()))
             room = s.get(_Room, tenancy.room_id) if tenancy and tenancy.room_id else None
             prop = s.get(_Property, room.property_id) if room and room.property_id else None
+            # Latest refund for this tenancy — drives TENANTS.Refund Status / Amount.
+            latest_refund = None
+            if tenancy:
+                latest_refund = s.scalar(
+                    _sel(_Refund)
+                    .where(_Refund.tenancy_id == tenancy.id)
+                    .order_by(_Refund.created_at.desc())
+                )
 
         engine.dispose()
     except Exception as e:
@@ -2121,6 +2096,12 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
         return v.value if hasattr(v, "value") else (v or "")
 
     # ── Build TENANTS tab row values keyed by header name ─────────────────
+    refund_status_val = ""
+    refund_amount_val: int | str = ""
+    if latest_refund is not None:
+        refund_status_val = _enum_str(latest_refund.status) or ""
+        refund_amount_val = int(latest_refund.amount or 0)
+
     tenants_row = {
         "room": room.room_number,
         "name": tenant.name or "",
@@ -2138,11 +2119,18 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
         "notice date": _date_str(tenancy.notice_date),
         "expected exit": _date_str(tenancy.expected_checkout),
         "checkout date": _date_str(tenancy.checkout_date),
+        "refund status": refund_status_val,
+        "refund amount": refund_amount_val,
         "dob": _date_str(tenant.date_of_birth),
         "father name": tenant.father_name or "",
         "father phone": tenant.father_phone or "",
         "address": tenant.permanent_address or "",
-        "emergency contact": tenant.emergency_contact_name or tenant.emergency_contact_phone or "",
+        # Split emergency-contact into separate name + phone cells.
+        # "Emergency Contact" stays (legacy column) → name only.
+        # "Emergency Contact Phone" is additive — populated once present
+        # in the TENANTS sheet header row.
+        "emergency contact": tenant.emergency_contact_name or "",
+        "emergency contact phone": tenant.emergency_contact_phone or "",
         "emergency relationship": tenant.emergency_contact_relationship or "",
         "email": tenant.email or "",
         "occupation": tenant.occupation or "",
