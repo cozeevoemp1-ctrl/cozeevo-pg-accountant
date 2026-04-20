@@ -41,11 +41,12 @@ from sqlalchemy import select, delete, text
 from src.database.db_manager import init_db, get_session
 from src.database.models import PendingAction
 from src.whatsapp.role_service import CallerContext, _normalize
-from src.whatsapp.intent_detector import detect_intent, _extract_entities
+from src.whatsapp.intent_detector import detect_intent
 from src.whatsapp.gatekeeper import route
 
 
 ADMIN_PHONE = os.getenv("TEST_ADMIN_PHONE", "+917845952289")  # Kiran
+_CANCEL_WORDS = {"cancel", "stop", "abort", "quit", "nevermind", "never mind"}
 
 
 async def _purge_pending(phone_norm: str) -> None:
@@ -98,14 +99,37 @@ async def _pick_unique_tenant() -> tuple[str, str, str]:
 
 
 async def _send(ctx: CallerContext, message: str) -> str:
-    intent, conf, _ = detect_intent(message)
-    entities = _extract_entities(message, intent) if intent else {}
-    entities["_raw_message"] = message
+    """Mirror chat_api: run pending resolver first; else detect intent + route."""
+    from src.whatsapp.chat_api import _get_active_pending
+    from src.whatsapp.handlers.owner_handler import resolve_pending_action
     try:
-        reply = await route(ctx, message, intent, entities)
+        async with get_session() as s:
+            pending = await _get_active_pending(ctx.phone, s)
+            if pending and not pending.resolved:
+                try:
+                    resolved = await resolve_pending_action(pending, message, s)
+                except Exception as e:
+                    await s.rollback()
+                    return f"__ERROR__ resolver {type(e).__name__}: {e}"
+                if resolved:
+                    if resolved.startswith("__KEEP_PENDING__"):
+                        await s.commit()
+                        return resolved[len("__KEEP_PENDING__"):]
+                    pending.resolved = True
+                    await s.commit()
+                    return resolved
+                if message.strip().lower() in _CANCEL_WORDS:
+                    pending.resolved = True
+                    await s.commit()
+                    return "Cancelled."
+            intent_r = detect_intent(message, ctx.role)
+            entities = dict(intent_r.entities or {})
+            entities.setdefault("_raw_message", message)
+            reply = await route(intent_r.intent, entities, ctx, message, s)
+            await s.commit()
+            return reply or ""
     except Exception as e:
-        reply = f"__ERROR__ {type(e).__name__}: {e}"
-    return reply or ""
+        return f"__ERROR__ {type(e).__name__}: {e}"
 
 
 # ── Scenario runner ─────────────────────────────────────────────────────────
