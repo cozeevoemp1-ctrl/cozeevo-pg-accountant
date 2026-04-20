@@ -101,7 +101,30 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
             )
         )
         paid = result.scalar() or Decimal("0")
-        balance = (rs.rent_due or Decimal("0")) - paid
+
+        # Carry-forward any unpaid dues from months BEFORE asked_month so the
+        # tenant sees their true outstanding, not just one month's slice.
+        prev_due_row = (await session.execute(
+            select(
+                func.coalesce(func.sum(RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)), 0),
+                func.coalesce(
+                    (select(func.sum(Payment.amount)).where(
+                        Payment.tenancy_id == tenancy.id,
+                        Payment.period_month < asked_month,
+                        Payment.is_void == False,
+                    )).scalar_subquery(), 0),
+            ).where(
+                RentSchedule.tenancy_id == tenancy.id,
+                RentSchedule.period_month < asked_month,
+                RentSchedule.status != RentStatus.na,
+            )
+        )).first()
+        prev_total_due = Decimal(str(prev_due_row[0] or 0))
+        prev_total_paid = Decimal(str(prev_due_row[1] or 0))
+        prev_due = max(Decimal("0"), prev_total_due - prev_total_paid)
+
+        current_due = rs.rent_due or Decimal("0")
+        balance = current_due + prev_due - paid
         status_msg = {
             RentStatus.paid:    "Fully paid ✓",
             RentStatus.partial: f"Partial — Rs.{int(balance):,} still due",
@@ -109,10 +132,15 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
             RentStatus.waived:  "Waived",
             RentStatus.na:      "Not applicable",
         }.get(rs.status, "Unknown")
+        prev_line = (
+            f"Previous unpaid: Rs.{int(prev_due):,}\n" if prev_due > 0 else ""
+        )
         return (
             f"*Your Balance — {asked_month.strftime('%B %Y')}*\n\n"
-            f"Rent due: Rs.{int(rs.rent_due or 0):,}\n"
+            f"Rent due: Rs.{int(current_due):,}\n"
+            f"{prev_line}"
             f"Paid so far: Rs.{int(paid):,}\n"
+            f"Outstanding: Rs.{int(balance):,}\n"
             f"Status: {status_msg}\n\n"
             "For payment receipts, say: *my payments*"
         )
