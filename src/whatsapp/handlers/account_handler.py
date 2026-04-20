@@ -2083,9 +2083,30 @@ async def _add_refund(entities: dict, ctx: CallerContext, session: AsyncSession)
     if not rows:
         return _format_no_match_message(name or room)
 
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(
+            ctx.phone, "REFUND_WHO",
+            {"amount": float(amount), "name_raw": name or room},
+            choices, session,
+        )
+        return _format_choices_message(name or room, choices,
+                                       f"record refund of Rs.{int(amount):,}")
+
     tenant, tenancy, room_obj = rows[0]
+    return await _do_add_refund_by_ids(
+        tenancy.id, tenant.name, float(amount), ctx, session,
+    )
+
+
+async def _do_add_refund_by_ids(
+    tenancy_id: int, tenant_name: str, amount: float,
+    ctx: CallerContext, session: AsyncSession,
+) -> str:
+    """Create the Refund row for a specific tenancy_id. Called both by the
+    single-match path and by the REFUND_WHO pending resolver."""
     refund = Refund(
-        tenancy_id=tenancy.id,
+        tenancy_id=tenancy_id,
         amount=Decimal(str(amount)),
         refund_date=date.today(),
         reason="deposit refund",
@@ -2094,7 +2115,7 @@ async def _add_refund(entities: dict, ctx: CallerContext, session: AsyncSession)
     )
     session.add(refund)
     return (
-        f"*Refund recorded — {tenant.name}*\n"
+        f"*Refund recorded — {tenant_name}*\n"
         f"Amount: Rs.{int(amount):,}\n"
         f"Status: Pending\n\n"
         "Mark as processed once payment is sent."

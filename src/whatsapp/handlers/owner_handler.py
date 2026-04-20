@@ -1254,6 +1254,39 @@ async def resolve_pending_action(
         pending.resolved = True
         return result
 
+    if pending.intent in ("ASSIGN_STAFF_WHO", "EXIT_STAFF_WHO"):
+        # Disambiguating which staff the user meant
+        if chosen_idx is None or chosen_idx < 0 or chosen_idx >= len(choices):
+            return None  # invalid reply — keep pending alive
+        from src.database.models import Staff as _Staff, Room as _Room
+        from src.whatsapp.handlers.update_handler import (
+            _apply_staff_assignment, _apply_staff_exit,
+        )
+        picked = choices[chosen_idx]
+        staff_id = picked.get("staff_id")
+        staff = await session.get(_Staff, staff_id) if staff_id else None
+        if not staff:
+            pending.resolved = True
+            return "That staff record is no longer available."
+        pending.resolved = True
+        if pending.intent == "EXIT_STAFF_WHO":
+            # Need a ctx for audit writes — synthesise one from pending.phone
+            from src.whatsapp.role_service import CallerContext
+            _ctx = CallerContext(phone=pending.phone, role="admin", name="")
+            return await _apply_staff_exit(staff, _ctx, session)
+        # ASSIGN_STAFF_WHO
+        room_id = action_data.get("room_id")
+        room = await session.get(_Room, room_id) if room_id else None
+        if not room:
+            return "That room is no longer available."
+        from src.whatsapp.role_service import CallerContext
+        _ctx = CallerContext(phone=pending.phone, role="admin", name="")
+        return await _apply_staff_assignment(
+            staff, staff.name, room,
+            action_data.get("role"), action_data.get("phone"),
+            _ctx, session,
+        )
+
     if pending.intent == "CONFIRM_DEPOSIT_REFUND":
         ans = reply_text.lower().strip()
         tenancy_id   = action_data.get("tenancy_id")
@@ -2779,6 +2812,25 @@ async def resolve_pending_action(
             "1. Yes, void it\n"
             "2. No, keep it\n\n"
             "Reply *1* or *2*."
+        )
+
+    if chosen is not None and pending.intent == "REFUND_WHO":
+        tenant_id = chosen.get("tenant_id")
+        tenancy_id = chosen.get("tenancy_id")
+        if not tenant_id or not tenancy_id:
+            return "Invalid selection. Refund cancelled."
+        tenant = await session.get(Tenant, tenant_id)
+        if not tenant:
+            return "Tenant record not found."
+        amount = float(action_data.get("amount") or 0)
+        if amount <= 0:
+            return "Missing refund amount."
+        from src.whatsapp.handlers.account_handler import _do_add_refund_by_ids
+        from src.whatsapp.role_service import CallerContext
+        _ctx = CallerContext(phone=pending.phone, role="admin", name="")
+        pending.resolved = True
+        return await _do_add_refund_by_ids(
+            tenancy_id, tenant.name, amount, _ctx, session,
         )
 
     if chosen is not None and pending.intent == "ROOM_TRANSFER_WHO":

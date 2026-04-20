@@ -686,9 +686,38 @@ async def assign_staff_to_room(entities: dict, ctx: CallerContext, session: Asyn
     existing = (await session.execute(
         select(Staff).where(Staff.active == True)
     )).scalars().all()
-    staff = next((s for s in existing if s.name.lower() == name.lower()), None)
+    exact_matches = [s for s in existing if s.name.lower() == name.lower()]
+
+    if len(exact_matches) > 1:
+        # Disambiguate — save pending and show numbered choices
+        choices = [
+            {"seq": i + 1, "intent": "ASSIGN_STAFF_PICK",
+             "label": f"{s.name}" + (f" ({s.role})" if s.role else ""),
+             "staff_id": s.id}
+            for i, s in enumerate(exact_matches)
+        ]
+        await _save_pending(
+            ctx.phone, "ASSIGN_STAFF_WHO",
+            {"name": name, "room_id": room.id, "room_number": room.room_number,
+             "role": role, "phone": phone},
+            choices, session,
+        )
+        lines = [f"Multiple active staff match *{name}* — which one to assign to room {room.room_number}?\n"]
+        for c in choices:
+            lines.append(f"*{c['seq']}.* {c['label']}")
+        lines.append(f"\nOr reply *cancel* to abort.")
+        return "\n".join(lines)
+
+    staff = exact_matches[0] if exact_matches else None
+    return await _apply_staff_assignment(staff, name, room, role, phone, ctx, session)
+
+
+async def _apply_staff_assignment(
+    staff, name: str, room, role, phone, ctx: CallerContext, session: AsyncSession,
+) -> str:
+    """Create-or-link a staff member to a room + flip room to staff."""
     created = False
-    if not staff:
+    if staff is None:
         staff = Staff(
             name=name, property_id=room.property_id, room_id=room.id,
             role=role, phone=phone, active=True,
@@ -712,7 +741,6 @@ async def assign_staff_to_room(entities: dict, ctx: CallerContext, session: Asyn
                 source="whatsapp",
             ))
 
-    # Ensure the room is flagged as staff
     if not room.is_staff_room:
         room.is_staff_room = True
         session.add(AuditLog(
@@ -753,10 +781,39 @@ async def exit_staff_from_room(entities: dict, ctx: CallerContext, session: Asyn
     if not matches:
         return f"No active staff matching *{name}*."
     if len(matches) > 1:
-        opts = "\n".join(f"{i+1}. {s.name} ({s.role or '?'})" for i, s in enumerate(matches))
-        return f"Multiple matches — which one?\n{opts}"
+        # Pre-fetch rooms so the choice list can show each staff's room
+        room_ids = {s.room_id for s in matches if s.room_id}
+        rooms_by_id: dict[int, Room] = {}
+        if room_ids:
+            room_rows = (await session.execute(
+                select(Room).where(Room.id.in_(room_ids))
+            )).scalars().all()
+            rooms_by_id = {r.id: r for r in room_rows}
+
+        choices = []
+        for i, s in enumerate(matches):
+            suffix = f" ({s.role})" if s.role else ""
+            if s.room_id and s.room_id in rooms_by_id:
+                suffix += f" — room {rooms_by_id[s.room_id].room_number}"
+            choices.append({
+                "seq": i + 1, "intent": "EXIT_STAFF_PICK",
+                "label": f"{s.name}{suffix}", "staff_id": s.id,
+            })
+        await _save_pending(
+            ctx.phone, "EXIT_STAFF_WHO", {"name": name}, choices, session,
+        )
+        lines = [f"Multiple active staff match *{name}* — which one is exiting?\n"]
+        for c in choices:
+            lines.append(f"*{c['seq']}.* {c['label']}")
+        lines.append("\nOr reply *cancel* to abort.")
+        return "\n".join(lines)
 
     staff = matches[0]
+    return await _apply_staff_exit(staff, ctx, session)
+
+
+async def _apply_staff_exit(staff, ctx: CallerContext, session: AsyncSession) -> str:
+    """Mark a staff as exited; flip their room to revenue if now empty."""
     old_room_id = staff.room_id
     staff.active = False
     from datetime import date as _d
