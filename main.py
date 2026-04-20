@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
@@ -295,13 +295,17 @@ async def serve_admin_onboarding():
 entity_router = APIRouter(prefix="/api/entities", tags=["master-data"])
 
 @entity_router.get("/pending")
-async def get_pending():
+async def get_pending(request: Request):
+    from src.api.onboarding_router import _check_admin_pin
+    _check_admin_pin(request)
     from src.database.db_manager import get_pending_entities
     items = await get_pending_entities()
     return [{"id": p.id, "type": p.entity_type, "data": p.raw_data} for p in items]
 
 @entity_router.post("/{entity_id}/approve")
-async def approve(entity_id: int):
+async def approve(entity_id: int, request: Request):
+    from src.api.onboarding_router import _check_admin_pin
+    _check_admin_pin(request)
     from src.database.db_manager import approve_pending_entity
     result = await approve_pending_entity(entity_id)
     if not result:
@@ -309,7 +313,9 @@ async def approve(entity_id: int):
     return result
 
 @entity_router.post("/{entity_id}/reject")
-async def reject(entity_id: int):
+async def reject(entity_id: int, request: Request):
+    from src.api.onboarding_router import _check_admin_pin
+    _check_admin_pin(request)
     from src.database.db_manager import reject_pending_entity
     await reject_pending_entity(entity_id)
     return {"status": "rejected"}

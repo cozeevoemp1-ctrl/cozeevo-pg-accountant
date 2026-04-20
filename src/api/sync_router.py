@@ -15,8 +15,13 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+import sys
 from datetime import date, datetime, timedelta
 from typing import Optional
+
+# Use the running interpreter so this works on both Windows dev (venv/Scripts/python)
+# and Linux VPS (venv/bin/python) without a brittle hardcoded path.
+_PY = sys.executable
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from loguru import logger
@@ -42,7 +47,7 @@ async def _run_sync() -> dict:
     try:
         proc = await asyncio.to_thread(
             subprocess.run,
-            ["venv/Scripts/python", "scripts/sync_from_source_sheet.py", "--write"],
+            [_PY, "scripts/sync_from_source_sheet.py", "--write"],
             capture_output=True, text=True, timeout=600,
         )
         if proc.returncode != 0:
@@ -75,7 +80,7 @@ async def _run_sync() -> dict:
         today = date.today()
         await asyncio.to_thread(
             subprocess.run,
-            ["venv/Scripts/python", "scripts/sync_sheet_from_db.py",
+            [_PY, "scripts/sync_sheet_from_db.py",
              "--month", str(today.month), "--year", str(today.year), "--write"],
             capture_output=True, text=True, timeout=600,
         )
@@ -90,7 +95,7 @@ async def _run_sync() -> dict:
     try:
         await asyncio.to_thread(
             subprocess.run,
-            ["venv/Scripts/python", "scripts/sync_daywise_from_db.py", "--write"],
+            [_PY, "scripts/sync_daywise_from_db.py", "--write"],
             capture_output=True, text=True, timeout=300,
         )
         logger.info("[SyncWebhook] DAY WISE sheet refreshed")

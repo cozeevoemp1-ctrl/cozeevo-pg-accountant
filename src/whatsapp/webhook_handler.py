@@ -88,9 +88,17 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     """
     raw_body = await request.body()
 
-    # -- Verify Meta signature (skip only if APP_SECRET not set yet) ----------
+    # -- Verify Meta signature (REQUIRED in prod) ------------------------------
+    # WHATSAPP_APP_SECRET MUST be set or signature check explicitly disabled
+    # via WHATSAPP_SKIP_SIG_CHECK=1 (dev/local-test only). In prod, missing or
+    # placeholder secret = reject every request — fail closed, never open.
     app_secret = os.getenv("WHATSAPP_APP_SECRET", "")
-    if app_secret and app_secret != "PASTE_YOUR_META_APP_SECRET_HERE":
+    skip_check = os.getenv("WHATSAPP_SKIP_SIG_CHECK") == "1"
+    if not skip_check:
+        if not app_secret or app_secret == "PASTE_YOUR_META_APP_SECRET_HERE":
+            logger.error("[Webhook] WHATSAPP_APP_SECRET not configured — rejecting "
+                         "request. Set the secret or WHATSAPP_SKIP_SIG_CHECK=1 for dev.")
+            raise HTTPException(status_code=503, detail="Webhook not configured")
         sig_header = request.headers.get("X-Hub-Signature-256", "")
         if not _verify_meta_signature(raw_body, sig_header, app_secret):
             logger.warning("[Webhook] Signature verification failed — request rejected")

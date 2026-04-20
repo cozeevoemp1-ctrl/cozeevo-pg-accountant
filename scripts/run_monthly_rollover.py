@@ -47,7 +47,7 @@ async def _generate_rs(year: int, month: int) -> dict:
 
 def _run_source_sync() -> bool:
     print("[1/4] Pulling source sheet → DB...")
-    py = "venv/Scripts/python" if os.name == "nt" else "venv/bin/python"
+    py = sys.executable
     result = subprocess.run(
         [py, "scripts/sync_from_source_sheet.py", "--write"],
         capture_output=True, text=True, timeout=600,
@@ -61,7 +61,7 @@ def _run_source_sync() -> bool:
 
 def _create_sheet_tab(month_name: str, year: int) -> bool:
     print(f"[3/4] Creating sheet tab {month_name} {year}...")
-    py = "venv/Scripts/python" if os.name == "nt" else "venv/bin/python"
+    py = sys.executable
     result = subprocess.run(
         [py, "scripts/create_month.py", month_name, str(year)],
         capture_output=True, text=True, timeout=300,
@@ -77,7 +77,7 @@ def _create_sheet_tab(month_name: str, year: int) -> bool:
 def _refresh_dashboard(year: int, month: int) -> None:
     """Re-sync the new month's sheet from DB (ensures rent_due matches RentSchedule)."""
     print(f"[4/4] Refreshing sheet from DB for {year}-{month:02d}...")
-    py = "venv/Scripts/python" if os.name == "nt" else "venv/bin/python"
+    py = sys.executable
     result = subprocess.run(
         [py, "scripts/sync_sheet_from_db.py",
          "--month", str(month), "--year", str(year), "--write"],
