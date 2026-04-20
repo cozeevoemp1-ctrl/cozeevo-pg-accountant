@@ -693,14 +693,17 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
 
         else:
             # ── Monthly stay path ──────────────────────────────────────────
-            # Auto-fill sharing_type from the room's room_type when the form
-            # didn't explicitly select one. Memory rule: sharing_type must be
-            # set on every tenancy so monthly sheet + bed counts are correct.
+            # Resolve tenancy.sharing_type in this priority:
+            #   1. receptionist override from review form (overrides["sharing_type"])
+            #   2. room.room_type (master data default — never mutated)
+            # This lets us book a "premium" tenancy in a "double" master room
+            # (one tenant paying for both beds) without changing master data.
             from src.database.models import SharingType
+            effective_sharing = (overrides.get("sharing_type") or sharing or "").strip().lower()
             sharing_default = None
-            if sharing in ("single", "double", "triple", "premium"):
+            if effective_sharing in ("single", "double", "triple", "premium"):
                 try:
-                    sharing_default = SharingType(sharing)
+                    sharing_default = SharingType(effective_sharing)
                 except ValueError:
                     sharing_default = None
             tenancy = Tenancy(
@@ -912,6 +915,14 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                             f"• {label}: {_format_diff_value(k, original_financial.get(k))}"
                             f" → {_format_diff_value(k, final_financial.get(k))}"
                         )
+                # Sharing-type diff — room master type (original) vs the
+                # receptionist's effective pick for this tenancy.
+                master_sharing = (sharing or "").lower()
+                if effective_sharing and effective_sharing != master_sharing:
+                    diff_lines.append(
+                        f"• Sharing Type: {master_sharing or '—'}"
+                        f" → {effective_sharing}"
+                    )
                 for k, label in _KYC_FIELD_LABELS.items():
                     if str(original_kyc.get(k, "") or "") != str(final_kyc.get(k, "") or ""):
                         diff_lines.append(
@@ -938,6 +949,16 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                                 room_number=room.room_number, source="onboarding_review",
                                 note="receptionist override at approve",
                             ))
+                    # Sharing-type override — tenancy-level only, never room.
+                    if effective_sharing and effective_sharing != master_sharing:
+                        session.add(_AL(
+                            changed_by="receptionist", entity_type="tenancy",
+                            entity_id=tenancy.id if 'tenancy' in dir() and not is_daily else 0,
+                            entity_name=tenant_name, field="sharing_type",
+                            old_value=master_sharing, new_value=effective_sharing,
+                            room_number=room.room_number, source="onboarding_review",
+                            note="receptionist override at approve (master data unchanged)",
+                        ))
                     for k in _KYC_FIELD_LABELS.keys():
                         if str(original_kyc.get(k, "") or "") != str(final_kyc.get(k, "") or ""):
                             session.add(_AL(

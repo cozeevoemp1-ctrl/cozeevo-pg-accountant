@@ -1150,7 +1150,8 @@
       <div class="section-divider">Room &amp; Booking</div>
       <div class="detail-grid">
         <div class="detail-field"><div class="detail-label">Room</div><div class="detail-value">${escHtml(room.number || '—')} ${room.building ? '· ' + escHtml(room.building) : ''}</div></div>
-        <div class="detail-field"><div class="detail-label">Floor / Type</div><div class="detail-value">${escHtml(room.floor || '—')} / ${escHtml(room.sharing || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Floor</div><div class="detail-value">${escHtml(room.floor || '—')}</div></div>
+        <div class="detail-field"><div class="detail-label">Sharing Type</div>${inpSelect('sharing_type', (data.sharing_type || room.sharing || '').toLowerCase(), ['single', 'double', 'triple', 'premium'])}</div>
         <div class="detail-field"><div class="detail-label">Check-in</div>${editable
           ? `<input data-field="checkin_date" data-token="${token}" type="date" value="${isoDate(data.checkin_date)}" style="${inpStyle}">`
           : `<div class="detail-value">${data.checkin_date ? formatDateShort(data.checkin_date) : '—'}</div>`}</div>
