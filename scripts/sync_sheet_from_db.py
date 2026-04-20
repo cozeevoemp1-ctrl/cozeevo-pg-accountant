@@ -278,13 +278,19 @@ async def main(args):
             # Deposit (security deposit only — maintenance kept separate per memory rule).
             deposit_amt = int(tenancy.security_deposit or 0)
 
-            # Base monthly rent — info column (always agreed_rent or schedule override).
+            # Rent column (visual "monthly rent" — always agreed_rent, never bundled).
             agreed_rent_amt = int(tenancy.agreed_rent or 0)
-            base_rent = int((rs.rent_due or 0) + (rs.adjustment or 0)) if rs else agreed_rent_amt
-            # Rent Due = full first-month bill (rent + deposit) when this is
-            # their checkin month. Otherwise just the base rent.
-            # Memory: feedback_deposit_dues_logic.md — enforced here AND in create_month.py.
-            rent_due = base_rent + deposit_amt if is_first_month else base_rent
+
+            # Rent Due — trust the DB. Post-2026-04-20 backfill, RentSchedule.rent_due
+            # already bundles deposit for the check-in month (enforced by
+            # src/services/rent_schedule.first_month_rent_due). Adding deposit here
+            # again was the Surya Shivani 81,000 double-count bug.
+            if rs:
+                rent_due = int((rs.rent_due or 0) + (rs.adjustment or 0))
+            else:
+                rent_due = agreed_rent_amt + (deposit_amt if is_first_month else 0)
+            # For first-month display/note, derive rent portion = rent_due - deposit.
+            base_rent = max(0, rent_due - deposit_amt) if is_first_month else rent_due
 
             cash = int(pays["cash"])
             upi = int(pays["upi"])
