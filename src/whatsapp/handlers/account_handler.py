@@ -2118,6 +2118,19 @@ async def _do_add_refund_by_ids(
         notes=f"Logged via WhatsApp by {ctx.name or ctx.phone}",
     )
     session.add(refund)
+    await session.flush()
+
+    # Push Refund Status + Refund Amount to TENANTS sheet so the
+    # dashboard KPI for pending refunds stays accurate.
+    try:
+        tenancy = await session.get(Tenancy, tenancy_id)
+        if tenancy:
+            import asyncio as _aio
+            from src.integrations.gsheets import sync_tenant_all_fields as _sync
+            _aio.create_task(_sync(tenancy.tenant_id))
+    except Exception:
+        pass  # fire-and-forget; DB is authoritative
+
     return (
         f"*Refund recorded — {tenant_name}*\n"
         f"Amount: Rs.{int(amount):,}\n"

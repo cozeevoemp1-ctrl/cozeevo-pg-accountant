@@ -4082,6 +4082,16 @@ async def _do_update_checkout_date(
     old_checkout = tenancy.checkout_date
     old_str = old_checkout.strftime('%d %b %Y') if old_checkout else "not set"
     tenancy.checkout_date = new_checkout
+    await session.flush()
+
+    # Push Checkout Date to TENANTS sheet — dashboard occupancy / exit
+    # KPIs read this column.
+    try:
+        import asyncio as _aio
+        from src.integrations.gsheets import sync_tenant_all_fields as _sync
+        _aio.create_task(_sync(tenancy.tenant_id))
+    except Exception:
+        pass  # fire-and-forget; DB is authoritative
 
     return (
         f"*Checkout date updated — {tenant_name}*\n"
