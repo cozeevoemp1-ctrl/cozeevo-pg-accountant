@@ -184,6 +184,106 @@ def _log_next_runs(scheduler: AsyncIOScheduler) -> None:
         logger.info(f"  [{job.id}] next run: {job.next_run_time}")
 
 
+# ── Job: Check-in/out Prep Reminders ──────────────────────────────────────────
+
+async def _prep_reminder(when: str = "tomorrow") -> None:
+    """
+    Notify every admin/owner of the day's check-ins + check-outs so rooms can
+    be prepared.
+
+    when='tomorrow' → runs 18:00 IST daily, lists tomorrow's check-ins +
+                      check-outs (24-hour advance warning).
+    when='today'    → runs 08:00 IST daily, lists today's movements so
+                      reception has the list in hand when the day starts.
+
+    Check-ins come from tenancies.checkin_date matching the target day
+    AND status IN (active, no_show) so newly added no-shows still appear
+    until they actually arrive.
+    Check-outs come from tenancies.expected_checkout matching the target
+    day AND status = active.
+    """
+    from datetime import timedelta
+    from src.whatsapp.webhook_handler import _send_whatsapp
+
+    today = date.today()
+    target = today + timedelta(days=1) if when == "tomorrow" else today
+    when_label = "TOMORROW" if when == "tomorrow" else "TODAY"
+
+    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    logger.info(f"[Scheduler] prep_reminder ({when}) — target {target}")
+
+    try:
+        async with engine.connect() as conn:
+            checkins = (await conn.execute(text("""
+                SELECT t.name, r.room_number, COALESCE(t.phone, '') AS phone,
+                       COALESCE(tn.sharing_type::text, '') AS sharing,
+                       COALESCE(tn.notes, '') AS notes
+                FROM tenancies tn
+                JOIN tenants t ON t.id = tn.tenant_id
+                JOIN rooms r   ON r.id = tn.room_id
+                WHERE tn.checkin_date = :target
+                  AND tn.status IN ('active', 'no_show')
+                ORDER BY r.room_number
+            """), {"target": target.isoformat()})).fetchall()
+
+            checkouts = (await conn.execute(text("""
+                SELECT t.name, r.room_number, COALESCE(t.phone, '') AS phone,
+                       COALESCE(tn.notes, '') AS notes
+                FROM tenancies tn
+                JOIN tenants t ON t.id = tn.tenant_id
+                JOIN rooms r   ON r.id = tn.room_id
+                WHERE tn.expected_checkout = :target
+                  AND tn.status = 'active'
+                ORDER BY r.room_number
+            """), {"target": target.isoformat()})).fetchall()
+
+            admin_rows = (await conn.execute(text("""
+                SELECT phone FROM authorized_users
+                WHERE role IN ('admin', 'owner') AND active = TRUE
+            """))).fetchall()
+    finally:
+        await engine.dispose()
+
+    if not checkins and not checkouts:
+        logger.info(f"[Scheduler] prep_reminder ({when}) — nothing scheduled.")
+        return
+
+    admin_phones = [r[0] for r in admin_rows if r[0]]
+    if not admin_phones:
+        logger.warning("[Scheduler] prep_reminder — no admin/owner phones configured.")
+        return
+
+    lines = [f"*Room Prep — {when_label} ({target.strftime('%d %b %Y')})*"]
+    if checkins:
+        lines.append(f"\n*Check-ins ({len(checkins)}):*")
+        for row in checkins:
+            nm, rn, ph, sh, nt = row
+            sh_part = f" — {sh}" if sh else ""
+            ph_part = f" ({ph})" if ph else ""
+            nt_part = f"\n   _{nt[:80]}_" if nt else ""
+            lines.append(f"• Room {rn}{sh_part} — {nm}{ph_part}{nt_part}")
+    if checkouts:
+        lines.append(f"\n*Check-outs ({len(checkouts)}):*")
+        for row in checkouts:
+            nm, rn, ph, nt = row
+            ph_part = f" ({ph})" if ph else ""
+            nt_part = f"\n   _{nt[:80]}_" if nt else ""
+            lines.append(f"• Room {rn} — {nm}{ph_part}{nt_part}")
+
+    if when == "tomorrow":
+        lines.append("\n_Prep rooms today. Another reminder will fire at 8 AM tomorrow._")
+    else:
+        lines.append("\n_Happening today. Keep rooms / paperwork ready._")
+
+    msg = "\n".join(lines)
+    for phone in admin_phones:
+        try:
+            await _send_whatsapp(phone, msg)
+            logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone}")
+        except Exception as e:
+            logger.warning(f"[Scheduler] prep_reminder — send to {phone} failed: {e}")
+
+
 # ── Job: Rent Reminders ────────────────────────────────────────────────────────
 
 async def _rent_reminder(label: str = "first") -> None:
