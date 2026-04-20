@@ -150,9 +150,12 @@ def start_scheduler() -> AsyncIOScheduler:
     )
 
     # Prep reminders for admins — 24h before + morning-of.
+    # Explicit timezone: scheduler's Asia/Kolkata default wasn't propagating
+    # to pre-existing triggers (they fire in UTC). Pass it here so these two
+    # jobs run at actual IST wall-clock times.
     scheduler.add_job(
         _prep_reminder,
-        trigger=CronTrigger(hour=18, minute=0),  # every day 6pm IST
+        trigger=CronTrigger(hour=18, minute=0, timezone="Asia/Kolkata"),
         id="prep_reminder_tomorrow",
         name="Prep Reminder — tomorrow's checkins/outs (6pm IST)",
         replace_existing=True,
@@ -160,7 +163,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
     scheduler.add_job(
         _prep_reminder,
-        trigger=CronTrigger(hour=8, minute=0),   # every day 8am IST
+        trigger=CronTrigger(hour=8, minute=0, timezone="Asia/Kolkata"),
         id="prep_reminder_today",
         name="Prep Reminder — today's checkins/outs (8am IST)",
         replace_existing=True,
