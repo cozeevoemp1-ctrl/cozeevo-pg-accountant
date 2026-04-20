@@ -2,6 +2,37 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.40.0] — 2026-04-20 (late evening) — State-mgmt fixes + RentSchedule first-month = rent + deposit
+
+### Fixed (state management)
+- **Staff-room toggle substring bug** — `_update_single_room` checked `"staff room" in desc_lower` before `"not staff"`, so "Not staff rooms 114 and 618" / "114 not staff room" hit the MARK branch (because `"staff room"` is a substring of `"staff rooms"` / `"not staff room"`). Lokesh 2026-04-20 16:49–16:59 thrashed 12 messages with rooms 114/618 flipping True↔False in audit log. Extracted `_classify_staff_toggle()` in `src/whatsapp/handlers/update_handler.py` — UNMARK patterns evaluated before MARK so negative phrasings always win. 19 parametrized tests lock it in.
+- **`CONFIRM_FIELD_UPDATE` "Yes" → "Update cancelled"** — resolver did `choice = reply_text.strip()` (no `.lower()`), then `if choice in ("1","yes","y")`, so capital "Yes" fell to else → cancel. Partner 2026-04-20 16:42 sharing-change for Rakesh. Extracted `_is_confirm_choice()` accepting "1" + full `is_affirmative` set (any case). 25 parametrized tests lock it in.
+
+### Fixed (financial — Diya Gupta blunder)
+- **First-month `RentSchedule.rent_due` now bundles security deposit** per `memory/feedback_deposit_dues_logic.md`. Diya 2026-04-20: rent 12,000 + deposit 6,000, paid 12,000 UPI — bot said "This month: PAID" because `rs.rent_due` was only 12,000. Should have said PARTIAL with Rs.6,000 due.
+- New helper **`src/services/rent_schedule.first_month_rent_due(tenancy, period)`** — returns rent + deposit when period == checkin_month, else just rent. Single source of truth.
+- Wired into 5 RentSchedule creation sites: `src/services/payments.py`, `src/api/onboarding_router.py`, `src/whatsapp/handlers/owner_handler.py` (`_finalize_add_tenant`), `src/database/excel_import.py`, `src/database/delta_import.py`. Importers use inline check (their `period_rent` reflects rent revisions, not agreed_rent).
+- **Display fix** — `_do_query_tenant_by_id` was `net_due = deposit + rs.rent_due - booking_amount`, so after backfill it double-counted deposit (Diya showed Rs.22,000). Now derives `first_rent = rs.rent_due − deposit` for display; net_due arithmetic unchanged.
+- **Backfill script** `scripts/backfill_first_month_rent_due.py` — idempotent dry-run/apply. Ran `--apply` on VPS: **268 check-in-month RentSchedule rows corrected, 20 unchanged**. Status recomputed from non-void payments.
+
+### Added
+- `tests/test_staff_room_toggle.py`, `tests/test_confirm_field_update_choice.py`, `tests/test_first_month_rent_due.py` — **52 new parametrized tests**, all green on VPS post-deploy.
+
+### Verified on VPS
+- 3 commits deployed (`fix(state-mgmt)`, `fix(rent_schedule)`, `fix(query)`), service `active`, `/healthz` 200.
+- Diya Gupta bot query now shows: `This month PARTIAL`, `First month rent Rs.12,000`, `Net due Rs.16,000`, `Apr: Rs.18,000 — PARTIAL (due Rs.6,000)`.
+
+### Still pending (next session)
+- **Sheet re-sync** for the 268 updated tenancies — DB and Sheet may show different Balance until `sync_sheet_from_db` runs.
+- **"Raj balance doesn't work"** — Kiran flagged; needs repro with exact phrasing + which Raj (multiple exist).
+- **Lokesh's 17:37 pending** `Diya Gupta paid 6000 cash` — pending confirmation not resolved; will expire via TTL.
+- **booking_amount missing as Payment row** — old Excel-imported tenants have `tenancy.booking_amount > 0` but no `Payment(for_type=booking)` row, so Apr balance doesn't reflect the advance. One-time migration needed.
+- **Cash + UPI one-liner parser** — `"Diya paid 3000 cash 3000 upi"` currently not parsed; only the step-by-step collect-rent form handles split modes today.
+- **Cheat sheet enhancement** — prominent "Someone came to pay — where to start" section at top (flows A/B/C exist but are buried).
+- 16 state-management golden failures (from prior session, still open).
+
+---
+
 ## [1.39.0] — 2026-04-20 (evening) — Disambig audit + sheet auto-refresh + sort
 
 ### Added
