@@ -580,11 +580,17 @@ async def resolve_field_update(
             source="whatsapp",
         ))
 
-        # ── Sync to Google Sheet ─────────────────────────────────────────
+        # ── Sync to Google Sheet (BOTH tabs) ────────────────────────────
+        # Fast path: single-cell write to the current monthly tab for instant
+        # visibility. Then systemic sync pushes the same field to TENANTS
+        # master tab so the dashboard KPIs stay accurate. Without the second
+        # call the TENANTS row would go stale on every confirm.
         if room_number:
             try:
                 import asyncio as _aio
-                from src.integrations.gsheets import update_tenant_field
+                from src.integrations.gsheets import (
+                    update_tenant_field, sync_tenant_all_fields as _sync,
+                )
                 sheet_value = str(new_value)
                 if field == "sharing_type":
                     sheet_value = str(new_value).replace("SharingType.", "").capitalize()
@@ -592,6 +598,17 @@ async def resolve_field_update(
                     update_tenant_field(room_number, tenant_name, field, sheet_value),
                     timeout=10,
                 )
+                # Systemic sync (both tabs) — fire-and-forget, resolves any
+                # ripple cells the per-field write missed.
+                resolved_tenant_id = None
+                if table == "tenants":
+                    resolved_tenant_id = action_data.get("tenant_id")
+                else:
+                    tenancy_for_sync = await session.get(Tenancy, action_data.get("tenancy_id"))
+                    if tenancy_for_sync:
+                        resolved_tenant_id = tenancy_for_sync.tenant_id
+                if resolved_tenant_id:
+                    _aio.create_task(_sync(resolved_tenant_id))
             except Exception as e:
                 logger.warning(f"[Update] Sheet sync failed for {tenant_name}.{field}: {e}")
 
