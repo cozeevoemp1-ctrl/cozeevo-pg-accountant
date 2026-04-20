@@ -304,12 +304,21 @@ async def main(args):
 
             total_paid = cash + upi
 
-            # Existing-sheet preserved fields, looked up by header name (not position)
+            # DB is source of truth. Sheet lookups only used as migration
+            # fallback while pre-existing sheet-only content is copied over.
+            # - notice date: Tenancy.notice_date  (DB field exists)
+            # - notes:       Tenancy.notes         (DB field exists)
+            # - entered by:  receptionist-cosmetic only; keep sheet fallback
+            #                until we wire it to Payment.received_by_staff.
             key = (room.room_number, tenant.name.lower())
             preserved = sheet_lookup.get(key, {})
-            notice = preserved.get("notice date", "")
-            existing_notes = preserved.get("notes", "")
-            entered = preserved.get("entered by", "")
+            notice = (
+                tenancy.notice_date.strftime("%d/%m/%Y")
+                if tenancy.notice_date else preserved.get("notice date", "")
+            )
+            db_notes = (tenancy.notes or "").strip()
+            existing_notes = db_notes or preserved.get("notes", "")
+            entered = preserved.get("entered by", "")  # TODO: derive from Payment
 
             # Prev due from DB (previous month's unpaid rent), not from sheet
             prev_due_num = prev_due_map.get(tenancy.id, 0)

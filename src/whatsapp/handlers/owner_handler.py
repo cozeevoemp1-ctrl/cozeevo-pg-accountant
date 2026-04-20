@@ -4946,11 +4946,29 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         else:
             period = date(period.year, period.month + 1, 1)
 
+    # Audit trail — one entry per checkin (covers tenancy + all RentSchedule rows).
+    from src.database.models import AuditLog as _AL
+    _who = data.get("entered_by") or "bot"
+    session.add(_AL(
+        changed_by=_who,
+        entity_type="tenancy",
+        entity_id=tenancy.id,
+        field="checkin",
+        old_value=None,
+        new_value=(
+            f"room={room_number};rent={int(base_rent)};deposit={int(deposit)};"
+            f"advance={int(advance)};checkin={checkin_date.isoformat()}"
+        ),
+        source="whatsapp",
+        note=f"New tenant {name} ({phone}) checked in; rent schedule generated "
+             f"from {checkin_date.strftime('%Y-%m-01')} to {current_month.isoformat()}",
+    ))
+
     # Log advance as Payment
     if advance > 0:
         adv_mode_str = data.get("advance_mode", "")
         adv_mode = PaymentMode.upi if adv_mode_str == "upi" else PaymentMode.cash
-        session.add(Payment(
+        adv_pay = Payment(
             tenancy_id   = tenancy.id,
             amount       = advance,
             payment_date = checkin_date,
@@ -4958,6 +4976,18 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             for_type     = PaymentFor.booking,
             period_month = checkin_date.replace(day=1),
             notes        = f"Booking advance at check-in ({adv_mode_str})",
+        )
+        session.add(adv_pay)
+        await session.flush()  # get adv_pay.id for AuditLog
+        session.add(_AL(
+            changed_by=_who,
+            entity_type="payment",
+            entity_id=adv_pay.id,
+            field="created_booking_advance",
+            old_value=None,
+            new_value=str(int(advance)),
+            source="whatsapp",
+            note=f"Booking advance Rs.{int(advance):,} at check-in for {name} ({adv_mode_str or 'cash'})",
         ))
 
     # ── Google Sheets write-back (fire-and-forget) ──
