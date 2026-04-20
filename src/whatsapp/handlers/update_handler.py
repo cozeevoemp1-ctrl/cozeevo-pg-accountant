@@ -29,6 +29,38 @@ from src.whatsapp.handlers._shared import (
 )
 
 
+async def _disambiguate_or_pick(
+    name: str,
+    ctx: CallerContext,
+    session: AsyncSession,
+    field: str,
+    new_value,
+    verb: str,
+):
+    """Return (tenant, tenancy, room, early_reply).
+
+    early_reply is non-None when the caller should return it immediately
+    (no match / saved pending for disambiguation). Avoids the prior
+    LIMIT-1 silent-pick bug: when >1 active tenants match the name, we
+    save a FIELD_UPDATE_WHO pending and show the choice list instead of
+    committing to the first match.
+    """
+    rows = await _find_active_tenants_by_name(name, session)
+    if not rows:
+        suggestions = await _find_similar_names(name, session)
+        return None, None, None, _format_no_match_message(name, suggestions)
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(
+            ctx.phone, "FIELD_UPDATE_WHO",
+            {"field": field, "new_value": new_value},
+            choices, session,
+        )
+        return None, None, None, _format_choices_message(name, choices, verb)
+    tenant, tenancy, room = rows[0]
+    return tenant, tenancy, room, None
+
+
 # ── UPDATE SHARING TYPE ─────────────────────────────────────────────────────
 
 async def update_sharing_type(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -59,28 +91,19 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] [sharing type]*"
 
-    # Disambiguate when multiple active tenants share the name.
-    rows = await _find_active_tenants_by_name(name, session)
-    if not rows:
-        suggestions = await _find_similar_names(name, session)
-        return _format_no_match_message(name, suggestions)
-
-    if len(rows) > 1:
-        choices = _make_choices(rows)
-        await _save_pending(
-            ctx.phone, "SHARING_CHANGE_WHO",
-            {"new_sharing": new_sharing}, choices, session,
-        )
-        return _format_choices_message(name, choices, f"change sharing to {new_sharing}")
-
-    tenant, tenancy, room = rows[0]
+    tenant, tenancy, room, early = await _disambiguate_or_pick(
+        name, ctx, session, "sharing_type", new_sharing,
+        f"change sharing to {new_sharing}",
+    )
+    if early:
+        return early
 
     raw = tenancy.sharing_type
     old_sharing = raw.value if hasattr(raw, "value") else (raw or "not set")
     if old_sharing == new_sharing:
         return f"*{tenant.name}* is already {new_sharing} sharing."
 
-    room_label = f" (Room {room.room_number})" if room else ""
+    room_label = f" (Room {room.room_number})" if room and hasattr(room, "room_number") else ""
 
     # Confirm
     action_data = {
@@ -128,17 +151,19 @@ async def update_rent(entities: dict, ctx: CallerContext, session: AsyncSession)
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] rent [amount]*"
 
-    tenant, tenancy = await _find_active_tenant(name, session)
-    if not tenant:
-        return f"Couldn't find active tenant '{name}'."
+    tenant, tenancy, room, early = await _disambiguate_or_pick(
+        name, ctx, session, "agreed_rent", int(amount),
+        f"change rent to Rs.{int(amount):,}",
+    )
+    if early:
+        return early
 
     old_rent = int(tenancy.agreed_rent or 0)
     new_rent = int(amount)
     if old_rent == new_rent:
         return f"*{tenant.name}*'s rent is already Rs.{new_rent:,}."
 
-    room = await session.get(Room, tenancy.room_id)
-    room_label = f" (Room {room.room_number})" if room else ""
+    room_label = f" (Room {room.room_number})" if room and hasattr(room, "room_number") else ""
 
     action_data = {
         "tenancy_id": tenancy.id,
@@ -181,9 +206,12 @@ async def update_phone(entities: dict, ctx: CallerContext, session: AsyncSession
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] phone [number]*"
 
-    tenant, tenancy = await _find_active_tenant(name, session)
-    if not tenant:
-        return f"Couldn't find active tenant '{name}'."
+    tenant, tenancy, room, early = await _disambiguate_or_pick(
+        name, ctx, session, "phone", new_phone,
+        f"change phone to {new_phone}",
+    )
+    if early:
+        return early
 
     old_phone = tenant.phone or "not set"
 
@@ -232,9 +260,12 @@ async def update_gender(entities: dict, ctx: CallerContext, session: AsyncSessio
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] gender [male/female]*"
 
-    tenant, tenancy = await _find_active_tenant(name, session)
-    if not tenant:
-        return f"Couldn't find active tenant '{name}'."
+    tenant, tenancy, room, early = await _disambiguate_or_pick(
+        name, ctx, session, "gender", new_gender,
+        f"change gender to {new_gender}",
+    )
+    if early:
+        return early
 
     old_gender = tenant.gender or "not set"
 
@@ -280,9 +311,12 @@ async def update_deposit(entities: dict, ctx: CallerContext, session: AsyncSessi
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] deposit [amount]*"
 
-    tenant, tenancy = await _find_active_tenant(name, session)
-    if not tenant:
-        return f"Couldn't find active tenant '{name}'."
+    tenant, tenancy, room, early = await _disambiguate_or_pick(
+        name, ctx, session, "security_deposit", int(amount),
+        f"change deposit to Rs.{int(amount):,}",
+    )
+    if early:
+        return early
 
     old_dep = int(tenancy.security_deposit or 0)
     new_dep = int(amount)

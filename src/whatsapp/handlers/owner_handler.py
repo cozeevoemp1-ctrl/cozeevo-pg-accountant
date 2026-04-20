@@ -2301,7 +2301,7 @@ async def resolve_pending_action(
         "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "DEPOSIT_CHANGE_WHO",
         "ROOM_TRANSFER_WHO", "ROOM_TRANSFER_DEST",
-        "SHARING_CHANGE_WHO",
+        "FIELD_UPDATE_WHO",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
         return "❌ Cancelled. Nothing was changed."
@@ -2868,18 +2868,56 @@ async def resolve_pending_action(
             )
         return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
 
-    if chosen is not None and pending.intent == "SHARING_CHANGE_WHO":
+    if chosen is not None and pending.intent == "FIELD_UPDATE_WHO":
         tenant = await session.get(Tenant, chosen["tenant_id"])
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
         if not tenant or not tenancy:
             return "Tenant not found."
         room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
         room_label = f" (Room {room.room_number})" if room else ""
-        new_sharing = (action_data.get("new_sharing") or "").strip().lower()
-        raw = tenancy.sharing_type
-        old_sharing = raw.value if hasattr(raw, "value") else (raw or "not set")
-        if old_sharing == new_sharing:
-            return f"*{tenant.name}* is already {new_sharing} sharing."
+        field = (action_data.get("field") or "").strip()
+        new_value = action_data.get("new_value")
+
+        # Read old_value + display line per field.
+        if field == "sharing_type":
+            raw = tenancy.sharing_type
+            old_value = raw.value if hasattr(raw, "value") else (raw or "not set")
+            if str(old_value).lower() == str(new_value).lower():
+                return f"*{tenant.name}* is already {new_value} sharing."
+            display_line = f"Sharing: {old_value} → *{new_value}*"
+        elif field == "agreed_rent":
+            old_value = int(tenancy.agreed_rent or 0)
+            if int(old_value) == int(new_value):
+                return f"*{tenant.name}*'s rent is already Rs.{int(new_value):,}."
+            display_line = f"Rent: Rs.{int(old_value):,} → *Rs.{int(new_value):,}*"
+        elif field == "security_deposit":
+            old_value = int(tenancy.security_deposit or 0)
+            if int(old_value) == int(new_value):
+                return f"*{tenant.name}*'s deposit is already Rs.{int(new_value):,}."
+            display_line = f"Deposit: Rs.{int(old_value):,} → *Rs.{int(new_value):,}*"
+        elif field == "phone":
+            old_value = tenant.phone or "not set"
+            if str(old_value) == str(new_value):
+                return f"*{tenant.name}*'s phone is already {new_value}."
+            display_line = f"Phone: {old_value} → *{new_value}*"
+        elif field == "gender":
+            old_value = tenant.gender or "not set"
+            if str(old_value).lower() == str(new_value).lower():
+                return f"*{tenant.name}* is already {new_value}."
+            display_line = f"Gender: {old_value} → *{new_value}*"
+        else:
+            return f"Unknown update field: {field}."
+
+        action_data_confirm = {
+            "tenancy_id": tenancy.id,
+            "field": field,
+            "old_value": str(old_value),
+            "new_value": new_value,
+            "tenant_name": tenant.name,
+        }
+        if field == "phone":
+            action_data_confirm["tenant_id"] = tenant.id
+            action_data_confirm["table"] = "tenants"
 
         option_choices = [
             {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes, update"},
@@ -2887,18 +2925,11 @@ async def resolve_pending_action(
         ]
         await _save_pending(
             pending.phone, "CONFIRM_FIELD_UPDATE",
-            {
-                "tenancy_id": tenancy.id,
-                "field": "sharing_type",
-                "old_value": old_sharing,
-                "new_value": new_sharing,
-                "tenant_name": tenant.name,
-            },
-            option_choices, session,
+            action_data_confirm, option_choices, session,
         )
         return (
             f"Update *{tenant.name}*{room_label}?\n\n"
-            f"Sharing: {old_sharing} → *{new_sharing}*\n\n"
+            f"{display_line}\n\n"
             f"Reply *1* to confirm or *2* to cancel."
         )
 
