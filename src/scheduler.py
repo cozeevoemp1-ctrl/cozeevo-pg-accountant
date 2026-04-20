@@ -154,23 +154,23 @@ def start_scheduler() -> AsyncIOScheduler:
     # nothing scheduled → nothing sent (no empty "no movements" noise).
     # Recipients: every admin / owner / receptionist in authorized_users
     # (includes Lokesh 7680814628).
-    # 9am → TOMORROW so reception has the full day to prep rooms.
-    # 2pm → TODAY as a last-chance heads-up (most check-ins land evening).
+    # 9am → TODAY (morning briefing of what's happening today).
+    # 2pm → TOMORROW (afternoon heads-up so reception can prep for next day).
     scheduler.add_job(
         _prep_reminder,
         trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
-        id="prep_reminder_tomorrow",
-        name="Prep Reminder — tomorrow's checkins/outs (9am IST)",
+        id="prep_reminder_today",
+        name="Prep Reminder — today's checkins/outs (9am IST)",
         replace_existing=True,
-        kwargs={"when": "tomorrow"},
+        kwargs={"when": "today"},
     )
     scheduler.add_job(
         _prep_reminder,
         trigger=CronTrigger(hour=14, minute=0, timezone="Asia/Kolkata"),
-        id="prep_reminder_today",
-        name="Prep Reminder — today's checkins/outs (2pm IST)",
+        id="prep_reminder_tomorrow",
+        name="Prep Reminder — tomorrow's checkins/outs (2pm IST)",
         replace_existing=True,
-        kwargs={"when": "today"},
+        kwargs={"when": "tomorrow"},
     )
 
     scheduler.start()
