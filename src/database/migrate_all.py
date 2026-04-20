@@ -1075,11 +1075,12 @@ async def run_extend_onboarding_sessions(conn) -> None:
         ))
     except Exception:
         pass
-    # Daily stay fields
+    # Daily stay fields + sharing override
     for col_name, col_type in [
         ("checkout_date", "DATE"),
         ("num_days", "INTEGER DEFAULT 0"),
         ("daily_rate", "NUMERIC(10,2) DEFAULT 0"),
+        ("sharing_type", "VARCHAR(20)"),
     ]:
         try:
             await conn.execute(text(

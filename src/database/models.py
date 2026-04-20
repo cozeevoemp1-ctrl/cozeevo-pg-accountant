@@ -821,6 +821,7 @@ class OnboardingSession(Base):
     maintenance_fee   = Column(Numeric(10, 2), default=0)
     booking_amount    = Column(Numeric(12, 2), default=0)
     advance_mode      = Column(String(10))
+    sharing_type      = Column(String(20))          # receptionist override at create-time (single/double/triple/premium)
     checkin_date      = Column(Date)
     stay_type         = Column(String(10), default="monthly")
     lock_in_months    = Column(Integer, default=0)

@@ -158,6 +158,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
             maintenance_fee=Decimal(str(req.maintenance_fee)),
             booking_amount=Decimal(str(req.booking_amount)),
             advance_mode=req.advance_mode if req.booking_amount > 0 else "",
+            sharing_type=(req.sharing_type or "").strip().lower() or None,
             checkin_date=date.fromisoformat(req.checkin_date),
             stay_type=req.stay_type,
             lock_in_months=req.lock_in_months,
@@ -695,11 +696,17 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
             # ── Monthly stay path ──────────────────────────────────────────
             # Resolve tenancy.sharing_type in this priority:
             #   1. receptionist override from review form (overrides["sharing_type"])
-            #   2. room.room_type (master data default — never mutated)
+            #   2. receptionist pick at CREATE time (obs.sharing_type)
+            #   3. room.room_type (master data default — never mutated)
             # This lets us book a "premium" tenancy in a "double" master room
             # (one tenant paying for both beds) without changing master data.
             from src.database.models import SharingType
-            effective_sharing = (overrides.get("sharing_type") or sharing or "").strip().lower()
+            effective_sharing = (
+                overrides.get("sharing_type")
+                or (obs.sharing_type or "")
+                or sharing
+                or ""
+            ).strip().lower()
             sharing_default = None
             if effective_sharing in ("single", "double", "triple", "premium"):
                 try:
