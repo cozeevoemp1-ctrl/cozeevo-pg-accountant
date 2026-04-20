@@ -117,7 +117,7 @@ async def scenario(name: str, turns: list[tuple[str, callable]]) -> None:
     (ok: bool, note: str). The scenario PASSes only if every turn's check returns ok."""
     phone_norm = _normalize(ADMIN_PHONE)
     await _purge_pending(phone_norm)
-    ctx = CallerContext(phone=ADMIN_PHONE, role="admin", staff_id=None, tenancy_id=None, tenant_id=None)
+    ctx = CallerContext(phone=ADMIN_PHONE, role="admin", name="Kiran")
 
     notes: list[str] = []
     ok = True
