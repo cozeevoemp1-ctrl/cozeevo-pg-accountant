@@ -2,6 +2,62 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.41.0] — 2026-04-20 (late evening #2) — Sync invariant + live ops fixes
+
+Post-compact session. Focus: closing every gap between DB ↔ sheet ↔ dashboard KPIs, plus live UX bugs Prabhakaran / Lokesh hit.
+
+### Added
+- **`cozeevo_checkout_confirmation` wired** into `_do_checkout` ([owner_handler.py](src/whatsapp/handlers/owner_handler.py)) — fire-and-forget template + free-text fallback. Active once Meta approves.
+- **`cozeevo_payment_received` wired** into `_do_log_payment_by_ids` ([account_handler.py](src/whatsapp/handlers/account_handler.py)) — 4 vars, no payment mode.
+- **`src/database/field_registry.py`** — Phase 1 field registry. 40+ `Field` entries as single source of truth. Derives `MONTHLY_HEADERS`, `TENANTS_HEADERS`, `_TENANTS_FIELD_TO_HEADER`, `_FIELD_TO_COL`, plus `fields_for_pwa()` helper for the future API endpoint.
+- **Emergency Contact Phone** — additive TENANTS column (legacy "Emergency Contact" column stays, now strictly name-only).
+- **`tests/test_field_registry.py`** — 10 parity + invariant tests.
+- **OnboardingSession.sharing_type column** + migration. Create-time receptionist override now persists. Approve honors it instead of falling back to `room.room_type` master.
+- **Editable Sharing Type dropdown** in the review form ([admin_onboarding.html](static/admin_onboarding.html)). Receptionist can flip single/double/triple/premium per tenancy — never touches master data.
+- **SHARING TYPE CHANGE** section in [docs/RECEPTIONIST_CHEAT_SHEET.md](docs/RECEPTIONIST_CHEAT_SHEET.md).
+- **Generic `FIELD_UPDATE_WHO` disambiguation** — sharing / rent / phone / gender / deposit handlers in `update_handler.py` all use the `_disambiguate_or_pick` helper. No more LIMIT-1 silent-pick when 2+ tenants share a name (3 Rakesh case).
+- **`Staff.room_id`** column + migration. Was referenced in handler code but missing in VPS schema → AttributeError on QUERY_STAFF_ROOMS.
+- **Multi-room command support** in `update_room` — "not staff rooms 114 and 618" applies to both.
+- **Bare-cancel short-circuit** in chat_api — `cancel / stop / abort / nevermind` with no pending returns a clean "Nothing to cancel right now." (Groq was hallucinating it as VOID_PAYMENT).
+- **Prabhakaran granted `admin` role** via `authorized_users`.
+
+### Fixed
+- **Nginx `client_max_body_size` 1M → 20M** on `/etc/nginx/sites-available/pg-accountant`. Tenant form submits (signature + selfie + ID base64 ≈ 3MB) were silently rejected at edge. 6 failed attempts observed in nginx error log before this was caught.
+- **`sync_tenant_all_fields`** — refund audit gap closed: now writes `Refund Status` + `Refund Amount` to TENANTS.
+- **`_do_add_refund_by_ids`** — fires `sync_tenant_all_fields` post-flush. Was DB-only → dashboard pending-refund KPI went stale.
+- **`_do_update_checkout_date`** — fires sheet sync post-flush. Was DB-only → exit-pipeline KPI went stale.
+- **`resolve_field_update`** — after "Reply 1" confirm, the monthly-tab single-cell write is now followed by a systemic `sync_tenant_all_fields` so TENANTS master catches up. Previously only monthly tab updated.
+- **5 cancel paths in `resolve_pending_action`** now set `pending.resolved = True`. Root cause of "cancel doesn't let me start a new flow" — pending row stayed alive so the next message bumped the same dead resolver.
+- **FIELD_UPDATE_WHO resolver** — missing `_save_pending` import caused Python scoping error. Resolver returned None → chat_api killed the pending → fell through to ConversationAgent replying "I don't understand '3'". Prabhakaran saw this live; added explicit import.
+- **`QUERY_STAFF_ROOMS` vs `UPDATE_ROOM` regex** — "not staff rooms 114 and 618" now routes to UPDATE_ROOM (was silently re-listing).
+- **Sheet sharing-type after editable review** — `approve_session` uses `effective_sharing` in sheet write, not `room.room_type`.
+
+### Changed
+- `src/integrations/gsheets.py` — `MONTHLY_HEADERS` + 3 related structures now derive from the registry. Positional `T_*` / `M_*` indices preserved (refund write path unchanged).
+- TENANTS tab 34 → 35 columns (additive Emergency Contact Phone).
+
+### Sync invariant (now explicit, across the board)
+Every bot-triggered DB mutation propagates:
+- DB commit → instant
+- Monthly + TENANTS sheet → 1-2s (fire-and-forget `sync_tenant_all_fields` or specialised per-event write)
+- Google Sheet DASHBOARD tab → auto via `onEdit` trigger
+- `/dashboard` web UI → still manual reload (no polling — left as optional follow-up)
+
+### Commits in this session
+`1245f89 → 9f2d151 → 2b38afa → 593734c → 7e6e5b4 → 9eba958 → efa48a1 → f45a508 → 48e5daa → 441a4e5 → 64f7617 → 7633abc → 71fa2e0 → 57fbecb`
+
+### Still pending (carries to next session)
+- Edit `cozeevo_booking_confirmation` body via Meta API once APPROVED.
+- Phase 2 field registry: `GET /api/v2/app/field-registry` endpoint (helper already exists).
+- Phase 3: PWA consumer of the registry.
+- 16 state-management golden failures (carried from prior session).
+- Web dashboard polling / SSE at `/dashboard`.
+- Kiran: add "Emergency Contact Phone" column header in the TENANTS Google Sheet tab so the additive field starts populating.
+- `MY_BALANCE` bug at `tenant_handler.py:104` (prev_due not included).
+- Live Lokesh issues: staff-room unmark end-to-end retest (logic shipped, needs him to retry).
+
+---
+
 ## [1.40.0] — 2026-04-20 (late evening) — State-mgmt fixes + RentSchedule first-month = rent + deposit
 
 ### Fixed (state management)
