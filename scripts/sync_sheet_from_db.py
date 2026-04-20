@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, selectinload
 from src.database.models import (
     Tenancy, Tenant, Room, Property, TenancyStatus,
-    RentSchedule, RentStatus, Payment, PaymentFor,
+    RentSchedule, RentStatus, Payment, PaymentFor, Staff,
 )
 # Canonical column list (single source of truth). Row width and column
 # letters are derived from this — never hardcoded.
@@ -146,6 +146,9 @@ async def main(args):
                 Payment.for_type == PaymentFor.rent,
             )
         )).scalars().all()
+        # Track most recent payment per tenancy to derive "entered by" (who
+        # recorded the most recent payment for this period).
+        latest_pay_per_t: dict[int, Payment] = {}
         for p in pay_rows:
             if p.tenancy_id not in payment_map:
                 payment_map[p.tenancy_id] = {"cash": Decimal("0"), "upi": Decimal("0")}
@@ -154,6 +157,27 @@ async def main(args):
                 payment_map[p.tenancy_id]["upi"] += p.amount
             else:
                 payment_map[p.tenancy_id]["cash"] += p.amount
+            # Most recent by created_at, fallback to payment_date
+            _prev = latest_pay_per_t.get(p.tenancy_id)
+            _p_ts = getattr(p, "created_at", None) or p.payment_date
+            _prev_ts = (getattr(_prev, "created_at", None) or _prev.payment_date) if _prev else None
+            if _prev is None or (_p_ts and _prev_ts and _p_ts > _prev_ts):
+                latest_pay_per_t[p.tenancy_id] = p
+
+        # Resolve received_by_staff_id → Staff.name in one bulk query.
+        entered_by_map: dict[int, str] = {}  # tenancy_id -> staff name
+        staff_ids = {
+            p.received_by_staff_id for p in latest_pay_per_t.values()
+            if p.received_by_staff_id
+        }
+        if staff_ids:
+            staff_rows = (await session.execute(
+                select(Staff.id, Staff.name).where(Staff.id.in_(staff_ids))
+            )).all()
+            _staff_name_by_id = {sid: name for sid, name in staff_rows}
+            for tid, pay in latest_pay_per_t.items():
+                if pay.received_by_staff_id and pay.received_by_staff_id in _staff_name_by_id:
+                    entered_by_map[tid] = _staff_name_by_id[pay.received_by_staff_id]
 
         # Booking-advance payments — keyed by tenancy_id. Applied to first-month
         # tenants only (decided in row builder below), so we fetch *all* booking
@@ -306,10 +330,10 @@ async def main(args):
 
             # DB is source of truth. Sheet lookups only used as migration
             # fallback while pre-existing sheet-only content is copied over.
-            # - notice date: Tenancy.notice_date  (DB field exists)
-            # - notes:       Tenancy.notes         (DB field exists)
-            # - entered by:  receptionist-cosmetic only; keep sheet fallback
-            #                until we wire it to Payment.received_by_staff.
+            # - notice date: Tenancy.notice_date          (DB)
+            # - notes:       Tenancy.notes                 (DB)
+            # - entered by:  Staff.name via Payment.received_by_staff_id (DB,
+            #                derived from latest Payment in this period)
             key = (room.room_number, tenant.name.lower())
             preserved = sheet_lookup.get(key, {})
             notice = (
@@ -318,7 +342,9 @@ async def main(args):
             )
             db_notes = (tenancy.notes or "").strip()
             existing_notes = db_notes or preserved.get("notes", "")
-            entered = preserved.get("entered by", "")  # TODO: derive from Payment
+            # Sheet fallback kept only during migration so historical entries
+            # don't vanish; future payments populate received_by_staff_id.
+            entered = entered_by_map.get(tenancy.id, "") or preserved.get("entered by", "")
 
             # Prev due from DB (previous month's unpaid rent), not from sheet
             prev_due_num = prev_due_map.get(tenancy.id, 0)

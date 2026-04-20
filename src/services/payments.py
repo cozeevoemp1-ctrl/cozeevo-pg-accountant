@@ -192,6 +192,24 @@ async def log_payment(
         or Decimal("0")
     )
 
+    # ── Resolve the receptionist who recorded this ─────────────────────────
+    # recorded_by is typically the caller's phone (or name). Normalise to last
+    # 10 digits and look up Staff by phone so received_by_staff_id is set on
+    # the Payment row. Sheet's "entered by" column + audit trails depend on
+    # this being populated.
+    received_by_staff_id: Optional[int] = None
+    if recorded_by:
+        import re as _re
+        from src.database.models import Staff as _Staff
+        _digits = _re.sub(r"[^0-9]", "", recorded_by)
+        if len(_digits) >= 10:
+            _phone10 = _digits[-10:]
+            _staff = await session.scalar(
+                select(_Staff).where(_Staff.phone.like(f"%{_phone10}"))
+            )
+            if _staff:
+                received_by_staff_id = _staff.id
+
     # ── Create Payment row ─────────────────────────────────────────────────
     payment = Payment(
         tenancy_id=tenancy.id,
@@ -203,6 +221,7 @@ async def log_payment(
         notes=notes or f"Logged by {recorded_by}",
         is_void=False,
         receipt_url=None,
+        received_by_staff_id=received_by_staff_id,
     )
     session.add(payment)
     await session.flush()  # get payment.id
