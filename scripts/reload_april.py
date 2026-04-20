@@ -307,8 +307,16 @@ def build_april_rows(
     """Build 17-column rows for APRIL 2026."""
     from src.integrations.gsheets import _safe_parse_numeric
 
+    def _ci_key(item):
+        ci = item[1].get("checkin") or ""
+        try:
+            dt = datetime.strptime(ci, "%d/%m/%Y")
+        except (ValueError, TypeError):
+            dt = datetime.min  # missing dates go to top so latest check-in stays at the bottom
+        return (dt, item[0][0], item[0][1])
+
     rows = []
-    for key, ex in sorted(excel_data.items(), key=lambda x: (x[0][0], x[0][1])):
+    for key, ex in sorted(excel_data.items(), key=_ci_key):
         room, name_lower = key
         name = ex["name"]
 

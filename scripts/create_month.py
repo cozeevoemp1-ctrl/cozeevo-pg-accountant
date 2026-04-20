@@ -177,6 +177,11 @@ def create_month(month_name, year):
             "entered by": "",
         })
 
+    def _ci_key(r):
+        dt = parse_date(r.get("check-in", ""))
+        return (dt or date.min, str(r.get("room", "")), str(r.get("name", "")))
+    rows.sort(key=_ci_key)
+
     print(f"Creating {tab}: {len(rows)} tenants...")
 
     # ── Create worksheet ────────────────────────────────────────────────────

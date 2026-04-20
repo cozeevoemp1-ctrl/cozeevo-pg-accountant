@@ -202,6 +202,10 @@ def main():
     tenants = read_history()
     print(f"  {len(tenants)} tenants parsed")
 
+    # Sort by check-in ascending so every tab (TENANTS + monthly) has latest check-in at the bottom.
+    # None/missing check-ins sink to the top so the real latest stays last.
+    tenants.sort(key=lambda t: (t.get('checkin') or date.min, str(t.get('room', '')), str(t.get('name', ''))))
+
     # No-show count is calculated per-month (only those whose checkin >= month start)
 
     # ── Step 2: Write to Google Sheet ────────────────────────────────────
