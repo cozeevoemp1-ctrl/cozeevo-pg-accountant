@@ -54,6 +54,8 @@ from src.whatsapp.handlers.update_handler import (
     query_audit as _query_audit,
     query_rent_history as _query_rent_history,
     query_staff_rooms as _query_staff_rooms,
+    assign_staff_to_room as _assign_staff_to_room,
+    exit_staff_from_room as _exit_staff_from_room,
 )
 from services.property_logic import (
     NOTICE_BY_DAY,
@@ -123,6 +125,8 @@ async def handle_owner(
         "QUERY_AUDIT":        _query_audit,
         "QUERY_RENT_HISTORY": _query_rent_history,
         "QUERY_STAFF_ROOMS":  _query_staff_rooms,
+        "ASSIGN_STAFF_ROOM":  _assign_staff_to_room,
+        "EXIT_STAFF":         _exit_staff_from_room,
         "CHANGE_ROOM":        _room_transfer_prompt,  # alias for ROOM_TRANSFER
         "ASSIGN_ROOM":        _assign_room_prompt,
         "QUERY_UNHANDLED":    _query_unhandled,
@@ -2877,6 +2881,7 @@ async def resolve_pending_action(
         return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
 
     if chosen is not None and pending.intent == "FIELD_UPDATE_WHO":
+        from src.whatsapp.handlers._shared import _save_pending
         tenant = await session.get(Tenant, chosen["tenant_id"])
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
         if not tenant or not tenancy:
