@@ -486,15 +486,25 @@ async def _update_single_room(room_num: str, desc: str, ctx: CallerContext, sess
 
     # Staff room toggle (no revenue)
     toggle = _classify_staff_toggle(desc_lower)
-    if toggle == "mark":
+    if toggle in ("mark", "unmark"):
+        new_val = (toggle == "mark")
         old = room.is_staff_room
-        room.is_staff_room = True
-        _audit_room("is_staff_room", old, True)
-        return f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations)."
-    if toggle == "unmark":
-        old = room.is_staff_room
-        room.is_staff_room = False
-        _audit_room("is_staff_room", old, False)
+        room.is_staff_room = new_val
+        _audit_room("is_staff_room", old, new_val)
+        # Toggling is_staff_room changes the total-beds denominator used in the
+        # monthly tab summary banner (Active / Beds / Vacant / Occupancy). Fire
+        # a monthly sheet sync so those cells refresh immediately rather than
+        # waiting for the next tenant-level mutation. Per sop_db_sheet_financial:
+        # any DB change visible in the sheet must trigger a sheet write.
+        try:
+            from src.integrations import gsheets as _gs
+            from datetime import date as _date
+            _today = _date.today()
+            _gs.trigger_monthly_sheet_sync(_today.month, _today.year)
+        except Exception:
+            pass
+        if new_val:
+            return f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations)."
         return f"Room *{room_num}* is now a *revenue room* (included in calculations)."
 
     return (
