@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.43.0] — 2026-04-20 (late night) — Audit batches 1 + 2
+
+Acted on parallel security/flow/sync/scheduler audit (4 Explore subagents).
+
+### Security & infra (batch 1)
+- **Webhook signature now FAILS CLOSED.** [`webhook_handler.py`](src/whatsapp/webhook_handler.py) used to silently skip the X-Hub-Signature-256 check if `WHATSAPP_APP_SECRET` was missing or still the placeholder. Now: production rejects all requests until secret set; dev opt-out via `WHATSAPP_SKIP_SIG_CHECK=1`.
+- **`/api/entities/{pending,approve,reject}` now require admin PIN** ([main.py:297-323](main.py#L297-L323)). Were fully open — anyone could approve master-data entries.
+- **All `subprocess.run` paths use `sys.executable`** instead of hardcoded `venv/Scripts/python` (Windows-only). Affected: [sync_router.py](src/api/sync_router.py), [scheduler.py](src/scheduler.py), [run_monthly_rollover.py](scripts/run_monthly_rollover.py). VPS no longer relies on identical relative path.
+- **`_overnight_source_sync` alerts admin on failure.** Steps 2 + 3 now check returncode (were silent). Failures Whatsapp the admin via `_send_whatsapp` so silent corruption can't drift.
+
+### Handler bugs (batch 2)
+- **`pending.resolved = True`** added at 5 sites in [owner_handler.py](src/whatsapp/handlers/owner_handler.py): COLLECT_RECEIPT skip (945), COLLECT_RECEIPT save (978), UNDERPAYMENT_NOTE skip (2695), UNDERPAYMENT_NOTE save (2710), OVERPAYMENT_ADD_NOTE save (2683). All previously returned success but left pending alive → user looped forever.
+- **Overpayment carry-forward Payment** ([owner_handler.py:2623](src/whatsapp/handlers/owner_handler.py#L2623)) now writes AuditLog + fires `sync_tenant_all_fields`. Was DB-only — dashboard "Total Paid" KPI went stale.
+
+### Verified safe before deploy
+- VPS `WHATSAPP_APP_SECRET` confirmed set + not placeholder
+- `ONBOARDING_ADMIN_PIN` confirmed configured
+
+---
+
 ## [1.42.0] — 2026-04-20 (night) — Monthly rollover + rules single-source
 
 ### Added
