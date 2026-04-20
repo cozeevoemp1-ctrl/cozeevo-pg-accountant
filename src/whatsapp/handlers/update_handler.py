@@ -768,8 +768,10 @@ async def _apply_staff_assignment(
                 source="whatsapp",
             ))
 
+    room_flag_changed = False
     if not room.is_staff_room:
         room.is_staff_room = True
+        room_flag_changed = True
         session.add(AuditLog(
             changed_by=ctx.phone or "system",
             entity_type="room", entity_id=room.id,
@@ -777,6 +779,15 @@ async def _apply_staff_assignment(
             old_value="False", new_value="True",
             room_number=room.room_number, source="whatsapp",
         ))
+
+    if room_flag_changed:
+        try:
+            from src.integrations import gsheets as _gs
+            from datetime import date as _d
+            _t = _d.today()
+            _gs.trigger_monthly_sheet_sync(_t.month, _t.year)
+        except Exception:
+            pass
 
     verb = "Added" if created else "Assigned"
     return (f"{verb} *{staff.name}*"
@@ -868,6 +879,13 @@ async def _apply_staff_exit(staff, ctx: CallerContext, session: AsyncSession) ->
                     old_value="True", new_value="False",
                     room_number=room.room_number, source="whatsapp",
                 ))
+                try:
+                    from src.integrations import gsheets as _gs
+                    from datetime import date as _d
+                    _t = _d.today()
+                    _gs.trigger_monthly_sheet_sync(_t.month, _t.year)
+                except Exception:
+                    pass
                 msg_room_freed = (f"\nRoom *{room.room_number}* is now a revenue room "
                                   "and will appear in available rooms.")
             elif remaining is not None:
