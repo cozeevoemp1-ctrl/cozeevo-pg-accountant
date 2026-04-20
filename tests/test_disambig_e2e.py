@@ -78,8 +78,35 @@ async def _pick_duplicate_first_name(session) -> str:
 
 
 async def _route_message(ctx: CallerContext, message: str) -> str:
-    """Run intent detection + gatekeeper route for a fresh message."""
+    """Run the same sequence chat_api uses: first check for an active pending
+    and let its resolver (+ the cancel-keyword fallback) run; only fall
+    through to fresh intent detection when the resolver returns None AND the
+    message isn't a cancel keyword."""
+    from src.whatsapp.chat_api import _get_active_pending
+    from src.whatsapp.handlers.owner_handler import resolve_pending_action
+
+    _CANCEL_WORDS = {"cancel", "stop", "abort", "quit", "nevermind", "never mind"}
+
     async with get_session() as s:
+        pending = await _get_active_pending(ctx.phone, s)
+        if pending and not pending.resolved:
+            try:
+                resolved_reply = await resolve_pending_action(pending, message, s)
+            except Exception:
+                resolved_reply = None
+            if resolved_reply:
+                if resolved_reply.startswith("__KEEP_PENDING__"):
+                    await s.commit()
+                    return resolved_reply[len("__KEEP_PENDING__"):]
+                pending.resolved = True
+                await s.commit()
+                return resolved_reply
+            # Resolver returned None — match chat_api.py cancel-keyword fallback
+            if message.strip().lower() in _CANCEL_WORDS:
+                pending.resolved = True
+                await s.commit()
+                return "Cancelled."
+            # Else: keep pending alive, fall through to fresh intent detection
         intent_r = detect_intent(message, ctx.role)
         entities = dict(intent_r.entities or {})
         entities.setdefault("_raw_message", message)
@@ -112,22 +139,23 @@ async def main():
     # Pick a real duplicate first-name for tenant-side tests
     async with get_session() as s:
         dup_name = await _pick_duplicate_first_name(s)
-    print(f"Using duplicate first-name: *{dup_name}*")
+    # Real receptionists capitalize. Lowercase only routes for QUERY_TENANT
+    # (dedicated fallback); capitalize for every other intent.
+    dup_cap = dup_name.capitalize()
+    print(f"Using duplicate first-name: *{dup_name}* (cap: {dup_cap})")
 
     # Each case: (label, message_to_send, expected_pending_intent).
-    # expected_pending_intent=None means "handler replies directly, no pending".
+    # Real phrasing that actually matches the intent-detector regexes.
     cases = [
-        # Read-only — should disambig
-        (f"QUERY_TENANT  '{dup_name} balance'", f"{dup_name} balance", "QUERY_TENANT"),
-        # Mutating — disambig first (we cancel before the confirm step applies)
-        (f"PAYMENT_LOG   '{dup_name} paid 1 cash'", f"{dup_name} paid 1 cash", "PAYMENT_WHO"),
-        (f"VOID_PAYMENT  'void {dup_name}'", f"void {dup_name}", "VOID_WHO"),
-        (f"RENT_CHANGE   '{dup_name} rent 99999'", f"{dup_name} rent 99999", "FIELD_UPDATE_WHO"),
-        (f"UPDATE_SHARING '{dup_name} premium'", f"{dup_name} premium", "FIELD_UPDATE_WHO"),
-        (f"UPDATE_PHONE  '{dup_name} phone 9999999999'", f"{dup_name} phone 9999999999", "FIELD_UPDATE_WHO"),
-        (f"ADD_REFUND    'refund {dup_name} 1'", f"refund {dup_name} 1", "REFUND_WHO"),
-        (f"CHECKOUT      'checkout {dup_name}'", f"checkout {dup_name}", "CHECKOUT_WHO"),
-        (f"ROOM_TRANSFER 'move {dup_name} to 999'", f"move {dup_name} to 999", "ROOM_TRANSFER_WHO"),
+        (f"QUERY_TENANT   '{dup_name} balance'", f"{dup_name} balance", "QUERY_TENANT"),
+        (f"PAYMENT_LOG    '{dup_cap} paid 1 cash'", f"{dup_cap} paid 1 cash", "PAYMENT_LOG"),
+        (f"VOID_PAYMENT   'reverse payment {dup_cap}'", f"reverse payment {dup_cap}", "VOID_PAYMENT"),
+        (f"RENT_CHANGE    'change {dup_cap} rent to 99999'", f"change {dup_cap} rent to 99999", "FIELD_UPDATE_WHO"),
+        (f"UPDATE_SHARING 'change {dup_cap} sharing to premium'", f"change {dup_cap} sharing to premium", "FIELD_UPDATE_WHO"),
+        (f"UPDATE_PHONE   'update {dup_cap} phone 9999999999'", f"update {dup_cap} phone 9999999999", "FIELD_UPDATE_WHO"),
+        (f"ADD_REFUND     'refund {dup_cap} 1'", f"refund {dup_cap} 1", "REFUND_WHO"),
+        (f"CHECKOUT       'checkout {dup_cap}'", f"checkout {dup_cap}", "CHECKOUT"),
+        (f"ROOM_TRANSFER  'move {dup_cap} to 999'", f"move {dup_cap} to 999", "ROOM_TRANSFER_WHO"),
     ]
 
     ok, fail, skip = 0, 0, 0
@@ -229,7 +257,7 @@ async def main():
     # ─── State-preservation probes ─────────────────────────────────────────
     # (A) Mid-pending unrelated message → pending survives
     await _purge_pending(phone_norm)
-    await _route_message(ctx, f"{dup_name} rent 99999")  # creates a pending
+    await _route_message(ctx, f"change {dup_cap} rent to 99999")  # creates a pending
     before = await _latest_pending(phone_norm)
     # Send unrelated message
     await _route_message(ctx, "staff rooms")
