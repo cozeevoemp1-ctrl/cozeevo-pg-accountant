@@ -3634,6 +3634,16 @@ async def _do_checkout(
     if checkout_date_val > date.today():
         # Future date → schedule only, tenancy stays active
         tenancy.expected_checkout = checkout_date_val
+        await session.commit()
+        # Gap A fix: propagate the expected_checkout to the sheet so the
+        # Event / Notice Date columns reflect the scheduled exit instantly
+        # (previously only the nightly cron picked this up).
+        try:
+            from src.integrations.gsheets import sync_tenant_all_fields as _sync_all
+            import asyncio as _aio
+            _aio.create_task(_sync_all(tenancy.tenant_id))
+        except Exception:
+            pass
         return (
             f"*Checkout scheduled for {tenant_name}*\n"
             f"Expected exit: {checkout_date_val.strftime('%d %b %Y')}\n"

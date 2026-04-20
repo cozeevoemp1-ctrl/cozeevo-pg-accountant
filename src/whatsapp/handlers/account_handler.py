@@ -884,6 +884,14 @@ async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str,
     import asyncio as _aio
     _aio.create_task(_instant_cell_update())
     _gs.trigger_monthly_sheet_sync(today.month, today.year)
+    # Gap B fix: first-month rent_due bundles deposit, so if the check-in
+    # month is different from the current month we need to re-sync that
+    # tab too — otherwise the check-in month's Rent Due / Balance cells
+    # stay stale until the nightly cron.
+    if tenancy.checkin_date:
+        ci = tenancy.checkin_date
+        if (ci.month, ci.year) != (today.month, today.year):
+            _gs.trigger_monthly_sheet_sync(ci.month, ci.year)
 
     return f"Deposit updated — *{tenant_name}* ₹{new_amount:,}"
 
