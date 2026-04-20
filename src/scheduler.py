@@ -224,7 +224,7 @@ async def _prep_reminder(when: str = "tomorrow") -> None:
                 WHERE tn.checkin_date = :target
                   AND tn.status IN ('active', 'no_show')
                 ORDER BY r.room_number
-            """), {"target": target.isoformat()})).fetchall()
+            """), {"target": target})).fetchall()
 
             checkouts = (await conn.execute(text("""
                 SELECT t.name, r.room_number, COALESCE(t.phone, '') AS phone,
@@ -235,7 +235,7 @@ async def _prep_reminder(when: str = "tomorrow") -> None:
                 WHERE tn.expected_checkout = :target
                   AND tn.status = 'active'
                 ORDER BY r.room_number
-            """), {"target": target.isoformat()})).fetchall()
+            """), {"target": target})).fetchall()
 
             admin_rows = (await conn.execute(text("""
                 SELECT phone FROM authorized_users
