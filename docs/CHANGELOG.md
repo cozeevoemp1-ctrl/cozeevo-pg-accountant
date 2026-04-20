@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.42.0] — 2026-04-20 (night) — Monthly rollover + rules single-source
+
+### Added
+- **`src/services/monthly_rollover.py`** — new DB-side generator. Upserts `RentSchedule` rows for the target month. Idempotent. Rules: active + no_show only; exited/cancelled skipped; first-month prorate; no-show → `RentStatus.na` + 0 due; no-shows carry every month until they check in.
+- **`scripts/run_monthly_rollover.py`** — atomic rollover runner. Sequence: source-sheet → DB → RentSchedule generation → sheet tab → sheet↔DB reconcile. Manual: `python scripts/run_monthly_rollover.py MAY 2026`.
+- **`/api/onboarding/{token}` now returns `rules`** — substituted `HOUSE_RULES` (pdf_generator.py is single source). Form renders them dynamically into `#rules-container`; no more drift between form and PDF.
+
+### Changed
+- **Scheduler rollover trigger** — moved from 1st-of-month 12:30 AM to **second-last calendar day 11 PM IST**. Job self-checks day using `calendar.monthrange` (handles 28/29/30/31-day months + leap years automatically). Calls `scripts/run_monthly_rollover.py` end-to-end.
+- **`_monthly_tab_rollover`** — now a proper atomic rollover, not just a sheet-tab writer. Source sync runs first (no more ordering race vs 3 AM `_overnight_source_sync`).
+- **[static/onboarding.html](static/onboarding.html)** — hardcoded 10-rule list removed; rules now fetched from API.
+
+### Fixed
+- **Silent DB↔sheet divergence on rollover** — the old `create_month.py` wrote the sheet tab but never created `RentSchedule` rows. Bot's dues calculations would've diverged from sheet from May onwards. Now the atomic runner generates both.
+
+### Notes
+- Deposit-pending carry-forward stays in the existing notes column (create_month.py:151-155). Sufficient per Kiran — first-month rent_due already includes deposit; any pending rolls into prev_due naturally.
+- Custom x-to-x billing cycles are NOT supported in code. Prorated first-month is the only mode. For x-to-x clients, add a `notes` entry manually and remember to skip last-month rent.
+
+---
+
 ## [1.41.0] — 2026-04-20 (late evening #2) — Sync invariant + live ops fixes
 
 Post-compact session. Focus: closing every gap between DB ↔ sheet ↔ dashboard KPIs, plus live UX bugs Prabhakaran / Lokesh hit.

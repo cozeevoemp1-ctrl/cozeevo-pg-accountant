@@ -882,17 +882,8 @@
     <div class="terms-box" id="terms-box">
       <p><strong>Cozeevo Co-living — Resident Agreement</strong></p>
       <p>By signing below, I confirm that I have read and agree to the following terms and conditions:</p>
-      <p><strong>1. Rent Payment:</strong> Monthly rent of <span id="terms-rent">—</span> is due by the 5th of each month. Late payments attract a penalty of ₹200 per day after the 5th.</p>
-      <p><strong>2. Security Deposit:</strong> A refundable security deposit of <span id="terms-deposit">—</span> has been collected. It will be refunded within 15 days of vacating, subject to deductions for damages.</p>
-      <p><strong>3. Lock-in Period:</strong> A minimum stay of <span id="terms-lockin">—</span> is required. Early exit within the lock-in period will result in forfeiture of the security deposit.</p>
-      <p><strong>4. Notice Period:</strong> A minimum 30-day written notice is required before vacating. Failure to provide notice will result in one month's rent being deducted from the deposit.</p>
-      <p><strong>5. Property Care:</strong> Residents are responsible for maintaining cleanliness in their rooms and shared spaces. Damage beyond normal wear and tear will be charged to the resident.</p>
-      <p><strong>6. Guests:</strong> Overnight guests are not permitted without prior approval from management. Day visitors must leave by 10 PM.</p>
-      <p><strong>7. Noise & Conduct:</strong> Quiet hours are 11 PM – 7 AM. Residents must respect fellow occupants and maintain decorum in all common areas.</p>
-      <p><strong>8. Prohibited Items:</strong> Cooking appliances, alcohol, tobacco products, and pets are not permitted inside the premises.</p>
-      <p><strong>9. Management Access:</strong> Management reserves the right to inspect rooms with 24-hour notice, or immediately in cases of emergency.</p>
-      <p><strong>10. Termination:</strong> Cozeevo reserves the right to terminate residency for violation of house rules, without refund of deposit.</p>
-      <p>I confirm that all information provided in this registration form is true and accurate to the best of my knowledge.</p>
+      <div id="rules-container"></div>
+      <p style="margin-top:10px;">I confirm that all information provided in this registration form is true and accurate to the best of my knowledge.</p>
     </div>
 
     <div class="signature-area" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:16px;">
@@ -999,6 +990,7 @@
         deposit: data.security_deposit || 0,
         lockin_months: data.lock_in_months || 0,
         maintenance: data.maintenance_fee || 0,
+        rules: data.rules || [],
       });
       document.getElementById('main-content').style.display = 'block';
     } catch (e) {
@@ -1032,10 +1024,19 @@
     document.getElementById('agree-deposit').textContent = fmtMoney(data.deposit);
     document.getElementById('agree-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : '—';
 
-    // Terms placeholders
-    document.getElementById('terms-rent').textContent = fmtMoney(data.monthly_rent);
-    document.getElementById('terms-deposit').textContent = fmtMoney(data.deposit);
-    document.getElementById('terms-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : 'agreed period';
+    // Render house rules (single source of truth: pdf_generator.HOUSE_RULES → API)
+    const rulesBox = document.getElementById('rules-container');
+    if (rulesBox && Array.isArray(data.rules) && data.rules.length) {
+      rulesBox.innerHTML = data.rules
+        .map((r, i) => `<p><strong>${i + 1}.</strong> ${escapeHtml(r)}</p>`)
+        .join('');
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
   }
 
   // ── Step navigation ────────────────────────────────────────────────────────

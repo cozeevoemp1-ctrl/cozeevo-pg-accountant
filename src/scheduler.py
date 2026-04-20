@@ -131,11 +131,13 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Rollover on second-last calendar day of every month at 23:00 IST.
+    # Job self-checks (handles 28/29/30/31-day months + leap years automatically).
     scheduler.add_job(
         _monthly_tab_rollover,
-        trigger=CronTrigger(day=1, hour=0, minute=30),  # 1st of every month at 12:30am
+        trigger=CronTrigger(hour=23, minute=0),  # daily 11pm; self-checks day
         id="monthly_tab_rollover",
-        name="Monthly Sheet Tab Rollover — 1st of month",
+        name="Monthly Rollover — 2nd-to-last calendar day, 11pm IST",
         replace_existing=True,
     )
 
@@ -147,8 +149,26 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Prep reminders for admins — 24h before + morning-of.
+    scheduler.add_job(
+        _prep_reminder,
+        trigger=CronTrigger(hour=18, minute=0),  # every day 6pm IST
+        id="prep_reminder_tomorrow",
+        name="Prep Reminder — tomorrow's checkins/outs (6pm IST)",
+        replace_existing=True,
+        kwargs={"when": "tomorrow"},
+    )
+    scheduler.add_job(
+        _prep_reminder,
+        trigger=CronTrigger(hour=8, minute=0),   # every day 8am IST
+        id="prep_reminder_today",
+        name="Prep Reminder — today's checkins/outs (8am IST)",
+        replace_existing=True,
+        kwargs={"when": "today"},
+    )
+
     scheduler.start()
-    logger.info("[Scheduler] Started — 7 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 9 jobs registered (jobs persist in Supabase)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -419,24 +439,73 @@ def _prune_old_backups(max_keep: int = 8) -> None:
 # ── Job: Monthly Sheet Tab Rollover ───────────────────────────────────────────
 
 async def _monthly_tab_rollover() -> None:
-    """Create new month's tab in Google Sheet on 1st of every month.
-    Copies active tenants, carries forward prev dues, includes deposit for first-month."""
+    """Atomic monthly rollover — fires daily at 23:00 IST, self-checks whether
+    today is the second-last calendar day of the month. If yes:
+      1. Pull source sheet → DB
+      2. Generate RentSchedule rows for NEXT month (active + no-show only,
+         exited/cancelled skipped; first-month prorate applied)
+      3. Create NEXT month's tab in Operations sheet
+      4. Reconcile sheet ↔ DB
+    Handles 28/29/30/31-day months + Feb leap years automatically via
+    calendar.monthrange (Python stdlib).
+    """
     import asyncio
+    import calendar
+    import subprocess
+    import sys
+    import os
     from datetime import date
-    MONTHS = ["JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY",
-              "AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"]
+
     today = date.today()
-    month_name = MONTHS[today.month - 1]
-    year = today.year
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    if today.day != last_day - 1:
+        # Not the second-last day — skip silently. Daily fire is intentional.
+        return
+
+    MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY",
+              "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
+    if today.month == 12:
+        next_year, next_month_num = today.year + 1, 1
+    else:
+        next_year, next_month_num = today.year, today.month + 1
+    next_month_name = MONTHS[next_month_num - 1]
+
+    logger.info("[Scheduler] Monthly rollover fire — target %s %d",
+                next_month_name, next_year)
+
+    # Pick python executable (VPS is linux → venv/bin/python)
+    py = "venv/Scripts/python" if os.name == "nt" else "venv/bin/python"
 
     try:
-        import sys, os
-        sys.path.insert(0, os.getcwd())
-        from scripts.create_month import create_month
-        await asyncio.to_thread(create_month, month_name, year)
-        logger.info("[Scheduler] Monthly tab rollover: created %s %d", month_name, year)
+        result = await asyncio.to_thread(
+            subprocess.run,
+            [py, "scripts/run_monthly_rollover.py", next_month_name, str(next_year)],
+            capture_output=True, text=True, timeout=900,
+        )
+        if result.returncode != 0:
+            logger.error("[Scheduler] Monthly rollover failed (rc=%s): %s",
+                         result.returncode, (result.stderr or result.stdout)[-600:])
+            if _ADMIN_PHONE:
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                await _send_whatsapp(
+                    _ADMIN_PHONE,
+                    f"⚠️ Monthly rollover FAILED for {next_month_name} {next_year}.\n"
+                    f"Check server logs. Run manually:\n"
+                    f"python scripts/run_monthly_rollover.py {next_month_name} {next_year}"
+                )
+            return
+
+        logger.info("[Scheduler] Monthly rollover done: %s %d",
+                    next_month_name, next_year)
+        if _ADMIN_PHONE:
+            from src.whatsapp.webhook_handler import _send_whatsapp
+            await _send_whatsapp(
+                _ADMIN_PHONE,
+                f"✅ Monthly rollover complete — {next_month_name} {next_year}\n"
+                f"Sheet tab created, RentSchedule rows generated, dashboard refreshed."
+            )
     except Exception as e:
-        logger.error("[Scheduler] Monthly tab rollover failed: %s", e)
+        logger.error("[Scheduler] Monthly rollover exception: %s", e)
 
 
 # ── Job: Overnight Source Sheet Reconciliation ─────────────────────────────────
