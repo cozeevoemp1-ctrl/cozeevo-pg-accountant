@@ -283,6 +283,23 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 ---
 
+### SHARING TYPE CHANGE
+
+Changes only the *tenant's* sharing, never the room's master type.
+Use this when one tenant pays extra to occupy the full room (premium)
+or when a sharing tier is renegotiated.
+
+| Message | What it does |
+|---------|-------------|
+| **change Raj sharing to premium** | Update tenant sharing type |
+| **update Raj sharing type to double** | Same |
+| **Raj is in premium sharing** | Same |
+| **set Raj sharing triple** | Same |
+
+Values: `single`, `double`, `triple`, `premium`.
+
+---
+
 ### RENT DISCOUNT / CONCESSION
 
 | Message | What it does |
