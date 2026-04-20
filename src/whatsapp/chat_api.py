@@ -238,9 +238,25 @@ async def _process_message_inner(
                 await _log(session, phone, message, ctx.role, "CANCEL", cancel_reply)
                 await session.commit()
                 return OutboundReply(reply=cancel_reply, intent="CANCEL", role=ctx.role)
-            if _breakout in ("greeting", "new_intent"):
-                # Clear pending and fall through to normal intent detection
+            if _breakout == "greeting":
+                # Greeting (hi/hello/thanks) — low-risk to silently clear pending
                 pending.resolved = True
+            elif _breakout == "new_intent":
+                # High-risk: user seemingly started a different task while one
+                # was active. Previously we silently cleared pending and fell
+                # through — but that vaporized Prabhakaran's sharing-change
+                # mid-flow on 2026-04-20. Now we HARD STOP: tell them they're
+                # in the middle of X, require explicit cancel to switch.
+                _intent_label = pending.intent.replace("_", " ").lower()
+                _stop_reply = (
+                    f"You're in the middle of a *{_intent_label}* flow.\n"
+                    f"Reply *cancel* to stop it, or continue with your answer."
+                )
+                await _log(session, phone, message, ctx.role,
+                           "FLOW_COLLISION", _stop_reply)
+                await session.commit()
+                return OutboundReply(
+                    reply=_stop_reply, intent="FLOW_COLLISION", role=ctx.role)
 
             # ── Intent-ambiguity resolution (e.g. "Raj 31st March" → checkin or checkout?) ──
             if not pending.resolved and pending.intent == "INTENT_AMBIGUOUS":
