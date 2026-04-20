@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.44.0] — 2026-04-20 (late night #2) — Audit batch 3 + MY_BALANCE + flow collision guard
+
+### Sync invariant (batch 3 partial)
+- **`sync_sheet_from_db.py`** now sources `notice date` + `notes` from `Tenancy.notice_date` / `Tenancy.notes` (DB). Sheet-preserved fallback kept during migration so existing sheet-only notes aren't wiped. `entered by` still sheet-only (TODO: derive from `Payment.received_by_staff`).
+
+### Audit trail (batch 3 partial)
+- **[owner_handler.py `_do_add_tenant`](src/whatsapp/handlers/owner_handler.py)** writes an `AuditLog` entry per checkin (summarises all generated `RentSchedule` rows + rent/deposit/advance values). Separately audits the booking-advance `Payment` with amount + mode. Previously checkin was DB-only with no audit record.
+
+### User-visible bugs fixed
+- **`MY_BALANCE` single-month query** ([tenant_handler.py:104](src/whatsapp/handlers/tenant_handler.py#L104)) now includes prev-month unpaid carry-forward. Was showing wrong outstanding when tenant asked about specific month while unpaid from earlier.
+- **Workflow-collision guard** in [chat_api.py](src/whatsapp/chat_api.py). When user has an unresolved pending and the new message is classified as a different intent, bot no longer silently vaporises the pending. Instead: *"You're in the middle of a <X> flow. Reply *cancel* to stop it, or continue with your answer."* Greetings still clear silently (low-risk). Root cause of Prabhakaran's mid-sharing-change loss on 2026-04-20. Surfaces to logs as `FLOW_COLLISION`.
+
+### Deferred (in `project_pending_tasks.md`)
+- CASCADE DELETE on `RentSchedule.tenancy_id` + `Payment.unique_hash` — schema migration, needs careful backfill
+- `SELECT...FOR UPDATE` pessimistic locking on concurrent Tenancy mutations
+- ADD_REFUND/QUERY_REFUNDS regex overlap — inspected, pattern ordering already correct for real-world inputs. Not a real bug.
+
+---
+
 ## [1.43.0] — 2026-04-20 (late night) — Audit batches 1 + 2
 
 Acted on parallel security/flow/sync/scheduler audit (4 Explore subagents).
