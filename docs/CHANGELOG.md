@@ -2,6 +2,35 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.39.0] — 2026-04-20 (evening) — Disambig audit + sheet auto-refresh + sort
+
+### Added
+- **`scripts/sort_monthly_by_checkin.py`** — one-off sorter for every monthly tab. Dynamic header-row detection, per-tab CSV backup in `data/backups/sort_<timestamp>/`, row-count + content-multiset checks post-write, no column truncation. Already run once against DEC 2025 → APRIL 2026 live.
+- **`tests/test_disambig_e2e.py`** — end-to-end disambiguation test. Routes messages through `intent_detector → gatekeeper → handler → pending → resolver` for every name-based intent (QUERY_TENANT, PAYMENT_LOG, VOID_PAYMENT, RENT_CHANGE, UPDATE_SHARING/RENT/PHONE, ADD_REFUND, CHECKOUT, ROOM_TRANSFER, ASSIGN_STAFF_ROOM, EXIT_STAFF). Mutating intents are auto-cancelled — safe on live DB. Also probes state-preservation + cancel.
+- **`ASSIGN_STAFF_ROOM` / `EXIT_STAFF` intents** — bot commands `staff [name] room [num]`, `staff [name] exit`, `assign staff [name] to [num]`. Many staff per room allowed (no sharing-type enforcement). Auto-flips `Room.is_staff_room` true on assign and back to false only when the last staff leaves.
+
+### Fixed
+- **Pending state silently dropped** (`src/whatsapp/chat_api.py:435`) — if a user mid-confirmation sent anything other than the expected choice, `pending.resolved = True` fired with no reply, killing state. Now: cancel keywords (`cancel`/`stop`/`abort`/`quit`/`nevermind`) close pending cleanly; anything else keeps pending alive and falls through to normal intent detection so side-tasks don't nuke confirmation flows.
+- **Monthly tab ordering** — `clean_and_load.py`, `create_month.py`, and `reload_april.py` now sort tenants by check-in ascending before writing, so the latest check-in always lands at the bottom. Missing check-ins sink to the top so the real latest stays last.
+- **Dashboard banner stale after sharing / rent / checkin change** — API writes don't fire the Apps Script `onEdit` trigger, so banner rows never refreshed after bot writes. Fix is at the gsheets layer: `_update_tenant_field_sync`, `_update_checkin_sync`, `_sync_tenant_all_fields_sync` all call `_refresh_summary_sync` post-write. Covers every caller (field updates, systemic sync, check-in changes); existing refresh in payment_log / add_tenant / record_checkout / record_notice / void_payment unchanged.
+- **Silent-pick disambig bugs** uncovered by full audit:
+  - `_add_refund` (account_handler) was picking `rows[0]` when multiple active or exited tenants matched the name. Now saves `REFUND_WHO` pending + prompts. `_do_add_refund_by_ids` extracted so the resolver can finish the refund once the user picks.
+  - `assign_staff_to_room` was `next((s for s … if s.name.lower() == name.lower()))` — silent first-match when 2+ active staff share a name. Now saves `ASSIGN_STAFF_WHO` pending. `_apply_staff_assignment` extracted.
+  - `exit_staff_from_room` was returning a plain text choice list with no pending saved — the user's `1` would route as a fresh intent, not a disambig reply. Now saves `EXIT_STAFF_WHO`; `_apply_staff_exit` extracted.
+  - Resolver branches for `ASSIGN_STAFF_WHO`, `EXIT_STAFF_WHO`, `REFUND_WHO` added to `resolve_pending_action` in `owner_handler.py`.
+
+### Verified
+- "disha balance" (and any duplicate first-name) path: QUERY_TENANT detects ambiguity, saves pending, shows numbered choices, resolves on `1`/`2`.
+- 2 active staff named `zzDupStaff` → `staff zzDupStaff room G05` → disambig pending saved → pick `1` → Manager linked to G05, Security untouched, room flipped to staff.
+- Post-write banner refresh recomputes `Active / Beds (X+YP) / Vacant / Occupancy` based on the updated sharing column (`gsheets.py:619` → 2 beds if premium, 1 otherwise).
+
+### Still pending (next session)
+- Run `tests/test_disambig_e2e.py` end-to-end and fix any failures before VPS deploy.
+- DEPOSIT_CHANGE end-to-end confirmation (audit flagged as OK structurally but not functionally tested).
+- Tenant-side pending: `chat_api.py:443` still unconditionally resolves after `resolve_tenant_complaint`; apply the same keep-pending rule if tenant flows grow multi-step.
+
+---
+
 ## [1.38.0] — 2026-04-20 — Field registry (Phase 1) + refund audit gap closed
 
 ### Added
