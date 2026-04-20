@@ -196,6 +196,17 @@ async def _process_message_inner(
                           phone, "FOUND" if pending else "NONE",
                           pending.intent if pending else "-",
                           pending.resolved if pending else "-")
+
+        # Bare "cancel" / "stop" / "abort" with no active pending — short
+        # circuit before Groq classification. LLM used to hallucinate these
+        # as VOID_PAYMENT, which triggered a fresh payment-void flow. Now
+        # we answer flatly and the user can start whatever they want next.
+        _bare = message.strip().lower().rstrip(".!?")
+        if (not pending or pending.resolved) and _bare in ("cancel", "stop", "abort", "nevermind", "never mind"):
+            _reply = "Nothing to cancel right now."
+            await _log(session, phone, message, ctx.role, "CANCEL_NOOP", _reply)
+            await session.commit()
+            return OutboundReply(reply=_reply, intent="CANCEL_NOOP", role=ctx.role)
         # File-based debug log for VPS tracing
         import json as _dbg_json
         def _safe_parse_ad(raw):
