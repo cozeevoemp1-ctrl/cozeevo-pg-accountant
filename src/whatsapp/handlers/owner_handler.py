@@ -1246,8 +1246,8 @@ async def resolve_pending_action(
         )
 
     if pending.intent == "CONFIRM_FIELD_UPDATE":
-        choice = reply_text.strip()
-        if choice in ("1", "yes", "y"):
+        from src.whatsapp.handlers.update_handler import _is_confirm_choice
+        if _is_confirm_choice(reply_text):
             result = await _resolve_field_update("1", action_data, session, changed_by=pending.phone)
         else:
             result = await _resolve_field_update("2", action_data, session, changed_by=pending.phone)

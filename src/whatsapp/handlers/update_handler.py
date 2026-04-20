@@ -343,6 +343,52 @@ async def update_deposit(entities: dict, ctx: CallerContext, session: AsyncSessi
 
 # ── UPDATE ROOM (AC, type, maintenance) ──────────────────────────────────────
 
+# Staff-room toggle phrase patterns. UNMARK is checked before MARK so
+# phrases like "not staff rooms 114 and 618" or "114 not staff room"
+# (where "staff room" is a substring of "staff rooms" / "not staff room")
+# don't hijack the MARK branch via substring match.
+_STAFF_UNMARK_PATTERNS = (
+    "not staff", "remove staff", "no staff", "unmark staff",
+    "revenue room", "tenant room",
+)
+_STAFF_MARK_PATTERNS = (
+    "staff room", "mark staff", "is staff", "make staff",
+    "set staff", "staff yes",
+)
+
+
+def _is_confirm_choice(text: str) -> bool:
+    """True if `text` is a confirm-style reply for a 1/2 or Yes/No prompt.
+
+    Accepts "1", "yes"/"y" (any case), and common variants like "confirm",
+    "ok", "sure". Returns False for cancel words, numeric "2", unknown
+    text, and empty input (safe default: don't apply a change when the
+    user's intent is unclear).
+    """
+    if not text:
+        return False
+    stripped = text.strip().rstrip(".").strip()
+    if not stripped:
+        return False
+    if stripped == "1":
+        return True
+    from src.whatsapp.handlers._shared import is_affirmative
+    return is_affirmative(stripped)
+
+
+def _classify_staff_toggle(desc_lower: str) -> Optional[str]:
+    """Return "mark" / "unmark" / None for a staff-room toggle phrase.
+
+    `desc_lower` must be the message already lower-cased. UNMARK wins when
+    both patterns appear so "not staff room" → unmark, not mark.
+    """
+    if any(p in desc_lower for p in _STAFF_UNMARK_PATTERNS):
+        return "unmark"
+    if any(p in desc_lower for p in _STAFF_MARK_PATTERNS):
+        return "mark"
+    return None
+
+
 async def update_room(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """Update room properties: AC, room type, maintenance mode, staff flag.
 
@@ -439,17 +485,17 @@ async def _update_single_room(room_num: str, desc: str, ctx: CallerContext, sess
             return f"Room *{room_num}* is now *active* again."
 
     # Staff room toggle (no revenue)
-    if "staff" in desc_lower:
-        if any(w in desc_lower for w in ("staff room", "mark staff", "is staff", "make staff", "set staff", "staff yes")):
-            old = room.is_staff_room
-            room.is_staff_room = True
-            _audit_room("is_staff_room", old, True)
-            return f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations)."
-        elif any(w in desc_lower for w in ("not staff", "remove staff", "no staff", "unmark staff", "revenue room", "tenant room")):
-            old = room.is_staff_room
-            room.is_staff_room = False
-            _audit_room("is_staff_room", old, False)
-            return f"Room *{room_num}* is now a *revenue room* (included in calculations)."
+    toggle = _classify_staff_toggle(desc_lower)
+    if toggle == "mark":
+        old = room.is_staff_room
+        room.is_staff_room = True
+        _audit_room("is_staff_room", old, True)
+        return f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations)."
+    if toggle == "unmark":
+        old = room.is_staff_room
+        room.is_staff_room = False
+        _audit_room("is_staff_room", old, False)
+        return f"Room *{room_num}* is now a *revenue room* (included in calculations)."
 
     return (
         f"Room *{room_num}* — what to change?\n"
