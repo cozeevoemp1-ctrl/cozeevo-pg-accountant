@@ -942,6 +942,7 @@ async def resolve_pending_action(
         ans = reply_text.strip().lower()
 
         if ans in ("done", "skip", "no", "cancel", "later"):
+            pending.resolved = True
             return "OK, no receipt saved."
 
         if media_id and media_type == "image":
@@ -975,6 +976,7 @@ async def resolve_pending_action(
                 notes=action_data.get("receipt_note", f"Payment receipt - {action_data.get('tenant_name', '')} - Room {room}"),
             ))
 
+            pending.resolved = True
             return f"Receipt saved for {action_data.get('tenant_name', 'tenant')} (Room {room})."
 
         return "__KEEP_PENDING__Send photo of the receipt slip, or say *skip*."
@@ -2620,7 +2622,7 @@ async def resolve_pending_action(
                     next_month = date(next_month.year + 1, 1, 1)
                 else:
                     next_month = next_month.replace(month=next_month.month + 1)
-            session.add(Payment(
+            new_pay = Payment(
                 tenancy_id=tenancy_id,
                 amount=Decimal(str(extra)),
                 payment_date=date.today(),
@@ -2628,7 +2630,30 @@ async def resolve_pending_action(
                 for_type=PaymentFor.rent,
                 period_month=next_month,
                 notes=f"Advance for {next_month.strftime('%b %Y')} — overpayment carry-forward",
+            )
+            session.add(new_pay)
+            await session.flush()  # get new_pay.id for AuditLog
+            from src.database.models import AuditLog as _AL
+            session.add(_AL(
+                changed_by=pending.phone,
+                entity_type="payment",
+                entity_id=new_pay.id,
+                field="created_advance",
+                old_value=None,
+                new_value=str(int(extra)),
+                source="whatsapp",
+                note=f"Overpayment Rs.{int(extra):,} for {tenant_name} carried forward as advance for {next_month.strftime('%b %Y')}",
             ))
+            # Mirror to sheet so dashboard 'Total Paid' reflects the advance.
+            try:
+                import asyncio as _aio
+                from src.integrations.gsheets import sync_tenant_all_fields as _sta
+                _t = await session.get(Tenancy, tenancy_id)
+                if _t:
+                    _aio.create_task(_sta(_t.tenant_id))
+            except Exception:
+                pass
+            pending.resolved = True
             return (
                 f"*Overpayment allocated — {tenant_name}*\n"
                 f"Rs.{int(extra):,} logged as advance for {next_month.strftime('%b %Y')}."
@@ -2681,6 +2706,7 @@ async def resolve_pending_action(
             source="whatsapp",
             note=f"Overpayment Rs.{int(extra):,} for {tenant_name}: {reply_text}",
         ))
+        pending.resolved = True
         return (
             f"Note saved for {tenant_name}'s overpayment (Rs.{int(extra):,}):\n"
             f"_{reply_text}_"
@@ -2692,6 +2718,7 @@ async def resolve_pending_action(
         tenant_name = action_data["tenant_name"]
         remaining = action_data["remaining"]
         if reply_text.lower().strip() in ("skip", "no", "n"):
+            pending.resolved = True
             return "OK, no note added."
         from src.database.models import Payment as _Pay, AuditLog
         pay = await session.get(_Pay, payment_id)
@@ -2707,6 +2734,7 @@ async def resolve_pending_action(
             source="whatsapp",
             note=f"Underpayment Rs.{int(remaining):,} for {tenant_name}: {reply_text}",
         ))
+        pending.resolved = True
         return (
             f"Note saved for {tenant_name}'s underpayment (Rs.{int(remaining):,} remaining):\n"
             f"_{reply_text}_"
