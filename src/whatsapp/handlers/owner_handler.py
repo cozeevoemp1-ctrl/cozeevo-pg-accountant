@@ -2301,6 +2301,7 @@ async def resolve_pending_action(
         "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "DEPOSIT_CHANGE_WHO",
         "ROOM_TRANSFER_WHO", "ROOM_TRANSFER_DEST",
+        "SHARING_CHANGE_WHO",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
         return "❌ Cancelled. Nothing was changed."
@@ -2866,6 +2867,40 @@ async def resolve_pending_action(
                 changed_by=pending.phone,
             )
         return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
+
+    if chosen is not None and pending.intent == "SHARING_CHANGE_WHO":
+        tenant = await session.get(Tenant, chosen["tenant_id"])
+        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+        if not tenant or not tenancy:
+            return "Tenant not found."
+        room = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
+        room_label = f" (Room {room.room_number})" if room else ""
+        new_sharing = (action_data.get("new_sharing") or "").strip().lower()
+        raw = tenancy.sharing_type
+        old_sharing = raw.value if hasattr(raw, "value") else (raw or "not set")
+        if old_sharing == new_sharing:
+            return f"*{tenant.name}* is already {new_sharing} sharing."
+
+        option_choices = [
+            {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes, update"},
+            {"seq": 2, "intent": "CANCEL_UPDATE", "label": "No, cancel"},
+        ]
+        await _save_pending(
+            pending.phone, "CONFIRM_FIELD_UPDATE",
+            {
+                "tenancy_id": tenancy.id,
+                "field": "sharing_type",
+                "old_value": old_sharing,
+                "new_value": new_sharing,
+                "tenant_name": tenant.name,
+            },
+            option_choices, session,
+        )
+        return (
+            f"Update *{tenant.name}*{room_label}?\n\n"
+            f"Sharing: {old_sharing} → *{new_sharing}*\n\n"
+            f"Reply *1* to confirm or *2* to cancel."
+        )
 
     # (ROOM_TRANSFER step-by-step handled earlier, before cancel/chosen_idx checks)
 

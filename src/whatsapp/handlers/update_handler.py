@@ -23,7 +23,10 @@ from src.database.models import (
     AuditLog, RentRevision,
 )
 from src.whatsapp.role_service import CallerContext
-from src.whatsapp.handlers._shared import _save_pending
+from src.whatsapp.handlers._shared import (
+    _save_pending, _find_active_tenants_by_name, _find_similar_names,
+    _make_choices, _format_choices_message, _format_no_match_message,
+)
 
 
 # ── UPDATE SHARING TYPE ─────────────────────────────────────────────────────
@@ -56,16 +59,27 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
     if not name or len(name) < 2:
         return "Which tenant? Reply: *[Name] [sharing type]*"
 
-    tenant, tenancy = await _find_active_tenant(name, session)
-    if not tenant:
-        return f"Couldn't find active tenant '{name}'. Check the spelling."
+    # Disambiguate when multiple active tenants share the name.
+    rows = await _find_active_tenants_by_name(name, session)
+    if not rows:
+        suggestions = await _find_similar_names(name, session)
+        return _format_no_match_message(name, suggestions)
+
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(
+            ctx.phone, "SHARING_CHANGE_WHO",
+            {"new_sharing": new_sharing}, choices, session,
+        )
+        return _format_choices_message(name, choices, f"change sharing to {new_sharing}")
+
+    tenant, tenancy, room = rows[0]
 
     raw = tenancy.sharing_type
     old_sharing = raw.value if hasattr(raw, "value") else (raw or "not set")
     if old_sharing == new_sharing:
         return f"*{tenant.name}* is already {new_sharing} sharing."
 
-    room = await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room.room_number})" if room else ""
 
     # Confirm
