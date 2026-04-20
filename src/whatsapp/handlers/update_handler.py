@@ -549,6 +549,29 @@ async def resolve_field_update(
             except Exception as e:
                 logger.warning(f"[Update] Sheet sync failed for {tenant_name}.{field}: {e}")
 
+            # Summary (Active / Beds / Vacant / Occupancy) only recomputes when
+            # the summary refresher runs. Fields like sharing_type flip a bed
+            # count (double -> premium reserves a second bed) but the banner
+            # stays stale until we call it explicitly.
+            _SUMMARY_AFFECTING = {
+                "sharing_type", "status", "checkin_date", "checkout_date",
+                "agreed_rent", "security_deposit", "maintenance_fee",
+            }
+            if field in _SUMMARY_AFFECTING:
+                try:
+                    import asyncio as _aio
+                    from src.integrations.gsheets import (
+                        _refresh_summary_sync, _current_month_tab,
+                    )
+                    await _aio.wait_for(
+                        _aio.to_thread(_refresh_summary_sync, _current_month_tab()),
+                        timeout=15,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[Update] Summary refresh failed after {field} change: {e}"
+                    )
+
         result = f"Updated *{tenant_name}*: {field} = *{new_value}*"
 
         # ── If sharing type changed, prompt to update rent too ──────────
