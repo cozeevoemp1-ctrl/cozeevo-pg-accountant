@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.46.0] — 2026-04-20 (late night #4) — Batch 4: cash+UPI split, entered_by wiring, booking migration
+
+### Added
+- **Cash+UPI split one-liner parser** ([intent_detector.py](src/whatsapp/intent_detector.py), [account_handler.py](src/whatsapp/handlers/account_handler.py), [owner_handler.py](src/whatsapp/handlers/owner_handler.py)) — `"Diya paid 3000 cash 3000 upi"` now parses as split: `entities["split_payment"]=True`, `cash_amount`, `upi_amount`. Confirmation shows the breakdown; on affirmative, two `Payment` rows written with `skip_duplicate_check=True` (pair is intentional).
+- **`entered_by` end-to-end wiring** — [src/services/payments.py](src/services/payments.py) `log_payment` resolves `recorded_by` (caller phone/name) → `Staff.phone` last-10-digit lookup → sets `Payment.received_by_staff_id`. [scripts/sync_sheet_from_db.py](scripts/sync_sheet_from_db.py) tracks latest Payment per tenancy in the period, bulk-joins Staff.id → Staff.name, populates the "entered by" sheet column from DB. Sheet fallback retained during migration.
+- **`scripts/migrate_booking_amount_to_payment.py`** — one-time, idempotent backfill. Dry-run by default. Creates missing `Payment(for_type=booking, period=checkin_month)` rows for every `Tenancy.booking_amount > 0` that had none. Audit-logged per row with `source='migration'`.
+
+### Executed on VPS
+- **Booking migration** — 287 candidates, 244 already had Payment, **43 new Payment rows committed**. Mostly ₹2,000 standard advances; outliers ₹18,375 / ₹26,000 / ₹15,000 / ₹13,000 / ₹6,078. First-month balances for those 43 Excel-imported tenants now correct.
+- **April sheet refreshed** after migration: 273 rows written, Cash ₹12.13L + UPI ₹29.68L = ₹41.81L, 150 PAID / 90 PARTIAL / 12 UNPAID.
+
+### Fixed
+- Excel-imported tenants' balance no longer overstates first-month dues by the booking advance amount (was systematic underpay report for those 43 tenants).
+
+---
+
 ## [1.45.0] — 2026-04-20 (late night #3) — Daily prep reminders + disambig E2E verified
 
 ### Added
