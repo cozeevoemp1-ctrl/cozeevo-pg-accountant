@@ -432,9 +432,21 @@ async def _process_message_inner(
                 with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                     _dbg.write(f"  RETURNED: {resolved_reply[:80]}\n")
                 return OutboundReply(reply=resolved_reply, intent="CONFIRMATION", role=ctx.role)
-            pending.resolved = True
+            # resolve_pending_action returned None — the user's reply wasn't a
+            # valid choice for the pending step. Preserve pending state unless
+            # the user explicitly cancels. Otherwise fall through to normal
+            # intent detection and keep pending alive for a later reply.
+            _cancel_words = {"cancel", "stop", "abort", "quit", "nevermind", "never mind"}
+            if message.strip().lower() in _cancel_words:
+                pending.resolved = True
+                cancel_reply = "Cancelled."
+                await _log(session, phone, message, ctx.role, "CONFIRMATION", cancel_reply)
+                await session.commit()
+                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                    _dbg.write(f"  CANCELLED by user\n")
+                return OutboundReply(reply=cancel_reply, intent="CONFIRMATION", role=ctx.role)
             with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
-                _dbg.write(f"  FELL THROUGH — resolved_reply was None, pending killed\n")
+                _dbg.write(f"  KEPT PENDING — falling through to normal intent detection\n")
 
     if ctx.role == "tenant":
         pending = await _get_active_pending(ctx.phone, session)

@@ -137,6 +137,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"rent\s+(?:history|changes?|revisions?)\s*(?:for\s+)?\w*|(?:show|check)\s+rent\s+(?:changes?|revisions?|history)", re.I), "QUERY_RENT_HISTORY", 0.93),
     (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b)", re.I), "UPDATE_ROOM", 0.93),
     (re.compile(r"(?<!not\s)(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|^\s*(?:staff|labou?r)\s+rooms?\s*(?:list|\?)?\s*$|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
+    # Staff exit — mark a staff member as exited (clears room link; room auto-flips to revenue if empty)
+    (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:exit|exited|left|leaving|gone|resigned?)\b|\b[A-Za-z]+\s+staff\s+exit(?:ed)?\b|^\s*exit\s+staff\s+[A-Za-z]", re.I), "EXIT_STAFF", 0.93),
+    # Staff assign — link a staff member to a room (many staff per room allowed, no sharing cap)
+    (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:room|in|to)\s+\w+|\bassign\s+staff\s+[A-Za-z]+\s+(?:to\s+)?(?:room\s+)?\w+|\b(?:add|put)\s+staff\s+[A-Za-z]+\s+(?:to|in)\s+(?:room\s+)?\w+", re.I), "ASSIGN_STAFF_ROOM", 0.93),
     # Occupancy overview
     (re.compile(r"(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)
@@ -642,5 +646,48 @@ def _extract_entities(text: str, intent: str) -> dict:
     # Relative time — "last month", "previous month"
     if re.search(r"\b(?:last|previous|prev)\s+month\b", text, re.I):
         entities["relative"] = "last_month"
+
+    # Staff-room intents — pull the staff name (may be lowercase), room, and optional role
+    if intent in ("ASSIGN_STAFF_ROOM", "EXIT_STAFF"):
+        # Name extraction
+        m = re.search(
+            r"\bstaff\s+([A-Za-z][A-Za-z\s]*?)\s+(?:room\b|in\b|to\b|exit|exited|left|leaving|resigned?|gone)",
+            text, re.I,
+        )
+        if not m:
+            m = re.search(
+                r"\bassign\s+staff\s+([A-Za-z][A-Za-z\s]*?)\s+(?:to\s+)?(?:room\s+)?[\w-]+",
+                text, re.I,
+            )
+        if not m:
+            m = re.search(
+                r"\b(?:add|put)\s+staff\s+([A-Za-z][A-Za-z\s]*?)\s+(?:to|in)\s+(?:room\s+)?[\w-]+",
+                text, re.I,
+            )
+        if m:
+            cand = m.group(1).strip()
+            cand = re.sub(r"\s+(manager|housekeeping|security|cook|watchman|guard|cleaner|maid|caretaker)\s*$", "", cand, flags=re.I).strip()
+            if cand:
+                entities["name"] = cand
+
+        # Room extraction — handle "in G05" / "to 107" / "room G05" forms
+        if intent == "ASSIGN_STAFF_ROOM":
+            rm = re.search(
+                r"\b(?:room|in|to)\s+([A-Za-z]?\d{1,4}[A-Za-z]?|G\d{1,3})\b",
+                text, re.I,
+            )
+            if rm:
+                entities["room_number"] = rm.group(1)
+                # Override any bogus amount the generic extractor picked up
+                if "amount" in entities and str(int(entities["amount"])) == rm.group(1):
+                    entities.pop("amount", None)
+
+        # Role detection
+        role_match = re.search(
+            r"\b(manager|housekeeping|security|cook|watchman|guard|cleaner|maid|caretaker)\b",
+            text, re.I,
+        )
+        if role_match:
+            entities["role"] = role_match.group(1).capitalize()
 
     return entities
