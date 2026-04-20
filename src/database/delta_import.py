@@ -351,6 +351,9 @@ async def run_delta(write: bool) -> None:
                         # rec["rent"] is effective rent; if rent_from exists, original is unknown
                         # safe fallback: use rec["rent"] (worst case same value)
                         period_rent = rec["rent"] or Decimal("0")
+                    # First (check-in) month bundles security deposit per business rule
+                    if tenancy.checkin_date and period == tenancy.checkin_date.replace(day=1):
+                        period_rent = (period_rent or Decimal("0")) + Decimal(str(tenancy.security_deposit or 0))
                     session.add(RentSchedule(
                         tenancy_id   = tenancy.id,
                         period_month = period,

@@ -167,10 +167,11 @@ async def log_payment(
             )
             carry_notes = prev_rs.notes if prev_rs else None
 
+            from src.services.rent_schedule import first_month_rent_due
             rs = RentSchedule(
                 tenancy_id=tenancy.id,
                 period_month=period,
-                rent_due=tenancy.agreed_rent or Decimal("0"),
+                rent_due=first_month_rent_due(tenancy, period),
                 maintenance_due=tenancy.maintenance_fee or Decimal("0"),
                 status=RentStatus.pending,
                 due_date=period,

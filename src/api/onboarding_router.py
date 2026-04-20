@@ -725,12 +725,14 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
             await session.flush()
 
             # RentSchedule
+            from src.services.rent_schedule import first_month_rent_due
             period = checkin.replace(day=1)
             current_month = date.today().replace(day=1)
             while period <= current_month:
                 session.add(RentSchedule(
                     tenancy_id=tenancy.id, period_month=period,
-                    rent_due=obs.agreed_rent or 0, maintenance_due=obs.maintenance_fee or 0,
+                    rent_due=first_month_rent_due(tenancy, period),
+                    maintenance_due=obs.maintenance_fee or 0,
                     status=RentStatus.pending, due_date=period,
                 ))
                 if period.month == 12:

@@ -4882,10 +4882,11 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             adj_note = (f"discount until {discount_until.strftime('%b %Y')}"
                         if discount_until else "discount")
 
+        from src.services.rent_schedule import first_month_rent_due
         session.add(RentSchedule(
             tenancy_id      = tenancy.id,
             period_month    = period,
-            rent_due        = base_rent,
+            rent_due        = first_month_rent_due(tenancy, period),
             maintenance_due = maintenance,
             adjustment      = adjustment if adjustment != Decimal("0") else None,
             adjustment_note = adj_note,

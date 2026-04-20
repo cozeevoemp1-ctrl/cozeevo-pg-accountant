@@ -401,10 +401,14 @@ async def run_import(write: bool) -> None:
 
                 # Rent schedule (only if status exists)
                 if st_val:
+                    rent_due_val = _to_dec(period_rent)
+                    # First (check-in) month bundles security deposit per business rule
+                    if tenancy.checkin_date and period == tenancy.checkin_date.replace(day=1):
+                        rent_due_val += Decimal(str(tenancy.security_deposit or 0))
                     session.add(RentSchedule(
                         tenancy_id=tenancy.id,
                         period_month=period,
-                        rent_due=_to_dec(period_rent),
+                        rent_due=rent_due_val,
                         maintenance_due=Decimal("0"),
                         status=_rent_status_to_enum(st_val),
                         due_date=period,
