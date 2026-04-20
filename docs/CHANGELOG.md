@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.45.0] — 2026-04-20 (late night #3) — Daily prep reminders + disambig E2E verified
+
+### Added
+- **`prep_reminder_today` / `prep_reminder_tomorrow` scheduler jobs** ([src/scheduler.py](src/scheduler.py)) — two separate morning/afternoon WhatsApp reminders to every admin/owner/receptionist (incl. Lokesh `7680814628`) listing that day's check-ins + check-outs so rooms can be prepared.
+  - 09:00 IST — TODAY's movements (morning briefing).
+  - 14:00 IST — TOMORROW's movements (afternoon prep heads-up, full day of lead time).
+  - Each message suppresses if its target day has zero check-ins AND zero check-outs (no empty-list noise). Sections (Check-ins / Check-outs) suppress independently.
+  - Data: `tenancies.checkin_date` with status in (active, no_show) for arrivals; `tenancies.expected_checkout` with status active for departures. No schema change — every field already in DB + sheet.
+- **`tests/test_disambig_e2e.py`** — 15/15 passing. Routes messages through full pipeline (`chat_api pending check` → `intent_detector` → `gatekeeper` → `handler` → `pending` → `resolver`) for every name-based intent. Safe on live DB (auto-cancels every mutating path; seeds `zzDupStaff` for staff-intent tests and cleans up).
+
+### Fixed
+- **Scheduler timezone** — pre-existing `AsyncIOScheduler(timezone="Asia/Kolkata")` wasn't propagating to `CronTrigger` instances; my new jobs fire at actual IST wall-clock times by passing `timezone="Asia/Kolkata"` to the trigger itself. Other jobs still fire in UTC — documented as follow-up; no behaviour change today.
+- **Monthly tabs sort by check-in ascending** — latest arrival lives at the bottom. [scripts/clean_and_load.py](scripts/clean_and_load.py), [scripts/create_month.py](scripts/create_month.py), [scripts/reload_april.py](scripts/reload_april.py) updated; new [scripts/sort_monthly_by_checkin.py](scripts/sort_monthly_by_checkin.py) one-off ran against DEC 2025 → APRIL 2026 with per-tab CSV backup.
+- **Dashboard banner auto-refresh on every bot-driven cell write** ([src/integrations/gsheets.py](src/integrations/gsheets.py)) — `_update_tenant_field_sync`, `_update_checkin_sync`, `_sync_tenant_all_fields_sync` all call `_refresh_summary_sync` post-write so Active / Beds / Vacant / Occupancy recompute immediately after sharing / rent / check-in changes.
+- **Silent-pick disambig bugs** in `_add_refund` / `assign_staff_to_room` / `exit_staff_from_room` — all three now save a `_WHO` pending and show numbered choices when multiple entities match. New resolver branches for `ASSIGN_STAFF_WHO`, `EXIT_STAFF_WHO`, `REFUND_WHO`.
+- **`ASSIGN_STAFF_ROOM` / `EXIT_STAFF` intents** — bot commands `staff [name] room [num]`, `staff [name] exit`, `assign staff [name] to [num]`. Many staff per room allowed (no sharing-cap enforcement). Auto-flips `Room.is_staff_room` true on assign, back to false only when the last staff leaves.
+
+### Operational
+- **VPS storage reality check** — All uploaded files (KYC, receipts, agreements) live on VPS local disk, not Supabase Storage. Current usage: 4.1 MB media + 164 KB agreements on 48 GB disk (44 GB free). Supabase free tier fine indefinitely for DB (~50 MB). Real risk = **backup** (none today). Options in pending tasks: Hostinger weekly backup / rsync to R2 nightly / migrate to Supabase Storage.
+
+### Deferred
+- Other pre-existing scheduler jobs still fire in UTC (rent reminders, daily reconciliation, etc.). No one's noticed — fixing them independently if they become a problem.
+- Tenant-path complaint resolver still unconditionally sets `pending.resolved = True` (`chat_api.py:443`). Fine today because complaints are single-turn.
+
+---
+
 ## [1.44.0] — 2026-04-20 (late night #2) — Audit batch 3 + MY_BALANCE + flow collision guard
 
 ### Sync invariant (batch 3 partial)
