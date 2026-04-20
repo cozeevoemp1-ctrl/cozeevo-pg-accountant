@@ -617,6 +617,37 @@ def _extract_entities(text: str, intent: str) -> dict:
     elif re.search(r"\b(?:upi|gpay|phonepe|paytm|online|transfer|netbanking|net\s*banking|neft|imps)\b", text, re.I):
         entities["payment_mode"] = "upi"
 
+    # Split-mode payment: "Diya paid 3000 cash 3000 upi" or "3000 upi 2000 cash".
+    # Detect two amount-mode pairs; if both present set cash_amount/upi_amount
+    # and override `amount` with the sum. Downstream payment handler branches
+    # on entities["split_payment"] to create two Payment rows.
+    if intent == "PAYMENT_LOG":
+        _UPI_WORDS = r"upi|gpay|phonepe|paytm|online|netbanking|net\s*banking|neft|imps|transfer"
+        _CASH_WORDS = r"cash|naqad"
+        def _k_to_int(raw: str) -> float:
+            raw = raw.replace(",", "").strip().lower()
+            if raw.endswith("k"):
+                try:
+                    return float(raw[:-1]) * 1000
+                except ValueError:
+                    return 0.0
+            try:
+                return float(raw)
+            except ValueError:
+                return 0.0
+
+        cash_m = re.search(rf"(\d[\d,]*k?)\s*(?:rs\.?|inr)?\s*(?:{_CASH_WORDS})\b", text, re.I)
+        upi_m  = re.search(rf"(\d[\d,]*k?)\s*(?:rs\.?|inr)?\s*(?:{_UPI_WORDS})\b", text, re.I)
+        if cash_m and upi_m:
+            cash_amt = _k_to_int(cash_m.group(1))
+            upi_amt  = _k_to_int(upi_m.group(1))
+            if cash_amt > 0 and upi_amt > 0:
+                entities["split_payment"] = True
+                entities["cash_amount"]   = cash_amt
+                entities["upi_amount"]    = upi_amt
+                entities["amount"]        = cash_amt + upi_amt
+                entities["payment_mode"]  = "split"
+
     # Extract expense category (for ADD_EXPENSE — avoids unnecessary "choose category" prompt)
     if intent == "ADD_EXPENSE":
         _EXPENSE_KEYWORDS = [

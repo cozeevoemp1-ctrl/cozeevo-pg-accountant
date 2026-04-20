@@ -119,6 +119,11 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     if mode:
         mode = mode.lower().strip()
     month_num = entities.get("month")
+    # Split-mode detection — e.g. "Diya paid 3000 cash 3000 upi".
+    # entities set by intent_detector._extract_entities; amount is already the sum.
+    _split      = bool(entities.get("split_payment"))
+    _split_cash = float(entities.get("cash_amount", 0) or 0) if _split else 0.0
+    _split_upi  = float(entities.get("upi_amount", 0) or 0) if _split else 0.0
 
     # If no amount AND no name -> start step-by-step collect rent form
     if not amount and not name and not room:
@@ -175,26 +180,32 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
         if not pending_months:
             # No dues — log to current month, will trigger overpayment flow
             pm = period_month or current_month
-            await _save_pending(
-                ctx.phone, "CONFIRM_PAYMENT_LOG",
-                {
-                    "tenant_id": tenant.id,
-                    "tenancy_id": tenancy.id,
-                    "amount": amount,
-                    "mode": mode or "cash",
-                    "logged_by": ctx.name or ctx.phone,
-                    "period_month": pm.isoformat(),
-                    "tenant_name": tenant.name,
-                    "room_number": _room.room_number,
-                },
-                [], session,
-            )
-            mode_label = (mode or "cash").upper()
+            _pdata = {
+                "tenant_id": tenant.id,
+                "tenancy_id": tenancy.id,
+                "amount": amount,
+                "mode": "split" if _split else (mode or "cash"),
+                "logged_by": ctx.name or ctx.phone,
+                "period_month": pm.isoformat(),
+                "tenant_name": tenant.name,
+                "room_number": _room.room_number,
+            }
+            if _split:
+                _pdata["split_payment"] = True
+                _pdata["cash_amount"] = _split_cash
+                _pdata["upi_amount"] = _split_upi
+            await _save_pending(ctx.phone, "CONFIRM_PAYMENT_LOG", _pdata, [], session)
+            if _split:
+                amt_line = (f"- Amount : Rs.{int(amount):,} "
+                            f"(Rs.{int(_split_cash):,} cash + Rs.{int(_split_upi):,} UPI)\n")
+                mode_line = "- Mode   : SPLIT\n"
+            else:
+                amt_line = f"- Amount : Rs.{int(amount):,}\n"
+                mode_line = f"- Mode   : {(mode or 'cash').upper()}\n"
             return (
                 snapshot["text"] + "\n\n"
                 f"*Confirm Payment?*\n"
-                f"- Amount : Rs.{int(amount):,}\n"
-                f"- Mode   : {mode_label}\n"
+                f"{amt_line}{mode_line}"
                 f"- Month  : {pm.strftime('%B %Y')}\n\n"
                 "Reply *Yes* to log or *No* to cancel."
             )

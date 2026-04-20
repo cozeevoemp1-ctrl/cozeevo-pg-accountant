@@ -1045,15 +1045,48 @@ async def resolve_pending_action(
                 + "\nReply *Yes* to confirm or *No* to cancel."
             )
         if is_affirmative(reply_text):
-            result = await _do_log_payment_by_ids(
-                tenant_id=action_data["tenant_id"],
-                tenancy_id=action_data["tenancy_id"],
-                amount=action_data["amount"],
-                mode=action_data["mode"],
-                ctx_name=action_data["logged_by"],
-                period_month_str=action_data["period_month"],
-                session=session,
-            )
+            if action_data.get("split_payment"):
+                # Split mode: create two Payment rows; inner call returns a
+                # balance-status string per row — we discard them and build a
+                # single combined summary instead.
+                cash_amt = float(action_data.get("cash_amount", 0) or 0)
+                upi_amt  = float(action_data.get("upi_amount", 0) or 0)
+                await _do_log_payment_by_ids(
+                    tenant_id=action_data["tenant_id"],
+                    tenancy_id=action_data["tenancy_id"],
+                    amount=cash_amt,
+                    mode="cash",
+                    ctx_name=action_data["logged_by"],
+                    period_month_str=action_data["period_month"],
+                    session=session,
+                    skip_duplicate_check=True,  # pair is intentional
+                )
+                await _do_log_payment_by_ids(
+                    tenant_id=action_data["tenant_id"],
+                    tenancy_id=action_data["tenancy_id"],
+                    amount=upi_amt,
+                    mode="upi",
+                    ctx_name=action_data["logged_by"],
+                    period_month_str=action_data["period_month"],
+                    session=session,
+                    skip_duplicate_check=True,
+                )
+                result = (
+                    f"Split payment logged:\n"
+                    f"• Cash: Rs.{int(cash_amt):,}\n"
+                    f"• UPI:  Rs.{int(upi_amt):,}\n"
+                    f"• Total: Rs.{int(cash_amt + upi_amt):,}"
+                )
+            else:
+                result = await _do_log_payment_by_ids(
+                    tenant_id=action_data["tenant_id"],
+                    tenancy_id=action_data["tenancy_id"],
+                    amount=action_data["amount"],
+                    mode=action_data["mode"],
+                    ctx_name=action_data["logged_by"],
+                    period_month_str=action_data["period_month"],
+                    session=session,
+                )
             # Start receipt collection
             from src.whatsapp.handlers._shared import _save_pending as _sp_r
             await _sp_r(pending.phone, "COLLECT_RECEIPT", {
