@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     Tenancy, Tenant, Room, TenancyStatus, Property,
-    AuditLog, RentRevision,
+    AuditLog, RentRevision, Staff,
 )
 from src.whatsapp.role_service import CallerContext
 from src.whatsapp.handlers._shared import (
@@ -344,17 +344,40 @@ async def update_deposit(entities: dict, ctx: CallerContext, session: AsyncSessi
 # ── UPDATE ROOM (AC, type, maintenance) ──────────────────────────────────────
 
 async def update_room(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Update room properties: AC, room type, maintenance mode."""
+    """Update room properties: AC, room type, maintenance mode, staff flag.
+
+    Supports multi-room commands like "not staff rooms 114 and 618" —
+    each room number in the message gets the same update applied.
+    """
     desc = (entities.get("description") or entities.get("_raw_message") or "").strip()
-    room_num = entities.get("room", "").strip()
+    room_num_entity = entities.get("room", "").strip()
 
-    if not room_num:
-        m = re.search(r"room\s*(\w+)", desc, re.I)
-        room_num = m.group(1) if m else ""
+    # Collect all candidate room numbers — multi-room commands like
+    # "not staff rooms 114 and 618" should update both.
+    nums = re.findall(r"\b([A-Za-z]?\d{1,4})\b", desc)
+    # De-dupe preserving order
+    seen = set()
+    room_nums: list[str] = []
+    for n in ([room_num_entity] + nums) if room_num_entity else nums:
+        if n and n not in seen:
+            seen.add(n); room_nums.append(n)
 
-    if not room_num:
+    if not room_nums:
         return "Which room? Reply: *room [number] [what to change]*"
 
+    # Single-room path (original behaviour) — keep the old return
+    # messages. Multi-room: loop and join.
+    if len(room_nums) == 1:
+        return await _update_single_room(room_nums[0], desc, ctx, session)
+
+    results: list[str] = []
+    for rn in room_nums:
+        results.append(await _update_single_room(rn, desc, ctx, session))
+    return "\n".join(results)
+
+
+async def _update_single_room(room_num: str, desc: str, ctx: CallerContext, session: AsyncSession) -> str:
+    """Apply one room-level update to one room."""
     room = await session.scalar(
         select(Room).where(Room.room_number == room_num, Room.active == True)
     )
@@ -549,9 +572,7 @@ async def resolve_field_update(
 # ── QUERY STAFF ROOMS ──────────────────────────────────────────────────────
 
 async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """List all staff rooms (not counted in revenue)."""
-    from src.database.models import Property
-
+    """List all staff rooms grouped with the staff living in each."""
     rows = (await session.execute(
         select(Room, Property.name)
         .join(Property, Property.id == Room.property_id, isouter=True)
@@ -562,16 +583,176 @@ async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSe
     if not rows:
         return "No staff rooms configured."
 
+    # Fetch all active staff with a room assignment in one shot
+    staff_rows = (await session.execute(
+        select(Staff).where(Staff.active == True, Staff.room_id.isnot(None))
+    )).scalars().all()
+    by_room: dict[int, list[Staff]] = {}
+    for s in staff_rows:
+        by_room.setdefault(s.room_id, []).append(s)
+
     lines = []
     for room, bldg in rows:
-        status = "active" if room.active else "inactive"
-        lines.append(f"• Room *{room.room_number}* ({bldg or '?'}) — {status}")
+        occupants = by_room.get(room.id, [])
+        if occupants:
+            names = ", ".join(
+                f"{s.name}" + (f" ({s.role})" if s.role else "")
+                for s in occupants
+            )
+            occ = f"{len(occupants)} staff — {names}"
+        else:
+            occ = "_vacant_"
+        status = "" if room.active else " [inactive]"
+        lines.append(f"• *{room.room_number}* ({bldg or '?'}){status} — {occ}")
 
     return (
         f"*Staff Rooms* ({len(rows)} rooms, excluded from revenue):\n\n"
         + "\n".join(lines)
-        + "\n\nTo change: _room [num] not staff_ or _room [num] staff room_"
+        + "\n\nAssign: _staff [name] room [num]_ • Exit: _staff [name] exit_"
     )
+
+
+# ── ASSIGN / EXIT STAFF TO ROOM ────────────────────────────────────────────
+
+async def assign_staff_to_room(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Link a staff member to a room. Auto-flips room to staff-room.
+    Many staff may share a single room — sharing type / max occupancy is not enforced.
+
+    Expected entities: name, room_number, role (optional), phone (optional)
+    """
+    name = (entities.get("name") or "").strip()
+    room_num = (entities.get("room_number") or entities.get("room") or "").strip()
+    role = (entities.get("role") or "").strip() or None
+    phone = (entities.get("phone") or "").strip() or None
+
+    if not name or not room_num:
+        return ("To assign a staff member to a room, send:\n"
+                "_staff [name] room [num]_\n"
+                "e.g. _staff Rajesh room G05_")
+
+    room = (await session.execute(
+        select(Room).where(Room.room_number == room_num)
+    )).scalar_one_or_none()
+    if not room:
+        return f"Room *{room_num}* not found."
+
+    # Find or create staff by case-insensitive name
+    existing = (await session.execute(
+        select(Staff).where(Staff.active == True)
+    )).scalars().all()
+    staff = next((s for s in existing if s.name.lower() == name.lower()), None)
+    created = False
+    if not staff:
+        staff = Staff(
+            name=name, property_id=room.property_id, room_id=room.id,
+            role=role, phone=phone, active=True,
+        )
+        session.add(staff)
+        created = True
+    else:
+        old_room = staff.room_id
+        staff.room_id = room.id
+        if role:
+            staff.role = role
+        if phone:
+            staff.phone = phone
+        if old_room != room.id:
+            session.add(AuditLog(
+                changed_by=ctx.phone or "system",
+                entity_type="staff", entity_id=staff.id,
+                entity_name=staff.name, field="room_id",
+                old_value=str(old_room) if old_room else None,
+                new_value=str(room.id), room_number=room.room_number,
+                source="whatsapp",
+            ))
+
+    # Ensure the room is flagged as staff
+    if not room.is_staff_room:
+        room.is_staff_room = True
+        session.add(AuditLog(
+            changed_by=ctx.phone or "system",
+            entity_type="room", entity_id=room.id,
+            entity_name=room.room_number, field="is_staff_room",
+            old_value="False", new_value="True",
+            room_number=room.room_number, source="whatsapp",
+        ))
+
+    verb = "Added" if created else "Assigned"
+    return (f"{verb} *{staff.name}*"
+            + (f" ({staff.role})" if staff.role else "")
+            + f" to room *{room.room_number}*. Room is now a staff room "
+              "(excluded from availability).")
+
+
+async def exit_staff_from_room(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Mark a staff member as exited. Clears their room link.
+    If this was the LAST staff in that room, the room flips back to revenue
+    and re-appears in available rooms automatically.
+
+    Expected entities: name (required)
+    """
+    name = (entities.get("name") or "").strip()
+    if not name:
+        return ("To mark a staff exit, send:\n"
+                "_staff [name] exit_\n"
+                "e.g. _staff Rajesh exit_")
+
+    candidates = (await session.execute(
+        select(Staff).where(Staff.active == True)
+    )).scalars().all()
+    matches = [s for s in candidates if s.name.lower() == name.lower()]
+    if not matches:
+        # Loose match — substring
+        matches = [s for s in candidates if name.lower() in s.name.lower()]
+    if not matches:
+        return f"No active staff matching *{name}*."
+    if len(matches) > 1:
+        opts = "\n".join(f"{i+1}. {s.name} ({s.role or '?'})" for i, s in enumerate(matches))
+        return f"Multiple matches — which one?\n{opts}"
+
+    staff = matches[0]
+    old_room_id = staff.room_id
+    staff.active = False
+    from datetime import date as _d
+    staff.exit_date = _d.today()
+    staff.room_id = None
+
+    msg_room_freed = ""
+    if old_room_id:
+        room = await session.get(Room, old_room_id)
+        if room:
+            # Are there any other active staff still in this room?
+            remaining = (await session.execute(
+                select(Staff).where(
+                    Staff.room_id == old_room_id,
+                    Staff.active == True,
+                    Staff.id != staff.id,
+                )
+            )).scalars().first()
+            if remaining is None and room.is_staff_room:
+                room.is_staff_room = False
+                session.add(AuditLog(
+                    changed_by=ctx.phone or "system",
+                    entity_type="room", entity_id=room.id,
+                    entity_name=room.room_number, field="is_staff_room",
+                    old_value="True", new_value="False",
+                    room_number=room.room_number, source="whatsapp",
+                ))
+                msg_room_freed = (f"\nRoom *{room.room_number}* is now a revenue room "
+                                  "and will appear in available rooms.")
+            elif remaining is not None:
+                msg_room_freed = (f"\nRoom *{room.room_number}* still has other staff — "
+                                  "kept as staff room.")
+
+    session.add(AuditLog(
+        changed_by=ctx.phone or "system",
+        entity_type="staff", entity_id=staff.id,
+        entity_name=staff.name, field="active",
+        old_value="True", new_value="False",
+        source="whatsapp",
+    ))
+
+    return f"*{staff.name}* marked as exited." + msg_room_freed
 
 
 # ── QUERY AUDIT LOG ─────────────────────────────────────────────────────────

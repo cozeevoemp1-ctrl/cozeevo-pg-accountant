@@ -328,6 +328,7 @@ async def resolve_pending_action(
         step = action_data.get("step", "")
 
         if ans in ("no", "n", "cancel", "abort"):
+            pending.resolved = True
             return "Cancelled. Tenant not added."
 
         # ── Edit a field ──────────────────────────────────────────────────
@@ -642,6 +643,7 @@ async def resolve_pending_action(
                 return "*Which room?* (e.g. T-201)"
 
             elif ans == "3":
+                pending.resolved = True
                 return "Cancelled. Tenant not added."
 
             return "__KEEP_PENDING__Reply *1*, *2*, or *3*."
@@ -747,6 +749,7 @@ async def resolve_pending_action(
         step = action_data.get("step", "")
 
         if ans in ("no", "n", "cancel", "abort"):
+            pending.resolved = True
             return "Checkout cancelled."
 
         # Edit a field
@@ -860,9 +863,11 @@ async def resolve_pending_action(
 
         if ans in ("done", "finish", "finished", "that's all", "thats all", "complete", "skip"):
             docs_count = action_data.get("docs_saved", 0)
+            pending.resolved = True
             return f"Documents saved ({docs_count} total) for {action_data.get('tenant_name', 'tenant')}."
 
         if ans in ("cancel", "abort", "no"):
+            pending.resolved = True
             return "Document collection cancelled."
 
         # Image received — save it
@@ -2304,6 +2309,9 @@ async def resolve_pending_action(
         "FIELD_UPDATE_WHO",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
+        # Mark resolved so the NEXT user message starts a fresh flow
+        # — otherwise the pending row stays alive and swallows their reply.
+        pending.resolved = True
         return "❌ Cancelled. Nothing was changed."
 
     # ── Correction: amount/mode update while disambiguation is pending ────────

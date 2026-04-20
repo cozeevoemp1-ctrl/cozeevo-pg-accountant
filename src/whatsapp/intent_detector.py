@@ -135,8 +135,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # UPDATE_DEPOSIT removed — DEPOSIT_CHANGE (line ~88) handles this with full account_handler flow
     (re.compile(r"(?:show|check|view|get|who)\s+(?:changes?|audit|history|log|modified|updated)\s+(?:for|of|on|to)?\s*(?:room|tenant)?|(?:changes?|audit|history)\s+(?:for|of)\s+\w+|what\s+changed|audit\s+log|who\s+changed\s+\w+", re.I), "QUERY_AUDIT", 0.92),
     (re.compile(r"rent\s+(?:history|changes?|revisions?)\s*(?:for\s+)?\w*|(?:show|check)\s+rent\s+(?:changes?|revisions?|history)", re.I), "QUERY_RENT_HISTORY", 0.93),
-    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff))", re.I), "UPDATE_ROOM", 0.93),
-    (re.compile(r"(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|(?:staff|labou?r)\s+rooms?\s*(?:list)?|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
+    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b)", re.I), "UPDATE_ROOM", 0.93),
+    (re.compile(r"(?<!not\s)(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|^\s*(?:staff|labou?r)\s+rooms?\s*(?:list|\?)?\s*$|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
     # Occupancy overview
     (re.compile(r"(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)
