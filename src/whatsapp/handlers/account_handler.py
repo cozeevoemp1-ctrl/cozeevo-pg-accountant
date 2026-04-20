@@ -1084,13 +1084,17 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
                 RentSchedule.period_month == checkin_month,
             )
         )
+        deposit = tenancy.security_deposit or Decimal("0")
         if checkin_rs:
-            first_rent = (checkin_rs.rent_due or Decimal("0")) + (checkin_rs.adjustment or Decimal("0"))
+            # rent_due bundles the deposit for the check-in month
+            # (src/services/rent_schedule.first_month_rent_due). Back it
+            # out to display the rent portion only.
+            total_first_month = (checkin_rs.rent_due or Decimal("0")) + (checkin_rs.adjustment or Decimal("0"))
+            first_rent = max(Decimal("0"), total_first_month - deposit)
         else:
             days_in_month = calendar.monthrange(tenancy.checkin_date.year, tenancy.checkin_date.month)[1]
             days_remaining = max(0, days_in_month - tenancy.checkin_date.day + 1)
             first_rent = Decimal(str(int(Decimal(str(tenancy.agreed_rent or 0)) * days_remaining / days_in_month)))
-        deposit = tenancy.security_deposit or Decimal("0")
         net_due = deposit + first_rent - booking_amount
         lines += [
             "",
