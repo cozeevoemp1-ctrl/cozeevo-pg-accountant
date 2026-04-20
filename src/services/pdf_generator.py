@@ -121,10 +121,42 @@ def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str
     ))
     elements.append(Spacer(1, 3*mm))
 
-    # Build signature images
+    # Build tenant signature block.
+    # New flow (IT Act 2000 §3A): tenant ticks "I agree" — their typed name
+    # + timestamp is stored as text token "I_AGREE:<name>:<iso_ts>".
+    # Legacy drawn-PNG signatures also still render (pre-migration forms).
     tenant_sig_el = Paragraph("[Signature on file]", small)
     sig_data = obs.signature_image or ""
-    if sig_data and "base64," in sig_data:
+    if sig_data.startswith("I_AGREE:"):
+        parts = sig_data.split(":", 2)
+        typed_name = parts[1] if len(parts) > 1 else tenant_data.get("name", "")
+        ts_iso = parts[2] if len(parts) > 2 else ""
+        signed_on = ""
+        try:
+            from datetime import datetime as _dt
+            dt_ = _dt.fromisoformat(ts_iso.replace("Z", "+00:00"))
+            signed_on = dt_.strftime("%d %b %Y, %H:%M")
+        except Exception:
+            signed_on = ts_iso[:16] if ts_iso else ""
+        cursive_style = ParagraphStyle(
+            'CursiveSig', parent=small, fontName='Helvetica-Oblique',
+            fontSize=16, textColor=colors.HexColor("#EF1F9C"), leading=18,
+        )
+        sig_meta_style = ParagraphStyle(
+            'SigMeta', parent=small, fontSize=7, textColor=colors.grey,
+        )
+        tenant_sig_el = Table([
+            [Paragraph(typed_name or "—", cursive_style)],
+            [Paragraph("✓ Agreed digitally" + (f" — {signed_on}" if signed_on else ""),
+                       sig_meta_style)],
+        ], colWidths=[70*mm])
+        tenant_sig_el.setStyle(TableStyle([
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+            ('TOPPADDING', (0,0), (-1,-1), 0),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+        ]))
+    elif sig_data and "base64," in sig_data:
         try:
             b64 = sig_data.split("base64,")[1]
             img_bytes = base64.b64decode(b64)

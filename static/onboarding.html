@@ -895,12 +895,25 @@
       <p>I confirm that all information provided in this registration form is true and accurate to the best of my knowledge.</p>
     </div>
 
-    <div class="signature-area">
-      <label class="required">Signature</label>
-      <canvas id="signature-canvas"></canvas>
-      <div class="error-msg" id="err-signature">Please sign before submitting</div>
-      <div class="sig-hint">Draw your signature above using your finger or stylus</div>
-      <button type="button" class="clear-sig" onclick="clearSignature()">Clear &amp; redraw</button>
+    <div class="signature-area" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:16px;">
+      <div style="margin-bottom:12px;">
+        <label for="agree-checkbox" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.4;">
+          <input type="checkbox" id="agree-checkbox" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:#EF1F9C;">
+          <span style="font-size:14px;color:#2D3748;">
+            I have read and agree to the house rules and resident agreement above. I confirm that the information I provided is true and accurate.
+          </span>
+        </label>
+      </div>
+      <div style="padding:10px 12px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:8px;">
+        <div style="font-size:11px;color:#718096;margin-bottom:4px;">Digital signature (your name from Step 1):</div>
+        <div id="typed-signature" style="font-family:'Dancing Script','Brush Script MT',cursive;font-size:26px;color:#EF1F9C;min-height:32px;">—</div>
+        <div id="sig-timestamp" style="font-size:11px;color:#718096;margin-top:4px;"></div>
+      </div>
+      <div class="error-msg" id="err-signature">Please tick the agreement box to continue.</div>
+      <div class="sig-hint" style="font-size:11px;color:#718096;margin-top:6px;">
+        By ticking the box and submitting, your typed name and timestamp above serve as your digital signature
+        (valid under IT Act 2000, Section 3A).
+      </div>
     </div>
 
     <div class="nav-buttons">
@@ -1043,12 +1056,16 @@
     updateProgress(n);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Update agree-name and reinit signature canvas when reaching step 5
+    // On reaching step 5: mirror the tenant's name into both the booking
+    // summary line AND the digital-signature preview block.
     if (n === 5) {
       const name = document.getElementById('name').value.trim();
       document.getElementById('agree-name').textContent = name || '—';
-      // Reinit canvas now that step 5 is visible (getBoundingClientRect works)
-      setTimeout(initSignatureCanvas, 50);
+      document.getElementById('typed-signature').textContent = name || '—';
+      const now = new Date();
+      document.getElementById('sig-timestamp').textContent =
+        'Signed on ' + now.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) +
+        ' at ' + now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
     }
   }
 
@@ -1197,9 +1214,10 @@
    try {
     clearErrors();
 
-    // Validate signature
-    if (!sigDrawn) {
-      document.getElementById('signature-canvas').classList.add('error');
+    // Agreement: tenant must tick "I agree". The digital signature is their
+    // typed name + timestamp — captured as a text token, no PNG drawing.
+    const agreeBox = document.getElementById('agree-checkbox');
+    if (!agreeBox || !agreeBox.checked) {
       document.getElementById('err-signature').classList.add('visible');
       return;
     }
@@ -1230,14 +1248,17 @@
       // Uploads
       id_photo: getUploadDataUrl('id-photo-preview'),
       selfie_photo: getUploadDataUrl('selfie-preview-wrap'),
-      // Signature
-      signature_image: document.getElementById('signature-canvas').toDataURL('image/png')
+      // Digital signature — typed-name token (no drawn PNG).
+      // Format: "I_AGREE:<name>:<ISO-8601 timestamp>"
+      signature_image: (function() {
+        const nm = document.getElementById('name').value.trim();
+        return 'I_AGREE:' + nm + ':' + new Date().toISOString();
+      })()
     };
 
     // Validate mandatory uploads
     if (!payload.selfie_photo) { showError('Please upload your selfie photo (Step 1).'); return; }
     if (!payload.id_photo) { showError('Please upload your ID proof document (Step 4).'); return; }
-    if (!sigDrawn) { showError('Please draw your signature (Step 5).'); return; }
 
     showLoading('Submitting registration...');
 

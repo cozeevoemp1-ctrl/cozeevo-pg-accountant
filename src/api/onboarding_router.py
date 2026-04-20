@@ -29,7 +29,10 @@ router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 # ── Security: Rate limiting + Admin auth ────────────────────────────────────
 
 ADMIN_PIN = os.getenv("ONBOARDING_ADMIN_PIN", "cozeevo2026")
-MAX_UPLOAD_SIZE = 5 * 1024 * 1024  # 5MB per file (base64)
+# Per-file cap: 4MB base64 ≈ 3MB raw. Covers a clear ID photo + selfie.
+# Aggregate across 3 fields (selfie + id_proof + signature-token) stays
+# well under the 10MB nginx cap set in /etc/nginx/sites-available/pg-accountant.
+MAX_UPLOAD_SIZE = 4 * 1024 * 1024
 
 # Simple in-memory rate limiter
 _rate_limits: dict[str, list[float]] = defaultdict(list)
@@ -405,10 +408,11 @@ async def get_session_data(token: str, request: Request):
 @router.post("/{token}/submit")
 async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
     _rate_check(f"submit:{request.client.host}", 5, 60)  # 5/min per IP
-    # File size check (base64 ~1.37x original, 5MB limit)
+    # File size check (base64 ~1.37x original). Signature is now a short
+    # text token ("I_AGREE:<name>:<timestamp>") so it always passes.
     for field_name, data in [("selfie", req.selfie_photo), ("id_proof", req.id_photo), ("signature", req.signature_image)]:
         if data and len(data) > MAX_UPLOAD_SIZE:
-            raise HTTPException(413, f"{field_name} file too large (max 5MB)")
+            raise HTTPException(413, f"{field_name} file too large (max 4MB)")
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
