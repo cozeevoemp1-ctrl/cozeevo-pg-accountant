@@ -250,6 +250,24 @@ async def _prep_reminder(when: str = "today") -> None:
                 ORDER BY r.room_number
             """), {"target": target})).fetchall()
 
+            # Day-wise short-stay prebookings — separate table, same target day.
+            daywise_in = (await conn.execute(text("""
+                SELECT guest_name, room_number, COALESCE(phone, '') AS phone,
+                       COALESCE(stay_period, '') AS period,
+                       COALESCE(num_days, 0) AS days,
+                       COALESCE(comments, '') AS notes
+                FROM daywise_stays
+                WHERE checkin_date = :target
+                ORDER BY room_number
+            """), {"target": target})).fetchall()
+
+            daywise_out = (await conn.execute(text("""
+                SELECT guest_name, room_number, COALESCE(phone, '') AS phone
+                FROM daywise_stays
+                WHERE checkout_date = :target
+                ORDER BY room_number
+            """), {"target": target})).fetchall()
+
             admin_rows = (await conn.execute(text("""
                 SELECT phone FROM authorized_users
                 WHERE role IN ('admin', 'owner', 'receptionist') AND active = TRUE
@@ -259,7 +277,7 @@ async def _prep_reminder(when: str = "today") -> None:
 
     # Always send — even on empty days — so the team knows the bot is watching.
     # (Previously suppressed empty days; reception + admins asked for daily pulse.)
-    if not checkins and not checkouts:
+    if not checkins and not checkouts and not daywise_in and not daywise_out:
         logger.info(f"[Scheduler] prep_reminder ({when}) — empty day, sending quiet-day notice.")
 
     admin_phones = [r[0] for r in admin_rows if r[0]]
@@ -268,7 +286,7 @@ async def _prep_reminder(when: str = "today") -> None:
         return
 
     lines = [f"*Room Prep — {header_label} ({target.strftime('%a %d %b %Y')})*"]
-    if not checkins and not checkouts:
+    if not checkins and not checkouts and not daywise_in and not daywise_out:
         lines.append("\nAll quiet — no check-ins or check-outs.")
     if checkins:
         lines.append(f"\n*Check-ins ({len(checkins)}):*")
@@ -283,6 +301,19 @@ async def _prep_reminder(when: str = "today") -> None:
             ph_part = f" ({ph})" if ph else ""
             nt_part = f"\n   _{nt[:80]}_" if nt else ""
             lines.append(f"• Room {rn} — {nm}{ph_part}{nt_part}")
+    if daywise_in:
+        lines.append(f"\n*Day-wise check-ins ({len(daywise_in)}):*")
+        for nm, rn, ph, pd, dy, nt in daywise_in:
+            ph_part = f" ({ph})" if ph else ""
+            days_part = f" — {dy}d" if dy else ""
+            period_part = f" [{pd}]" if pd else ""
+            nt_part = f"\n   _{nt[:80]}_" if nt else ""
+            lines.append(f"• Room {rn}{days_part}{period_part} — {nm}{ph_part}{nt_part}")
+    if daywise_out:
+        lines.append(f"\n*Day-wise check-outs ({len(daywise_out)}):*")
+        for nm, rn, ph in daywise_out:
+            ph_part = f" ({ph})" if ph else ""
+            lines.append(f"• Room {rn} — {nm}{ph_part}")
 
     msg = "\n".join(lines)
     for phone in admin_phones:
