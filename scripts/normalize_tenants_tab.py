@@ -34,7 +34,7 @@ async def main():
             ).distinct()
         )).scalars().all()
 
-    print(f"Normalising {len(tenant_ids)} tenants...")
+    print(f"Normalising {len(tenant_ids)} tenants...", flush=True)
     total_cells = 0
     errors = 0
     for i, tid in enumerate(tenant_ids, 1):

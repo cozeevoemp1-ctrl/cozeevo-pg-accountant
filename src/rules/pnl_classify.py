@@ -18,6 +18,11 @@ from __future__ import annotations
 
 EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     # ── NON-OPERATING — must be FIRST so loan names don't match other rules ──
+    # Description-based overrides: the SAME person can receive rent OR a loan;
+    # trust the memo keyword. These run BEFORE the landlord-name matches below.
+    ("Non-Operating",        "Cash Borrow / Exchange",       ["money exchange","cash borrow","cash borrows","money borrow"]),
+    ("Non-Operating",        "Repayment",                    ["repaymen","repayment","loan repay"]),
+    ("Non-Operating",        "Borrowed From",                ["borrowed f","borrowed from"]),
     ("Non-Operating",        "Loan Repayment (Bharathi)",    ["bharathi prabhakaran"]),
     ("Non-Operating",        "Unknown Transfer (shalu)",     ["shalu.pravi"]),
 

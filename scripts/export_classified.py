@@ -74,20 +74,38 @@ def read_yes_bank_csv(path):
     return out
 
 # ── load data ──────────────────────────────────────────────────────────────
+# Priority order (highest first): CSV is most recent download and overrides
+# overlapping Excel downloads for the same period. Dedupe by (date, amt, desc).
 txns = []
+sources = []
+
+import glob as _glob
+# CSVs first — newest downloads
+for f in sorted(_glob.glob('Statement-*.csv'), reverse=True):
+    t = read_yes_bank_csv(f)
+    print('Loaded %d from %s' % (len(t), f))
+    txns += t
+    sources.append(f)
+
+# Then Excel statements (only add if not already seen)
 for f in ['2025 statement.xlsx', '2026 statment.xlsx']:
     t = read_yes_bank(f)
     print('Loaded %d from %s' % (len(t), f))
     txns += t
+    sources.append(f)
 
-# CSV statements
-import glob as _glob
-for f in _glob.glob('Statement-*.csv'):
-    t = read_yes_bank_csv(f)
-    print('Loaded %d from %s' % (len(t), f))
-    txns += t
-
-print('Total: %d txns' % len(txns))
+# Dedupe by (date, amount, description) — same UTR / same cheque should
+# only count once even if it's present in both an Excel and a CSV dump.
+seen = set()
+deduped = []
+for dt, desc, typ, amt in txns:
+    key = (dt.strftime('%Y-%m-%d'), round(float(amt), 2), (desc or '').strip().lower())
+    if key in seen:
+        continue
+    seen.add(key)
+    deduped.append((dt, desc, typ, amt))
+print('After dedupe: %d txns (removed %d duplicates)' % (len(deduped), len(txns) - len(deduped)))
+txns = deduped
 
 classified = []
 for dt, desc, typ, amt in txns:

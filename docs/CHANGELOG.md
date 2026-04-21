@@ -2,6 +2,46 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.0] — 2026-04-21 (full day) — April/March reconciliation, format unification, reminder + onboarding fixes
+
+### Critical data fixes
+- **April drop+reload** — `scripts/sync_from_source_sheet.py` now hard-DELETEs all April payments (any for_type) + rent_schedule before reload. Prior voided-only behaviour caused 2x duplication when the 03:00 IST scheduler ran the old version against my fresh inserts (Cash jumped to 24.16L / UPI 60.02L). DB now matches source exactly: Cash 11.61L / UPI 30.01L / Total 41.62L / 279 payments.
+- **March settlement** (`scripts/settle_march_dues.py`) — 116 settlement Payments totalling Rs.14.67L inserted; March RentSchedule statuses flipped to paid. April ops sheet Prev Due = 0.
+- **Booking credit no longer inflates Cash/UPI cols** — `sync_sheet_from_db.py` tracks booking as `booking_credit` applied only to balance/status via `effective_paid`, keeping Cash/UPI display in parity with source sheet.
+- **Rakesh 415 duplicate merged** — payment + rent_schedule reassigned from tenancy 899 (T.Rakesh Chetan) to 894 (Rakesh Thallapally); 899 + its Tenant row hard-deleted; phone normalised to `+919515739255`.
+- **Yash Shinde (416)** — agreed_rent 0→11500, sharing single→double, lock_in_months=4, RentRevision row for 11500→12000 effective 2026-06-01, April rent_schedule.rent_due=23500 (first-month). Balance now Rs.0.
+- **agreed_rent backfill** — Chinmay (22000), Ajay (12000), Mamta (12000), Yuvaraj (12500).
+
+### Code fixes
+- **Onboarding approve for day-stays** (`src/api/onboarding_router.py`) — `tenancy` and `effective_sharing` initialised to None so daily branch doesn't UnboundLocalError. Approve handler wrapped in try/except so real errors surface ("Approve failed: TypeError: …") instead of generic "Network error." Frontend updated to parse non-JSON error bodies. Verified with REDDY AJAY (room 609) — tenant 912 + DaywiseStay 185 created, DAY WISE sheet updated, session approved.
+- **Intent misrouting fixed** (`src/whatsapp/intent_detector.py`) — `ADD_PARTNER` had unanchored `add\s+staff\b` that stole "G20 add staff room" etc. Added negative lookahead + 5 new UPDATE_ROOM alternations covering `<id> add/mark/set/is staff [room]`, `<id> not staff`, `mark <id> staff`, `add staff room <id>`, `<id> staff room`. 13 tests green.
+- **Reminder scheduler** — `_prep_reminder` now queries daywise_stays alongside tenancies for the target date so prebookings appear. Silence-on-empty behaviour kept per Kiran's preference.
+- **TENANTS tab canonical format** — `_sync_tenant_all_fields_sync` writes phone as +91XXXXXXXXXX, building as "HULK"/"THOR" (stripped "Cozeevo"), Title-Case gender/sharing/status. `scripts/normalize_tenants_tab.py` bulk-pushed canonical values: 270 cells updated across 266 tenants, 0 errors.
+- **`Room.floor` helper** — `src/utils/room_floor.derive_floor()` single source of truth (G→0, else first digit). Backfill script (`scripts/backfill_room_floors.py`) confirms all 167 rooms already correct (earlier audit's "32 NULL" was a falsy-zero bug).
+
+### Added tests
+- `tests/test_my_balance_prev_due.py` (2)
+- `tests/test_deposit_change_confirm.py` (4 — prevents Pooja-style corruption via stray "1")
+- `tests/test_staff_room_intent.py` (13)
+- `tests/test_staff_room_invariant.py` (4 — whole-room exclusion on any staff)
+
+### Audits + docs
+- `docs/audit_premium_2026-04-21.md` — premium = 22 (sheet) vs 23 (DB), resolved via 415 merge.
+- `docs/audit_room_anomalies_2026-04-21.md` — 2 mixed-sharing rooms (416, 610), 46 rent-mismatch rooms (mostly ±500-1000 grandfathered), 5 big gaps worth review.
+- `docs/audit_missing_fields_2026-04-21.md` — 5 UNASSIGNED (future May/June check-ins), 10 deposit=0 rows.
+- `memory/sop_april_reload.md` — standing drop+reload playbook for monthly sync divergence.
+- `memory/project_pnl_oct25_mar26.md` — P&L after dedup + loan-reclass fixes. Rs.19.5L moved from Property Rent → Non-Operating. YTD EBITDA Rs.32.1L, Net Rs.71k. Flags: property-rent still thin (Rs.12L vs expected ~60L), Other Expenses catch-all needs vendor-naming pass.
+
+### DEPOSIT_CHANGE confirm step
+- [src/whatsapp/handlers/owner_handler.py:2971-3011](src/whatsapp/handlers/owner_handler.py#L2971-L3011) — numeric reply on DEPOSIT_CHANGE_AMT now saves a confirm pending instead of writing the deposit immediately.
+
+### Kiran actions awaiting
+- Review P&L audit flags in `memory/project_pnl_oct25_mar26.md`.
+- Fill source sheet cell for Yash Shinde (col J) if rent still needed there.
+- Review auto-push git hook (every commit pushes to origin; flagged by all agents).
+
+---
+
 ## [1.48.0] — 2026-04-21 (morning #2) — Parallel agent batch
 
 ### Added
