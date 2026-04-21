@@ -561,6 +561,20 @@ def _format_diff_value(field: str, value) -> str:
 @router.post("/{token}/approve")
 async def approve_session(token: str, request: Request, req: ApproveRequest = None):
     _check_admin_pin(request)
+    try:
+        return await _approve_session_impl(token, req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger(__name__).error(
+            "Approve failed for token %s: %s\n%s", token[:8], e, traceback.format_exc()
+        )
+        # Surface a readable reason to the admin UI instead of a blank 500
+        raise HTTPException(500, f"Approve failed: {type(e).__name__}: {e}")
+
+
+async def _approve_session_impl(token: str, req: ApproveRequest | None):
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
@@ -654,6 +668,8 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
         _logger = _log.getLogger(__name__)
         gsheets_note = ""
         phone_sheet = f"+91{phone}" if len(phone) == 10 else phone
+        # Set in monthly branch; stays None for daily stays (no tenancy row)
+        tenancy = None
 
         if is_daily:
             # ── Daily stay path ────────────────────────────────────────────
@@ -842,6 +858,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
             "id_proof": DocumentType.id_proof,
             "signature": DocumentType.photo,
         }
+        _tenancy_id_for_docs = tenancy.id if tenancy is not None else None
         for file_key, doc_type in doc_map.items():
             file_path = saved_files.get(file_key)
             if file_path:
@@ -851,7 +868,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                     original_name=f"{file_key}_{td.get('name', 'tenant')}",
                     mime_type="image/png" if file_key == "signature" else "image/jpeg",
                     tenant_id=tenant.id,
-                    tenancy_id=tenancy.id,
+                    tenancy_id=_tenancy_id_for_docs,
                 ))
         # Agreement PDF as document
         if obs.agreement_pdf_path:
@@ -861,7 +878,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                 original_name=f"agreement_{td.get('name', 'tenant')}",
                 mime_type="application/pdf",
                 tenant_id=tenant.id,
-                tenancy_id=tenancy.id,
+                tenancy_id=_tenancy_id_for_docs,
             ))
 
         # Send booking confirmation to tenant via WhatsApp.
@@ -966,7 +983,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                         if str(original_financial.get(k, "")) != str(final_financial.get(k, "")):
                             session.add(_AL(
                                 changed_by="receptionist", entity_type="tenancy",
-                                entity_id=tenancy.id if 'tenancy' in dir() and not is_daily else 0,
+                                entity_id=tenancy.id if (tenancy is not None and not is_daily) else 0,
                                 entity_name=tenant_name, field=k,
                                 old_value=str(original_financial.get(k, "")),
                                 new_value=str(final_financial.get(k, "")),
@@ -977,7 +994,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
                     if effective_sharing and effective_sharing != master_sharing:
                         session.add(_AL(
                             changed_by="receptionist", entity_type="tenancy",
-                            entity_id=tenancy.id if 'tenancy' in dir() and not is_daily else 0,
+                            entity_id=tenancy.id if (tenancy is not None and not is_daily) else 0,
                             entity_name=tenant_name, field="sharing_type",
                             old_value=master_sharing, new_value=effective_sharing,
                             room_number=room.room_number, source="onboarding_review",
@@ -1032,7 +1049,7 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
             _l.getLogger(__name__).warning("Could not schedule post-onboarding sync: %s", _e)
 
         # Fallback: tenancy_id may not be set in the daily-stay branch
-        _tenancy_id = getattr(obs, "tenancy_id", None) or (tenancy.id if 'tenancy' in dir() and not is_daily else None)
+        _tenancy_id = getattr(obs, "tenancy_id", None) or (tenancy.id if (tenancy is not None and not is_daily) else None)
 
         return {
             "status": "approved", "tenant_id": tenant.id, "tenancy_id": _tenancy_id,

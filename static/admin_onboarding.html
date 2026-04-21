@@ -1328,10 +1328,14 @@
         headers: pinHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ staff_signature: staffSig, overrides }),
       });
-      const data = await res.json();
+      // Parse body defensively — 500s may return HTML, not JSON
+      let data = {};
+      const raw = await res.text();
+      try { data = JSON.parse(raw); } catch { data = { detail: raw.slice(0, 300) }; }
 
       if (!res.ok) {
-        showInlineAlert(errEl, data.detail || 'Approval failed.');
+        const msg = data.detail || data.message || `Server error (${res.status}). Check VPS logs.`;
+        showInlineAlert(errEl, `Approval failed: ${msg}`);
         btn.disabled = false;
         btn.innerHTML = 'Approve &amp; Create Tenant';
         return;
@@ -1354,7 +1358,7 @@
       setTimeout(loadPending, 1500);
 
     } catch (err) {
-      showInlineAlert(errEl, 'Network error. Please try again.');
+      showInlineAlert(errEl, `Network error: ${err && err.message ? err.message : err}. Please try again.`);
       btn.disabled = false;
       btn.innerHTML = 'Approve &amp; Create Tenant';
     }
