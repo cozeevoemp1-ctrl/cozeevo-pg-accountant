@@ -318,15 +318,14 @@ async def main(args):
 
             cash = int(pays["cash"])
             upi = int(pays["upi"])
+            total_paid = cash + upi
 
-            # First-month rows also get the booking advance applied to Total
-            # Paid (advance reduces the first-month outstanding).
+            # Booking advance reduces first-month outstanding without being
+            # shown in the Cash/UPI columns (keeps parity with source sheet).
+            booking_credit = 0
             if is_first_month:
                 bk = booking_pay_map.get(tenancy.id, {"cash": Decimal("0"), "upi": Decimal("0")})
-                cash += int(bk["cash"])
-                upi += int(bk["upi"])
-
-            total_paid = cash + upi
+                booking_credit = int(bk["cash"]) + int(bk["upi"])
 
             # DB is source of truth. Sheet lookups only used as migration
             # fallback while pre-existing sheet-only content is copied over.
@@ -350,16 +349,17 @@ async def main(args):
             prev_due_num = prev_due_map.get(tenancy.id, 0)
             prev_due = int(prev_due_num) if prev_due_num else ""
 
-            balance = rent_due + int(prev_due_num) - total_paid
+            effective_paid = total_paid + booking_credit
+            balance = rent_due + int(prev_due_num) - effective_paid
 
             # Status
             if tenancy.status == TenancyStatus.exited:
                 status = "EXIT"
             elif tenancy.status == TenancyStatus.no_show:
                 status = "NO-SHOW"
-            elif total_paid >= rent_due + int(prev_due_num):
+            elif effective_paid >= rent_due + int(prev_due_num):
                 status = "PAID"
-            elif total_paid > 0:
+            elif effective_paid > 0:
                 status = "PARTIAL"
             else:
                 status = "UNPAID"

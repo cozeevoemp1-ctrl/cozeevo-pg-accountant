@@ -145,20 +145,18 @@ async def main(write: bool):
             tenant_map[(t.phone, t.name.lower().strip())] = t
             tenant_map.setdefault(("phone_only", t.phone), t)
 
-        # ── 1. Void ALL April rent payments to start fresh ──────────────
+        # ── 1. Hard-DELETE all April payments (any for_type) + schedules ─
         if write:
             old_pays = (await s.execute(
-                select(Payment).where(
-                    Payment.period_month == APRIL,
-                    Payment.for_type == PaymentFor.rent,
-                    Payment.is_void == False,
-                )
+                select(Payment).where(Payment.period_month == APRIL)
             )).scalars().all()
             for p in old_pays:
-                p.is_void = True
-            print(f"Voided {len(old_pays)} old April rent payments")
+                await s.delete(p)
+            print(f"Deleted {len(old_pays)} old April payments (all for_types)")
 
-            # Delete old April rent_schedules
+            # Reassign orphan booking payments that got stamped period_month=APRIL
+            # going forward: booking payments should have period_month=NULL (not a rent period)
+
             old_rs = (await s.execute(
                 select(RentSchedule).where(RentSchedule.period_month == APRIL)
             )).scalars().all()
