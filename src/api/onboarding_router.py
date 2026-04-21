@@ -670,6 +670,10 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         phone_sheet = f"+91{phone}" if len(phone) == 10 else phone
         # Set in monthly branch; stays None for daily stays (no tenancy row)
         tenancy = None
+        # effective_sharing is only assigned in the monthly branch but is read
+        # later by the diff/WhatsApp block unconditionally — init here so
+        # day-stay approvals don't crash with UnboundLocalError.
+        effective_sharing = None
 
         if is_daily:
             # ── Daily stay path ────────────────────────────────────────────
