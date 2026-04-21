@@ -2110,6 +2110,26 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
     def _enum_str(v):
         return v.value if hasattr(v, "value") else (v or "")
 
+    def _phone_str(p):
+        # Normalise to +91XXXXXXXXXX (10-digit Indian phone with prefix).
+        import re as _re
+        if not p:
+            return ""
+        digits = _re.sub(r"[^0-9]", "", str(p))
+        if len(digits) > 10:
+            digits = digits[-10:]
+        return f"+91{digits}" if len(digits) == 10 else (p or "")
+
+    def _building_short(name):
+        # Strip "Cozeevo " prefix so TENANTS shows "HULK" / "THOR" consistently.
+        if not name:
+            return ""
+        return name.replace("Cozeevo ", "").strip()
+
+    def _tc(s):
+        # Title-case free-text categoricals (Male/Female, Double/Single/Premium, Active/No-show).
+        return str(s or "").strip().title()
+
     # ── Build TENANTS tab row values keyed by header name ─────────────────
     refund_status_val = ""
     refund_amount_val: int | str = ""
@@ -2120,13 +2140,13 @@ def _sync_tenant_all_fields_sync(tenant_id: int, skip_fields: list | None = None
     tenants_row = {
         "room": room.room_number,
         "name": tenant.name or "",
-        "phone": tenant.phone or "",
-        "gender": tenant.gender or "",
-        "building": prop.name if prop else "",
+        "phone": _phone_str(tenant.phone),
+        "gender": _tc(tenant.gender),
+        "building": _building_short(prop.name if prop else ""),
         "floor": str(room.floor or ""),
-        "sharing": _enum_str(tenancy.sharing_type),
+        "sharing": _tc(_enum_str(tenancy.sharing_type)),
         "check-in": _date_str(tenancy.checkin_date),
-        "status": _enum_str(tenancy.status).lower() or "",
+        "status": _tc(_enum_str(tenancy.status)),
         "agreed rent": int(tenancy.agreed_rent or 0),
         "deposit": int(tenancy.security_deposit or 0),
         "booking": int(tenancy.booking_amount or 0),

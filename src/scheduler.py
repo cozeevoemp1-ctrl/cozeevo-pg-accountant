@@ -257,10 +257,10 @@ async def _prep_reminder(when: str = "today") -> None:
     finally:
         await engine.dispose()
 
-    # Suppress entirely if nothing is scheduled for this target day.
+    # Always send — even on empty days — so the team knows the bot is watching.
+    # (Previously suppressed empty days; reception + admins asked for daily pulse.)
     if not checkins and not checkouts:
-        logger.info(f"[Scheduler] prep_reminder ({when}) — nothing scheduled, not sending.")
-        return
+        logger.info(f"[Scheduler] prep_reminder ({when}) — empty day, sending quiet-day notice.")
 
     admin_phones = [r[0] for r in admin_rows if r[0]]
     if not admin_phones:
@@ -268,6 +268,8 @@ async def _prep_reminder(when: str = "today") -> None:
         return
 
     lines = [f"*Room Prep — {header_label} ({target.strftime('%a %d %b %Y')})*"]
+    if not checkins and not checkouts:
+        lines.append("\nAll quiet — no check-ins or check-outs.")
     if checkins:
         lines.append(f"\n*Check-ins ({len(checkins)}):*")
         for nm, rn, ph, sh, nt in checkins:
