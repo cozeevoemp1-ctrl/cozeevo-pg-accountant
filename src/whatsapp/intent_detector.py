@@ -135,7 +135,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # UPDATE_DEPOSIT removed — DEPOSIT_CHANGE (line ~88) handles this with full account_handler flow
     (re.compile(r"(?:show|check|view|get|who)\s+(?:changes?|audit|history|log|modified|updated)\s+(?:for|of|on|to)?\s*(?:room|tenant)?|(?:changes?|audit|history)\s+(?:for|of)\s+\w+|what\s+changed|audit\s+log|who\s+changed\s+\w+", re.I), "QUERY_AUDIT", 0.92),
     (re.compile(r"rent\s+(?:history|changes?|revisions?)\s*(?:for\s+)?\w*|(?:show|check)\s+rent\s+(?:changes?|revisions?|history)", re.I), "QUERY_RENT_HISTORY", 0.93),
-    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b)", re.I), "UPDATE_ROOM", 0.93),
+    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+(?:add|mark|set|make|is)\s+(?:a\s+)?staff(?:\s+room)?\b|\b[A-Z]?\d{1,4}\b\s+(?:not|no\s+longer)\s+(?:a\s+)?staff(?:\s+room)?\b|\b(?:mark|set|make)\s+[A-Z]?\d{1,4}\b\s+(?:as\s+)?(?:a\s+)?staff(?:\s+room)?\b|\badd\s+staff\s+room\s+[A-Z]?\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+staff\s+room\b)", re.I), "UPDATE_ROOM", 0.93),
     (re.compile(r"(?<!not\s)(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|^\s*(?:staff|labou?r)\s+rooms?\s*(?:list|\?)?\s*$|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
     # Staff exit — mark a staff member as exited (clears room link; room auto-flips to revenue if empty)
     (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:exit|exited|left|leaving|gone|resigned?)\b|\b[A-Za-z]+\s+staff\s+exit(?:ed)?\b|^\s*exit\s+staff\s+[A-Za-z]", re.I), "EXIT_STAFF", 0.93),
@@ -261,7 +261,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # One-time discount / concession / surcharge
     (re.compile(r"(?:concession|discount|waive|deduct|give.*less|less this month|reduce this month|reduce\s+\w+'?s?\s+rent\s+by|extra charge|add.*surcharge|add.*electricity|add.*food charge)", re.I), "RENT_DISCOUNT", 0.90),
     # Add partner / staff
-    (re.compile(r"(?:add partner|add owner|add power user|new admin|give access|add\s+staff\b)", re.I), "ADD_PARTNER", 0.97),
+    (re.compile(r"(?:add partner|add owner|add power user|new admin|give access|add\s+staff\b(?!\s+room))", re.I), "ADD_PARTNER", 0.97),
     # WiFi password — owner reads or sets WiFi credentials
     (re.compile(r"(?:set\s+wifi|update\s+wifi|change\s+wifi|wifi\s+(?:ssid|network|password)\s+\w+|set\s+(?:floor|common)\s+wifi)", re.I), "SET_WIFI", 0.95),
     (re.compile(r"(?:wifi|wi-fi|internet|net)\s*(?:password|pass|pw|code|key|kya\s+hai|batao|share|bata|kya\s+h)", re.I), "GET_WIFI_PASSWORD", 0.95),
