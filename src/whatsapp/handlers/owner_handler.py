@@ -2969,7 +2969,8 @@ async def resolve_pending_action(
         )
 
     if pending.intent == "DEPOSIT_CHANGE":
-        if is_affirmative(reply_text):
+        from src.whatsapp.handlers.update_handler import _is_confirm_choice
+        if _is_confirm_choice(reply_text):
             from src.whatsapp.handlers.account_handler import _do_deposit_change
             return await _do_deposit_change(
                 tenancy_id=action_data["tenancy_id"],
@@ -2983,13 +2984,27 @@ async def resolve_pending_action(
     if pending.intent == "DEPOSIT_CHANGE_AMT":
         amt_str = reply_text.strip().replace(",", "").replace("₹", "").replace("Rs", "").strip()
         if amt_str.isdigit():
-            from src.whatsapp.handlers.account_handler import _do_deposit_change
-            return await _do_deposit_change(
-                tenancy_id=action_data["tenancy_id"],
-                new_amount=int(amt_str),
-                tenant_name=action_data["tenant_name"],
-                session=session,
-                changed_by=pending.phone,
+            new_amt = int(amt_str)
+            tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+            current = int(tenancy.security_deposit or 0) if tenancy else 0
+            room_num = ""
+            if tenancy and tenancy.room_id:
+                room = await session.get(Room, tenancy.room_id)
+                room_num = room.room_number if room else ""
+            option_choices = [{"seq": 1, "label": "Yes, update"}, {"seq": 2, "label": "No, cancel"}]
+            from src.whatsapp.handlers._shared import _save_pending as _sp_dc
+            await _sp_dc(
+                pending.phone, "DEPOSIT_CHANGE",
+                {"tenancy_id": action_data["tenancy_id"],
+                 "tenant_name": action_data["tenant_name"],
+                 "new_amount": new_amt, "old_amount": current},
+                option_choices, session,
+            )
+            return (
+                f"*Change deposit — {action_data['tenant_name']}*\n"
+                f"Room {room_num}\n"
+                f"Current: Rs.{current:,}  ->  New: Rs.{new_amt:,}\n\n"
+                "Reply *1* / *Yes* to confirm or *2* / *cancel* to abort."
             )
         return "__KEEP_PENDING__Reply with the new deposit amount (numbers only):"
 
