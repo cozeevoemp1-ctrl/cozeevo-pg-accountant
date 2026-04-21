@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.47.0] — 2026-04-21 (morning) — April drop+reload parity + March settlement
+
+### Fixed
+- **`scripts/sync_from_source_sheet.py`** — hard-DELETE all April payments + rent_schedule before reload (any `for_type`, any `is_void`). Prior behavior voided only rent-type, leaving 34 booking payments with `period_month=April` inflating DB totals by Rs.1.37L. When 03:00 IST scheduler reran the old script against the new inserts, totals doubled (Cash 24.16L / UPI 60.02L). Drop+reload now idempotent.
+- **`scripts/sync_sheet_from_db.py`** — booking advances no longer bundled into Cash/UPI display columns; tracked as `booking_credit` and applied to balance + status via `effective_paid`. Ops sheet Cash/UPI now matches source sheet exactly.
+
+### Executed on local → VPS
+- **April full drop+reload**: 279 payments repopulated from source. DB == source == ops sheet = Cash Rs.11.61L / UPI Rs.30.01L / Total Rs.41.62L (exact match).
+- **March settlement** (`scripts/settle_march_dues.py`) — Kiran confirmed all March dues paid. Inserted 116 settlement Payment rows totaling Rs.14.67L, marked March RentSchedule status=paid. April ops sheet `Prev Due` now Rs.0, `Pending` reflects only April-month outstanding.
+
+### Added
+- **`memory/sop_april_reload.md`** — standing procedure for monthly drop+reload whenever source sheet totals diverge from DB/ops. Steps: fetch source truth → compare → hard-delete → reload DB → reload sheet → verify to-the-rupee. Indexed in MEMORY.md.
+
+---
+
 ## [1.46.0] — 2026-04-20 (late night #4) — Batch 4: cash+UPI split, entered_by wiring, booking migration
 
 ### Added
