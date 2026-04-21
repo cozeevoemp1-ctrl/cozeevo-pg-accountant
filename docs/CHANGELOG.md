@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.48.0] — 2026-04-21 (morning #2) — Parallel agent batch
+
+### Added
+- **`MY_BALANCE` regression tests** ([tests/test_my_balance_prev_due.py](tests/test_my_balance_prev_due.py)) — 2 cases verifying prev-month carry-forward. Bug itself already fixed in `d6d83f9`.
+- **`DEPOSIT_CHANGE` confirm step** ([src/whatsapp/handlers/owner_handler.py:2971-3011](src/whatsapp/handlers/owner_handler.py#L2971-L3011)) — numeric reply on `DEPOSIT_CHANGE_AMT` now saves a `DEPOSIT_CHANGE` confirm pending (Yes/1 to apply, cancel to abort) instead of writing deposit immediately. Prevents Pooja-style accidental corruption from stray "1" replies. 4 pytests all green.
+- **`scripts/backfill_agreed_rent.py`** — idempotent dry-run + `--write` backfill for tenancies with `agreed_rent = 0/NULL`.
+- **`docs/audit_premium_2026-04-21.md`** — premium sharing audit (22 on sheet, 23 in DB). Found duplicate tenancy: room 415 has both `Rakesh Thallapally` (phone `9515739255` no +91) and `T.Rakesh Chetan` (phone `+919515739255`). Same person — one is stale. Kiran to decide which to close.
+
+### Executed on local → VPS
+- **agreed_rent backfill** — 4 rows written with audit_log: Chinmay Pagey (22000), Ajay Ramchandra (12000), Mamta Khandade (12000), Yuvaraj (12500). Yash Shinde (416) skipped — source sheet cell blank; needs manual rent entry.
+- VPS `git pull` + `systemctl restart` — latest master deployed, service active.
+
+### Findings (Kiran action)
+- **Rakesh Thallapally dupe (room 415)** — close one tenancy; name-variant + phone-normalisation issue. See audit doc.
+- **Yash Shinde (416)** — `agreed_rent` still 0; source sheet col J is empty. Fill source or tell me the rent to write directly.
+- **Pre-commit/post-commit hook auto-pushes** — every `git commit` pushes to origin. Noted by all 4 agents; review if unintended.
+
+---
+
 ## [1.47.0] — 2026-04-21 (morning) — April drop+reload parity + March settlement
 
 ### Fixed
