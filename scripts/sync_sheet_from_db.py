@@ -273,7 +273,10 @@ async def main(args):
         )).scalars().all()
         prev_due_map = {}  # tenancy_id -> outstanding
         for rs in prev_rs:
-            prev_due_map[rs.tenancy_id] = float(rs.rent_due or 0)
+            # Include adjustment — drop_pre_april_dues.py uses adjustment
+            # (negative) to cancel residual balances without rewriting
+            # rent_due (so frozen sheet tabs keep their historical value).
+            prev_due_map[rs.tenancy_id] = float(rs.rent_due or 0) + float(rs.adjustment or 0)
         for p in prev_pays:
             if p.tenancy_id in prev_due_map:
                 prev_due_map[p.tenancy_id] -= float(p.amount)
