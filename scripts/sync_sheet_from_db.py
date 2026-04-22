@@ -340,7 +340,11 @@ async def main(args):
             if rs:
                 rent_due = int((rs.rent_due or 0) + (rs.adjustment or 0))
             else:
-                rent_due = agreed_rent_amt + (deposit_amt if is_first_month else 0)
+                # No RentSchedule for this period → not billed. Catches future
+                # check-ins (May/June) + exited tenants still referenced via
+                # prior payments; neither should contribute to this month's
+                # Rent Billed/Pending totals.
+                rent_due = 0
             # For first-month display/note, derive rent portion = rent_due - deposit.
             base_rent = max(0, rent_due - deposit_amt) if is_first_month else rent_due
 
