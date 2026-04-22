@@ -102,27 +102,10 @@ async def get_kpis(
     ) or 0
     TOTAL_BEDS = int(TOTAL_BEDS)
 
-    # Count occupied beds during the selected month.
-    # Premium tenancy = 1 person occupying all beds in the room (max_occupancy).
-    # Regular tenancy = 1 bed per person.
-    occupied_beds = await session.scalar(
-        select(func.coalesce(func.sum(
-            case(
-                (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                else_=literal_column("1"),
-            )
-        ), 0))
-        .select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Room.is_staff_room == False,
-            Tenancy.checkin_date <= to_date,
-            or_(
-                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
-                Tenancy.checkout_date >= from_date,
-            ),
-        )
-    ) or 0
+    # Occupied beds during the selected month, via single source of truth
+    # (long-term tenancies + day-stays). See src/services/room_occupancy.py.
+    from src.services.room_occupancy import count_occupied_beds
+    occupied_beds = await count_occupied_beds(session, from_date, to_date)
 
     vacant_beds = TOTAL_BEDS - int(occupied_beds)
     occ_pct     = round(int(occupied_beds) / TOTAL_BEDS * 100, 1) if TOTAL_BEDS > 0 else 0

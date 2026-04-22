@@ -273,31 +273,16 @@ async def _check_room_overlap(
     exclude_tenancy_id: Optional[int],
     session: AsyncSession,
 ) -> Optional[str]:
+    """Return conflicting occupant name if the room is booked during
+    [start_date, end_date], else None.
+
+    Thin wrapper over the canonical helper so BOTH long-term tenancies
+    AND day-stays are checked — see src/services/room_occupancy.py.
     """
-    Return the conflicting tenant's name if the room is occupied during [start_date, end_date].
-    Returns None if the room is free.
-    """
-    q = (
-        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date)
-        .join(Tenant, Tenant.id == Tenancy.tenant_id)
-        .where(
-            Tenancy.room_id == room_id,
-            Tenancy.status == TenancyStatus.active,
-        )
+    from src.services.room_occupancy import find_overlap_conflict
+    return await find_overlap_conflict(
+        session, room_id, start_date, end_date, exclude_tenancy_id
     )
-    if exclude_tenancy_id:
-        q = q.where(Tenancy.id != exclude_tenancy_id)
-
-    result = await session.execute(q)
-    far_future = date(9999, 12, 31)
-    period_end = end_date or far_future
-
-    for name, checkin, checkout in result.all():
-        existing_end = checkout or far_future
-        # Overlap: start1 < end2 AND end1 > start2
-        if start_date < existing_end and period_end > checkin:
-            return name
-    return None
 
 
 def _make_choices(rows) -> list[dict]:

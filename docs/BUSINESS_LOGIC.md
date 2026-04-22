@@ -133,6 +133,24 @@ IF outstanding > 0: include in dues list
 
 **Test:** `tests/test_dues_month_scope.py` -- 10/10 passing
 
+### 2.5 Room Occupancy — Single Source of Truth
+
+**Any code answering "who is in room X?" / "is room X free?" / "how many beds occupied?" MUST use `src/services/room_occupancy.py`.**
+
+A bed can be occupied by a long-term `Tenancy` OR a short-stay `DaywiseStay`. Before this helper existed, every caller rolled its own query and many forgot DaywiseStay — rooms looked VACANT while day-stay guests were sleeping in them. Example regression: April 2026 room 609 returned VACANT even though Albin + Anika were checked in as day-stays (fixed 2026-04-22).
+
+Public helpers:
+- `get_room_occupants(session, room, on_date)` — returns `RoomOccupants(tenancies, daywise, total_occupied)`
+- `find_overlap_conflict(session, room_id, start, end, exclude_tenancy_id)` — returns conflicting name or None; used before every new check-in/transfer
+- `count_occupied_beds(session, from_date, to_date)` — global bed count for dashboard KPIs
+
+**Callers (don't inline the queries, import from here):**
+- `owner_handler._room_status`, `_query_vacant_rooms`, `_query_occupancy`
+- `account_handler._monthly_report`
+- `dashboard_router` occupancy KPI
+- `_shared._check_room_overlap`
+- `sync_sheet_from_db` dashboard summary
+
 ### 2.4 No-Shows and Future Checkins — AUTO-EXCLUDED
 
 Pending(M) iterates `RentSchedule(period_month = M)`. We do NOT create RentSchedule for:
