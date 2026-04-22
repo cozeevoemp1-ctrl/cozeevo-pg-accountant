@@ -146,11 +146,20 @@ async def main(write: bool):
             tenant_map.setdefault(("phone_only", t.phone), t)
 
         # ── 1. Hard-DELETE all April payments (any for_type) + schedules ─
+        # SAFETY: only April. Earlier history (incl. March settlements
+        # inserted by settle_march_dues.py) MUST stay intact. A previous
+        # version of this script accidentally voided 116 March settlement
+        # payments via "sheet-reload" tag — never again.
         if write:
             old_pays = (await s.execute(
                 select(Payment).where(Payment.period_month == APRIL)
             )).scalars().all()
             for p in old_pays:
+                if p.period_month and p.period_month < APRIL:
+                    raise RuntimeError(
+                        f"REFUSING to delete payment id={p.id} period={p.period_month} "
+                        f"— sync_from_source must never touch pre-April rows."
+                    )
                 await s.delete(p)
             print(f"Deleted {len(old_pays)} old April payments (all for_types)")
 
@@ -251,22 +260,38 @@ async def main(write: bool):
             # ── Rent schedule for April (skip EXIT/CANCELLED) ─────────
             # Dedupe: only insert if no existing April rent_schedule for this tenancy
             # ── Parse comments for expected_checkout + notice_date ────
+            # Be careful: a phrase like "jun 5" is an exit date ONLY when
+            # the surrounding text actually means "leaving" — NOT when it
+            # appears inside a lock-in/agreement clause (e.g. "@ months
+            # lockin until jun 5th or 7th"), which is just the earliest
+            # date the tenant is contractually free to leave.
+            import re as _re
             cmt_raw = (row[COL["comments"]] or "").strip()
             cmt = cmt_raw.lower()
+            is_lockin_note = bool(_re.search(r"lock\s*-?\s*in", cmt))
+
+            # Derive lock-in months from the comment regardless ("@" was a
+            # corruption of "2" in the source spreadsheet).
+            lockin_m = _re.search(r"(?:^|\s)(\d|@)\s*months?\s+lock\s*-?\s*in", cmt)
+            if write and lockin_m:
+                raw_n = lockin_m.group(1)
+                months_n = 2 if raw_n == "@" else int(raw_n)
+                if (tenancy.lock_in_months or 0) != months_n:
+                    tenancy.lock_in_months = months_n
+                    stats["lockin_set"] = stats.get("lockin_set", 0) + 1
+
             exp_exit = None
-            if "july 18" in cmt or "jul 18" in cmt or "july 18th" in cmt:
-                exp_exit = date(2026, 7, 18)
-            elif "jun 5" in cmt or "june 5" in cmt or "jun 7" in cmt or "june 7" in cmt or "jun 5th or 7th" in cmt:
-                exp_exit = date(2026, 6, 7)
-            elif "this month end exit" in cmt or "april end exit" in cmt or "end of april" in cmt:
-                exp_exit = date(2026, 4, 30)
-            elif "leave after april" in cmt or "exit after april" in cmt:
-                exp_exit = date(2026, 4, 30)
-            elif "may 31" in cmt or "end of may" in cmt:
-                exp_exit = date(2026, 5, 31)
-            # 3-month lockin starting April → expected exit ≈ June 30 if mentioned
-            elif "3 months lockin" in cmt and "april" in cmt and not exp_exit:
-                exp_exit = date(2026, 6, 30)
+            if not is_lockin_note:
+                if "july 18" in cmt or "jul 18" in cmt or "july 18th" in cmt:
+                    exp_exit = date(2026, 7, 18)
+                elif "jun 5" in cmt or "june 5" in cmt or "jun 7" in cmt or "june 7" in cmt:
+                    exp_exit = date(2026, 6, 7)
+                elif "this month end exit" in cmt or "april end exit" in cmt or "end of april" in cmt:
+                    exp_exit = date(2026, 4, 30)
+                elif "leave after april" in cmt or "exit after april" in cmt:
+                    exp_exit = date(2026, 4, 30)
+                elif "may 31" in cmt or "end of may" in cmt:
+                    exp_exit = date(2026, 5, 31)
             if write and exp_exit and tenancy.expected_checkout != exp_exit:
                 tenancy.expected_checkout = exp_exit
                 stats["expected_exit_set"] = stats.get("expected_exit_set", 0) + 1
