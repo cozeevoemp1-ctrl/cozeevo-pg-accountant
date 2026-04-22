@@ -214,6 +214,19 @@ async def main(args):
             else:
                 booking_pay_map[p.tenancy_id]["cash"] += p.amount
 
+        # Deposit payments — applied to first-month tenants only (rent_due on
+        # first month includes the deposit via first_month_rent_due, so any
+        # for_type=deposit Payment offsets the same bundle).
+        deposit_pay_map = {}  # tenancy_id -> Decimal
+        deposit_rows = (await session.execute(
+            select(Payment).where(
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.deposit,
+            )
+        )).scalars().all()
+        for p in deposit_rows:
+            deposit_pay_map[p.tenancy_id] = deposit_pay_map.get(p.tenancy_id, Decimal("0")) + p.amount
+
         # ── 3b. Compute prev-month outstanding from DB (not sheet) ──
         prev_period = date(year - 1, 12, 1) if month == 1 else date(year, month - 1, 1)
         prev_rs = (await session.execute(
@@ -365,7 +378,10 @@ async def main(args):
             prev_due = int(prev_due_num) if prev_due_num else ""
 
             prepaid_credit = int(prepaid_map.get(tenancy.id, 0))
-            effective_paid = total_paid + booking_credit + prepaid_credit
+            # Deposit payments credit the first-month bundle (rent_due already
+            # includes security_deposit on the check-in month).
+            deposit_credit = int(deposit_pay_map.get(tenancy.id, 0)) if is_first_month else 0
+            effective_paid = total_paid + booking_credit + prepaid_credit + deposit_credit
             balance = rent_due + int(prev_due_num) - effective_paid
 
             # Status
@@ -487,9 +503,9 @@ async def main(args):
         vacant_beds = int(total_rev_beds) - booked_beds
         occ_pct = (beds / int(total_rev_beds) * 100) if total_rev_beds else 0
 
+        from src.utils.money import inr as _inr
         def fmt_lakh(n):
-            n = float(n)
-            return f"{n/100000:.2f}L" if abs(n) >= 100000 else f"{int(n):,}"
+            return f"Rs.{_inr(n)}"
 
         # 5 summary rows. One cell = one metric. No merging.
         # Section label in col A, metrics in cols B onward.

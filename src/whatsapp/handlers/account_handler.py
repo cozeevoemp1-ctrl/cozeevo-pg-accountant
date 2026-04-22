@@ -28,6 +28,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.utils.money import inr as _inr
 from src.database.models import (
     AuditLog, Expense, Payment, PaymentFor, PaymentMode,
     PendingAction, Refund, RefundStatus, RentSchedule, RentStatus,
@@ -1782,11 +1783,11 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
 
     deposit_recv_line = ""
     if deposits_received > 0:
-        deposit_recv_line = f"\n  Security Deposits: Rs.{int(deposits_received):,}"
+        deposit_recv_line = f"\n  Security Deposits: Rs.{_inr(deposits_received)}"
 
     maintenance_line = ""
     if maintenance_collected > 0:
-        maintenance_line = f"\n  Maintenance: Rs.{int(maintenance_collected):,}"
+        maintenance_line = f"\n  Maintenance: Rs.{_inr(maintenance_collected)}"
 
     month_tag = current_month.strftime("%B %Y")
 
@@ -1799,15 +1800,15 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
         + f"\n  Vacant: {vacant_beds} beds\n"
         f"{vacant_line}\n\n"
         f"*Income*\n"
-        f"  Rent: Rs.{int(rent_collected):,} (Cash {int(cash_collected):,} | UPI {int(upi_collected):,})"
+        f"  Rent: Rs.{_inr(rent_collected)} (Cash {_inr(cash_collected)} | UPI {_inr(upi_collected)})"
         f"{maintenance_line}\n"
-        f"  *Total Collection: Rs.{int(collected):,}*\n"
+        f"  *Total Collection: Rs.{_inr(collected)}*\n"
         f"{deposit_recv_line}"
-        f"  Pending: Rs.{int(pending):,}\n\n"
+        f"  Pending: Rs.{_inr(pending)}\n\n"
         f"*Expenses*\n"
-        f"  Total: Rs.{int(total_expenses):,}{exp_source}"
+        f"  Total: Rs.{_inr(total_expenses)}{exp_source}"
         f"{deposit_refund_line}\n\n"
-        f"*Net: Rs.{net_income:,}*\n\n"
+        f"*Net: Rs.{_inr(net_income)}*\n\n"
         f"Say *empty beds in thor* or *hulk vacant* for room details"
     )
 
@@ -1920,14 +1921,14 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
         total_maintenance += maint
         total_deposits_recv += dep_recv
 
-        maint_note = f" | Maint {maint//1000}K" if maint > 0 else ""
-        dep_note = f" | Dep.Ret: {dep_ret//1000}K" if dep_ret > 0 else ""
-        dep_recv_note = f" | Dep.In: {dep_recv//1000}K" if dep_recv > 0 else ""
+        maint_note = f" | Maint Rs.{_inr(maint)}" if maint > 0 else ""
+        dep_note = f" | Dep.Ret: Rs.{_inr(dep_ret)}" if dep_ret > 0 else ""
+        dep_recv_note = f" | Dep.In: Rs.{_inr(dep_recv)}" if dep_recv > 0 else ""
         lines.append(
-            f"*{month_label}* | Cash {cash//1000}K | UPI {upi//1000}K"
-            f"{maint_note} | Exp {exp//1000}K{dep_note}{dep_recv_note}"
-            f" | Net {net//1000}K"
-            + (f" | Pend {pend//1000}K" if pend > 0 else "")
+            f"*{month_label}* | Cash Rs.{_inr(cash)} | UPI Rs.{_inr(upi)}"
+            f"{maint_note} | Exp Rs.{_inr(exp)}{dep_note}{dep_recv_note}"
+            f" | Net Rs.{_inr(net)}"
+            + (f" | Pend Rs.{_inr(pend)}" if pend > 0 else "")
         )
 
     total_collected = total_cash + total_upi + total_maintenance
@@ -1936,14 +1937,14 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
     lines.append(f"\n{'─' * 30}")
     lines.append(
         f"*TOTAL*\n"
-        f"  Rent: Rs.{total_cash + total_upi:,} (Cash {total_cash:,} | UPI {total_upi:,})\n"
-        + (f"  Maintenance: Rs.{total_maintenance:,}\n" if total_maintenance > 0 else "")
-        + f"  *Total Collection: Rs.{total_collected:,}*\n"
-        + (f"  Security Deposits: Rs.{total_deposits_recv:,}\n" if total_deposits_recv > 0 else "")
-        + f"  Expenses:  Rs.{total_expenses:,}\n"
-        + (f"  Deposits Returned: Rs.{total_deposits:,}\n" if total_deposits > 0 else "")
-        + f"  Pending: Rs.{total_pending:,}\n"
-        f"  *Net Income: Rs.{total_net:,}*"
+        f"  Rent: Rs.{_inr(total_cash + total_upi)} (Cash {_inr(total_cash)} | UPI {_inr(total_upi)})\n"
+        + (f"  Maintenance: Rs.{_inr(total_maintenance)}\n" if total_maintenance > 0 else "")
+        + f"  *Total Collection: Rs.{_inr(total_collected)}*\n"
+        + (f"  Security Deposits: Rs.{_inr(total_deposits_recv)}\n" if total_deposits_recv > 0 else "")
+        + f"  Expenses:  Rs.{_inr(total_expenses)}\n"
+        + (f"  Deposits Returned: Rs.{_inr(total_deposits)}\n" if total_deposits > 0 else "")
+        + f"  Pending: Rs.{_inr(total_pending)}\n"
+        f"  *Net Income: Rs.{_inr(total_net)}*"
     )
 
     return "\n".join(lines)

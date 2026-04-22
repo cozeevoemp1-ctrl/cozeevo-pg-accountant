@@ -273,7 +273,11 @@ async def main(write: bool):
                 if not tenancy.notice_date:
                     tenancy.notice_date = date.today()
 
-            if inout in ("CHECKIN", "NO SHOW"):
+            # Only create April RentSchedule if tenant's checkin is on or before
+            # April month (not for future May/June check-ins that are parked as
+            # no-show with a next-month checkin_date — they don't owe April rent).
+            checkin_in_or_before_apr = (checkin and checkin < date(2026, 5, 1))
+            if inout in ("CHECKIN", "NO SHOW") and checkin_in_or_before_apr:
                 existing_rs = (await s.execute(
                     select(RentSchedule).where(
                         RentSchedule.tenancy_id == tenancy.id,
