@@ -55,6 +55,30 @@ def pn(val) -> float:
         return 0.0
 
 
+def _add_months(d: date, n: int) -> date:
+    """Return the first of the month N months after `d` (simple, no deps)."""
+    m_index = (d.month - 1) + n
+    y = d.year + m_index // 12
+    m = m_index % 12 + 1
+    return date(y, m, 1)
+
+
+def _vacating_distribution(period: date, vacating_by_month: dict) -> str:
+    """Render the next three months of bed vacancies as a single cell.
+
+    Example (viewing April tab):
+      "Vacating May:1 Jun:16 Jul:3"
+
+    Zero months are still shown so the rhythm is consistent month to month
+    and a reader can spot when there's a genuine lull.
+    """
+    parts = []
+    for i in range(1, 4):
+        m = _add_months(period, i)
+        parts.append(f"{m.strftime('%b')}:{vacating_by_month.get(m, 0)}")
+    return "Vacating " + " ".join(parts)
+
+
 async def main(args):
     month = args.month
     year = args.year
@@ -257,18 +281,12 @@ async def main(args):
         prev_due_map = {tid: max(0, bal) for tid, bal in prev_due_map.items() if bal > 0}
 
         # ── 3c. Notice / upcoming exits ──
-        next_end = date(year + 1, 2, 1) if month == 12 else (
-            date(year, month + 2, 1) if month < 11 else date(year + 1, 1, 1)
-        )
-        # Active tenancies with expected_checkout in next month
-        exit_next_rows = (await session.execute(
-            select(Tenancy).where(
-                Tenancy.status == TenancyStatus.active,
-                Tenancy.expected_checkout >= next_period,
-                Tenancy.expected_checkout < next_end,
-            )
-        )).scalars().all()
-        # Active tenancies with notice_date in this month (formal notice given)
+        # Break the on-notice tenants down by the month they actually exit
+        # (expected_checkout). A notice given in April but following the
+        # "after 5th" convention leaves the tenant billed through May and
+        # checking out June 1 — that's why "next month" can be tiny while
+        # "following month" is huge. Showing the distribution avoids the
+        # confusion that the summary row caused before 2026-04-22.
         notice_this_month_rows = (await session.execute(
             select(Tenancy).where(
                 Tenancy.status == TenancyStatus.active,
@@ -277,10 +295,25 @@ async def main(args):
             )
         )).scalars().all()
         notice_count = len(notice_this_month_rows)
-        # Beds vacating = count of exits next month, premium = 2 beds
-        exit_next_beds = 0
-        for t in exit_next_rows:
-            exit_next_beds += 2 if (t.sharing_type and str(t.sharing_type.value if hasattr(t.sharing_type, 'value') else t.sharing_type) == "premium") else 1
+
+        def _bedcount(t):
+            return 2 if (t.sharing_type and str(t.sharing_type.value if hasattr(t.sharing_type, 'value') else t.sharing_type) == "premium") else 1
+
+        # Count beds vacating across all active tenancies (not just this
+        # month's notice) by expected_checkout month — covers prior notices
+        # too, so the full pipeline of exits is visible.
+        from collections import defaultdict
+        all_notice_active = (await session.execute(
+            select(Tenancy).where(
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.expected_checkout.isnot(None),
+                Tenancy.expected_checkout >= period,
+            )
+        )).scalars().all()
+        vacating_by_month = defaultdict(int)  # period_month_date -> bed count
+        for t in all_notice_active:
+            mkey = t.expected_checkout.replace(day=1)
+            vacating_by_month[mkey] += _bedcount(t)
 
         # ── 4. Read existing Sheet to preserve any data not in DB ──
         from src.integrations.gsheets import _get_worksheet_sync
@@ -566,7 +599,7 @@ async def main(args):
         summary_row5 = pad([
             "NOTICE",
             f"On notice: {notice_count} tenants",
-            f"Vacating next month: {exit_next_beds} beds",
+            _vacating_distribution(period, vacating_by_month),
         ])
 
         header_row = list(MONTHLY_HEADERS)
@@ -577,7 +610,7 @@ async def main(args):
         print(f"BUILDINGS  THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)  Exits: {len(exit_rows)}")
         print(f"COLLECTION Cash: {fmt_lakh(total_cash)}  UPI: {fmt_lakh(total_upi)}  Collected: {fmt_lakh(total_collected)}  Rent Billed: {fmt_lakh(total_rent_due)}  Prev Due: {fmt_lakh(total_prev_due)}")
         print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  Pending: {fmt_lakh(total_pending)}")
-        print(f"NOTICE     {notice_count} tenants gave notice  •  {exit_next_beds} beds vacating next month")
+        print(f"NOTICE     {notice_count} tenants gave notice  •  {_vacating_distribution(period, vacating_by_month)}")
 
         if not args.write:
             print(f"\n[DRY RUN] Would write {len(data_rows) + 6} rows to '{tab_name}'")
