@@ -133,6 +133,14 @@ IF outstanding > 0: include in dues list
 
 **Test:** `tests/test_dues_month_scope.py` -- 10/10 passing
 
+### 2.4 No-Shows and Future Checkins — AUTO-EXCLUDED
+
+Pending(M) iterates `RentSchedule(period_month = M)`. We do NOT create RentSchedule for:
+- `Tenancy.status = no_show`
+- Tenancies with `checkin_date >= next_period_month` (future checkins shown in the source sheet but not yet live)
+
+→ They cannot appear in Pending for month M. Source sheet's "April Balance" column may list them; reconciliation scripts must strip no-shows before comparing. See `docs/REPORTING.md §11.2`.
+
 ---
 
 ## 3. PAYMENT PROCESSING

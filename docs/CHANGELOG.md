@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.1] — 2026-04-22 — Pending scope rule locked (no-shows excluded) + standard formula reinstated
+
+### Formula stance (authoritative)
+- Kiran reversed an earlier Option A "trust source cash+upi+balance for rent_due" — our standard `first_month_rent_due = agreed_rent + security_deposit` is authoritative. Source sheet is data only. Reverted `scripts/sync_from_source_sheet.py` to call `first_month_rent_due()` for new April RentSchedules. Pending back to **Rs.2,56,123** (Rs.45,35,375 billed − Rs.42,79,252 effective paid).
+
+### Pending scope rule — month only, no-shows excluded
+- **Confirmed:** Source "April Balance" sum Rs.3,26,054 = Rs.1,45,054 real April pending + **Rs.1,81,000 from 7 no-shows** (May/June checkins still listed with their future first-month due in source). No-shows don't have an April RentSchedule in our DB, so they're automatically excluded from Pending(April). Kiran confirmed this is correct.
+- **Doc updates:** `docs/REPORTING.md §11.2` new subsection + `docs/BUSINESS_LOGIC.md §2.4` + memory `sop_db_sheet_financial.md` rule #8. Enforcement already in place via RentSchedule iteration.
+- Reconciliation scripts: `scripts/april_balance_29.py` (per-tenant view of the 29 source-Balance rows) and `scripts/gap_report_xlsx.py` (updated for booking/deposit/prepaid credits) saved under `data/reports/`.
+
+### Format
+- All financial figures in Indian-comma format via `src/utils/money.inr()` — ops sheet summary + bot WhatsApp monthly report. No more "12.03 L" abbreviations.
+
+---
+
 ## [1.49.0] — 2026-04-21 (full day) — April/March reconciliation, format unification, reminder + onboarding fixes
 
 ### Critical data fixes

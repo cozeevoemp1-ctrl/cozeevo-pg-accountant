@@ -431,12 +431,25 @@ For month M:
   cash = SUM(... WHERE payment_mode = cash)
   upi = SUM(... WHERE payment_mode = upi)
 
-  pending = SUM(RentSchedule.rent_due)
-            WHERE period_month = M, status IN [pending, partial],
-            Tenancy.status = active, Tenancy.checkin_date <= last_day_of_M
+  pending = SUM(positive per-row Balance over tenancies that have RentSchedule for M)
+            Balance = rent_due + prev_due − (cash + upi + prepaid + booking_credit + deposit_credit)
 
   active_tenants = COUNT(Tenancy WHERE status = active, checkin_date <= last_day_of_M)
 ```
+
+### 11.2 Pending Excludes No-Shows and Future Checkins (LOCKED)
+
+**A tenancy contributes to Pending(M) only if it has a `RentSchedule(period_month = M)` row.**
+
+- No-shows: `Tenancy.status = no_show` — no RentSchedule is created for them → excluded.
+- Future checkins (e.g., May/June tenants visible in April source sheets): `checkin_date >= next_month_start` — no April RentSchedule created → excluded.
+- Frozen months (Dec 2025 – Mar 2026) are loaded 1:1 and retain their RentSchedule rows.
+
+**Enforcement site:** `scripts/sync_from_source_sheet.py` — skips RentSchedule creation when `checkin_date >= next period_month`. `scripts/sync_sheet_from_db.py` and `account_handler._monthly_report()` iterate only over RentSchedule rows for month M, so exclusion is automatic.
+
+**Why:** Source sheet (`April Month Collection`) tracks deposit installments and future booking balances in its Balance column. Our bot/sheet/DB are month-scoped: Pending(April) = money owed *for April rent only*. Someone arriving in May cannot be "pending" for April.
+
+**Reconciliation:** Source "April Balance" sum includes no-shows + deposit installments; after excluding those it matches our per-row Balance for the same tenants. Any residual gap is the formula difference (standard `first_month_rent_due = rent + deposit` vs source's installment view). Our formula is authoritative.
 
 ---
 
