@@ -231,6 +231,7 @@ function readMonthData(sheet) {
   const data = sheet.getDataRange().getValues();
   const r = {
     tenants: 0, beds: 0, regular: 0, premium: 0, noshow: 0,
+    daywise: 0,  // day-stay guests currently checked in (from DAY WISE tab)
     cash: 0, upi: 0, balance: 0, rentExpected: 0,
     paid: 0, partial: 0, unpaid: 0,
     newCheckins: 0, exits: 0,
@@ -238,6 +239,32 @@ function readMonthData(sheet) {
     thorRent: 0, hulkRent: 0,
     thorCash: 0, hulkCash: 0, thorUpi: 0, hulkUpi: 0,
   };
+
+  // Count active day-stays so DASHBOARD vacant count matches the bot +
+  // monthly tab summary. A room with only day-stay guests is NOT vacant.
+  try {
+    const dw = SpreadsheetApp.getActive().getSheetByName("DAY WISE");
+    if (dw) {
+      const dwData = dw.getDataRange().getValues();
+      const dwHdr = _findRow_(dwData, "Room", 5);
+      if (dwHdr >= 0) {
+        const dwCm = _colMap_(dwData[dwHdr]);
+        const cChk = _col_(dwCm, "Check-in");
+        const cOut = _col_(dwCm, "Check-out");
+        const cStat = _col_(dwCm, "Status");
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        for (let i = dwHdr + 1; i < dwData.length; i++) {
+          const row = dwData[i];
+          const chk = row[cChk] ? new Date(row[cChk]) : null;
+          const out = row[cOut] ? new Date(row[cOut]) : null;
+          const stat = String(row[cStat] || "").toUpperCase();
+          if (!chk) continue;
+          if (stat === "EXIT" || stat === "CANCELLED") continue;
+          if (chk <= today && (!out || out > today)) r.daywise++;
+        }
+      }
+    }
+  } catch (e) { /* DAY WISE missing or read error — leave 0 */ }
   // Header-driven — locate "Room" header row (row 4 in legacy, row 7 in new
   // sync_sheet_from_db.py layout). Column lookup by name, not position.
   const headerIdx = _findRow_(data, "Room", 12);
@@ -351,8 +378,10 @@ function refreshDashboardContent_() {
   const tab = tabs.find(t => t.name.toUpperCase() === selected.toUpperCase()) || tabs[tabs.length - 1];
   const d = readMonthData(tab.sheet);
   const collected = d.cash + d.upi;
-  const vacant = TOTAL_BEDS - d.beds - d.noshow;
-  const occPct = (d.beds / TOTAL_BEDS * 100).toFixed(0);
+  // Vacant must subtract day-stays too — a room with a day-stay guest is
+  // not free for a new booking.
+  const vacant = TOTAL_BEDS - d.beds - d.noshow - d.daywise;
+  const occPct = ((d.beds + d.daywise) / TOTAL_BEDS * 100).toFixed(0);
   const deposit = getTotalDeposit_();
 
   // Clear content below row 1 (keep title + dropdown)
@@ -378,7 +407,7 @@ function refreshDashboardContent_() {
   r++;
   dash.getRange(r, 1).setValue(d.regular + " reg + " + d.premium + " prem")
     .setFontSize(9).setFontColor("#999999");
-  dash.getRange(r, 2).setValue(d.noshow + " no-show | " + vacant + " vacant")
+  dash.getRange(r, 2).setValue(d.noshow + " no-show | " + d.daywise + " day-stay | " + vacant + " vacant")
     .setFontSize(9).setFontColor("#999999");
   dash.getRange(r, 4).setValue("Outstanding").setFontSize(10).setFontColor("#666666");
   dash.getRange(r, 5).setValue(d.balance).setFontSize(14).setFontWeight("bold")

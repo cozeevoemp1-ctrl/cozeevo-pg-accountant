@@ -503,15 +503,20 @@ async def main(args):
         partial_count = sum(1 for r in data_rows if r[i_status] == "PARTIAL")
         unpaid_count = sum(1 for r in data_rows if r[i_status] == "UNPAID")
 
-        # Vacant beds
+        # Vacant beds — daywise count via canonical helper so DASHBOARD,
+        # bot queries, and this summary all agree. See
+        # src/services/room_occupancy.py.
         total_rev_beds = (await session.execute(
             select(func.sum(Room.max_occupancy)).where(Room.active == True, Room.is_staff_room == False)
         )).scalar() or 0
         from src.database.models import DaywiseStay
         daywise_beds = (await session.execute(
-            select(func.count()).select_from(DaywiseStay).where(
+            select(func.count()).select_from(DaywiseStay)
+            .join(Room, Room.room_number == DaywiseStay.room_number)
+            .where(
+                Room.is_staff_room == False,
                 DaywiseStay.checkin_date <= date.today(),
-                DaywiseStay.checkout_date >= date.today(),
+                DaywiseStay.checkout_date > date.today(),
                 DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
             )
         )).scalar() or 0
