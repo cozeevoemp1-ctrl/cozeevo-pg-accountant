@@ -17,6 +17,9 @@ from __future__ import annotations
 # Empty keywords list = catch-all (used as last rule in the list).
 
 EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
+    # ── CAPITAL INVESTMENT — must be FIRST so CCTV cheque doesn't land in Misc ──
+    ("Capital Investment",   "CCTV Installation",            ["chq w/l_kiran kumar pemma","cctv install","cctv"]),
+
     # ── NON-OPERATING — must be FIRST so loan names don't match other rules ──
     # Description-based overrides: the SAME person can receive rent OR a loan;
     # trust the memo keyword. These run BEFORE the landlord-name matches below.
@@ -48,10 +51,10 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("IT & Software",        "KIPINN (Software/ISP)",        ["kipinn","kipnn","kipi nn","kipin"]),
 
     # ── INTERNET & WIFI ───────────────────────────────────────────────────────
+    # Keep Airtel/Jio/Vi as specific merchant strings only — raw "airtel"/"jio" matches
+    # Razorpay/PayU payment rails (e.g. *.rzp@rxairtel = Zepto, *.payu@mairtel = Flipkart)
     ("Internet & WiFi",      "Airwire Broadband",            ["airwire"]),
-    ("Internet & WiFi",      "Jio Recharge",                 ["jioinappdirect","jio"]),
-    ("Internet & WiFi",      "Vi / Vodafone Recharge",       ["viinappguj","vodafone","vi "]),
-    ("Internet & WiFi",      "Airtel Recharge",              ["airtelpredirect","airtel"]),
+    ("Internet & WiFi",      "Airtel Recharge (Direct)",     ["airtelpredirect"]),
     ("Internet & WiFi",      "WiFi Vendor",                  ["wifi","wi-fi","broadband"]),
 
     # ── FURNITURE & FITTINGS ──────────────────────────────────────────────────
@@ -104,6 +107,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff - 9102937483",           ["9102937483"]),
     ("Staff & Labour",       "Staff - 9342205440 (Vendor)",  ["9342205440"]),
     ("Staff & Labour",       "Advance for Cook (Rampukar)",  ["rampukar","advance for cook","cooking t"]),
+    ("Staff & Labour",       "Cleaners Advance",             ["cleaners advance","cleaner advance","8787621802"]),
     ("Staff & Labour",       "WorkIndia (Recruitment)",      ["workindia","work india"]),
     ("Staff & Labour",       "Staff - kn.ravikumar",         ["kn.ravikumar","ravikumar80"]),
     ("Staff & Labour",       "Staff - sachindivya",          ["sachindivya"]),
@@ -114,6 +118,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff - gudadesh (Contractor)",["gudadesh","udadesh"]),
     ("Staff & Labour",       "Staff - sandeepgowda",         ["sandeepgowda"]),
     ("Staff & Labour",       "Staff - Various UPI",          ["akmalakmal","kutubuddinku","vishal521","sanket","biplab"]),
+    ("Staff & Labour",       "Staff Mobile Recharge (Jio)",  ["jioinappdirect"]),
+    ("Staff & Labour",       "Staff Mobile Recharge (Vi)",   ["viinappguj"]),
 
     # ── GOVT & REGULATORY ─────────────────────────────────────────────────────
     ("Govt & Regulatory",    "BBMP Tax / Property Bill",     ["bbmp","bbpsbp"]),
@@ -123,6 +129,13 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
 
     # ── TENANT DEPOSIT REFUND ─────────────────────────────────────────────────
     ("Tenant Deposit Refund","Booking Cancellation Refund",  ["booking cancellation"]),
+    ("Tenant Deposit Refund","Refund - Chandrasekhar",       ["chandrasekhar1996krish"]),
+    ("Tenant Deposit Refund","Refund - Amal",                ["amalsreenimj"]),
+    ("Tenant Deposit Refund","Refund - Adithya",             ["adithya3sri"]),
+    ("Tenant Deposit Refund","Refund - Kuhan Mohan",         ["kuhanmohan123"]),
+    ("Tenant Deposit Refund","Refund - T Srinivasa",         ["t.srinivasa34"]),
+    ("Tenant Deposit Refund","Refund - Swami Venkatesh",     ["swamivenkatesh264"]),
+    ("Tenant Deposit Refund","Refund - K S Shyam Reddy",     ["ksshyamreddy"]),
     ("Tenant Deposit Refund","Other Refund / Exit",          ["refund","exit refund","checkout refund","rishwanth refund","hafiz refund","gotham refund","lakshmi priya refund"]),
 
     # ── MARKETING ─────────────────────────────────────────────────────────────
@@ -132,8 +145,11 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Marketing",            "FindMyPG Listing",             ["find my pg","findmypg"]),
     ("Marketing",            "Marketing / Promotions",       ["marketing","advertisement"]),
 
+    # ── WASTE DISPOSAL ────────────────────────────────────────────────────────
+    ("Waste Disposal",       "Pavan (6366411789)",           ["6366411789","garbage collection"]),
+
     # ── CLEANING & HOUSEKEEPING SUPPLIES ──────────────────────────────────────
-    ("Cleaning Supplies",    "Garbage Bags / Bins",          ["garbage bag","garbage"]),
+    ("Cleaning Supplies",    "Garbage Bags / Bins",          ["garbage bag"]),
     ("Cleaning Supplies",    "Phenyl / Disinfectant",        ["phenyl","disinfect","toilet adour","toilet filter","bleaching powder"]),
     ("Cleaning Supplies",    "Mop / Cleaning Tools",         ["mop","broom","knife sharpen"]),
     ("Cleaning Supplies",    "Room Freshener / Hooks",       ["room freshner","freshner","hooks"]),
@@ -141,7 +157,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
 
     # ── SHOPPING & SUPPLIES ───────────────────────────────────────────────────
     ("Furniture & Fittings", "Elgis Fitness — Gym CAPEX",     ["elgis"]),
-    ("Shopping & Supplies",  "Amazon",                       ["amazon"]),
+    # Amazon goes to Operational Expenses per Kiran's rule
+    ("Operational Expenses", "Amazon",                       ["amazon"]),
+    ("Operational Expenses", "Misc - akhilreddy007420",      ["akhilreddy007420"]),
     ("Shopping & Supplies",  "Flipkart",                     ["flipkart"]),
     ("Shopping & Supplies",  "BharatPE (POS Payments)",      ["bharatpe","bharat pe"]),
     ("Shopping & Supplies",  "Pine Labs (POS Terminal)",     ["pinelab","pi nelabs"]),

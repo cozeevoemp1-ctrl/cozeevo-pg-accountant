@@ -2,6 +2,47 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.2] — 2026-04-22 — P&L rebuild: cash-inclusive, March DB↔sheet 1:1 reload, new categories, consolidated SOP
+
+### Classifier rule updates (`src/rules/pnl_classify.py`)
+- **New category "Operational Expenses"** — Amazon (always) + `akhilreddy007420` (per Kiran).
+- **New category "Waste Disposal"** — Pavan (`6366411789` / "garbage collection"), ₹3.5K/mo fixed.
+- **New category "Capital Investment"** — CCTV cheque `CHQ W/L_KIRAN KUMAR PEMMA SANI-BELLANDUR` (₹82K Nov).
+- Removed over-broad `airtel` keyword (was catching `*.rzp@rxairtel` / `*.payu@mairtel` Razorpay/PayU rails) — only `airtelpredirect` matches now. Zepto/Flipkart/Origin Mandi now route to their true categories.
+- Jio (`jioinappdirect`) + Vi (`viinappguj`) recharges → Staff & Labour / Staff Mobile Recharge (not Internet).
+- 7 tenant deposit refund handle rules: `chandrasekhar1996krish`, `amalsreenimj`, `adithya3sri`, `kuhanmohan123`, `t.srinivasa34`, `swamivenkatesh264`, `ksshyamreddy`.
+- `cleaners advance` / `8787621802` → Staff & Labour / Cleaners Advance.
+
+### Data — March DB↔Source Sheet 1:1 reload
+- Detected drift: DB had 279 tenants × ₹53.66L March rent vs sheet 227 × ₹39.83L (₹13.83L phantom in DB, mostly cash).
+- Voided 372 old March rent payments (audit preserved, `is_void=True`).
+- Inserted 258 fresh payments matching sheet 1:1 (cash ₹10,94,220 + UPI ₹28,89,193).
+- Backup: `data/backups/march_rent_payments_before_20260422_173828.csv`.
+- Loader glob updated in `scripts/export_classified.py` to pick up renamed `2026 statment.csv` (was `Statement-*.csv`) + tolerate missing optional xlsx.
+
+### Accrual overrides locked in SOP
+- **Property Rent**: ₹21.32L/mo (164 rooms × ₹13K) starting Jan 2026, paid 10th of next month (~₹6L UPI + ~₹15.32L cash per month). Replaces bank-classifier ₹12.05L two-month total.
+- **Internet**: ₹15,514/mo effective (Airwire ₹1.13L + WiFi Vendor ₹1.04L = ₹2.17L for 14 months from Feb, covering both buildings).
+- **Police (Pradeep)**: ₹3,000/mo fixed cash-paid, rarely in bank.
+- **Cash-only flag** on Water / Maintenance / Housekeeping / Vegetables — bank shows ≤10% of real spend; ≈₹3.5L/mo leakage not in bank P&L.
+
+### Simple P&L result (Oct'25–Mar'26, bank-visible accrual)
+Revenue ₹1,12,40,175 − Opex ₹90,77,293 = **Net Profit ₹21,62,882 (19.2%)**.
+After adjusting for ~₹17L cash-ops leakage: real profit ≈ **₹4.6L** (essentially break-even, operations funded by refundable deposits). Refundable Security Deposit liability ₹21,56,125 (252 active tenants, Kiran's April-Collection method).
+
+### Memory consolidation
+- Deleted: `feedback_reporting.md`, `feedback_pnl_report.md`, `feedback_pnl_fixed_rules.md`, `project_pnl_oct25_mar26.md`, `project_pnl_reclassification.md`.
+- New single SOP: `memory/sop_pnl.md` (10 steps) — source data, classifier rules, income/expense accrual overrides, March reload procedure, refundable-deposit method, cash-position framework, peer benchmark, hard rule "never estimate cash, ask Kiran".
+- Session snapshot for tomorrow: `memory/project_pnl_session_2026_04_22.md`.
+
+### Open questions for next session
+- Actual cash-in-hand (Kiran) — my ₹30L estimate was wrong.
+- Landlord security deposit/advance at PG startup.
+- April bank CSV (current file ends 31-Mar).
+- Identify volipi.l / arunphilip25 / tpasha638 (still in Other Expenses).
+
+---
+
 ## [1.49.1] — 2026-04-22 — Pending scope rule locked (no-shows excluded) + standard formula reinstated
 
 ### Formula stance (authoritative)

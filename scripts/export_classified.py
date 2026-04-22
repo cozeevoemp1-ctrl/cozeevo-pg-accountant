@@ -80,8 +80,9 @@ txns = []
 sources = []
 
 import glob as _glob
-# CSVs first — newest downloads
-for f in sorted(_glob.glob('Statement-*.csv'), reverse=True):
+# CSVs first — newest downloads (covers Statement-*.csv and "YYYY statment.csv")
+csv_files = sorted(set(_glob.glob('Statement-*.csv') + _glob.glob('*statment*.csv') + _glob.glob('*statement*.csv')), reverse=True)
+for f in csv_files:
     t = read_yes_bank_csv(f)
     print('Loaded %d from %s' % (len(t), f))
     txns += t
@@ -89,6 +90,8 @@ for f in sorted(_glob.glob('Statement-*.csv'), reverse=True):
 
 # Then Excel statements (only add if not already seen)
 for f in ['2025 statement.xlsx', '2026 statment.xlsx']:
+    if not os.path.exists(f):
+        continue
     t = read_yes_bank(f)
     print('Loaded %d from %s' % (len(t), f))
     txns += t
@@ -124,8 +127,10 @@ CTR       = Alignment(horizontal='center', vertical='center', wrap_text=False)
 CATS = [
     'Property Rent', 'Electricity', 'Water', 'IT & Software', 'Internet & WiFi',
     'Food & Groceries', 'Fuel & Diesel', 'Staff & Labour', 'Furniture & Fittings',
-    'Maintenance & Repairs', 'Cleaning Supplies', 'Shopping & Supplies', 'Marketing',
-    'Govt & Regulatory', 'Tenant Deposit Refund', 'Bank Charges', 'Non-Operating',
+    'Maintenance & Repairs', 'Cleaning Supplies', 'Waste Disposal',
+    'Shopping & Supplies', 'Operational Expenses', 'Marketing',
+    'Govt & Regulatory', 'Tenant Deposit Refund', 'Bank Charges',
+    'Capital Investment', 'Non-Operating',
     'Other Expenses',
 ]
 
