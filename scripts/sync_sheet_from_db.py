@@ -60,6 +60,7 @@ async def main(args):
     year = args.year
     tab_name = f"{MONTH_NAMES[month]} {year}"
     period = date(year, month, 1)
+    next_period = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
 
     print(f"=== Sync Sheet '{tab_name}' from DB ===\n")
 
@@ -136,9 +137,16 @@ async def main(args):
             rent_map[rs.tenancy_id] = rs
 
         # ── 3. Get RENT payments for this month (exclude deposit/maintenance) ──
-        # Booking advances are also collected here only for tenants whose first
-        # month == this period, since the advance counts against first-month dues.
-        payment_map = {}  # tenancy_id -> {cash, upi}
+        # Two maps:
+        #   payment_map      → Cash/UPI display cols: only payments with
+        #                      payment_date IN this month (matches source sheet's
+        #                      "April cash"/"April UPI" columns which are receipts
+        #                      received in April, not pre-paid in March).
+        #   prepaid_map      → Pre-payments with period_month=this month but
+        #                      payment_date in a prior month. Count toward rent_due
+        #                      coverage (balance + status) but NOT shown in Cash/UPI.
+        payment_map = {}   # tenancy_id -> {cash, upi}  (display)
+        prepaid_map = {}   # tenancy_id -> Decimal      (pre-payments, for balance)
         pay_rows = (await session.execute(
             select(Payment).where(
                 Payment.period_month == period,
@@ -153,10 +161,18 @@ async def main(args):
             if p.tenancy_id not in payment_map:
                 payment_map[p.tenancy_id] = {"cash": Decimal("0"), "upi": Decimal("0")}
             mode = (p.payment_mode.value if hasattr(p.payment_mode, 'value') else str(p.payment_mode or "cash")).lower()
-            if mode in ("upi", "bank", "online", "neft", "imps"):
-                payment_map[p.tenancy_id]["upi"] += p.amount
+            paid_in_period = (
+                p.payment_date is not None
+                and period <= p.payment_date < next_period
+            )
+            if paid_in_period:
+                if mode in ("upi", "bank", "online", "neft", "imps"):
+                    payment_map[p.tenancy_id]["upi"] += p.amount
+                else:
+                    payment_map[p.tenancy_id]["cash"] += p.amount
             else:
-                payment_map[p.tenancy_id]["cash"] += p.amount
+                # Pre-payment (paid before period_month) — count toward balance only
+                prepaid_map[p.tenancy_id] = prepaid_map.get(p.tenancy_id, Decimal("0")) + p.amount
             # Most recent by created_at, fallback to payment_date
             _prev = latest_pay_per_t.get(p.tenancy_id)
             _p_ts = getattr(p, "created_at", None) or p.payment_date
@@ -220,7 +236,6 @@ async def main(args):
         prev_due_map = {tid: max(0, bal) for tid, bal in prev_due_map.items() if bal > 0}
 
         # ── 3c. Notice / upcoming exits ──
-        next_period = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
         next_end = date(year + 1, 2, 1) if month == 12 else (
             date(year, month + 2, 1) if month < 11 else date(year + 1, 1, 1)
         )
@@ -349,7 +364,8 @@ async def main(args):
             prev_due_num = prev_due_map.get(tenancy.id, 0)
             prev_due = int(prev_due_num) if prev_due_num else ""
 
-            effective_paid = total_paid + booking_credit
+            prepaid_credit = int(prepaid_map.get(tenancy.id, 0))
+            effective_paid = total_paid + booking_credit + prepaid_credit
             balance = rent_due + int(prev_due_num) - effective_paid
 
             # Status

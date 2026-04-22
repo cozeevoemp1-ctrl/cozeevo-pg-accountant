@@ -200,9 +200,10 @@ async def main(write: bool):
             status = status_from_inout(inout)
             sharing = norm_sharing(row[COL["sharing"]])
 
-            # Find/create tenant (by phone+name, allow shared phones)
-            tenant = tenant_map.get((phone, name.lower().strip())) \
-                  or tenant_map.get(("phone_only", phone))
+            # Find/create tenant (by phone+name). Do NOT fall back to
+            # phone-only — two people can share a phone (roommates on one SIM)
+            # and we need separate Tenants so their payments don't merge.
+            tenant = tenant_map.get((phone, name.lower().strip()))
             if not tenant and write:
                 tenant = Tenant(
                     name=name, phone=phone,
@@ -249,6 +250,29 @@ async def main(write: bool):
 
             # ── Rent schedule for April (skip EXIT/CANCELLED) ─────────
             # Dedupe: only insert if no existing April rent_schedule for this tenancy
+            # ── Parse comments for expected_checkout + notice_date ────
+            cmt_raw = (row[COL["comments"]] or "").strip()
+            cmt = cmt_raw.lower()
+            exp_exit = None
+            if "july 18" in cmt or "jul 18" in cmt or "july 18th" in cmt:
+                exp_exit = date(2026, 7, 18)
+            elif "jun 5" in cmt or "june 5" in cmt or "jun 7" in cmt or "june 7" in cmt or "jun 5th or 7th" in cmt:
+                exp_exit = date(2026, 6, 7)
+            elif "this month end exit" in cmt or "april end exit" in cmt or "end of april" in cmt:
+                exp_exit = date(2026, 4, 30)
+            elif "leave after april" in cmt or "exit after april" in cmt:
+                exp_exit = date(2026, 4, 30)
+            elif "may 31" in cmt or "end of may" in cmt:
+                exp_exit = date(2026, 5, 31)
+            # 3-month lockin starting April → expected exit ≈ June 30 if mentioned
+            elif "3 months lockin" in cmt and "april" in cmt and not exp_exit:
+                exp_exit = date(2026, 6, 30)
+            if write and exp_exit and tenancy.expected_checkout != exp_exit:
+                tenancy.expected_checkout = exp_exit
+                stats["expected_exit_set"] = stats.get("expected_exit_set", 0) + 1
+                if not tenancy.notice_date:
+                    tenancy.notice_date = date.today()
+
             if inout in ("CHECKIN", "NO SHOW"):
                 existing_rs = (await s.execute(
                     select(RentSchedule).where(
@@ -257,7 +281,8 @@ async def main(write: bool):
                     )
                 )).scalar()
                 if not existing_rs:
-                    rent_amt = Decimal(str(pn(row[COL["monthly_rent"]])))
+                    from src.services.rent_schedule import first_month_rent_due
+                    rent_amt = first_month_rent_due(tenancy, APRIL)
                     rs_status = RentStatus.pending if inout == "CHECKIN" else RentStatus.na
                     s.add(RentSchedule(
                         tenancy_id=tenancy.id,
@@ -266,11 +291,44 @@ async def main(write: bool):
                         maintenance_due=Decimal("0"),
                         status=rs_status,
                         due_date=APRIL,
-                        notes=(row[COL["comments"]] or "")[:250] or None,
+                        notes=(cmt_raw or None)[:250] if cmt_raw else None,
                     ))
 
+            # ── Helpers for "paid in <month>" pre-payments ────────────
+            import re as _re2
+            _PREV_MONTH_RE = _re2.compile(
+                r"paid\s+in\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)",
+                _re2.I,
+            )
+            _MONTH_LAST_DAY = {
+                "jan": date(2026, 1, 31), "feb": date(2026, 2, 28),
+                "mar": date(2026, 3, 31), "apr": date(2026, 4, 30),
+                "may": date(2026, 5, 31), "jun": date(2026, 6, 30),
+                "jul": date(2026, 7, 31), "aug": date(2026, 8, 31),
+                "sep": date(2026, 9, 30), "oct": date(2026, 10, 31),
+                "nov": date(2026, 11, 30), "dec": date(2026, 12, 31),
+            }
+
+            def _maybe_prepayment(cell_text: str, default_mode: PaymentMode):
+                """If cell contains 'paid in <month>', return (amount, mode, pay_date, note). Else None."""
+                if not cell_text:
+                    return None
+                m = _PREV_MONTH_RE.search(cell_text)
+                if not m:
+                    return None
+                month_key = m.group(1).lower()[:3]
+                pay_dt = _MONTH_LAST_DAY.get(month_key, date(2026, 3, 31))
+                # Mode: if the text says "by cash" → cash, else trust the column default
+                mode = PaymentMode.cash if "by cash" in cell_text.lower() else default_mode
+                amt = Decimal(str(pn(row[COL["monthly_rent"]]) or 0))
+                if amt == 0:
+                    return None
+                note = f"Pre-paid in {month_key.title()} for April rent — source sheet"
+                return (amt, mode, pay_dt, note)
+
             # ── Cash payment ──────────────────────────────────────────
-            cash = pn(row[COL["apr_cash"]])
+            cash_text = str(row[COL["apr_cash"]] or "")
+            cash = pn(cash_text)
             if cash > 0:
                 s.add(Payment(
                     tenancy_id=tenancy.id,
@@ -282,12 +340,22 @@ async def main(write: bool):
                     notes="April cash — live sync from source sheet",
                 ))
                 stats["cash_added"] += 1
+            else:
+                pre = _maybe_prepayment(cash_text, PaymentMode.cash)
+                if pre:
+                    amt, mode, pd, note = pre
+                    s.add(Payment(
+                        tenancy_id=tenancy.id, amount=amt, payment_date=pd,
+                        payment_mode=mode, for_type=PaymentFor.rent,
+                        period_month=APRIL, notes=note,
+                    ))
+                    stats["prepaid_added"] = stats.get("prepaid_added", 0) + 1
 
             # ── UPI payment ───────────────────────────────────────────
-            upi = pn(row[COL["apr_upi"]])
+            upi_text = str(row[COL["apr_upi"]] or "")
+            upi = pn(upi_text)
             if upi > 0:
                 # Check if description contains chandra
-                cash_text = str(row[COL["apr_cash"]] or "")
                 bal_text = str(row[COL["apr_balance"]] or "")
                 chandra_note = ""
                 if "chandra" in cash_text.lower() or "chandra" in bal_text.lower():
@@ -302,6 +370,16 @@ async def main(write: bool):
                     notes=f"April UPI — live sync from source sheet{chandra_note}",
                 ))
                 stats["upi_added"] += 1
+            else:
+                pre = _maybe_prepayment(upi_text, PaymentMode.upi)
+                if pre:
+                    amt, mode, pd, note = pre
+                    s.add(Payment(
+                        tenancy_id=tenancy.id, amount=amt, payment_date=pd,
+                        payment_mode=mode, for_type=PaymentFor.rent,
+                        period_month=APRIL, notes=note,
+                    ))
+                    stats["prepaid_added"] = stats.get("prepaid_added", 0) + 1
 
         if write:
             await s.commit()
