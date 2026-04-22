@@ -151,6 +151,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:who checked? ?in|new arrivals?|new tenants? (?:this|in|for)|new joinings?|checkins? (?:this|for) month|joined (?:this|recently)|recent checkins?|who joined|recent\s+admissions?|checkins?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|is\s+mahine\s+kaun\s+aaya|kaun\s+aaya\s+(?:is|this)\s+mahine)", re.I), "QUERY_CHECKINS", 0.91),
     # Checkouts this month
     (re.compile(r"(?:who checked? ?out|checkouts? this month|who left|who vacated|exits? this month|move(?:d)? out this month|recent checkouts?|who left recently|checkouts?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+mein\s+kaun\s+gaya|March\s+mein\s+kaun\s+gaya)", re.I), "QUERY_CHECKOUTS", 0.91),
+    # Checkout date for a specific room or occupant — long-term + day-stay
+    # "checkout date for room 419", "when does akshit leave",
+    # "room 609 checkout", "leaving date for rakesh"
+    (re.compile(r"(?:checkout\s+(?:date|time)?\s*(?:for|of)\s+(?:room\s+)?[\w-]+|(?:when|what)\s+(?:does|is|will)\s+[\w\s]+\s+(?:leav(?:e|ing)|checkout|check\s*out|exit(?:ing)?|vacat(?:e|ing))|leaving\s+date\s+(?:for|of)\s+[\w\s-]+|room\s+[\w-]+\s+checkout|checkout\s+room\s+[\w-]+)", re.I), "QUERY_CHECKOUT_ROOM", 0.92),
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
     (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|expense\s+(?:summary|breakdown|analysis)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
@@ -437,7 +441,7 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
     "ADD_TENANT", "CHECKOUT", "RECORD_CHECKOUT", "START_ONBOARDING", "CHANGE_ROOM", "ASSIGN_ROOM",
     "PAYMENT_LOG", "ADD_EXPENSE", "ADD_REFUND",
     "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
-    "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CONTACTS",
+    "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CHECKOUT_ROOM", "QUERY_CONTACTS",
     "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
     "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
     "ACTIVITY_LOG", "QUERY_ACTIVITY",
@@ -597,6 +601,18 @@ def _extract_entities(text: str, intent: str) -> dict:
         )
     if room_match:
         entities["room"] = room_match.group(1)
+
+    # Extract user-supplied note on payment/update commands.
+    # e.g. "Raj paid 15000 cash note: cleared march bounce"
+    #      "update notes for akshit: pays on 10th"
+    # The trailing text after "note:" / "notes:" / "remark:" / "reason:" /
+    # "comment:" (first match wins) becomes entities["note"].
+    note_match = re.search(
+        r"\b(?:notes?|remark|reason|comment)\s*[:=\-]\s*(.+)$",
+        text, re.I,
+    )
+    if note_match:
+        entities["note"] = note_match.group(1).strip().strip('"\'')
 
     # Extract full date (ISO string) — takes priority for timing scenarios
     date_val = _extract_date_entity(text)

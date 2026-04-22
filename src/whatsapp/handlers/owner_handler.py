@@ -97,6 +97,7 @@ async def handle_owner(
         "QUERY_EXPIRING":     _query_expiring,
         "QUERY_CHECKINS":     _query_checkins,
         "QUERY_CHECKOUTS":    _query_checkouts,
+        "QUERY_CHECKOUT_ROOM": _query_checkout_room,
         "LOG_VACATION":       _log_vacation,
         "ROOM_STATUS":        _room_status,
         "SEND_REMINDER_ALL":  _send_reminder_all,
@@ -1086,6 +1087,7 @@ async def resolve_pending_action(
                     ctx_name=action_data["logged_by"],
                     period_month_str=action_data["period_month"],
                     session=session,
+                    user_note=action_data.get("user_note") or "",
                 )
             # Start receipt collection
             from src.whatsapp.handlers._shared import _save_pending as _sp_r
@@ -6023,36 +6025,20 @@ async def _log_vacation(entities: dict, ctx: CallerContext, session: AsyncSessio
 
 async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     room = entities.get("room", "").strip()
-
     if not room:
         return "Which room? Say: *who's in room 203* or *room 5 occupant*"
 
-    from src.database.models import DaywiseStay
-    from datetime import date as _date
-    today = _date.today()
+    from src.services.occupants import find_occupants
 
-    rows = await _find_active_tenants_by_room(room, session)
-
-    # Also include currently-staying day-wise guests for this room — the
-    # room isn't truly vacant if short-stay guests are checked in.
+    occ = await find_occupants(session, room=room)
     room_obj = await session.scalar(
         select(Room).where(Room.room_number.ilike(f"%{room}%"))
     )
-    dw_rows = []
-    if room_obj:
-        dw_rows = (await session.execute(
-            select(DaywiseStay).where(
-                DaywiseStay.room_number == room_obj.room_number,
-                DaywiseStay.checkin_date <= today,
-                DaywiseStay.checkout_date > today,
-                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
-            )
-        )).scalars().all()
 
-    if not rows and not dw_rows:
+    if not occ:
         if room_obj:
             rt = room_obj.room_type
-            rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
+            rt_str = rt.value if hasattr(rt, "value") else str(rt or "")
             max_occ = room_obj.max_occupancy or 1
             return (
                 f"*Room {room_obj.room_number}* ({rt_str} sharing)\n"
@@ -6061,27 +6047,82 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
             )
         return f"Room {room} not found."
 
-    first_room = rows[0][2] if rows else room_obj
-    rt = first_room.room_type
-    rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
-    max_occ = first_room.max_occupancy or 1
-    total_occ = len(rows) + len(dw_rows)
+    # Pick any matched Room object for sharing-type header (all occupants
+    # are in the same room_number so room_type is consistent).
+    first_room = room_obj or await session.scalar(
+        select(Room).where(Room.room_number == occ[0].room_number)
+    )
+    rt = first_room.room_type if first_room else None
+    rt_str = (rt.value if hasattr(rt, "value") else str(rt or "")) if rt else ""
+    max_occ = (first_room.max_occupancy if first_room else 1) or 1
     lines = [
-        f"*Room {first_room.room_number}* ({rt_str} sharing, {total_occ}/{max_occ} occupied)\n"
+        f"*Room {occ[0].room_number}* ({rt_str} sharing, {len(occ)}/{max_occ} occupied)\n"
     ]
-    for tenant, tenancy, room_obj in rows:
-        o_rent, o_maint = await _calc_outstanding_dues(tenancy.id, session)
-        rent_str = f"Rs.{int(tenancy.agreed_rent or 0):,}/month"
-        due_note = f" | Due: Rs.{int(o_rent):,}" if o_rent > 0 else " | Paid"
-        lines.append(
-            f"• {tenant.name} — {rent_str}\n"
-            f"  Since: {tenancy.checkin_date.strftime('%d %b %Y')}{due_note}"
+    for o in occ:
+        if o.kind == "tenancy":
+            o_rent, _ = await _calc_outstanding_dues(o.id, session)
+            due_note = f" | Due: Rs.{int(o_rent):,}" if o_rent > 0 else " | Paid"
+            lines.append(
+                f"• {o.name} — Rs.{int(o.rate):,}/month\n"
+                f"  Since: {o.checkin_date.strftime('%d %b %Y')}{due_note}"
+            )
+        else:  # daystay
+            out = o.checkout_date.strftime("%d %b") if o.checkout_date else "?"
+            lines.append(
+                f"• {o.name} (day-stay) — Rs.{int(o.rate):,}/day\n"
+                f"  {o.checkin_date.strftime('%d %b')} → {out}"
+            )
+    return "\n".join(lines)
+
+
+# ── Checkout date for a specific room / occupant (unified) ────────────────────
+
+async def _query_checkout_room(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show checkout / leaving date for every occupant of a room, or for a
+    specific named occupant. Covers both long-term tenancies and day-stays.
+    """
+    from src.services.occupants import find_occupants, checkout_of
+    from datetime import date as _date
+
+    room = (entities.get("room") or "").strip()
+    name = (entities.get("name") or "").strip()
+
+    if not room and not name:
+        return (
+            "Which room or who? Try:\n"
+            "  *checkout date for room 419*\n"
+            "  *when does akshit leave*"
         )
-    for dw in dw_rows:
-        lines.append(
-            f"• {dw.guest_name} (day-stay) — Rs.{int(dw.daily_rate or 0):,}/day\n"
-            f"  {dw.checkin_date.strftime('%d %b')} → {dw.checkout_date.strftime('%d %b')} ({dw.num_days}d)"
-        )
+
+    occ = await find_occupants(session, room=room or None, name=name or None)
+    if not occ:
+        label = f"room {room}" if room else name
+        return f"No active occupants found for {label}."
+
+    today = _date.today()
+    lines = []
+    header = f"*Checkout — Room {room}*" if room else f"*Checkout — {name}*"
+    lines.append(header + "\n")
+    for o in occ:
+        out = checkout_of(o)
+        if out:
+            days = (out - today).days
+            when = f"{out.strftime('%d %b %Y')}"
+            if days < 0:
+                tag = f" (left {abs(days)}d ago)"
+            elif days == 0:
+                tag = " (today)"
+            else:
+                tag = f" (in {days}d)"
+        else:
+            when = "not set"
+            tag = ""
+        sub = o.display
+        if o.kind == "tenancy" and o.notice_date:
+            notice = f" • notice: {o.notice_date.strftime('%d %b')}"
+        else:
+            notice = ""
+        lines.append(f"• {sub} — room {o.room_number}\n  Checkout: {when}{tag}{notice}")
     return "\n".join(lines)
 
 

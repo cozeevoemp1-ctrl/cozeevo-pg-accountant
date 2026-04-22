@@ -120,6 +120,9 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     if mode:
         mode = mode.lower().strip()
     month_num = entities.get("month")
+    # Free-text note the user tacked on (e.g. "... note: cleared Mar bounce").
+    # Stored on Payment.notes alongside the standard "Logged via WhatsApp" tag.
+    user_note = (entities.get("note") or "").strip()
     # Split-mode detection — e.g. "Diya paid 3000 cash 3000 upi".
     # entities set by intent_detector._extract_entities; amount is already the sum.
     _split      = bool(entities.get("split_payment"))
@@ -190,6 +193,7 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
                 "period_month": pm.isoformat(),
                 "tenant_name": tenant.name,
                 "room_number": _room.room_number,
+                "user_note": user_note or None,
             }
             if _split:
                 _pdata["split_payment"] = True
@@ -229,6 +233,7 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
             "allocation": alloc_data,
             "tenant_name": tenant.name,
             "room_number": _room.room_number,
+            "user_note": user_note or None,
         }
 
         # If multi-month dues, include month data for override parsing
@@ -296,6 +301,7 @@ async def _do_log_payment_by_ids(
     session: AsyncSession,
     period_month_str: str = "",
     skip_duplicate_check: bool = False,
+    user_note: str = "",
 ) -> str:
     tenant = await session.get(Tenant, tenant_id)
     tenancy = await session.get(Tenancy, tenancy_id)
@@ -380,6 +386,11 @@ async def _do_log_payment_by_ids(
     _room_obj = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
 
     # ── Insert payment + update rent_schedule + audit (via shared service) ──────
+    # If the sender tacked on "note: ..." we append it so the note shows up
+    # both on the Payment row and in audit history.
+    note_text = f"Logged via WhatsApp by {ctx_name}"
+    if user_note:
+        note_text += f" — {user_note}"
     from src.services.payments import log_payment as _log_payment
     pay_result = await _log_payment(
         tenancy_id=tenancy.id,
@@ -389,7 +400,7 @@ async def _do_log_payment_by_ids(
         period_month=period_month.isoformat(),
         recorded_by=ctx_name or "bot",
         session=session,
-        notes=f"Logged via WhatsApp by {ctx_name}",
+        notes=note_text,
         source="whatsapp",
         room_number=_room_obj.room_number if _room_obj else None,
         entity_name=tenant.name,
