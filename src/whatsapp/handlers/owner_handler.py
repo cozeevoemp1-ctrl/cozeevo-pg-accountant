@@ -6027,12 +6027,29 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
     if not room:
         return "Which room? Say: *who's in room 203* or *room 5 occupant*"
 
+    from src.database.models import DaywiseStay
+    from datetime import date as _date
+    today = _date.today()
+
     rows = await _find_active_tenants_by_room(room, session)
-    if not rows:
-        # Check if room exists but is vacant
-        room_obj = await session.scalar(
-            select(Room).where(Room.room_number.ilike(f"%{room}%"))
-        )
+
+    # Also include currently-staying day-wise guests for this room — the
+    # room isn't truly vacant if short-stay guests are checked in.
+    room_obj = await session.scalar(
+        select(Room).where(Room.room_number.ilike(f"%{room}%"))
+    )
+    dw_rows = []
+    if room_obj:
+        dw_rows = (await session.execute(
+            select(DaywiseStay).where(
+                DaywiseStay.room_number == room_obj.room_number,
+                DaywiseStay.checkin_date <= today,
+                DaywiseStay.checkout_date > today,
+                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            )
+        )).scalars().all()
+
+    if not rows and not dw_rows:
         if room_obj:
             rt = room_obj.room_type
             rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
@@ -6044,12 +6061,13 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
             )
         return f"Room {room} not found."
 
-    first_room = rows[0][2]
+    first_room = rows[0][2] if rows else room_obj
     rt = first_room.room_type
     rt_str = rt.value if hasattr(rt, 'value') else str(rt or "")
     max_occ = first_room.max_occupancy or 1
+    total_occ = len(rows) + len(dw_rows)
     lines = [
-        f"*Room {first_room.room_number}* ({rt_str} sharing, {len(rows)}/{max_occ} occupied)\n"
+        f"*Room {first_room.room_number}* ({rt_str} sharing, {total_occ}/{max_occ} occupied)\n"
     ]
     for tenant, tenancy, room_obj in rows:
         o_rent, o_maint = await _calc_outstanding_dues(tenancy.id, session)
@@ -6058,6 +6076,11 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
         lines.append(
             f"• {tenant.name} — {rent_str}\n"
             f"  Since: {tenancy.checkin_date.strftime('%d %b %Y')}{due_note}"
+        )
+    for dw in dw_rows:
+        lines.append(
+            f"• {dw.guest_name} (day-stay) — Rs.{int(dw.daily_rate or 0):,}/day\n"
+            f"  {dw.checkin_date.strftime('%d %b')} → {dw.checkout_date.strftime('%d %b')} ({dw.num_days}d)"
         )
     return "\n".join(lines)
 
