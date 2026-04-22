@@ -931,6 +931,59 @@
   let currentStep = 1;
   let sigDrawn = false;
 
+  // ── Draft auto-save (localStorage) ────────────────────────────────────────
+  // Saves text inputs + selected radios + current step on every change so
+  // a refresh / accidental close doesn't lose progress. Photos are skipped
+  // (browser quota; user re-uploads if needed). Cleared on successful submit.
+  function draftKey() { return 'cozeevo_onboard_' + (token || 'unknown'); }
+
+  function saveDraft() {
+    if (!token) return;
+    try {
+      const data = { __step: currentStep };
+      document.querySelectorAll('input[type=text],input[type=tel],input[type=email],input[type=date],input[type=number],textarea,select').forEach(el => {
+        if (el.id) data[el.id] = el.value;
+      });
+      document.querySelectorAll('input[type=radio]:checked').forEach(el => {
+        if (el.name) data['__r_' + el.name] = el.value;
+      });
+      const agree = document.getElementById('agree-checkbox');
+      if (agree) data['__agree'] = agree.checked;
+      localStorage.setItem(draftKey(), JSON.stringify(data));
+    } catch (e) { /* quota or disabled — ignore */ }
+  }
+
+  function restoreDraft() {
+    if (!token) return;
+    let data;
+    try {
+      const raw = localStorage.getItem(draftKey());
+      if (!raw) return;
+      data = JSON.parse(raw);
+    } catch (e) { return; }
+    Object.keys(data).forEach(k => {
+      if (k === '__step') return;
+      if (k === '__agree') {
+        const a = document.getElementById('agree-checkbox');
+        if (a) a.checked = !!data[k];
+      } else if (k.indexOf('__r_') === 0) {
+        const name = k.slice(4);
+        const r = document.querySelector('input[name="' + name + '"][value="' + data[k] + '"]');
+        if (r) r.checked = true;
+      } else {
+        const el = document.getElementById(k);
+        if (el && data[k] != null) el.value = data[k];
+      }
+    });
+    if (data.__step && data.__step > 1 && data.__step <= 5) {
+      goToStep(data.__step);
+    }
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(draftKey()); } catch (e) {}
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     token = extractToken();
@@ -940,6 +993,9 @@
     }
     loadSession(token);
     initSignatureCanvas();
+    // Save draft on every text/radio/checkbox change.
+    document.addEventListener('input', saveDraft);
+    document.addEventListener('change', saveDraft);
   });
 
   function extractToken() {
@@ -993,6 +1049,8 @@
         rules: data.rules || [],
       });
       document.getElementById('main-content').style.display = 'block';
+      // Restore in-progress draft if user refreshed/came back.
+      restoreDraft();
     } catch (e) {
       hideLoading();
       showTokenError();
@@ -1055,6 +1113,7 @@
     const next = document.getElementById('step-' + n) || document.getElementById('confirmation');
     next.classList.add('active');
     updateProgress(n);
+    saveDraft();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // On reaching step 5: mirror the tenant's name into both the booking
@@ -1277,6 +1336,9 @@
         showError(err.detail || 'Submission failed. Please try again.');
         return;
       }
+
+      // Submitted — drop the draft so it doesn't repopulate next visit.
+      clearDraft();
 
       // Show confirmation
       document.getElementById('step-5').classList.remove('active');
