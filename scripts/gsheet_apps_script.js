@@ -81,6 +81,31 @@ function onOpen() {
     .addItem("Setup Triggers (first time)", "setupTriggers")
     .addItem("Lock All Sheets (read-only)", "lockAllSheets")
     .addToUi();
+
+  // Auto-jump to the most recent monthly tab on every open. Tabs are named
+  // "<MONTH> <YYYY>" (e.g. "APRIL 2026"). Picks the chronologically latest
+  // and selects it; falls back to no-op if none match.
+  jumpToLatestMonth();
+}
+
+function jumpToLatestMonth() {
+  var ss = SpreadsheetApp.getActive();
+  var monthMap = {
+    JANUARY: 1, FEBRUARY: 2, MARCH: 3, APRIL: 4, MAY: 5, JUNE: 6,
+    JULY: 7, AUGUST: 8, SEPTEMBER: 9, OCTOBER: 10, NOVEMBER: 11, DECEMBER: 12,
+  };
+  var best = null;
+  ss.getSheets().forEach(function(sh) {
+    var nm = sh.getName().toUpperCase();
+    var parts = nm.split(/\s+/);
+    if (parts.length !== 2) return;
+    var m = monthMap[parts[0]];
+    var y = parseInt(parts[1], 10);
+    if (!m || isNaN(y)) return;
+    var ord = y * 12 + m;
+    if (!best || ord > best.ord) best = { sheet: sh, ord: ord };
+  });
+  if (best) ss.setActiveSheet(best.sheet);
 }
 
 /**

@@ -115,7 +115,15 @@ async def main(args):
                     ),
                 )
             )
-            .order_by(Room.room_number, Tenant.name)
+            # Order: oldest checkin at top, latest checkin at the BOTTOM so
+            # newest arrivals are easy to spot. NULL checkins (rare) sink to
+            # the very top, then chronological. Room number is the tiebreaker
+            # for same-day checkins.
+            .order_by(
+                Tenancy.checkin_date.asc().nullsfirst(),
+                Room.room_number,
+                Tenant.name,
+            )
         )).all()
 
         print(f"DB: {len(rows)} tenancies for {tab_name}")
