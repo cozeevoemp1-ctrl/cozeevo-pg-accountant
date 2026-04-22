@@ -480,7 +480,12 @@ async def main(args):
         total_cash = sum(pn(r[i_cash]) for r in data_rows)
         total_upi = sum(pn(r[i_upi]) for r in data_rows)
         total_collected = total_cash + total_upi
-        total_pending = max(0, total_rent_due + total_prev_due - total_collected)
+        # Pending = sum of per-row positive Balance (which already reflects
+        # booking/prepaid/deposit credits via effective_paid). Rent Billed minus
+        # Cash minus UPI over-states Pending because those credits are not in
+        # Cash/UPI display columns.
+        i_balance = H["balance"]
+        total_pending = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
 
         paid_count = sum(1 for r in data_rows if r[i_status] == "PAID")
         partial_count = sum(1 for r in data_rows if r[i_status] == "PARTIAL")
