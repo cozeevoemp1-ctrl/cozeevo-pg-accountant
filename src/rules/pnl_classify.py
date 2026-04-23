@@ -44,6 +44,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Water",                "Water Tanker",                 ["water tanker","tanker","water lorry","water supply","water vendor"]),
     ("Water",                "Water Bill / Charges",         ["water bill","water charge","water tax"]),
     ("Water",                "Water Barrels / Drums",        ["barrels","water barrel","water drum"]),
+    # Manoj B — UPI 9535665407@ybl. Paid monthly, cycle = one month behind
+    # (April payment = March bill). Confirmed vendor by Kiran 2026-04-22.
+    ("Water",                "Manoj B (Water Vendor)",       ["manojb","9535665407","manoj b","manoj bharath"]),
 
     # ── IT & SOFTWARE ─────────────────────────────────────────────────────────
     ("IT & Software",        "Hostinger (VPS Hosting)",      ["hostinger","hostingerpteltd"]),

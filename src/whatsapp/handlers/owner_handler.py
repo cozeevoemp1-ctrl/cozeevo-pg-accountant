@@ -98,6 +98,7 @@ async def handle_owner(
         "QUERY_CHECKINS":     _query_checkins,
         "QUERY_CHECKOUTS":    _query_checkouts,
         "QUERY_CHECKOUT_ROOM": _query_checkout_room,
+        "DAYSTAY_AVAILABILITY": _daystay_availability,
         "LOG_VACATION":       _log_vacation,
         "ROOM_STATUS":        _room_status,
         "SEND_REMINDER_ALL":  _send_reminder_all,
@@ -2095,7 +2096,13 @@ async def resolve_pending_action(
             )
 
         if step == "confirm":
-            if ans.lower() in ("yes", "y", "confirm", "save", "ok", "done"):
+            # Align with framework's _YES_WORDS so casual variants ("okay",
+            # "yeah", "yep", "sure", "approve") all confirm. Legacy list was
+            # missing these, causing users who typed "okay" or "yeah" to see
+            # "Cancelled. No expense logged." — the bug Kiran flagged.
+            _EXP_YES = {"yes", "y", "yeah", "yep", "ok", "okay", "confirm",
+                        "save", "sure", "done", "approve", "approved"}
+            if ans.lower().strip().rstrip(".!?,;:") in _EXP_YES:
                 cat = action_data["category"]
                 amt = Decimal(str(action_data["amount"]))
                 desc = action_data.get("final_description", "") or action_data.get("description", "")
@@ -6254,22 +6261,46 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
         return "Which room? Say: *who's in room 203* or *room 5 occupant*"
 
     from src.services.occupants import find_occupants
+    from src.services.room_occupancy import get_room_future_reservations
 
     occ = await find_occupants(session, room=room)
     room_obj = await session.scalar(
         select(Room).where(Room.room_number.ilike(f"%{room}%"))
     )
 
+    # Upcoming no-show reservations — the bed is physically free until
+    # their checkin_date. Show these so the receptionist knows until when
+    # the room can still be offered for day-stay.
+    future_res: list = []
+    if room_obj:
+        future_res = await get_room_future_reservations(session, room_obj)
+
     if not occ:
         if room_obj:
             rt = room_obj.room_type
             rt_str = rt.value if hasattr(rt, "value") else str(rt or "")
             max_occ = room_obj.max_occupancy or 1
-            return (
-                f"*Room {room_obj.room_number}* ({rt_str} sharing)\n"
-                f"Status: VACANT (0/{max_occ} beds)\n\n"
-                f"No active tenants."
-            )
+            lines = [
+                f"*Room {room_obj.room_number}* ({rt_str} sharing)",
+                f"Status: VACANT (0/{max_occ} beds) — empty tonight",
+            ]
+            if future_res:
+                next_in = future_res[0][1].checkin_date
+                lines.append("")
+                lines.append(f"📅 *Reserved from {next_in.strftime('%d %b %Y')}:*")
+                for tenant, tenancy in future_res:
+                    lines.append(
+                        f"  • {tenant.name} — arriving {tenancy.checkin_date.strftime('%d %b')}"
+                    )
+                lines.append("")
+                lines.append(
+                    f"✅ Day-stay rentable until {(next_in).strftime('%d %b %Y')} "
+                    f"(the day before arrival)."
+                )
+            else:
+                lines.append("")
+                lines.append("No upcoming reservations — fully open.")
+            return "\n".join(lines)
         return f"Room {room} not found."
 
     # Pick any matched Room object for sharing-type header (all occupants
@@ -6297,6 +6328,70 @@ async def _room_status(entities: dict, ctx: CallerContext, session: AsyncSession
                 f"• {o.name} (day-stay) — Rs.{int(o.rate):,}/day\n"
                 f"  {o.checkin_date.strftime('%d %b')} → {out}"
             )
+    # Append future reservations block, if any
+    if future_res:
+        lines.append("")
+        lines.append("📅 *Upcoming reservations:*")
+        for tenant, tenancy in future_res:
+            lines.append(
+                f"  • {tenant.name} — arriving {tenancy.checkin_date.strftime('%d %b %Y')}"
+            )
+    return "\n".join(lines)
+
+
+# ── Day-stay availability: beds free on tonight / a target date ──────────────
+
+async def _daystay_availability(
+    entities: dict, ctx: CallerContext, session: AsyncSession
+) -> str:
+    """Answer "how many beds are free tonight?" / "free beds on May 5".
+
+    Differs from QUERY_VACANT_ROOMS (long-term availability) because it
+    INCLUDES beds physically empty today that are reserved for a future
+    long-term tenant — those beds are still day-stay rentable until the
+    future checkin_date.
+
+    Entity support:
+      - `entities["date"]` (ISO str or date) → target date; defaults today.
+    """
+    from datetime import date as _date, datetime as _dt
+    from src.services.room_occupancy import beds_free_on_date
+
+    raw_dt = entities.get("date") or entities.get("target_date")
+    target: _date
+    if isinstance(raw_dt, _date):
+        target = raw_dt
+    elif isinstance(raw_dt, str) and raw_dt.strip():
+        parsed = None
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                parsed = _dt.strptime(raw_dt.strip()[:10], fmt).date()
+                break
+            except ValueError:
+                continue
+        target = parsed or _date.today()
+    else:
+        target = _date.today()
+
+    r = await beds_free_on_date(session, target)
+    label = "tonight" if target == _date.today() else target.strftime("%d %b %Y")
+
+    lines = [
+        f"*Beds free {label}: {r['free']}/{r['total_beds']}*",
+        "",
+        f"  Occupied long-term: {r['occupied_longterm']}",
+        f"  Occupied day-stay:  {r['occupied_daystay']}",
+    ]
+    if r["occupied_noshow"]:
+        lines.append(f"  Held by arrivals (on/before target): {r['occupied_noshow']}")
+    lines.append("")
+    if r["free"] <= 0:
+        lines.append("No beds free — property full.")
+    else:
+        lines.append(
+            "Reply *room <number>* to see which specific beds are open "
+            "and until when (before the next long-term arrival)."
+        )
     return "\n".join(lines)
 
 

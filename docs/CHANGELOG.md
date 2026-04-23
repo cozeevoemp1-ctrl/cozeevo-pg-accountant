@@ -2,6 +2,93 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.50.0] — 2026-04-23 — April 1:1 source sync + day-stay planning + expense yes-words
+
+### What's new for the receptionist / admin
+
+- **Vacant tonight vs long-term are now separate numbers.** Sheet OCCUPANCY row:
+  `Vacant tonight: N/294 | Vacant long-term: M | Reserved future: K (May:x Jun:y)`.
+  A bed booked by a future-month tenant (no-show with May/June checkin) is empty
+  TONIGHT and rentable for a day-stay until their arrival — the old "Vacant: 5"
+  count hid that.
+- **Room status shows upcoming reservations.** `room 514 status` now lists both
+  current occupants AND upcoming no-show arrivals ("Diksha arriving May 1"), plus
+  "Day-stay rentable until Apr 30".
+- **New intent: DAYSTAY_AVAILABILITY.** `beds free tonight`, `beds free on 2026-05-05`,
+  `day-stay availability` → returns free-bed count for that date.
+- **Day-stay overbooking guard.** `find_overlap_conflict` now checks no-show
+  tenancies too. A day-stay booking that crosses a future no-show's checkin_date
+  is refused with "… (booking)" in the conflict message.
+- **NO-SHOW count now permanent in STATUS row** of every monthly tab (was only
+  showing in OCCUPANCY). Exits metric removed — month-by-month vacating
+  distribution already covers that.
+- **New DEPOSITS row** on every monthly tab:
+  `Refundable: Rs.X | Held: Rs.Y | Maintenance (non-refundable): Rs.Z`.
+  Active tenants only; maintenance never refunded.
+- **"Vacating Apr" now included** in the month-by-month distribution (was hidden).
+  Count is tenants, not beds — "May: 4" means 4 people leaving in May, not 5 beds.
+
+### April 1:1 reload from source
+
+Full drop+reload of April payments/RS from `April Month Collection` sheet matched
+source truth. DB now shows exactly: Active 246 = **224 regular + 22 premium**,
+268 physical beds, deposit held Rs.34,82,325, maintenance Rs.11,30,700, refundable
+Rs.23,51,625 — all matching source row-for-row.
+
+### Fixes
+
+- **Ghost tenancies cleared.** 6 duplicate/stale active tenancies exited on
+  2026-04-23: tid 628 Anshsinha (old phone), 749 Sanskar Bharadia (old phone),
+  818 Chinmay Pagey (wrong room duplicate of 835), 892 Arun R L (phone-format
+  twin of 896), 893 Pooja K L (phone-format twin of 895), 894 Rakesh Thallapally
+  (premium duplicate of 901). Plus Yatam Ramakanth (742) auto-exited via source
+  sync. Plus duplicate Ajay Mohan no_show deleted (tid=904 dup of 905).
+- **Stale checkout_date cleared** for 2 active tenants (621 Sai Prashanth +
+  622 Vijay Kumar) — had `2026-03-31` from earlier absconded tag but source
+  says active. Bed count was under-reporting by 2.
+- **sync_from_source_sheet.py now updates money fields on match.** Previously
+  only set deposit/maintenance/booking on CREATE — existing tenancies kept stale
+  values. 13 deposits + 7 maintenance + 1 booking re-aligned with source.
+- **sync_from_source_sheet.py now clears stale checkout_date** when source
+  status transitions back to active (so absconded-then-reactivated tenants
+  don't under-report bed count).
+- **parse_april_planned_exits.py** (new) — parses April Balance column text
+  ("exit on april 30th", "exit may 23rd", "exit on 26 th april", etc.) and sets
+  `tenancy.expected_checkout` + `notice_date`. 23 planned exits captured:
+  16 April + 4 May + 3 July. Scheduler prep reminder fires at 08:00 IST daily
+  using these dates.
+- **sync_tenants_tab_notice.py** (new) — one batch_update for TENANTS master
+  tab Notice/Expected/Checkout/Status columns. Was previously per-tenant API
+  call × 300 (slow and partially ran); now one call. Fixed Tripati Patro's
+  missing exit date on TENANTS tab.
+- **Log expense "yes" not saving** — legacy `LOG_EXPENSE_STEP` confirm branch
+  only accepted `yes/y/confirm/save/ok/done`. Users typing "okay", "yeah",
+  "yep", "sure" were falling through to "Cancelled. No expense logged." Aligned
+  with framework's wider `_YES_WORDS` set.
+
+### New scripts
+
+- `scripts/exit_april_ghosts.py` — one-shot ghost cleanup.
+- `scripts/parse_april_planned_exits.py` — idempotent; re-run any time.
+- `scripts/sync_tenants_tab_notice.py` — idempotent; batch-writes notice/exit/
+  checkout/status to TENANTS master.
+
+### New helpers (`src/services/room_occupancy.py`)
+
+- `get_room_future_reservations(room, after_date=today)` — upcoming no-shows.
+- `beds_free_on_date(session, on_date)` — date-aware property-wide bed count,
+  returns dict with breakdown by occupancy type.
+- `get_room_occupants` extended to include arrived-but-status-no_show tenancies.
+- `find_overlap_conflict` extended to include no_show in the overlap scan.
+
+### Memory
+
+Saved `feedback_auto_refresh_metrics.md` — rule: every DB mutation must trigger
+sheet resync so metrics never go stale. Applied to future bot handlers and
+bulk scripts via SOP. Indexed in MEMORY.md.
+
+---
+
 ## [1.49.11] — 2026-04-23 — Stop orphan TENANTS rows + clean up Pranav
 
 ### Root cause (Pranav's "ghost row" at Room 305)

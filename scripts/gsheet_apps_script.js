@@ -425,7 +425,7 @@ function refreshDashboardContent_() {
     ["Cash", d.cash, "", "Paid", d.paid],
     ["UPI", d.upi, "", "Partial", d.partial],
     ["Total Collected", collected, "", "Unpaid", d.unpaid],
-    ["Deposit (all active)", deposit, "", "Exits", d.exits],
+    ["Deposit (all active)", deposit, "", "No-show", d.noshow],
     ["", "", "", "New check-ins", d.newCheckins],
   ];
   dash.getRange(r, 1, rows1.length, 5).setValues(rows1);

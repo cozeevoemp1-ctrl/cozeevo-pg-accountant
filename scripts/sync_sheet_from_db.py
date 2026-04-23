@@ -64,16 +64,17 @@ def _add_months(d: date, n: int) -> date:
 
 
 def _vacating_distribution(period: date, vacating_by_month: dict) -> str:
-    """Render the next three months of bed vacancies as a single cell.
+    """Render vacancies for the current month + next three, as a single cell.
 
     Example (viewing April tab):
-      "Vacating May:1 Jun:16 Jul:3"
+      "Vacating Apr:16 May:1 Jun:16 Jul:3"
 
-    Zero months are still shown so the rhythm is consistent month to month
-    and a reader can spot when there's a genuine lull.
+    Current month is included because receptionists and admins looking at
+    "this month's tab" need to see who's leaving THIS month, not only
+    upcoming. Zero months are still shown for visual rhythm.
     """
     parts = []
-    for i in range(1, 4):
+    for i in range(0, 4):
         m = _add_months(period, i)
         parts.append(f"{m.strftime('%b')}:{vacating_by_month.get(m, 0)}")
     return "Vacating " + " ".join(parts)
@@ -129,14 +130,11 @@ async def main(args):
                     ),
                     # Any tenancy with payment or rent schedule for this month
                     Tenancy.id.in_(tids_with_activity) if tids_with_activity else False,
-                    # No-shows ONLY in their own checkin month — never carry
-                    # forward to past or future months. Memory:
-                    # feedback_noshow_filtering.md.
-                    and_(
-                        Tenancy.status == TenancyStatus.no_show,
-                        Tenancy.checkin_date >= period,
-                        Tenancy.checkin_date < last_day,
-                    ),
+                    # All no-shows — future bookings that haven't checked in
+                    # yet. Kiran wants every pending booking visible on the
+                    # current month tab so the receptionist can see who's
+                    # still owed / expected. Filter removed 2026-04-23.
+                    Tenancy.status == TenancyStatus.no_show,
                 )
             )
             # Order: oldest checkin at top, latest checkin at the BOTTOM so
@@ -302,9 +300,10 @@ async def main(args):
         def _bedcount(t):
             return 2 if (t.sharing_type and str(t.sharing_type.value if hasattr(t.sharing_type, 'value') else t.sharing_type) == "premium") else 1
 
-        # Count beds vacating across all active tenancies (not just this
-        # month's notice) by expected_checkout month — covers prior notices
-        # too, so the full pipeline of exits is visible.
+        # Count PEOPLE vacating across all active tenancies (not just this
+        # month's notice) by expected_checkout month. We count tenants, not
+        # beds — Kiran reads "May:4" as four people leaving. Premium tenants
+        # still count as 1 person here, even though their room frees 2 beds.
         from collections import defaultdict
         all_notice_active = (await session.execute(
             select(Tenancy).where(
@@ -313,10 +312,10 @@ async def main(args):
                 Tenancy.expected_checkout >= period,
             )
         )).scalars().all()
-        vacating_by_month = defaultdict(int)  # period_month_date -> bed count
+        vacating_by_month = defaultdict(int)  # period_month_date -> tenant count
         for t in all_notice_active:
             mkey = t.expected_checkout.replace(day=1)
-            vacating_by_month[mkey] += _bedcount(t)
+            vacating_by_month[mkey] += 1
 
         # ── 4. Read existing Sheet to preserve any data not in DB ──
         from src.integrations.gsheets import _get_worksheet_sync
@@ -509,7 +508,6 @@ async def main(args):
 
         active_rows = [r for r in data_rows if r[i_event] == "CHECKIN"]
         noshow_rows = [r for r in data_rows if r[i_event] == "NO SHOW"]
-        exit_rows = [r for r in data_rows if r[i_event] == "EXIT"]
 
         regular = sum(1 for r in active_rows if r[i_sharing] != "premium")
         premium = sum(1 for r in active_rows if r[i_sharing] == "premium")
@@ -557,32 +555,78 @@ async def main(args):
             )
         )).scalar() or 0
 
-        booked_beds = beds + len(noshow_rows) + daywise_beds
-        vacant_beds = int(total_rev_beds) - booked_beds
+        # Two distinct vacancy views:
+        #  - vacant_tonight  = beds physically empty TONIGHT (day-stay eligible).
+        #                      Active tenants + day-stays take beds now. Future
+        #                      bookings (no-shows with checkin_date > today) do
+        #                      NOT occupy beds tonight — their bed is empty and
+        #                      rentable for a day-stay until their arrival.
+        #  - vacant_longterm = beds available for a NEW monthly lease.
+        #                      Subtracts future reservations on top, since those
+        #                      beds will lock in.
+        today = date.today()
+        future_reserved = 0  # no-show tenancies whose checkin_date is after today
+        noshow_today = 0     # actual no-shows: checkin_date <= today but not arrived
+        for tenancy, _, _, _ in rows:
+            if tenancy.status != TenancyStatus.no_show:
+                continue
+            bc = 2 if (tenancy.sharing_type and str(
+                tenancy.sharing_type.value if hasattr(tenancy.sharing_type, 'value') else tenancy.sharing_type
+            ) == "premium") else 1
+            if tenancy.checkin_date and tenancy.checkin_date > today:
+                future_reserved += bc
+            else:
+                noshow_today += bc
+
+        vacant_tonight = int(total_rev_beds) - beds - daywise_beds - noshow_today
+        vacant_longterm = vacant_tonight - future_reserved
         occ_pct = (beds / int(total_rev_beds) * 100) if total_rev_beds else 0
+
+        # Distribution of future reservations by checkin month, to show receptionist
+        # the pipeline of upcoming lock-ins.
+        from collections import Counter as _Counter
+        future_by_month = _Counter()
+        for tenancy, _, _, _ in rows:
+            if (tenancy.status == TenancyStatus.no_show and
+                tenancy.checkin_date and tenancy.checkin_date > today):
+                mkey = tenancy.checkin_date.replace(day=1)
+                bc = 2 if (tenancy.sharing_type and str(
+                    tenancy.sharing_type.value if hasattr(tenancy.sharing_type, 'value') else tenancy.sharing_type
+                ) == "premium") else 1
+                future_by_month[mkey] += bc
+        future_months_str = " ".join(
+            f"{m.strftime('%b')}:{c}" for m, c in sorted(future_by_month.items())
+        ) or "—"
 
         from src.utils.money import inr as _inr
         def fmt_lakh(n):
             return f"Rs.{_inr(n)}"
 
-        # 5 summary rows. One cell = one metric. No merging.
+        # 6 summary rows. One cell = one metric. No merging.
         # Section label in col A, metrics in cols B onward.
         def pad(cells, n=ncols):
             return cells + [""] * (n - len(cells))
+
+        # Deposits-held metric: active tenants only, refundable = deposit − maintenance
+        # (maintenance is never refunded per Kiran's business rule).
+        active_tenancy_objs = [t for t, _, _, _ in rows if t.status == TenancyStatus.active]
+        total_deposit_held = sum(float(t.security_deposit or 0) for t in active_tenancy_objs)
+        total_maint_nonref = sum(float(t.maintenance_fee or 0) for t in active_tenancy_objs)
+        refundable_deposit = total_deposit_held - total_maint_nonref
 
         summary_row1 = pad([
             "OCCUPANCY",
             f"Active: {len(active_rows)}",
             f"Beds: {beds} ({regular}+{premium}P)",
-            f"No-show: {len(noshow_rows)}",
-            f"Vacant: {vacant_beds}/{int(total_rev_beds)}",
+            f"Vacant tonight: {vacant_tonight}/{int(total_rev_beds)}",
+            f"Vacant long-term: {vacant_longterm}",
+            f"Reserved future: {future_reserved} ({future_months_str})",
             f"Occupancy: {occ_pct:.1f}%",
         ])
         summary_row2 = pad([
             "BUILDINGS",
             f"THOR: {thor_beds} beds ({thor_t}t)",
             f"HULK: {hulk_beds} beds ({hulk_t}t)",
-            f"Exits: {len(exit_rows)}",
         ])
         summary_row3 = pad([
             "COLLECTION",
@@ -597,6 +641,7 @@ async def main(args):
             f"PAID: {paid_count}",
             f"PARTIAL: {partial_count}",
             f"UNPAID: {unpaid_count}",
+            f"NO-SHOW: {len(noshow_rows)}",
             f"Pending: {fmt_lakh(total_pending)}",
         ])
         summary_row5 = pad([
@@ -604,28 +649,35 @@ async def main(args):
             f"On notice: {notice_count} tenants",
             _vacating_distribution(period, vacating_by_month),
         ])
+        summary_row6 = pad([
+            "DEPOSITS",
+            f"Refundable: {fmt_lakh(refundable_deposit)}",
+            f"Held: {fmt_lakh(total_deposit_held)}",
+            f"Maintenance (non-refundable): {fmt_lakh(total_maint_nonref)}",
+        ])
 
         header_row = list(MONTHLY_HEADERS)
 
         # ── 7. Print summary ──
         print(f"\n=== Summary ===")
-        print(f"OCCUPANCY  Active: {len(active_rows)}  Beds: {beds} ({regular}+{premium}P)  No-show: {len(noshow_rows)}  Vacant: {vacant_beds}/{int(total_rev_beds)}  Occ: {occ_pct:.1f}%")
-        print(f"BUILDINGS  THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)  Exits: {len(exit_rows)}")
+        print(f"OCCUPANCY  Active: {len(active_rows)}  Beds: {beds} ({regular}+{premium}P)  Vacant tonight: {vacant_tonight}/{int(total_rev_beds)}  Long-term: {vacant_longterm}  Reserved future: {future_reserved} ({future_months_str})  Occ: {occ_pct:.1f}%")
+        print(f"BUILDINGS  THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)")
         print(f"COLLECTION Cash: {fmt_lakh(total_cash)}  UPI: {fmt_lakh(total_upi)}  Collected: {fmt_lakh(total_collected)}  Rent Billed: {fmt_lakh(total_rent_due)}  Prev Due: {fmt_lakh(total_prev_due)}")
-        print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  Pending: {fmt_lakh(total_pending)}")
+        print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  NO-SHOW: {len(noshow_rows)}  Pending: {fmt_lakh(total_pending)}")
         print(f"NOTICE     {notice_count} tenants gave notice  •  {_vacating_distribution(period, vacating_by_month)}")
+        print(f"DEPOSITS   Refundable: {fmt_lakh(refundable_deposit)}  Held: {fmt_lakh(total_deposit_held)}  Maint (non-refundable): {fmt_lakh(total_maint_nonref)}")
 
         if not args.write:
             print(f"\n[DRY RUN] Would write {len(data_rows) + 6} rows to '{tab_name}'")
             print("Run with --write to apply.")
         else:
             # ── 8. Write to Sheet ──
-            print(f"\nWriting {len(data_rows) + 6} rows to '{tab_name}'...")
+            print(f"\nWriting {len(data_rows) + 7} rows to '{tab_name}'...")
 
-            # Row 1: title | Rows 2-6: summary cards | Row 7: header | Rows 8+: data
+            # Row 1: title | Rows 2-7: summary cards | Row 8: header | Rows 9+: data
             title_row = [f"{MONTH_NAMES[month].title()} {year}"] + [""] * (ncols - 1)
             all_rows = [title_row, summary_row1, summary_row2, summary_row3,
-                        summary_row4, summary_row5, header_row] + data_rows
+                        summary_row4, summary_row5, summary_row6, header_row] + data_rows
 
             # Pad all rows to the canonical column count
             for i, row in enumerate(all_rows):
@@ -639,7 +691,7 @@ async def main(args):
             # Clear, unmerge anything from previous runs, then write
             ws.clear()
             try:
-                ws.unmerge_cells(f"A1:{last_col}6")
+                ws.unmerge_cells(f"A1:{last_col}7")
             except Exception:
                 pass
             ws.update(range_name="A1", values=all_rows)
@@ -656,7 +708,7 @@ async def main(args):
                     "verticalAlignment": "MIDDLE",
                 })
 
-                # Summary rows 2-6: each cell separate, color-coded per section,
+                # Summary rows 2-7: each cell separate, color-coded per section,
                 # bold + light background. Non-empty cells get a visible border.
                 section_colors = [
                     (f"A2:{last_col}2", {"red": 0.90, "green": 0.96, "blue": 1.00}),  # OCCUPANCY  - light blue
@@ -664,6 +716,7 @@ async def main(args):
                     (f"A4:{last_col}4", {"red": 0.88, "green": 0.98, "blue": 0.88}),  # COLLECTION - light green
                     (f"A5:{last_col}5", {"red": 1.00, "green": 0.96, "blue": 0.85}),  # STATUS     - amber
                     (f"A6:{last_col}6", {"red": 0.98, "green": 0.92, "blue": 0.92}),  # NOTICE     - light pink
+                    (f"A7:{last_col}7", {"red": 0.92, "green": 0.93, "blue": 0.98}),  # DEPOSITS   - lavender
                 ]
                 for rng, color in section_colors:
                     ws.format(rng, {
@@ -683,7 +736,7 @@ async def main(args):
                         "updateBorders": {
                             "range": {
                                 "sheetId": sheet_id,
-                                "startRowIndex": 1, "endRowIndex": 6,
+                                "startRowIndex": 1, "endRowIndex": 7,
                                 "startColumnIndex": 0, "endColumnIndex": ncols,
                             },
                             "top": border_style,
@@ -696,14 +749,14 @@ async def main(args):
                     }]
                 })
 
-                # Column header row (row 7)
-                ws.format(f"A7:{last_col}7", {
+                # Column header row (row 8)
+                ws.format(f"A8:{last_col}8", {
                     "textFormat": {"bold": True,
                                    "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                     "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
                     "horizontalAlignment": "CENTER",
                 })
-                ws.freeze(rows=7)
+                ws.freeze(rows=8)
             except Exception as e:
                 print(f"  [warn] formatting failed: {e}")
             print(f"  [ok] Wrote {len(all_rows)} rows")

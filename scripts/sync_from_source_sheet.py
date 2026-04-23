@@ -247,14 +247,33 @@ async def main(write: bool):
                 await s.flush()
                 stats["created_tenancy"] += 1
             else:
-                # Update status, sharing, room
+                # Update status, sharing, room, and money fields. Source is
+                # truth for deposit/maintenance/booking — older bot actions
+                # might have left these stale, so overwrite from source.
                 if tenancy.status != status:
                     tenancy.status = status
                     stats["updated_status"] += 1
+                    # If source says the tenant is currently checked in, any
+                    # stale checkout_date from a prior "absconded" or voided
+                    # exit must go — otherwise bed counts under-report.
+                    if status == TenancyStatus.active and tenancy.checkout_date:
+                        tenancy.checkout_date = None
                 if sharing and tenancy.sharing_type != sharing:
                     tenancy.sharing_type = sharing
                 if tenancy.room_id != room.id:
                     tenancy.room_id = room.id
+                src_dep = Decimal(str(pn(row[COL["deposit"]])))
+                src_maint = Decimal(str(pn(row[COL["maintenance"]])))
+                src_book = Decimal(str(pn(row[COL["booking"]])))
+                if (tenancy.security_deposit or Decimal("0")) != src_dep:
+                    tenancy.security_deposit = src_dep
+                    stats["updated_deposit"] = stats.get("updated_deposit", 0) + 1
+                if (tenancy.maintenance_fee or Decimal("0")) != src_maint:
+                    tenancy.maintenance_fee = src_maint
+                    stats["updated_maintenance"] = stats.get("updated_maintenance", 0) + 1
+                if (tenancy.booking_amount or Decimal("0")) != src_book:
+                    tenancy.booking_amount = src_book
+                    stats["updated_booking"] = stats.get("updated_booking", 0) + 1
                 stats["matched"] += 1
 
             # ── Rent schedule for April (skip EXIT/CANCELLED) ─────────

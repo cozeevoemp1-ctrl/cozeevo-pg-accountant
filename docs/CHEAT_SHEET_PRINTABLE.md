@@ -351,7 +351,23 @@ No multi-step.
 
 ---
 
-## 22. ONBOARDING / KYC (Tenant Self-Service)
+## 22. STAFF ROOM MARK / UNMARK (Admin)
+
+| # | You Say (BLUE) | Bot Asks/Does (GREEN) |
+|---|---|---|
+| A | **room 114 staff room** | Room 114 marked as staff room (excluded from revenue) |
+| B | **mark 114 staff** | Same |
+| C | **room 114 not staff** | Room 114 is now a revenue room |
+| D | **not staff rooms 114 and 618** | Both unmarked in one go |
+| E | **staff rooms** | Lists all staff rooms with occupants |
+| F | **staff Rajesh room G05** | Assigns staff Rajesh to room G05 (auto-flips to staff room) |
+| G | **staff Rajesh exit** | Marks staff as exited; room flips back to revenue if empty |
+
+Instant — no multi-step form.
+
+---
+
+## 23. ONBOARDING / KYC (Tenant Self-Service)
 
 | # | You Say (BLUE) | Bot Asks/Does (GREEN) |
 |---|---|---|

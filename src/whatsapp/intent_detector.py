@@ -155,6 +155,11 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # "checkout date for room 419", "when does akshit leave",
     # "room 609 checkout", "leaving date for rakesh"
     (re.compile(r"(?:checkout\s+(?:date|time)?\s*(?:for|of)\s+(?:room\s+)?[\w-]+|(?:when|what)\s+(?:does|is|will)\s+[\w\s]+\s+(?:leav(?:e|ing)|checkout|check\s*out|exit(?:ing)?|vacat(?:e|ing))|leaving\s+date\s+(?:for|of)\s+[\w\s-]+|room\s+[\w-]+\s+checkout|checkout\s+room\s+[\w-]+)", re.I), "QUERY_CHECKOUT_ROOM", 0.92),
+    # "beds free tonight" / "how many beds free today" / "beds free on may 5"
+    # / "free beds for day stay" — day-stay availability on a specific date.
+    # Distinct from QUERY_VACANT_ROOMS (long-term) because this includes beds
+    # reserved by future no-shows that are still free tonight.
+    (re.compile(r"(?:(?:beds?|rooms?)\s+free\s+(?:tonight|today|now|on\s+[\w\s\d/-]+)|(?:how\s+many|any)\s+(?:beds?|rooms?)\s+free\s+(?:tonight|today|on\s+[\w\s\d/-]+)|day[-\s]*stay\s+availab|free\s+(?:beds?|rooms?)\s+for\s+day[-\s]*stay|day[-\s]*stay\s+(?:beds?|rooms?)\s+(?:free|available))", re.I), "DAYSTAY_AVAILABILITY", 0.94),
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
     (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|expense\s+(?:summary|breakdown|analysis)|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
@@ -442,6 +447,7 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
     "PAYMENT_LOG", "ADD_EXPENSE", "ADD_REFUND",
     "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
     "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CHECKOUT_ROOM", "QUERY_CONTACTS",
+    "DAYSTAY_AVAILABILITY",
     "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
     "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
     "ACTIVITY_LOG", "QUERY_ACTIVITY",
@@ -451,7 +457,7 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
 # Subset of _OWNER_DIRECT that receptionist can use via button taps
 _RECEPTIONIST_DIRECT: frozenset[str] = frozenset({
     "PAYMENT_LOG", "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS",
-    "QUERY_OCCUPANCY", "QUERY_CONTACTS",
+    "QUERY_OCCUPANCY", "QUERY_CONTACTS", "DAYSTAY_AVAILABILITY",
     "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
     "ACTIVITY_LOG", "QUERY_ACTIVITY",
     "HELP", "MORE_MENU",
