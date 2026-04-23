@@ -2,6 +2,67 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.0] — 2026-04-23 — Status rule simplified + notes flow fix + April source alignment
+
+### Status rule (breaking)
+`PAID` iff this month's rent paid, else `PARTIAL`. Previously `PAID` required
+`paid >= rent_due + prev_due`, so a tenant who paid April fully but owed
+March dues showed PARTIAL. No more UNPAID on live months — anyone not fully
+paid for the month is PARTIAL. Bot + sheet + Apps Script + dashboard all
+compute identically. Frozen Dec–March cells unchanged.
+
+Sites updated: `sync_sheet_from_db.py`, `src/integrations/gsheets.py` (4
+sites: API recalc, payment log, onboarding, payment delete),
+`gsheet_apps_script.js` (onEdit recalc, new-tenant default),
+`tests/test_lifecycle.py` (4 post-void assertions UNPAID → PARTIAL).
+
+### Notes flow — multiple bugs fixed
+Lokesh sent "Edit notes 603" → bot started asking for contact info instead
+of tenant notes. Root causes (three of them):
+
+1. `UPDATE_CONTACT` regex at line 115 caught "notes" before
+   `UPDATE_TENANT_NOTES` at line 289 got a chance. Removed "notes" from
+   UPDATE_CONTACT's fallback — vendor contact notes still route via the
+   stricter line 112 "update contact" pattern.
+2. My room-extraction hook for notes intents was nested inside the
+   ASSIGN_STAFF_ROOM block, so it never fired for UPDATE_TENANT_NOTES.
+   Moved out to module scope.
+3. "Edit notes 603" put `603` in `entities["amount"]` not
+   `entities["room"]`. Added intent-specific extractor that recognises the
+   room when there's no "room" keyword.
+
+### Notes — new one-shot delete
+"delete notes for 603", "clear notes for X", "wipe notes for 603" now
+short-circuit straight to a Yes/No confirm. `intent_detector` sets
+`action=delete` on the delete verbs; `_update_tenant_notes` skips the
+enter-notes step and saves pending at `step=confirm` with blank notes.
+
+### Notes column no longer auto-appended on payment
+Previously every payment appended `[DD-Mon HH:MM] Rs.X CASH by Y` to the
+Notes column, cluttering actual tenant-agreement notes. Stopped — payment
+history lives in the DB `payments` table and the Cash/UPI columns.
+
+### April 2026 source alignment
+Source sheet "Long term" tab's April Balance column is now the truth for
+partial dues. Reconciled DB → source:
+- 8 April rent adjustments for receipt mismatches (Manideep, Shilpa,
+  Chandrasekhar, Balaji, Mahika, Deepak, Arumugam, Praveen).
+- 4 missing April payments logged (Saurav 2000 cash, Yuvaraj 23000 cash,
+  Prableen 2000 upi, Priyanshi 2000 cash).
+- 100 Rs void for 4 triple-sharing tenants (Ankit/Anudeep G13, Shubham
+  Varma/Yogesh G14) whose agreed April rent was 9900.
+- Source-alignment script adjusted April RentSchedule for every active
+  tenant so DB gap = source April Balance exactly.
+
+Final April summary: Active 246 · PAID 224 · PARTIAL 22 · NO-SHOW 15 ·
+Collected Rs.43,66,279 · Rent Billed Rs.45,25,575.
+
+The 12 May-checkin no-shows (Ajay Ramchandra, Alma Siddique, Anush Sharma,
+Aravind, Arnab Roy, Ayush Kolte, Baisali Das, Diksha, Ganesh Magi, Prasad
+Vadlamani, Saksham Tapadia, Santhosh) appear in source sheet's April
+Balance but correctly belong to May per the SOP — they're counted under
+"Reserved future: 16 beds".
+
 ## [1.50.1] — 2026-04-23 — Fix: silent payment loss on "Yes" when tenant already fully paid
 
 ### Bug
