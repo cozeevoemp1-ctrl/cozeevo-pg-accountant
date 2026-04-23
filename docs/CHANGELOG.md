@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.4] — 2026-04-23 — Room transfer/assign: count beds, not occupants
+
+### Root cause
+`_finalize_room_transfer` and `ASSIGN_ROOM_STEP` (pick_tenant inline branch) refused the move whenever **any** active tenancy existed in the destination room — they never compared against `Room.max_occupancy`. So Lokesh couldn't move a tenant into any double/triple room that already had one occupant, even with a free bed. Same bug blocked first-time room assignment for shared rooms.
+
+### Fix (`src/whatsapp/handlers/owner_handler.py`)
+- `_finalize_room_transfer` — counts active tenancies excluding the moving tenant, compares to `max_occupancy`. Refuses only when room is full. Confirm prompt now lists existing roommate(s) and shows `(n+1)/max` bed usage.
+- `ASSIGN_ROOM_STEP` pick_tenant inline check — same bed-count logic; error reads `"Room X is full (n/max beds)"` instead of "is occupied".
+- Aligns with `feedback_no_double_booking.md`: bed-slot count is the contract (double = 2, triple = 3).
+
+### Known follow-up
+- `src/services/room_occupancy.py:find_overlap_conflict` / `check_room_bookable` still use any-occupant blocking. Affects `ADD_TENANT`, onboarding form approve, day-stay booking, and the `ASSIGN_ROOM_STEP` ask_room branch. Not fixed in this commit — needs its own audit per the no-double-booking memory.
+
 ## [1.49.3] — 2026-04-23 — Fix duplicate reminders + silent non-delivery
 
 ### Root causes (diagnosed from `whatsapp_log` + `apscheduler_jobs`)

@@ -2267,8 +2267,9 @@ async def resolve_pending_action(
                 occ = await session.scalar(
                     select(func.count(Tenancy.id)).where(
                         Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active))
-                if occ:
-                    return f"Room *{action_data['room']}* is occupied. Pick a vacant room."
+                max_occ = int(new_room.max_occupancy or 1)
+                if (occ or 0) >= max_occ:
+                    return f"Room *{action_data['room']}* is *full* ({occ}/{max_occ} beds). Pick a different room."
                 action_data["step"] = "confirm"
                 action_data["room_id"] = new_room.id
                 action_data["room_number"] = new_room.room_number
@@ -2288,16 +2289,12 @@ async def resolve_pending_action(
             if not rm:
                 return "__KEEP_PENDING__Enter a valid room number (e.g. 305-A):"
             room_str = rm.group(1).upper()
-            new_room = await session.scalar(
-                select(Room).where(Room.room_number == room_str, Room.active == True)
+            from src.services.room_occupancy import check_room_bookable
+            new_room, err = await check_room_bookable(
+                session, room_str, date.today(), None,
             )
-            if not new_room:
-                return f"__KEEP_PENDING__Room *{room_str}* not found. Try again:"
-            occ = await session.scalar(
-                select(func.count(Tenancy.id)).where(
-                    Tenancy.room_id == new_room.id, Tenancy.status == TenancyStatus.active))
-            if occ:
-                return f"__KEEP_PENDING__Room *{room_str}* is occupied. Pick a vacant room:"
+            if err:
+                return f"__KEEP_PENDING__{err} Pick a different room:"
             action_data["room_id"] = new_room.id
             action_data["room_number"] = new_room.room_number
             action_data["step"] = "confirm"
@@ -5377,14 +5374,17 @@ async def _finalize_room_transfer(
             Tenancy.room_id == new_room.id,
             Tenancy.status == TenancyStatus.active,
             Tenancy.tenant_id == Tenant.id,
+            Tenancy.id != tenancy.id,
         )
     )).all()
-    if occupied_rows:
+    max_occ = int(new_room.max_occupancy or 1)
+    free_beds = max_occ - len(occupied_rows)
+    if free_beds <= 0:
         occ_lines = "\n".join(f"  - {r[0]} ({r[1]})" for r in occupied_rows)
         return (
-            f"Room *{to_room}* is occupied by:\n{occ_lines}\n\n"
+            f"Room *{to_room}* is *full* ({len(occupied_rows)}/{max_occ} beds):\n{occ_lines}\n\n"
             f"Options:\n"
-            f"*1.* Checkout the current occupant(s) first, then retry\n"
+            f"*1.* Checkout one of them first, then retry\n"
             f"*2.* Pick a different room\n\n"
             f"_I can't auto-swap yet — checkout the occupant first, then move {tenant_name}._"
         )
@@ -5409,10 +5409,15 @@ async def _finalize_room_transfer(
         "step": "confirm",
     }
     await _save_pending(phone, "ROOM_TRANSFER", action_data, [], session)
+    roommate_note = ""
+    if occupied_rows:
+        names = ", ".join(r[0] for r in occupied_rows)
+        roommate_note = f"Sharing with: {names} ({len(occupied_rows)+1}/{max_occ} beds)\n"
     return (
         f"*Room Transfer — {tenant_name}*\n"
         f"From: Room *{from_room}*\n"
         f"To:   Room *{new_room.room_number}*\n"
+        f"{roommate_note}"
         f"Current rent: Rs.{current_rent:,}/mo\n\n"
         "*Rent for new room?*\n"
         f"*1.* Keep current (Rs.{current_rent:,})\n"
