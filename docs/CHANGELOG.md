@@ -2,6 +2,53 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.4] — 2026-04-23 — Full-flow e2e harness + 2 silent-fail bugs fixed
+
+Kiran asked for ALL-handlers ALL-intents end-to-end testing — not just
+the narrow CONFIRM_* audit from the Prabhakaran/Lokesh incident earlier
+today. Built `tests/test_full_flow_e2e.py` that walks every major
+happy-path from first message → disambig → confirm → **Yes** →
+assert-DB-row → revert. 10/10 green on live DB (every mutation voided
+or reverted at end).
+
+### Bugs found and fixed
+
+**1. Multi-word-name regexes silently went to UNKNOWN.**
+`UPDATE_SHARING_TYPE`, `UPDATE_RENT`, `UPDATE_PHONE`, `UPDATE_GENDER`
+used `(?:\w+\s+)?` — only allowed a single name token before the field.
+So `change Ankita Benarjee sharing to premium` never matched any intent
+and the bot replied `"I didn't understand that"`. Widened to
+`(?:\w+\s+){0,4}?` (up to 4 name tokens). Fix in
+`src/whatsapp/intent_detector.py` lines 133-136.
+
+**2. "cancel" during CONFIRM_PAYMENT_LOG (and every CONFIRM_*) trapped
+the user.** `is_negative("cancel")` returns True because "cancel" is
+in the `_NEGATIVE` set, so the resolver treated "cancel" as "No, I
+want to change" and replied "What would you like to change? ...
+or *cancel* to stop." Another "cancel" → same prompt → infinite loop.
+Fix: `chat_api.py` now checks cancel words BEFORE calling
+`resolve_pending_action`, so cancel always escapes regardless of
+resolver interpretation. File: `src/whatsapp/chat_api.py` ~line 426.
+
+### Coverage in the new harness (10 scenarios)
+- PAYMENT_LOG → DB row → void
+- UPDATE_SHARING_TYPE → tenancy.sharing_type updated → revert
+- RENT_CHANGE → tenancy.agreed_rent updated → revert
+- DEPOSIT_CHANGE → tenancy.security_deposit updated → revert
+- ADD_EXPENSE multi-step (category → amount → desc → skip photo → yes)
+- State preservation (unrelated message keeps pending alive)
+- Cancel clears pending
+- Mid-flow correction ("amount 22") re-prompts with new value
+- Out-of-range numeric choice re-prompts, pending survives
+- Workflow collision (new intent mid-pending — no greeting, no clobber)
+
+### Not yet covered (deferred)
+VOID_PAYMENT full flow, ADD_REFUND full flow, CHECKOUT full flow,
+ROOM_TRANSFER full flow, ADD_TENANT wizard, day-wise variants,
+tenant-role intents. All disambig paths for these are already green
+in `tests/test_disambig_e2e.py` (15/15) — the final Yes→DB assertion
+is the gap.
+
 ## [1.51.3] — 2026-04-23 — Combined command: payment + notes in one message
 
 Receptionists can now log rent AND update/clear tenant notes in a single
