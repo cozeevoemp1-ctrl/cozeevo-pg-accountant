@@ -843,7 +843,7 @@
     <div class="field">
       <label>Upload ID Photo *</label>
       <div class="upload-area" id="id-upload-area">
-        <input type="file" id="id-photo-input" accept="image/*,application/pdf" style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
+        <input type="file" id="id-photo-input" accept="image/*,application/pdf" capture="environment" style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
         <div id="id-photo-preview" class="upload-preview"></div>
         <div class="upload-placeholder" id="id-upload-placeholder">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
