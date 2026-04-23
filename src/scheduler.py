@@ -250,7 +250,7 @@ async def _prep_reminder(when: str = "today") -> None:
     Prabhakaran, Lakshmi, and Lokesh (7680814628, receptionist).
     """
     from datetime import timedelta
-    from src.whatsapp.webhook_handler import _send_whatsapp
+    from src.whatsapp.reminder_sender import send_template
 
     today = date.today()
     if when == "tomorrow":
@@ -307,7 +307,8 @@ async def _prep_reminder(when: str = "today") -> None:
             """), {"target": target})).fetchall()
 
             admin_rows = (await conn.execute(text("""
-                SELECT phone FROM authorized_users
+                SELECT phone, COALESCE(NULLIF(name, ''), 'team') AS name
+                FROM authorized_users
                 WHERE role IN ('admin', 'owner', 'receptionist') AND active = TRUE
             """))).fetchall()
     finally:
@@ -319,8 +320,8 @@ async def _prep_reminder(when: str = "today") -> None:
         logger.info(f"[Scheduler] prep_reminder ({when}) — nothing scheduled, not sending.")
         return
 
-    admin_phones = [r[0] for r in admin_rows if r[0]]
-    if not admin_phones:
+    admin_recipients = [(r[0], r[1]) for r in admin_rows if r[0]]
+    if not admin_recipients:
         logger.warning("[Scheduler] prep_reminder — no admin/owner/receptionist phones configured.")
         return
 
@@ -352,13 +353,28 @@ async def _prep_reminder(when: str = "today") -> None:
             ph_part = f" ({ph})" if ph else ""
             lines.append(f"• Room {rn} — {nm}{ph_part}")
 
+    # Send via approved "general_notice" template so Meta delivers outside the
+    # 24-hour customer-service window. Body in Meta: "Hi {{1}}, {{2}} - Cozeevo
+    # Co-living" — Meta caps body params at 1024 chars, so truncate defensively
+    # even though prep reminders rarely get close.
     msg = "\n".join(lines)
-    for phone in admin_phones:
+    template_body = msg[:1000]
+    sent = 0
+    for phone, name in admin_recipients:
         try:
-            await _send_whatsapp(phone, msg)
-            logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone}")
+            ok = await send_template(
+                phone,
+                "general_notice",
+                body_params=[name, template_body],
+            )
+            if ok:
+                sent += 1
+                logger.info(f"[Scheduler] prep_reminder ({when}) — template sent to {phone} ({name})")
+            else:
+                logger.warning(f"[Scheduler] prep_reminder ({when}) — template send FAILED to {phone}")
         except Exception as e:
-            logger.warning(f"[Scheduler] prep_reminder ({when}) — send to {phone} failed: {e}")
+            logger.warning(f"[Scheduler] prep_reminder ({when}) — send to {phone} exception: {e}")
+    logger.info(f"[Scheduler] prep_reminder ({when}) — {sent}/{len(admin_recipients)} delivered via template")
 
 
 # ── Job: Rent Reminders ────────────────────────────────────────────────────────

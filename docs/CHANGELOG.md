@@ -6,10 +6,12 @@ All notable changes to PG Accountant will be documented here.
 
 ### Root causes (diagnosed from `whatsapp_log` + `apscheduler_jobs`)
 - **Duplicate fires**: systemd runs `uvicorn --workers 2` so each worker constructed its own APScheduler against the same Supabase jobstore. Every cron fired twice — 10 outbound rows for today's prep reminder, 2 per recipient, 2–5 ms apart per pair.
-- **Silent non-delivery**: `authorized_users` stores phones as 10 digits (`7845952289`, `8548884455`, etc.). `_send_whatsapp` only stripped `+`/spaces, so Meta received bare 10-digit numbers. Meta returns HTTP 200 for these but routes only those already in the test-recipient allowlist (Prabhakaran `9444296681`), silently dropping the rest.
+- **Silent non-delivery**: prep reminder used `_send_whatsapp` (free-form `type: "text"`), which Meta only delivers inside the 24-hour customer-service window. Prabhakaran received (he's in Meta's test-recipient allowlist); Kiran / Lakshmi / Lokesh / Business Number fell outside the window and Meta silently dropped after returning 200.
+- **Minor contributor**: 10-digit phones (`7845952289`, `8548884455`) reached Meta without the `91` country code, which can also cause silent drops.
 
 ### Fixes
 - **`src/scheduler.py`** — `_acquire_scheduler_lock()` via `fcntl.flock` on `/tmp/pg-accountant-scheduler.lock`; only the winning worker starts the scheduler, losers return a no-op `AsyncIOScheduler`. Windows skips the lock (single-worker dev).
+- **`src/scheduler.py _prep_reminder`** — now sends via the approved `general_notice` template (`send_template`) instead of free-form text. Templates bypass the 24h window, so recipients no longer need to have messaged the bot first. Also selects `name` from `authorized_users` to fill `{{1}}`.
 - **`src/whatsapp/webhook_handler.py`** — new `_to_e164_for_meta()` helper; Indian 10-digit mobiles (first digit 6–9) get `91` prepended before every outbound send (`_send_whatsapp`, `_send_whatsapp_template`, `_send_whatsapp_interactive`, `_send_whatsapp_document`).
 - **`src/whatsapp/reminder_sender.py`** — `_clean_phone()` applies the same prefix rule so the official reminder-number path is consistent.
 
