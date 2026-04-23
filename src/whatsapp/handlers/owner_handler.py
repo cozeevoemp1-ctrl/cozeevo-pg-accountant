@@ -1187,6 +1187,23 @@ async def resolve_pending_action(
 
         if is_affirmative(ans):
             allocation = action_data.get("allocation", [])
+            # Defensive: never return "" (chat_api treats empty reply as falsy
+            # and falls through to CONVERSE -> payment is silently lost).
+            if not allocation:
+                _amt = float(action_data.get("amount") or 0)
+                _mode = action_data.get("mode") or "cash"
+                _from = date.today().replace(day=1).isoformat()
+                r = await _do_log_payment_by_ids(
+                    tenant_id=action_data["tenant_id"],
+                    tenancy_id=action_data["tenancy_id"],
+                    amount=_amt,
+                    mode=_mode,
+                    ctx_name=action_data["logged_by"],
+                    session=session,
+                    period_month_str=_from,
+                )
+                month_label = date.fromisoformat(_from).strftime("%b %Y")
+                return f"{month_label}: Rs.{int(_amt):,} -- {r}"
             results = []
             for i, alloc in enumerate(allocation):
                 r = await _do_log_payment_by_ids(
@@ -1201,7 +1218,7 @@ async def resolve_pending_action(
                 )
                 month_label = date.fromisoformat(alloc["period"]).strftime("%b %Y")
                 results.append(f"{month_label}: Rs.{int(alloc['amount']):,} -- {r}")
-            return "\n".join(results)
+            return "\n".join(results) or f"Payment of Rs.{int(action_data.get('amount') or 0):,} logged."
 
         # Try override parsing
         pending_months_raw = action_data.get("pending_months", [])

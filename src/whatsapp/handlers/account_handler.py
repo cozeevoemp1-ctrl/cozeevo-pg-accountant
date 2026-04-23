@@ -181,8 +181,15 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
         amount_dec = Decimal(str(amount))
         pending_months = snapshot["months"]
 
-        if not pending_months:
-            # No dues — log to current month, will trigger overpayment flow
+        # Treat "all pending months have zero remaining" the same as "no pending
+        # months". Otherwise compute_allocation returns [] (it skips months with
+        # remaining<=0) and the saved CONFIRM_PAYMENT_ALLOC handler returns ""
+        # on Yes -> chat_api falls through to CONVERSE and the payment is lost.
+        _all_zero_due = bool(pending_months) and all(
+            (m.get("remaining") or 0) <= 0 for m in pending_months
+        )
+        if not pending_months or _all_zero_due:
+            # No real dues — log to current month, will trigger overpayment flow
             pm = period_month or current_month
             _pdata = {
                 "tenant_id": tenant.id,

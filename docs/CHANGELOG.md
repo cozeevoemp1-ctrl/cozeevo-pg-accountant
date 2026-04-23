@@ -2,6 +2,38 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.50.1] — 2026-04-23 — Fix: silent payment loss on "Yes" when tenant already fully paid
+
+### Bug
+Lokesh sent `Ganesh Divekar paid 20000 cash, 8000 upi`. Bot prompted
+"Reply Yes to log". Lokesh replied `Yes`. Bot replied with the generic
+greeting and **never logged the payment** (no DB row, no Sheet write).
+
+### Root cause
+`build_dues_snapshot` returned April with `remaining=0` (already paid by
+morning source-sheet sync). `account_handler` routed to
+`CONFIRM_PAYMENT_ALLOC`, but `compute_allocation` skips zero-remaining
+months → `allocation=[]`. On Yes the handler looped over `[]` and
+returned `""`. `chat_api.py` line `if resolved_reply:` is falsy on `""`
+and fell through to LLM `CONVERSE`, which produced the greeting.
+
+### Fix (3 layers)
+1. `account_handler._payment_log` — when ALL pending months have
+   `remaining<=0`, route to `CONFIRM_PAYMENT_LOG` (overpayment flow)
+   instead of the allocation flow.
+2. `owner_handler` `CONFIRM_PAYMENT_ALLOC` Yes branch — defensive
+   fallback: if `allocation==[]`, still log the payment to the current
+   month so we never silently drop a confirmation.
+3. `chat_api.py` — treat `resolved_reply == ""` as a resolved no-op
+   with an explicit error message instead of falling through to the
+   LLM. Only `None` falls through now.
+
+### Test
+`tests/test_payment_confirm_overpay.py` — picks an over-paid active
+tenant, sends a split payment, replies `Yes`, asserts a real DB row
+is created and the bot did NOT greet. Cleans up by voiding test rows.
+PASSED locally.
+
 ## [1.50.0] — 2026-04-23 — April 1:1 source sync + day-stay planning + expense yes-words
 
 ### What's new for the receptionist / admin

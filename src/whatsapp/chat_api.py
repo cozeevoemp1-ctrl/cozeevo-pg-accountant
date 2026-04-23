@@ -446,6 +446,17 @@ async def _process_message_inner(
                 _chat_logger.info("Pending already resolved, skipping resolve_pending_action")
                 with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
                     _dbg.write(f"  ALREADY RESOLVED — skipped\n")
+            # Treat empty-string the same as a successful resolution with no
+            # message (do NOT fall through to LLM CONVERSE — that silently
+            # loses the user's confirmation). Only None means "not handled".
+            if resolved_reply == "":
+                pending.resolved = True
+                _err = "Payment confirmation hit an empty handler result. Please re-send the payment message."
+                await _log(session, phone, message, ctx.role, "CONFIRMATION", _err)
+                await session.commit()
+                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                    _dbg.write(f"  EMPTY REPLY guarded -> resolved + error msg\n")
+                return OutboundReply(reply=_err, intent="CONFIRMATION", role=ctx.role)
             if resolved_reply:
                 # Prefix "__KEEP_PENDING__" means correction re-prompt — keep pending alive
                 if resolved_reply.startswith("__KEEP_PENDING__"):
