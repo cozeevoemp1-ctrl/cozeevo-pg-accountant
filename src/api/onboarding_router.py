@@ -898,7 +898,10 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 from pathlib import Path
                 # Build public URL for the PDF
                 base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-                pdf_url = f"{base_url}/static/agreements/{obs.agreement_pdf_path}"
+                # obs.agreement_pdf_path is already "agreements/YYYY-MM/agreement_*.pdf"
+                # (relative to MEDIA_DIR which contains agreements/) — don't prefix with
+                # /static/agreements/ or we get a doubled 'agreements/agreements/' URL.
+                pdf_url = f"{base_url}/static/{obs.agreement_pdf_path}"
                 # Also copy PDF to static dir so it's accessible
                 media_dir = Path(os.getenv("MEDIA_DIR", "media"))
                 src_pdf = media_dir / obs.agreement_pdf_path
