@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.2] — 2026-04-23 — Onboarding form UX (Lokesh)
+
+Three receptionist-driven UX tweaks on the admin onboarding create form:
+
+- **Empty amount defaults** — `security_deposit`, `maintenance_fee`,
+  `booking_amount`, `daily_rate` no longer pre-fill "0". Lokesh can type
+  directly without clearing the zero first. Empty submits as 0.
+- **Enter moves to next field** — pressing Enter in any text/number/date
+  input or select focuses the next visible form field. Textarea, radio,
+  and submit button keep native behavior.
+- **Number spinners hidden** — CSS kills the up/down arrows on
+  `<input type="number">` (Chrome/Firefox). User types the amount.
+
+File: `static/admin_onboarding.html`.
+
 ## [1.51.1] — 2026-04-23 — First-month rent always prorated (onboarding + DB + Sheet)
 
 Kiran's rule: **first month is always pro rata by check-in date —
