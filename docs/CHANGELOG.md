@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.7] — 2026-04-23 — Three-tier rent reminders + Rs.200/day late fee
+
+### Cadence (all delivered via approved Meta templates — no 24h CS-window required)
+1. **Tier 1 — Advance**: 2 days before each new month (e.g. Apr 29 for May), 9am IST → `rent_reminder` template to **every active tenant**.
+2. **Tier 2 — Day 1**: 1st of the month, 9am IST → `rent_reminder` template to **every active tenant**.
+3. **Tier 3 — Daily overdue chaser**: 2nd onwards every day at 9am IST → `general_notice` template (custom wording) to **unpaid tenants only**. Stops the day after a tenant's balance clears.
+
+### Late fee
+- **Rs.200 per day** on payments made on or after the **6th**. Accrues daily until balance clears.
+- Reminders from day 2 warn about the upcoming fee; from day 6 they show the running total (`Rs.200 × N day(s) = Rs.X`).
+- Constants: `LATE_FEE_PER_DAY = 200`, `LATE_FEE_FROM_DAY = 6` in [src/scheduler.py](src/scheduler.py).
+- **Not yet auto-charged** — fee is shown in reminder text only; `rent_schedule.due_amount` is not auto-incremented (follow-up, needs schema decision).
+
+### Implementation
+- `_rent_reminder()` rewritten with a `mode` kwarg (`advance` / `day1` / `overdue_daily`) replacing the old `label`. Advance-mode query falls back to `tenancy.agreed_rent` when `rent_schedule` row for next month doesn't exist yet.
+- `rent_reminder_early` job ID reused for Tier 2 (now targets all active, not just unpaid).
+- `rent_reminder_late` job ID reused for Tier 3 (trigger changed from day=15 to daily; self-skips on day 1).
+- New `rent_reminder_advance` job; daily cron, self-skips unless `day == last_day_of_month - 1`.
+
+### Docs updated
+- [docs/BUSINESS_LOGIC.md](docs/BUSINESS_LOGIC.md) § 8a — due date + late fee.
+- [memory/project_billing_rules.md](../memory/project_billing_rules.md) — cadence + fee rule.
+
 ## [1.49.6] — 2026-04-23 — Sheet access fix (cozeevoemp1) + nightly DB↔Sheet drift audit
 
 ### Background

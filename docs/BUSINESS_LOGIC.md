@@ -320,6 +320,19 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 - Excel rent columns `From 1st FEB` etc. = rent revision from that date
 - **Proration always rounds DOWN** -- tenant pays less, not more
 
+### 8a. Due date + late fee (effective 2026-04-23)
+
+- **Grace window:** rent for month M is due by the **5th** of M.
+- **Late fee:** **Rs.200 per day** for any payment made on or after the **6th**. Accrues daily until balance clears.
+  - Day 6 → 1 day × Rs.200 = Rs.200
+  - Day 10 → 5 days × Rs.200 = Rs.1,000
+- **Reminder cadence** (all via approved Meta templates — no 24h window):
+  1. 2 days before next month begins → `rent_reminder` to **every active tenant**.
+  2. 1st of month → `rent_reminder` to **every active tenant**.
+  3. 2nd onwards daily → `general_notice` to **unpaid tenants only**, with the running late-fee total from day 6.
+- Fee wording is driven by `LATE_FEE_PER_DAY` + `LATE_FEE_FROM_DAY` in `src/scheduler.py`.
+- **Not yet automated:** the Rs.200/day is currently displayed in reminder text only. Auto-adding it to `rent_schedule.due_amount` is a separate follow-up (needs schema decision: new column vs. folded into `due_amount`).
+
 ---
 
 ## 9. KEY CONSTANTS
@@ -332,6 +345,8 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection window |
 | DEPOSIT_MATCH_TOLERANCE | 10% | Bank deposit matching |
 | DEPOSIT_MATCH_DAYS | 45 | Bank deposit matching window |
+| LATE_FEE_PER_DAY | 200 | Rs./day, applied from day 6 |
+| LATE_FEE_FROM_DAY | 6 | First day late fee starts accruing |
 
 ---
 

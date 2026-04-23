@@ -127,22 +127,40 @@ def start_scheduler() -> AsyncIOScheduler:
 
     # ── Register jobs ──────────────────────────────────────────────────────────
 
+    # Tier 1 — ADVANCE reminder, 2 days before the next month begins.
+    # Fires daily 09:00 IST; the job self-checks for (last_day_of_month - 1).
+    # Sends `rent_reminder` template to EVERY active tenant for NEXT month.
     scheduler.add_job(
         _rent_reminder,
-        trigger=CronTrigger(day=1, hour=9, minute=0),   # 1st of month, 9am
-        id="rent_reminder_early",
-        name="Rent Reminder — 1st of month",
+        trigger=CronTrigger(hour=9, minute=0),
+        id="rent_reminder_advance",
+        name="Rent Reminder — 2 days before next month",
         replace_existing=True,
-        kwargs={"label": "first"},
+        kwargs={"mode": "advance"},
     )
 
+    # Tier 2 — DAY 1 reminder. Same ID as before (rent_reminder_early) but
+    # the logic now targets ALL active tenants, not only unpaid.
     scheduler.add_job(
         _rent_reminder,
-        trigger=CronTrigger(day=15, hour=9, minute=0),  # 15th of month, 9am
-        id="rent_reminder_late",
-        name="Rent Reminder — 15th of month",
+        trigger=CronTrigger(day=1, hour=9, minute=0),
+        id="rent_reminder_early",
+        name="Rent Reminder — 1st of month (all active)",
         replace_existing=True,
-        kwargs={"label": "second"},
+        kwargs={"mode": "day1"},
+    )
+
+    # Tier 3 — DAILY OVERDUE chaser, day 2 through end of month. Re-uses the
+    # old `rent_reminder_late` ID so the existing apscheduler_jobs row gets
+    # replaced cleanly on startup. Self-skips on day 1. Uses general_notice
+    # template so the Rs.200/day-from-day-6 late-fee warning can be inlined.
+    scheduler.add_job(
+        _rent_reminder,
+        trigger=CronTrigger(hour=9, minute=0),
+        id="rent_reminder_late",
+        name="Rent Reminder — daily overdue chaser (day 2+ unpaid)",
+        replace_existing=True,
+        kwargs={"mode": "overdue_daily"},
     )
 
     scheduler.add_job(
@@ -389,101 +407,158 @@ async def _prep_reminder(when: str = "today") -> None:
 
 # ── Job: Rent Reminders ────────────────────────────────────────────────────────
 
-async def _rent_reminder(label: str = "first") -> None:
+# Billing rule (see docs/BUSINESS_LOGIC.md § Late Fee).
+LATE_FEE_PER_DAY  = 200   # Rupees per day after the grace window
+LATE_FEE_FROM_DAY = 6     # Fee starts accruing on this day of the month
+
+
+async def _rent_reminder(mode: str = "day1") -> None:
+    """Three-tier rent reminder — all delivered via approved Meta templates so
+    no 24-hour customer-service window is required.
+
+      mode='advance'      → fires daily 09:00 IST; only runs on
+                            (last day of month − 1), i.e. 2 days before the
+                            next month begins. Sends the ``rent_reminder``
+                            template to *every* active tenant for NEXT month.
+
+      mode='day1'         → fires daily 09:00 IST; only runs on the 1st.
+                            Sends ``rent_reminder`` to *every* active tenant
+                            for the current month.
+
+      mode='overdue_daily' → fires daily 09:00 IST; only runs from day 2
+                            onwards. Sends ``general_notice`` (custom wording)
+                            to tenants still unpaid for the current month, and
+                            includes the Rs.200/day late-fee warning that
+                            accrues from day 6.
+
+    Tenants stop receiving the overdue reminder the day after their payment
+    clears the balance (rent_schedule.paid_amount >= due_amount).
     """
-    Query active tenancies with unpaid or partially-paid rent for the current month.
-    Send a personalised WhatsApp reminder via the OFFICIAL number (template-based).
-    Falls back to bot number free-form text if official number not configured.
-    label: "first" (1st of month) or "second" (15th of month)
-    """
-    from src.whatsapp.webhook_handler import _send_whatsapp
-    from src.whatsapp.reminder_sender import send_template, _REMINDER_TOKEN
+    import calendar
+    from src.whatsapp.reminder_sender import send_template
+
+    today = date.today()
+
+    if mode == "advance":
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        if today.day != last_day - 1:
+            return
+        target_year  = today.year + (1 if today.month == 12 else 0)
+        target_month = 1 if today.month == 12 else today.month + 1
+        period        = date(target_year, target_month, 1)
+        all_active    = True
+        template_name = "rent_reminder"
+        log_tag       = "advance (2 days before next month)"
+    elif mode == "day1":
+        if today.day != 1:
+            return
+        period        = date(today.year, today.month, 1)
+        all_active    = True
+        template_name = "rent_reminder"
+        log_tag       = "day1 (all active)"
+    elif mode == "overdue_daily":
+        if today.day < 2:
+            return
+        period        = date(today.year, today.month, 1)
+        all_active    = False
+        template_name = "general_notice"
+        log_tag       = f"overdue_daily (day {today.day}, unpaid)"
+    else:
+        logger.warning("[Scheduler] _rent_reminder unknown mode: %s", mode)
+        return
+
+    month_label = period.strftime("%B %Y")
+    logger.info("[Scheduler] rent_reminder (%s) — period=%s", log_tag, period)
 
     engine = create_async_engine(_ASYNC_DB_URL, echo=False)
-    today  = date.today()
-    period = today.strftime("%Y-%m-01")  # first day of current month
-
-    logger.info(f"[Scheduler] rent_reminder ({label}) — period {period}")
-
     try:
         async with engine.connect() as conn:
-            result = await conn.execute(text("""
-                SELECT
-                    t.name,
-                    t.phone,
-                    rs.due_amount,
-                    rs.paid_amount,
-                    (rs.due_amount - COALESCE(rs.paid_amount, 0)) AS balance
-                FROM rent_schedule rs
-                JOIN tenancies  tn ON tn.id  = rs.tenancy_id
-                JOIN tenants    t  ON t.id   = tn.tenant_id
-                WHERE rs.period_month = :period
-                  AND tn.status       = 'active'
-                  AND rs.is_void      = FALSE
-                  AND (rs.due_amount - COALESCE(rs.paid_amount, 0)) > 0
-                ORDER BY balance DESC
-            """), {"period": period})
-            rows = result.fetchall()
+            if all_active:
+                # rent_schedule row for the target period may not exist yet on
+                # the 'advance' fire (rollover runs same evening, after our
+                # 09:00 IST slot). Fall back to tenancy.agreed_rent.
+                rows = (await conn.execute(text("""
+                    SELECT t.name, t.phone,
+                           COALESCE(rs.due_amount, tn.agreed_rent, 0) AS balance
+                    FROM tenancies tn
+                    JOIN tenants t ON t.id = tn.tenant_id
+                    LEFT JOIN rent_schedule rs
+                           ON rs.tenancy_id = tn.id
+                          AND rs.period_month = :period
+                          AND rs.is_void = FALSE
+                    WHERE tn.status = 'active'
+                      AND t.phone IS NOT NULL AND t.phone <> ''
+                    ORDER BY t.name
+                """), {"period": period})).fetchall()
+            else:
+                rows = (await conn.execute(text("""
+                    SELECT t.name, t.phone,
+                           (rs.due_amount - COALESCE(rs.paid_amount, 0)) AS balance
+                    FROM rent_schedule rs
+                    JOIN tenancies tn ON tn.id = rs.tenancy_id
+                    JOIN tenants   t  ON t.id  = tn.tenant_id
+                    WHERE rs.period_month = :period
+                      AND tn.status       = 'active'
+                      AND rs.is_void      = FALSE
+                      AND (rs.due_amount - COALESCE(rs.paid_amount, 0)) > 0
+                      AND t.phone IS NOT NULL AND t.phone <> ''
+                    ORDER BY balance DESC
+                """), {"period": period})).fetchall()
     finally:
         await engine.dispose()
 
     if not rows:
-        logger.info("[Scheduler] rent_reminder — no unpaid tenants found.")
+        logger.info("[Scheduler] rent_reminder (%s) — no recipients.", log_tag)
         return
 
-    month_label = today.strftime("%B %Y")
-    use_template = bool(_REMINDER_TOKEN)
     sent = 0
-
-    for name, phone, due, paid, balance in rows:
-        if not phone:
+    for name, phone, balance in rows:
+        if not phone or not balance or float(balance) <= 0:
             continue
-
-        if use_template:
-            # Official number — send approved template
-            if label == "first":
-                ok = await send_template(phone, "rent_reminder", body_params=[
-                    name, f"{balance:,.0f}", month_label,
-                ])
+        try:
+            if template_name == "general_notice":
+                # Custom wording so we can include the Rs.200/day late-fee warning.
+                if today.day < LATE_FEE_FROM_DAY:
+                    fee_line = (
+                        f" A late fee of Rs.{LATE_FEE_PER_DAY}/day will apply "
+                        f"for payments made on or after the {LATE_FEE_FROM_DAY}th."
+                    )
+                else:
+                    days_late = today.day - LATE_FEE_FROM_DAY + 1
+                    fee_line = (
+                        f" Late fee so far: Rs.{LATE_FEE_PER_DAY} × {days_late} day(s) "
+                        f"= Rs.{LATE_FEE_PER_DAY * days_late:,}."
+                    )
+                custom = (
+                    f"your rent of Rs.{int(balance):,} for {month_label} is unpaid."
+                    f"{fee_line} Please clear it today to stop the fee growing."
+                )
+                ok = await send_template(
+                    phone, "general_notice",
+                    body_params=[name, custom[:1000]],
+                )
             else:
-                ok = await send_template(phone, "rent_overdue", body_params=[
-                    name, f"{balance:,.0f}", month_label,
-                ])
+                ok = await send_template(
+                    phone, "rent_reminder",
+                    body_params=[name, f"{int(balance):,}", month_label],
+                )
             if ok:
                 sent += 1
-        else:
-            # Fallback — bot number, free-form text
-            if label == "first":
-                msg = (
-                    f"Hi {name},\n\n"
-                    f"This is a friendly reminder that your rent for *{month_label}* is due.\n"
-                    f"Amount due: *Rs.{balance:,.0f}*\n\n"
-                    f"Please arrange payment at your earliest convenience.\n"
-                    f"Thank you! — Cozeevo Co-living"
-                )
-            else:
-                msg = (
-                    f"Hi {name},\n\n"
-                    f"This is a *second reminder* — your rent for *{month_label}* is still outstanding.\n"
-                    f"Balance: *Rs.{balance:,.0f}*\n\n"
-                    f"Kindly clear this immediately to avoid a late fee.\n"
-                    f"— Cozeevo Co-living"
-                )
-            await _send_whatsapp(phone, msg)
-            sent += 1
+        except Exception as e:
+            logger.warning("[Scheduler] rent_reminder (%s) — send to %s exception: %s",
+                           log_tag, phone, e)
 
-    source = "official number (template)" if use_template else "bot number (text)"
-    logger.info(f"[Scheduler] rent_reminder ({label}) — sent {sent}/{len(rows)} via {source}")
+    logger.info("[Scheduler] rent_reminder (%s) — %d/%d sent via %s",
+                log_tag, sent, len(rows), template_name)
 
-    # Notify admin with summary (always via bot number)
-    if _ADMIN_PHONE and rows:
-        summary = (
-            f"*Rent Reminder Sent ({label})* — {month_label}\n"
-            f"Tenants messaged: {sent}\n"
-            f"Total outstanding: Rs.{sum(r[4] for r in rows):,.0f}\n"
-            f"Sent via: {source}"
+    if _ADMIN_PHONE:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        await _send_whatsapp(
+            _ADMIN_PHONE,
+            f"*Rent Reminder — {log_tag}*\n"
+            f"Month: {month_label}\n"
+            f"Recipients: {sent}/{len(rows)} delivered via `{template_name}` template."
         )
-        await _send_whatsapp(_ADMIN_PHONE, summary)
 
 
 # ── Job: Daily Reconciliation ──────────────────────────────────────────────────
