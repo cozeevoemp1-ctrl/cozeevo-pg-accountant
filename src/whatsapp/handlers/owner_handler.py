@@ -2109,12 +2109,25 @@ async def resolve_pending_action(
                     session.add(cat_row)
                     await session.flush()
 
+                # Expense.property_id is required; pick the active property.
+                from src.database.models import Property as _Property
+                prop = await session.scalar(
+                    select(_Property).where(_Property.active == True).limit(1)
+                )
+                if not prop:
+                    prop = await session.scalar(select(_Property).limit(1))
+                if not prop:
+                    return "No property configured — can't log expense."
+
+                # Expense has no `recorded_by` column; record the source phone
+                # in `notes` so the audit trail is preserved.
                 expense = Expense(
+                    property_id=prop.id,
                     category_id=cat_row.id,
                     amount=amt,
                     expense_date=date.today(),
                     description=desc[:500] if desc else f"{cat} expense",
-                    recorded_by=pending.phone,
+                    notes=f"Logged via WhatsApp by {pending.phone}",
                 )
                 session.add(expense)
 

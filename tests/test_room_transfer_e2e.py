@@ -283,13 +283,83 @@ async def main() -> int:
         fails.append("D: pending still alive after cancel")
     await _purge_pending(phone_norm)
 
+    # ── Scenario E: DAY-WISE move yes-path ──────────────────────────────────
+    # Find a day-wise guest active today and a partial destination room.
+    from src.database.models import DaywiseStay
+    from datetime import date as _d
+    async with get_session() as s:
+        dw = (await s.execute(
+            select(DaywiseStay).where(
+                DaywiseStay.checkin_date <= _d.today(),
+                DaywiseStay.checkout_date >= _d.today(),
+                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            ).limit(1)
+        )).scalars().first()
+    if not dw:
+        print("[SKIP-E] No active day-wise guest in DB — can't test yes-path.")
+    else:
+        print(f"\nDAYWISE guest: {dw.guest_name} (room {dw.room_number}, till {dw.checkout_date})")
+        msg_e = f"move {dw.guest_name} to {partial_room.room_number}"
+        reply_e = await _route_message(ctx, msg_e)
+        print(f"\n--- E: DAY-WISE confirm ---")
+        print(f"> {msg_e}\n{reply_e}")
+        # Handle possible disambig
+        if reply_e.lower().startswith("found") and "day-wise" in reply_e.lower():
+            reply_e = await _route_message(ctx, "1")
+            print(f"> 1\n{reply_e}")
+        if "Move day-stay guest" not in reply_e:
+            fails.append(f"E: did not get day-wise confirm prompt. reply={reply_e[:200]}")
+        else:
+            # cancel — DO NOT mutate the live day-wise row
+            reply_e2 = await _route_message(ctx, "no")
+            print(f"> no\n{reply_e2}")
+            if "cancel" not in reply_e2.lower():
+                fails.append(f"E: 'no' did not cancel day-wise move. reply={reply_e2[:160]}")
+        await _purge_pending(phone_norm)
+
+    # ── Scenario F: EXPENSE log yes-path (regression for Prabha's "Yes" bug) ─
+    # Walks: ADD_EXPENSE -> pick category 7 (Other) -> 50 -> Flower -> skip photo
+    # -> Yes. Cleans up by voiding the expense if it actually got created.
+    print("\n--- F: EXPENSE log yes-path ---")
+    msg_f1 = "ADD_EXPENSE"
+    reply_f1 = await _route_message(ctx, msg_f1)
+    print(f"> {msg_f1}\n{reply_f1[:200]}")
+    if "category" not in reply_f1.lower():
+        fails.append(f"F: ADD_EXPENSE did not prompt for category. reply={reply_f1[:160]}")
+    else:
+        for step_msg in ("7", "50", "Flower test", "skip"):
+            reply_f = await _route_message(ctx, step_msg)
+            print(f"> {step_msg}\n{reply_f[:200]}")
+        # Now should be at Confirm Expense step. Reply Yes.
+        from src.database.models import Expense
+        async with get_session() as s:
+            count_before = (await s.execute(select(Expense).where(Expense.notes.ilike("%Logged via WhatsApp%")))).scalars().all()
+        reply_f_yes = await _route_message(ctx, "yes")
+        print(f"> yes\n{reply_f_yes[:200]}")
+        if "logged" not in reply_f_yes.lower():
+            fails.append(f"F: 'yes' did not log expense. reply={reply_f_yes[:200]}")
+        else:
+            # Clean up — void the row we just created so we don't pollute reports.
+            async with get_session() as s:
+                latest = (await s.execute(
+                    select(Expense).where(
+                        Expense.notes.ilike("%Logged via WhatsApp%"),
+                        Expense.is_void == False,
+                    ).order_by(Expense.id.desc()).limit(1)
+                )).scalars().first()
+                if latest and latest.id not in {e.id for e in count_before}:
+                    latest.is_void = True
+                    print(f"  [cleanup] voided expense id={latest.id}")
+                    await s.commit()
+        await _purge_pending(phone_norm)
+
     print("\n" + "=" * 60)
     if fails:
         print(f"FAIL ({len(fails)} issues):")
         for f in fails:
             print("  -", f)
         return 1
-    print("PASS — all room-transfer e2e scenarios green.")
+    print("PASS — all room-transfer + day-wise + expense e2e scenarios green.")
     return 0
 
 
