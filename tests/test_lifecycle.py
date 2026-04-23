@@ -290,7 +290,7 @@ async def test_01_payment_with_upi():
     check("01d_voided", r["reply"], ["voided", "krishnanshu"])
     await verify_db_payment("Krishnanshu", 0)
     verify_sheet("01e_sheet_after_void", "211", "Krishnanshu",
-                 expected_upi=0.0, expected_cash=0.0, expected_status="UNPAID")
+                 expected_upi=0.0, expected_cash=0.0, expected_status="PARTIAL")
 
 
 async def test_02_payment_with_cash():
@@ -442,7 +442,7 @@ async def test_09_void_current_month():
 
     await verify_db_payment("Krishnanshu", 0)
     verify_sheet("09d_sheet_after_void", "211", "Krishnanshu",
-                 expected_upi=0.0, expected_cash=0.0, expected_status="UNPAID")
+                 expected_upi=0.0, expected_cash=0.0, expected_status="PARTIAL")
     await cleanup_test_tenant("Krishnanshu")
 
 
@@ -916,7 +916,7 @@ async def test_46_void_then_relog():
         r = await send(ADMIN_PHONE, "1")
     check("46c_voided", r["reply"], ["voided"])
     verify_sheet("46d_sheet_voided", "211", "Krishnanshu",
-                 expected_cash=0.0, expected_upi=0.0, expected_status="UNPAID")
+                 expected_cash=0.0, expected_upi=0.0, expected_status="PARTIAL")
 
     # Relog correct amount
     await clear_pendings()
@@ -1229,7 +1229,7 @@ async def test_56_payment_log_then_balance():
     check("56d_balance_after", r["reply"], ["15,000"])  # back to full
 
     verify_sheet("56e_sheet", "102", "Akarsh",
-                 expected_cash=0.0, expected_upi=0.0, expected_status="UNPAID")
+                 expected_cash=0.0, expected_upi=0.0, expected_status="PARTIAL")
 
     await cleanup_test_tenant("Akarsh")
 

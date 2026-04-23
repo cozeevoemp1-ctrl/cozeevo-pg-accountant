@@ -6558,6 +6558,29 @@ async def _update_tenant_notes(entities: dict, ctx: CallerContext, session: Asyn
     tenant, tenancy, room_obj = rows[0]
     current_notes = tenancy.notes or "(no notes)"
 
+    # One-shot delete: "delete notes for 603" — skip the enter-notes step and
+    # jump straight to confirm with new_notes cleared.
+    if entities.get("action") == "delete":
+        await _save_pending(
+            ctx.phone, "UPDATE_TENANT_NOTES_STEP",
+            {
+                "step": "confirm",
+                "tenant_id": tenant.id,
+                "tenancy_id": tenancy.id,
+                "tenant_name": tenant.name,
+                "room_number": room_obj.room_number,
+                "current_notes": tenancy.notes or "",
+                "new_notes": "",
+                "notes_action": "delete",
+            },
+            [], session,
+        )
+        return (
+            f"*{tenant.name}* (Room {room_obj.room_number})\n\n"
+            f"Current: _{current_notes}_\n\n"
+            "Clear these notes? Reply *Yes* to confirm or *No* to cancel."
+        )
+
     await _save_pending(
         ctx.phone, "UPDATE_TENANT_NOTES_STEP",
         {

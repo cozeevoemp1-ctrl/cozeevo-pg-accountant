@@ -110,7 +110,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
     # UPDATE_CONTACT — change phone/notes for existing vendor contact
     (re.compile(r"(?:update|edit|change|modify)\s+(?:contact|vendor|supplier)\b", re.I), "UPDATE_CONTACT", 0.95),
-    (re.compile(r"(?:update|edit|change|modify)\s+(?!tenant)(?:\w+\s+){0,5}(?:contact|number|phone|notes?|comment)\b", re.I), "UPDATE_CONTACT", 0.93),
+    # "notes" routes to UPDATE_TENANT_NOTES (line ~287), not here. Keeping
+    # contact/phone/comment only avoids stealing "update notes for <room>".
+    (re.compile(r"(?:update|edit|change|modify)\s+(?!tenant)(?:\w+\s+){0,5}(?:contact|number|phone|comment)\b", re.I), "UPDATE_CONTACT", 0.93),
     # Log expense — step-by-step form OR "log <expense keyword>" (must be BEFORE ACTIVITY_LOG)
     (re.compile(r"^(?:log\s+(?:an?\s+)?expense|add\s+(?:an?\s+)?expense|record\s+expense|new\s+expense)\s*$", re.I), "ADD_EXPENSE", 0.95),
     (re.compile(r"^log\s+(?!received|delivered|got|bought)(?:.*?\b(?:eb|electricity|bill|water\s+bill|internet|salary|maintenance|plumber|repair|groceries?|cleaning|diesel|generator|rent|expense)\b)", re.I), "ADD_EXPENSE", 0.94),
@@ -285,6 +287,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
     # Update tenant permanent notes / agreement
     (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
+    # One-shot clear: "delete/clear/remove notes for 603" — handler short-circuits to confirm.
+    (re.compile(r"(?:delete|clear|remove|reset|wipe)\s+(?:tenant\s+)?notes?\s+(?:for\s+)?[\w-]+", re.I), "UPDATE_TENANT_NOTES", 0.94),
     # Tenant notes / agreed terms / payment method lookup
     (re.compile(r"(?:notes?|agreement|agreed\s+terms?|payment\s+method|cash\s+only|rent\s+terms?|terms?)\s+(?:for\s+|of\s+)?(?:room\s+)?[\w-]+|(?:check|show|get|what(?:'?s|\s+is)?)\s+(?:the\s+)?(?:notes?|agreement|terms?|payment\s+method)\s+(?:for\s+|of\s+)?[\w\s-]+|room\s+[\w-]+\s+(?:notes?|terms?|agreement|payment\s+method|cash\s+only)|(?:notes?|agreement|terms?)\s+room\s+[\w-]+", re.I), "GET_TENANT_NOTES", 0.93),
     # Expense category shorthand "Category Amount [Mode]" — MUST come before PAYMENT_LOG shorthand
@@ -787,5 +791,30 @@ def _extract_entities(text: str, intent: str) -> dict:
         )
         if role_match:
             entities["role"] = role_match.group(1).capitalize()
+
+    # UPDATE_TENANT_NOTES / GET_TENANT_NOTES — "update notes for 603" should
+    # treat "603" as room, not amount. Generic extractor skips because there's
+    # no "room" prefix.
+    if intent in ("UPDATE_TENANT_NOTES", "GET_TENANT_NOTES") and "room" not in entities:
+        rm = re.search(
+            r"(?:notes?|agreement|terms?)\s+(?:for\s+)?([A-Za-z]?\d{1,4}[A-Za-z]?|G\d{1,3})\b",
+            text, re.I,
+        )
+        if rm:
+            entities["room"] = rm.group(1)
+            if "amount" in entities and str(int(entities["amount"])) == rm.group(1):
+                entities.pop("amount", None)
+            # Generic extractor may also have captured room as the "name"
+            # (e.g. "Akshit" case vs "603" case). For numeric rooms strip it
+            # so handler doesn't search for a tenant named "603".
+            if entities.get("name", "").isdigit():
+                entities.pop("name", None)
+
+    # One-shot clear: "delete/clear/remove notes for 603" → flag action=delete
+    # so the handler short-circuits the prompt and jumps to confirm.
+    if intent == "UPDATE_TENANT_NOTES" and re.match(
+        r"\s*(?:delete|clear|remove|reset|wipe)\s+(?:tenant\s+)?notes?\b", text, re.I
+    ):
+        entities["action"] = "delete"
 
     return entities

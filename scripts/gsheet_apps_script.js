@@ -569,7 +569,8 @@ function updateMonthSummary(sheet) {
     const tp = cash + upi;
     let bal = rent + prevDue - tp;
     if (bal < 0) bal = 0;  // excess is deposit/advance, not overpayment
-    const st = (tp === 0) ? "UNPAID" : (bal <= 0 ? "PAID" : "PARTIAL");
+    // Status: current rent only (ignore prev due). Kiran 2026-04-23.
+    const st = (tp >= rent) ? "PAID" : "PARTIAL";
     if (cTp >= 0) sheet.getRange(i + 1, cTp + 1).setValue(tp);
     if (cBal >= 0) sheet.getRange(i + 1, cBal + 1).setValue(bal);
     if (cSt >= 0) sheet.getRange(i + 1, cSt + 1).setValue(st);
@@ -700,7 +701,7 @@ function createMonthTab(tabName, monthIdx, year) {
       rentDue,                    // F: Rent Due
       0, 0, 0,                   // G: Cash, H: UPI, I: Total Paid
       totalDue,                   // J: Balance = rent + prevDue
-      "UNPAID",                   // K: Status
+      "PARTIAL",                  // K: Status (no UNPAID on live months — Kiran 2026-04-23)
       t[7],                       // L: Check-in
       noticeDate,                 // M: Notice Date
       event,                      // N: Event

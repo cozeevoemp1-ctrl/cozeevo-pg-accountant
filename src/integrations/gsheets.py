@@ -550,7 +550,9 @@ def _refresh_summary_sync(tab_name: str) -> None:
             bal = rent + prev_due - tp
             if bal < 0:
                 bal = 0  # excess is deposit/advance, not overpayment
-            st = "UNPAID" if tp == 0 else ("PAID" if bal <= 0 else "PARTIAL")
+            # Status looks at THIS month's rent only (ignore prev_due).
+            # Kiran 2026-04-23: paid current rent = PAID, any shortfall = PARTIAL.
+            st = "PAID" if tp >= rent else "PARTIAL"
 
             sheet_row = i + 1  # 1-based
             row_updates.append({"range": gspread.utils.rowcol_to_a1(sheet_row, ci["tp"] + 1), "values": [[tp]]})
@@ -828,23 +830,19 @@ def _update_payment_sync(
             f"(+Rs.{int(abs(new_balance)):,} extra)"
         )
 
-    # Determine status
-    if new_total_paid >= total_due and total_due > 0:
+    # Determine status — rent-only rule (ignore prev_due).
+    # Kiran 2026-04-23: paid current rent = PAID, any shortfall = PARTIAL.
+    if new_total_paid >= rent_due and rent_due > 0:
         new_status = "PAID"
-    elif new_total_paid > 0:
-        new_status = "PARTIAL"
+    elif rent_due == 0:
+        new_status = _cell(row_data, col_st) or "PAID"
     else:
-        new_status = _cell(row_data, col_st) or "UNPAID"
+        new_status = "PARTIAL"
 
-    # Build notes append
-    ts = datetime.now().strftime("%d-%b %H:%M")
-    method_upper = method.upper()
-    by_tag = f" by {entered_by}" if entered_by else ""
-    note_entry = f"[{ts}] Rs.{int(amount):,} {method_upper}{by_tag}"
-    existing_notes = _cell(row_data, col_notes)
-    updated_notes = f"{existing_notes} | {note_entry}" if existing_notes else note_entry
-
-    # Batch update: target payment col, Total Paid, Balance, Status, Notes
+    # Kiran 2026-04-23: stop appending payment timestamps to Notes.
+    # Payment history lives in DB payments table + Cash/UPI columns.
+    # Notes column is reserved for tenant business notes (lockin, special rent, etc.).
+    # Batch update: target payment col, Total Paid, Balance, Status
     try:
         batch = [
             {
@@ -863,10 +861,6 @@ def _update_payment_sync(
                 "range": gspread.utils.rowcol_to_a1(row, col_st + 1),
                 "values": [[new_status]],
             },
-            {
-                "range": gspread.utils.rowcol_to_a1(row, col_notes + 1),
-                "values": [[updated_notes]],
-            },
         ]
         # Add Entered By column if new format
         if is_new and entered_by:
@@ -878,7 +872,7 @@ def _update_payment_sync(
         result["success"] = True
         logger.info(
             "GSheets: row %d in %s — Room %s / %s — Rs.%s %s → total %s/%s, balance=%s, status=%s",
-            row, tab_name, room_number, tenant_name, int(amount), method_upper,
+            row, tab_name, room_number, tenant_name, int(amount), method.upper(),
             int(new_total_paid), int(total_due), int(new_balance), new_status,
         )
         # Refresh summary rows (API writes don't trigger Apps Script onEdit)
@@ -1070,7 +1064,9 @@ def _add_tenant_sync(
         # First month: Rent Due = rent, Deposit Due = deposit (separate column)
         first_month_total = agreed_rent + deposit
         adv_balance = first_month_total - advance_amount
-        adv_status = "PAID" if adv_balance <= 0 else ("PARTIAL" if advance_amount > 0 else "UNPAID")
+        # First-month status: rent+deposit bundle. PAID if covered by advance,
+        # else PARTIAL (Kiran 2026-04-23 — no UNPAID status on live months).
+        adv_status = "PAID" if adv_balance <= 0 else "PARTIAL"
 
         m_field_map = {
             "room": room_number,
@@ -1394,12 +1390,14 @@ def _void_payment_sync(
     total_due = rent_due + prev_due
     new_balance = total_due - new_total_paid
 
-    if new_total_paid >= total_due and total_due > 0:
+    # Rent-only status rule (Kiran 2026-04-23): current rent paid = PAID,
+    # any shortfall = PARTIAL. prev_due is tracked via Balance, not Status.
+    if rent_due == 0:
         new_status = "PAID"
-    elif new_total_paid > 0:
-        new_status = "PARTIAL"
+    elif new_total_paid >= rent_due:
+        new_status = "PAID"
     else:
-        new_status = "UNPAID"
+        new_status = "PARTIAL"
 
     # Remove the specific payment note that was added when this payment was logged
     # Notes format: "[03-Apr 11:00] Rs.5,000 UPI by Kiran | [other notes]"
