@@ -211,8 +211,18 @@ def start_scheduler() -> AsyncIOScheduler:
         kwargs={"when": "tomorrow"},
     )
 
+    # Nightly sheet↔DB drift audit — 23:30 IST. Alerts admin on WhatsApp when
+    # TENANTS / current-monthly-tab values diverge from DB (manual sheet edits).
+    scheduler.add_job(
+        _nightly_sheet_audit,
+        trigger=CronTrigger(hour=23, minute=30, timezone="Asia/Kolkata"),
+        id="nightly_sheet_audit",
+        name="Nightly Sheet Audit — DB↔Sheet drift check (11:30pm IST)",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info("[Scheduler] Started — 9 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 10 jobs registered (jobs persist in Supabase)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -896,3 +906,45 @@ async def _checkout_deposit_alerts() -> None:
                 )
     finally:
         await engine2.dispose()
+
+
+# ── Job: Nightly Sheet Audit ──────────────────────────────────────────────────
+
+async def _nightly_sheet_audit() -> None:
+    """
+    Compare TENANTS + current-monthly-tab cells against DB on high-signal
+    fields (Room, Rent, Deposit, Cash, UPI, Total Paid, Notice Date,
+    Checkout Date). WhatsApp the admin if any drift is detected so a manual
+    edit on the sheet — which the bot would never notice on its own — gets
+    surfaced within 24h.
+
+    Not auto-heal. `sync_sheet_from_db.py` preserves sheet Cash/UPI values, so
+    blindly re-running it could keep an accidental zero. Kiran triages first.
+    """
+    from src.services.sheet_audit import run_audit, whatsapp_message
+    from src.whatsapp.webhook_handler import _send_whatsapp
+
+    logger.info("[Scheduler] nightly_sheet_audit — running")
+    try:
+        result = await run_audit()
+    except Exception as e:
+        logger.exception(f"[Scheduler] nightly_sheet_audit failed: {e}")
+        if _ADMIN_PHONE:
+            await _send_whatsapp(
+                _ADMIN_PHONE,
+                f"Sheet audit FAILED at {datetime.now():%Y-%m-%d %H:%M}: {e}"
+            )
+        return
+
+    logger.info(
+        f"[Scheduler] nightly_sheet_audit — tenants_diffs={len(result.tenants_diffs)} "
+        f"monthly_diffs={len(result.monthly_diffs)} "
+        f"missing_in_db={len(result.missing_in_db)} "
+        f"missing_in_sheet={len(result.missing_in_sheet)}"
+    )
+
+    if result.total_diffs == 0:
+        return   # silent on clean runs — no WhatsApp spam
+
+    if _ADMIN_PHONE:
+        await _send_whatsapp(_ADMIN_PHONE, whatsapp_message(result))

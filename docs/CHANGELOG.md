@@ -2,6 +2,33 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.6] — 2026-04-23 — Sheet access fix (cozeevoemp1) + nightly DB↔Sheet drift audit
+
+### Background
+- cozeevoemp1@gmail.com had Editor role on the Operations v2 sheet but couldn't apply filters on any tab. Root cause: every tab has an entire-sheet protection whose editor list only included the service account + cozeevo@gmail.com. Protections block filter/sort for non-allowed editors even with file-level Edit access.
+- No mechanism existed to detect drift if someone with edit rights accidentally overwrote a cell. Bot reads DB only — it would never notice, and the sheet would silently show wrong numbers to anyone viewing it directly.
+
+### Fix — editor access (`scripts/grant_sheet_editor.py`, new)
+- Programmatically adds an email to the file's Drive permissions AND to every protected range's editor list.
+- Applied to cozeevoemp1@gmail.com — now appears in all 8 protections (DASHBOARD, TENANTS, DEC 2025 – APR 2026, DAY WISE). Filter/sort/column-resize now works for him.
+- `scripts/list_sheet_protections.py` (new) — audit tool for who can edit each protected range.
+
+### Feature — nightly sheet audit
+- **`src/services/sheet_audit.py`** (new) — compares TENANTS + current-month tab cells against DB on Room, Agreed Rent, Deposit, Notice Date, Checkout Date (TENANTS) and Room, Rent, Cash, UPI, Total Paid (monthly). Per-phone match; normalises numbers/dates; tolerates minor formatting. Skips Balance/Prev Due/Event/Status (proration-heavy — out of scope).
+- **`scripts/sheet_audit.py`** (new) — CLI wrapper. Flags: `--alert` (WhatsApp ADMIN_PHONE on diffs), `--json` (machine-readable). Exit 0 if clean, 1 if diffs.
+- **`src/scheduler.py::_nightly_sheet_audit`** — new APScheduler job at 23:30 IST daily. Silent when clean; WhatsApps admin with preview + total counts when diffs found. Does NOT auto-heal because `sync_sheet_from_db.py --write` preserves sheet Cash/UPI (would lock in accidental zeros). Kiran triages, then runs heal manually.
+
+### What the first run will catch (55+ pre-existing issues as of today's dry-run)
+- Room moves not reflected in sheet (Prasad 520, Chinmay 124, Sujith 621, G.D. Abhishek 612).
+- Notice dates set via bot but sheet empty for 3 tenants (Didla, Shivam, Aldrin).
+- Deposit mismatches (Akshit, Aruf: sheet 13500 vs DB 11500).
+- Missing Cash/UPI on 5+ April rows where DB has payments logged (Chinmay 41K, Arun R L 19.5K, Pooja K L 19.5K, Rakesh 20K, Rohit 20078).
+- 4 sheet rows with no matching DB tenancy (Pranav Sonawane, Prabhakaran, Shashank).
+
+### Ops
+- Scheduler now registers 10 jobs (was 9). State persists in Supabase jobstore; one VPS worker owns the scheduler via fcntl lock.
+- No DB schema change. No new env vars (uses existing `ADMIN_PHONE`).
+
 ## [1.49.5] — 2026-04-23 — Double-booking guard, March = source, day-wise cleanup
 
 ### Double-booking guard (closes 1.49.4 follow-up)
