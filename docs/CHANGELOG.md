@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.11] — 2026-04-23 — Stop orphan TENANTS rows + clean up Pranav
+
+### Root cause (Pranav's "ghost row" at Room 305)
+TENANTS sheet showed Pranav Sonawane at Room 305 active with rent 13000 — but DB had **no Tenancy** for him (only a day-wise stay). Real occupant of 305: Jeewan Kant Oberoi (premium, 28000). The orphan came from `_do_add_tenant` (WhatsApp ADD_TENANT confirm path): it inserted Tenancy + pushed TENANTS sheet row **without** running `check_room_bookable`. When the Tenancy was later removed (manual cleanup or import re-run) the Sheet row stayed, making the master tab lie about who's where.
+
+### Fix
+- **`src/whatsapp/handlers/owner_handler.py:_do_add_tenant`** — added `check_room_bookable` guard immediately before the Tenancy insert, mirroring the onboarding form's approve flow. Refuses with `❌ Cannot add {name} to room {room}: {reason}` so no orphan row reaches the Sheet.
+- **`scripts/cleanup_orphan_tenants_rows.py`** — new CLI. Scans the TENANTS tab; flags a row as orphan when it CLAIMS active status but no matching active monthly Tenancy exists. Format-agnostic phone match (`%9878817607` ilike) so Sheet `+91…` and DB `+91…` / 10-digit don't false-flag (caught Jeewan-in-305 in dry-run before write).
+  - Cleanup action: clears Room/Agreed Rent/Deposit/Booking/Maintenance, sets `Status=INACTIVE`, appends `orphan-cleanup YYYY-MM-DD` note. Preserves history; never deletes the row.
+  - `--only "Name"` filter for surgical cleanup; default dry-run; `--write` applies.
+  - Skips rows already Exited/Inactive (those are correct historical records).
+
+### Live cleanup
+- `--only Pranav --write` → row 17 marked INACTIVE, room/rent cleared.
+- Full dry-run finds 3 remaining orphans (Prabhakaran r25 likely partner-account; Sanskar r240, Anshsinha r253 need owner review before bulk-write).
+
 ## [1.49.10] — 2026-04-23 — Room transfer: day-wise guests (Pranav in 308)
 
 ### Root cause

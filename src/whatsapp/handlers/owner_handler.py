@@ -4979,6 +4979,18 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         if food_pref and not tenant.food_preference:
             tenant.food_preference = food_pref
 
+    # Double-booking guard — must pass before any Tenancy insert. This is the
+    # same guard the onboarding form runs at approve time. Without it the
+    # WhatsApp ADD_TENANT confirm path could create a tenancy in an already-
+    # occupied premium / shared room AND push a TENANTS sheet row, leaving an
+    # orphan if the conflict is later resolved manually (e.g. Pranav-in-305).
+    from src.services.room_occupancy import check_room_bookable
+    _, _bookable_err = await check_room_bookable(
+        session, room_number, checkin_date, None,
+    )
+    if _bookable_err:
+        return f"❌ Cannot add {name} to room {room_number}: {_bookable_err}"
+
     # Tenancy record
     tenancy = Tenancy(
         tenant_id        = tenant.id,
