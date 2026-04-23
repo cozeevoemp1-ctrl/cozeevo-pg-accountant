@@ -2,6 +2,39 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.3] — 2026-04-23 — Combined command: payment + notes in one message
+
+Receptionists can now log rent AND update/clear tenant notes in a single
+WhatsApp message — no separate `update notes for 603` follow-up needed.
+
+```
+Ganesh paid 20000 cash and clear notes
+Ganesh paid 20000 cash, 8000 upi and clear notes              ← split + clear
+Ganesh paid 20000 cash and update notes to pays 5th of month  ← payment + set
+Ganesh paid 20000 cash, 8000 upi and set notes to cash only   ← split + set
+```
+
+After Yes, bot appends notes result:
+```
+Payment logged — Rs.28,000 SPLIT for Ganesh Divekar (Room 603)
+Notes cleared.
+```
+
+**How**
+- `intent_detector`: new high-priority PAYMENT_LOG rule (0.96) so
+  `paid N cash/upi` wins over UPDATE_TENANT_NOTES even when the message
+  contains `update notes`. New extractor pulls `tenant_note_action`
+  (clear|set) and `tenant_note_text` from the trailing clause.
+- `account_handler._payment_log`: passes `tenant_note_action` +
+  `tenant_note_text` through CONFIRM_PAYMENT_LOG and
+  CONFIRM_PAYMENT_ALLOC pending data.
+- `owner_handler._apply_tenant_notes_from_payment`: new helper called in
+  both Yes branches. Writes Tenancy.notes + audit_log + syncs TENANTS
+  master + monthly tab (same path as standalone UPDATE_TENANT_NOTES).
+
+Standalone `update notes for 603` / `delete notes for 603` still work.
+Vendor `UPDATE_CONTACT` flows untouched. Commit 946beee.
+
 ## [1.51.2] — 2026-04-23 — Onboarding form UX (Lokesh)
 
 Three receptionist-driven UX tweaks on the admin onboarding create form:
