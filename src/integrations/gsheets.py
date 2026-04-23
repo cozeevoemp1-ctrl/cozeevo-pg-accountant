@@ -80,6 +80,7 @@ from src.database.field_registry import (
     tenants_field_to_header as _tenants_field_to_header,
     field_to_col as _field_to_col,
 )
+from src.services.rent_status import compute_status as _compute_status
 
 MONTHLY_HEADERS = _monthly_headers()
 TENANTS_HEADERS = _tenants_headers()
@@ -343,6 +344,32 @@ def _month_tab_for(month: int, year: int) -> str:
     return f"{MONTH_NAMES[month - 1]} {year}"
 
 
+# Frozen period: Dec 2025–Mar 2026 are loaded 1:1 from Cozeevo source sheets
+# and MUST NOT be mutated by the bot or sync scripts. Convention → code guard.
+FROZEN_MONTHS: frozenset[tuple[int, int]] = frozenset({
+    (2025, 12), (2026, 1), (2026, 2), (2026, 3),
+})
+
+
+def _is_frozen_month(month: int, year: int) -> bool:
+    return (year, month) in FROZEN_MONTHS
+
+
+def _is_frozen_tab(tab_name: str) -> bool:
+    """True if tab_name like 'MARCH 2026' falls in the frozen range."""
+    if not tab_name:
+        return False
+    parts = tab_name.strip().upper().split()
+    if len(parts) != 2 or parts[0] not in MONTH_NAMES:
+        return False
+    try:
+        m = MONTH_NAMES.index(parts[0]) + 1
+        y = int(parts[1])
+    except (ValueError, IndexError):
+        return False
+    return _is_frozen_month(m, y)
+
+
 # -- Helpers -------------------------------------------------------------------
 
 _NUMERIC_RE = re.compile(r"^[\d,.\s]*$")
@@ -550,9 +577,7 @@ def _refresh_summary_sync(tab_name: str) -> None:
             bal = rent + prev_due - tp
             if bal < 0:
                 bal = 0  # excess is deposit/advance, not overpayment
-            # Status looks at THIS month's rent only (ignore prev_due).
-            # Kiran 2026-04-23: paid current rent = PAID, any shortfall = PARTIAL.
-            st = "PAID" if tp >= rent else "PARTIAL"
+            st = _compute_status(tp, rent)
 
             sheet_row = i + 1  # 1-based
             row_updates.append({"range": gspread.utils.rowcol_to_a1(sheet_row, ci["tp"] + 1), "values": [[tp]]})
@@ -733,6 +758,11 @@ def _update_payment_sync(
         "error": None,
     }
 
+    if _is_frozen_month(month, year):
+        result["error"] = f"Refused write to frozen tab '{tab_name}' (Dec 2025–Mar 2026 is read-only)"
+        logger.warning("GSheets update_payment: blocked frozen-month write to %s", tab_name)
+        return result
+
     try:
         ws = _get_worksheet_sync(tab_name)
     except gspread.exceptions.WorksheetNotFound:
@@ -830,14 +860,7 @@ def _update_payment_sync(
             f"(+Rs.{int(abs(new_balance)):,} extra)"
         )
 
-    # Determine status — rent-only rule (ignore prev_due).
-    # Kiran 2026-04-23: paid current rent = PAID, any shortfall = PARTIAL.
-    if new_total_paid >= rent_due and rent_due > 0:
-        new_status = "PAID"
-    elif rent_due == 0:
-        new_status = _cell(row_data, col_st) or "PAID"
-    else:
-        new_status = "PARTIAL"
+    new_status = _compute_status(new_total_paid, rent_due)
 
     # Kiran 2026-04-23: stop appending payment timestamps to Notes.
     # Payment history lives in DB payments table + Cash/UPI columns.
@@ -1064,9 +1087,9 @@ def _add_tenant_sync(
         # First month: Rent Due = rent, Deposit Due = deposit (separate column)
         first_month_total = agreed_rent + deposit
         adv_balance = first_month_total - advance_amount
-        # First-month status: rent+deposit bundle. PAID if covered by advance,
-        # else PARTIAL (Kiran 2026-04-23 — no UNPAID status on live months).
-        adv_status = "PAID" if adv_balance <= 0 else "PARTIAL"
+        # First-month status: rent+deposit bundle. Balance <= 0 means advance
+        # covered the full bundle. Delegated to canonical helper.
+        adv_status = _compute_status(float(advance_amount or 0), float(first_month_total or 0))
 
         m_field_map = {
             "room": room_number,
@@ -1333,6 +1356,10 @@ def _void_payment_sync(
         year = today.year
 
     tab_name = _month_tab_for(month, year)
+    if _is_frozen_month(month, year):
+        result["error"] = f"Refused write to frozen tab '{tab_name}' (Dec 2025–Mar 2026 is read-only)"
+        logger.warning("GSheets void: blocked frozen-month write to %s", tab_name)
+        return result
     try:
         ws = _get_worksheet_sync(tab_name)
     except gspread.WorksheetNotFound:
@@ -1390,14 +1417,7 @@ def _void_payment_sync(
     total_due = rent_due + prev_due
     new_balance = total_due - new_total_paid
 
-    # Rent-only status rule (Kiran 2026-04-23): current rent paid = PAID,
-    # any shortfall = PARTIAL. prev_due is tracked via Balance, not Status.
-    if rent_due == 0:
-        new_status = "PAID"
-    elif new_total_paid >= rent_due:
-        new_status = "PAID"
-    else:
-        new_status = "PARTIAL"
+    new_status = _compute_status(new_total_paid, rent_due)
 
     # Remove the specific payment note that was added when this payment was logged
     # Notes format: "[03-Apr 11:00] Rs.5,000 UPI by Kiran | [other notes]"
@@ -2336,6 +2356,13 @@ def trigger_monthly_sheet_sync(month: int, year: int) -> None:
     import subprocess
     import sys
     from pathlib import Path
+
+    if _is_frozen_month(month, year):
+        logger.warning(
+            "trigger_monthly_sheet_sync: blocked frozen month %d/%d (Dec 2025–Mar 2026 is read-only)",
+            month, year,
+        )
+        return
 
     try:
         project_root = Path(__file__).resolve().parents[2]

@@ -431,17 +431,14 @@ async def main(args):
             effective_paid = total_paid + booking_credit + prepaid_credit + deposit_credit
             balance = rent_due + int(prev_due_num) - effective_paid
 
-            # Status — based on THIS month's rent only (ignore prev_due).
-            # Paid April's rent fully → PAID. Any April shortfall → PARTIAL.
-            # Kiran's rule 2026-04-23: pending April due = partial, rest = paid.
+            # Status — canonical rent-only helper (src/services/rent_status.py).
+            from src.services.rent_status import compute_status, NO_SHOW, EXIT
             if tenancy.status == TenancyStatus.exited:
-                status = "EXIT"
+                status = EXIT
             elif tenancy.status == TenancyStatus.no_show:
-                status = "NO-SHOW"
-            elif effective_paid >= rent_due:
-                status = "PAID"
+                status = NO_SHOW
             else:
-                status = "PARTIAL"
+                status = compute_status(effective_paid, rent_due)
 
             # Event
             if tenancy.status == TenancyStatus.exited:
