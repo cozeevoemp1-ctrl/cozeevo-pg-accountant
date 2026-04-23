@@ -423,6 +423,21 @@ async def _process_message_inner(
                 except Exception as _corr_err:
                     _chat_logger.warning("AI correction detection failed: %s", _corr_err)
 
+            # ── Cancel-word short-circuit ──────────────────────────────────
+            # Must run BEFORE the resolver. `is_negative("cancel")` is True, so
+            # CONFIRM_PAYMENT_LOG treats "cancel" as "No, let me correct"
+            # (__KEEP_PENDING__) — user can't actually escape the loop. Cancel
+            # words always win over negative interpretation.
+            _cancel_words_early = {"cancel", "stop", "abort", "quit", "nevermind", "never mind"}
+            if not pending.resolved and message.strip().lower() in _cancel_words_early:
+                pending.resolved = True
+                cancel_reply = "Cancelled."
+                await _log(session, phone, message, ctx.role, "CONFIRMATION", cancel_reply)
+                await session.commit()
+                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                    _dbg.write(f"  CANCELLED early (pre-resolver) on '{pending.intent}'\n")
+                return OutboundReply(reply=cancel_reply, intent="CONFIRMATION", role=ctx.role)
+
             if not pending.resolved:
                 _chat_logger.info("Calling resolve_pending_action: intent=%s, msg=%s, step=%s",
                                   pending.intent, message[:50],
