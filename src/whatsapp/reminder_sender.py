@@ -54,8 +54,16 @@ def _get_reminder_creds() -> tuple[str, str]:
 
 
 def _clean_phone(phone: str) -> str:
-    """Strip +, spaces, dashes — Meta expects plain digits like 919876543210."""
-    return phone.lstrip("+").replace(" ", "").replace("-", "")
+    """Strip +, spaces, dashes — Meta expects plain digits like 919876543210.
+
+    Indian 10-digit mobiles (e.g. ``7845952289``) get ``91`` prepended so Meta
+    can route them; without the country code Meta returns 200 but silently
+    drops delivery.
+    """
+    to = phone.lstrip("+").replace(" ", "").replace("-", "")
+    if len(to) == 10 and to[:1] in "6789":
+        to = "91" + to
+    return to
 
 
 # ── Template Sender ───────────────────────────────────────────────────────────

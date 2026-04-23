@@ -310,6 +310,23 @@ def _extract_message(payload: dict) -> Optional[dict]:
 
 # -- Meta Graph API sender -----------------------------------------------------
 
+def _to_e164_for_meta(phone: str) -> str:
+    """Normalise a phone into the digits-only form Meta expects (E.164 without +).
+
+    Why: authorized_users + tenant rows store phones in several formats
+    (``+917845952289``, ``917845952289``, ``7845952289``). Meta's Cloud API
+    returns HTTP 200 even when the number is unroutable, then silently drops
+    the message — which bit us on the 2026-04-23 prep reminder (only the one
+    recipient already in Meta's test-allowlist received it; four 10-digit
+    numbers got 200 but never delivered). Any Indian mobile (10 digits
+    starting 6–9) gets the ``91`` country code prepended so Meta can route it.
+    """
+    to = phone.lstrip("+").replace(" ", "").replace("-", "")
+    if len(to) == 10 and to[:1] in "6789":
+        to = "91" + to
+    return to
+
+
 async def _send_whatsapp(to_number: str, message: str, *, intent: str = "OUTBOUND"):
     """Send WhatsApp reply via Meta Graph API and persist to whatsapp_log.
 
@@ -324,8 +341,7 @@ async def _send_whatsapp(to_number: str, message: str, *, intent: str = "OUTBOUN
         logger.warning("[Meta] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set -- skipping send.")
         return
 
-    # Meta expects plain digits (e.g. 919876543210), no + or spaces
-    to = to_number.lstrip("+").replace(" ", "")
+    to = _to_e164_for_meta(to_number)
 
     import httpx
     url     = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
@@ -374,7 +390,7 @@ async def _send_whatsapp_template(to_number: str, template_name: str, parameters
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
     if not (token and phone_id):
         return
-    to = to_number.lstrip("+").replace(" ", "")
+    to = _to_e164_for_meta(to_number)
     import httpx
     url     = f"https://graph.facebook.com/v25.0/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -432,7 +448,7 @@ async def _send_whatsapp_interactive(to_number: str, payload: dict):
         logger.warning("[Meta] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set -- skipping send.")
         return
 
-    to = to_number.lstrip("+").replace(" ", "")
+    to = _to_e164_for_meta(to_number)
     url     = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     body = {"messaging_product": "whatsapp", "recipient_type": "individual", "to": to, **payload}
@@ -457,7 +473,7 @@ async def _send_whatsapp_document(to_number: str, document_url: str, filename: s
         logger.warning("[Meta] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set")
         return
 
-    to = to_number.lstrip("+").replace(" ", "")
+    to = _to_e164_for_meta(to_number)
     url     = f"https://graph.facebook.com/v18.0/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     body = {

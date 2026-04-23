@@ -53,6 +53,41 @@ _ASYNC_DB_URL = _raw_url if "+asyncpg" in _raw_url else _raw_url.replace("postgr
 _ADMIN_PHONE  = os.getenv("ADMIN_PHONE", "")
 _BACKUP_DIR   = Path(os.getenv("BACKUP_DIR", "data/backups"))
 
+# Hold the lock file descriptor for the process lifetime — lock releases on exit.
+_scheduler_lock_fd: int | None = None
+
+
+def _acquire_scheduler_lock() -> bool:
+    """Return True if this worker should own the scheduler, False otherwise.
+
+    Why: uvicorn runs with --workers 2 on the VPS, and each worker was
+    constructing its own APScheduler + SQLAlchemyJobStore, so every cron job
+    fired twice (duplicate reminders, duplicate reconciliations, etc.).
+    APScheduler's jobstore does not coordinate runs across processes — we
+    coordinate via a POSIX advisory lock instead. Exactly one worker wins the
+    lock; others return a no-op scheduler. On Windows (local dev, single
+    worker), fcntl is unavailable — skip the lock and always run.
+    """
+    global _scheduler_lock_fd
+    try:
+        import fcntl
+    except ImportError:
+        return True   # Windows local dev — assume single worker
+
+    lock_path = os.getenv("SCHEDULER_LOCK_PATH", "/tmp/pg-accountant-scheduler.lock")
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_WRONLY, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.ftruncate(fd, 0)
+        os.write(fd, f"{os.getpid()}\n".encode())
+        _scheduler_lock_fd = fd   # keep fd open so kernel holds the lock
+        logger.info("[Scheduler] acquired lock %s (pid=%d)", lock_path, os.getpid())
+        return True
+    except (BlockingIOError, OSError) as e:
+        logger.info("[Scheduler] lock held by another worker — skipping (pid=%d, %s)",
+                    os.getpid(), e)
+        return False
+
 
 # ── Builder ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +99,9 @@ def start_scheduler() -> AsyncIOScheduler:
     if not _SYNC_DB_URL:
         logger.warning("[Scheduler] DATABASE_URL not set — scheduler disabled.")
         return AsyncIOScheduler()   # no-op scheduler
+
+    if not _acquire_scheduler_lock():
+        return AsyncIOScheduler()   # another worker owns the scheduler
 
     jobstores = {
         "default": SQLAlchemyJobStore(
