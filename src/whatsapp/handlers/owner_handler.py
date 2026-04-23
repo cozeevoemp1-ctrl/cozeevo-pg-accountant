@@ -151,6 +151,12 @@ async def resolve_pending_action(
     from src.whatsapp.handlers.account_handler import (
         _do_log_payment_by_ids, _do_void_payment, _do_rent_change, _do_query_tenant_by_id,
     )
+    # _save_pending is also locally re-imported in many branches below. Because
+    # Python treats any name assigned anywhere in a function as a local for the
+    # WHOLE function, branches that use bare `_save_pending` without a local
+    # rebind would otherwise raise UnboundLocalError (the module-level import
+    # at line 38 is shadowed). Bind it once at the top so every branch is safe.
+    from src.whatsapp.handlers._shared import _save_pending
     reply_text = reply_text.strip()
     choices = json.loads(pending.choices or "[]")
     action_data = json.loads(pending.action_data or "{}")
@@ -5377,12 +5383,29 @@ async def _finalize_room_transfer(
             Tenancy.id != tenancy.id,
         )
     )).all()
+
+    # Day-wise stays overlapping today also occupy beds in the destination room.
+    from src.database.models import DaywiseStay
+    _today = date.today()
+    daywise_rows = (await session.execute(
+        select(DaywiseStay.guest_name, DaywiseStay.checkin_date, DaywiseStay.checkout_date)
+        .where(
+            DaywiseStay.room_number == new_room.room_number,
+            DaywiseStay.checkin_date <= _today,
+            DaywiseStay.checkout_date >= _today,
+            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+        )
+    )).all()
+
     max_occ = int(new_room.max_occupancy or 1)
-    free_beds = max_occ - len(occupied_rows)
+    occ_total = len(occupied_rows) + len(daywise_rows)
+    free_beds = max_occ - occ_total
     if free_beds <= 0:
         occ_lines = "\n".join(f"  - {r[0]} ({r[1]})" for r in occupied_rows)
+        dw_lines = "\n".join(f"  - {r[0]} (day-stay till {r[2]})" for r in daywise_rows)
+        all_lines = "\n".join(x for x in (occ_lines, dw_lines) if x)
         return (
-            f"Room *{to_room}* is *full* ({len(occupied_rows)}/{max_occ} beds):\n{occ_lines}\n\n"
+            f"Room *{to_room}* is *full* ({occ_total}/{max_occ} beds):\n{all_lines}\n\n"
             f"Options:\n"
             f"*1.* Checkout one of them first, then retry\n"
             f"*2.* Pick a different room\n\n"

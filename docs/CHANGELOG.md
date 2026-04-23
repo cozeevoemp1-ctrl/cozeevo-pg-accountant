@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.8] — 2026-04-23 — Room transfer: unblock confirm step + count day-wise stays + e2e test
+
+### Root cause #1 — UnboundLocalError on rent step
+`resolve_pending_action` re-imports `_save_pending` locally in 11 branches. Python's lexical scoping treats any name assigned anywhere in a function as **local for the entire function**, so bare `_save_pending` calls in the ROOM_TRANSFER step machine raised `UnboundLocalError` whenever no earlier branch had executed its local import. Symptom: at the rent confirm prompt, replying "1" triggered the resolver to throw, the caller silently swallowed it, bot replied "I didn't understand that". This was masked by the bed-count refusal in 1.49.4 — no one ever reached the rent step.
+
+### Root cause #2 — day-wise stays not counted
+1.49.4 only counted active long-term `Tenancy` rows. Day-wise guests sleeping in the destination room weren't counted, so a fully-booked day-stay room still looked free.
+
+### Fix (`src/whatsapp/handlers/owner_handler.py`)
+- Top of `resolve_pending_action`: unconditional `from ... import _save_pending` so every branch is safe regardless of which conditional fires.
+- `_finalize_room_transfer`: bed count now sums active `Tenancy` + `DaywiseStay` overlapping today; full-room message lists both groups.
+
+### Test (`tests/test_room_transfer_e2e.py`)
+New e2e harness auto-discovers a partially-occupied multi-bed room + a full one + an active mover, then walks the full flow per `sop_testing.md`:
+- A — PARTIAL: `move X to Y` → disambig → pick → confirm with roommate line → "1" keep rent → "0" no extra deposit → final cancel
+- B — FULL: `move X to Z` → disambig → pick → "Room Z is full (n/max beds)" with occupant list
+- C — garbage at disambig → KEEP_PENDING (pending alive)
+- D — cancel mid-flow → pending resolved cleanly
+
+Safe on live DB (always cancels at final step). All scenarios green.
+
 ## [1.49.7] — 2026-04-23 — Three-tier rent reminders + Rs.200/day late fee
 
 ### Cadence (all delivered via approved Meta templates — no 24h CS-window required)
