@@ -2,6 +2,46 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.1] — 2026-04-23 — First-month rent always prorated (onboarding + DB + Sheet)
+
+Kiran's rule: **first month is always pro rata by check-in date —
+everywhere** (DB, Sheet, Excel, bot, onboarding form). Previously the
+onboarding form's dues calculator and the `first_month_rent_due` helper
+returned full `rent + deposit` without proration, so receptionists had to
+hand-adjust the booking amount whenever someone checked in mid-month.
+
+Formula (canonical, used everywhere now):
+```
+days_billed  = days_in_month - checkin.day + 1
+prorated     = floor(agreed_rent * days_billed / days_in_month)
+rent_due     = prorated + security_deposit   # check-in month
+rent_due     = agreed_rent                   # every other month
+```
+
+### Changes
+- `src/services/rent_schedule.py` — `first_month_rent_due()` now
+  prorates the rent portion before bundling the deposit. New sibling
+  helper `prorated_first_month_rent(agreed_rent, checkin)` returns the
+  rent portion only (for UI breakdowns / form calculators).
+- `static/admin_onboarding.html` — dues calculator prorates the first
+  month automatically for monthly stays; shows breakdown note
+  "(prorata: N/M days from D-Mon, monthly rent ₹X)" when days < full
+  month. Daily stays unchanged (`agreed_rent` is the total). Listeners
+  added for `checkin_date` and `stay_type` so the total recalcs live.
+- `src/api/onboarding_router.py` — `/create` returns prorated
+  `dues_due`; `/approve` RentSchedule rows use the canonical helper
+  (no inline duplicate formula).
+- Callers that propagate automatically via the helper: owner_handler
+  ADD_TENANT, `src/services/payments.py`, `scripts/sync_from_source_sheet.py`.
+- `tests/test_first_month_rent_due.py` — rewritten to assert proration;
+  14/14 green. New parametrized cases cover 30/31/28/29-day months,
+  checkin day 1 (no proration), last day of month, leap year.
+
+### SOP
+- New rule pinned to `memory/feedback_billing_proration.md` — first
+  month is ALWAYS prorated; call `first_month_rent_due()` everywhere,
+  never inline the formula.
+
 ## [1.51.0] — 2026-04-23 — Status rule simplified + notes flow fix + April source alignment
 
 ### Status rule (breaking)

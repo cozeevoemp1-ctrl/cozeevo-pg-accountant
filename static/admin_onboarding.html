@@ -888,22 +888,45 @@
   });
 
   // ── Dues calculator (live) ──────────────────────────────────────────────────
+  // Monthly stay: first-month rent defaults to prorata on check-in date
+  //   prorated = floor(rent * (days_in_month - checkin.day + 1) / days_in_month)
+  // Daily stay: agreed_rent holds the total stay amount — no proration.
   function updateDues() {
     const rent = parseFloat(document.getElementById('agreed_rent').value) || 0;
     const deposit = parseFloat(document.getElementById('security_deposit').value) || 0;
     const booking = parseFloat(document.getElementById('booking_amount').value) || 0;
+    const stayType = document.getElementById('stay_type').value;
+    const checkinStr = document.getElementById('checkin_date').value;
+
+    let firstMonthRent = rent;
+    let prorationNote = '';
+    if (stayType === 'monthly' && checkinStr && rent > 0) {
+      const checkin = new Date(checkinStr + 'T00:00:00');
+      const y = checkin.getFullYear();
+      const m = checkin.getMonth();
+      const day = checkin.getDate();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      const daysBilled = daysInMonth - day + 1;
+      firstMonthRent = Math.floor(rent * daysBilled / daysInMonth);
+      if (firstMonthRent !== rent) {
+        const monthLabel = checkin.toLocaleString('en-IN', { month: 'short' });
+        prorationNote = ` <span style="color:var(--muted);font-size:11px;">(prorata: ${daysBilled}/${daysInMonth} days from ${day}-${monthLabel}, monthly rent ₹${rent.toLocaleString('en-IN')})</span>`;
+      }
+    }
+
     // Deposit already includes maintenance — don't double count
-    const total = rent + deposit - booking;
+    const total = firstMonthRent + deposit - booking;
     const fmt = (v) => `₹${v.toLocaleString('en-IN')}`;
     let lines = [];
-    if (rent) lines.push(`First month rent: ${fmt(rent)}`);
+    if (firstMonthRent) lines.push(`First month rent: ${fmt(firstMonthRent)}${prorationNote}`);
     if (deposit) lines.push(`Security deposit (incl. maintenance): ${fmt(deposit)}`);
     if (booking) lines.push(`Less advance paid: <span style="color:var(--green);">-${fmt(booking)}</span>`);
     document.getElementById('dues-breakdown').innerHTML = lines.join('<br>') || 'Enter amounts above';
     document.getElementById('dues-total').textContent = fmt(Math.max(0, total));
   }
-  ['agreed_rent','security_deposit','maintenance_fee','booking_amount'].forEach(id => {
+  ['agreed_rent','security_deposit','maintenance_fee','booking_amount','checkin_date','stay_type'].forEach(id => {
     document.getElementById(id).addEventListener('input', updateDues);
+    document.getElementById(id).addEventListener('change', updateDues);
   });
   updateDues();
 

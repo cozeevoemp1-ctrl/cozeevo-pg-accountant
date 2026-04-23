@@ -179,8 +179,16 @@ async def create_session(req: CreateSessionRequest, request: Request):
         sharing = req.sharing_type if req.sharing_type else (rt.value if hasattr(rt, 'value') else str(rt or ""))
 
         # Calculate dues
-        # Deposit already includes maintenance — don't double count
-        total_due = float(req.agreed_rent + req.security_deposit - req.booking_amount)
+        # Monthly stay: first-month rent is prorated by default on check-in date.
+        # Daily stay: agreed_rent already holds the total stay amount — no proration.
+        # Deposit already includes maintenance — don't double count.
+        from src.services.rent_schedule import prorated_first_month_rent
+        checkin_for_dues = date.fromisoformat(req.checkin_date)
+        if req.stay_type == "monthly":
+            first_month_rent = float(prorated_first_month_rent(req.agreed_rent, checkin_for_dues))
+        else:
+            first_month_rent = float(req.agreed_rent)
+        total_due = float(first_month_rent + req.security_deposit - req.booking_amount)
         dues_due = max(0, total_due)
 
         # Auto-send onboarding link to tenant via WhatsApp
@@ -773,7 +781,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             session.add(tenancy)
             await session.flush()
 
-            # RentSchedule
+            # RentSchedule — first-month rent prorated by default on check-in
+            # date (canonical helper handles the rule).
             from src.services.rent_schedule import first_month_rent_due
             period = checkin.replace(day=1)
             current_month = date.today().replace(day=1)
