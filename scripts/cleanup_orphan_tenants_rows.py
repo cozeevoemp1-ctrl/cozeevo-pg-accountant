@@ -43,7 +43,7 @@ load_dotenv()
 
 from sqlalchemy import select
 from src.database.db_manager import init_db, get_session
-from src.database.models import Tenant, Tenancy, TenancyStatus
+from src.database.models import Tenant, Tenancy, DaywiseStay, TenancyStatus
 from src.integrations.gsheets import _get_worksheet_sync
 
 
@@ -85,10 +85,10 @@ async def _orphan_rows(only: str | None) -> list[dict]:
 
             if not name and not phone_raw:
                 continue
-            # Only target rows that CLAIM to be active. Anything already
-            # marked Exited/Inactive/etc. is historical and must not be
-            # erased (preserves room/rent for past stays).
-            if status.upper() not in ("ACTIVE", "", "PENDING"):
+            # When --only is used, the user is targeting specific names; bypass
+            # the status guard so rows previously cleaned to INACTIVE can still
+            # be re-touched if extra fields (Sharing/Check-in) leak through.
+            if not only and status.upper() not in ("ACTIVE", "", "PENDING"):
                 continue
             if only and only.lower() not in name.lower():
                 continue
@@ -116,9 +116,24 @@ async def _orphan_rows(only: str | None) -> list[dict]:
             # (Day-wise stays live in the DAY WISE tab — they don't belong
             # in TENANTS even if the person exists in DaywiseStay today.)
             if not has_tenancy:
+                # Distinguish "this person is currently a day-wise guest" from
+                # "this person is gone" — surfaces as different new Status.
+                today_d = date.today()
+                dw_q = select(DaywiseStay).where(
+                    DaywiseStay.checkin_date <= today_d,
+                    DaywiseStay.checkout_date >= today_d,
+                    DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+                )
+                if phone and len(phone) == 10:
+                    dw_q = dw_q.where(DaywiseStay.phone.ilike(f"%{phone}"))
+                else:
+                    dw_q = dw_q.where(DaywiseStay.guest_name.ilike(name))
+                dw_row = (await s.execute(dw_q.limit(1))).scalars().first()
                 orphans.append({
                     "row": ri, "name": name, "phone": phone_raw,
                     "room": room, "status": status,
+                    "is_daywise": dw_row is not None,
+                    "daywise_room": dw_row.room_number if dw_row else None,
                 })
 
     return orphans
@@ -136,33 +151,36 @@ def _apply_cleanup(orphans: list[dict]) -> None:
         except ValueError:
             return -1
 
-    targets = {
-        "room": "",
-        "agreed rent": "",
-        "deposit": "",
-        "booking": "",
-        "maintenance": "",
-        "status": "INACTIVE",
-    }
+    # Fields cleared regardless of state — they describe a long-term tenancy
+    # that no longer exists in DB. Sharing + Check-in are included so a
+    # day-wise guest doesn't show "double" + an old check-in date.
+    clear_fields = ("room", "agreed rent", "deposit", "booking",
+                    "maintenance", "sharing", "check-in")
     notes_idx = col("notes")
     today_iso = date.today().isoformat()
 
     for orphan in orphans:
         ri = orphan["row"]
+        new_status = "DAY-STAY" if orphan.get("is_daywise") else "INACTIVE"
         updates = []
-        for hkey, val in targets.items():
+        for hkey in clear_fields:
             ci = col(hkey)
             if ci >= 0:
-                a1 = gspread_a1(ri, ci + 1)
-                updates.append({"range": a1, "values": [[val]]})
+                updates.append({"range": gspread_a1(ri, ci + 1), "values": [[""]]})
+        status_idx = col("status")
+        if status_idx >= 0:
+            updates.append({"range": gspread_a1(ri, status_idx + 1), "values": [[new_status]]})
         if notes_idx >= 0:
             existing = ws.cell(ri, notes_idx + 1).value or ""
-            note_msg = f"orphan-cleanup {today_iso}"
-            new_note = (existing + " | " + note_msg).strip(" |") if existing else note_msg
+            tag = (f"day-stay in {orphan['daywise_room']} as of {today_iso}"
+                   if orphan.get("is_daywise")
+                   else f"orphan-cleanup {today_iso}")
+            new_note = (existing + " | " + tag).strip(" |") if existing else tag
             updates.append({"range": gspread_a1(ri, notes_idx + 1), "values": [[new_note]]})
         if updates:
             ws.batch_update(updates, value_input_option="USER_ENTERED")
-            print(f"  [write] row {ri} {orphan['name']} (room {orphan['room']}) -> INACTIVE")
+            print(f"  [write] row {ri} {orphan['name']} -> {new_status}"
+                  + (f" (live in DAY WISE room {orphan['daywise_room']})" if orphan.get("is_daywise") else ""))
 
 
 def gspread_a1(row: int, col: int) -> str:
