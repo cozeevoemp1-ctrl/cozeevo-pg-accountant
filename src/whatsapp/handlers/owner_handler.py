@@ -2247,6 +2247,34 @@ async def resolve_pending_action(
 
         return None
 
+    # ── Day-wise room move (simpler: pick guest → dest room → yes/no) ────────
+    if pending.intent == "ROOM_TRANSFER_DW_WHO":
+        try:
+            idx = int(reply_text.strip()) - 1
+            chosen = choices[idx]
+        except (ValueError, IndexError):
+            return "__KEEP_PENDING__Reply with the number of the day-stay guest."
+        return await _finalize_daywise_transfer(
+            pending.phone, int(chosen["daywise_id"]),
+            action_data.get("to_room", ""), session,
+        )
+
+    if pending.intent == "ROOM_TRANSFER_DW_DEST":
+        to_room = reply_text.strip()
+        if not to_room:
+            return "__KEEP_PENDING__Reply with the destination room number."
+        return await _finalize_daywise_transfer(
+            pending.phone, int(action_data["daywise_id"]), to_room, session,
+        )
+
+    if pending.intent == "ROOM_TRANSFER_DW_CONFIRM":
+        if is_negative(reply_text):
+            return "Day-stay move cancelled."
+        if is_affirmative(reply_text) or reply_text.strip() == "1":
+            action_data["changed_by"] = pending.phone
+            return await _do_daywise_transfer(action_data, session)
+        return "__KEEP_PENDING__Reply *yes* to confirm or *no* to cancel."
+
     # ── Assign Room step-by-step ─────────────────────────────────────────────
     if pending.intent == "ASSIGN_ROOM_STEP" and action_data.get("step"):
         step = action_data["step"]
@@ -2383,6 +2411,7 @@ async def resolve_pending_action(
         "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "DEPOSIT_CHANGE_WHO",
         "ROOM_TRANSFER_WHO", "ROOM_TRANSFER_DEST",
+        "ROOM_TRANSFER_DW_WHO", "ROOM_TRANSFER_DW_DEST", "ROOM_TRANSFER_DW_CONFIRM",
         "FIELD_UPDATE_WHO",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
     ):
@@ -5310,7 +5339,8 @@ async def _rules(entities: dict, ctx: CallerContext, session: AsyncSession) -> s
 # ── Vacant rooms ──────────────────────────────────────────────────────────────
 
 async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Initiate moving a tenant from their current room to a new one."""
+    """Initiate moving a tenant from their current room to a new one.
+    Works for both monthly tenants and day-wise guests."""
     name   = entities.get("name", "").strip()
     to_room = entities.get("room", "").strip()
 
@@ -5329,6 +5359,25 @@ async def _room_transfer_prompt(entities: dict, ctx: CallerContext, session: Asy
 
     rows = await _find_active_tenants_by_name(name, session)
     if not rows:
+        # Day-wise guest fallback: Lokesh uses "move X to Y" for short-stay
+        # guests too. They live in DaywiseStay, not Tenancy.
+        from src.whatsapp.handlers._shared import _find_active_daywise_by_name
+        dw_rows = await _find_active_daywise_by_name(name, session)
+        if dw_rows:
+            if len(dw_rows) > 1:
+                choices = [
+                    {"daywise_id": d.id, "label": f"{d.guest_name} (Room {d.room_number}, day-stay till {d.checkout_date})"}
+                    for d in dw_rows
+                ]
+                await _save_pending(
+                    ctx.phone, "ROOM_TRANSFER_DW_WHO",
+                    {"to_room": to_room}, choices, session,
+                )
+                lines = "\n".join(f"*{i+1}.* {c['label']}" for i, c in enumerate(choices))
+                return f"Found {len(choices)} day-wise guests matching *{name}*:\n\n{lines}\n\nReply *1*-*{len(choices)}*."
+            return await _finalize_daywise_transfer(
+                ctx.phone, dw_rows[0].id, to_room, session,
+            )
         suggestions = await _find_similar_names(name, session)
         return _format_no_match_message(name, suggestions)
     if len(rows) > 1:
@@ -5446,6 +5495,119 @@ async def _finalize_room_transfer(
         f"*1.* Keep current (Rs.{current_rent:,})\n"
         "*2.* Enter new amount\n\n"
         "or *no* to cancel."
+    )
+
+
+async def _finalize_daywise_transfer(
+    phone: str, daywise_id: int, to_room: str, session: AsyncSession,
+) -> str:
+    """Move a day-wise guest to another room. No rent/deposit flow —
+    day-wise rate stays, only the room assignment changes. Respects the
+    same bed-count rule as monthly transfers (Tenancy + overlapping
+    DaywiseStay vs Room.max_occupancy)."""
+    from src.database.models import DaywiseStay
+    dw = await session.get(DaywiseStay, daywise_id)
+    if not dw:
+        return "Day-wise guest record not found."
+
+    if not to_room:
+        await _save_pending(phone, "ROOM_TRANSFER_DW_DEST",
+                            {"daywise_id": dw.id, "guest_name": dw.guest_name,
+                             "from_room": dw.room_number}, [], session)
+        return (
+            f"Moving day-stay guest *{dw.guest_name}* from Room *{dw.room_number}*.\n\n"
+            "Which room should they move to? (Reply with room number)"
+        )
+
+    new_room = await session.scalar(
+        select(Room).where(Room.room_number == to_room.upper(), Room.active == True)
+    )
+    if not new_room:
+        return f"Room *{to_room}* not found. Check the room number and try again."
+
+    # Bed-count: active Tenancy + active DaywiseStay overlapping today,
+    # excluding this daywise row itself (in case it's already in `new_room`).
+    from src.database.models import DaywiseStay as _DW
+    _today = date.today()
+    occupied_rows = (await session.execute(
+        select(Tenant.name, Tenant.phone).where(
+            Tenancy.room_id == new_room.id,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.tenant_id == Tenant.id,
+        )
+    )).all()
+    daywise_rows = (await session.execute(
+        select(_DW.guest_name, _DW.checkout_date)
+        .where(
+            _DW.room_number == new_room.room_number,
+            _DW.checkin_date <= _today,
+            _DW.checkout_date >= _today,
+            _DW.status.notin_(["EXIT", "CANCELLED"]),
+            _DW.id != dw.id,
+        )
+    )).all()
+    max_occ = int(new_room.max_occupancy or 1)
+    occ_total = len(occupied_rows) + len(daywise_rows)
+    if occ_total >= max_occ:
+        occ_lines = "\n".join(f"  - {r[0]} ({r[1]})" for r in occupied_rows)
+        dw_lines = "\n".join(f"  - {r[0]} (day-stay till {r[1]})" for r in daywise_rows)
+        all_lines = "\n".join(x for x in (occ_lines, dw_lines) if x)
+        return (
+            f"Room *{to_room}* is *full* ({occ_total}/{max_occ} beds):\n{all_lines}\n\n"
+            f"_Checkout one of them first, then retry moving {dw.guest_name}._"
+        )
+
+    action_data = {
+        "daywise_id": dw.id,
+        "guest_name": dw.guest_name,
+        "from_room": dw.room_number,
+        "to_room_number": new_room.room_number,
+    }
+    await _save_pending(phone, "ROOM_TRANSFER_DW_CONFIRM", action_data, [], session)
+    roommate_note = ""
+    names = [r[0] for r in occupied_rows] + [r[0] for r in daywise_rows]
+    if names:
+        roommate_note = f"Sharing with: {', '.join(names)} ({occ_total+1}/{max_occ} beds)\n"
+    return (
+        f"*Move day-stay guest — {dw.guest_name}*\n"
+        f"From: Room *{dw.room_number}*\n"
+        f"To:   Room *{new_room.room_number}*\n"
+        f"{roommate_note}"
+        f"Day-stay till: {dw.checkout_date}\n\n"
+        "Reply *yes* to confirm or *no* to cancel."
+    )
+
+
+async def _do_daywise_transfer(action_data: dict, session: AsyncSession) -> str:
+    """Apply a confirmed day-wise room move + audit log."""
+    from src.database.models import DaywiseStay, AuditLog
+    dw = await session.get(DaywiseStay, action_data["daywise_id"])
+    if not dw:
+        return "Day-wise guest record not found."
+
+    old_room = action_data["from_room"]
+    new_room_number = action_data["to_room_number"]
+    guest_name = action_data["guest_name"]
+
+    dw.room_number = new_room_number
+
+    session.add(AuditLog(
+        changed_by=action_data.get("changed_by", "system"),
+        entity_type="daywise_stay",
+        entity_id=dw.id,
+        entity_name=guest_name,
+        field="room_number",
+        old_value=old_room,
+        new_value=new_room_number,
+        room_number=new_room_number,
+        source="whatsapp",
+        note=f"Day-wise room move: {old_room} -> {new_room_number}",
+    ))
+
+    # Sheet sync is best-effort — day-wise tab gets rebuilt nightly anyway.
+    return (
+        f"Day-stay room moved — *{guest_name}*\n"
+        f"Room *{old_room}* -> Room *{new_room_number}*"
     )
 
 

@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.10] — 2026-04-23 — Room transfer: day-wise guests (Pranav in 308)
+
+### Root cause
+`_room_transfer_prompt` only searched `Tenancy`. Day-wise guests live in `DaywiseStay`. Lokesh's target Pranav Sonawane was a day-stay in 308 (till 25-Apr), so lookup came back empty → "No active tenant found matching Pranav Sonawane". Same hole everywhere day-wise guests aren't first-class in the lookup helpers — per `feedback_sync_all_outputs.md`, new features must also work for day-wise.
+
+### Fix
+- **`src/whatsapp/handlers/_shared.py`**: new `_find_active_daywise_by_name(name, session)` — mirrors the tenant lookup (first-word, full-name, substring tiers) but over `DaywiseStay` where today is between `checkin_date` and `checkout_date` and status is not EXIT/CANCELLED.
+- **`src/whatsapp/handlers/owner_handler.py`**: `_room_transfer_prompt` now falls back to the day-wise lookup when no active tenancy matches. Two new helpers wire the flow:
+  - `_finalize_daywise_transfer(phone, daywise_id, to_room, session)` — validates destination (bed count includes both `Tenancy` and overlapping `DaywiseStay` against `max_occupancy`) and saves a `ROOM_TRANSFER_DW_CONFIRM` pending with a plain yes/no prompt (no rent/deposit step — day-wise rate stays).
+  - `_do_daywise_transfer(action_data, session)` — updates `DaywiseStay.room_number` + writes an `AuditLog`.
+- Resolver branches for `ROOM_TRANSFER_DW_WHO` (disambig), `ROOM_TRANSFER_DW_DEST` (name given without room), and `ROOM_TRANSFER_DW_CONFIRM` (yes/no). All three added to the pending-takeover whitelist.
+
+### Coverage
+- Monthly room-transfer e2e still green (`tests/test_room_transfer_e2e.py`).
+- Live DB verified: `_find_active_daywise_by_name('Pranav Sonawane')` returns id=188, room 308, till 2026-04-25.
+
 ## [1.49.9] — 2026-04-23 — Room transfer: extract name correctly (was "Move Pranav")
 
 ### Root cause
