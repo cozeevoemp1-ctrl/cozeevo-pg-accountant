@@ -17,10 +17,14 @@ Plan: docs/superpowers/plans/2026-04-23-phase2-handler-refactor.md
 """
 from __future__ import annotations
 
-from .onboarding import resolve_approve_onboarding
+from .onboarding import (
+    resolve_approve_onboarding,
+    resolve_confirm_checkin_arrival,
+)
 
 # Intents not yet in the dispatch table fall back to the legacy if/elif chain
 # in owner_handler.resolve_pending_action. Phase 2B/2C migrate the rest.
 PENDING_RESOLVERS: dict = {
-    "APPROVE_ONBOARDING": resolve_approve_onboarding,
+    "APPROVE_ONBOARDING":        resolve_approve_onboarding,
+    "CONFIRM_CHECKIN_ARRIVAL":   resolve_confirm_checkin_arrival,
 }

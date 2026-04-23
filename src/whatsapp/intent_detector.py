@@ -309,6 +309,15 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # High-priority PAYMENT_LOG — "Name paid N cash/upi" must win even when
     # the message also contains "update notes ..." (combined command).
     (re.compile(rf"\b(?:p[ai]{{0,2}}j?[ai]{{0,2}}d|paied)\s+\d[\d,k]+\s+(?:{_MODES_CORE})", re.I), "PAYMENT_LOG", 0.96),
+    # CHECKIN_ARRIVAL — receptionist marks a no-show tenant as arrived.
+    # Accepts: "Ajay arrived", "mark Ajay arrived", "Ajay is here",
+    # "checkin arrival Ajay", "confirm arrival Ajay". Deliberately does NOT
+    # match bare "check in Ajay" — that overlaps ADD_TENANT's "new checkin"
+    # phrase at line ~290. Runtime fallback: if ADD_TENANT handler finds the
+    # named person is already a no_show tenancy, it redirects to CHECKIN_ARRIVAL.
+    # The negative lookahead excludes date-style "arrived on 5 March" which is
+    # actually an UPDATE_CHECKIN.
+    (re.compile(r"\b(?:mark\s+\w+\s+(?:as\s+)?(?:arrived|checked\s*in|here)|\w+\s+(?:has\s+)?arrived(?:\s+(?:today|yesterday))?$|\w+\s+is\s+here|confirm\s+arrival|check.?in\s+arrival)\b(?!.*\b(?:was\s+on|on\s+\d|dated?|date)\b)", re.I), "CHECKIN_ARRIVAL", 0.94),
     # Update tenant permanent notes / agreement
     (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
     # One-shot clear: "delete/clear/remove notes for 603" — handler short-circuits to confirm.

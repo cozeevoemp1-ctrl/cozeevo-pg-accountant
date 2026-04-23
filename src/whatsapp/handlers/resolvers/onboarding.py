@@ -5,6 +5,7 @@ See plan: docs/superpowers/plans/2026-04-23-phase2-handler-refactor.md
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -134,3 +135,109 @@ async def resolve_approve_onboarding(
         return "Onboarding rejected."
 
     return "__KEEP_PENDING__Reply *yes* to approve or *no* to reject."
+
+
+async def resolve_confirm_checkin_arrival(
+    pending: PendingAction,
+    reply_text: str,
+    session: AsyncSession,
+    action_data: dict,
+    choices: list,
+    *,
+    media_id: Optional[str] = None,
+    media_type: Optional[str] = None,
+    media_mime: Optional[str] = None,
+) -> Optional[str]:
+    """Flip a no-show tenancy to active when receptionist confirms arrival.
+
+    Writes Tenancy.status = active + audit_log + triggers monthly sheet sync
+    (so the NO-SHOW row becomes an active CHECKIN) + TENANTS master sync.
+    Optionally updates checkin_date to today if the booking was for a future
+    date (so sheet shows actual arrival, not booking).
+    """
+    from src.database.models import Tenancy, TenancyStatus, AuditLog
+    from src.whatsapp.handlers._shared import is_affirmative, is_negative
+
+    ans = reply_text.strip().lower()
+    if is_negative(ans):
+        return "Cancelled. Tenancy stays as no-show."
+    if not is_affirmative(ans):
+        return "__KEEP_PENDING__Reply *Yes* to mark as arrived or *No* to cancel."
+
+    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+    if not tenancy:
+        return "Tenancy not found — may have been already checked in."
+    if tenancy.status != TenancyStatus.no_show:
+        return (
+            f"*{action_data['tenant_name']}* is already "
+            f"{tenancy.status.value if hasattr(tenancy.status, 'value') else tenancy.status}. "
+            f"No change."
+        )
+
+    today = date.today()
+    old_checkin = tenancy.checkin_date
+    old_status = "no_show"
+
+    # If the tenant arrived earlier than their booked date, keep booked_checkin
+    # (it's the agreement). If booked_checkin is in the future, fast-forward to
+    # today so sheet reflects the actual arrival.
+    if tenancy.checkin_date and tenancy.checkin_date > today:
+        tenancy.checkin_date = today
+
+    tenancy.status = TenancyStatus.active
+
+    session.add(AuditLog(
+        changed_by=action_data.get("confirmed_by", "system"),
+        entity_type="tenancy",
+        entity_id=tenancy.id,
+        entity_name=action_data.get("tenant_name", ""),
+        field="status",
+        old_value=old_status,
+        new_value="active",
+        room_number=action_data.get("room_number", ""),
+        source="whatsapp",
+        notes=(
+            f"arrival confirmed; booked_checkin={old_checkin.isoformat() if old_checkin else '-'}, "
+            f"actual={tenancy.checkin_date.isoformat() if tenancy.checkin_date else '-'}"
+        ),
+    ))
+
+    # DB → sheet: TENANTS master row (status, checkin) + current monthly tab
+    # (NO-SHOW row → CHECKIN row). Fire-and-forget — scheduled retry queue
+    # handles failures (see Phase 2D).
+    try:
+        import asyncio
+        from src.integrations.gsheets import (
+            sync_tenant_all_fields as _sta,
+            trigger_monthly_sheet_sync as _tms,
+        )
+        asyncio.create_task(_sta(tenancy.tenant_id))
+        _tms(today.month, today.year)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).error(
+            "Sheet sync failed after CHECKIN_ARRIVAL for tenancy %s", tenancy.id
+        )
+
+    # Notify tenant
+    try:
+        from src.database.models import Tenant
+        tenant = await session.get(Tenant, tenancy.tenant_id)
+        if tenant and tenant.phone:
+            from src.whatsapp.webhook_handler import _send_whatsapp
+            await _send_whatsapp(
+                tenant.phone,
+                f"Welcome, {tenant.name}! Your check-in has been confirmed at Cozeevo.",
+            )
+    except Exception:
+        pass
+
+    new_ci = tenancy.checkin_date.strftime("%d %b %Y") if tenancy.checkin_date else "-"
+    ff_note = ""
+    if old_checkin and old_checkin != tenancy.checkin_date:
+        ff_note = f" (booking was {old_checkin.strftime('%d %b %Y')}, arrived early)"
+    return (
+        f"*{action_data['tenant_name']}* marked as arrived ✓\n"
+        f"Room {action_data.get('room_number', '?')} — check-in {new_ci}{ff_note}\n"
+        f"Status: ACTIVE. Sheets updating."
+    )

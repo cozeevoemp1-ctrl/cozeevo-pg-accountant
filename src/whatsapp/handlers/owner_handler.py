@@ -86,6 +86,7 @@ async def handle_owner(
         "CHECKOUT":           _checkout_prompt,
         "SCHEDULE_CHECKOUT":  _checkout_prompt,   # same handler — date in entities distinguishes
         "UPDATE_CHECKIN":     _update_checkin,
+        "CHECKIN_ARRIVAL":    _checkin_arrival,
         "UPDATE_CHECKOUT_DATE": _update_checkout_date,
         "NOTICE_GIVEN":       _notice_given,
         "ADD_PARTNER":        _add_partner,
@@ -4075,6 +4076,97 @@ async def _update_checkin(entities: dict, ctx: CallerContext, session: AsyncSess
     choices = _make_choices(rows)
     await _save_pending(ctx.phone, "UPDATE_CHECKIN", action_data, choices, session)
     return _format_choices_message(search_term, choices, f"update checkin to {new_checkin.strftime('%d %b %Y')}")
+
+
+async def _checkin_arrival(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Receptionist marks a no-show tenant as arrived → flip status to active.
+
+    Triggered by "Ajay arrived", "mark Ajay as arrived", "Ajay is here",
+    "confirm arrival Ajay". The tenancy must currently be status=no_show.
+    On confirm Yes, resolve_confirm_checkin_arrival (resolvers/onboarding.py)
+    flips DB status + writes audit log + triggers monthly sheet sync so
+    the NO-SHOW row becomes an active CHECKIN row.
+    """
+    name = entities.get("name", "").strip()
+    room = entities.get("room", "").strip()
+
+    if not name and not room:
+        return (
+            "Who arrived? Say *[Name] arrived* or *mark [Name] as arrived*.\n"
+            "Example: *Ajay arrived* or *mark Ajay as arrived*"
+        )
+
+    # Look up no_show tenancies matching name/room.
+    rows: list = []
+    if name:
+        first_word = name.split()[0] if name.split() else name
+        result = await session.execute(
+            select(Tenant, Tenancy, Room)
+            .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Tenant.name.ilike(f"{first_word}%"),
+                Tenancy.status == TenancyStatus.no_show,
+            )
+            .order_by(Tenancy.checkin_date.asc())
+        )
+        seen_tenants: set = set()
+        for row in result.all():
+            if row[0].id not in seen_tenants:
+                seen_tenants.add(row[0].id)
+                rows.append(row)
+
+    if not rows and room:
+        result = await session.execute(
+            select(Tenant, Tenancy, Room)
+            .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Room.room_number == room,
+                Tenancy.status == TenancyStatus.no_show,
+            )
+            .order_by(Tenancy.checkin_date.asc())
+        )
+        rows = list(result.all())
+
+    if not rows:
+        return (
+            f"No no-show booking found for *{name or ('Room ' + room)}*.\n"
+            f"If they're already checked in, use: *{name or 'name'} paid <amount> <cash/upi>*\n"
+            f"If this is a new tenant, use: *add tenant {name or '<name>'} <phone> room <X>*"
+        )
+
+    if len(rows) == 1:
+        tenant, tenancy, room_obj = rows[0]
+        ci_str = tenancy.checkin_date.strftime("%d %b %Y") if tenancy.checkin_date else "—"
+        action_data = {
+            "tenant_id": tenant.id,
+            "tenancy_id": tenancy.id,
+            "tenant_name": tenant.name,
+            "room_number": room_obj.room_number,
+            "booked_checkin": tenancy.checkin_date.isoformat() if tenancy.checkin_date else "",
+            "confirmed_by": ctx.name or ctx.phone,
+        }
+        await _save_pending(ctx.phone, "CONFIRM_CHECKIN_ARRIVAL", action_data, [], session)
+        return (
+            f"*Mark as arrived — {tenant.name}* (Room {room_obj.room_number})\n"
+            f"Booked check-in : {ci_str}\n"
+            f"New status       : ACTIVE\n\n"
+            f"Reply *Yes* to confirm or *No* to cancel."
+        )
+
+    # Multiple no-show tenancies match — ask for a more specific identifier.
+    # (Disambig flow deferred to a later iteration; receptionist can use room
+    # number or full name to pick a single match.)
+    names_list = "\n".join(
+        f"  • {t.name} (Room {rm.room_number}, booked {tn.checkin_date.strftime('%d %b') if tn.checkin_date else '?'})"
+        for t, tn, rm in rows
+    )
+    return (
+        f"Multiple no-show bookings match *{name or room}*:\n{names_list}\n\n"
+        "Please be more specific — include room number or full name.\n"
+        "Example: *Ajay room 213 arrived*"
+    )
 
 
 async def _do_update_checkin(
