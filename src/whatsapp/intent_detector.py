@@ -285,6 +285,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:complaint|complain|issue|problem|not working|broken|leak(?:ing)?\b|fix|tap|flush|bulb|fan|switch|slow net|food (?:complaint|bad|issue|quality)|bed sheet|mattress|pillow|chair|table|shelf|almirah|\bAC\b|air.?condition|toilet|blocked|door\s*lock|kharab\b|pest\b|wifi\s+(?:not|issue|problem|broken|slow)|internet\s+(?:not|issue|problem|down|slow))", re.I), "COMPLAINT_REGISTER", 0.88),
     # PG rules & regulations
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
+    # High-priority PAYMENT_LOG — "Name paid N cash/upi" must win even when
+    # the message also contains "update notes ..." (combined command).
+    (re.compile(r"\b(?:p[ai]{0,2}j?[ai]{0,2}d|paied)\s+\d[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|naqad)", re.I), "PAYMENT_LOG", 0.96),
     # Update tenant permanent notes / agreement
     (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
     # One-shot clear: "delete/clear/remove notes for 603" — handler short-circuits to confirm.
@@ -718,6 +721,25 @@ def _extract_entities(text: str, intent: str) -> dict:
                 entities["upi_amount"]    = upi_amt
                 entities["amount"]        = cash_amt + upi_amt
                 entities["payment_mode"]  = "split"
+
+        # Combined command: payment + tenant-notes update in one message.
+        # Syntax:
+        #   "...and clear/delete/remove/wipe notes"  → tenant_note_action=clear
+        #   "...and update/set notes to <text>"      → tenant_note_action=set
+        # Applied after payment confirm-Yes in the resolver.
+        _m_clear = re.search(
+            r"\b(?:and\s+)?(?:clear|delete|remove|wipe|reset)\s+(?:tenant\s+)?notes?\b",
+            text, re.I,
+        )
+        _m_set = re.search(
+            r"\b(?:and\s+)?(?:update|set|change|replace)\s+(?:tenant\s+)?notes?\s+(?:to|with|:)\s*(.+?)\s*$",
+            text, re.I,
+        )
+        if _m_set:
+            entities["tenant_note_action"] = "set"
+            entities["tenant_note_text"] = _m_set.group(1).strip().strip('"\'')
+        elif _m_clear:
+            entities["tenant_note_action"] = "clear"
 
     # Extract expense category (for ADD_EXPENSE — avoids unnecessary "choose category" prompt)
     if intent == "ADD_EXPENSE":

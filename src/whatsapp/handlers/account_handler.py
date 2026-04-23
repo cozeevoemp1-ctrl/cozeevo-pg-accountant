@@ -123,6 +123,10 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     # Free-text note the user tacked on (e.g. "... note: cleared Mar bounce").
     # Stored on Payment.notes alongside the standard "Logged via WhatsApp" tag.
     user_note = (entities.get("note") or "").strip()
+    # Combined-command: tenant notes update alongside payment.
+    # Set by intent_detector when message contains "and clear/update notes".
+    tenant_note_action = (entities.get("tenant_note_action") or "").strip().lower()
+    tenant_note_text = (entities.get("tenant_note_text") or "").strip()
     # Split-mode detection — e.g. "Diya paid 3000 cash 3000 upi".
     # entities set by intent_detector._extract_entities; amount is already the sum.
     _split      = bool(entities.get("split_payment"))
@@ -201,6 +205,8 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
                 "tenant_name": tenant.name,
                 "room_number": _room.room_number,
                 "user_note": user_note or None,
+                "tenant_note_action": tenant_note_action or None,
+                "tenant_note_text": tenant_note_text or None,
             }
             if _split:
                 _pdata["split_payment"] = True
@@ -241,6 +247,8 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
             "tenant_name": tenant.name,
             "room_number": _room.room_number,
             "user_note": user_note or None,
+            "tenant_note_action": tenant_note_action or None,
+            "tenant_note_text": tenant_note_text or None,
         }
 
         # If multi-month dues, include month data for override parsing

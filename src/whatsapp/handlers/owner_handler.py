@@ -140,6 +140,61 @@ async def handle_owner(
 
 # ── Pending action resolver (called from chat_api before intent detection) ────
 
+
+async def _apply_tenant_notes_from_payment(action_data: dict, session: AsyncSession) -> str:
+    """Combined command: apply tenant-notes update after payment log succeeds.
+
+    action_data["tenant_note_action"] may be "clear" or "set"; for "set",
+    action_data["tenant_note_text"] holds the new text. Returns a suffix
+    string to append to the bot reply, or "" if no action requested.
+
+    Writes to Tenancy.notes + audit_log + syncs TENANTS master + monthly tab.
+    """
+    act = (action_data.get("tenant_note_action") or "").lower()
+    if act not in ("clear", "set"):
+        return ""
+    from src.database.models import Tenancy, AuditLog
+    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+    if not tenancy:
+        return ""
+    old_notes = tenancy.notes
+    new_notes = action_data.get("tenant_note_text") if act == "set" else None
+    if act == "set" and not (new_notes or "").strip():
+        return ""
+    tenancy.notes = new_notes
+    session.add(AuditLog(
+        changed_by=action_data.get("logged_by", "system"),
+        entity_type="tenancy",
+        entity_id=tenancy.id,
+        entity_name=action_data.get("tenant_name", ""),
+        field="notes",
+        old_value=old_notes,
+        new_value=new_notes,
+        room_number=action_data.get("room_number", ""),
+        source="whatsapp",
+    ))
+    try:
+        from src.integrations.gsheets import sync_tenants_tab_notes, update_notes
+        import asyncio as _aio
+        _nv = new_notes or ""
+        _aio.create_task(sync_tenants_tab_notes(
+            action_data.get("room_number", ""),
+            action_data.get("tenant_name", ""),
+            _nv,
+        ))
+        _aio.create_task(update_notes(
+            action_data.get("room_number", ""),
+            action_data.get("tenant_name", ""),
+            _nv,
+        ))
+    except Exception as _e:
+        import logging as _log
+        _log.getLogger(__name__).error("Notes sheet sync failed in combined flow: %s", _e)
+    if act == "clear":
+        return "\nNotes cleared."
+    return f'\nNotes updated: "{new_notes}"'
+
+
 async def resolve_pending_action(
     pending: PendingAction, reply_text: str, session: AsyncSession,
     media_id: str | None = None, media_type: str | None = None, media_mime: str | None = None,
@@ -1096,6 +1151,8 @@ async def resolve_pending_action(
                     session=session,
                     user_note=action_data.get("user_note") or "",
                 )
+            # Combined command: apply tenant-notes update if requested.
+            result += await _apply_tenant_notes_from_payment(action_data, session)
             # Start receipt collection
             from src.whatsapp.handlers._shared import _save_pending as _sp_r
             await _sp_r(pending.phone, "COLLECT_RECEIPT", {
@@ -1218,7 +1275,10 @@ async def resolve_pending_action(
                 )
                 month_label = date.fromisoformat(alloc["period"]).strftime("%b %Y")
                 results.append(f"{month_label}: Rs.{int(alloc['amount']):,} -- {r}")
-            return "\n".join(results) or f"Payment of Rs.{int(action_data.get('amount') or 0):,} logged."
+            reply = "\n".join(results) or f"Payment of Rs.{int(action_data.get('amount') or 0):,} logged."
+            # Combined command: apply tenant-notes update if requested.
+            reply += await _apply_tenant_notes_from_payment(action_data, session)
+            return reply
 
         # Try override parsing
         pending_months_raw = action_data.get("pending_months", [])
