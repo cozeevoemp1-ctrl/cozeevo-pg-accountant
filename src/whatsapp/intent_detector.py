@@ -71,6 +71,17 @@ class IntentResult:
     alternatives: list[str]  = field(default_factory=list)   # set when intent == "AMBIGUOUS"
 
 
+# ── Payment-mode tokens (centralized) ────────────────────────────────────────
+# Previously duplicated inline across ~17 regexes. Update here once to register
+# a new mode (bot, expense, PAYMENT_LOG, ADD_EXPENSE shortcuts all follow).
+_MODES_CORE = "cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|naqad"
+_MODES_WITH_CHEQUE = _MODES_CORE + "|cheque"
+# Split-payment sub-groups (cash-side vs upi-side) — used only by the split
+# parser in _extract_entities, where we need to classify each leg.
+_SPLIT_CASH_MODES = "cash|naqad"
+_SPLIT_UPI_MODES = r"upi|gpay|phonepe|paytm|online|netbanking|net\s*banking|neft|imps|transfer"
+
+
 # ── Owner / Power-user intents ────────────────────────────────────────────────
 
 _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
@@ -110,6 +121,12 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:add|save)\s+(?!tenant|tenent|room|expense|partner|staff|refund)(?:\w+\s+){0,5}\d{7,}", re.I), "ADD_CONTACT", 0.94),
     # UPDATE_CONTACT — change phone/notes for existing vendor contact
     (re.compile(r"(?:update|edit|change|modify)\s+(?:contact|vendor|supplier)\b", re.I), "UPDATE_CONTACT", 0.95),
+    # UPDATE_PHONE — tenant phone update. MUST come before the generic
+    # UPDATE_CONTACT pattern below, which also matches "phone" and was
+    # stealing `change <tenant-name> phone to <number>`. Negative lookahead
+    # `(?!contact|vendor|supplier)` prevents this from stealing
+    # `change contact X phone to Y`.
+    (re.compile(r"(?:change|update|set|modify)\s+(?!contact\b|vendor\b|supplier\b)(?:\w+\s+){0,4}?(?:phone|mobile|number|cell)\s+(?:to\s+)?\+?\d", re.I), "UPDATE_PHONE", 0.95),
     # "notes" routes to UPDATE_TENANT_NOTES (line ~287), not here. Keeping
     # contact/phone/comment only avoids stealing "update notes for <room>".
     (re.compile(r"(?:update|edit|change|modify)\s+(?!tenant)(?:\w+\s+){0,5}(?:contact|number|phone|comment)\b", re.I), "UPDATE_CONTACT", 0.93),
@@ -136,7 +153,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # went to UNKNOWN intent ("I didn't understand that").
     (re.compile(r"(?:change|update|set|modify|switch)\s+(?:\w+\s+){0,4}?(?:sharing\s*(?:type)?|sharing)\s+(?:to\s+)?(?:premium|single|double|triple)|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing", re.I), "UPDATE_SHARING_TYPE", 0.94),
     (re.compile(r"(?:change|update|set|modify|revise)\s+(?:\w+\s+){0,4}?rent\s+(?:to\s+)?\d|(?:\w+)\s+rent\s+(?:is|=|should\s+be)\s+\d", re.I), "UPDATE_RENT", 0.93),
-    (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+){0,4}?(?:phone|mobile|number|cell)\s+(?:to\s+)?\+?\d", re.I), "UPDATE_PHONE", 0.93),
+    # UPDATE_PHONE moved up (before UPDATE_CONTACT at line ~115) — see note there.
     (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+){0,4}?gender\s+(?:to\s+)?(?:male|female)|(?:\w+)\s+(?:is\s+)?(?:male|female)", re.I), "UPDATE_GENDER", 0.93),
     # UPDATE_DEPOSIT removed — DEPOSIT_CHANGE (line ~88) handles this with full account_handler flow
     (re.compile(r"(?:show|check|view|get|who)\s+(?:changes?|audit|history|log|modified|updated)\s+(?:for|of|on|to)?\s*(?:room|tenant)?|(?:changes?|audit|history)\s+(?:for|of)\s+\w+|what\s+changed|audit\s+log|who\s+changed\s+\w+", re.I), "QUERY_AUDIT", 0.92),
@@ -199,7 +216,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Expense (add new expense — must come before PAYMENT_LOG)
     (re.compile(r"(?:expense|electricity\s+(?:bill\s+)?\d|water\s+bill|internet\s+bill|salary|maintenance\s+cost|paid\s+for|vendor|repair\s+\d|\d+\s+repair|generator\s+(?:maintenance|fuel|diesel|repair|rent|bill|expense|cost)\b|diesel\s+\d|\d+\s+diesel)", re.I), "ADD_EXPENSE", 0.88),
     # Amount-first expense shorthand: "5000 cash maintenance", "3000 upi electricity"
-    (re.compile(r"^\d[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|naqad)\s+(?:maintena?na?ce?|cleaning|repair|electricity|water|internet|generator|groceries?|housekeeping|supplies|security|pest|plumbing|painting|furniture|food)\b", re.I), "ADD_EXPENSE", 0.92),
+    (re.compile(rf"^\d[\d,k]+\s+(?:{_MODES_CORE})\s+(?:maintena?na?ce?|cleaning|repair|electricity|water|internet|generator|groceries?|housekeeping|supplies|security|pest|plumbing|painting|furniture|food)\b", re.I), "ADD_EXPENSE", 0.92),
     # Early QUERY_DUES — explicit patterns before QUERY_TENANT grabs "outstanding"/"month" as a name
     (re.compile(
         r"(?:outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
@@ -291,7 +308,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
     # High-priority PAYMENT_LOG — "Name paid N cash/upi" must win even when
     # the message also contains "update notes ..." (combined command).
-    (re.compile(r"\b(?:p[ai]{0,2}j?[ai]{0,2}d|paied)\s+\d[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|naqad)", re.I), "PAYMENT_LOG", 0.96),
+    (re.compile(rf"\b(?:p[ai]{{0,2}}j?[ai]{{0,2}}d|paied)\s+\d[\d,k]+\s+(?:{_MODES_CORE})", re.I), "PAYMENT_LOG", 0.96),
     # Update tenant permanent notes / agreement
     (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
     # One-shot clear: "delete/clear/remove notes for 603" — handler short-circuits to confirm.
@@ -300,7 +317,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:notes?|agreement|agreed\s+terms?|payment\s+method|cash\s+only|rent\s+terms?|terms?)\s+(?:for\s+|of\s+)?(?:room\s+)?[\w-]+|(?:check|show|get|what(?:'?s|\s+is)?)\s+(?:the\s+)?(?:notes?|agreement|terms?|payment\s+method)\s+(?:for\s+|of\s+)?[\w\s-]+|room\s+[\w-]+\s+(?:notes?|terms?|agreement|payment\s+method|cash\s+only)|(?:notes?|agreement|terms?)\s+room\s+[\w-]+", re.I), "GET_TENANT_NOTES", 0.93),
     # Expense category shorthand "Category Amount [Mode]" — MUST come before PAYMENT_LOG shorthand
     # With payment mode (e.g. "maintenance 3000 upi")
-    (re.compile(r"^(?:maintena?na?ce?|maintanace|maintanance|cleaning|repairs?|furniture|plumbing|painting|pest\s*(?:control)?|food\s+(?:supplies?|expense|stuff)|internet|generator|groceries?|housekeeping|supplies|security)\s+[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "ADD_EXPENSE", 0.94),
+    (re.compile(rf"^(?:maintena?na?ce?|maintanace|maintanance|cleaning|repairs?|furniture|plumbing|painting|pest\s*(?:control)?|food\s+(?:supplies?|expense|stuff)|internet|generator|groceries?|housekeeping|supplies|security)\s+[\d,k]+\s+(?:{_MODES_WITH_CHEQUE})\b", re.I), "ADD_EXPENSE", 0.94),
     # Without payment mode (e.g. "electricity 8400", "internet 1800", "maintenance 3000")
     (re.compile(r"^(?:electricity|water\s*bill|internet|maintenance|food|groceries?|cleaning|plumbing|pest\s*(?:control)?|generator|security|supplies|housekeeping|repairs?|diesel|salary)\s+[\d,k]+\s*$", re.I), "ADD_EXPENSE", 0.92),
     # Collect rent — step-by-step form trigger (no amount/name)
@@ -312,9 +329,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # "Deepak payment received" — payment received without explicit digit (assume most recent payment)
     (re.compile(r"(?:[A-Z][a-z]{2,})\s+payment\s+(?:received|confirmed|done|collected|cleared)\b", re.I), "PAYMENT_LOG", 0.90),
     # Shorthand "Name Amount Mode" — e.g. "Arjun 12000 cash", "Raj 8000 upi"
-    (re.compile(r"^[A-Z][a-z]{2,}\s+\d[\d,k]+\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "PAYMENT_LOG", 0.91),
+    (re.compile(rf"^[A-Z][a-z]{{2,}}\s+\d[\d,k]+\s+(?:{_MODES_WITH_CHEQUE})\b", re.I), "PAYMENT_LOG", 0.91),
     # Amount-first shorthand: "15000 Raj gpay", "8000 from Suresh cash"
-    (re.compile(r"^\d[\d,k]+\s+(?:[A-Z][a-z]{2,}|from\s+[A-Z][a-z]{2,})\s+(?:cash|upi|gpay|phonepe|paytm|online|bank|neft|imps|cheque|naqad)\b", re.I), "PAYMENT_LOG", 0.91),
+    (re.compile(rf"^\d[\d,k]+\s+(?:[A-Z][a-z]{{2,}}|from\s+[A-Z][a-z]{{2,}})\s+(?:{_MODES_WITH_CHEQUE})\b", re.I), "PAYMENT_LOG", 0.91),
     # Word-number payments: "Raj paid fifteen thousand", "paid ten thousand"
     (re.compile(r"(?:[A-Z][a-z]+\s+)?(?:p[aie]{2,3}d?|paied)\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty)\s+(?:thousand|hundred|lakh)\b", re.I), "PAYMENT_LOG", 0.90),
     # Help — only for short greeting messages (moved after PAYMENT_LOG)
@@ -700,8 +717,8 @@ def _extract_entities(text: str, intent: str) -> dict:
     # and override `amount` with the sum. Downstream payment handler branches
     # on entities["split_payment"] to create two Payment rows.
     if intent == "PAYMENT_LOG":
-        _UPI_WORDS = r"upi|gpay|phonepe|paytm|online|netbanking|net\s*banking|neft|imps|transfer"
-        _CASH_WORDS = r"cash|naqad"
+        _UPI_WORDS = _SPLIT_UPI_MODES
+        _CASH_WORDS = _SPLIT_CASH_MODES
         def _k_to_int(raw: str) -> float:
             raw = raw.replace(",", "").strip().lower()
             if raw.endswith("k"):
