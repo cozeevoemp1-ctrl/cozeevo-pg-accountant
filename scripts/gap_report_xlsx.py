@@ -195,7 +195,7 @@ async def main():
             for ci, v in enumerate(vals, 1):
                 c = ws.cell(row=ri, column=ci, value=v)
                 if ci >= 5 and ci <= 17 and isinstance(v, int):
-                    c.number_format = '#,##0'
+                    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
                 if ri % 2 == 0:
                     c.fill = alt_fill
             # highlight gap column
@@ -239,7 +239,7 @@ async def main():
             c1.fill = hdr_fill; c1.font = hdr_font
             c2.fill = hdr_fill; c2.font = hdr_font
         if isinstance(v, int):
-            c2.number_format = '#,##0'
+            c2.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     ws1.column_dimensions['A'].width = 50
     ws1.column_dimensions['B'].width = 20
 

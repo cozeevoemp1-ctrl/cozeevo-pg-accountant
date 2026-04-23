@@ -104,7 +104,7 @@ def write_excel(df: pd.DataFrame, out_path: str) -> None:
 
             # Right-align Amount column (col 5)
             ws.cell(row=row_num, column=5).alignment = Alignment(horizontal="right")
-            ws.cell(row=row_num, column=5).number_format = '#,##0'
+            ws.cell(row=row_num, column=5).number_format = '#,##,##,##0;(#,##,##,##0);"-"'
 
         # Column widths
         col_widths = [4, 12, 22, 12, 12, 18, 8]
@@ -118,7 +118,7 @@ def write_excel(df: pd.DataFrame, out_path: str) -> None:
         # Totals row
         total_row = len(df) + 3
         ws.cell(total_row, 1, "TOTAL").font = Font(bold=True, name="Calibri")
-        ws.cell(total_row, 5, df["Amount (₹)"].sum()).number_format = '#,##0'
+        ws.cell(total_row, 5, df["Amount (₹)"].sum()).number_format = '#,##,##,##0;(#,##,##,##0);"-"'
         ws.cell(total_row, 5).font = Font(bold=True, name="Calibri")
         ws.cell(total_row, 5).alignment = Alignment(horizontal="right")
         for c in range(1, len(df_out.columns) + 1):
@@ -173,7 +173,7 @@ def write_excel(df: pd.DataFrame, out_path: str) -> None:
         for row in ws2.iter_rows(min_row=3, max_row=2 + len(pivot),
                                   min_col=2, max_col=len(pivot.columns)):
             for cell in row:
-                cell.number_format = '#,##0'
+                cell.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
                 cell.alignment = Alignment(horizontal="right")
 
         for i in range(1, len(pivot.columns) + 1):
@@ -188,7 +188,7 @@ def write_excel(df: pd.DataFrame, out_path: str) -> None:
             val = pivot[col_name].sum() if col_name in num_cols else ""
             cell = ws2.cell(total_row2, col_idx, val if val else "")
             if isinstance(val, (int, float)):
-                cell.number_format = '#,##0'
+                cell.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
                 cell.alignment = Alignment(horizontal="right")
             cell.font = Font(bold=True, name="Calibri")
             cell.fill = PatternFill("solid", fgColor=TOTAL_COLOR)
@@ -230,7 +230,7 @@ def write_excel(df: pd.DataFrame, out_path: str) -> None:
         for row in ws3.iter_rows(min_row=3, max_row=2 + len(person_summary),
                                   min_col=3, max_col=3):
             for cell in row:
-                cell.number_format = '#,##0'
+                cell.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
                 cell.alignment = Alignment(horizontal="right")
 
         ws3.column_dimensions["A"].width = 5
@@ -240,7 +240,7 @@ def write_excel(df: pd.DataFrame, out_path: str) -> None:
         # Person total
         total_row3 = len(person_summary) + 3
         ws3.cell(total_row3, 2, "TOTAL").font = Font(bold=True, name="Calibri")
-        ws3.cell(total_row3, 3, person_summary["Amount (₹)"].sum()).number_format = '#,##0'
+        ws3.cell(total_row3, 3, person_summary["Amount (₹)"].sum()).number_format = '#,##,##,##0;(#,##,##,##0);"-"'
         ws3.cell(total_row3, 3).font = Font(bold=True, name="Calibri")
         ws3.cell(total_row3, 3).alignment = Alignment(horizontal="right")
         for c in [1, 2, 3]:

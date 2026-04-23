@@ -10,9 +10,14 @@ Rules applied (from memory/sop_pnl.md Step 4 — updated 2026-04-23):
 - Waste: Rs.3.5K/mo (classifier rule handles).
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
+from utils.inr_format import INR_NUMBER_FORMAT
 
 OUT = Path(__file__).parent.parent / "data" / "reports" / "PnL_Accrual_2026_04_23.xlsx"
 
@@ -146,7 +151,7 @@ def main():
         for i, cell in enumerate(row):
             if i == 0 or cell.value is None or isinstance(cell.value, str):
                 continue
-            cell.number_format = '#,##0;(#,##0);"-"'
+            cell.number_format = INR_NUMBER_FORMAT
 
     ws.column_dimensions["A"].width = 55
     for col_letter in "BCDEFGH":
@@ -176,7 +181,7 @@ def main():
     for row in ws2.iter_rows():
         for i, cell in enumerate(row):
             if i >= 1 and isinstance(cell.value, (int, float)):
-                cell.number_format = '#,##0;(#,##0);"-"'
+                cell.number_format = INR_NUMBER_FORMAT
     ws2.column_dimensions["A"].width = 45
     ws2.column_dimensions["B"].width = 16
 

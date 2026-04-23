@@ -99,7 +99,7 @@ for ri, (dt, desc, typ, amt, cat, sub, ref) in enumerate(
     ws.cell(row=ri, column=3, value=desc).fill = fill
     c = ws.cell(row=ri, column=4, value=amt)
     c.fill = fill
-    c.number_format = "#,##0"
+    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     ws.cell(row=ri, column=5, value=cat).fill = fill
     ws.cell(row=ri, column=6, value=sub).fill = fill
     ws.cell(row=ri, column=7, value=ref).fill = fill
@@ -137,10 +137,10 @@ for cat_key in cats_exp:
         val = by_month_cat[m].get(cat_key, 0)
         c = ws2.cell(row=row, column=ci, value=val if val else "")
         if val:
-            c.number_format = "#,##0"
+            c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
         total += val
     c = ws2.cell(row=row, column=len(months) + 2, value=total)
-    c.number_format = "#,##0"
+    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     c.font = Font(bold=True)
     row += 1
 
@@ -149,10 +149,10 @@ ws2.cell(row=row, column=1, value="TOTAL EXPENSES").font = Font(bold=True, color
 for ci, m in enumerate(months, 2):
     val = sum(by_month_cat[m].get(k, 0) for k in cats_exp)
     c = ws2.cell(row=row, column=ci, value=val)
-    c.number_format = "#,##0"
+    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     c.font = Font(bold=True, color="FF0000")
 c = ws2.cell(row=row, column=len(months) + 2, value=total_exp)
-c.number_format = "#,##0"
+c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
 c.font = Font(bold=True, color="FF0000")
 row += 2
 
@@ -166,10 +166,10 @@ for cat_key in cats_inc:
         val = by_month_cat[m].get(cat_key, 0)
         c = ws2.cell(row=row, column=ci, value=val if val else "")
         if val:
-            c.number_format = "#,##0"
+            c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
         total += val
     c = ws2.cell(row=row, column=len(months) + 2, value=total)
-    c.number_format = "#,##0"
+    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     c.font = Font(bold=True)
     row += 1
 
@@ -177,10 +177,10 @@ ws2.cell(row=row, column=1, value="TOTAL INCOME").font = Font(bold=True, color="
 for ci, m in enumerate(months, 2):
     val = sum(by_month_cat[m].get(k, 0) for k in cats_inc)
     c = ws2.cell(row=row, column=ci, value=val)
-    c.number_format = "#,##0"
+    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     c.font = Font(bold=True, color="008000")
 c = ws2.cell(row=row, column=len(months) + 2, value=total_inc)
-c.number_format = "#,##0"
+c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
 c.font = Font(bold=True, color="008000")
 
 ws2.column_dimensions["A"].width = 30
@@ -207,7 +207,7 @@ for dt, desc, typ, amt, cat, sub, ref in sorted(rows, key=lambda x: -x[3]):
     ws3.cell(row=ri, column=3, value=desc).fill = fill
     c = ws3.cell(row=ri, column=4, value=amt)
     c.fill = fill
-    c.number_format = "#,##0"
+    c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
     ws3.cell(row=ri, column=5, value=f"{cat} / {sub}").fill = fill
     ws3.cell(row=ri, column=6, value="").fill = YLW_FILL
     ri += 1

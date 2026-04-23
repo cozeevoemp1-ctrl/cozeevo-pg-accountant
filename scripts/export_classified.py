@@ -12,6 +12,7 @@ import openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment
 from openpyxl.utils import get_column_letter
 from src.rules.pnl_classify import classify_txn
+from src.utils.inr_format import INR_NUMBER_FORMAT
 from collections import defaultdict
 from datetime import datetime
 
@@ -161,7 +162,7 @@ for month in sorted(months_unc.keys()):
         ws.cell(row=ri, column=1, value=dt.strftime('%d %b %Y')).fill = fill
         ws.cell(row=ri, column=2, value=desc).fill = fill
         c = ws.cell(row=ri, column=3, value=amt)
-        c.fill = fill; c.number_format = '#,##0'
+        c.fill = fill; c.number_format = INR_NUMBER_FORMAT
         ws.cell(row=ri, column=4, value=cat).fill = fill
         ws.cell(row=ri, column=5, value=sub).fill = fill
         ws.cell(row=ri, column=6, value='').fill = YLW_FILL  # yellow = fill in
@@ -171,7 +172,7 @@ for month in sorted(months_unc.keys()):
     c = ws.cell(row=tr, column=1, value='TOTAL')
     c.font = Font(bold=True)
     c = ws.cell(row=tr, column=3, value=total)
-    c.font = Font(bold=True); c.number_format = '#,##0'
+    c.font = Font(bold=True); c.number_format = INR_NUMBER_FORMAT
 
     ws.column_dimensions['A'].width = 14
     ws.column_dimensions['B'].width = 72
@@ -212,7 +213,7 @@ SEC_FONT  = Font(bold=True, color='FFFFFF', size=11)
 TOT_FONT  = Font(bold=True, size=11)
 TOT_FONT_R = Font(bold=True, size=11, color='FF0000')
 TOT_FONT_G = Font(bold=True, size=11, color='008B00')
-NUM_FMT   = '#,##0'
+NUM_FMT   = INR_NUMBER_FORMAT
 
 def _write_row(ws, ri, label, vals, font=None, fill=None, indent=False):
     """Write a label + monthly values row."""
@@ -367,9 +368,9 @@ for cat in CATS:
         for ci, m in enumerate(months, 3):
             v = monthly_sub.get((m, cat, sub), 0)
             c = ws_sub.cell(row=ri, column=ci, value=round(v) if v else 0)
-            c.fill = fill; c.number_format = '#,##0'
+            c.fill = fill; c.number_format = INR_NUMBER_FORMAT
         c = ws_sub.cell(row=ri, column=len(months)+3, value=round(sub_total))
-        c.fill = fill; c.number_format = '#,##0'; c.font = Font(bold=True)
+        c.fill = fill; c.number_format = INR_NUMBER_FORMAT; c.font = Font(bold=True)
         ri += 1
 
 ws_sub.column_dimensions['A'].width = 26
@@ -393,7 +394,7 @@ for ri, (dt, desc, typ, amt, cat, sub) in enumerate(sorted(classified, key=lambd
     ws_txn.cell(row=ri, column=4, value=cat).fill = fill
     ws_txn.cell(row=ri, column=5, value=sub).fill = fill
     c = ws_txn.cell(row=ri, column=6, value=amt)
-    c.fill = fill; c.number_format = '#,##0'
+    c.fill = fill; c.number_format = INR_NUMBER_FORMAT
     ws_txn.cell(row=ri, column=7, value=desc).fill = fill
 
 ws_txn.column_dimensions['A'].width = 14

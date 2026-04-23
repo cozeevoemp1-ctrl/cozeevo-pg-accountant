@@ -163,7 +163,7 @@ async def main():
         for ci, v in enumerate(vals, 1):
             c = ws.cell(row=ri, column=ci, value=v)
             if ci >= 6 and isinstance(v, int):
-                c.number_format = '#,##0'
+                c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
             if ri % 2 == 0:
                 c.fill = alt_fill
             if ci == 3 and d["fm"]:
@@ -179,7 +179,7 @@ async def main():
         tot = sum(d[key] for d in data)
         c = ws.cell(row=tr, column=col, value=tot)
         c.font = Font(bold=True)
-        c.number_format = '#,##0'
+        c.number_format = '#,##,##,##0;(#,##,##,##0);"-"'
         c.fill = PatternFill("solid", fgColor="FFD700")
 
     # Widths
