@@ -5617,10 +5617,20 @@ async def _do_daywise_transfer(action_data: dict, session: AsyncSession) -> str:
         note=f"Day-wise room move: {old_room} -> {new_room_number}",
     ))
 
-    # Sheet sync is best-effort — day-wise tab gets rebuilt nightly anyway.
+    # Trigger DAY WISE Sheet sync in the background so the tab reflects DB
+    # without waiting for the nightly cron. Fire-and-forget.
+    sheet_note = ""
+    try:
+        from src.integrations.gsheets import trigger_daywise_sheet_sync
+        trigger_daywise_sheet_sync()
+        sheet_note = "\nSheet update queued"
+    except Exception:
+        pass
+
     return (
         f"Day-stay room moved — *{guest_name}*\n"
         f"Room *{old_room}* -> Room *{new_room_number}*"
+        f"{sheet_note}"
     )
 
 

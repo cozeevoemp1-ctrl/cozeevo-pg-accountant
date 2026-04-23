@@ -2297,6 +2297,35 @@ async def sync_tenant_all_fields(tenant_id: int, skip_fields: list | None = None
     return await asyncio.to_thread(_sync_tenant_all_fields_sync, tenant_id, skip_fields)
 
 
+def trigger_daywise_sheet_sync() -> None:
+    """Fire `scripts/sync_daywise_from_db.py --write` in the background.
+
+    Used after a day-wise stay row mutates (e.g. room move) so the DAY WISE
+    tab reflects DB state without waiting for the nightly cron.
+    Fire-and-forget — never raises.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    try:
+        project_root = Path(__file__).resolve().parents[2]
+        script = project_root / "scripts" / "sync_daywise_from_db.py"
+        if not script.exists():
+            logger.warning("trigger_daywise_sheet_sync: script not found at %s", script)
+            return
+        subprocess.Popen(
+            [sys.executable, str(script), "--write"],
+            cwd=str(project_root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+        logger.info("trigger_daywise_sheet_sync: queued day-wise sync")
+    except Exception as e:
+        logger.warning("trigger_daywise_sheet_sync failed: %s", e)
+
+
 def trigger_monthly_sheet_sync(month: int, year: int) -> None:
     """
     Fire `scripts/sync_sheet_from_db.py --month M --year Y --write` in the
