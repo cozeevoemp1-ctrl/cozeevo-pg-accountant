@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.9] — 2026-04-23 — Room transfer: extract name correctly (was "Move Pranav")
+
+### Root cause
+For `Move Pranav Sonawane to 516`, the generic name extractor captured `"Move Pranav"` as the tenant name because `SKIP_WORDS` had `change`/`update`/`add`/`log` but not `move`/`shift`/`transfer`/`swap`/`switch`/`relocate`/`assign`. Also the fallback regex only captured up to 2 consecutive capitalized words and did not strip leading skip-words (unlike the `for/of <Name>` branch). Symptom reported by Lokesh: bot replied _"No active tenant found matching **Move Pranav**"_.
+
+A second issue was that `Change room for Pranav Sonawane to 516` set `entities["room"] = "for"` because the generic `(?:room|bed|flat|unit)\s*([\w-]+)` grabbed the next word without regard for skip-words.
+
+### Fix (`src/whatsapp/intent_detector.py`)
+- `SKIP_WORDS` extended with the transfer verbs: `move / shift / transfer / swap / switch / relocate / assign / put / send`.
+- Fallback capitalized-name regex upgraded to match up to **three** consecutive capitalized words (so "Pranav Kumar Sonawane" is captured) and now pops **leading** skip-words too, mirroring the `for/of` branch.
+- New dedicated ROOM_TRANSFER / CHANGE_ROOM / ASSIGN_ROOM extractor: pulls the name from `<verb>\s+<name>\s+(from room X)?\s+to <room>` case-insensitively. Unlocks lowercase phrasings like `transfer pranav sonawane to 516` and `Room change pranav sonawane from 308 to 516`.
+- New dedicated ROOM_TRANSFER destination-room extractor reading `to (room)? <number>` so "Change room for X to 516" correctly sets `room=516`.
+- Generic room extractor now guarded with `"room" not in entities`, requires a digit or letter-word start, and rejects a capture that's a skip-word (no more `room="for"`).
+
+### Coverage verified
+17-case regression sweep (mixed/lower/upper, with/without "room", with "from X", plus the existing PAYMENT_LOG / QUERY_TENANT / ASSIGN_ROOM phrasings) — all green. `tests/test_room_transfer_e2e.py` + staff-room suite also green.
+
 ## [1.49.8] — 2026-04-23 — Room transfer: unblock confirm step + count day-wise stays + e2e test
 
 ### Root cause #1 — UnboundLocalError on rent step

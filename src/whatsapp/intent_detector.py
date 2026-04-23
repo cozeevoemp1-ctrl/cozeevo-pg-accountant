@@ -558,7 +558,11 @@ def _extract_entities(text: str, intent: str) -> dict:
                   "show", "check", "get", "give", "tell", "update", "change",
                   "set", "add", "new", "collect", "record", "log", "void",
                   "cancel", "total", "all", "this", "that", "last", "next",
-                  "month", "year", "today", "yesterday"}
+                  "month", "year", "today", "yesterday",
+                  # Transfer/move verbs — otherwise "Move Pranav" gets grabbed
+                  # as the tenant name for ROOM_TRANSFER / ASSIGN_ROOM intents.
+                  "move", "shift", "transfer", "swap", "switch", "relocate",
+                  "assign", "put", "move", "send"}
 
     # Priority: try "for/of <Name>" pattern first (e.g. "what is the rent for Chinmay")
     for_name = re.search(r"(?:for|of)\s+([A-Za-z]{3,}(?:\s+[A-Za-z]+)*)\s*$", text, re.I)
@@ -572,14 +576,20 @@ def _extract_entities(text: str, intent: str) -> dict:
         if parts:
             entities["name"] = " ".join(parts)
 
-    # Fallback: first capitalized word not in skip list
+    # Fallback: first capitalized word(s) not in skip list. Match up to three
+    # consecutive capitalized words so names like "Pranav Kumar Sonawane" are
+    # fully captured; strip leading verb skip-words like "Move"/"Transfer".
     if "name" not in entities:
-        name_match = re.search(r"\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+)?)\b", text)
+        name_match = re.search(
+            r"\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+){0,2})\b", text,
+        )
         if name_match:
             parts = name_match.group(1).split()
             while parts and parts[-1].lower() in SKIP_WORDS:
                 parts.pop()
-            if parts and parts[0].lower() not in SKIP_WORDS:
+            while parts and parts[0].lower() in SKIP_WORDS:
+                parts.pop(0)
+            if parts:
                 entities["name"] = " ".join(parts)
 
     # Fallback for QUERY_TENANT: try lowercase "name balance/dues/account" pattern
@@ -590,17 +600,52 @@ def _extract_entities(text: str, intent: str) -> dict:
             if candidate.lower() not in SKIP_WORDS:
                 entities["name"] = candidate
 
+    # ROOM_TRANSFER / CHANGE_ROOM — dedicated extractor: pull the name between
+    # the transfer verb and "to <room>". Case-insensitive so Lokesh's
+    # "move pranav sonawane to 516" (all lowercase) works.
+    if intent in ("ROOM_TRANSFER", "CHANGE_ROOM", "ASSIGN_ROOM") and "name" not in entities:
+        rt_verb = (
+            r"(?:move|shift|transfer|relocate|swap|switch|"
+            r"change\s+room\s+(?:for|of)|room\s+(?:change|swap|switch|transfer|shift|move)(?:\s+for)?|"
+            r"assign(?:\s+room\s+[\w-]+\s+to)?)"
+        )
+        rt_name = re.search(
+            rt_verb + r"\s+([A-Za-z][A-Za-z\s]*?)\s+(?:from\s+(?:room\s+)?[\w-]+\s+)?(?:to|into|in|->|→)\s+(?:room\s+)?[\w-]+",
+            text, re.I,
+        )
+        if rt_name:
+            cand = rt_name.group(1).strip()
+            cand_parts = [p for p in cand.split() if p.lower() not in SKIP_WORDS]
+            if cand_parts:
+                entities["name"] = " ".join(cand_parts)
+
+    # ROOM_TRANSFER — also extract the destination room explicitly so the
+    # generic "room X" extractor below doesn't grab "room for" or similar
+    # boilerplate slots.
+    if intent in ("ROOM_TRANSFER", "CHANGE_ROOM") and "room" not in entities:
+        rt_room = re.search(
+            r"\bto\s+(?:room\s+)?([A-Za-z]?\d{1,4}[A-Za-z]?(?:-[A-Za-z])?)\b",
+            text, re.I,
+        )
+        if rt_room:
+            entities["room"] = rt_room.group(1)
+
     # Extract room number — handles:
     #   "room 203", "room 203-A", "bed 203", "flat G15"
     #   "203A paid 8000"  (room number at start before a payment verb)
-    room_match = re.search(r"(?:room|bed|flat|unit)\s*([\w-]+)", text, re.I)
-    if not room_match:
-        room_match = re.search(
-            r"^([\d]{2,4}[A-Za-z]?)\s+(?:paid|paied|payment|received|balance|dues|has|is|gave|wants|plans|leaving|checkout|checked|joined)\b",
-            text, re.I,
-        )
-    if room_match:
-        entities["room"] = room_match.group(1)
+    # Skip if the dedicated ROOM_TRANSFER extractor above already set it, AND
+    # reject capture groups that are just skip-words like "for"/"of".
+    if "room" not in entities:
+        room_match = re.search(r"(?:room|bed|flat|unit)\s+([A-Za-z]?\d[\w-]*|[A-Za-z]\w*)", text, re.I)
+        if not room_match:
+            room_match = re.search(
+                r"^([\d]{2,4}[A-Za-z]?)\s+(?:paid|paied|payment|received|balance|dues|has|is|gave|wants|plans|leaving|checkout|checked|joined)\b",
+                text, re.I,
+            )
+        if room_match:
+            cand_room = room_match.group(1)
+            if cand_room.lower() not in SKIP_WORDS:
+                entities["room"] = cand_room
 
     # Extract user-supplied note on payment/update commands.
     # e.g. "Raj paid 15000 cash note: cleared march bounce"
