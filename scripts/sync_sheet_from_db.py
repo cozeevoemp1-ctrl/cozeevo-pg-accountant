@@ -716,9 +716,26 @@ async def main(args):
     print("\nDone.")
 
 
+# Frozen months — mirror Cozeevo Monthly stay source sheet and must never
+# be regenerated from DB. If you need to reload them, use
+# scripts/mirror_march_source_to_ops.py (or an equivalent per-month mirror).
+FROZEN_MONTHS = {
+    (2025, 12), (2026, 1), (2026, 2), (2026, 3),
+}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sync monthly Sheet tab from DB")
     parser.add_argument("--month", type=int, default=4, help="Month number (default: 4)")
     parser.add_argument("--year", type=int, default=2026, help="Year (default: 2026)")
     parser.add_argument("--write", action="store_true", help="Actually write to Sheet")
-    asyncio.run(main(parser.parse_args()))
+    parser.add_argument("--force-frozen", action="store_true",
+                        help="Override frozen-month guard (dangerous — source sheet is truth, not DB)")
+    args = parser.parse_args()
+    if (args.year, args.month) in FROZEN_MONTHS and args.write and not args.force_frozen:
+        print(f"REFUSED: {MONTH_NAMES[args.month]} {args.year} is a FROZEN month.")
+        print("Source of truth = Cozeevo Monthly stay sheet, not DB.")
+        print("Use scripts/mirror_march_source_to_ops.py to reload from source.")
+        print("Or pass --force-frozen if you really know what you're doing.")
+        sys.exit(2)
+    asyncio.run(main(args))

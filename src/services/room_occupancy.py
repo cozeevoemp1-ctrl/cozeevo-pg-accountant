@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.models import (
     DaywiseStay,
     Room,
+    Staff,
     Tenancy,
     TenancyStatus,
     Tenant,
@@ -134,6 +135,66 @@ async def find_overlap_conflict(
                 return f"{name} (day-stay)"
 
     return None
+
+
+async def check_room_bookable(
+    session: AsyncSession,
+    room_number: str,
+    start_date: _date,
+    end_date: Optional[_date],
+    property_id: Optional[int] = None,
+    exclude_tenancy_id: Optional[int] = None,
+) -> tuple[Optional[Room], Optional[str]]:
+    """Gate-keeper for every new booking (long-term or day-wise).
+
+    Returns (room, error_message). If error_message is set, refuse the
+    booking and surface the message to the caller. Checks, in order:
+
+      1. Room exists in master data (room_number matches a Room row)
+      2. Room is marked active
+      3. Room is not a staff room (Room.is_staff_room) AND no active
+         Staff is assigned to it — if even one staff sleeps here, the
+         whole room is off-limits for bookings.
+      4. No overlap conflict with any existing tenancy/day-stay.
+
+    Callers MUST use this helper; do not reimplement these checks inline.
+    """
+    rn = (room_number or "").strip()
+    if not rn:
+        return None, "Room number is empty."
+
+    q = select(Room).where(Room.room_number == rn)
+    if property_id is not None:
+        q = q.where(Room.property_id == property_id)
+    room = (await session.execute(q)).scalars().first()
+    if room is None:
+        return None, f"Room '{rn}' is not in master data — booking refused."
+
+    if not bool(room.active):
+        return room, f"Room {rn} is marked inactive — booking refused."
+
+    if bool(room.is_staff_room):
+        return room, f"Room {rn} is a staff room — tenant/guest bookings not allowed."
+
+    # If ANY active staff is assigned to this room, the whole room is
+    # blocked (one staff bed => entire room reserved).
+    staff_here = (await session.execute(
+        select(Staff.name).where(
+            Staff.room_id == room.id,
+            Staff.active == True,
+            Staff.exit_date.is_(None),
+        )
+    )).scalars().first()
+    if staff_here:
+        return room, f"Room {rn} has staff member '{staff_here}' — whole room blocked for bookings."
+
+    conflict = await find_overlap_conflict(
+        session, room.id, start_date, end_date, exclude_tenancy_id=exclude_tenancy_id
+    )
+    if conflict:
+        return room, f"Room {rn} already has an overlapping booking: {conflict}."
+
+    return room, None
 
 
 async def count_occupied_beds(

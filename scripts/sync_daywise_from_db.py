@@ -68,8 +68,20 @@ async def main(args):
             total_revenue += total
             total_days += int(r.num_days or 0)
 
-            # Active = currently staying today (between checkin and checkout, not EXIT/CANCELLED)
+            # Back-fill stay_period from checkin/checkout when DB is empty.
+            # Older Excel-imported rows have no stay_period text.
+            stay_period_text = r.stay_period or ""
+            if not stay_period_text and r.checkin_date and r.checkout_date:
+                stay_period_text = f"{r.checkin_date.strftime('%d/%m')}-{r.checkout_date.strftime('%d/%m')}"
+            elif not stay_period_text and r.checkin_date:
+                stay_period_text = r.checkin_date.strftime("%d/%m")
+
+            # Auto-flip stale CHECKIN/ACTIVE → EXIT when checkout has passed.
+            # Only for display here — fixing DB requires a separate worker.
             status = (r.status or "EXIT").upper()
+            if status in ("CHECKIN", "ACTIVE") and r.checkout_date and r.checkout_date < today:
+                status = "EXIT"
+
             if (r.checkin_date and r.checkin_date <= today
                     and (not r.checkout_date or r.checkout_date >= today)
                     and status not in ("EXIT", "CANCELLED")):
@@ -81,7 +93,7 @@ async def main(args):
                 r.phone or "",
                 checkin,
                 checkout,
-                r.stay_period or "",
+                stay_period_text,
                 r.num_days or "",
                 float(r.daily_rate or 0) or "",
                 float(r.booking_amount or 0) or "",

@@ -663,6 +663,20 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         checkin = obs.checkin_date or date.today()
         is_daily = obs.stay_type == "daily"
 
+        # Double-booking guard — enforces master data, staff-room block,
+        # and bed-overlap on every approve. Must pass before we insert any
+        # Tenancy or DaywiseStay rows.
+        from src.services.room_occupancy import check_room_bookable
+        _guard_checkout = None
+        if is_daily:
+            _guard_checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
+        _, _guard_err = await check_room_bookable(
+            session, room.room_number, checkin, _guard_checkout,
+            property_id=room.property_id,
+        )
+        if _guard_err:
+            raise HTTPException(409, _guard_err)
+
         import asyncio as _aio
         import logging as _log
         _logger = _log.getLogger(__name__)

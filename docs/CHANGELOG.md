@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.49.5] — 2026-04-23 — Double-booking guard, March = source, day-wise cleanup
+
+### Double-booking guard (closes 1.49.4 follow-up)
+- **`src/services/room_occupancy.py`** — new `check_room_bookable()`. Gate for every new booking. Checks in order: room exists in master data → room active → not `is_staff_room` → no active Staff assigned (one staff bed ⇒ whole room blocked) → no tenancy/day-stay overlap.
+- **`src/whatsapp/handlers/owner_handler.py`** (ASSIGN_ROOM_STEP ask_room branch) — inline check replaced with `check_room_bookable`.
+- **`src/api/onboarding_router.py`** (approve, both daily + monthly paths) — guard placed before the branch so one call covers both. Returns 409 with specific reason.
+- Verified live against DB: non-existent room, staff-flag room, occupied room (returns occupant name), and vacant room all behave correctly.
+
+### March = Cozeevo Monthly stay source sheet (frozen)
+- **`scripts/reload_march_from_source.py`** (new) — voids all DB March rent payments, re-inserts from source sheet (`1jOCVBkVurLNaht9HYKR6SFqGCciIoMWeOJkfKF9essk` → History tab). 374 old voided, 233 fresh inserted. 22 tenants present in source have no DB tenancy (pre-existing gap; logged).
+- **`scripts/mirror_march_source_to_ops.py`** (new) — copies source sheet → Ops v2 MARCH 2026 tab 1:1 (bypasses DB for 100% match). Sheet now shows Cash ₹10,94,220 / UPI ₹28,89,193 / Balance ₹89,250 — exact source match.
+- **`scripts/sync_sheet_from_db.py`** — frozen-months guard: refuses `--write` for Dec 2025, Jan/Feb/Mar 2026 unless `--force-frozen`. Message points operators at `mirror_march_source_to_ops.py` for source reloads.
+
+### Day-wise tab fixes
+- **`scripts/sync_daywise_from_db.py`** — stay-period back-filled from checkin/checkout when DB field is empty (was 24 empty rows from old Excel imports). Stale `CHECKIN` rows with past checkout auto-flip to `EXIT` at display layer.
+- **`scripts/import_missing_daywise_from_april_sheet.py`** (new) — imports day-wise guests entered manually in April Month Collection but missing from DB. 9 inserted (Mohit rana, maharajan, Mangesh Gosavi, etc.).
+- DB backfill: 5 stale `CHECKIN`/`ACTIVE` rows with past checkout flipped to `EXIT`. Mohit rana checkout corrected to 2026-04-24 (source days=2 was stale).
+- Result: DB day-wise 92→101 rows, active today 3→6 (matches April Month Collection).
+
+### Memory
+- `memory/feedback_no_double_booking.md` — saves the rule with rationale and trigger points.
+
 ## [1.49.4] — 2026-04-23 — Room transfer/assign: count beds, not occupants
 
 ### Root cause
