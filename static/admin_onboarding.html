@@ -122,6 +122,13 @@
       transition: border-color .15s, box-shadow .15s;
       width: 100%;
     }
+    /* Hide the up/down spinner on number inputs — user types the amount */
+    input[type="number"] { -moz-appearance: textfield; }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
     input:focus, select:focus, textarea:focus {
       border-color: var(--pink);
       box-shadow: 0 0 0 3px rgba(239,31,156,.1);
@@ -504,17 +511,17 @@
 
             <div class="form-group">
               <label for="security_deposit">Security Deposit (₹)</label>
-              <input type="number" id="security_deposit" name="security_deposit" placeholder="0" min="0" value="0">
+              <input type="number" id="security_deposit" name="security_deposit" placeholder="0" min="0">
             </div>
 
             <div class="form-group">
               <label for="maintenance_fee">Maintenance Fee (₹)</label>
-              <input type="number" id="maintenance_fee" name="maintenance_fee" placeholder="0" min="0" value="0">
+              <input type="number" id="maintenance_fee" name="maintenance_fee" placeholder="0" min="0">
             </div>
 
             <div class="form-group">
               <label for="booking_amount">Booking Amount (₹)</label>
-              <input type="number" id="booking_amount" name="booking_amount" placeholder="0" min="0" value="0">
+              <input type="number" id="booking_amount" name="booking_amount" placeholder="0" min="0">
             </div>
 
             <div class="form-group full" id="payment-mode-field">
@@ -555,7 +562,7 @@
             </div>
             <div class="form-group daily-field" style="display:none;">
               <label for="daily_rate">Daily Rate (₹)</label>
-              <input type="number" id="daily_rate" name="daily_rate" min="0" value="0">
+              <input type="number" id="daily_rate" name="daily_rate" min="0" placeholder="0">
             </div>
 
             <div class="form-group full">
@@ -967,6 +974,24 @@
       warnEl.textContent = `Master data says "${roomMasterSharing}" — you are overriding to "${this.value}"`;
     } else {
       warnEl.textContent = '';
+    }
+  });
+
+  // ── Enter key → next field ─────────────────────────────────────────────────
+  // Lokesh fills the form top-to-bottom on a keyboard; Tab works natively but
+  // Enter feels more natural after typing a number. Skip submit/textarea/radio
+  // so the behavior stays predictable.
+  document.getElementById('create-form').addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    const t = e.target;
+    if (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
+    if (t.type === 'radio' || t.type === 'checkbox' || t.type === 'submit') return;
+    e.preventDefault();
+    const focusables = Array.from(this.querySelectorAll('input, select, textarea, button[type="submit"]'))
+      .filter(el => !el.disabled && el.offsetParent !== null && el.type !== 'hidden');
+    const idx = focusables.indexOf(t);
+    if (idx >= 0 && idx < focusables.length - 1) {
+      focusables[idx + 1].focus();
     }
   });
 
