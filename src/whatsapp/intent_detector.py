@@ -612,6 +612,21 @@ def _extract_entities(text: str, intent: str) -> dict:
                   "move", "shift", "transfer", "swap", "switch", "relocate",
                   "assign", "put", "move", "send"}
 
+    # Extract room number early (before name) so we can skip fallback name extraction
+    # if a room is already present. This prevents "Room 603 paid for May" from extracting
+    # name="May" when room 603 is explicitly specified.
+    if "room" not in entities:
+        room_match = re.search(r"(?:room|bed|flat|unit)\s+([A-Za-z]?\d[\w-]*|[A-Za-z]\w*)", text, re.I)
+        if not room_match:
+            room_match = re.search(
+                r"^([\d]{2,4}[A-Za-z]?)\s+(?:paid|paied|payment|received|balance|dues|has|is|gave|wants|plans|leaving|checkout|checked|joined)\b",
+                text, re.I,
+            )
+        if room_match:
+            cand_room = room_match.group(1)
+            if cand_room.lower() not in SKIP_WORDS:
+                entities["room"] = cand_room
+
     # Priority: try "for/of <Name>" pattern first (e.g. "what is the rent for Chinmay")
     for_name = re.search(r"(?:for|of)\s+([A-Za-z]{3,}(?:\s+[A-Za-z]+)*)\s*$", text, re.I)
     if for_name:
@@ -627,18 +642,22 @@ def _extract_entities(text: str, intent: str) -> dict:
     # Fallback: first capitalized word(s) not in skip list. Match up to three
     # consecutive capitalized words so names like "Pranav Kumar Sonawane" are
     # fully captured; strip leading verb skip-words like "Move"/"Transfer".
+    # Skip this for PAYMENT_LOG/VOID_PAYMENT if a room is already extracted—
+    # room is unambiguous so don't guess a name that might incorrectly match a tenant.
     if "name" not in entities:
-        name_match = re.search(
-            r"\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+){0,2})\b", text,
-        )
-        if name_match:
-            parts = name_match.group(1).split()
-            while parts and parts[-1].lower() in SKIP_WORDS:
-                parts.pop()
-            while parts and parts[0].lower() in SKIP_WORDS:
-                parts.pop(0)
-            if parts:
-                entities["name"] = " ".join(parts)
+        should_skip_fallback = (intent in ("PAYMENT_LOG", "VOID_PAYMENT") and "room" in entities)
+        if not should_skip_fallback:
+            name_match = re.search(
+                r"\b([A-Z][a-z]{2,}(?:\s[A-Z][a-z]+){0,2})\b", text,
+            )
+            if name_match:
+                parts = name_match.group(1).split()
+                while parts and parts[-1].lower() in SKIP_WORDS:
+                    parts.pop()
+                while parts and parts[0].lower() in SKIP_WORDS:
+                    parts.pop(0)
+                if parts:
+                    entities["name"] = " ".join(parts)
 
     # Fallback for QUERY_TENANT: try lowercase "name balance/dues/account" pattern
     if "name" not in entities and intent == "QUERY_TENANT":
@@ -678,22 +697,6 @@ def _extract_entities(text: str, intent: str) -> dict:
         if rt_room:
             entities["room"] = rt_room.group(1)
 
-    # Extract room number — handles:
-    #   "room 203", "room 203-A", "bed 203", "flat G15"
-    #   "203A paid 8000"  (room number at start before a payment verb)
-    # Skip if the dedicated ROOM_TRANSFER extractor above already set it, AND
-    # reject capture groups that are just skip-words like "for"/"of".
-    if "room" not in entities:
-        room_match = re.search(r"(?:room|bed|flat|unit)\s+([A-Za-z]?\d[\w-]*|[A-Za-z]\w*)", text, re.I)
-        if not room_match:
-            room_match = re.search(
-                r"^([\d]{2,4}[A-Za-z]?)\s+(?:paid|paied|payment|received|balance|dues|has|is|gave|wants|plans|leaving|checkout|checked|joined)\b",
-                text, re.I,
-            )
-        if room_match:
-            cand_room = room_match.group(1)
-            if cand_room.lower() not in SKIP_WORDS:
-                entities["room"] = cand_room
 
     # Extract user-supplied note on payment/update commands.
     # e.g. "Raj paid 15000 cash note: cleared march bounce"
