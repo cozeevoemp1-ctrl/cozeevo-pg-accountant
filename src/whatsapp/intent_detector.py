@@ -219,7 +219,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(rf"^\d[\d,k]+\s+(?:{_MODES_CORE})\s+(?:maintena?na?ce?|cleaning|repair|electricity|water|internet|generator|groceries?|housekeeping|supplies|security|pest|plumbing|painting|furniture|food)\b", re.I), "ADD_EXPENSE", 0.92),
     # Early QUERY_DUES — explicit patterns before QUERY_TENANT grabs "outstanding"/"month" as a name
     (re.compile(
-        r"(?:outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
+        r"(?:check\s+(?:dues|pending)|outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
         re.I
     ), "QUERY_DUES", 0.92),
     # "did Raj pay this month?" / "did Suresh pay?" — query, NOT payment log
@@ -235,9 +235,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     #   3. Hindi: name ka paise/balance
     (re.compile(
         r"(?:"
-        r"(?:balance|dues|status)\s+(?:of\s+|for\s+)?(?!(?:my|all|total|pending|outstanding|show|the|everyone|all|this|last|complaint)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)"  # "balance of Raj"
+        r"(?:balance|dues|status)\s+(?:of\s+|for\s+)?(?!(?:my|all|total|pending|outstanding|show|the|everyone|all|this|last|complaint|check|get|list|see|who|what|how|display|verify|confirm|tenants|guests|rooms|all)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)"  # "balance of Raj"
         r"|"
-        r"\b(?!(?:my|all|total|pending|outstanding|show|the|everyone|complaint)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)'?s?\s+(?:balance|dues|status|outstanding|account\s+statement|details?)"  # "Raj balance", "Raj's account", "Vikram details"
+        r"\b(?!(?:my|all|total|pending|outstanding|show|the|everyone|complaint|check|get|list|see|who|what|how|display|verify|confirm)\b)([A-Z][a-z]{1,}(?:\s+[A-Z][a-z]+)?)'?s?\s+(?:balance|dues|status|outstanding|account\s+statement|details?)"  # "Raj balance", "Raj's account", "Vikram details"
         r"|"
         r"room\s+[\w-]+\s+(?:balance|dues|status|who|tenant|person|occupant)"  # "room 203 balance" (removed "details" — goes to ROOM_STATUS)
         r"|"
