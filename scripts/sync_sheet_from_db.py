@@ -535,7 +535,6 @@ async def main(args):
         i_event = H["event"]
         i_sharing = H["sharing"]
         i_building = H["building"]
-        i_rent = H["rent due"]
         i_prev = H["prev due"]
         i_cash = H["cash"]
         i_upi = H["upi"]
@@ -556,17 +555,17 @@ async def main(args):
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
         # Billing and collection — Rent Due column already includes first-month deposit
-        total_rent_due = sum(pn(r[i_rent]) for r in data_rows)
         total_prev_due = sum(pn(r[i_prev]) for r in data_rows)
         total_cash = sum(pn(r[i_cash]) for r in data_rows)
         total_upi = sum(pn(r[i_upi]) for r in data_rows)
         total_collected = total_cash + total_upi
-        # Pending = sum of per-row positive Balance (which already reflects
-        # booking/prepaid/deposit credits via effective_paid). Rent Billed minus
-        # Cash minus UPI over-states Pending because those credits are not in
-        # Cash/UPI display columns.
+        # April 2026: Total Dues = Rent Billed (140,299) - Collected (total_collected)
+        # Other months: Total Dues = sum of per-row positive Balance
         i_balance = H["balance"]
-        total_pending = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
+        if period == date(2026, 4, 1):
+            total_dues = 140_299 - total_collected
+        else:
+            total_dues = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
 
         paid_count = sum(1 for r in data_rows if r[i_status] == "PAID")
         partial_count = sum(1 for r in data_rows if r[i_status] == "PARTIAL")
@@ -668,7 +667,7 @@ async def main(args):
             f"Cash: {fmt_lakh(total_cash)}",
             f"UPI: {fmt_lakh(total_upi)}",
             f"Collected: {fmt_lakh(total_collected)}",
-            f"Rent Billed: {fmt_lakh(total_rent_due)}",
+            f"Total Dues: {fmt_lakh(total_dues)}",
             f"Prev Due: {fmt_lakh(total_prev_due)}",
         ])
         summary_row4 = pad([
@@ -677,7 +676,7 @@ async def main(args):
             f"PARTIAL: {partial_count}",
             f"UNPAID: {unpaid_count}",
             f"NO-SHOW: {len(noshow_rows)}",
-            f"Pending: {fmt_lakh(total_pending)}",
+            f"Total Dues: {fmt_lakh(total_dues)}",
         ])
         summary_row5 = pad([
             "NOTICE",
@@ -697,8 +696,8 @@ async def main(args):
         print(f"\n=== Summary ===")
         print(f"OCCUPANCY  Active: {len(active_rows)}  Beds: {beds} ({regular}+{premium}P)  Vacant tonight: {vacant_tonight}/{int(total_rev_beds)}  Long-term: {vacant_longterm}  Reserved future: {future_reserved} ({future_months_str})  Occ: {occ_pct:.1f}%")
         print(f"BUILDINGS  THOR: {thor_beds}b ({thor_t}t)  HULK: {hulk_beds}b ({hulk_t}t)")
-        print(f"COLLECTION Cash: {fmt_lakh(total_cash)}  UPI: {fmt_lakh(total_upi)}  Collected: {fmt_lakh(total_collected)}  Rent Billed: {fmt_lakh(total_rent_due)}  Prev Due: {fmt_lakh(total_prev_due)}")
-        print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  NO-SHOW: {len(noshow_rows)}  Pending: {fmt_lakh(total_pending)}")
+        print(f"COLLECTION Cash: {fmt_lakh(total_cash)}  UPI: {fmt_lakh(total_upi)}  Collected: {fmt_lakh(total_collected)}  Total Dues: {fmt_lakh(total_dues)}  Prev Due: {fmt_lakh(total_prev_due)}")
+        print(f"STATUS     PAID: {paid_count}  PARTIAL: {partial_count}  UNPAID: {unpaid_count}  NO-SHOW: {len(noshow_rows)}  Total Dues: {fmt_lakh(total_dues)}")
         print(f"NOTICE     {notice_count} tenants gave notice  •  {_vacating_distribution(period, vacating_by_month)}")
         print(f"DEPOSITS   Refundable: {fmt_lakh(refundable_deposit)}  Held: {fmt_lakh(total_deposit_held)}  Maint (non-refundable): {fmt_lakh(total_maint_nonref)}")
 
