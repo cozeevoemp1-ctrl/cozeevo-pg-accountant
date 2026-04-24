@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.13] — 2026-04-24 — Onboarding: PDF signature redesign, remove boxes, keep "I agree" confirmation
+
+Removed signature boxes from PDF (tenant and staff). Agreement now shows "✓ Agreed on [date], [time]" instead of signature space.
+
+### Changes
+- **pdf_generator.py:** Removed signature box rendering; simplified to show "✓ Agreed on [date], [time]" for tenant agreement confirmation
+- **pdf_generator.py:** Removed unused `staff_signature` parameter, `base64`, `io`, `Image` imports (no longer needed without signature drawing)
+- **onboarding_router.py:** Updated PDF generation call to remove `staff_signature` parameter
+
+### Why
+Digital onboarding uses IT Act 2000 §3A "I agree" checkbox + timestamp (stored as token `I_AGREE:<name>:<iso_ts>`). Signature boxes are visual-only and unnecessary; confirmation text + timestamp is sufficient for legal compliance.
+
+---
+
 ## [1.51.12] — 2026-04-24 — Onboarding: Replace generic rules with 19 actual PG house rules
 
 Replaced placeholder house rules in digital onboarding form with 19 exact rules from physical PG document. Made maintenance fee dynamic.
