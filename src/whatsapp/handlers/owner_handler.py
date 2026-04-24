@@ -98,6 +98,7 @@ async def handle_owner(
         "QUERY_VACANT_ROOMS": _query_vacant_rooms,
         "QUERY_OCCUPANCY":    _query_occupancy,
         "QUERY_EXPIRING":     _query_expiring,
+        "QUERY_ALL_NOTICES":  _query_all_notices,
         "QUERY_CHECKINS":     _query_checkins,
         "QUERY_CHECKOUTS":    _query_checkouts,
         "QUERY_CHECKOUT_ROOM": _query_checkout_room,
@@ -6339,6 +6340,72 @@ async def _query_expiring(entities: dict, ctx: CallerContext, session: AsyncSess
         else:
             deposit_note = f"Deposit Rs.{deposit:,}"
         lines.append(f"• {name} (Room {room.room_number})\n  Notice: {notice_str} | Exit: {exit_str} | {deposit_note}")
+    return "\n".join(lines)
+
+
+# ── All notices across future months ──────────────────────────────────────────
+
+async def _query_all_notices(_entities: dict, _ctx: CallerContext, session: AsyncSession) -> str:
+    """List all tenants on notice across all future months, grouped by month.
+
+    Simple clean format:
+    APRIL 2026 (16 vacating)
+    • Raj Kumar (Room 305) — Notice: 15 Apr
+    • Priya Singh (Room 401) — Notice: 10 Apr
+    ...
+    """
+    today = date.today()
+    from collections import defaultdict
+    import calendar as _cal
+
+    result = await session.execute(
+        select(Tenant.name, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(
+            Tenancy.status == TenancyStatus.active,
+            or_(
+                Tenancy.notice_date != None,
+                Tenancy.expected_checkout != None,
+            ),
+            or_(
+                Tenancy.notice_date >= today,
+                Tenancy.expected_checkout >= today,
+            )
+        )
+    )
+    rows = result.all()
+
+    if not rows:
+        return "No tenants on notice or upcoming checkouts."
+
+    # Group by checkout month
+    by_month = defaultdict(list)
+    for name, tenancy, room in rows:
+        checkout_date = tenancy.expected_checkout or tenancy.notice_date
+        if checkout_date and checkout_date >= today:
+            month_key = checkout_date.replace(day=1)
+            notice_str = tenancy.notice_date.strftime("%d %b") if tenancy.notice_date else "—"
+            by_month[month_key].append((name, room.room_number, notice_str))
+
+    # Sort months chronologically
+    sorted_months = sorted(by_month.keys())
+
+    if not sorted_months:
+        return "No tenants on notice or upcoming checkouts."
+
+    notice_count = sum(len(v) for v in by_month.values())
+    lines = [f"*On notice: {notice_count} tenant{'s' if notice_count != 1 else ''}*\n"]
+
+    for month_date in sorted_months:
+        month_name = month_date.strftime("%B %Y")
+        count = len(by_month[month_date])
+        lines.append(f"\n*{month_name}* ({count} vacating)")
+
+        # Sort by name within month
+        for name, room_num, notice_str in sorted(by_month[month_date], key=lambda x: x[0]):
+            lines.append(f"  • {name} (Room {room_num}) — Notice: {notice_str}")
+
     return "\n".join(lines)
 
 

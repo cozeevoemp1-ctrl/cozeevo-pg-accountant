@@ -170,6 +170,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"\b[A-Za-z]+\s+check.?in\s+(?:was\s+)?(?:on\s+)?(?:\d|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "UPDATE_CHECKIN", 0.94),
     # Expiring tenancies / upcoming checkouts
     (re.compile(r"(?:expir(?:ing|es?)|agreements? ending|who(?:'s| is) (?:leaving|vacating|planning to (?:leave|vacate|checkout))|upcoming checkout|checkouts? (?:this|next) month|notice(?:s)? (?:this|next) month|how many notice|end of (?:lease|stay|tenancy)|who\s+is\s+vacating|tenants?\s+leaving|end\s+of\s+(?:the\s+)?month\s+checkout|checkouts?\s+coming\s+up|expiring\s+tenancies|who\s+is\s+leaving\b|who gave notice|(?:vacating|leaving)\s+(?:this|next)\s+month|who\s+(?:plans?|will)\s+(?:to\s+)?(?:leave|vacate|checkout)|is\s+mahine\s+kaun\s+ja\s+raha)", re.I), "QUERY_EXPIRING", 0.92),
+    # All notices across all upcoming months
+    (re.compile(r"(?:total (?:notice|notices|vacating|checkouts)|all notice|all notices|show all notice|all upcoming|notice summary|total vacating|all tenants (?:on )?notice)", re.I), "QUERY_ALL_NOTICES", 0.92),
     # Checkins this month
     (re.compile(r"(?:who checked? ?in|new arrivals?|new tenants? (?:this|in|for)|new joinings?|checkins? (?:this|for) month|joined (?:this|recently)|recent checkins?|who joined|recent\s+admissions?|checkins?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|is\s+mahine\s+kaun\s+aaya|kaun\s+aaya\s+(?:is|this)\s+mahine)", re.I), "QUERY_CHECKINS", 0.91),
     # Checkouts this month
