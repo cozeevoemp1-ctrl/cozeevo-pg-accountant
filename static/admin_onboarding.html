@@ -812,6 +812,7 @@
 
       const chips = document.getElementById('result-chips');
       chips.innerHTML = '';
+      if (data.warning) chips.innerHTML += `<span class="chip" style="background:#fee2e2;color:#dc2626;font-weight:700;">${data.warning}</span>`;
       if (data.room?.floor) chips.innerHTML += `<span class="chip">Floor ${data.room.floor}</span>`;
       if (data.room?.sharing) chips.innerHTML += `<span class="chip">${data.room.sharing}</span>`;
       if (data.dues_due != null) chips.innerHTML += `<span class="chip" style="background:#FFF5F9;color:var(--pink);font-weight:700;">Due: ₹${Number(data.dues_due).toLocaleString('en-IN')}</span>`;
@@ -991,8 +992,7 @@
     if (!(isEnter || isArrowDown || isArrowRight || isArrowUp || isArrowLeft)) return;
 
     const t = e.target;
-    if (t.tagName === 'BUTTON') return;
-    if (t.type === 'radio' || t.type === 'checkbox' || t.type === 'submit') return;
+    if (t.type === 'radio' || t.type === 'checkbox') return;
 
     // For textarea: only Up/Down navigate fields; Left/Right edit text
     if (t.tagName === 'TEXTAREA' && (isArrowLeft || isArrowRight)) return;

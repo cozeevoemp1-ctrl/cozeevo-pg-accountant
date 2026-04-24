@@ -217,6 +217,11 @@ async def resolve_pending_action(
     # at line 38 is shadowed). Bind it once at the top so every branch is safe.
     from src.whatsapp.handlers._shared import _save_pending
     reply_text = reply_text.strip()
+
+    # ── Global cancel — ANY pending intent, ANY state ────────────────────
+    if reply_text.lower() in ("cancel", "abort"):
+        return "❌ Cancelled. Nothing was changed."
+
     choices = json.loads(pending.choices or "[]")
     action_data = json.loads(pending.action_data or "{}")
     # Handle double-serialized action_data (legacy bug: json.dumps called twice)

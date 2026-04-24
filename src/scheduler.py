@@ -169,13 +169,14 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    scheduler.add_job(
-        _overnight_source_sync,
-        trigger=CronTrigger(hour=3, minute=0),   # every day at 3am IST
-        id="overnight_source_sync",
-        name="Overnight Source Sheet Reconciliation — 3am daily",
-        replace_existing=True,
-    )
+    # ❌ PAUSED: Overnight source sync disabled for manual WhatsApp testing
+    # scheduler.add_job(
+    #     _overnight_source_sync,
+    #     trigger=CronTrigger(hour=3, minute=0),   # every day at 3am IST
+    #     id="overnight_source_sync",
+    #     name="Overnight Source Sheet Reconciliation — 3am daily",
+    #     replace_existing=True,
+    # )
 
     # Prep reminders — TWO separate messages at 08:00 IST daily.
     # Each message is only sent if its target day actually has movements;
