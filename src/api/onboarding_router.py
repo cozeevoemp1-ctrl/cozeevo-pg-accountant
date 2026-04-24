@@ -903,12 +903,11 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             except Exception:
                 pass
 
-        # PDF generation (includes both tenant + staff signatures)
+        # PDF generation
         try:
             from src.services.pdf_generator import generate_agreement_pdf
             pdf_path = await generate_agreement_pdf(
                 obs, td, room, building, sharing,
-                staff_signature=req.staff_signature if req else "",
             )
             obs.agreement_pdf_path = pdf_path
         except Exception as e:
