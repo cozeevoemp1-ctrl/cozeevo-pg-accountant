@@ -24,18 +24,25 @@ AGREEMENT_DIR = MEDIA_DIR / "agreements"
 
 
 HOUSE_RULES = [
-    "Rent of {rent} is due on the 1st of every month. Late payment after the 5th incurs Rs.200/day penalty.",
-    "Security deposit of {deposit} is refundable on checkout after deducting damages and outstanding dues.",
-    "Minimum stay period is {lock_in} months. Early exit forfeits the security deposit.",
-    "30-day written notice is required before checkout.",
-    "No smoking, alcohol, or illegal substances on premises.",
-    "Guests allowed only in common areas. No overnight guests.",
-    "Quiet hours: 10 PM - 7 AM.",
-    "Tenant is responsible for personal belongings. Management is not liable for theft or loss.",
-    "Room damage beyond normal wear will be deducted from deposit.",
-    "Management may reassign rooms with 7-day notice.",
-    "Food plan: {food} as per selected plan.",
-    "Violation of rules may lead to termination with 7-day notice.",
+    "If anybody wants to vacate the PG, they should inform 30 days before and vacating notice before 5th of EVERY MONTH. Otherwise 30 days rent must be paid. (Note: should vacate only on 30th or 31st of any month)",
+    "Rent should be paid on or before 5th of every calendar month.",
+    "Once paid the Advance & Rent cannot be refunded.",
+    "Outsiders are strictly not allowed.",
+    "Guest Accommodation with / without food will be charged Rs.1200/- per day.",
+    "Iron box, Kettle, Induction Stove etc., usage not allowed.",
+    "Maintenance Charges are fixed @ Rs. 5000/-",
+    "Management is not responsible for your belongings.",
+    "Please make sure that all the lights, fans and geysers are SWITCHED OFF before you leave the premises.",
+    "Smoking & Liquor not allowed inside the premises of the PG.",
+    "Please do not throw garbage out of your window and must keep all premises clean.",
+    "In the event of failure to abide by the rules, the paying guest shall vacate the room within 30 days.",
+    "Management reserves the right to immediately evict, without exception, any person whose behavior is deemed abnormal, inappropriate, disruptive, or poses risk to others.",
+    "In case of late arrival to PG (after 10.30 pm) please inform the in-charge in advance in writing.",
+    "Two wheeler wheel lock should be ensured.",
+    "Parking space will be provided, but management is not responsible for the vehicles parked for stolen etc.",
+    "If you lose the Key, you have to pay Rs.1000/- for duplicate key.",
+    "Do not take PG FOOD for outsiders.",
+    "If any belongings of owner are damaged, the amount for the item will be deducted from the advance amount.",
 ]
 
 
