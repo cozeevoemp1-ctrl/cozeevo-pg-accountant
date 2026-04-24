@@ -220,8 +220,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Amount-first expense shorthand: "5000 cash maintenance", "3000 upi electricity"
     (re.compile(rf"^\d[\d,k]+\s+(?:{_MODES_CORE})\s+(?:maintena?na?ce?|cleaning|repair|electricity|water|internet|generator|groceries?|housekeeping|supplies|security|pest|plumbing|painting|furniture|food)\b", re.I), "ADD_EXPENSE", 0.92),
     # Early QUERY_DUES — explicit patterns before QUERY_TENANT grabs "outstanding"/"month" as a name
+    # Includes: "check dues", "[Name] dues", "room X dues", monthly reports, etc.
     (re.compile(
-        r"(?:check\s+(?:dues|pending)|outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
+        r"(?:check\s+(?:dues|pending)|outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka)|(?:\w+(?:\s+\w+)*)\s+dues\b|room\s+[\w-]+\s+dues\b)",
         re.I
     ), "QUERY_DUES", 0.92),
     # "did Raj pay this month?" / "did Suresh pay?" — query, NOT payment log
