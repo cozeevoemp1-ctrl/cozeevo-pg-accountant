@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.7] — 2026-04-24 — Fix amount extraction to recognize price/cost keywords
+
+Fixed bug where "Log expense water tanker 2 Lods price 3400" extracted amount=2 (incorrect).
+
+### Changes
+- **intent_detector.py (line 584):** Added "price", "cost", "for", "@" to amount keyword list
+  - Amount regex now prioritizes numbers after these keywords
+  - Handles common expense phrasings: "price 3400", "cost 5000", "2 for 3400", "@ 50 each"
+  - Fallback (first number) still applies if no keyword present
+  - Backward compatible with existing payment keywords: paid, payment, received, collected, deposited
+
+---
+
 ## [1.51.6] — 2026-04-24 — Receptionist expense management permissions + weekly/daily query filtering
 
 Granted Lokesh (receptionist role) full expense management access per user approval.
