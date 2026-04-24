@@ -396,6 +396,8 @@ _MONTHS = {
     "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
 }
 
+_MONTH_NAMES = {"jan", "january", "feb", "february", "mar", "march", "apr", "april", "may", "june", "jun", "jul", "july", "aug", "august", "sep", "september", "oct", "october", "nov", "november", "dec", "december"}
+
 
 def _extract_date_entity(text: str) -> Optional[str]:
     """
@@ -628,6 +630,7 @@ def _extract_entities(text: str, intent: str) -> dict:
                 entities["room"] = cand_room
 
     # Priority: try "for/of <Name>" pattern first (e.g. "what is the rent for Chinmay")
+    # But skip if it's a month name (e.g., "for May month" should not extract name="May")
     for_name = re.search(r"(?:for|of)\s+([A-Za-z]{3,}(?:\s+[A-Za-z]+)*)\s*$", text, re.I)
     if for_name:
         candidate = for_name.group(1).strip()
@@ -636,7 +639,8 @@ def _extract_entities(text: str, intent: str) -> dict:
             parts.pop()
         while parts and parts[0].lower() in SKIP_WORDS:
             parts.pop(0)
-        if parts:
+        # Skip if the result is a month name
+        if parts and " ".join(parts).lower() not in _MONTH_NAMES:
             entities["name"] = " ".join(parts)
 
     # Fallback: first capitalized word(s) not in skip list. Match up to three
@@ -644,6 +648,7 @@ def _extract_entities(text: str, intent: str) -> dict:
     # fully captured; strip leading verb skip-words like "Move"/"Transfer".
     # Skip this for PAYMENT_LOG/VOID_PAYMENT if a room is already extracted—
     # room is unambiguous so don't guess a name that might incorrectly match a tenant.
+    # Also skip if result is a month name (prevents "May" in "for May month" from matching "Mayur").
     if "name" not in entities:
         should_skip_fallback = (intent in ("PAYMENT_LOG", "VOID_PAYMENT") and "room" in entities)
         if not should_skip_fallback:
@@ -656,8 +661,10 @@ def _extract_entities(text: str, intent: str) -> dict:
                     parts.pop()
                 while parts and parts[0].lower() in SKIP_WORDS:
                     parts.pop(0)
-                if parts:
-                    entities["name"] = " ".join(parts)
+                candidate = " ".join(parts)
+                # Don't extract if it's a month name
+                if parts and candidate.lower() not in _MONTH_NAMES:
+                    entities["name"] = candidate
 
     # Fallback for QUERY_TENANT: try lowercase "name balance/dues/account" pattern
     if "name" not in entities and intent == "QUERY_TENANT":
