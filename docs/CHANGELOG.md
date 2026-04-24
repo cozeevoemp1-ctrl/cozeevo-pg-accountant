@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.10] — 2026-04-24 — April dashboard: Total Dues = Rs.1,40,299, remove Rent Billed KPI
+
+Audit complete: April custom code properly gated, doesn't leak into May. Dashboard now shows "Total Dues" instead of "Rent Billed".
+
+### Changes
+- **sync_sheet_from_db.py:** Renamed "Rent Billed" KPI to "Total Dues" in summary rows (lines 671, 681, 701, 702)
+- **sync_sheet_from_db.py:** April Total Dues hardcoded to Rs.1,40,299 (sum of 21 pending balance map entries)
+- **sync_sheet_from_db.py:** Other months auto-calculate Total Dues from per-row balance sum
+- **Verified:** May-safety audit confirms zero April-specific leakage into May; monthly rollover fully automatic
+
+### Why
+April is frozen historical data. The 21 pending tenants represent total outstanding dues of Rs.1,40,299 (sum from hardcoded balance map: Abhishek 6066 + Akshit 11500 + ... + T.Rakesh 15533). Dashboard now accurately reflects total dues owed, not a calculated "rent billed" figure.
+
+---
+
 ## [1.51.9] — 2026-04-24 — April 2026: Hardcoded balance values, balance-based status
 
 Implemented hardcoded April balance values as single source of truth (not calculated from DB). Status now shows balance-based classification for April.
