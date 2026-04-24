@@ -162,22 +162,24 @@ async def handle_receipt_upload(
     recent_unattached = await _get_recent_unattached_payments(phone, session, minutes=30)
 
     if len(recent_unattached) == 1:
-        # Only one recent payment without receipt → auto-attach
+        # Only one recent payment → ask for confirmation (never auto-attach silently)
         payment = recent_unattached[0]
         tenant = await _get_tenant_for_payment(payment, session)
-        file_path = await download_whatsapp_media(
-            media_id, media_mime, "receipts",
-            filename_prefix=f"pay{payment.id}",
-        )
-        if file_path:
-            await _attach_receipt(payment, file_path, media_mime, phone, session)
-            name = tenant.name if tenant else "Unknown"
-            return (
-                f"Receipt saved for *{name}*\n"
-                f"Amount: Rs.{int(payment.amount):,} ({payment.payment_mode.value.upper()})\n"
-                f"Month: {payment.period_month.strftime('%B %Y') if payment.period_month else 'N/A'}"
-            )
-        return "Could not download the image. Please try sending again."
+        name = tenant.name if tenant else "Unknown"
+
+        choices = [
+            {"seq": 1, "intent": "CONFIRM_RECEIPT", "label": "Yes"},
+            {"seq": 2, "intent": "CONFIRM_RECEIPT", "label": "No, type name"},
+        ]
+        action_data = {
+            "media_id": media_id,
+            "media_mime": media_mime,
+            "tenancy_id": payment.tenancy_id,
+            "tenant_name": name,
+            "room_number": "?",
+        }
+        await _save_pending(phone, "RECEIPT_CONFIRM", action_data, choices, session)
+        return f"Is this receipt for *{name}*?\n\n1. Yes\n2. No, type name"
 
     if len(recent_unattached) > 1:
         # Multiple recent payments → ask which one
