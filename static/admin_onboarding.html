@@ -997,6 +997,8 @@
     // For textarea: only Up/Down navigate fields; Left/Right edit text
     if (t.tagName === 'TEXTAREA' && (isArrowLeft || isArrowRight)) return;
 
+    // For non-textareas: all arrows navigate
+    // For textareas: Up/Down navigate, Left/Right edit (already returned above)
     e.preventDefault();
     const focusables = Array.from(this.querySelectorAll('input, select, textarea, button[type="submit"]'))
       .filter(el => !el.disabled && el.offsetParent !== null && el.type !== 'hidden');

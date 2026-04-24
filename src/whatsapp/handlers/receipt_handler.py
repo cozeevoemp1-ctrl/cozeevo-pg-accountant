@@ -602,14 +602,18 @@ async def _handle_gemini_receipt(
 async def _match_from_caption_tenant(caption: str, session: AsyncSession) -> tuple[Optional[str], Optional[Tenancy], Optional[Room]]:
     """Extract tenant info from caption. Returns (tenant_name, tenancy, room)."""
     from src.whatsapp.handlers._shared import _find_active_tenants_by_name
+    import logging
+    log = logging.getLogger(__name__)
 
     # Extract name-like words from caption (skip numbers, "receipt", "payment" etc.)
     clean = re.sub(r"\b(receipt|payment|paid|cash|upi|april|march|may|jan|feb|jun|jul|aug|sep|oct|nov|dec|\d+)\b", "", caption, flags=re.I).strip()
     if len(clean) < 2:
+        log.warning(f"[RECEIPT] Caption too short after cleaning: '{caption}' -> '{clean}'")
         return None, None, None
 
     # Use proper name matching (ilike with fallback to substring search)
     matches = await _find_active_tenants_by_name(clean, session)
+    log.info(f"[RECEIPT] Caption: '{caption}' | Clean: '{clean}' | Matches found: {len(matches)} | {[m[0].name for m in matches] if matches else 'NONE'}")
 
     if not matches:
         return None, None, None

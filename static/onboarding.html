@@ -1549,11 +1549,11 @@
     // For textarea: only Up/Down navigate fields; Left/Right edit text
     if (document.activeElement.tagName === 'TEXTAREA' && (isArrowLeft || isArrowRight)) return;
 
+    e.preventDefault();
     console.log('Arrow key pressed:', e.key, 'currentStep:', currentStep, 'activeElement:', document.activeElement.tagName, document.activeElement.id);
 
     // Right or Down arrow
     if (isArrowRight || isArrowDown) {
-      e.preventDefault();
       const fields = getFocusableFields(currentStep);
       console.log('Available fields in step', currentStep, ':', fields.length);
       const moved = focusNextField(currentStep);
