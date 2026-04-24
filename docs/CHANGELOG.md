@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.8] — 2026-04-24 — Fix receptionist dues query intent detection
+
+Fixed bug where Lokesh (receptionist) couldn't check dues because "check dues" was being misdetected as QUERY_TENANT instead of QUERY_DUES.
+
+### Changes
+- **intent_detector.py:** Moved "check dues/pending" pattern to Early QUERY_DUES (line 220) to take precedence over QUERY_TENANT
+  - Pattern matching now runs before QUERY_TENANT grabs the phrase
+  - Receptionist now correctly detects: "check dues", "check dues for tenants", "check pending"
+  - All variants now route to account_handler._query_dues() with confidence 0.92
+- **Improved QUERY_TENANT lookahead:** Added command verbs to negative lookahead (check, get, list, who, what, how) to prevent false-positives
+
+### Test cases passing
+```
+'check dues' → QUERY_DUES (0.92)
+'check dues for tenants' → QUERY_DUES (0.92)
+'check pending' → QUERY_DUES (0.92)
+'Raj balance' → QUERY_TENANT (0.88) [still works]
+```
+
+---
+
 ## [1.51.7] — 2026-04-24 — Fix amount extraction to recognize price/cost keywords
 
 Fixed bug where "Log expense water tanker 2 Lods price 3400" extracted amount=2 (incorrect).
