@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.12] — 2026-04-24 — Onboarding: Replace generic rules with 19 actual PG house rules
+
+Replaced placeholder house rules in digital onboarding form with 19 exact rules from physical PG document. Made maintenance fee dynamic.
+
+### Changes
+- **pdf_generator.py:** Updated `HOUSE_RULES` list (lines 26-46) with 19 actual rules from physical document (was 12 generic placeholders)
+- **pdf_generator.py:** Made rule 7 dynamic: changed hardcoded "Maintenance Charges are fixed @ Rs. 5000/-" to "Maintenance Charges are fixed @ {maintenance}/-"
+- **pdf_generator.py:** Added maintenance fee calculation (line 116) and passed to `rule.format()` for substitution
+- **onboarding_router.py:** Updated `_substitute_house_rules()` function to include maintenance parameter in rule substitution
+- **onboarding.html:** Rules now display the 19 actual rules in Step 5 (Agreement & Signature) for tenant form
+
+### Why
+The onboarding form was using generic placeholder rules instead of the actual 19 house rules from the physical Cozeevo document. Maintenance fee was hardcoded to Rs.5000 instead of using the actual maintenance_fee from the onboarding session form input by receptionist.
+
+---
+
 ## [1.51.11] — 2026-04-24 — QUERY_ALL_NOTICES: Monthly notice breakdown report
 
 New bot command to show all tenants on notice across all future months, organized by month.
