@@ -666,11 +666,9 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 if room:
                     obs.room_id = room.id
 
-        if not room:
-            raise HTTPException(400, "Room not assigned. Please specify a room number or assign one at approval time.")
-
+        # Room can be unassigned for future bookings (assigned later via ASSIGN_ROOM)
         building = ""
-        if room.property_id:
+        if room and room.property_id:
             prop = await session.get(Property, room.property_id)
             building = prop.name if prop else ""
 
@@ -704,24 +702,23 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             session.add(tenant)
             await session.flush()
 
-        rt = room.room_type
+        rt = room.room_type if room else None
         sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
         checkin = obs.checkin_date or date.today()
         is_daily = obs.stay_type == "daily"
 
-        # Double-booking guard — enforces master data, staff-room block,
-        # and bed-overlap on every approve. Must pass before we insert any
-        # Tenancy or DaywiseStay rows.
-        from src.services.room_occupancy import check_room_bookable
-        _guard_checkout = None
-        if is_daily:
-            _guard_checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
-        _, _guard_err = await check_room_bookable(
-            session, room.room_number, checkin, _guard_checkout,
-            property_id=room.property_id,
-        )
-        if _guard_err:
-            raise HTTPException(409, _guard_err)
+        # Double-booking guard — only if room is assigned
+        if room:
+            from src.services.room_occupancy import check_room_bookable
+            _guard_checkout = None
+            if is_daily:
+                _guard_checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
+            _, _guard_err = await check_room_bookable(
+                session, room.room_number, checkin, _guard_checkout,
+                property_id=room.property_id,
+            )
+            if _guard_err:
+                raise HTTPException(409, _guard_err)
 
         import asyncio as _aio
         import logging as _log
@@ -743,7 +740,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             total_amount = float(obs.agreed_rent or 0)  # agreed_rent stores total for daily
 
             dw = DaywiseStay(
-                room_number=room.room_number,
+                room_number=room.room_number if room else "TBD",
                 guest_name=td["name"],
                 phone=phone,
                 checkin_date=checkin,
@@ -770,7 +767,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 try:
                     from src.integrations.gsheets import add_daywise_stay as gsheets_dw
                     gs_r = await gsheets_dw(
-                        room_number=room.room_number, guest_name=td["name"], phone=phone_sheet,
+                        room_number=room.room_number if room else "TBD", guest_name=td["name"], phone=phone_sheet,
                         checkin=checkin.strftime("%d/%m/%Y"),
                         stay_period=dw.stay_period, num_days=num_days,
                         daily_rate=float(obs.daily_rate or 0),
@@ -809,7 +806,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 except ValueError:
                     sharing_default = None
             tenancy = Tenancy(
-                tenant_id=tenant.id, room_id=room.id, checkin_date=checkin,
+                tenant_id=tenant.id, room_id=room.id if room else None, checkin_date=checkin,
                 agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
                 booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
                 lock_in_months=obs.lock_in_months or 0,
@@ -853,9 +850,9 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
 
             # GSheets TENANTS + monthly tab (retry 3x)
             gsheet_kwargs = dict(
-                room_number=room.room_number, name=td["name"], phone=phone_sheet,
+                room_number=room.room_number if room else "TBD", name=td["name"], phone=phone_sheet,
                 gender=td.get("gender", ""), building=building,
-                floor=str(room.floor or ""), sharing=effective_sharing or sharing,
+                floor=str(room.floor or "") if room else "", sharing=effective_sharing or sharing,
                 checkin=checkin.strftime("%d/%m/%Y"),
                 agreed_rent=float(obs.agreed_rent or 0), deposit=float(obs.security_deposit or 0),
                 booking=float(obs.booking_amount or 0), maintenance=float(obs.maintenance_fee or 0),
@@ -986,10 +983,11 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 #              {{4}}=rent amount {{5}}=deposit amount
                 rent_str = f"Rs.{int(obs.agreed_rent or 0):,}"
                 deposit_str = f"Rs.{int(obs.security_deposit or 0):,}"
+                room_for_msg = room.room_number if room else "TBD"
                 tpl_sent = await _send_whatsapp_template(
                     phone_wa,
                     "cozeevo_booking_confirmation",
-                    [tenant_name, room.room_number, checkin_str, rent_str, deposit_str],
+                    [tenant_name, room_for_msg, checkin_str, rent_str, deposit_str],
                 )
                 # Fallback: if template not approved yet, send free text
                 # (works only if tenant messaged us in the last 24h).
@@ -998,7 +996,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                         phone_wa,
                         f"Welcome to Cozeevo, {tenant_name}!\n\n"
                         f"Your booking is confirmed.\n"
-                        f"Room: {room.room_number}\n"
+                        f"Room: {room_for_msg}\n"
                         f"Check-in: {checkin_str}\n"
                         f"Monthly rent: {rent_str}\n"
                         f"Deposit: {deposit_str}\n\n"
@@ -1055,7 +1053,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                                 entity_name=tenant_name, field=k,
                                 old_value=str(original_financial.get(k, "")),
                                 new_value=str(final_financial.get(k, "")),
-                                room_number=room.room_number, source="onboarding_review",
+                                room_number=room.room_number if room else "TBD", source="onboarding_review",
                                 note="receptionist override at approve",
                             ))
                     # Sharing-type override — tenancy-level only, never room.
@@ -1075,7 +1073,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                                 entity_id=tenant.id, entity_name=tenant_name, field=k,
                                 old_value=str(original_kyc.get(k, "") or ""),
                                 new_value=str(final_kyc.get(k, "") or ""),
-                                room_number=room.room_number, source="onboarding_review",
+                                room_number=room.room_number if room else "TBD", source="onboarding_review",
                                 note="receptionist override at approve",
                             ))
 

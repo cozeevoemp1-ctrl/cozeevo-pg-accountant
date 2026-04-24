@@ -379,7 +379,7 @@ class Tenancy(Base):
 
     id                  = Column(Integer, primary_key=True)
     tenant_id           = Column(Integer, ForeignKey("tenants.id"), nullable=False)
-    room_id             = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id             = Column(Integer, ForeignKey("rooms.id"), nullable=True)
     stay_type           = Column(Enum(StayType), nullable=False, default=StayType.monthly)
     sharing_type        = Column(Enum(SharingType), nullable=True)   # how tenant uses room; premium = occupies all beds
     status              = Column(Enum(TenancyStatus), nullable=False, default=TenancyStatus.active)

@@ -160,11 +160,13 @@ async def _payment_log(entities: dict, ctx: CallerContext, session: AsyncSession
     rows: list = []
     search_term = name
 
-    if name:
-        rows = await _find_active_tenants_by_name(name, session)
-    if not rows and room:
+    # Prioritize room lookup over name — room is unambiguous, name extraction is fragile
+    # (e.g., "for May" in message gets extracted as name="May" → matches Mayur)
+    if room:
         rows = await _find_active_tenants_by_room(room, session)
         search_term = f"Room {room}"
+    if not rows and name:
+        rows = await _find_active_tenants_by_name(name, session)
 
     if len(rows) == 0:
         suggestions = await _find_similar_names(name, session) if name else []
@@ -569,11 +571,12 @@ async def _void_payment(entities: dict, ctx: CallerContext, session: AsyncSessio
 
     rows: list = []
     search_term = name
-    if name:
-        rows = await _find_active_tenants_by_name(name, session)
-    if not rows and room:
+    # Prioritize room lookup over name — room is unambiguous
+    if room:
         rows = await _find_active_tenants_by_room(room, session)
         search_term = f"Room {room}"
+    if not rows and name:
+        rows = await _find_active_tenants_by_name(name, session)
 
     if len(rows) == 0:
         suggestions = await _find_similar_names(name, session) if name else []

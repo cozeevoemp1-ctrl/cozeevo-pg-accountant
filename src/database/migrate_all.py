@@ -1041,6 +1041,18 @@ async def run_add_staff_room_id_2026_04_20(conn) -> None:
     print("  [ok] staff.room_id migration complete")
 
 
+async def run_allow_unassigned_room_2026_04_24(conn) -> None:
+    """Allow room_id to be NULL on tenancies for future bookings. Added 2026-04-24."""
+    print("\n== Make tenancies.room_id nullable ==")
+    try:
+        await conn.execute(text(
+            "ALTER TABLE tenancies ALTER COLUMN room_id DROP NOT NULL"
+        ))
+        print("  [ok] tenancies.room_id is now nullable")
+    except Exception as e:
+        print(f"  [skip] tenancies.room_id nullable: {e}")
+
+
 async def run_unhandled_requests_table(conn) -> None:
     """Create unhandled_requests table for logging unknown intents. Added 2026-04-13."""
     print("\n== Create unhandled_requests table ==")
@@ -1178,6 +1190,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_extend_onboarding_sessions(conn)
             await run_add_org_id_2026_04_19(conn)
             await run_add_staff_room_id_2026_04_20(conn)
+            await run_allow_unassigned_room_2026_04_24(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)
