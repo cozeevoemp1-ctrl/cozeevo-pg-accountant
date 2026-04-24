@@ -1347,37 +1347,28 @@ async def get_session_creation_form(pin: str = None):
 
             // Arrow key navigation between form fields
             const formFields = [
-                'agreed_rent',
-                'tenant_phone',
-                'checkin_date',
-                'room_number',
-                'security_deposit',
-                'maintenance_fee',
+                document.getElementById('agreed_rent'),
+                document.getElementById('tenant_phone'),
+                document.getElementById('checkin_date'),
+                document.getElementById('room_number'),
+                document.getElementById('security_deposit'),
+                document.getElementById('maintenance_fee'),
             ];
 
-            document.addEventListener('keydown', (e) => {
-                const isArrowDown = e.key === 'ArrowDown';
-                const isArrowUp = e.key === 'ArrowUp';
-                const isArrowRight = e.key === 'ArrowRight';
-                const isArrowLeft = e.key === 'ArrowLeft';
-
-                if (!(isArrowDown || isArrowUp || isArrowRight || isArrowLeft)) return;
-
-                const activeElement = document.activeElement;
-                if (!activeElement || !formFields.includes(activeElement.id)) return;
-
-                e.preventDefault();
-
-                const currentIndex = formFields.indexOf(activeElement.id);
-                let nextIndex = currentIndex;
-
-                if (isArrowDown || isArrowRight) {
-                    nextIndex = (currentIndex + 1) % formFields.length;
-                } else if (isArrowUp || isArrowLeft) {
-                    nextIndex = (currentIndex - 1 + formFields.length) % formFields.length;
-                }
-
-                document.getElementById(formFields[nextIndex]).focus();
+            formFields.forEach((field, index) => {
+                if (!field) return;
+                field.addEventListener('keydown', (e) => {
+                    const key = e.key;
+                    if (key === 'ArrowDown' || key === 'ArrowRight') {
+                        e.preventDefault();
+                        const nextField = formFields[(index + 1) % formFields.length];
+                        if (nextField) nextField.focus();
+                    } else if (key === 'ArrowUp' || key === 'ArrowLeft') {
+                        e.preventDefault();
+                        const prevField = formFields[(index - 1 + formFields.length) % formFields.length];
+                        if (prevField) prevField.focus();
+                    }
+                });
             });
 
             document.getElementById('sessionForm').addEventListener('submit', async (e) => {
