@@ -236,8 +236,10 @@ async def create_session(req: CreateSessionRequest, request: Request):
                     await _send_whatsapp(phone_wa, "\n".join(summary_lines))
                     whatsapp_sent = True
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).error("WhatsApp onboarding link send failed: %s", e)
+                import logging, traceback
+                logger = logging.getLogger(__name__)
+                logger.error("WhatsApp onboarding link send FAILED for %s: %s\n%s",
+                            req.tenant_phone, e, traceback.format_exc())
 
         return {
             "token": token,
