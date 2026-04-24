@@ -2,24 +2,6 @@
 
 All notable changes to PG Accountant will be documented here.
 
-## [1.51.9] — 2026-04-24 — Daily stay form auto-calculation UX
-
-Enhanced admin onboarding form for daily stay sessions with intelligent field auto-calculation.
-
-### Changes
-- **Daily stay date auto-sync:** Check-in, check-out, and number of days fields now intelligently auto-fill based on user input
-  - User enters check-in + num_days → check-out date auto-calculates
-  - User enters check-out + check-in → number of days auto-calculates
-  - User changes check-out → number of days updates accordingly
-  - Works on real-time `input` events for immediate staff feedback
-- **Total amount auto-calculation:** agreed_rent (num_days × daily_rate) updates whenever any related field changes
-- **Implementation:** New `syncDailyStayFields(changedFieldId)` function tracks which field was modified and intelligently calculates missing fields
-  - Only auto-fills empty/zero fields; respects existing user input
-  - Event listeners on checkin_date, checkout_date, num_days, daily_rate
-- **Result:** Faster daily stay data entry, fewer manual calculation errors, better UX for Lokesh
-
----
-
 ## [1.51.8] — 2026-04-24 — Fix receptionist dues query intent detection
 
 Fixed bug where Lokesh (receptionist) couldn't check dues because "check dues" was being misdetected as QUERY_TENANT instead of QUERY_DUES.
