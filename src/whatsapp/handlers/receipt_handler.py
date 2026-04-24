@@ -32,6 +32,7 @@ from src.database.models import (
 )
 from src.whatsapp.role_service import CallerContext
 from src.whatsapp.handlers._shared import _save_pending
+from src.whatsapp.intent_detector import _MONTH_NAMES
 
 # ── Keyword patterns for auto-classification ─────────────────────────────
 
@@ -605,8 +606,11 @@ async def _match_from_caption_tenant(caption: str, session: AsyncSession) -> tup
     import logging
     log = logging.getLogger(__name__)
 
-    # Extract name-like words from caption (skip numbers, "receipt", "payment" etc.)
-    clean = re.sub(r"\b(receipt|payment|paid|cash|upi|april|march|may|jan|feb|jun|jul|aug|sep|oct|nov|dec|\d+)\b", "", caption, flags=re.I).strip()
+    # Extract name-like words from caption (skip numbers, "receipt", "payment" etc., and all month names)
+    clean = re.sub(r"\b(receipt|payment|paid|cash|upi|\d+)\b", "", caption, flags=re.I).strip()
+    # Remove month names using the canonical list
+    clean = " ".join(w for w in clean.split() if w.lower() not in _MONTH_NAMES).strip()
+
     if len(clean) < 2:
         log.warning(f"[RECEIPT] Caption too short after cleaning: '{caption}' -> '{clean}'")
         return None, None, None
@@ -627,8 +631,11 @@ async def _match_from_caption(caption: str, session: AsyncSession) -> tuple[Opti
     """Try to find a payment matching the caption (tenant name + optional month)."""
     from src.whatsapp.handlers._shared import _find_active_tenants_by_name
 
-    # Extract name-like words from caption (skip numbers, "receipt", "payment" etc.)
-    clean = re.sub(r"\b(receipt|payment|paid|cash|upi|april|march|may|jan|feb|jun|jul|aug|sep|oct|nov|dec|\d+)\b", "", caption, flags=re.I).strip()
+    # Extract name-like words from caption (skip numbers, "receipt", "payment" etc., and all month names)
+    clean = re.sub(r"\b(receipt|payment|paid|cash|upi|\d+)\b", "", caption, flags=re.I).strip()
+    # Remove month names using the canonical list
+    clean = " ".join(w for w in clean.split() if w.lower() not in _MONTH_NAMES).strip()
+
     if len(clean) < 2:
         return None, ""
 
