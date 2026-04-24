@@ -1441,6 +1441,139 @@
       this.value = this.value.replace(/\D/g, '').slice(0, 10);
     });
   });
+
+  // ── Arrow key navigation between fields ─────────────────────────────────────
+  function getFocusableFields(stepNum) {
+    const step = document.getElementById('step-' + stepNum);
+    if (!step) return [];
+
+    // Collect all focusable form elements in order (text, tel, email, date, number, textarea, select, radio)
+    const inputs = step.querySelectorAll(
+      'input[type="text"], input[type="tel"], input[type="email"], input[type="date"], ' +
+      'input[type="number"], textarea, select'
+    );
+    const radios = step.querySelectorAll('input[type="radio"]');
+
+    const fields = Array.from(inputs);
+
+    // For radio groups, add only the first radio of each group
+    const radioGroups = new Set();
+    radios.forEach(radio => {
+      if (!radioGroups.has(radio.name)) {
+        radioGroups.add(radio.name);
+        fields.push(radio);
+      }
+    });
+
+    // Checkboxes (like agree-checkbox)
+    const checkboxes = step.querySelectorAll('input[type="checkbox"]');
+    fields.push(...checkboxes);
+
+    // Sort by DOM order
+    return fields.sort((a, b) => {
+      const aPos = a.compareDocumentPosition(b);
+      return aPos === Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+  }
+
+  function focusNextField(stepNum) {
+    const fields = getFocusableFields(stepNum);
+    if (!fields.length) return false;
+
+    const active = document.activeElement;
+    let currentIdx = fields.indexOf(active);
+
+    // If no field is focused, focus first one
+    if (currentIdx === -1) {
+      fields[0].focus();
+      return true;
+    }
+
+    // Move to next field
+    if (currentIdx < fields.length - 1) {
+      const nextField = fields[currentIdx + 1];
+      // For radio buttons, focus the checked one
+      if (nextField.type === 'radio') {
+        const group = document.querySelector(`input[name="${nextField.name}"]:checked`) || nextField;
+        group.focus();
+      } else {
+        nextField.focus();
+      }
+      return true;
+    }
+
+    // At last field — return false to signal we should go to next step
+    return false;
+  }
+
+  function focusPrevField(stepNum) {
+    const fields = getFocusableFields(stepNum);
+    if (!fields.length) return false;
+
+    const active = document.activeElement;
+    let currentIdx = fields.indexOf(active);
+
+    // If no field is focused, focus last one
+    if (currentIdx === -1) {
+      fields[fields.length - 1].focus();
+      return true;
+    }
+
+    // Move to previous field
+    if (currentIdx > 0) {
+      const prevField = fields[currentIdx - 1];
+      // For radio buttons, focus the checked one
+      if (prevField.type === 'radio') {
+        const group = document.querySelector(`input[name="${prevField.name}"]:checked`) || prevField;
+        group.focus();
+      } else {
+        prevField.focus();
+      }
+      return true;
+    }
+
+    // At first field — return false to signal we should go to previous step
+    return false;
+  }
+
+  // Keyboard handler for arrow keys
+  document.addEventListener('keydown', function(e) {
+    if (!currentStep || currentStep > 5) return;
+
+    const isArrowRight = e.key === 'ArrowRight';
+    const isArrowLeft = e.key === 'ArrowLeft';
+    const isArrowDown = e.key === 'ArrowDown';
+    const isArrowUp = e.key === 'ArrowUp';
+
+    // Right or Down arrow
+    if (isArrowRight || isArrowDown) {
+      e.preventDefault();
+      const moved = focusNextField(currentStep);
+      if (!moved && currentStep < 5) {
+        // At last field, go to next step
+        if (validateStep(currentStep)) {
+          goToStep(currentStep + 1);
+          // Auto-focus first field in next step
+          setTimeout(() => focusNextField(currentStep + 1), 100);
+        }
+      }
+    }
+
+    // Left or Up arrow
+    if (isArrowLeft || isArrowUp) {
+      e.preventDefault();
+      const moved = focusPrevField(currentStep);
+      if (!moved && currentStep > 1) {
+        // At first field, go to previous step
+        goToStep(currentStep - 1);
+        // Auto-focus last field in previous step
+        setTimeout(() => {
+          const fields = getFocusableFields(currentStep - 1);
+          if (fields.length) fields[fields.length - 1].focus();
+        }, 100);
+      }
+    }
+  });
 </script>
 
 <!-- Selfie camera modal -->

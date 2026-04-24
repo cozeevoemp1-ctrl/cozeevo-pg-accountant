@@ -82,7 +82,8 @@ async def handle_owner(
     # Financial intents are handled by AccountWorker (account_handler.py).
     # Only operational intents remain here.
     handlers = {
-        "ADD_TENANT":         _add_tenant_prompt,
+        # "ADD_TENANT": DEPRECATED — now routes to START_ONBOARDING (unified web form)
+        # "ADD_TENANT":         _add_tenant_prompt,
         "CHECKOUT":           _checkout_prompt,
         "SCHEDULE_CHECKOUT":  _checkout_prompt,   # same handler — date in entities distinguishes
         "UPDATE_CHECKIN":     _update_checkin,

@@ -58,7 +58,7 @@ def _check_admin_pin(request: Request):
 # ── Pydantic models ──────────────────────────────────────────────────────────
 
 class CreateSessionRequest(BaseModel):
-    room_number: str
+    room_number: str = ""  # Optional — for future check-ins, room can be assigned later
     sharing_type: str = ""  # single/double/triple — override room default
     agreed_rent: float
     security_deposit: float = 0
@@ -141,14 +141,16 @@ async def create_session(req: CreateSessionRequest, request: Request):
             for old_obs in old.scalars().all():
                 old_obs.status = "cancelled"
 
-        room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
-        if not room:
-            raise HTTPException(404, f"Room {req.room_number} not found")
-
+        # Lookup room if provided, otherwise allow future room assignment
+        room = None
         building = ""
-        if room.property_id:
-            prop = await session.get(Property, room.property_id)
-            building = prop.name if prop else ""
+        if req.room_number and req.room_number.strip():
+            room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
+            if not room:
+                raise HTTPException(404, f"Room {req.room_number} not found")
+            if room.property_id:
+                prop = await session.get(Property, room.property_id)
+                building = prop.name if prop else ""
 
         token = str(uuid.uuid4())
         obs = OnboardingSession(
@@ -156,7 +158,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
             status="pending_tenant",
             created_by_phone=req.created_by_phone,
             tenant_phone=req.tenant_phone,
-            room_id=room.id,
+            room_id=room.id if room else None,
             agreed_rent=Decimal(str(req.agreed_rent)),
             security_deposit=Decimal(str(req.security_deposit)),
             maintenance_fee=Decimal(str(req.maintenance_fee)),
@@ -175,8 +177,10 @@ async def create_session(req: CreateSessionRequest, request: Request):
         session.add(obs)
         await session.flush()
 
-        rt = room.room_type
-        sharing = req.sharing_type if req.sharing_type else (rt.value if hasattr(rt, 'value') else str(rt or ""))
+        # Determine sharing type (from override, room master data, or request param)
+        sharing = req.sharing_type if req.sharing_type else (
+            (room.room_type.value if hasattr(room.room_type, 'value') else str(room.room_type)) if room else ""
+        )
 
         # Calculate dues
         # Monthly stay: first-month rent is prorated by default on check-in date.
@@ -203,17 +207,22 @@ async def create_session(req: CreateSessionRequest, request: Request):
                     phone_wa = "91" + phone_wa
                 rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else "Rs.0"
 
-                # Try template first (works without 24hr window)
-                try:
-                    await _send_whatsapp_template(
-                        phone_wa, "cozeevo_checkin_form",
-                        [room.room_number, rent_str, onboard_link]
-                    )
-                    whatsapp_sent = True
-                except Exception:
-                    # Fallback to regular message (needs 24hr window)
+                # Try template first if room is assigned (works without 24hr window)
+                if room:
+                    try:
+                        await _send_whatsapp_template(
+                            phone_wa, "cozeevo_checkin_form",
+                            [room.room_number, rent_str, onboard_link]
+                        )
+                        whatsapp_sent = True
+                    except Exception:
+                        pass  # Fall through to regular message
+
+                # Fallback to regular message (needs 24hr window, or room not yet assigned)
+                if not whatsapp_sent:
                     summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
-                    summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
+                    if room:
+                        summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
                     summary_lines.append(f"Rent: {rent_str}/month")
                     summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
                     summary_lines.append(f"\nThis link is valid for 2 hours.")
@@ -230,7 +239,12 @@ async def create_session(req: CreateSessionRequest, request: Request):
             "session_id": obs.id,
             "whatsapp_sent": whatsapp_sent,
             "dues_due": dues_due,
-            "room": {"number": room.room_number, "building": building, "floor": str(room.floor or ""), "sharing": sharing},
+            "room": {
+                "number": room.room_number if room else "TBD",
+                "building": building if room else "",
+                "floor": str(room.floor or "") if room else "",
+                "sharing": sharing
+            },
         }
 
 
@@ -627,9 +641,25 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         if not td.get("name") or not td.get("phone"):
             raise HTTPException(400, "Tenant data incomplete")
 
-        room = await session.get(Room, obs.room_id)
+        # If room was not assigned at creation time (future booking), allow override now
+        room = None
+        if obs.room_id:
+            room = await session.get(Room, obs.room_id)
+
+        # Check if receptionist is assigning room at approval time via override
+        if "room_id" in overrides or "room_number" in overrides:
+            room_identifier = overrides.get("room_number") or overrides.get("room_id")
+            if room_identifier:
+                # Try to look up by room_number if it's a string
+                if isinstance(room_identifier, str):
+                    room = await session.scalar(select(Room).where(Room.room_number.ilike(room_identifier)))
+                else:
+                    room = await session.get(Room, room_identifier)
+                if room:
+                    obs.room_id = room.id
+
         if not room:
-            raise HTTPException(400, "Room not found")
+            raise HTTPException(400, "Room not assigned. Please specify a room number or assign one at approval time.")
 
         building = ""
         if room.property_id:

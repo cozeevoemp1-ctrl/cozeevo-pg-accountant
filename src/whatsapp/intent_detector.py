@@ -286,8 +286,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"assign\s+(?:room\s+)?[\w-]+\s+to\s+\w+|assign\s+\w+\s+(?:to\s+)?room\s+[\w-]+|allocate\s+room|room\s+assign|allot\s+room", re.I), "ASSIGN_ROOM", 0.94),
     # Immediate checkout (no date)
     (re.compile(r"(?:check.?out|vacate|vacating|leaving|exit|moving out|ja\s+raha\s+hai\b|chhod\s+raha\s+hai\b)", re.I), "CHECKOUT", 0.95),
-    # Add tenant
-    (re.compile(r"(?:add\s+te(?:nant?|ant|nent|nnant?)\b|new\s+tenant|new\s+admission|\badmit\s+\w+|\btenant\s+\w+\s+\d{7,}|\bcheck.?in\b|joining|new\s+room|onboard|register\s+tenant|naya\s+tenant\b|tenant\s+add\s+karo)", re.I), "ADD_TENANT", 0.95),
+    # Add tenant — DEPRECATED: now routes to START_ONBOARDING (unified web form flow)
+    # Old patterns: "add tenant", "new checkin", "joining", "check in", "register tenant"
+    # These now trigger the onboarding form instead of the old ADD_TENANT bot flow.
+    # (re.compile(r"(?:add\s+te(?:nant?|ant|nent|nnant?)\b|new\s+tenant|new\s+admission|\badmit\s+\w+|\btenant\s+\w+\s+\d{7,}|\bcheck.?in\b|joining|new\s+room|onboard|register\s+tenant|naya\s+tenant\b|tenant\s+add\s+karo)", re.I), "ADD_TENANT", 0.95),
     # Rent change (permanent or from a month) — must come before RENT_DISCOUNT
     (re.compile(r"rent (?:is now|from\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next)|change|increase|hike|reduce|decrease)|new rent|from \w+ rent|rent to \d|from\s+next\s+month\s+rent|room\s+[\w-]+\s+rent\s+(?:\d|updated?|changed?|revised?)|(?:change|update|revise|set|increase)\s+rent\b|room\s+[\w-]+\s+to\s+\d{4,}|increase\s+rent\s+(?:for\s+)?room|(?:change|update|revise|set|increase)\s+rent\s+(?:for\s+)?(?:room|[A-Z][a-z]+)\b", re.I), "RENT_CHANGE", 0.91),
     # One-time discount / concession / surcharge
