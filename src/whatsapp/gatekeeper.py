@@ -10,7 +10,7 @@ handles what; all workers remain unaware of each other.
 Routing rules (3 tiers):
   admin        → full access (financial + operational + L0 master data)
   owner        → financial + operational (no L0 master data changes)
-  receptionist → payment logging + individual queries (no financial reports)
+  receptionist → payment logging + expense management + individual queries (no financial reports / P&L)
   tenant       → TenantWorker   (tenant_handler)
   lead / unknown → LeadWorker  (lead_handler)
 """
@@ -27,14 +27,11 @@ from src.whatsapp.role_service import CallerContext
 OWNER_ROLES: frozenset[str] = frozenset({"admin", "owner"})
 
 # Intents the receptionist role is BLOCKED from.
-# Financial summaries, bank features, and expense management are restricted.
+# Financial summaries and bank features restricted; receptionists can manage expenses.
 RECEPTIONIST_BLOCKED: frozenset[str] = frozenset({
     "REPORT",            # monthly financial report / P&L
     "BANK_REPORT",       # bank statement analysis
     "BANK_DEPOSIT_MATCH",# bank deposit matching
-    "QUERY_EXPENSES",    # expense breakdown
-    "ADD_EXPENSE",       # log expenses
-    "VOID_EXPENSE",      # cancel expenses
     "ADD_REFUND",        # process refunds
     "QUERY_REFUNDS",     # list refunds
     "VOID_PAYMENT",      # void/reverse payments
