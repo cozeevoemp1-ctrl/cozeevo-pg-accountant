@@ -139,22 +139,24 @@ async def handle_receipt_upload(
 
     # ── Try to determine which payment this receipt belongs to ────────────
 
-    # Option 1: Caption has tenant name → match to recent payment
+    # Option 1: Caption has tenant name → ask for confirmation before attaching
     if caption:
-        payment, match_info = await _match_from_caption(caption, session)
-        if payment:
-            file_path = await download_whatsapp_media(
-                media_id, media_mime, "receipts",
-                filename_prefix=f"pay{payment.id}",
-            )
-            if file_path:
-                await _attach_receipt(payment, file_path, media_mime, phone, session)
-                return (
-                    f"Receipt saved for *{match_info}*\n"
-                    f"Amount: Rs.{int(payment.amount):,} ({payment.payment_mode.value.upper()})\n"
-                    f"Month: {payment.period_month.strftime('%B %Y') if payment.period_month else 'N/A'}"
-                )
-            return "Could not download the image. Please try sending again."
+        tenant_info, tenancy, room = await _match_from_caption_tenant(caption, session)
+        if tenant_info:
+            # Ask for confirmation before attaching
+            choices = [
+                {"seq": 1, "intent": "CONFIRM_RECEIPT", "label": "Yes"},
+                {"seq": 2, "intent": "CONFIRM_RECEIPT", "label": "No, type name"},
+            ]
+            action_data = {
+                "media_id": media_id,
+                "media_mime": media_mime,
+                "tenancy_id": tenancy.id,
+                "tenant_name": tenant_info,
+                "room_number": room.room_number if room else "?",
+            }
+            await _save_pending(phone, "RECEIPT_CONFIRM", action_data, choices, session)
+            return f"Is this receipt for *{tenant_info}* (Room {room.room_number})?\n\n1. Yes\n2. No"
 
     # Option 2: No caption or caption didn't match → check recent payments from this phone
     recent_unattached = await _get_recent_unattached_payments(phone, session, minutes=30)
@@ -595,39 +597,43 @@ async def _handle_gemini_receipt(
 
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
+async def _match_from_caption_tenant(caption: str, session: AsyncSession) -> tuple[Optional[str], Optional[Tenancy], Optional[Room]]:
+    """Extract tenant info from caption. Returns (tenant_name, tenancy, room)."""
+    from src.whatsapp.handlers._shared import _find_active_tenants_by_name
+
+    # Extract name-like words from caption (skip numbers, "receipt", "payment" etc.)
+    clean = re.sub(r"\b(receipt|payment|paid|cash|upi|april|march|may|jan|feb|jun|jul|aug|sep|oct|nov|dec|\d+)\b", "", caption, flags=re.I).strip()
+    if len(clean) < 2:
+        return None, None, None
+
+    # Use proper name matching (ilike with fallback to substring search)
+    matches = await _find_active_tenants_by_name(clean, session)
+
+    if not matches:
+        return None, None, None
+
+    # Use the first (best) match
+    tenant, tenancy, room = matches[0]
+    return tenant.name, tenancy, room
+
+
 async def _match_from_caption(caption: str, session: AsyncSession) -> tuple[Optional[Payment], str]:
     """Try to find a payment matching the caption (tenant name + optional month)."""
-    from src.whatsapp.handlers._shared import _fuzzy_match_tenant
+    from src.whatsapp.handlers._shared import _find_active_tenants_by_name
 
     # Extract name-like words from caption (skip numbers, "receipt", "payment" etc.)
     clean = re.sub(r"\b(receipt|payment|paid|cash|upi|april|march|may|jan|feb|jun|jul|aug|sep|oct|nov|dec|\d+)\b", "", caption, flags=re.I).strip()
     if len(clean) < 2:
         return None, ""
 
-    # Try fuzzy tenant match
-    rows = await session.execute(
-        select(Tenant, Tenancy)
-        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
-        .where(Tenancy.status == TenancyStatus.active)
-    )
-    all_tenants = rows.all()
+    # Use proper name matching (ilike with fallback to substring search)
+    matches = await _find_active_tenants_by_name(clean, session)
 
-    # Simple name matching
-    best_match = None
-    best_score = 0
-    for tenant, tenancy in all_tenants:
-        name_lower = (tenant.name or "").lower()
-        caption_lower = clean.lower()
-        if caption_lower in name_lower or name_lower in caption_lower:
-            score = len(name_lower)
-            if score > best_score:
-                best_match = (tenant, tenancy)
-                best_score = score
-
-    if not best_match:
+    if not matches:
         return None, ""
 
-    tenant, tenancy = best_match
+    # Use the first (best) match
+    tenant, tenancy, room = matches[0]
 
     # Find most recent unattached payment for this tenant
     payment = await session.scalar(
@@ -642,7 +648,6 @@ async def _match_from_caption(caption: str, session: AsyncSession) -> tuple[Opti
     )
 
     if payment:
-        room = await session.get(Room, tenancy.room_id)
         room_label = f" (Room {room.room_number})" if room else ""
         return payment, f"{tenant.name}{room_label}"
 

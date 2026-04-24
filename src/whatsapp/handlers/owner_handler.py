@@ -21,6 +21,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
 from sqlalchemy import select, and_, or_, func, case as sa_case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -3227,6 +3228,91 @@ async def resolve_pending_action(
 
             return result
         return "__KEEP_PENDING__Reply *Yes* to save the new tenant or *No* to cancel."
+
+    if pending.intent == "RECEIPT_CONFIRM":
+        if is_negative(reply_text):
+            # User said No, cancel and ask them to send photo again with correct name
+            return (
+                "Cancelled. Send the receipt photo again with the correct tenant name in the caption.\n"
+                "Example: *ganesh divekar* (just the name, nothing else)"
+            )
+        if is_affirmative(reply_text):
+            # User confirmed, attach the receipt
+            from src.whatsapp.media_handler import download_whatsapp_media
+            from src.whatsapp.handlers.receipt_handler import _attach_receipt
+
+            media_id = action_data.get("media_id")
+            media_mime = action_data.get("media_mime")
+            tenancy_id = action_data.get("tenancy_id")
+            tenant_name = action_data.get("tenant_name")
+            room_number = action_data.get("room_number")
+
+            if not media_id or not tenancy_id:
+                return "Error: missing media or tenancy info."
+
+            try:
+                # Find most recent unattached payment for this tenancy
+                payment = await session.scalar(
+                    select(Payment)
+                    .where(
+                        Payment.tenancy_id == tenancy_id,
+                        Payment.is_void == False,
+                        Payment.receipt_url.is_(None),
+                    )
+                    .order_by(desc(Payment.created_at))
+                    .limit(1)
+                )
+
+                if not payment:
+                    return (
+                        f"No pending payment found for {tenant_name} "
+                        f"(Room {room_number}) to attach this receipt to.\n\n"
+                        "Please log the payment first."
+                    )
+
+                # Download and attach
+                file_path = await download_whatsapp_media(
+                    media_id, media_mime, "receipts",
+                    filename_prefix=f"pay{payment.id}",
+                )
+
+                if not file_path:
+                    return "Could not download the image. Please try sending again."
+
+                await _attach_receipt(payment, file_path, media_mime, pending.phone, session)
+
+                return (
+                    f"✅ Receipt saved for *{tenant_name}* (Room {room_number})\n"
+                    f"Amount: Rs.{int(payment.amount):,} ({payment.payment_mode.value.upper()})\n"
+                    f"Month: {payment.period_month.strftime('%B %Y') if payment.period_month else 'N/A'}"
+                )
+            except Exception as e:
+                logger.exception(f"[RECEIPT_CONFIRM] Error: {e}")
+                return f"Error saving receipt: {str(e)}"
+
+        # If not Yes/No, treat as correction — save corrected name and ask confirmation again
+        tenant_name_input = reply_text.strip()
+        if len(tenant_name_input) >= 3:
+            from src.whatsapp.handlers._shared import _find_active_tenants_by_name
+            matches = await _find_active_tenants_by_name(tenant_name_input, session)
+            if matches:
+                tenant, tenancy, room = matches[0]
+                action_data["tenant_name"] = tenant.name
+                action_data["tenancy_id"] = tenancy.id
+                action_data["room_number"] = room.room_number if room else "?"
+                pending.action_data = json.dumps(action_data)
+                await session.flush()
+                return (
+                    "__KEEP_PENDING__"
+                    f"Is this receipt for *{tenant.name}* (Room {room.room_number})?\n\n"
+                    "1. Yes\n"
+                    "2. No"
+                )
+        return (
+            "__KEEP_PENDING__"
+            f"Is this receipt for *{action_data.get('tenant_name')}* (Room {action_data.get('room_number')})?\n"
+            "Reply *Yes* / *No* or type a different tenant name."
+        )
 
     if pending.intent == "UPDATE_TENANT_NOTES_STEP":
         ans = reply_text.strip()
