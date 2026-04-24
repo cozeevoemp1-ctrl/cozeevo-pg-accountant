@@ -219,14 +219,15 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:expense|electricity\s+(?:bill\s+)?\d|water\s+bill|internet\s+bill|salary|maintenance\s+cost|paid\s+for|vendor|repair\s+\d|\d+\s+repair|generator\s+(?:maintenance|fuel|diesel|repair|rent|bill|expense|cost)\b|diesel\s+\d|\d+\s+diesel)", re.I), "ADD_EXPENSE", 0.88),
     # Amount-first expense shorthand: "5000 cash maintenance", "3000 upi electricity"
     (re.compile(rf"^\d[\d,k]+\s+(?:{_MODES_CORE})\s+(?:maintena?na?ce?|cleaning|repair|electricity|water|internet|generator|groceries?|housekeeping|supplies|security|pest|plumbing|painting|furniture|food)\b", re.I), "ADD_EXPENSE", 0.92),
-    # Early QUERY_DUES — explicit patterns before QUERY_TENANT grabs "outstanding"/"month" as a name
-    # Includes: "check dues", "[Name] dues", "room X dues", monthly reports, etc.
+    # Early QUERY_DUES — explicit patterns BEFORE QUERY_TENANT (which grabs bare names)
     (re.compile(
-        r"(?:check\s+(?:dues|pending)|outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka)|(?:\w+(?:\s+\w+)*)\s+dues\b|room\s+[\w-]+\s+dues\b)",
+        r"(?:check\s+(?:dues|pending)|show\s+(?:dues|pending)|pending\s+(?:dues|list)|outstanding\s+dues\b|dues\s+(?:for\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?|backlogs?\b|kisne\s+nahi\s+diya|defaulters?\s+(?:list|log)|baki\s+(?:list|sabka))",
         re.I
     ), "QUERY_DUES", 0.92),
     # "did Raj pay this month?" / "did Suresh pay?" — query, NOT payment log
     (re.compile(r"did\s+(?!my\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)\s+pay\b", re.I), "QUERY_TENANT", 0.92),
+    # "[Name] dues" / "Room X dues" — specific tenant query (simple: just name/room + dues)
+    (re.compile(r"(?:room\s+[\d\w-]+|(?:[A-Z][a-z]+\s+)?[A-Z][a-z]+(?:\s+[a-z]+)*)\s+(?:dues|balance|status)", re.I), "QUERY_TENANT", 0.92),
     # "change/set/update rent for X" — MUST come before QUERY_TENANT rent_for rule
     (re.compile(r"(?:change|update|set|increase|decrease|revise|hike|reduce)\s+rent\s+(?:for|of)\s+\w", re.I), "RENT_CHANGE", 0.93),
     # "what is the rent for X" / "what's X's rent from July" — tenant account query
