@@ -1345,6 +1345,41 @@ async def get_session_creation_form(pin: str = None):
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('checkin_date').value = today;
 
+            // Arrow key navigation between form fields
+            const formFields = [
+                'agreed_rent',
+                'tenant_phone',
+                'checkin_date',
+                'room_number',
+                'security_deposit',
+                'maintenance_fee',
+            ];
+
+            document.addEventListener('keydown', (e) => {
+                const isArrowDown = e.key === 'ArrowDown';
+                const isArrowUp = e.key === 'ArrowUp';
+                const isArrowRight = e.key === 'ArrowRight';
+                const isArrowLeft = e.key === 'ArrowLeft';
+
+                if (!(isArrowDown || isArrowUp || isArrowRight || isArrowLeft)) return;
+
+                const activeElement = document.activeElement;
+                if (!activeElement || !formFields.includes(activeElement.id)) return;
+
+                e.preventDefault();
+
+                const currentIndex = formFields.indexOf(activeElement.id);
+                let nextIndex = currentIndex;
+
+                if (isArrowDown || isArrowRight) {
+                    nextIndex = (currentIndex + 1) % formFields.length;
+                } else if (isArrowUp || isArrowLeft) {
+                    nextIndex = (currentIndex - 1 + formFields.length) % formFields.length;
+                }
+
+                document.getElementById(formFields[nextIndex]).focus();
+            });
+
             document.getElementById('sessionForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
 
