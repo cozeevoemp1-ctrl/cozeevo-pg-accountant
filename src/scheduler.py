@@ -127,41 +127,13 @@ def start_scheduler() -> AsyncIOScheduler:
 
     # ── Register jobs ──────────────────────────────────────────────────────────
 
+    # ❌ DISABLED: Rent reminders disabled per Kiran's instruction (causing spam to Mayur + others)
     # Tier 1 — ADVANCE reminder, 2 days before the next month begins.
-    # Fires daily 09:00 IST; the job self-checks for (last_day_of_month - 1).
-    # Sends `rent_reminder` template to EVERY active tenant for NEXT month.
-    scheduler.add_job(
-        _rent_reminder,
-        trigger=CronTrigger(hour=9, minute=0),
-        id="rent_reminder_advance",
-        name="Rent Reminder — 2 days before next month",
-        replace_existing=True,
-        kwargs={"mode": "advance"},
-    )
-
-    # Tier 2 — DAY 1 reminder. Same ID as before (rent_reminder_early) but
-    # the logic now targets ALL active tenants, not only unpaid.
-    scheduler.add_job(
-        _rent_reminder,
-        trigger=CronTrigger(day=1, hour=9, minute=0),
-        id="rent_reminder_early",
-        name="Rent Reminder — 1st of month (all active)",
-        replace_existing=True,
-        kwargs={"mode": "day1"},
-    )
-
-    # Tier 3 — DAILY OVERDUE chaser, day 2 through end of month. Re-uses the
-    # old `rent_reminder_late` ID so the existing apscheduler_jobs row gets
-    # replaced cleanly on startup. Self-skips on day 1. Uses general_notice
-    # template so the Rs.200/day-from-day-6 late-fee warning can be inlined.
-    scheduler.add_job(
-        _rent_reminder,
-        trigger=CronTrigger(hour=9, minute=0),
-        id="rent_reminder_late",
-        name="Rent Reminder — daily overdue chaser (day 2+ unpaid)",
-        replace_existing=True,
-        kwargs={"mode": "overdue_daily"},
-    )
+    # scheduler.add_job(_rent_reminder, trigger=CronTrigger(hour=9, minute=0), id="rent_reminder_advance", kwargs={"mode": "advance"})
+    # Tier 2 — DAY 1 reminder
+    # scheduler.add_job(_rent_reminder, trigger=CronTrigger(day=1, hour=9, minute=0), id="rent_reminder_early", kwargs={"mode": "day1"})
+    # Tier 3 — DAILY OVERDUE chaser
+    # scheduler.add_job(_rent_reminder, trigger=CronTrigger(hour=9, minute=0), id="rent_reminder_late", kwargs={"mode": "overdue_daily"})
 
     scheduler.add_job(
         _daily_reconciliation,
