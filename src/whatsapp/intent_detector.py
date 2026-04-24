@@ -578,10 +578,10 @@ def _extract_entities(text: str, intent: str) -> dict:
     """Extract structured data from natural language."""
     entities: dict = {}
 
-    # Extract amount — prefer number AFTER a payment keyword (avoids room-number-as-amount)
-    # e.g. "203 paid 8000" → 8000, not 203
+    # Extract amount — prefer number AFTER a payment/price keyword (avoids room-number-as-amount)
+    # e.g. "203 paid 8000" → 8000, not 203; "price 3400" → 3400, not 2 from "2 loads"
     amount_match = re.search(
-        r"(?:paid|paied|payment|received|collected|deposited|rs\.?|inr)\s*(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?",
+        r"(?:paid|paied|payment|received|collected|deposited|rs\.?|inr|price|cost|for|@)\s*(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?",
         text, re.I,
     )
     if not amount_match:
