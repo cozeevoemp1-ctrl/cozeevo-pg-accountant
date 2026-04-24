@@ -1538,17 +1538,23 @@
 
   // Keyboard handler for arrow keys
   document.addEventListener('keydown', function(e) {
-    if (!currentStep || currentStep > 5) return;
-
     const isArrowRight = e.key === 'ArrowRight';
     const isArrowLeft = e.key === 'ArrowLeft';
     const isArrowDown = e.key === 'ArrowDown';
     const isArrowUp = e.key === 'ArrowUp';
 
+    if (!(isArrowRight || isArrowLeft || isArrowDown || isArrowUp)) return;
+    if (!currentStep || currentStep > 5) return;
+
+    console.log('Arrow key pressed:', e.key, 'currentStep:', currentStep, 'activeElement:', document.activeElement.tagName, document.activeElement.id);
+
     // Right or Down arrow
     if (isArrowRight || isArrowDown) {
       e.preventDefault();
+      const fields = getFocusableFields(currentStep);
+      console.log('Available fields in step', currentStep, ':', fields.length);
       const moved = focusNextField(currentStep);
+      console.log('focusNextField returned:', moved);
       if (!moved && currentStep < 5) {
         // At last field, go to next step
         if (validateStep(currentStep)) {
