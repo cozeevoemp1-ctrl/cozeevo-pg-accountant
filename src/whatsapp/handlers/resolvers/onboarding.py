@@ -152,11 +152,15 @@ async def resolve_confirm_checkin_arrival(
 
     Writes Tenancy.status = active + audit_log + triggers monthly sheet sync
     (so the NO-SHOW row becomes an active CHECKIN) + TENANTS master sync.
+    Calculates dues breakdown for first month (rent + deposit - advance/payments).
+    Shows receptionist what needs to be collected.
     Optionally updates checkin_date to today if the booking was for a future
     date (so sheet shows actual arrival, not booking).
     """
-    from src.database.models import Tenancy, TenancyStatus, AuditLog
+    from src.database.models import Tenancy, TenancyStatus, AuditLog, RentSchedule, Payment, RentStatus
     from src.whatsapp.handlers._shared import is_affirmative, is_negative
+    from src.services.rent_schedule import first_month_rent_due
+    from sqlalchemy import select
 
     ans = reply_text.strip().lower()
     if is_negative(ans):
@@ -196,11 +200,59 @@ async def resolve_confirm_checkin_arrival(
         new_value="active",
         room_number=action_data.get("room_number", ""),
         source="whatsapp",
-        notes=(
+        note=(
             f"arrival confirmed; booked_checkin={old_checkin.isoformat() if old_checkin else '-'}, "
             f"actual={tenancy.checkin_date.isoformat() if tenancy.checkin_date else '-'}"
         ),
     ))
+
+    # Ensure RentSchedule exists for check-in month (create if missing)
+    checkin_month = tenancy.checkin_date.replace(day=1) if tenancy.checkin_date else today.replace(day=1)
+    rs_result = await session.execute(
+        select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy.id,
+            RentSchedule.period_month == checkin_month,
+        )
+    )
+    rent_schedule = rs_result.scalar_one_or_none()
+
+    if not rent_schedule:
+        rent_due = first_month_rent_due(tenancy, checkin_month)
+        rent_schedule = RentSchedule(
+            tenancy_id=tenancy.id,
+            period_month=checkin_month,
+            rent_due=rent_due,
+            maintenance_due=tenancy.maintenance_fee or 0,
+            status=RentStatus.pending,
+            due_date=checkin_month,
+        )
+        session.add(rent_schedule)
+
+    # Calculate payments + advance for the check-in month
+    payments_result = await session.execute(
+        select(Payment).where(
+            Payment.tenancy_id == tenancy.id,
+            Payment.period_month == checkin_month,
+        )
+    )
+    payments = payments_result.scalars().all()
+    total_paid = sum(p.amount for p in payments)
+
+    rent_due = rent_schedule.rent_due if rent_schedule else first_month_rent_due(tenancy, checkin_month)
+    deposit_due = tenancy.security_deposit if tenancy.security_deposit else 0
+    total_due = rent_due + deposit_due
+
+    dues_breakdown = f"*Dues Breakdown for {action_data.get('tenant_name', 'Tenant')} (Room {action_data.get('room_number', '?')})*\n\n"
+    dues_breakdown += f"Rent Due (prorated)  : Rs.{rent_due:,.0f}\n"
+    if deposit_due > 0:
+        dues_breakdown += f"Security Deposit    : Rs.{deposit_due:,.0f}\n"
+    dues_breakdown += f"Total               : Rs.{total_due:,.0f}\n"
+    if total_paid > 0:
+        dues_breakdown += f"Already Paid        : Rs.{total_paid:,.0f}\n"
+        remaining = total_due - total_paid
+        dues_breakdown += f"*Remaining to Collect : Rs.{max(remaining, 0):,.0f}*\n"
+    else:
+        dues_breakdown += f"*To Collect         : Rs.{total_due:,.0f}*\n"
 
     # DB → sheet: TENANTS master row (status, checkin) + current monthly tab
     # (NO-SHOW row → CHECKIN row). Fire-and-forget — scheduled retry queue
@@ -212,7 +264,7 @@ async def resolve_confirm_checkin_arrival(
             trigger_monthly_sheet_sync as _tms,
         )
         asyncio.create_task(_sta(tenancy.tenant_id))
-        _tms(today.month, today.year)
+        _tms(checkin_month.month, checkin_month.year)
     except Exception:
         import logging
         logging.getLogger(__name__).error(
@@ -236,8 +288,11 @@ async def resolve_confirm_checkin_arrival(
     ff_note = ""
     if old_checkin and old_checkin != tenancy.checkin_date:
         ff_note = f" (booking was {old_checkin.strftime('%d %b %Y')}, arrived early)"
+
     return (
         f"*{action_data['tenant_name']}* marked as arrived ✓\n"
         f"Room {action_data.get('room_number', '?')} — check-in {new_ci}{ff_note}\n"
-        f"Status: ACTIVE. Sheets updating."
+        f"Status: ACTIVE. Sheets updating.\n\n"
+        f"{dues_breakdown}\n"
+        f"_Please collect the above amount and confirm via: **{action_data['tenant_name']} paid <amount> <cash/upi>**_"
     )

@@ -878,20 +878,55 @@
     updateDues();
   });
 
-  // Auto-calc daily total and num_days
-  ['checkout_date', 'num_days', 'daily_rate'].forEach(id => {
+  // Auto-calc daily stay dates and total amount
+  // Intelligently auto-fills missing dates based on user input
+  function syncDailyStayFields(changedFieldId) {
+    const checkin = document.getElementById('checkin_date').value;
+    const checkout = document.getElementById('checkout_date').value;
+    const numDays = parseInt(document.getElementById('num_days').value) || 0;
+    const rate = parseFloat(document.getElementById('daily_rate').value) || 0;
+
+    // If user just entered check-in date + num_days exists → calculate checkout
+    if (changedFieldId === 'checkin_date' && checkin && numDays > 0) {
+      const checkinDate = new Date(checkin + 'T00:00:00');
+      const checkoutDate = new Date(checkinDate);
+      checkoutDate.setDate(checkoutDate.getDate() + numDays);
+      document.getElementById('checkout_date').value = checkoutDate.toISOString().split('T')[0];
+    }
+    // If user just entered num_days + check-in exists → calculate checkout
+    else if (changedFieldId === 'num_days' && checkin && numDays > 0 && !checkout) {
+      const checkinDate = new Date(checkin + 'T00:00:00');
+      const checkoutDate = new Date(checkinDate);
+      checkoutDate.setDate(checkoutDate.getDate() + numDays);
+      document.getElementById('checkout_date').value = checkoutDate.toISOString().split('T')[0];
+    }
+    // If user just entered checkout date + check-in exists → calculate num_days
+    else if (changedFieldId === 'checkout_date' && checkin && checkout) {
+      const checkinDate = new Date(checkin + 'T00:00:00');
+      const checkoutDate = new Date(checkout + 'T00:00:00');
+      const days = Math.max(1, Math.round((checkoutDate - checkinDate) / 86400000));
+      document.getElementById('num_days').value = days;
+    }
+    // If user just entered checkout + num_days exists (but no checkin via stay_type=monthly) → calculate checkin
+    else if (changedFieldId === 'checkout_date' && !checkin && checkout && numDays > 0) {
+      const checkoutDate = new Date(checkout + 'T00:00:00');
+      const checkinDate = new Date(checkoutDate);
+      checkinDate.setDate(checkinDate.getDate() - numDays);
+      document.getElementById('checkin_date').value = checkinDate.toISOString().split('T')[0];
+    }
+
+    // Always update total rent based on num_days + rate
+    const updatedNumDays = parseInt(document.getElementById('num_days').value) || 0;
+    if (updatedNumDays > 0 && rate > 0) {
+      document.getElementById('agreed_rent').value = updatedNumDays * rate;
+    }
+
+    updateDues();
+  }
+
+  ['checkin_date', 'checkout_date', 'num_days', 'daily_rate'].forEach(id => {
     document.getElementById(id).addEventListener('input', function() {
-      const checkin = document.getElementById('checkin_date').value;
-      const checkout = document.getElementById('checkout_date').value;
-      const rate = parseFloat(document.getElementById('daily_rate').value) || 0;
-      if (checkin && checkout) {
-        const days = Math.max(1, Math.round((new Date(checkout) - new Date(checkin)) / 86400000));
-        document.getElementById('num_days').value = days;
-        document.getElementById('agreed_rent').value = days * rate;
-      } else if (document.getElementById('num_days').value && rate) {
-        document.getElementById('agreed_rent').value = parseInt(document.getElementById('num_days').value) * rate;
-      }
-      updateDues();
+      syncDailyStayFields(id);
     });
   });
 
