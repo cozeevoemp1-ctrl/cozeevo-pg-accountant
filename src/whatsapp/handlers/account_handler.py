@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -52,6 +52,7 @@ from src.whatsapp.handlers._shared import (
     compute_allocation,
     format_allocation,
 )
+from src.whatsapp.intent_detector import _MONTHS
 
 
 # ── Financial intents owned by this worker ────────────────────────────────────
@@ -59,6 +60,7 @@ from src.whatsapp.handlers._shared import (
 FINANCIAL_INTENTS: frozenset[str] = frozenset({
     "PAYMENT_LOG",
     "QUERY_DUES",
+    "QUERY_RECEIPT",
     "QUERY_TENANT",
     "ADD_EXPENSE",
     "QUERY_EXPENSES",
@@ -86,6 +88,7 @@ async def handle_account(
     handlers = {
         "PAYMENT_LOG":    _payment_log,
         "QUERY_DUES":     _query_dues,
+        "QUERY_RECEIPT":  _query_receipt,
         "QUERY_TENANT":   _query_tenant,
         "ADD_EXPENSE":    _add_expense_prompt,
         "QUERY_EXPENSES": _query_expenses,
@@ -1043,6 +1046,199 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
 
     lines.append(f"\n*Total outstanding: Rs.{int(total):,}*")
     return "\n".join(lines)
+
+
+# ── Query receipt ──────────────────────────────────────────────────────────────
+
+async def _query_receipt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Retrieve receipt for a tenant payment. Multi-step: name/room → month → result."""
+    name = entities.get("name", "").strip()
+    room = entities.get("room", "").strip()
+
+    # For tenants, auto-use their own tenancy
+    if ctx.role == "tenant":
+        tenancy = await _get_active_tenancy_for_phone(ctx.phone, session)
+        if not tenancy:
+            return "You don't have an active tenancy."
+        action_data = {"tenancy_id": tenancy.id, "tenant_name": tenancy.tenant.name, "step": "ask_month"}
+        await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, [], session)
+        return f"Which month would you like to see receipt for? (e.g. *May*, *June*)"
+
+    # Admins: search by name or room if provided
+    if name or room:
+        matches = []
+        if name:
+            matches = await _find_active_tenants_by_name(name, session)
+        elif room:
+            matches = await _find_active_tenants_by_room(room, session)
+
+        if not matches:
+            search_term = name or room
+            return f"No active tenant found for '{search_term}'. Try again with name or room number."
+
+        if len(matches) == 1:
+            tenant, tenancy, room_obj = matches[0]
+            action_data = {
+                "tenancy_id": tenancy.id,
+                "tenant_name": tenant.name,
+                "room_number": room_obj.room_number if room_obj else "?",
+                "step": "ask_month"
+            }
+            await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, [], session)
+            return f"Which month would you like to see receipt for? (e.g. *May*, *June*)"
+
+        # Multiple matches — ask which tenant
+        choices = _make_choices(matches, "tenancy_id")
+        formatted = _format_choices_message(name or room, choices, "view receipt")
+        action_data = {"step": "pick_tenant"}
+        await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, choices, session)
+        return formatted
+
+    # No name/room provided — ask which tenant
+    action_data = {"step": "ask_name"}
+    await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, [], session)
+    return "Whose receipt would you like to see?\n\nReply with tenant *name* or *room number*."
+
+
+async def resolve_query_receipt_step(
+    text: str,
+    action_data: dict,
+    choices: list,
+    ctx: CallerContext,
+    session: AsyncSession,
+) -> str:
+    """Resolve multi-step QUERY_RECEIPT flow."""
+    step = action_data.get("step", "ask_name")
+
+    # Step 1: ask_name — user provides name/room
+    if step == "ask_name":
+        matches = []
+        # Try name search first
+        matches = await _find_active_tenants_by_name(text, session)
+        if not matches:
+            # Try room search
+            matches = await _find_active_tenants_by_room(text, session)
+
+        if not matches:
+            return f"__KEEP_PENDING__ No match for '{text}'. Reply with tenant name or room number:"
+
+        if len(matches) == 1:
+            tenant, tenancy, room_obj = matches[0]
+            action_data["tenancy_id"] = tenancy.id
+            action_data["tenant_name"] = tenant.name
+            action_data["room_number"] = room_obj.room_number if room_obj else "?"
+            action_data["step"] = "ask_month"
+            await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, [], session)
+            return f"Which month? (e.g. *May*, *June*)"
+
+        # Multiple matches — show disambiguation
+        choices = _make_choices(matches, "tenancy_id")
+        formatted = _format_choices_message(text, choices, "view receipt")
+        action_data["step"] = "pick_tenant"
+        await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, choices, session)
+        return formatted
+
+    # Step 2: pick_tenant — user selected from disambiguation
+    if step == "pick_tenant":
+        try:
+            idx = int(text.strip()) - 1
+            if idx < 0 or idx >= len(choices):
+                return f"__KEEP_PENDING__ Reply *1-{len(choices)}*:"
+            selected = choices[idx]
+            tenancy_id = selected.get("tenancy_id")
+            tenancy = await session.get(Tenancy, tenancy_id)
+            if not tenancy:
+                return f"__KEEP_PENDING__ Tenant not found. Reply 1-{len(choices)}:"
+            action_data["tenancy_id"] = tenancy_id
+            action_data["tenant_name"] = tenancy.tenant.name
+            action_data["step"] = "ask_month"
+            await _save_pending(ctx.phone, "QUERY_RECEIPT_STEP", action_data, [], session)
+            return f"Which month? (e.g. *May*, *June*)"
+        except ValueError:
+            return f"__KEEP_PENDING__ Reply with a number 1-{len(choices)}:"
+
+    # Step 3: ask_month — user provides month/year
+    if step == "ask_month":
+        tenancy_id = action_data.get("tenancy_id")
+        if not tenancy_id:
+            return "Error: tenant not found. Try again with 'show receipt'."
+
+        month_num = _extract_month_from_text(text)
+        year = _extract_year_from_text(text) or date.today().year
+
+        if not month_num:
+            return f"__KEEP_PENDING__ Which month? Reply: *Jan*, *Feb*, *Mar*, *Apr*, *May*, *Jun*, *Jul*, *Aug*, *Sep*, *Oct*, *Nov*, *Dec*"
+
+        # Query for payment with receipt
+        query_month = date(year, month_num, 1)
+        payment = await session.scalar(
+            select(Payment)
+            .where(
+                Payment.tenancy_id == tenancy_id,
+                Payment.period_month == query_month,
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.rent,
+            )
+            .order_by(desc(Payment.created_at))
+            .limit(1)
+        )
+
+        tenancy = await session.get(Tenancy, tenancy_id)
+        tenant_name = tenancy.tenant.name if tenancy else "Unknown"
+        room_obj = tenancy.current_room if tenancy else None
+        room_label = f" (Room {room_obj.room_number})" if room_obj else ""
+
+        if not payment:
+            return f"*{tenant_name}{room_label}*\n{query_month.strftime('%B %Y')}\n\nNo payment found for this month."
+
+        # Payment found
+        paid_date = payment.created_at.strftime('%d-%b-%Y') if payment.created_at else "?"
+        amount = int(payment.amount)
+        mode = payment.payment_mode.value.upper() if payment.payment_mode else "?"
+
+        lines = [
+            f"*{tenant_name}{room_label}*",
+            f"{query_month.strftime('%B %Y')} — Rs.{amount:,} {mode}",
+            f"Paid on: {paid_date}",
+        ]
+
+        if payment.receipt_url:
+            receipt_url = f"https://api.getkozzy.com/documents/{payment.receipt_url}"
+            lines.append(f"\n[Receipt]({receipt_url})")
+        else:
+            lines.append("\n❌ No receipt uploaded for this payment.")
+
+        return "\n".join(lines)
+
+    return "Error: unknown step. Try 'show receipt' again."
+
+
+def _extract_month_from_text(text: str) -> Optional[int]:
+    """Extract month number (1-12) from text like 'May' or 'may'."""
+    text_lower = text.lower()
+    for short, num in _MONTHS.items():
+        if text_lower.startswith(short):
+            return num
+    return None
+
+
+def _extract_year_from_text(text: str) -> Optional[int]:
+    """Extract 4-digit year from text."""
+    import re
+    match = re.search(r'\b(20\d{2})\b', text)
+    return int(match.group(1)) if match else None
+
+
+async def _get_active_tenancy_for_phone(phone: str, session: AsyncSession) -> Optional[Tenancy]:
+    """Get active tenancy for a given phone number (tenant)."""
+    result = await session.execute(
+        select(Tenancy)
+        .join(Tenant)
+        .where(Tenant.phone == phone, Tenancy.status == TenancyStatus.active)
+        .order_by(desc(Tenancy.checkin_date))
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 # ── Query tenant account ───────────────────────────────────────────────────────

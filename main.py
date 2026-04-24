@@ -270,6 +270,11 @@ media_dir = Path(os.getenv("MEDIA_DIR", "./media"))
 media_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
 
+# Documents (receipts, invoices, ID proofs, licenses)
+docs_dir = Path(os.getenv("DATA_DOCUMENTS_DIR", "./data/documents"))
+if docs_dir.exists():
+    app.mount("/documents", StaticFiles(directory=str(docs_dir)), name="documents")
+
 @app.get("/dashboard")
 async def dashboard_page():
     return FileResponse(str(static_dir / "dashboard.html"))

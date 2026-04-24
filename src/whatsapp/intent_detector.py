@@ -185,6 +185,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:(?:beds?|rooms?)\s+free\s+(?:tonight|today|now|on\s+[\w\s\d/-]+)|(?:how\s+many|any)\s+(?:beds?|rooms?)\s+free\s+(?:tonight|today|on\s+[\w\s\d/-]+)|day[-\s]*stay\s+availab|free\s+(?:beds?|rooms?)\s+for\s+day[-\s]*stay|day[-\s]*stay\s+(?:beds?|rooms?)\s+(?:free|available))", re.I), "DAYSTAY_AVAILABILITY", 0.94),
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
     (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|weekly expenses?|daily expenses?|expense\s+(?:summary|breakdown|analysis)|(?:this|last)\s+(?:week|day)|today expenses?|yesterday expenses?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
+    # QUERY_RECEIPT — show receipt, get receipt (must come before REPORT)
+    (re.compile(r"(?:show\s+(?:me\s+)?receipt|get\s+receipt|(?:send|share|resend)\s+receipt|receipt\s+(?:for|of)\b|\breceipt\s+\w|where(?:'s|\s+is)\s+(?:the\s+)?receipt|do\s+we\s+have\s+(?:a\s+)?receipt|is\s+there\s+(?:a\s+)?receipt|find\s+receipt|my\s+receipt|receipt\s+milega)", re.I), "QUERY_RECEIPT", 0.91),
     # QUERY_DUES — who hasn't paid (specific: must come before REPORT catches "report" at end of message)
     (re.compile(r"(?:who\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+p[ai]{1,2}d?|which\s+tenants?\s+(?:hasn.?t|haven.?t|has\s+not|have\s+not)\s+paid|(?:have|has)\s+not\s+paid\s+(?:their|the|this|rent)|who\s+owes?\b|pending\s+dues|pending\s+(?:dues|rent|payments?)\s+(?:this|last)\s+month|dues\s+this\s+month|defaulters?\b|list\s+of\s+defaulters?)", re.I), "QUERY_DUES", 0.92),
     # QUERY_CONTACTS — vendor/supplier/service contact lookup
@@ -489,7 +491,7 @@ _INTENT_LABELS: dict[str, str] = {
 _OWNER_DIRECT: frozenset[str] = frozenset({
     "ADD_TENANT", "CHECKOUT", "RECORD_CHECKOUT", "START_ONBOARDING", "CHANGE_ROOM", "ASSIGN_ROOM",
     "PAYMENT_LOG", "ADD_EXPENSE", "ADD_REFUND",
-    "QUERY_DUES", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
+    "QUERY_DUES", "QUERY_RECEIPT", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
     "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CHECKOUT_ROOM", "QUERY_CONTACTS",
     "DAYSTAY_AVAILABILITY",
     "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
@@ -507,7 +509,7 @@ _RECEPTIONIST_DIRECT: frozenset[str] = frozenset({
     "HELP", "MORE_MENU",
 })
 _TENANT_DIRECT: frozenset[str] = frozenset({
-    "MY_BALANCE", "MY_PAYMENTS", "MY_DETAILS", "REQUEST_RECEIPT",
+    "MY_BALANCE", "MY_PAYMENTS", "MY_DETAILS", "REQUEST_RECEIPT", "QUERY_RECEIPT",
     "GET_WIFI_PASSWORD", "COMPLAINT_REGISTER", "CHECKOUT_NOTICE", "RULES", "HELP",
 })
 _LEAD_DIRECT: frozenset[str] = frozenset({
