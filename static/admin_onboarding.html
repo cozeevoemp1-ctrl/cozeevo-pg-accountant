@@ -982,17 +982,36 @@
   // Enter feels more natural after typing a number. Skip submit/textarea/radio
   // so the behavior stays predictable.
   document.getElementById('create-form').addEventListener('keydown', function(e) {
-    if (e.key !== 'Enter') return;
+    const isEnter = e.key === 'Enter';
+    const isArrowDown = e.key === 'ArrowDown';
+    const isArrowRight = e.key === 'ArrowRight';
+    const isArrowUp = e.key === 'ArrowUp';
+    const isArrowLeft = e.key === 'ArrowLeft';
+
+    if (!(isEnter || isArrowDown || isArrowRight || isArrowUp || isArrowLeft)) return;
+
     const t = e.target;
-    if (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
+    if (t.tagName === 'BUTTON') return;
     if (t.type === 'radio' || t.type === 'checkbox' || t.type === 'submit') return;
+
+    // For textarea: only Up/Down navigate fields; Left/Right edit text
+    if (t.tagName === 'TEXTAREA' && (isArrowLeft || isArrowRight)) return;
+
     e.preventDefault();
     const focusables = Array.from(this.querySelectorAll('input, select, textarea, button[type="submit"]'))
       .filter(el => !el.disabled && el.offsetParent !== null && el.type !== 'hidden');
     const idx = focusables.indexOf(t);
-    if (idx >= 0 && idx < focusables.length - 1) {
-      focusables[idx + 1].focus();
+
+    if (idx < 0) return;
+
+    let nextIdx = idx;
+    if (isEnter || isArrowDown || isArrowRight) {
+      nextIdx = (idx + 1) % focusables.length;
+    } else if (isArrowUp || isArrowLeft) {
+      nextIdx = (idx - 1 + focusables.length) % focusables.length;
     }
+
+    focusables[nextIdx].focus();
   });
 
   // ── Reset form ─────────────────────────────────────────────────────────────

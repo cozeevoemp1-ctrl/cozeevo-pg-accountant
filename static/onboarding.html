@@ -1546,6 +1546,9 @@
     if (!(isArrowRight || isArrowLeft || isArrowDown || isArrowUp)) return;
     if (!currentStep || currentStep > 5) return;
 
+    // For textarea: only Up/Down navigate fields; Left/Right edit text
+    if (document.activeElement.tagName === 'TEXTAREA' && (isArrowLeft || isArrowRight)) return;
+
     console.log('Arrow key pressed:', e.key, 'currentStep:', currentStep, 'activeElement:', document.activeElement.tagName, document.activeElement.id);
 
     // Right or Down arrow

@@ -538,7 +538,8 @@ async def _do_log_payment_by_ids(
                     "Payment-received send failed: %s", _e
                 )
 
-        _aio.create_task(_send_payment_msg())
+        # ❌ DISABLED: Payment confirmation messages disabled per Kiran's instruction (was spamming tenants)
+        # _aio.create_task(_send_payment_msg())
 
     return (
         f"*Payment logged — {tenant.name}{room_label}*\n"
