@@ -441,9 +441,10 @@ def _substitute_house_rules(obs: OnboardingSession) -> list[str]:
     rent = f"Rs.{int(obs.agreed_rent or 0):,}"
     deposit = f"Rs.{int(obs.security_deposit or 0):,}"
     lock_in = str(obs.lock_in_months or 3)
+    maintenance = f"Rs.{int(obs.maintenance_fee or 0):,}"
     tenant_data = json.loads(obs.tenant_data) if obs.tenant_data else {}
     food = (tenant_data.get("food_preference") if isinstance(tenant_data, dict) else None) or "Veg"
-    return [rule.format(rent=rent, deposit=deposit, lock_in=lock_in, food=food) for rule in HOUSE_RULES]
+    return [rule.format(rent=rent, deposit=deposit, lock_in=lock_in, food=food, maintenance=maintenance) for rule in HOUSE_RULES]
 
 
 # ── Tenant submits form ──────────────────────────────────────────────────────

@@ -30,7 +30,7 @@ HOUSE_RULES = [
     "Outsiders are strictly not allowed.",
     "Guest Accommodation with / without food will be charged Rs.1200/- per day.",
     "Iron box, Kettle, Induction Stove etc., usage not allowed.",
-    "Maintenance Charges are fixed @ Rs. 5000/-",
+    "Maintenance Charges are fixed @ {maintenance}/-",
     "Management is not responsible for your belongings.",
     "Please make sure that all the lights, fans and geysers are SWITCHED OFF before you leave the premises.",
     "Smoking & Liquor not allowed inside the premises of the PG.",
@@ -113,8 +113,9 @@ def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str
     elements.append(Paragraph("Terms &amp; Conditions", heading_style))
     lock_in = str(obs.lock_in_months or 3)
     food = tenant_data.get("food_preference", "Veg")
+    maintenance = f"Rs.{int(obs.maintenance_fee or 0):,}"
     for i, rule in enumerate(HOUSE_RULES, 1):
-        formatted = rule.format(rent=rent, deposit=deposit, lock_in=lock_in, food=food)
+        formatted = rule.format(rent=rent, deposit=deposit, lock_in=lock_in, food=food, maintenance=maintenance)
         elements.append(Paragraph(f"{i}. {formatted}", small))
         elements.append(Spacer(1, 1.5*mm))
 
