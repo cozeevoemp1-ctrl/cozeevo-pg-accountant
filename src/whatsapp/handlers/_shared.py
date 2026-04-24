@@ -169,7 +169,7 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
     """
     Returns list of (Tenant, Tenancy, Room) tuples matching the name.
     Deduplicates: one row per tenant (latest tenancy if multiple).
-    Tries exact ilike first, then first-word prefix if no results.
+    Tries exact ilike first, then first-word prefix, then fuzzy match on spelling.
     """
     async def _search(pattern: str):
         result = await session.execute(
@@ -206,7 +206,35 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
 
     # 3. Broad substring match as last resort (catches typos/partial)
     rows = await _search(f"%{name}%")
-    return rows
+    if rows:
+        return rows
+
+    # 4. Fuzzy match on spelling (handles "Divakra" vs "Divekar")
+    # Get all active tenants and score by similarity
+    result = await session.execute(
+        select(Tenant, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(Tenancy.status == TenancyStatus.active)
+        .order_by(Tenant.name, Tenancy.checkin_date.desc())
+    )
+
+    candidates = []
+    seen_tenants = set()
+    for tenant, tenancy, room in result.all():
+        if tenant.id not in seen_tenants:
+            seen_tenants.add(tenant.id)
+            # Score by similarity (0.0-1.0)
+            ratio = difflib.SequenceMatcher(None, name.lower(), tenant.name.lower()).ratio()
+            if ratio >= 0.75:  # 75%+ similarity (e.g., "Divakra" vs "Divekar")
+                candidates.append((ratio, (tenant, tenancy, room)))
+
+    if candidates:
+        # Return matches sorted by similarity (best first)
+        candidates.sort(reverse=True, key=lambda x: x[0])
+        return [match[1] for match in candidates]
+
+    return []
 
 
 async def _find_active_daywise_by_name(name: str, session: AsyncSession):
