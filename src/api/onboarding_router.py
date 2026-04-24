@@ -348,6 +348,389 @@ async def list_pending(request: Request):
         return {"sessions": items}
 
 
+# ── Receptionist dashboard (view pending + manual resend) ──────────────────────
+
+@router.get("/admin/pending-links", response_class=HTMLResponse)
+async def pending_links_dashboard(pin: str = None):
+    """Receptionist dashboard for pending onboarding sessions.
+
+    Shows:
+    - All pending sessions (waiting for tenant to fill form / waiting for approval)
+    - Direct link for each with copy-to-clipboard
+    - Resend WhatsApp button
+    - Expiration time
+
+    Usage: https://api.getkozzy.com/admin/pending-links?pin=cozeevo2026
+    """
+    if pin and pin != ADMIN_PIN:
+        raise HTTPException(403, "Invalid PIN")
+
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pending Onboarding Links</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background: #f5f7fa;
+                padding: 20px;
+            }
+            .container {
+                max-width: 1000px;
+                margin: 0 auto;
+            }
+            h1 {
+                color: #333;
+                margin-bottom: 8px;
+                font-size: 28px;
+            }
+            .subtitle {
+                color: #666;
+                margin-bottom: 24px;
+                font-size: 14px;
+            }
+            .controls {
+                margin-bottom: 24px;
+                display: flex;
+                gap: 10px;
+            }
+            button.primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 6px;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            button.primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            }
+            .sessions-grid {
+                display: grid;
+                gap: 16px;
+            }
+            .session-card {
+                background: white;
+                border-radius: 8px;
+                padding: 20px;
+                border-left: 4px solid #667eea;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            .session-card.expired {
+                border-left-color: #e74c3c;
+                background: #fef5f5;
+            }
+            .session-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: start;
+                margin-bottom: 12px;
+            }
+            .session-title {
+                font-weight: 600;
+                color: #333;
+                font-size: 16px;
+            }
+            .session-status {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            .session-status.pending-tenant {
+                background: #fff3cd;
+                color: #856404;
+            }
+            .session-status.pending-review {
+                background: #cfe2ff;
+                color: #084298;
+            }
+            .session-status.expired {
+                background: #f8d7da;
+                color: #842029;
+            }
+            .session-info {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 12px;
+                margin-bottom: 16px;
+                font-size: 13px;
+            }
+            .info-row {
+                color: #666;
+            }
+            .info-label {
+                font-weight: 600;
+                color: #333;
+                display: block;
+                margin-bottom: 2px;
+            }
+            .link-box {
+                background: #f8f9fa;
+                padding: 12px;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 12px;
+                word-break: break-all;
+                color: #333;
+                margin-bottom: 12px;
+                border: 1px solid #dee2e6;
+                max-height: 60px;
+                overflow-y: auto;
+            }
+            .session-actions {
+                display: flex;
+                gap: 8px;
+            }
+            button.action {
+                flex: 1;
+                padding: 8px 12px;
+                border: 1px solid #dee2e6;
+                background: white;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                color: #333;
+                transition: all 0.2s;
+            }
+            button.action:hover {
+                background: #f8f9fa;
+                border-color: #667eea;
+                color: #667eea;
+            }
+            button.action.copy {
+                color: #667eea;
+            }
+            button.action.resend {
+                color: #28a745;
+            }
+            .empty-state {
+                text-align: center;
+                padding: 40px 20px;
+                color: #666;
+            }
+            .empty-state svg {
+                width: 48px;
+                height: 48px;
+                margin-bottom: 12px;
+                opacity: 0.5;
+            }
+            .toast {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #28a745;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                display: none;
+                z-index: 1000;
+            }
+            .toast.show {
+                display: block;
+                animation: slideIn 0.3s ease-out;
+            }
+            .toast.error {
+                background: #dc3545;
+            }
+            @keyframes slideIn {
+                from { transform: translateX(400px); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>📋 Pending Onboarding Links</h1>
+            <p class="subtitle">Manage pending tenant onboarding sessions. Copy link or resend via WhatsApp if initial send failed.</p>
+
+            <div class="controls">
+                <button class="primary" onclick="loadSessions()">🔄 Refresh</button>
+            </div>
+
+            <div id="sessions" class="sessions-grid">
+                <div style="text-align: center; padding: 40px; color: #999;">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <script>
+            const ADMIN_PIN = 'cozeevo2026';
+
+            async function loadSessions() {
+                try {
+                    const response = await fetch('/api/onboarding/admin/pending', {
+                        headers: { 'X-Admin-Pin': ADMIN_PIN }
+                    });
+                    const data = await response.json();
+                    renderSessions(data.sessions || []);
+                } catch (err) {
+                    showToast('Failed to load sessions: ' + err.message, true);
+                }
+            }
+
+            function renderSessions(sessions) {
+                const container = document.getElementById('sessions');
+
+                if (sessions.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div style="font-size: 48px; margin-bottom: 12px;">✓</div>
+                            <p>No pending sessions</p>
+                            <p style="font-size: 12px; margin-top: 8px;">All onboarding forms have been completed or approved.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = sessions.map(s => {
+                    const now = new Date();
+                    const expiresAt = new Date(s.expires_at || null);
+                    const isExpired = expiresAt < now;
+                    const timeLeft = formatTimeLeft(expiresAt);
+                    const phone = formatPhone(s.tenant_phone);
+                    const baseUrl = window.location.origin;
+                    const fullLink = baseUrl + '/onboard/' + s.token;
+
+                    return `
+                        <div class="session-card ${isExpired ? 'expired' : ''}">
+                            <div class="session-header">
+                                <div>
+                                    <div class="session-title">${escapeHtml(s.tenant_name || 'Unnamed Tenant')}</div>
+                                    <div style="color: #999; font-size: 12px; margin-top: 4px;">${phone}</div>
+                                </div>
+                                <span class="session-status ${s.status}">${s.status === 'pending_tenant' ? 'Awaiting Form' : 'Awaiting Approval'}</span>
+                            </div>
+
+                            <div class="session-info">
+                                <div class="info-row">
+                                    <span class="info-label">Room</span>
+                                    ${s.room ? s.room : '—'}
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Check-in</span>
+                                    ${formatDate(s.checkin_date)}
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Created</span>
+                                    ${formatDate(s.created_at)}
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Expires</span>
+                                    <span style="color: ${isExpired ? '#dc3545' : '#666'};">
+                                        ${isExpired ? 'EXPIRED' : timeLeft}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="link-box">${escapeHtml(fullLink)}</div>
+
+                            <div class="session-actions">
+                                <button class="action copy" onclick="copyLink('${fullLink}')">📋 Copy Link</button>
+                                ${!isExpired ? `<button class="action resend" onclick="resendLink('${s.token}')">📤 Resend WhatsApp</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function formatPhone(phone) {
+                if (!phone) return '—';
+                const cleaned = phone.replace(/[^0-9]/g, '');
+                if (cleaned.length === 10) return '+91' + cleaned;
+                if (cleaned.length === 12 && cleaned.startsWith('91')) return '+' + cleaned;
+                return phone;
+            }
+
+            function formatDate(dateStr) {
+                if (!dateStr) return '—';
+                return new Date(dateStr).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            function formatTimeLeft(expiresAt) {
+                const now = new Date();
+                const diff = expiresAt - now;
+                if (diff < 0) return 'EXPIRED';
+
+                const mins = Math.floor(diff / 60000);
+                const hours = Math.floor(mins / 60);
+
+                if (hours > 0) return hours + 'h ' + (mins % 60) + 'm left';
+                return mins + 'm left';
+            }
+
+            async function copyLink(link) {
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast('✓ Link copied to clipboard');
+                } catch (err) {
+                    showToast('Failed to copy: ' + err.message, true);
+                }
+            }
+
+            async function resendLink(token) {
+                if (!confirm('Resend onboarding link via WhatsApp?')) return;
+
+                try {
+                    const response = await fetch('/api/onboarding/admin/' + token + '/resend', {
+                        method: 'POST',
+                        headers: { 'X-Admin-Pin': ADMIN_PIN }
+                    });
+
+                    if (response.ok) {
+                        showToast('✓ Link resent via WhatsApp');
+                    } else {
+                        const data = await response.json();
+                        showToast('Failed: ' + (data.detail || 'Unknown error'), true);
+                    }
+                } catch (err) {
+                    showToast('Error: ' + err.message, true);
+                }
+            }
+
+            function showToast(msg, isError = false) {
+                const toast = document.getElementById('toast');
+                toast.textContent = msg;
+                toast.classList.add('show');
+                if (isError) toast.classList.add('error');
+                else toast.classList.remove('error');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // Load on page load and auto-refresh every 30 seconds
+            loadSessions();
+            setInterval(loadSessions, 30000);
+        </script>
+    </body>
+    </html>
+    """
+
+
 # ── Cancel session (admin) ─────────────────────────────────────────────────────
 
 @router.post("/admin/{token}/cancel")
