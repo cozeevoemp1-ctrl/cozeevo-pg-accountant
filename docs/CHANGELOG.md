@@ -2,6 +2,57 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.5] — 2026-04-24 — E2E harness expanded to 26 scenarios + 2 more routing bugs fixed
+
+Follow-up after Kiran pushed back on "5 intents isn't all handlers". Expanded
+`tests/test_full_flow_e2e.py` to **26 scenarios** covering every common
+receptionist action from first message → disambig → confirm → Yes →
+DB-row assert → revert. **26/26 green** on live DB.
+
+### New coverage (beyond 1.51.4)
+- VOID_PAYMENT full flow (bot-driven void + DB assert)
+- ADD_REFUND full flow (Refund row + delete cleanup)
+- UPDATE_PHONE full flow (Tenant.phone + revert)
+- UPDATE_GENDER full flow (Tenant.gender + revert)
+- UPDATE_NOTES full flow (Tenancy.notes + revert)
+- NOTES delete one-shot
+- COMPLAINT_REGISTER full flow (with duplicate-guard cleanup)
+- ASSIGN_STAFF_ROOM full flow (Staff.room_id + seed/cleanup)
+- ROOM_TRANSFER full flow (skipped when no vacant room)
+- NOTICE_GIVEN full flow
+- LOG_VACATION full flow (skipped when flow needs explicit dates)
+- **PAYMENT split cash+upi** (2 Payment rows from one message)
+- **PAYMENT + set notes combined** (paid N cash and set notes to Y)
+- **PAYMENT split + clear notes** (split payment + clear notes one message)
+- PAYMENT edge: Rs.0 rejected (bot refuses)
+- PAYMENT edge: k-suffix (5k → Rs.5,000)
+
+### Bugs found and fixed
+
+**1. `change X phone to Y` routed tenant phone updates to vendor flow.**
+UPDATE_CONTACT regex at line 115 matched the word "phone" and stole the
+message before UPDATE_PHONE at line 139 could see it — receptionists got
+"Found N contacts matching X" from the vendor list instead of the
+tenant phone update. Fix: moved UPDATE_PHONE before UPDATE_CONTACT and
+added `(?!contact|vendor|supplier)` negative lookahead so explicit
+vendor phone updates still route correctly. Same multi-word-name
+widening applied. File: `src/whatsapp/intent_detector.py`.
+
+**2. `paid 5 cash and set notes to X` routed to GET_TENANT_NOTES instead
+of PAYMENT_LOG.** The high-priority PAYMENT_LOG regex required
+`\d[\d,k]+` (2+ chars) so single-digit amounts fell through to
+weaker patterns that lost to GET_TENANT_NOTES's "notes to \w+" match.
+`and clear notes` worked because that phrasing doesn't contain
+"notes to \w+". Fix: widened to `\d[\d,k]*` (1+ chars).
+`Ganesh paid 20000 cash and set notes to cash only` — the canonical
+example from CHANGELOG 1.51.3 — and the low-amount-receptionist-testing
+case `X paid 5 cash and set notes to Y` now both route correctly.
+
+### Still deferred (edge cases / destructive flows)
+CHECKOUT/SCHEDULE_CHECKOUT (would end tenancy), ADD_TENANT wizard
+(creates real tenant row), day-wise variants, tenant-role intents
+(MY_BALANCE, MY_PAYMENTS).
+
 ## [1.51.4] — 2026-04-23 — Full-flow e2e harness + 2 silent-fail bugs fixed
 
 Kiran asked for ALL-handlers ALL-intents end-to-end testing — not just

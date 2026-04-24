@@ -308,7 +308,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:rules?|regulations?|pg rules?|what are the rules?|rules and regulations?|policy|policies|house rules?|show rules?|niyam\b)", re.I), "RULES", 0.91),
     # High-priority PAYMENT_LOG — "Name paid N cash/upi" must win even when
     # the message also contains "update notes ..." (combined command).
-    (re.compile(rf"\b(?:p[ai]{{0,2}}j?[ai]{{0,2}}d|paied)\s+\d[\d,k]+\s+(?:{_MODES_CORE})", re.I), "PAYMENT_LOG", 0.96),
+    # `\d[\d,k]*` accepts single-digit amounts too (previously `\d[\d,k]+`
+    # required 2+ digits, so `paid 5 cash and set notes to X` fell through
+    # to GET_TENANT_NOTES at line ~326).
+    (re.compile(rf"\b(?:p[ai]{{0,2}}j?[ai]{{0,2}}d|paied)\s+\d[\d,k]*\s+(?:{_MODES_CORE})", re.I), "PAYMENT_LOG", 0.96),
     # CHECKIN_ARRIVAL — receptionist marks a no-show tenant as arrived.
     # Accepts: "Ajay arrived", "mark Ajay arrived", "Ajay is here",
     # "checkin arrival Ajay", "confirm arrival Ajay". Deliberately does NOT
