@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.6] — 2026-04-24 — Receptionist expense management permissions + weekly/daily query filtering
+
+Granted Lokesh (receptionist role) full expense management access per user approval.
+
+### Changes
+- **Permissions:** Remove ADD_EXPENSE, VOID_EXPENSE, QUERY_EXPENSES from RECEPTIONIST_BLOCKED
+  - Receptionists can now log, void, and query expenses
+  - Updated gatekeeper.py routing rules documentation
+- **Query filtering:** Enhanced QUERY_EXPENSES intent detection + handler
+  - Added regex patterns: "weekly expenses", "daily expenses", "this week", "last week", "today", "yesterday"
+  - Updated _query_expenses handler to parse timeframe from raw message
+  - Date-range logic now handles: today, yesterday, this week, last week, daily, weekly
+  - Default behavior unchanged (current month if no timeframe)
+- **Test:** Syntax validated on all 3 modified files (no regressions)
+
+---
+
 ## [1.51.5] — 2026-04-24 — E2E harness expanded to 26 scenarios + 2 more routing bugs fixed
 
 Follow-up after Kiran pushed back on "5 intents isn't all handlers". Expanded
