@@ -171,6 +171,9 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
     Deduplicates: one row per tenant (latest tenancy if multiple).
     Tries exact ilike first, then first-word prefix, then fuzzy match on spelling.
     """
+    from loguru import logger
+    logger.info(f"[_find_active_tenants_by_name] Searching for: '{name}'")
+
     async def _search(pattern: str):
         result = await session.execute(
             select(Tenant, Tenancy, Room)
@@ -196,17 +199,20 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
     if len(first_word) >= 3:
         rows = await _search(f"{first_word}%")
         if rows:
+            logger.info(f"[_find_active_tenants_by_name] ✓ Step 1 (first-name) found: {[r[0].name for r in rows]}")
             return rows
 
     # 2. Full name contains match (multi-word queries like "Arun Vas")
     if " " in name.strip():
         rows = await _search(f"%{name}%")
         if rows:
+            logger.info(f"[_find_active_tenants_by_name] ✓ Step 2 (contains) found: {[r[0].name for r in rows]}")
             return rows
 
     # 3. Broad substring match as last resort (catches typos/partial)
     rows = await _search(f"%{name}%")
     if rows:
+        logger.info(f"[_find_active_tenants_by_name] ✓ Step 3 (substring) found: {[r[0].name for r in rows]}")
         return rows
 
     # 4. Fuzzy match on spelling (handles "Divakra" vs "Divekar")
@@ -221,19 +227,24 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
 
     candidates = []
     seen_tenants = set()
+    all_active_names = []
     for tenant, tenancy, room in result.all():
         if tenant.id not in seen_tenants:
             seen_tenants.add(tenant.id)
+            all_active_names.append(tenant.name)
             # Score by similarity (0.0-1.0)
             ratio = difflib.SequenceMatcher(None, name.lower(), tenant.name.lower()).ratio()
             if ratio >= 0.75:  # 75%+ similarity (e.g., "Divakra" vs "Divekar")
                 candidates.append((ratio, (tenant, tenancy, room)))
+                logger.info(f"[_find_active_tenants_by_name] Fuzzy match: '{name}' vs '{tenant.name}' = {ratio:.2f}")
 
     if candidates:
         # Return matches sorted by similarity (best first)
         candidates.sort(reverse=True, key=lambda x: x[0])
+        logger.info(f"[_find_active_tenants_by_name] ✓ Step 4 (fuzzy) found: {[c[1][0].name for c in candidates]}")
         return [match[1] for match in candidates]
 
+    logger.warning(f"[_find_active_tenants_by_name] ✗ No matches for '{name}'. Active tenants in DB: {all_active_names}")
     return []
 
 
