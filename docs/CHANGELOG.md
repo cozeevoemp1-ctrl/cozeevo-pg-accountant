@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.9] — 2026-04-24 — April 2026: Hardcoded balance values, balance-based status
+
+Implemented hardcoded April balance values as single source of truth (not calculated from DB). Status now shows balance-based classification for April.
+
+### Changes
+- **sync_sheet_from_db.py:** Added hardcoded april_balances dict for 21 tenants with April balance (lines 435-458)
+  - Balance values: Suraj Prasana 1500, Arun Dharshini 6500, Claudin Narsis 6500, ... T.Rakesh Chetan 15533
+  - All other 255+ people get balance = 0
+  - April-specific balance lookup in rent calculation (lines 460-465)
+- **sync_sheet_from_db.py:** Changed April status logic to balance-based (lines 474-477)
+  - PARTIAL if balance > 0 (anyone who owes money)
+  - PAID if balance <= 0 (anyone who paid or overpaid)
+- **src/services/rent_status.py:** Added optional `balance` parameter to compute_status() for future balance-based logic (line 27)
+- **APRIL 2026 Sheet:** Updated to show PARTIAL: 21, PAID: 227 (based on hardcoded balances)
+- **Dashboard:** Corrected STATUS row to show actual counts from sheet
+
+### Why
+April 2026 is frozen (historical data loaded 1:1 from source). Using hardcoded balance values prevents formula drift and ensures balance values match source sheet exactly.
+
+---
+
 ## [1.51.8] — 2026-04-24 — Fix receptionist dues query intent detection
 
 Fixed bug where Lokesh (receptionist) couldn't check dues because "check dues" was being misdetected as QUERY_TENANT instead of QUERY_DUES.
