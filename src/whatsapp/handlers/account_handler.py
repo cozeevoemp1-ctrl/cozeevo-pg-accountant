@@ -1987,30 +1987,63 @@ async def _query_expenses(entities: dict, ctx: CallerContext, session: AsyncSess
         "this year", "all time", "trend", "highest", "lowest", "average",
     ))
 
-    if entities.get("date"):
+    # Detect timeframe: daily, weekly, or monthly (default)
+    today = date.today()
+    if "today" in raw:
+        search_start = today
+        search_end = today
+        label = "today"
+    elif "yesterday" in raw:
+        yesterday = today - timedelta(days=1)
+        search_start = yesterday
+        search_end = yesterday
+        label = "yesterday"
+    elif "this week" in raw or "weekly" in raw:
+        monday = today - timedelta(days=today.weekday())
+        search_start = monday
+        search_end = today
+        label = f"this week (Mon {monday.strftime('%d %b')} - {today.strftime('%d %b')})"
+    elif "last week" in raw:
+        today_weekday = today.weekday()
+        last_monday = today - timedelta(days=today_weekday + 7)
+        last_sunday = last_monday + timedelta(days=6)
+        search_start = last_monday
+        search_end = last_sunday
+        label = f"last week ({last_monday.strftime('%d %b')} - {last_sunday.strftime('%d %b')})"
+    elif "daily" in raw:
+        search_start = today
+        search_end = today
+        label = "today"
+    elif entities.get("date"):
         target_month = date.fromisoformat(entities["date"]).replace(day=1)
-    elif entities.get("month"):
-        today = date.today()
-        m = int(entities["month"])
-        year = today.year if date(today.year, m, 1) <= today.replace(day=1) else today.year - 1
-        target_month = date(year, m, 1)
-    else:
-        target_month = date.today().replace(day=1)
-
-    # For smart queries, search wider range
-    if is_smart and "year" in raw:
-        search_start = date(date.today().year, 1, 1)
-        search_end = date.today()
-        label = str(date.today().year)
-    elif is_smart:
-        search_start = date(2025, 1, 1)
-        search_end = date.today()
-        label = "all time"
-    else:
         search_start = target_month
         last_day = calendar.monthrange(target_month.year, target_month.month)[1]
         search_end = date(target_month.year, target_month.month, last_day)
         label = target_month.strftime('%B %Y')
+    elif entities.get("month"):
+        m = int(entities["month"])
+        year = today.year if date(today.year, m, 1) <= today.replace(day=1) else today.year - 1
+        target_month = date(year, m, 1)
+        search_start = target_month
+        last_day = calendar.monthrange(target_month.year, target_month.month)[1]
+        search_end = date(target_month.year, target_month.month, last_day)
+        label = target_month.strftime('%B %Y')
+    else:
+        target_month = today.replace(day=1)
+        search_start = target_month
+        last_day = calendar.monthrange(target_month.year, target_month.month)[1]
+        search_end = date(target_month.year, target_month.month, last_day)
+        label = target_month.strftime('%B %Y')
+
+    # For smart queries, expand range
+    if is_smart and "year" in raw:
+        search_start = date(today.year, 1, 1)
+        search_end = today
+        label = str(today.year)
+    elif is_smart and ("all time" in raw or "all" in raw):
+        search_start = date(2025, 1, 1)
+        search_end = today
+        label = "all time"
 
     result = await session.execute(
         select(Expense)
