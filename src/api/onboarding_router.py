@@ -141,6 +141,13 @@ async def create_session(req: CreateSessionRequest, request: Request):
             for old_obs in old.scalars().all():
                 old_obs.status = "cancelled"
 
+        # Check if tenant already exists in system
+        existing_tenant = None
+        if req.tenant_phone:
+            existing_tenant = await session.scalar(
+                select(Tenant).where(Tenant.phone == req.tenant_phone)
+            )
+
         # Lookup room if provided, otherwise allow future room assignment
         room = None
         building = ""
@@ -245,6 +252,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
                 "floor": str(room.floor or "") if room else "",
                 "sharing": sharing
             },
+            "warning": f"⚠️ Tenant already exists in system (phone: {req.tenant_phone})" if existing_tenant else None,
         }
 
 
