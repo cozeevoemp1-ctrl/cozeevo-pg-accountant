@@ -559,11 +559,11 @@ async def main(args):
         total_cash = sum(pn(r[i_cash]) for r in data_rows)
         total_upi = sum(pn(r[i_upi]) for r in data_rows)
         total_collected = total_cash + total_upi
-        # April 2026: Total Dues = Rent Billed (140,299) - Collected (total_collected)
+        # April 2026: Total Dues = sum of hardcoded pending balances (140,299)
         # Other months: Total Dues = sum of per-row positive Balance
         i_balance = H["balance"]
         if period == date(2026, 4, 1):
-            total_dues = 140_299 - total_collected
+            total_dues = 140_299  # sum of 21 pending tenants from April balance map
         else:
             total_dues = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
 
