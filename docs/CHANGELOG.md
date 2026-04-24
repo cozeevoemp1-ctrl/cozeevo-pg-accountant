@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.51.11] — 2026-04-24 — QUERY_ALL_NOTICES: Monthly notice breakdown report
+
+New bot command to show all tenants on notice across all future months, organized by month.
+
+### Changes
+- **intent_detector.py:** Added `QUERY_ALL_NOTICES` intent pattern for "total notices", "all notices", "show all notice", "all tenants on notice", "notice summary"
+- **owner_handler.py:** Added `_query_all_notices()` handler
+  - Lists all active tenants with notice_date or expected_checkout in future
+  - Groups by month (April, May, June, etc.)
+  - Shows count per month and notice date for each tenant
+  - Simple clean format for receptionist/admin dashboard
+
+### Example output
+```
+*On notice: 23 tenants*
+
+*April 2026* (16 vacating)
+  • Abhishek Charan (Room 411) — Notice: 05 Apr
+  • Akshit (Room 419) — Notice: 08 Apr
+  ...
+
+*May 2026* (5 vacating)
+  • Vikram Patel (Room 512) — Notice: 20 Apr
+  ...
+```
+
+---
+
 ## [1.51.10] — 2026-04-24 — April dashboard: Total Dues = Rs.1,40,299, remove Rent Billed KPI
 
 Audit complete: April custom code properly gated, doesn't leak into May. Dashboard now shows "Total Dues" instead of "Rent Billed".
