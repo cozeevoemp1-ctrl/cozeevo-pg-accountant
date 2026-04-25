@@ -47,6 +47,12 @@ from src.agent.channel import ChannelMessage as _AgentChannelMessage
 _chat_logger = logging.getLogger(__name__)
 
 
+def _open_log(path: str):
+    """Open a /tmp debug log with owner-only (0o600) permissions to protect PII."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    return os.fdopen(fd, "a", encoding="utf-8")
+
+
 async def _resolve_pg_id(session) -> str:
     """Get the active pg_id. Returns DEFAULT_PG_ID or first active PG."""
     if _DEFAULT_PG_ID:
@@ -220,7 +226,7 @@ async def _process_message_inner(
                 except Exception:
                     return {}
             return parsed if isinstance(parsed, dict) else {}
-        with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+        with _open_log("/tmp/pg_pending_debug.log") as _dbg:
             if pending:
                 _ad = _safe_parse_ad(pending.action_data)
                 _dbg.write(f"[{datetime.utcnow().isoformat()}] phone={ctx.phone} msg={message[:60]} "
@@ -436,7 +442,7 @@ async def _process_message_inner(
                 cancel_reply = "Cancelled."
                 await _log(session, phone, message, ctx.role, "CONFIRMATION", cancel_reply)
                 await session.commit()
-                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                     _dbg.write(f"  CANCELLED early (pre-resolver) on '{pending.intent}'\n")
                 return OutboundReply(reply=cancel_reply, intent="CONFIRMATION", role=ctx.role)
 
@@ -451,17 +457,17 @@ async def _process_message_inner(
                     )
                 except Exception as _resolve_err:
                     resolved_reply = None
-                    with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                    with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                         _dbg.write(f"  RESOLVE ERROR: {_resolve_err}\n")
                     import traceback
                     traceback.print_exc()
                 _chat_logger.info("resolve_pending_action returned: %s", repr(resolved_reply[:100]) if resolved_reply else "None")
-                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                     _dbg.write(f"  resolve_reply={'None' if resolved_reply is None else repr(resolved_reply[:100])}\n")
             else:
                 resolved_reply = None
                 _chat_logger.info("Pending already resolved, skipping resolve_pending_action")
-                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                     _dbg.write(f"  ALREADY RESOLVED — skipped\n")
             # Treat empty-string the same as a successful resolution with no
             # message (do NOT fall through to LLM CONVERSE — that silently
@@ -471,7 +477,7 @@ async def _process_message_inner(
                 _err = "Payment confirmation hit an empty handler result. Please re-send the payment message."
                 await _log(session, phone, message, ctx.role, "CONFIRMATION", _err)
                 await session.commit()
-                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                     _dbg.write(f"  EMPTY REPLY guarded -> resolved + error msg\n")
                 return OutboundReply(reply=_err, intent="CONFIRMATION", role=ctx.role)
             if resolved_reply:
@@ -484,7 +490,7 @@ async def _process_message_inner(
                 pending.resolved = True
                 await _log(session, phone, message, ctx.role, "CONFIRMATION", resolved_reply)
                 await session.commit()
-                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                     _dbg.write(f"  RETURNED: {resolved_reply[:80]}\n")
                 return OutboundReply(reply=resolved_reply, intent="CONFIRMATION", role=ctx.role)
             # resolve_pending_action returned None — the user's reply wasn't a
@@ -497,10 +503,10 @@ async def _process_message_inner(
                 cancel_reply = "Cancelled."
                 await _log(session, phone, message, ctx.role, "CONFIRMATION", cancel_reply)
                 await session.commit()
-                with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+                with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                     _dbg.write(f"  CANCELLED by user\n")
                 return OutboundReply(reply=cancel_reply, intent="CONFIRMATION", role=ctx.role)
-            with open("/tmp/pg_pending_debug.log", "a", encoding="utf-8") as _dbg:
+            with _open_log("/tmp/pg_pending_debug.log") as _dbg:
                 _dbg.write(f"  KEPT PENDING — falling through to normal intent detection\n")
 
     if ctx.role == "tenant":

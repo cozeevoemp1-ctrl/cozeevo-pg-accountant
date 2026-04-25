@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.59.0] — 2026-04-25 — Security hardening: auth header, MIME validation, log permissions, retry
+
+### Dashboard auth: query param → Authorization header
+- `dashboard_router.py`: `_auth` now reads `Authorization: Bearer <token>` header instead of `?token=`
+- Dev mode still works (token empty → auth skipped)
+- `Query` retained for all other endpoint params
+
+### File upload MIME validation (`main.py`)
+- Extension check: only `.csv` and `.pdf` accepted (was accepting any extension)
+- MIME check: `Content-Type` validated against allowed set (`text/csv`, `application/pdf`, etc.)
+- Returns HTTP 400 with clear message on invalid type
+
+### Debug log permissions (`chat_api.py`, `webhook_handler.py`)
+- All `/tmp/pg_*.log` writes now use `os.open(..., 0o600)` → owner-only, not world-readable
+- Protects PII (phone numbers, message content) from other processes on VPS
+
+### WhatsApp send retry on 429/5xx (`webhook_handler.py`)
+- `_send_whatsapp` now retries up to 3 times on 429 (rate limit) and 5xx (transient)
+- 429: respects `Retry-After` header, caps wait at 120s
+- 5xx / network error: exponential backoff (5s, 10s)
+
+---
+
 ## [1.58.0] — 2026-04-25 — E2E test suite: RECORD_CHECKOUT + ADD_TENANT confirm + SOP update
 
 ### test_full_flow_e2e.py: 33 → 35 scenarios

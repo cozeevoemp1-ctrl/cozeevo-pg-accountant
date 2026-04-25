@@ -170,7 +170,18 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     raw_dir = Path(os.getenv("DATA_RAW_DIR", "./data/raw"))
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    ext = Path(file.filename or "").suffix.lower() or ".csv"
+    ext = Path(file.filename or "").suffix.lower()
+    _ALLOWED_EXT = {".csv", ".pdf"}
+    _ALLOWED_MIME = {
+        "text/csv", "text/plain", "application/csv",
+        "application/vnd.ms-excel", "application/pdf",
+    }
+    if ext not in _ALLOWED_EXT:
+        raise HTTPException(400, f"Only CSV and PDF files are accepted (got extension {ext!r})")
+    mime = (file.content_type or "").split(";")[0].strip().lower()
+    if mime and mime not in _ALLOWED_MIME:
+        raise HTTPException(400, f"MIME type {mime!r} not allowed for upload")
+
     filename = f"upload_{uuid.uuid4().hex[:8]}{ext}"
     out_path = raw_dir / filename
 

@@ -18,6 +18,12 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, BackgroundTasks
 from loguru import logger
 
+
+def _open_log(path: str):
+    """Open a /tmp debug log with owner-only (0o600) permissions to protect PII."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    return os.fdopen(fd, "a", encoding="utf-8")
+
 router = APIRouter(prefix="/webhook", tags=["whatsapp"])
 
 
@@ -126,12 +132,12 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     logger.info(f"[Webhook] From={from_number} | Body={body[:80]} | MsgId={msg_id[:20] if msg_id else '-'}")
 
     # File-based debug log — journald not working
-    with open("/tmp/pg_webhook_debug.log", "a", encoding="utf-8") as _wdbg:
+    with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
         _wdbg.write(f"[{from_number}] msg={body[:60]} msg_id={msg_id[:30] if msg_id else '-'}\n")
 
     # -- Dedup: skip if we've already processed this exact message ----------------
     if await _is_duplicate(msg_id):
-        with open("/tmp/pg_webhook_debug.log", "a", encoding="utf-8") as _wdbg:
+        with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
             _wdbg.write(f"  DUPLICATE SKIPPED: {msg_id}\n")
         return {"status": "ok"}
 
@@ -354,18 +360,30 @@ async def _send_whatsapp(to_number: str, message: str, *, intent: str = "OUTBOUN
     }
     success = False
     err_text = None
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(url, json=body, headers=headers)
-        if resp.status_code == 200:
-            logger.info(f"[Meta] Sent to {to}")
-            success = True
-        else:
-            err_text = f"{resp.status_code}: {resp.text[:200]}"
-            logger.error(f"[Meta] Send failed {err_text}")
-    except Exception as e:
-        err_text = str(e)
-        logger.error(f"[Meta] Send exception: {e}")
+    import asyncio as _aio
+    _RETRYABLE = {429, 500, 502, 503, 504}
+    _MAX_TRIES = 3
+    for _attempt in range(_MAX_TRIES):
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(url, json=body, headers=headers)
+            if resp.status_code == 200:
+                logger.info(f"[Meta] Sent to {to}")
+                success = True
+                break
+            elif resp.status_code in _RETRYABLE and _attempt < _MAX_TRIES - 1:
+                _wait = int(resp.headers.get("Retry-After", 5 * (2 ** _attempt)))
+                logger.warning(f"[Meta] {resp.status_code} — retry in {_wait}s ({_attempt+1}/{_MAX_TRIES})")
+                await _aio.sleep(min(_wait, 120))
+            else:
+                err_text = f"{resp.status_code}: {resp.text[:200]}"
+                logger.error(f"[Meta] Send failed {err_text}")
+                break
+        except Exception as e:
+            err_text = str(e)
+            logger.error(f"[Meta] Send exception (attempt {_attempt+1}): {e}")
+            if _attempt < _MAX_TRIES - 1:
+                await _aio.sleep(5 * (2 ** _attempt))
 
     # Audit log — even failures are recorded so missing-message diagnoses are possible
     try:

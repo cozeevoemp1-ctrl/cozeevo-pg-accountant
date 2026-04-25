@@ -3,7 +3,7 @@ src/api/dashboard_router.py
 ============================
 REST API powering the Cozeevo web dashboard.
 
-All endpoints require ?token=<DASHBOARD_TOKEN> (set in .env).
+All endpoints require Authorization: Bearer <DASHBOARD_TOKEN> (set in .env).
 If DASHBOARD_TOKEN is empty, auth is skipped (dev mode).
 
 Endpoints:
@@ -22,7 +22,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select, func, and_, or_, case, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,8 +54,12 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 _TOKEN = os.getenv("DASHBOARD_TOKEN", "")
 
 
-def _auth(token: str = Query("", alias="token")):
-    if _TOKEN and token != _TOKEN:
+def _auth(authorization: str = Header("", alias="Authorization")):
+    if not _TOKEN:
+        return  # dev mode — no token configured
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(401, "Authorization: Bearer <token> required")
+    if authorization[7:] != _TOKEN:
         raise HTTPException(403, "Invalid dashboard token")
 
 
