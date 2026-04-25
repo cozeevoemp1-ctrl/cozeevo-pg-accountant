@@ -180,7 +180,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
             num_days=req.num_days,
             daily_rate=Decimal(str(req.daily_rate)) if req.daily_rate else 0,
             special_terms=req.special_terms,
-            expires_at=datetime.utcnow() + timedelta(hours=2),
+            expires_at=datetime.utcnow() + timedelta(hours=48),
         )
         session.add(obs)
         await session.flush()
@@ -296,26 +296,39 @@ async def onboarding_stats(request: Request, date_from: str = "", date_to: str =
 
 @router.get("/admin/all")
 async def list_all_sessions(request: Request, status: str = "", date_from: str = "", date_to: str = ""):
-    """List all sessions with optional filters. Superseded sessions hidden by default."""
+    """List all sessions with optional filters. Superseded sessions hidden by default.
+    pending_tenant sessions past their expires_at are lazily shown as expired."""
     _check_admin_pin(request)
+    from sqlalchemy import or_
+    now = datetime.utcnow()
     async with get_session() as session:
         q = select(OnboardingSession).order_by(OnboardingSession.created_at.desc())
+        not_superseded = (
+            (OnboardingSession.cancellation_reason == None) |
+            (OnboardingSession.cancellation_reason != "superseded")
+        )
         if status == "superseded":
-            # Explicit request: show only superseded
             q = q.where(OnboardingSession.cancellation_reason == "superseded")
+        elif status == "expired":
+            # Match both DB-expired and pending_tenant sessions that have since expired
+            q = q.where(not_superseded)
+            q = q.where(or_(
+                OnboardingSession.status == "expired",
+                (OnboardingSession.status == "pending_tenant") &
+                (OnboardingSession.expires_at != None) &
+                (OnboardingSession.expires_at < now),
+            ))
         elif status:
             q = q.where(OnboardingSession.status == status)
-            # Exclude superseded even within a status filter
-            q = q.where(
-                (OnboardingSession.cancellation_reason == None) |
-                (OnboardingSession.cancellation_reason != "superseded")
-            )
+            q = q.where(not_superseded)
+            # When filtering "pending_tenant", exclude those that have silently expired
+            if status == "pending_tenant":
+                q = q.where(
+                    (OnboardingSession.expires_at == None) |
+                    (OnboardingSession.expires_at >= now)
+                )
         else:
-            # Default: hide superseded clutter
-            q = q.where(
-                (OnboardingSession.cancellation_reason == None) |
-                (OnboardingSession.cancellation_reason != "superseded")
-            )
+            q = q.where(not_superseded)
         if date_from:
             q = q.where(OnboardingSession.created_at >= date.fromisoformat(date_from))
         if date_to:
@@ -326,15 +339,29 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
         for obs in sessions:
             room = await session.get(Room, obs.room_id) if obs.room_id else None
             td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+            # Lazily compute effective status — pending sessions past expiry show as expired
+            effective_status = obs.status
+            if obs.status == "pending_tenant" and obs.expires_at and obs.expires_at < now:
+                effective_status = "expired"
             # Checkin status: read from linked tenancy
             checkin_status = ""
             if obs.tenancy_id:
                 tenancy = await session.get(Tenancy, obs.tenancy_id)
                 if tenancy:
                     checkin_status = tenancy.status.value if tenancy.status else ""
+            # How long ago the link expired (for expired sessions)
+            expired_ago = ""
+            if effective_status == "expired" and obs.expires_at:
+                delta = now - obs.expires_at
+                hours = int(delta.total_seconds() // 3600)
+                if hours < 24:
+                    expired_ago = f"{hours}h ago"
+                else:
+                    expired_ago = f"{hours // 24}d ago"
             items.append({
                 "token": obs.token,
-                "status": obs.status,
+                "status": effective_status,
+                "db_status": obs.status,
                 "cancellation_reason": obs.cancellation_reason or "",
                 "room": room.room_number if room else "",
                 "tenant_phone": obs.tenant_phone,
@@ -345,6 +372,8 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
                 "approved_by_phone": obs.approved_by_phone or "",
                 "agreed_rent": float(obs.agreed_rent or 0),
                 "checkin_status": checkin_status,
+                "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
+                "expired_ago": expired_ago,
             })
         return {"sessions": items}
 
@@ -477,6 +506,151 @@ async def resend_link(token: str, request: Request):
             f"This link is valid for 2 hours."
         )
         return {"status": "sent", "token": token}
+
+
+@router.post("/admin/{token}/regen-pdf")
+async def regen_pdf(token: str, request: Request):
+    """Re-generate the agreement PDF for an approved session and optionally resend via WhatsApp."""
+    _check_admin_pin(request)
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status != "approved":
+            raise HTTPException(400, f"Session is not approved (status={obs.status})")
+
+        td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+        if not td.get("name") or not td.get("phone"):
+            raise HTTPException(400, "Tenant data incomplete — cannot generate PDF")
+
+        room = await session.get(Room, obs.room_id) if obs.room_id else None
+        building = ""
+        if room and room.property_id:
+            prop = await session.get(Property, room.property_id)
+            building = prop.name if prop else ""
+        rt = room.room_type if room else None
+        sharing = rt.value if hasattr(rt, "value") else str(rt or "")
+
+        from src.services.pdf_generator import generate_agreement_pdf
+        pdf_path = await generate_agreement_pdf(obs, td, room, building, sharing)
+        obs.agreement_pdf_path = pdf_path
+        await session.commit()
+
+        # Copy to static so dashboard link works
+        whatsapp_sent = False
+        try:
+            from pathlib import Path
+            media_dir = Path(os.getenv("MEDIA_DIR", "media"))
+            src_pdf = media_dir / pdf_path
+            static_pdf_dir = Path("static/agreements") / Path(pdf_path).parent.name
+            static_pdf_dir.mkdir(parents=True, exist_ok=True)
+            static_pdf = static_pdf_dir / Path(pdf_path).name
+            import shutil
+            shutil.copy2(str(src_pdf), str(static_pdf))
+        except Exception:
+            pass
+
+        # Optionally resend to tenant
+        send = (request.query_params.get("send") or "").lower() in ("1", "true", "yes")
+        if send and obs.tenant_phone:
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp_document
+                base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
+                pdf_url = f"{base_url}/static/{pdf_path}"
+                phone_wa = obs.tenant_phone.strip()
+                if not phone_wa.startswith("91"):
+                    phone_wa = "91" + phone_wa
+                await _send_whatsapp_document(
+                    phone_wa, pdf_url,
+                    f"Cozeevo_Agreement_{td.get('name', 'tenant').replace(' ', '_')}.pdf",
+                    caption="Your Cozeevo Co-living rental agreement (re-sent).",
+                )
+                whatsapp_sent = True
+            except Exception:
+                pass
+
+        return {"status": "ok", "pdf_path": pdf_path, "whatsapp_sent": whatsapp_sent}
+
+
+_AADHAAR_EXTRACT_PROMPT = """You are extracting identity details from an Indian Aadhaar card photo.
+Return ONLY valid JSON with these fields. No markdown, no explanation.
+
+{
+  "aadhaar_number": "",
+  "name": "",
+  "dob": "",
+  "gender": "",
+  "address": ""
+}
+
+Rules:
+- aadhaar_number: 12 digits, no spaces (e.g. "123456789012"). Look for the bold 12-digit number on the card.
+- name: full name as printed on card
+- dob: DD/MM/YYYY format
+- gender: "male" or "female" (lowercase)
+- address: full address as printed, single line, comma-separated
+- If a field is unreadable or not visible, use ""
+- For the back of the card: extract address. For the front: extract name, dob, gender, aadhaar_number.
+- If both sides are in one image, extract all fields.
+"""
+
+
+@router.post("/{token}/extract-id")
+async def extract_id_photo(token: str, request: Request):
+    """Extract Aadhaar details from an uploaded ID photo using Claude Haiku vision."""
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+    if not obs:
+        raise HTTPException(404, "Session not found")
+
+    body = await request.json()
+    image_b64 = body.get("image_b64", "")
+    mime_type = body.get("mime_type", "image/jpeg")
+
+    if not image_b64:
+        raise HTTPException(400, "image_b64 required")
+
+    # Strip data URI prefix if present
+    if "base64," in image_b64:
+        image_b64 = image_b64.split("base64,", 1)[1]
+
+    import base64
+    try:
+        image_bytes = base64.b64decode(image_b64)
+    except Exception:
+        raise HTTPException(400, "Invalid base64 image")
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key or api_key.startswith("sk-ant-your"):
+        return {"error": "extraction_unavailable", "fields": {}}
+
+    try:
+        import anthropic
+        media_type = mime_type if mime_type in ("image/jpeg", "image/png", "image/webp") else "image/jpeg"
+        b64_str = base64.b64encode(image_bytes).decode()
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        msg = await client.messages.create(
+            model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
+            max_tokens=512,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64_str}},
+                    {"type": "text", "text": _AADHAAR_EXTRACT_PROMPT},
+                ],
+            }],
+        )
+        raw = msg.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        fields = json.loads(raw)
+        return {"fields": fields}
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("ID extract failed: %s", e)
+        return {"error": str(e), "fields": {}}
 
 
 # ── Get session data (tenant form) ───────────────────────────────────────────

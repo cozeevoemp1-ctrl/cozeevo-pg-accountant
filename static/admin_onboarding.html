@@ -658,7 +658,7 @@
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Room</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Phone</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Rent</th>
-              <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Status</th>
+              <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Form Status</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Check-in</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Created</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Approved by</th>
@@ -714,10 +714,13 @@
       // Build rows — each data row + a hidden expand row below it
       const checkinColors = { active: '#166534', no_show: '#92400E', exited: '#6B7280', cancelled: '#991B1B' };
       const checkinBg     = { active: '#DCFCE7', no_show: '#FEF3C7', exited: '#F3F4F6', cancelled: '#FEE2E2' };
-      const checkinLabel  = { active: 'Checked In', no_show: 'Not Yet', exited: 'Checked Out', cancelled: 'Cancelled' };
+      const checkinLabel  = { active: 'Checked In', no_show: 'No Show', exited: 'Checked Out', cancelled: 'Cancelled' };
       const rows = [];
       d.sessions.forEach(s => {
-        const pill = `<span style="background:${statusBg[s.status]||'#F3F4F6'};color:${statusColors[s.status]||'#6B7280'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${statusLabel[s.status]||s.status}</span>`;
+        const pillLabel = s.status === 'expired' && s.expired_ago
+          ? `${statusLabel[s.status]||s.status} · ${escHtml(s.expired_ago)}`
+          : (statusLabel[s.status]||s.status);
+        const pill = `<span style="background:${statusBg[s.status]||'#F3F4F6'};color:${statusColors[s.status]||'#6B7280'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${pillLabel}</span>`;
         const approvedBy = s.approved_by_phone ? `<span style="color:var(--sub);font-size:11px;">${escHtml(s.approved_by_phone)}</span>` : '—';
         const ciStatus = s.checkin_status;
         const ciCell = ciStatus
