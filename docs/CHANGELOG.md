@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.52.4] — 2026-04-25 — Fix: room capacity check + admin dashboard UX + PDF OCR
+
+### Room capacity bug
+- `find_overlap_conflict` was blocking any booking as soon as 1 tenant overlapped, regardless of room capacity. Now counts beds consumed (premium = max_occupancy, regular = 1) and only rejects when `beds_used >= max_occupancy`. A 3-sharing room with 2 tenants now correctly accepts a 3rd.
+
+### Admin dashboard (onboarding)
+- **PDF OCR**: PDFs now render to high-DPI JPEG client-side via PDF.js and pass through existing Claude Haiku vision — Aadhaar number auto-fills from PDF
+- **Staff signature**: One-time signature collection page (`/api/onboarding/staff-sign`) + saved PNG per staff phone + auto-load checkbox on approval form (Lokesh's signature saved)
+- **Status pill filters**: Multi-select pills replace single dropdown; cancelled/expired hidden by default, one click to include
+- **Logo link**: Cozeevo icon now navigates to getkozzy.com
+- **Removed**: "How was this form filled?" radio (pointless for admin dashboard)
+
+### Test data cleanup
+- TEST_E2E tenant (id=932, tenancy=916, phone=9999999998) was manually created via admin dashboard and left in production DB + April sheet. Deleted from both.
+
+### Files changed
+- `src/services/room_occupancy.py` — capacity-aware overlap check
+- `static/onboarding.html` — PDF.js OCR path
+- `src/api/onboarding_router.py` — staff signature endpoints + collection page
+- `static/admin_onboarding.html` — pill filters, saved sig, logo link, radio removal
+
+### Deployed
+Live on VPS (commits 2a5da04 + ea727de + 7082656 + f639095 + 4607e8b + b54bea1).
+
+---
+
 ## [1.52.3] — 2026-04-25 — Fix: checkout flow end-to-end (OCR, "yes" routing, fuzzy match, settlement)
 
 ### Problems fixed
