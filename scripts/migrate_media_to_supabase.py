@@ -16,7 +16,7 @@ Run on VPS:
 
 Env required:
   SUPABASE_URL          https://<project-ref>.supabase.co
-  SUPABASE_SERVICE_KEY  service_role JWT
+  SUPABASE_SERVICE_KEY  service_role JWT  (or SUPABASE_KEY for anon key with RLS)
   DATABASE_URL          postgresql+asyncpg://...
 
 VPS media root: /opt/pg-accountant/media/
@@ -38,7 +38,7 @@ from sqlalchemy.orm import sessionmaker
 
 # ── Config ──────────────────────────────────────────────────────────────────
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "") or os.getenv("SUPABASE_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 # VPS local roots — adjust if directory layout differs
@@ -264,7 +264,7 @@ async def migrate_staff_signatures(
 
 async def main(dry_run: bool, delete_local: bool) -> None:
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-        sys.exit("ERROR: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env")
+        sys.exit("ERROR: SUPABASE_URL and (SUPABASE_SERVICE_KEY or SUPABASE_KEY) must be set in .env")
     if not DATABASE_URL:
         sys.exit("ERROR: DATABASE_URL must be set in .env")
 
