@@ -3940,20 +3940,33 @@ async def _do_checkout(
     deposit = tenancy.security_deposit or Decimal("0")
     o_rent, o_maintenance = await _calc_outstanding_dues(tenancy.id, session)
     damages = Decimal("0")   # 0 unless owner specifies later
-    net = deposit - o_rent - o_maintenance - damages
+
+    # Late / no notice → deposit forfeited (owner keeps it) + extra month charged
+    late_notice = not tenancy.notice_date or tenancy.notice_date.day > _NOTICE_BY_DAY
+    if late_notice:
+        extra_month = tenancy.rent or Decimal("0")
+        net = Decimal("0") - o_rent - o_maintenance - extra_month
+    else:
+        extra_month = Decimal("0")
+        net = deposit - o_rent - o_maintenance - damages
 
     settlement_lines = ["\n*Settlement Summary*"]
     settlement_lines.append(f"Security deposit held : Rs.{int(deposit):,}")
+    if late_notice:
+        settlement_lines.append(f"Deposit forfeited     : -Rs.{int(deposit):,} (late notice)")
+    if extra_month > 0:
+        settlement_lines.append(f"Extra month (penalty) : -Rs.{int(extra_month):,}")
     if o_rent > 0:
         settlement_lines.append(f"Outstanding rent      : -Rs.{int(o_rent):,}")
     if o_maintenance > 0:
         settlement_lines.append(f"Outstanding maintenance: -Rs.{int(o_maintenance):,}")
-    settlement_lines.append(f"Damages               : Rs.0")
+    if not late_notice:
+        settlement_lines.append(f"Damages               : Rs.0")
     settlement_lines.append("─" * 28)
     if net >= 0:
         settlement_lines.append(f"*Refund to tenant: Rs.{int(net):,}*")
     else:
-        settlement_lines.append(f"*Tenant still owes: Rs.{int(abs(net)):,}*")
+        settlement_lines.append(f"*Tenant owes: Rs.{int(abs(net)):,}*")
     settlement_summary = "\n".join(settlement_lines)
 
     # ── Google Sheets write-back (fire-and-forget) ──
