@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.services.sheet_audit import (
-    run_audit, format_report, whatsapp_message,
+    run_audit, run_audit_with_db, apply_fixes, format_report, whatsapp_message,
 )
 
 
@@ -49,7 +49,11 @@ async def _send_alert(body: str) -> bool:
 
 
 async def main_async(args) -> int:
-    r = await run_audit()
+    if args.auto_fix:
+        r, db_state = await run_audit_with_db()
+    else:
+        r = await run_audit()
+        db_state = {}
 
     if args.json:
         out = {
@@ -69,6 +73,14 @@ async def main_async(args) -> int:
     else:
         print(format_report(r))
 
+    if args.auto_fix and r.total_diffs > 0:
+        print("\n-- Auto-fix --")
+        fixes = await apply_fixes(r, db_state)
+        print(f"  Fixed:   {fixes['fixed']}")
+        print(f"  Skipped: {fixes['skipped']}")
+        for err in fixes["errors"]:
+            print(f"  ERROR: {err}")
+
     if args.alert and r.total_diffs > 0:
         await _send_alert(whatsapp_message(r))
 
@@ -81,6 +93,8 @@ def main() -> int:
                     help="Send WhatsApp alert to ADMIN_PHONE when diffs found")
     ap.add_argument("--json", action="store_true",
                     help="Emit JSON instead of human-readable report")
+    ap.add_argument("--auto-fix", action="store_true",
+                    help="Push DB values to sheet for all detected diffs (TENANTS fields + monthly tab)")
     args = ap.parse_args()
     return asyncio.run(main_async(args))
 

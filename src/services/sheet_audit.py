@@ -385,7 +385,8 @@ def _diff_monthly(rows: list[list[str]], db_monthly: dict[str, dict], tab: str
 
 # ── Public entry points ──────────────────────────────────────────────────────
 
-async def run_audit() -> AuditResult:
+async def run_audit_with_db() -> tuple[AuditResult, dict]:
+    """Like run_audit() but also returns raw db_state — used by apply_fixes()."""
     today = date.today()
     period = today.replace(day=1)
     next_period = (date(period.year + 1, 1, 1) if period.month == 12
@@ -405,13 +406,73 @@ async def run_audit() -> AuditResult:
         if ph not in m_seen and t["total"] > 0:
             missing_in_sheet.append((monthly_tab, ph, t["name"]))
 
-    return AuditResult(
+    result = AuditResult(
         tenants_diffs=t_diffs,
         monthly_diffs=m_diffs,
         missing_in_db=t_missing + m_missing,
         missing_in_sheet=missing_in_sheet,
         month_tab=monthly_tab,
     )
+    return result, db_state
+
+
+async def run_audit() -> AuditResult:
+    result, _ = await run_audit_with_db()
+    return result
+
+
+# Field label in Diff → gsheets field key accepted by update_tenants_tab_field
+_AUDIT_FIELD_TO_GSHEETS: dict[str, str] = {
+    "Room":          "room",
+    "Agreed Rent":   "agreed_rent",
+    "Deposit":       "deposit",
+    "Notice Date":   "notice_date",
+    "Checkout Date": "checkout_date",
+}
+
+
+async def apply_fixes(result: AuditResult, db_state: dict) -> dict:
+    """Push DB values to sheet for all detected diffs.
+
+    TENANTS diffs   → update_tenants_tab_field per diff (DB is authoritative)
+    Monthly diffs   → trigger_monthly_sheet_sync once (rewrites whole tab)
+    Missing in DB / missing in sheet → skipped (need human review)
+    """
+    from src.integrations.gsheets import (
+        update_tenants_tab_field, trigger_monthly_sheet_sync,
+    )
+
+    fixed = 0
+    skipped = 0
+    errors: list[str] = []
+
+    # ── TENANTS fixes ────────────────────────────────────────────────────────
+    for diff in result.tenants_diffs:
+        gsheets_key = _AUDIT_FIELD_TO_GSHEETS.get(diff.field)
+        if not gsheets_key:
+            skipped += 1
+            continue
+        db_row = db_state["tenants"].get(diff.phone)
+        room = db_row["room"] if db_row else diff.name  # fallback to name-only lookup
+        try:
+            r = await update_tenants_tab_field(room, diff.name, gsheets_key, diff.db)
+            if r.get("success"):
+                fixed += 1
+            else:
+                errors.append(f"TENANTS {diff.name} {diff.field}: {r.get('error')}")
+        except Exception as e:
+            errors.append(f"TENANTS {diff.name} {diff.field}: {e}")
+
+    # ── Monthly fixes ────────────────────────────────────────────────────────
+    if result.monthly_diffs:
+        today = date.today()
+        try:
+            trigger_monthly_sheet_sync(today.month, today.year)
+            fixed += len(result.monthly_diffs)
+        except Exception as e:
+            errors.append(f"Monthly sync: {e}")
+
+    return {"fixed": fixed, "skipped": skipped, "errors": errors}
 
 
 def format_report(r: AuditResult, preview: int = 15) -> str:
