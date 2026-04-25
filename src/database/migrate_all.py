@@ -1152,6 +1152,59 @@ async def run_add_cancellation_reason_2026_04_25b(conn) -> None:
     print("  [ok] cancellation_reason added")
 
 
+async def _migrate_checkout_sessions(conn) -> None:
+    """Create checkout_sessions table and extend checkout_records."""
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS checkout_sessions (
+            id                    SERIAL PRIMARY KEY,
+            token                 VARCHAR(36) NOT NULL UNIQUE,
+            status                VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_by_phone      VARCHAR(20) NOT NULL,
+            tenant_phone          VARCHAR(20) NOT NULL,
+            tenancy_id            INTEGER NOT NULL REFERENCES tenancies(id),
+            checkout_date         DATE NOT NULL,
+            room_key_returned     BOOLEAN NOT NULL DEFAULT FALSE,
+            wardrobe_key_returned BOOLEAN NOT NULL DEFAULT FALSE,
+            biometric_removed     BOOLEAN NOT NULL DEFAULT FALSE,
+            room_condition_ok     BOOLEAN NOT NULL DEFAULT TRUE,
+            damage_notes          TEXT,
+            security_deposit      NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            pending_dues          NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            deductions            NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            deduction_reason      TEXT,
+            refund_amount         NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            refund_mode           VARCHAR(10),
+            rejection_reason      TEXT,
+            expires_at            TIMESTAMPTZ NOT NULL,
+            confirmed_at          TIMESTAMPTZ,
+            created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_checkout_sessions_token ON checkout_sessions(token)"
+    ))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_checkout_sessions_status ON checkout_sessions(status)"
+    ))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_checkout_sessions_tenant_phone ON checkout_sessions(tenant_phone)"
+    ))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_checkout_sessions_expires ON checkout_sessions(expires_at)"
+    ))
+    await conn.execute(text("""
+        ALTER TABLE checkout_records
+            ADD COLUMN IF NOT EXISTS biometric_removed   BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS room_condition_ok   BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS deductions          NUMERIC(12, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS deduction_reason    TEXT,
+            ADD COLUMN IF NOT EXISTS refund_mode         VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS checkout_session_id INTEGER
+                REFERENCES checkout_sessions(id)
+    """))
+    print("  [ok] checkout_sessions table + checkout_records extensions ready")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1214,6 +1267,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_allow_unassigned_room_2026_04_24(conn)
             await run_add_approved_by_phone_2026_04_25(conn)
             await run_add_cancellation_reason_2026_04_25b(conn)
+            await _migrate_checkout_sessions(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)
