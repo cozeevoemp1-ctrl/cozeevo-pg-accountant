@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from .onboarding import (
     resolve_approve_onboarding,
+    resolve_checkin_arrival_payment,
     resolve_confirm_checkin_arrival,
 )
 
@@ -26,5 +27,6 @@ from .onboarding import (
 # in owner_handler.resolve_pending_action. Phase 2B/2C migrate the rest.
 PENDING_RESOLVERS: dict = {
     "APPROVE_ONBOARDING":        resolve_approve_onboarding,
+    "CHECKIN_ARRIVAL_PAYMENT":   resolve_checkin_arrival_payment,
     "CONFIRM_CHECKIN_ARRIVAL":   resolve_confirm_checkin_arrival,
 }

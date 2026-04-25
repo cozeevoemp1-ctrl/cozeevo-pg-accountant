@@ -140,6 +140,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
             )
             for old_obs in old.scalars().all():
                 old_obs.status = "cancelled"
+                old_obs.cancellation_reason = "superseded"
 
         # Check if tenant already exists in system
         existing_tenant = None
@@ -295,12 +296,26 @@ async def onboarding_stats(request: Request, date_from: str = "", date_to: str =
 
 @router.get("/admin/all")
 async def list_all_sessions(request: Request, status: str = "", date_from: str = "", date_to: str = ""):
-    """List all sessions with optional filters."""
+    """List all sessions with optional filters. Superseded sessions hidden by default."""
     _check_admin_pin(request)
     async with get_session() as session:
         q = select(OnboardingSession).order_by(OnboardingSession.created_at.desc())
-        if status:
+        if status == "superseded":
+            # Explicit request: show only superseded
+            q = q.where(OnboardingSession.cancellation_reason == "superseded")
+        elif status:
             q = q.where(OnboardingSession.status == status)
+            # Exclude superseded even within a status filter
+            q = q.where(
+                (OnboardingSession.cancellation_reason == None) |
+                (OnboardingSession.cancellation_reason != "superseded")
+            )
+        else:
+            # Default: hide superseded clutter
+            q = q.where(
+                (OnboardingSession.cancellation_reason == None) |
+                (OnboardingSession.cancellation_reason != "superseded")
+            )
         if date_from:
             q = q.where(OnboardingSession.created_at >= date.fromisoformat(date_from))
         if date_to:
@@ -311,9 +326,16 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
         for obs in sessions:
             room = await session.get(Room, obs.room_id) if obs.room_id else None
             td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+            # Checkin status: read from linked tenancy
+            checkin_status = ""
+            if obs.tenancy_id:
+                tenancy = await session.get(Tenancy, obs.tenancy_id)
+                if tenancy:
+                    checkin_status = tenancy.status.value if tenancy.status else ""
             items.append({
                 "token": obs.token,
                 "status": obs.status,
+                "cancellation_reason": obs.cancellation_reason or "",
                 "room": room.room_number if room else "",
                 "tenant_phone": obs.tenant_phone,
                 "tenant_name": td.get("name", ""),
@@ -322,6 +344,7 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
                 "approved_at": obs.approved_at.isoformat() if obs.approved_at else "",
                 "approved_by_phone": obs.approved_by_phone or "",
                 "agreed_rent": float(obs.agreed_rent or 0),
+                "checkin_status": checkin_status,
             })
         return {"sessions": items}
 
@@ -603,6 +626,7 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
 class ApproveRequest(BaseModel):
     staff_signature: str = ""  # base64 PNG data URL
     approved_by_phone: str = ""  # phone of the staff member approving
+    entry_source: str = "onboarding_form"  # "onboarding_form" | "physical_form"
     # Optional receptionist overrides — any field name in this dict replaces
     # the tenant-submitted value. Editable from the admin review screen.
     # Supported keys (financial): agreed_rent, security_deposit, maintenance_fee,
@@ -875,7 +899,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
                 lock_in_months=obs.lock_in_months or 0,
                 sharing_type=sharing_default,
-                entered_by="onboarding_form",
+                entered_by=(req.entry_source or "onboarding_form") if req else "onboarding_form",
                 status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
             )
             session.add(tenancy)
@@ -932,7 +956,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 education=td.get("educational_qualification", ""),
                 office_address=td.get("office_address", ""), office_phone=td.get("office_phone", ""),
                 id_type=td.get("id_proof_type", ""), id_number=td.get("id_proof_number", ""),
-                food_pref=td.get("food_preference", ""), entered_by="onboarding_form",
+                food_pref=td.get("food_preference", ""),
+                entered_by=(req.entry_source or "onboarding_form") if req else "onboarding_form",
                 advance_amount=float(obs.booking_amount or 0), advance_mode=obs.advance_mode or "",
             )
             for attempt in range(3):

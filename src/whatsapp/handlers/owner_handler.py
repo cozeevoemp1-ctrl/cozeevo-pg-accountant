@@ -4230,22 +4230,50 @@ async def _checkin_arrival(entities: dict, ctx: CallerContext, session: AsyncSes
 
     if len(rows) == 1:
         tenant, tenancy, room_obj = rows[0]
-        ci_str = tenancy.checkin_date.strftime("%d %b %Y") if tenancy.checkin_date else "—"
+        from decimal import Decimal
+        from src.services.rent_schedule import prorated_first_month_rent
+
+        checkin = tenancy.checkin_date or date.today()
+        rent     = Decimal(str(tenancy.agreed_rent or 0))
+        deposit  = Decimal(str(tenancy.security_deposit or 0))
+        advance  = Decimal(str(tenancy.booking_amount or 0))
+        maint    = Decimal(str(tenancy.maintenance_fee or 0))
+
+        import calendar as _cal
+        days_in_month = _cal.monthrange(checkin.year, checkin.month)[1]
+        prorated = prorated_first_month_rent(rent, checkin)
+        net_due  = prorated + deposit + maint - advance
+
+        lines = [
+            f"*Check-in: {tenant.name}* (Room {room_obj.room_number})",
+            f"Check-in date: {checkin.strftime('%d %b %Y')}",
+            "",
+            f"Prorated rent ({checkin.day}–{days_in_month} {checkin.strftime('%b')}): Rs.{int(prorated):,}",
+            f"Deposit: Rs.{int(deposit):,}",
+        ]
+        if maint > 0:
+            lines.append(f"Maintenance: Rs.{int(maint):,}")
+        if advance > 0:
+            lines.append(f"Advance paid: − Rs.{int(advance):,}")
+        lines += [
+            "─────────────────",
+            f"*Due at door: Rs.{int(net_due):,}*",
+            "",
+            "How much collected? (e.g. *15000 cash* or *17000 upi*)",
+            "Reply *0* or *skip* if nothing collected now.",
+        ]
+
         action_data = {
-            "tenant_id": tenant.id,
-            "tenancy_id": tenancy.id,
-            "tenant_name": tenant.name,
-            "room_number": room_obj.room_number,
+            "tenant_id":    tenant.id,
+            "tenancy_id":   tenancy.id,
+            "tenant_name":  tenant.name,
+            "room_number":  room_obj.room_number,
             "booked_checkin": tenancy.checkin_date.isoformat() if tenancy.checkin_date else "",
             "confirmed_by": ctx.name or ctx.phone,
+            "net_due":      int(net_due),
         }
-        await _save_pending(ctx.phone, "CONFIRM_CHECKIN_ARRIVAL", action_data, [], session)
-        return (
-            f"*Mark as arrived — {tenant.name}* (Room {room_obj.room_number})\n"
-            f"Booked check-in : {ci_str}\n"
-            f"New status       : ACTIVE\n\n"
-            f"Reply *Yes* to confirm or *No* to cancel."
-        )
+        await _save_pending(ctx.phone, "CHECKIN_ARRIVAL_PAYMENT", action_data, [], session)
+        return "\n".join(lines)
 
     # Multiple no-show tenancies match — ask for a more specific identifier.
     # (Disambig flow deferred to a later iteration; receptionist can use room
@@ -5178,7 +5206,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     if _bookable_err:
         return f"❌ Cannot add {name} to room {room_number}: {_bookable_err}"
 
-    # Tenancy record
+    # Tenancy record — future date = no_show until physical arrival confirmed
     tenancy = Tenancy(
         tenant_id        = tenant.id,
         room_id          = room_id,
@@ -5188,7 +5216,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         booking_amount   = advance,
         maintenance_fee  = maintenance,
         entered_by       = "whatsapp_bot",
-        status           = TenancyStatus.active,
+        status           = TenancyStatus.active if checkin_date <= date.today() else TenancyStatus.no_show,
     )
     session.add(tenancy)
     await session.flush()

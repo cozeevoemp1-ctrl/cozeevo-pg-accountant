@@ -642,6 +642,7 @@
             <option value="pending_tenant">Awaiting Tenant</option>
             <option value="cancelled">Cancelled</option>
             <option value="expired">Expired (not filled)</option>
+            <option value="superseded">Superseded (replaced)</option>
           </select>
           <input type="date" id="filter-date-from" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
           <input type="date" id="filter-date-to" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
@@ -658,6 +659,7 @@
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Phone</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Rent</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Status</th>
+              <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Check-in</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Created</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Approved by</th>
             </tr>
@@ -706,14 +708,21 @@
       const body = document.getElementById('history-body');
       document.getElementById('history-count').textContent = `${d.sessions.length} sessions`;
       if (!d.sessions.length) {
-        body.innerHTML = '<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--muted);">No sessions found</td></tr>';
+        body.innerHTML = '<tr><td colspan="9" style="padding:16px;text-align:center;color:var(--muted);">No sessions found</td></tr>';
         return;
       }
       // Build rows — each data row + a hidden expand row below it
+      const checkinColors = { active: '#166534', no_show: '#92400E', exited: '#6B7280', cancelled: '#991B1B' };
+      const checkinBg     = { active: '#DCFCE7', no_show: '#FEF3C7', exited: '#F3F4F6', cancelled: '#FEE2E2' };
+      const checkinLabel  = { active: 'Checked In', no_show: 'Not Yet', exited: 'Checked Out', cancelled: 'Cancelled' };
       const rows = [];
       d.sessions.forEach(s => {
         const pill = `<span style="background:${statusBg[s.status]||'#F3F4F6'};color:${statusColors[s.status]||'#6B7280'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${statusLabel[s.status]||s.status}</span>`;
         const approvedBy = s.approved_by_phone ? `<span style="color:var(--sub);font-size:11px;">${escHtml(s.approved_by_phone)}</span>` : '—';
+        const ciStatus = s.checkin_status;
+        const ciCell = ciStatus
+          ? `<span style="background:${checkinBg[ciStatus]||'#F3F4F6'};color:${checkinColors[ciStatus]||'#6B7280'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${checkinLabel[ciStatus]||ciStatus}</span>`
+          : '—';
         rows.push(`
           <tr class="hist-row" data-token="${escHtml(s.token)}" style="border-bottom:1px solid #F1F5F9;cursor:pointer;" onclick="toggleHistoryRow(this)">
             <td style="padding:8px 12px;color:var(--muted);font-size:11px;" class="hist-chevron">▶</td>
@@ -722,11 +731,12 @@
             <td style="padding:8px 12px;">${escHtml(s.tenant_phone || '—')}</td>
             <td style="padding:8px 12px;">₹${Number(s.agreed_rent || 0).toLocaleString('en-IN')}</td>
             <td style="padding:8px 12px;">${pill}</td>
+            <td style="padding:8px 12px;">${ciCell}</td>
             <td style="padding:8px 12px;color:var(--muted);">${s.created_at ? formatDateShort(s.created_at) : '—'}</td>
             <td style="padding:8px 12px;">${approvedBy}</td>
           </tr>
           <tr class="hist-detail-row" id="hist-detail-${escHtml(s.token)}" style="display:none;">
-            <td colspan="8" style="padding:0;background:#F7FAFC;border-bottom:2px solid #E2E8F0;">
+            <td colspan="9" style="padding:0;background:#F7FAFC;border-bottom:2px solid #E2E8F0;">
               <div id="hist-detail-inner-${escHtml(s.token)}" style="padding:16px 20px;">
                 <div style="color:var(--muted);font-size:12px;">Loading...</div>
               </div>
@@ -1416,6 +1426,17 @@
       ${status === 'pending_review' ? `
         <div class="section-divider">Approver Details</div>
         <div style="margin-bottom:12px;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:6px;">How was this form filled?</label>
+          <div style="display:flex;gap:16px;align-items:center;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+              <input type="radio" name="entry-source-${token}" value="onboarding_form" checked> Tenant filled digitally
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+              <input type="radio" name="entry-source-${token}" value="physical_form"> Staff filled from physical paper
+            </label>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
           <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:6px;">Your Phone Number (who is approving)</label>
           <input id="approver-phone-${token}" type="tel" maxlength="10" placeholder="10-digit phone" style="width:200px;padding:8px 10px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;">
         </div>
@@ -1550,12 +1571,14 @@
     const overrides = collectOverrides(token);
     const approverPhoneEl = document.getElementById(`approver-phone-${token}`);
     const approvedByPhone = approverPhoneEl ? approverPhoneEl.value.trim() : '';
+    const entrySourceEl = document.querySelector(`input[name="entry-source-${token}"]:checked`);
+    const entrySource = entrySourceEl ? entrySourceEl.value : 'onboarding_form';
 
     try {
       const res = await fetch(`/api/onboarding/${token}/approve`, {
         method: 'POST',
         headers: pinHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ staff_signature: staffSig, approved_by_phone: approvedByPhone, overrides }),
+        body: JSON.stringify({ staff_signature: staffSig, approved_by_phone: approvedByPhone, entry_source: entrySource, overrides }),
       });
       // Parse body defensively — 500s may return HTML, not JSON
       let data = {};

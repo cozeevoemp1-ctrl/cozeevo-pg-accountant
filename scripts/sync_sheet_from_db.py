@@ -34,6 +34,7 @@ from src.database.models import (
 # Canonical column list (single source of truth). Row width and column
 # letters are derived from this — never hardcoded.
 from src.integrations.gsheets import MONTHLY_HEADERS
+from src.services.rent_status import NO_SHOW, EXIT, PAID, PARTIAL
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 if DATABASE_URL.startswith("postgresql://"):
@@ -420,8 +421,10 @@ async def main(args):
             # don't vanish; future payments populate received_by_staff_id.
             entered = entered_by_map.get(tenancy.id, "") or preserved.get("entered by", "")
 
-            # Prev due from DB (previous month's unpaid rent), not from sheet
-            prev_due_num = prev_due_map.get(tenancy.id, 0)
+            # Prev due from DB (previous month's unpaid rent), not from sheet.
+            # For April 2026: source apr_balance already includes March carryover,
+            # so our rent_schedule adjustments encode the full balance — don't add prev_due again.
+            prev_due_num = 0 if period == date(2026, 4, 1) else prev_due_map.get(tenancy.id, 0)
             prev_due = int(prev_due_num) if prev_due_num else ""
 
             prepaid_credit = int(prepaid_map.get(tenancy.id, 0))
@@ -431,52 +434,13 @@ async def main(args):
             effective_paid = total_paid + booking_credit + prepaid_credit + deposit_credit
             balance = rent_due + int(prev_due_num) - effective_paid
 
-            # APRIL 2026: Use hardcoded balances (source of truth, not calculated)
-            if period == date(2026, 4, 1):
-                april_balances = {
-                    (106, 'Suraj Prasana'): 1500,
-                    (117, 'Claudin Narsis'): 6500,
-                    (117, 'Arun Dharshini'): 6500,
-                    (419, 'Akshit'): 11500,
-                    (419, 'Aruf Khan'): 11500,
-                    (420, 'Sai Shankar'): 6000,
-                    (316, 'Prashanth'): 6950,
-                    (215, 'Sachin Kumar Yadav'): 5250,
-                    (616, 'Omkar Deodher'): 5500,
-                    (616, 'Swarup Ravindra  Futane'): 5500,
-                    (615, 'Anshika Gahlot'): 1500,
-                    (623, 'Sachin'): 6250,
-                    (623, 'Veena.T'): 6250,
-                    ('G07', 'Didla Lochan'): 5000,
-                    ('G07', 'Shivam Nath'): 5000,
-                    ('G07', 'Aldrin P Thomas'): 5000,
-                    (213, 'Tanishka'): 4000,
-                    (409, 'Preesha'): 3000,
-                    (409, 'Amisha Mohta'): 3000,
-                    (411, 'Abhishek Charan'): 6066,
-                    (415, 'T.Rakesh Chetan'): 15533,
-                }
-                # Try to match tenant - first by room number + name, then just by name
-                room_num = int(room.room_number) if room.room_number.isdigit() else room.room_number
-                key = (room_num, tenant.name)
-                if key in april_balances:
-                    balance = april_balances[key]
-                else:
-                    balance = 0
-
-            # Status — canonical helper (src/services/rent_status.py).
-            from src.services.rent_status import compute_status, NO_SHOW, EXIT, PAID, PARTIAL
+            # Status
             if tenancy.status == TenancyStatus.exited:
                 status = EXIT
             elif tenancy.status == TenancyStatus.no_show:
                 status = NO_SHOW
             else:
-                # For April 2026, use balance-based status (hardcoded balance values)
-                if period == date(2026, 4, 1):
-                    status = PARTIAL if balance > 0 else PAID
-                else:
-                    # For other months, use rent-only status
-                    status = compute_status(effective_paid, rent_due)
+                status = PARTIAL if balance > 0 else PAID
 
             # Event
             if tenancy.status == TenancyStatus.exited:
@@ -559,13 +523,8 @@ async def main(args):
         total_cash = sum(pn(r[i_cash]) for r in data_rows)
         total_upi = sum(pn(r[i_upi]) for r in data_rows)
         total_collected = total_cash + total_upi
-        # April 2026: Total Dues = sum of hardcoded pending balances (140,299)
-        # Other months: Total Dues = sum of per-row positive Balance
         i_balance = H["balance"]
-        if period == date(2026, 4, 1):
-            total_dues = 140_299  # sum of 21 pending tenants from April balance map
-        else:
-            total_dues = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
+        total_dues = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
 
         paid_count = sum(1 for r in data_rows if r[i_status] == "PAID")
         partial_count = sum(1 for r in data_rows if r[i_status] == "PARTIAL")

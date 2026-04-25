@@ -292,10 +292,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"assign\s+(?:room\s+)?[\w-]+\s+to\s+\w+|assign\s+\w+\s+(?:to\s+)?room\s+[\w-]+|allocate\s+room|room\s+assign|allot\s+room", re.I), "ASSIGN_ROOM", 0.94),
     # Immediate checkout (no date)
     (re.compile(r"(?:check.?out|vacate|vacating|leaving|exit|moving out|ja\s+raha\s+hai\b|chhod\s+raha\s+hai\b)", re.I), "CHECKOUT", 0.95),
-    # Add tenant — DEPRECATED: now routes to START_ONBOARDING (unified web form flow)
-    # Old patterns: "add tenant", "new checkin", "joining", "check in", "register tenant"
-    # These now trigger the onboarding form instead of the old ADD_TENANT bot flow.
-    # (re.compile(r"(?:add\s+te(?:nant?|ant|nent|nnant?)\b|new\s+tenant|new\s+admission|\badmit\s+\w+|\btenant\s+\w+\s+\d{7,}|\bcheck.?in\b|joining|new\s+room|onboard|register\s+tenant|naya\s+tenant\b|tenant\s+add\s+karo)", re.I), "ADD_TENANT", 0.95),
+    # Add tenant — manual bot flow (booking/registration; physical arrival = CHECKIN_ARRIVAL)
+    (re.compile(r"(?:add\s+te(?:nant?|ant|nent|nnant?)\b|new\s+tenant|new\s+admission|\badmit\s+\w+|\btenant\s+\w+\s+\d{7,}|joining|new\s+room|register\s+tenant|naya\s+tenant\b|tenant\s+add\s+karo)", re.I), "ADD_TENANT", 0.95),
     # Rent change (permanent or from a month) — must come before RENT_DISCOUNT
     (re.compile(r"rent (?:is now|from\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next)|change|increase|hike|reduce|decrease)|new rent|from \w+ rent|rent to \d|from\s+next\s+month\s+rent|room\s+[\w-]+\s+rent\s+(?:\d|updated?|changed?|revised?)|(?:change|update|revise|set|increase)\s+rent\b|room\s+[\w-]+\s+to\s+\d{4,}|increase\s+rent\s+(?:for\s+)?room|(?:change|update|revise|set|increase)\s+rent\s+(?:for\s+)?(?:room|[A-Z][a-z]+)\b", re.I), "RENT_CHANGE", 0.91),
     # One-time discount / concession / surcharge
@@ -320,15 +318,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # required 2+ digits, so `paid 5 cash and set notes to X` fell through
     # to GET_TENANT_NOTES at line ~326).
     (re.compile(rf"\b(?:p[ai]{{0,2}}j?[ai]{{0,2}}d|paied)\s+\d[\d,k]*\s+(?:{_MODES_CORE})", re.I), "PAYMENT_LOG", 0.96),
-    # CHECKIN_ARRIVAL — receptionist marks a no-show tenant as arrived.
-    # Accepts: "Ajay arrived", "mark Ajay arrived", "Ajay is here",
-    # "checkin arrival Ajay", "confirm arrival Ajay". Deliberately does NOT
-    # match bare "check in Ajay" — that overlaps ADD_TENANT's "new checkin"
-    # phrase at line ~290. Runtime fallback: if ADD_TENANT handler finds the
-    # named person is already a no_show tenancy, it redirects to CHECKIN_ARRIVAL.
-    # The negative lookahead excludes date-style "arrived on 5 March" which is
-    # actually an UPDATE_CHECKIN.
-    (re.compile(r"\b(?:mark\s+\w+\s+(?:as\s+)?(?:arrived|checked\s*in|here)|\w+\s+(?:has\s+)?arrived(?:\s+(?:today|yesterday))?$|\w+\s+is\s+here|confirm\s+arrival|check.?in\s+arrival)\b(?!.*\b(?:was\s+on|on\s+\d|dated?|date)\b)", re.I), "CHECKIN_ARRIVAL", 0.94),
+    # CHECKIN_ARRIVAL — physical arrival of a booked (no_show) tenant.
+    # Accepts: "check in Ajay", "Ajay arrived", "mark Ajay arrived", "Ajay is here".
+    # Negative lookahead excludes "arrived on 5 March" (that's UPDATE_CHECKIN).
+    (re.compile(r"\b(?:check\s*in\s+\w+|mark\s+\w+\s+(?:as\s+)?(?:arrived|checked\s*in|here)|\w+\s+(?:has\s+)?arrived(?:\s+(?:today|yesterday))?$|\w+\s+is\s+here|confirm\s+arrival|check.?in\s+arrival)\b(?!.*\b(?:was\s+on|on\s+\d|dated?|date)\b)", re.I), "CHECKIN_ARRIVAL", 0.94),
     # Update tenant permanent notes / agreement
     (re.compile(r"(?:update\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|change\s+(?:tenant\s+)?(?:notes?|agreement)\s+(?:for\s+)?\w+|tenant\s+(?:notes?|agreement)\s+(?:for\s+)?\w+|update\s+agreement\s+(?:for\s+)?\w+|edit\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+|modify\s+(?:tenant\s+)?notes?\s+(?:for\s+)?\w+)", re.I), "UPDATE_TENANT_NOTES", 0.93),
     # One-shot clear: "delete/clear/remove notes for 603" — handler short-circuits to confirm.

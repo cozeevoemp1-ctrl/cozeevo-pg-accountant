@@ -78,10 +78,14 @@ def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str
     maint = f"Rs.{int(obs.maintenance_fee or 0):,}"
     checkin = obs.checkin_date.strftime("%d %b %Y") if obs.checkin_date else ""
 
+    room_number = room.room_number if room else "TBD"
+    floor_str   = str(room.floor or "") if room else ""
+    room_label  = f"{room_number} ({building})" if building else room_number
+
     details = [
-        ["Tenant Name", tenant_data.get("name", ""), "Room", f"{room.room_number} ({building})"],
+        ["Tenant Name", tenant_data.get("name", ""), "Room", room_label],
         ["Phone", tenant_data.get("phone", ""), "Sharing", sharing],
-        ["Gender", tenant_data.get("gender", ""), "Floor", str(room.floor or "")],
+        ["Gender", tenant_data.get("gender", ""), "Floor", floor_str],
         ["Monthly Rent", rent, "Deposit", deposit],
         ["Maintenance", maint, "Check-in", checkin],
         ["Lock-in", f"{obs.lock_in_months or 0} months", "Food", tenant_data.get("food_preference", "")],

@@ -137,6 +137,79 @@ async def resolve_approve_onboarding(
     return "__KEEP_PENDING__Reply *yes* to approve or *no* to reject."
 
 
+async def resolve_checkin_arrival_payment(
+    pending: PendingAction,
+    reply_text: str,
+    session: AsyncSession,
+    action_data: dict,
+    choices: list,
+    *,
+    media_id: Optional[str] = None,
+    media_type: Optional[str] = None,
+    media_mime: Optional[str] = None,
+) -> Optional[str]:
+    """Parse 'amount mode' reply, then move to CONFIRM_CHECKIN_ARRIVAL."""
+    import re
+    import json
+    from datetime import datetime, timedelta
+    from src.whatsapp.handlers._shared import is_negative
+
+    ans = reply_text.strip().lower()
+
+    if is_negative(ans) or ans == "cancel":
+        pending.completed = True
+        return "Check-in cancelled."
+
+    amount = 0
+    mode = "cash"
+
+    if re.search(r"\b(skip|nothing|none|later|no payment)\b", ans) or ans.strip() == "0":
+        amount = 0
+        mode = "none"
+    else:
+        amt_match = re.search(r"(\d[\d,]*)", ans)
+        if amt_match:
+            amount = int(amt_match.group(1).replace(",", ""))
+        mode_match = re.search(r"\b(cash|upi|gpay|phonepe|paytm|online|bank|neft)\b", ans, re.I)
+        if mode_match:
+            raw = mode_match.group(1).lower()
+            mode = "upi" if raw in ("gpay", "phonepe", "paytm", "online", "bank", "neft") else raw
+        elif amount > 0:
+            mode = "cash"
+
+    if amount < 0:
+        return "__KEEP_PENDING__Amount can't be negative. Try again (e.g. *15000 cash*)."
+
+    net_due = action_data.get("net_due", 0)
+    remaining = net_due - amount
+
+    action_data["collected_amount"] = amount
+    action_data["collected_mode"] = mode
+
+    pending.intent = "CONFIRM_CHECKIN_ARRIVAL"
+    pending.action_data = json.dumps(action_data)
+    pending.expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    tenant_name = action_data.get("tenant_name", "Tenant")
+    room = action_data.get("room_number", "?")
+
+    lines = [
+        f"*Confirm check-in for {tenant_name}?*",
+        f"Room {room}",
+        f"Due at door: Rs.{net_due:,}",
+    ]
+    if amount > 0:
+        lines.append(f"Collected: Rs.{amount:,} {mode.upper()}")
+        if remaining > 0:
+            lines.append(f"Balance remaining: Rs.{remaining:,}")
+        elif remaining < 0:
+            lines.append(f"Overpaid by: Rs.{abs(remaining):,}")
+    else:
+        lines.append("Collected: Nothing (to be collected later)")
+    lines += ["", "Reply *Yes* to check in or *No* to cancel."]
+    return "\n".join(lines)
+
+
 async def resolve_confirm_checkin_arrival(
     pending: PendingAction,
     reply_text: str,
@@ -185,6 +258,23 @@ async def resolve_confirm_checkin_arrival(
         tenancy.checkin_date = today
 
     tenancy.status = TenancyStatus.active
+
+    # Log payment collected at door
+    collected_amount = action_data.get("collected_amount", 0)
+    collected_mode   = action_data.get("collected_mode", "cash")
+    if collected_amount and collected_amount > 0:
+        from decimal import Decimal
+        from src.database.models import Payment, PaymentMode, PaymentFor
+        mode_map = {"cash": PaymentMode.cash, "upi": PaymentMode.upi}
+        session.add(Payment(
+            tenancy_id   = tenancy.id,
+            amount       = Decimal(str(collected_amount)),
+            payment_date = today,
+            payment_mode = mode_map.get(collected_mode, PaymentMode.cash),
+            for_type     = PaymentFor.rent,
+            period_month = (tenancy.checkin_date or today).replace(day=1),
+            notes        = f"Collected at check-in ({collected_mode})",
+        ))
 
     session.add(AuditLog(
         changed_by=action_data.get("confirmed_by", "system"),
@@ -236,8 +326,22 @@ async def resolve_confirm_checkin_arrival(
     ff_note = ""
     if old_checkin and old_checkin != tenancy.checkin_date:
         ff_note = f" (booking was {old_checkin.strftime('%d %b %Y')}, arrived early)"
+
+    collected_amount = action_data.get("collected_amount", 0)
+    collected_mode   = action_data.get("collected_mode", "cash")
+    net_due          = action_data.get("net_due", 0)
+    pay_line = ""
+    if collected_amount and collected_amount > 0:
+        remaining = net_due - collected_amount
+        pay_line = f"\nCollected: Rs.{collected_amount:,} {collected_mode.upper()}"
+        if remaining > 0:
+            pay_line += f" | Balance due: Rs.{remaining:,}"
+    else:
+        pay_line = f"\nPayment: Rs.{net_due:,} to be collected"
+
     return (
-        f"*{action_data['tenant_name']}* marked as arrived ✓\n"
-        f"Room {action_data.get('room_number', '?')} — check-in {new_ci}{ff_note}\n"
+        f"*{action_data['tenant_name']}* checked in ✓\n"
+        f"Room {action_data.get('room_number', '?')} — {new_ci}{ff_note}"
+        f"{pay_line}\n"
         f"Status: ACTIVE. Sheets updating."
     )
