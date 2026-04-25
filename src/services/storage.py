@@ -3,16 +3,13 @@ src/services/storage.py
 ========================
 Supabase Storage wrapper for KYC documents and agreement PDFs.
 
-Buckets (both public):
+Buckets (both public, pre-created via SQL migration):
   kyc-documents  — selfie, id_proof, signature, staff_signature per onboarding token
   agreements     — signed rental agreement PDFs
 
-All buckets are public: files are protected by obscure token-based paths,
-consistent with the previous /media/ static-file serving.
-
-Env vars required:
-  SUPABASE_URL          https://<project-ref>.supabase.co
-  SUPABASE_SERVICE_KEY  service_role JWT from Supabase → Settings → API
+Env vars (one of these pairs must be set):
+  SUPABASE_URL + SUPABASE_SERVICE_KEY  (preferred — service_role JWT, full access)
+  SUPABASE_URL + SUPABASE_KEY          (anon JWT — works with RLS policies on storage.objects)
 """
 from __future__ import annotations
 
@@ -23,7 +20,11 @@ import httpx
 from loguru import logger
 
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+# Prefer service_role key; fall back to anon key (works with RLS policies set on storage.objects)
+SUPABASE_SERVICE_KEY: str = (
+    os.getenv("SUPABASE_SERVICE_KEY", "")
+    or os.getenv("SUPABASE_KEY", "")
+)
 
 BUCKET_KYC = "kyc-documents"
 BUCKET_AGREEMENTS = "agreements"
@@ -52,7 +53,7 @@ def is_supabase_url(value: str) -> bool:
 
 
 async def ensure_bucket(bucket: str) -> None:
-    """Create bucket if it doesn't exist (idempotent). Skips if already created this session."""
+    """Mark bucket as ready (buckets are pre-created via SQL). Skips REST call when using anon key."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         return
     if bucket in _BUCKETS_CREATED:
@@ -75,7 +76,7 @@ async def upload(bucket: str, path: str, data: bytes, content_type: str) -> str:
     Uses x-upsert=true so re-uploads overwrite (idempotent).
     """
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env")
+        raise RuntimeError("SUPABASE_URL and (SUPABASE_SERVICE_KEY or SUPABASE_KEY) must be set in .env")
 
     await ensure_bucket(bucket)
 
@@ -99,7 +100,7 @@ async def upload(bucket: str, path: str, data: bytes, content_type: str) -> str:
 async def download(bucket: str, path: str) -> bytes:
     """Download a file from Supabase Storage. Returns raw bytes."""
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env")
+        raise RuntimeError("SUPABASE_URL and (SUPABASE_SERVICE_KEY or SUPABASE_KEY) must be set in .env")
     async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.get(
             f"{SUPABASE_URL}/storage/v1/object/{bucket}/{path}",
