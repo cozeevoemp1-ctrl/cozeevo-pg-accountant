@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.52.1] — 2026-04-25 — Fix: onboarding photo upload broken on all browsers
+
+Removed custom `getUserMedia` camera modal from the onboarding form. The modal was causing a silent failure: when camera permission was denied/dismissed, the fallback `file.click()` call was blocked by Chrome (and Safari) because the user-gesture token is consumed after `await getUserMedia`. Nothing happened — no camera, no file picker. Affected all browsers when camera permission was not pre-granted.
+
+### Root cause
+`capture="user"` on selfie input + custom JS camera modal. Fallback `.click()` in an async `catch` block is blocked by browser user-gesture policy. Also `capture="environment"` on ID photo input forced camera-only (no gallery).
+
+### Fix
+- Removed entire camera modal (HTML + CSS + JS — 151 lines deleted)
+- Selfie input: kept `capture="user"` — opens front camera directly on iOS Safari and Android Chrome (native, no JS needed)
+- ID photo input: removed `capture` attribute — shows native chooser (camera + gallery + files)
+- Selfie click listener simplified to `document.getElementById('selfie-input').click()` — synchronous, within user gesture, always works
+
+### Files changed
+- `static/onboarding.html`
+
+### Deployed
+Live on VPS. Reported by Prashant (room G09), reproduced and fixed in same session.
+
+---
+
 ## [1.52.0] — 2026-04-25 — LangGraph agent core: Phase 0 (audit) + Phase 1 (CHECKOUT + PAYMENT_LOG)
 
 Built the LangGraph-based agent core alongside the existing bot. Agent handles CHECKOUT and PAYMENT_LOG end-to-end (disambiguation → confirmation → execution) with full state persistence via MemorySaver (local) / AsyncPostgresSaver (VPS). Feature-flagged off on VPS via `USE_PYDANTIC_AGENTS=false`.
