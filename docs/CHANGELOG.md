@@ -31,7 +31,7 @@ Receptionist fills all checkout details in the browser, submits, and a WhatsApp 
 is sent to the tenant. Tenant has 2 hours to YES/NO. No reply = auto-confirmed.
 
 ### Phase 1 — Admin checkout form
-- **`/admin/checkout`** — new 3-step dark-theme wizard (tenant search → physical handover → financial settlement)
+- **`/admin/checkout`** — new 3-step wizard matching onboarding light theme (tenant search → physical handover → financial settlement)
 - **`/api/checkout/tenants`** — autocomplete active tenants by name/room
 - **`/api/checkout/tenant/{tenancy_id}`** — pre-fetch deposit, dues, notice date
 - **`/api/checkout/create`** — create `CheckoutSession` + send WhatsApp to tenant
