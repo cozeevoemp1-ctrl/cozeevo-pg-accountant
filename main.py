@@ -307,6 +307,14 @@ async def serve_admin_onboarding():
         return HTMLResponse("<h1>Admin panel not available yet</h1>", status_code=404)
     return HTMLResponse(form_path.read_text(encoding="utf-8"))
 
+@app.get("/admin/checkout", response_class=HTMLResponse)
+async def serve_admin_checkout():
+    """Serve the admin checkout panel."""
+    form_path = Path("static/checkout_admin.html")
+    if not form_path.exists():
+        return HTMLResponse("<h1>Checkout form not available yet</h1>", status_code=404)
+    return HTMLResponse(form_path.read_text(encoding="utf-8"))
+
 # ── Pending entity approval API ───────────────────────────────────────────
 
 entity_router = APIRouter(prefix="/api/entities", tags=["master-data"])
