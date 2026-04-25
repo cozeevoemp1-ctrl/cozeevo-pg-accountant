@@ -25,7 +25,15 @@ async def make_postgres_checkpointer():
     from psycopg_pool import AsyncConnectionPool
 
     db_url = os.environ["DATABASE_URL_PSYCOPG"]
-    pool = AsyncConnectionPool(db_url, open=False, max_size=5)
+    # autocommit=True required: LangGraph's setup() uses CREATE INDEX CONCURRENTLY
+    # which cannot run inside a transaction block.
+    # prepare_threshold=0 avoids prepared-statement issues with Supabase/PgBouncer.
+    pool = AsyncConnectionPool(
+        db_url,
+        open=False,
+        max_size=5,
+        kwargs={"autocommit": True, "prepare_threshold": 0},
+    )
     await pool.open()
     cp = AsyncPostgresSaver(pool)
     await cp.setup()    # creates langgraph_checkpoints table if not exists
