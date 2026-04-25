@@ -169,9 +169,13 @@ async def main(write: bool):
             old_rs = (await s.execute(
                 select(RentSchedule).where(RentSchedule.period_month == APRIL)
             )).scalars().all()
+            deleted_rs = 0
             for r in old_rs:
+                if r.adjustment_note == "MANUAL_LOCK":
+                    continue  # manually zeroed balance — do not overwrite
                 await s.delete(r)
-            print(f"Deleted {len(old_rs)} old April rent_schedule rows")
+                deleted_rs += 1
+            print(f"Deleted {deleted_rs} old April rent_schedule rows (skipped MANUAL_LOCK entries)")
             await s.flush()
 
         # ── 2. Process each sheet row ──────────────────────────────────
