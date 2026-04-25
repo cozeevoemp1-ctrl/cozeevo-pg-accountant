@@ -232,9 +232,16 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
         if tenant.id not in seen_tenants:
             seen_tenants.add(tenant.id)
             all_active_names.append(tenant.name)
-            # Score by similarity (0.0-1.0)
-            ratio = difflib.SequenceMatcher(None, name.lower(), tenant.name.lower()).ratio()
-            if ratio >= 0.75:  # 75%+ similarity (e.g., "Divakra" vs "Divekar")
+            # Score by similarity — compare against full name AND each word
+            # (so "Shubi" matches "Shubhi" in "Shubhi Vishnoi")
+            name_lower = name.lower()
+            full_ratio = difflib.SequenceMatcher(None, name_lower, tenant.name.lower()).ratio()
+            word_ratio = max(
+                difflib.SequenceMatcher(None, name_lower, w.lower()).ratio()
+                for w in tenant.name.split()
+            )
+            ratio = max(full_ratio, word_ratio)
+            if ratio >= 0.75:
                 candidates.append((ratio, (tenant, tenancy, room)))
                 logger.info(f"[_find_active_tenants_by_name] Fuzzy match: '{name}' vs '{tenant.name}' = {ratio:.2f}")
 
