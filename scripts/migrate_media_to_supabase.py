@@ -82,7 +82,7 @@ async def ensure_bucket(client: httpx.AsyncClient, bucket: str) -> None:
     if r.status_code in (200, 201, 409):
         _buckets_ensured.add(bucket)
     else:
-        logger.warning("bucket create %s → %d %s", bucket, r.status_code, r.text[:100])
+        logger.warning(f"bucket create {bucket} → {r.status_code} {r.text[:100]}")
 
 
 async def upload_file(client: httpx.AsyncClient, bucket: str, path: str,
@@ -186,13 +186,13 @@ async def migrate_column(
 
     for row_id, value in rows:
         if is_supabase_url(value):
-            logger.debug("[%s.%s id=%s] already Supabase URL — skip", table, column, row_id)
+            logger.debug(f"[{table}.{column} id={row_id}] already Supabase URL — skip")
             skipped += 1
             continue
 
         local_path = resolve_local_path(value)
         if local_path is None:
-            logger.warning("[%s.%s id=%s] file not found for path=%r — skip", table, column, row_id, value)
+            logger.warning(f"[{table}.{column} id={row_id}] file not found for path={value!r} — skip")
             skipped += 1
             continue
 
@@ -201,7 +201,7 @@ async def migrate_column(
         new_url = public_url(bucket, sb_path)
 
         if dry_run:
-            logger.info("[DRY] %s.%s id=%s: %s → %s", table, column, row_id, value, new_url)
+            logger.info(f"[DRY] {table}.{column} id={row_id}: {value} → {new_url}")
             migrated += 1
             continue
 
@@ -209,7 +209,7 @@ async def migrate_column(
         try:
             await upload_file(client, bucket, sb_path, data, content_type)
         except Exception as exc:
-            logger.error("[%s.%s id=%s] upload failed: %s", table, column, row_id, exc)
+            logger.error(f"[{table}.{column} id={row_id}] upload failed: {exc}")
             skipped += 1
             continue
 
@@ -217,15 +217,15 @@ async def migrate_column(
             text(f"UPDATE {table} SET {column} = :url WHERE id = :id"),
             {"url": new_url, "id": row_id},
         )
-        logger.info("  migrated %s.%s id=%s → %s", table, column, row_id, new_url)
+        logger.info(f"  migrated {table}.{column} id={row_id} → {new_url}")
         migrated += 1
 
         if delete_local:
             try:
                 local_path.unlink()
-                logger.debug("  deleted local %s", local_path)
+                logger.debug(f"  deleted local {local_path}")
             except Exception as exc:
-                logger.warning("  could not delete %s: %s", local_path, exc)
+                logger.warning(f"  could not delete {local_path}: {exc}")
 
     return found, migrated, skipped
 
@@ -246,18 +246,18 @@ async def migrate_staff_signatures(
         sb_path = f"staff-signatures/{phone}.png"
         new_url = public_url(BUCKET_KYC, sb_path)
         if dry_run:
-            logger.info("[DRY] staff-sig %s → %s", f, new_url)
+            logger.info(f"[DRY] staff-sig {f} → {new_url}")
             uploaded += 1
             continue
         data = f.read_bytes()
         try:
             await upload_file(client, BUCKET_KYC, sb_path, data, "image/png")
-            logger.info("  staff-sig %s → %s", phone, new_url)
+            logger.info(f"  staff-sig {phone} → {new_url}")
             uploaded += 1
             if delete_local:
                 f.unlink()
         except Exception as exc:
-            logger.error("  staff-sig %s failed: %s", phone, exc)
+            logger.error(f"  staff-sig {phone} failed: {exc}")
 
     return len(list(sig_dir.glob("*.png"))) if not dry_run else uploaded, uploaded
 
@@ -268,7 +268,8 @@ async def main(dry_run: bool, delete_local: bool) -> None:
     if not DATABASE_URL:
         sys.exit("ERROR: DATABASE_URL must be set in .env")
 
-    logger.info("=== migrate_media_to_supabase %s ===", "(DRY RUN)" if dry_run else "(WRITE)")
+    mode = "(DRY RUN)" if dry_run else "(WRITE)"
+    logger.info(f"=== migrate_media_to_supabase {mode} ===")
 
     engine = create_async_engine(DATABASE_URL, echo=False)
     AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -306,7 +307,7 @@ async def main(dry_run: bool, delete_local: bool) -> None:
 
     logger.info("\n=== Summary ===")
     for label, (found, migrated, skipped) in totals.items():
-        logger.info("  %-45s found=%d  migrated=%d  skipped=%d", label, found, migrated, skipped)
+        logger.info(f"  {label:<45}  found={found}  migrated={migrated}  skipped={skipped}")
 
     if dry_run:
         logger.info("\nDry run complete. Re-run with --write to apply changes.")
