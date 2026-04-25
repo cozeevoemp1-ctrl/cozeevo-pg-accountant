@@ -4,10 +4,12 @@ Tools are registered by importing their module (see end of this file).
 """
 from __future__ import annotations
 
+from typing import Any
+
 from langgraph.types import RunnableConfig
 from ..state import AgentState
 
-_TOOL_REGISTRY: dict[str, any] = {}
+_TOOL_REGISTRY: dict[str, Any] = {}
 
 
 def register_tool(name: str, fn) -> None:
@@ -20,6 +22,9 @@ async def execute_node(state: AgentState, config: RunnableConfig) -> dict:
         return {
             "reply": f"Internal error: tool '{tool_name}' not registered. Please try again.",
             "pending_tool": None,
+            "intent": None,
+            "entities": {},
+            "clarify_question": None,
             "error": f"tool_not_found:{tool_name}",
         }
 
@@ -41,6 +46,9 @@ async def execute_node(state: AgentState, config: RunnableConfig) -> dict:
         return {
             "reply": f"Something went wrong: {exc}. Please try again.",
             "pending_tool": None,
+            "intent": None,
+            "entities": {},
+            "clarify_question": None,
             "error": str(exc),
         }
 
