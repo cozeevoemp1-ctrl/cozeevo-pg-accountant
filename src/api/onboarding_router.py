@@ -30,10 +30,9 @@ router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 # ── Security: Rate limiting + Admin auth ────────────────────────────────────
 
 ADMIN_PIN = os.getenv("ONBOARDING_ADMIN_PIN", "cozeevo2026")
-# Per-file cap: 4MB base64 ≈ 3MB raw. Covers a clear ID photo + selfie.
-# Aggregate across 3 fields (selfie + id_proof + signature-token) stays
-# well under the 10MB nginx cap set in /etc/nginx/sites-available/pg-accountant.
-MAX_UPLOAD_SIZE = 4 * 1024 * 1024
+# Per-file cap: 10MB base64 ≈ 7.3MB raw. Matches the client-side 10MB guard.
+# Aggregate stays well under the 200MB nginx cap on /etc/nginx/sites-enabled/pg-accountant.
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024
 
 # Simple in-memory rate limiter
 _rate_limits: dict[str, list[float]] = defaultdict(list)
