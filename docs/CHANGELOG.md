@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.56.0] — 2026-04-25 — Schema migrations: CASCADE + payment dedup
+
+### rent_schedules FK → ON DELETE CASCADE
+- `rent_schedules.tenancy_id` FK upgraded to `ON DELETE CASCADE`
+- No data touched (tenancies are never hard-deleted — policy is status/is_void)
+- Only fires if a test tenancy is manually deleted — cascade cleans up its rent schedule rows automatically
+
+### payments.unique_hash dedup
+- New nullable `unique_hash VARCHAR(64)` column added to `payments` table
+- Partial unique index `uq_payment_unique_hash` (`WHERE unique_hash IS NOT NULL`)
+- `payments.py`: MD5 hash of `tenancy_id:date:amount:mode:period_month:for_type` set on every new bot payment
+- If a duplicate WhatsApp webhook replays the same payment, `flush()` raises `IntegrityError` → caller returns clean "already logged" message
+- Existing rows stay NULL — no backfill, no constraint violation
+
+---
+
 ## [1.55.0] — 2026-04-25 — Pessimistic locking + "where is X" intent
 
 ### Pessimistic locking on tenancy mutations (`SELECT...FOR UPDATE`)
