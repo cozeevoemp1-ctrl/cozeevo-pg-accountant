@@ -198,6 +198,93 @@ async def _apply_tenant_notes_from_payment(action_data: dict, session: AsyncSess
     return f'\nNotes updated: "{new_notes}"'
 
 
+async def _do_confirm_checkout(
+    cs: "CheckoutSession",
+    session: AsyncSession,
+) -> str:
+    """
+    Final checkout execution: write CheckoutRecord + Refund, mark tenancy exited,
+    sync Sheet. Returns a human-readable confirmation string.
+    Does NOT send WhatsApp — caller is responsible for that.
+    """
+    from src.database.models import CheckoutSession  # avoid circular at module level
+
+    tenancy = await session.get(Tenancy, cs.tenancy_id)
+    tenant_name = ""
+    room_number = ""
+    notice_str = None
+
+    if tenancy:
+        tenancy.status = TenancyStatus.exited
+        tenancy.checkout_date = cs.checkout_date
+        tenant = await session.get(Tenant, tenancy.tenant_id)
+        tenant_name = tenant.name if tenant else ""
+        room = await session.get(Room, tenancy.room_id)
+        room_number = room.room_number if room else ""
+        if tenancy.notice_date:
+            notice_str = tenancy.notice_date.strftime("%d/%m/%Y")
+
+    # Upsert CheckoutRecord (may already exist from old WhatsApp flow)
+    from sqlalchemy import select as _select
+    existing = await session.scalar(
+        _select(CheckoutRecord).where(CheckoutRecord.tenancy_id == cs.tenancy_id)
+    )
+    cr = existing or CheckoutRecord(tenancy_id=cs.tenancy_id)
+    cr.main_key_returned       = cs.room_key_returned
+    cr.cupboard_key_returned   = cs.wardrobe_key_returned
+    cr.biometric_removed       = cs.biometric_removed
+    cr.room_condition_ok       = cs.room_condition_ok
+    cr.damage_notes            = cs.damage_notes or None
+    cr.pending_dues_amount     = cs.pending_dues
+    cr.deposit_refunded_amount = cs.refund_amount
+    cr.deposit_refund_date     = cs.checkout_date if cs.refund_amount > 0 else None
+    cr.actual_exit_date        = cs.checkout_date
+    cr.recorded_by             = cs.created_by_phone
+    cr.deductions              = cs.deductions
+    cr.deduction_reason        = cs.deduction_reason
+    cr.refund_mode             = cs.refund_mode
+    cr.checkout_session_id     = cs.id
+    if not existing:
+        session.add(cr)
+
+    # Refund record
+    session.add(Refund(
+        tenancy_id  = cs.tenancy_id,
+        amount      = Decimal(str(cs.refund_amount)),
+        refund_date = cs.checkout_date if cs.refund_amount > 0 else None,
+        reason      = cs.deduction_reason or "checkout refund",
+        status      = RefundStatus.pending if cs.refund_amount > 0 else RefundStatus.cancelled,
+        notes       = f"Web checkout session {cs.token}",
+    ))
+
+    # Mark confirmed_at
+    cs.confirmed_at = datetime.utcnow()
+    await session.flush()
+
+    # Google Sheet sync
+    try:
+        from src.integrations.gsheets import record_checkout as _gs_checkout
+        await _gs_checkout(
+            room_number,
+            tenant_name,
+            notice_str,
+            cs.checkout_date.strftime("%d/%m/%Y"),
+        )
+    except Exception as _e:
+        logger.warning("Sheet sync failed on checkout confirm: %s", _e)
+
+    refund_line = (
+        f"Refund: Rs.{int(cs.refund_amount):,} via {cs.refund_mode}"
+        if cs.refund_amount > 0
+        else "No refund."
+    )
+    return (
+        f"Checkout confirmed — {tenant_name}, Room {room_number}\n"
+        f"Exit: {cs.checkout_date.strftime('%d %b %Y')}\n"
+        f"{refund_line}"
+    )
+
+
 async def resolve_pending_action(
     pending: PendingAction, reply_text: str, session: AsyncSession,
     media_id: str | None = None, media_type: str | None = None, media_mime: str | None = None,
