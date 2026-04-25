@@ -1114,11 +1114,19 @@
       const phone = stripDigits(document.getElementById('phone').value);
       const gender = document.querySelector('input[name="gender"]:checked');
       const food = document.querySelector('input[name="food"]:checked');
+      const selfie = getUploadDataUrl('selfie-preview-wrap');
 
       if (!name) { setError('name', 'err-name'); ok = false; }
       if (phone.length !== 10) { setError('phone', 'err-phone'); ok = false; }
       if (!gender) { setGroupError('gender-group', 'err-gender'); ok = false; }
       if (!food) { setGroupError('food-group', 'err-food'); ok = false; }
+      if (!selfie) {
+        const card = document.getElementById('selfie-upload-area');
+        card.style.border = '2px solid #E53E3E';
+        setTimeout(() => card.style.border = '', 3000);
+        showError('Please take your selfie photo before continuing (tap the circle at the top).');
+        ok = false;
+      }
     }
 
     if (step === 2) {
