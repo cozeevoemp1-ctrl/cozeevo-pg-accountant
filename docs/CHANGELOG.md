@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.52.3] — 2026-04-25 — Fix: checkout flow end-to-end (OCR, "yes" routing, fuzzy match, settlement)
+
+### Problems fixed
+Four separate bugs in the checkout flow, all discovered during live testing:
+
+1. **Photo checkout (OCR) never reached** — `media_id` was passed into the LangGraph agent but `AgentState` has no `media_id` field, so the OCR path never fired. Fix: intercept image+CHECKOUT intent *before* the agent block in `chat_api.py` and call `_extract_checkout_from_image` directly.
+
+2. **"yes" confirmation returned "How can I assist you today?"** — The PydanticAI converse path at line ~532 of `chat_api.py` ran for UNKNOWN intents (including "yes") and returned early before the LangGraph active-thread check ever ran. Fix: add an `aget_state` fast-path check *before* the PydanticAI path — if a `pending_tool` is active in the persisted thread, route straight to `run_agent`.
+
+3. **"No active tenant named 'Shubi' found"** — Fuzzy match scored "Shubi" against the full name "Shubhi Vishnoi" (ratio 0.53 < 0.75 threshold). Fix: also score against each individual word in the name and take the max ratio.
+
+4. **Wrong settlement shown** — Settlement code always computed `net = deposit - dues` regardless of notice status. Late/missing notice should forfeit deposit + add one extra month penalty. Fix: when `late_notice=True`, set `net = 0 - outstanding - agreed_rent` (no refund path), display forfeiture and penalty lines clearly.
+
+### Files changed
+- `src/whatsapp/chat_api.py` — image+CHECKOUT intercept + "yes" agent fast-path
+- `src/whatsapp/handlers/_shared.py` — per-word fuzzy scoring
+- `src/whatsapp/handlers/owner_handler.py` — settlement: late notice → forfeit deposit + agreed_rent penalty; used `agreed_rent` (not `rent`)
+- `src/agent/nodes/intent.py` — `_resolve_tenant_entities` now populates `tenant_name`, `room`, `checkout_date`
+- `src/agent/tools/checkout.py` — `checkout_date` defaults to today if empty
+
+### Deployed
+Live on VPS. Shubhi Vishnoi's tenancy reset to active for Kiran to end-to-end test himself.
+
+---
+
 ## [1.52.2] — 2026-04-25 — Fix: April balance -2000 for future check-ins + sheet stability
 
 ### Problem
