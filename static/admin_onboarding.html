@@ -629,7 +629,7 @@
     </div>
   </section>
 
-  <!-- ── Section 3: All Sessions (filterable, full width) ── -->
+  <!-- ── Section 3: All Sessions (filterable, expandable, full width) ── -->
   <section id="history-section" style="grid-column: 1 / -1;">
     <div class="card">
       <div class="card-header">
@@ -641,23 +641,25 @@
             <option value="pending_review">Pending Review</option>
             <option value="pending_tenant">Awaiting Tenant</option>
             <option value="cancelled">Cancelled</option>
-            <option value="expired">Expired</option>
+            <option value="expired">Expired (not filled)</option>
           </select>
           <input type="date" id="filter-date-from" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
           <input type="date" id="filter-date-to" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
           <span id="history-count" style="font-size:12px;color:var(--muted);"></span>
         </div>
       </div>
-      <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
+      <div class="card-body" style="padding:0;max-height:500px;overflow-y:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead>
-            <tr style="background:#F7FAFC;position:sticky;top:0;">
+            <tr style="background:#F7FAFC;position:sticky;top:0;z-index:1;">
+              <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;width:24px;"></th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Name</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Room</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Phone</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Rent</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Status</th>
               <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Created</th>
+              <th style="padding:8px 12px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid #E8ECF0;">Approved by</th>
             </tr>
           </thead>
           <tbody id="history-body"></tbody>
@@ -685,6 +687,10 @@
   }
 
   // ── On load ────────────────────────────────────────────────────────────────
+  const statusColors = { approved: '#166534', pending_review: '#92400E', pending_tenant: '#1E40AF', cancelled: '#991B1B', expired: '#6B7280', draft: '#6B7280' };
+  const statusBg    = { approved: '#DCFCE7', pending_review: '#FEF3C7', pending_tenant: '#DBEAFE', cancelled: '#FEE2E2', expired: '#F3F4F6', draft: '#F3F4F6' };
+  const statusLabel = { approved: 'Approved', pending_review: 'Pending Review', pending_tenant: 'Awaiting Tenant', cancelled: 'Cancelled', expired: 'Expired (not filled)', draft: 'Draft' };
+
   async function loadHistory() {
     const status = document.getElementById('filter-status').value;
     const from = document.getElementById('filter-date-from').value;
@@ -700,23 +706,167 @@
       const body = document.getElementById('history-body');
       document.getElementById('history-count').textContent = `${d.sessions.length} sessions`;
       if (!d.sessions.length) {
-        body.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:var(--muted);">No sessions found</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--muted);">No sessions found</td></tr>';
         return;
       }
-      const statusColors = { approved: '#166534', pending_review: '#92400E', pending_tenant: '#1E40AF', cancelled: '#991B1B', expired: '#6B7280' };
-      const statusBg = { approved: '#DCFCE7', pending_review: '#FEF3C7', pending_tenant: '#DBEAFE', cancelled: '#FEE2E2', expired: '#F3F4F6' };
-      const statusLabel = { approved: 'Approved', pending_review: 'Pending Review', pending_tenant: 'Awaiting Tenant', cancelled: 'Cancelled', expired: 'Expired' };
-      body.innerHTML = d.sessions.map(s => `
-        <tr style="border-bottom:1px solid #F1F5F9;">
-          <td style="padding:8px 12px;font-weight:500;">${escHtml(s.tenant_name || '—')}</td>
-          <td style="padding:8px 12px;">${escHtml(s.room || '—')}</td>
-          <td style="padding:8px 12px;">${escHtml(s.tenant_phone || '—')}</td>
-          <td style="padding:8px 12px;">₹${Number(s.agreed_rent || 0).toLocaleString('en-IN')}</td>
-          <td style="padding:8px 12px;"><span style="background:${statusBg[s.status]||'#F3F4F6'};color:${statusColors[s.status]||'#6B7280'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${statusLabel[s.status]||s.status}</span></td>
-          <td style="padding:8px 12px;color:var(--muted);">${s.created_at ? formatDateShort(s.created_at) : '—'}</td>
-        </tr>
-      `).join('');
+      // Build rows — each data row + a hidden expand row below it
+      const rows = [];
+      d.sessions.forEach(s => {
+        const pill = `<span style="background:${statusBg[s.status]||'#F3F4F6'};color:${statusColors[s.status]||'#6B7280'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${statusLabel[s.status]||s.status}</span>`;
+        const approvedBy = s.approved_by_phone ? `<span style="color:var(--sub);font-size:11px;">${escHtml(s.approved_by_phone)}</span>` : '—';
+        rows.push(`
+          <tr class="hist-row" data-token="${escHtml(s.token)}" style="border-bottom:1px solid #F1F5F9;cursor:pointer;" onclick="toggleHistoryRow(this)">
+            <td style="padding:8px 12px;color:var(--muted);font-size:11px;" class="hist-chevron">▶</td>
+            <td style="padding:8px 12px;font-weight:500;">${escHtml(s.tenant_name || '—')}</td>
+            <td style="padding:8px 12px;">${escHtml(s.room || '—')}</td>
+            <td style="padding:8px 12px;">${escHtml(s.tenant_phone || '—')}</td>
+            <td style="padding:8px 12px;">₹${Number(s.agreed_rent || 0).toLocaleString('en-IN')}</td>
+            <td style="padding:8px 12px;">${pill}</td>
+            <td style="padding:8px 12px;color:var(--muted);">${s.created_at ? formatDateShort(s.created_at) : '—'}</td>
+            <td style="padding:8px 12px;">${approvedBy}</td>
+          </tr>
+          <tr class="hist-detail-row" id="hist-detail-${escHtml(s.token)}" style="display:none;">
+            <td colspan="8" style="padding:0;background:#F7FAFC;border-bottom:2px solid #E2E8F0;">
+              <div id="hist-detail-inner-${escHtml(s.token)}" style="padding:16px 20px;">
+                <div style="color:var(--muted);font-size:12px;">Loading...</div>
+              </div>
+            </td>
+          </tr>`);
+      });
+      body.innerHTML = rows.join('');
     } catch(e) {}
+  }
+
+  // ── Toggle history row expand ──────────────────────────────────────────────
+  async function toggleHistoryRow(rowEl) {
+    const token = rowEl.dataset.token;
+    const detailRow = document.getElementById(`hist-detail-${token}`);
+    const chevron = rowEl.querySelector('.hist-chevron');
+    const isOpen = detailRow.style.display !== 'none';
+
+    // Collapse all others
+    document.querySelectorAll('.hist-detail-row').forEach(r => { r.style.display = 'none'; });
+    document.querySelectorAll('.hist-chevron').forEach(c => { c.textContent = '▶'; c.style.color = ''; });
+    document.querySelectorAll('.hist-row').forEach(r => { r.style.background = ''; });
+
+    if (isOpen) return; // was open → now closed, done
+
+    detailRow.style.display = '';
+    chevron.textContent = '▼';
+    chevron.style.color = 'var(--pink)';
+    rowEl.style.background = '#FFF5F9';
+
+    const innerEl = document.getElementById(`hist-detail-inner-${token}`);
+    if (innerEl.dataset.loaded === '1') return;
+
+    try {
+      const res = await fetch(`/api/onboarding/admin/${token}/detail`, { headers: pinHeaders() });
+      if (!res.ok) { innerEl.innerHTML = `<div style="color:#E53E3E;font-size:12px;">Failed to load detail.</div>`; return; }
+      const data = await res.json();
+      innerEl.innerHTML = renderHistoryDetail(data);
+      innerEl.dataset.loaded = '1';
+    } catch(e) {
+      innerEl.innerHTML = `<div style="color:#E53E3E;font-size:12px;">Network error.</div>`;
+    }
+  }
+
+  // ── Render read-only history detail ───────────────────────────────────────
+  function renderHistoryDetail(data) {
+    const td = data.tenant_data || {};
+    const room = data.room || {};
+    const savedFiles = td.saved_files || {};
+    const fmtMoney = v => v ? `₹${Number(v).toLocaleString('en-IN')}` : '—';
+    const fmtDate = iso => { try { return new Date(iso).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}); } catch { return iso||'—'; } };
+    const val = v => `<span style="font-size:13px;font-weight:500;color:#2D3748;">${escHtml(v||'—')}</span>`;
+    const field = (label, v) => `<div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#A0AEC0;">${label}</span>${val(v)}</div>`;
+
+    // Audit bar
+    const approvedBy = data.approved_by_name || data.approved_by_phone || '—';
+    const createdBy = data.created_by_phone || '—';
+    const auditBar = `
+      <div style="display:flex;gap:24px;flex-wrap:wrap;padding:10px 14px;background:#EBF8FF;border-radius:8px;margin-bottom:14px;font-size:12px;">
+        <div><span style="color:#718096;font-weight:600;">Created by:</span> <span style="color:#2B6CB0;font-weight:700;">${escHtml(createdBy)}</span></div>
+        ${data.approved_at ? `<div><span style="color:#718096;font-weight:600;">Approved:</span> <span style="color:#276749;font-weight:700;">${fmtDate(data.approved_at)}</span></div>` : ''}
+        ${data.approved_by_phone ? `<div><span style="color:#718096;font-weight:600;">Approved by:</span> <span style="color:#276749;font-weight:700;">${escHtml(approvedBy)}</span></div>` : ''}
+        ${data.status === 'expired' ? `<div><span style="color:#c53030;font-weight:700;">Link expired — tenant did not fill the form.</span> Created: ${fmtDate(data.created_at)}</div>` : ''}
+        ${data.agreement_pdf_path ? `<div><a href="/static/${escHtml(data.agreement_pdf_path)}" target="_blank" style="color:var(--pink);font-weight:700;text-decoration:none;">View Agreement PDF</a></div>` : ''}
+      </div>`;
+
+    // Booking section
+    const bookingHtml = `
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#718096;border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin:0 0 10px;">Room &amp; Booking</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
+        ${field('Room', (room.number || '—') + (room.building ? ' · '+room.building : ''))}
+        ${field('Floor', room.floor)}
+        ${field('Sharing', data.sharing_type || room.sharing)}
+        ${field('Stay Type', data.stay_type)}
+        ${field('Check-in', data.checkin_date ? fmtDate(data.checkin_date) : '—')}
+        ${field('Agreed Rent', fmtMoney(data.agreed_rent))}
+        ${field('Security Deposit', fmtMoney(data.security_deposit))}
+        ${field('Maintenance', fmtMoney(data.maintenance_fee))}
+        ${field('Booking Amount', fmtMoney(data.booking_amount))}
+        ${data.lock_in_months ? field('Lock-in', data.lock_in_months + ' months') : ''}
+        ${data.special_terms ? field('Special Terms', data.special_terms) : ''}
+      </div>`;
+
+    // KYC section
+    let kycHtml = '';
+    if (td.name) {
+      kycHtml = `
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#718096;border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin:14px 0 10px;">Tenant Details</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
+          ${field('Name', td.name)}
+          ${field('Phone', td.phone)}
+          ${field('Gender', td.gender)}
+          ${field('Date of Birth', td.date_of_birth)}
+          ${field('Email', td.email)}
+          ${field('Food Preference', td.food_preference)}
+          ${field('Occupation', td.occupation)}
+          ${field('Education', td.educational_qualification)}
+          ${field('ID Type', td.id_proof_type)}
+          ${field('ID Number', td.id_proof_number)}
+          ${field('Father Name', td.father_name)}
+          ${field('Father Phone', td.father_phone)}
+          ${field('Emergency Contact', td.emergency_contact_name)}
+          ${field('Emergency Phone', td.emergency_contact_phone)}
+          ${field('Emergency Relationship', td.emergency_contact_relationship)}
+        </div>
+        ${td.permanent_address ? `<div style="margin-bottom:14px;">${field('Permanent Address', td.permanent_address)}</div>` : ''}`;
+    } else {
+      kycHtml = `<div style="color:#A0AEC0;font-size:12px;padding:8px 0;">Tenant did not fill the form.</div>`;
+    }
+
+    // Photos
+    let photosHtml = '';
+    if (savedFiles.selfie || savedFiles.id_proof) {
+      photosHtml = `
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#718096;border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin:14px 0 10px;">Documents</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">`;
+      if (savedFiles.selfie) {
+        const u = '/media/'+savedFiles.selfie;
+        photosHtml += `<div style="text-align:center;cursor:pointer;" onclick="openLightbox('${u}')"><img src="${u}" style="width:72px;height:72px;object-fit:cover;border-radius:50%;border:2px solid #00AEED;"><div style="font-size:10px;color:#718096;margin-top:4px;">Selfie</div></div>`;
+      }
+      if (savedFiles.id_proof) {
+        const u = '/media/'+savedFiles.id_proof;
+        if (savedFiles.id_proof.endsWith('.pdf')) {
+          photosHtml += `<div style="text-align:center;"><div style="width:72px;height:72px;background:#FEF2F2;border:2px solid #E53E3E;border-radius:8px;display:flex;align-items:center;justify-content:center;"><a href="${u}" target="_blank" style="color:#E53E3E;font-size:11px;font-weight:600;">PDF</a></div><div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div></div>`;
+        } else {
+          photosHtml += `<div style="text-align:center;cursor:pointer;" onclick="openLightbox('${u}')"><img src="${u}" style="width:100px;height:70px;object-fit:cover;border-radius:8px;border:2px solid #00AEED;"><div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div></div>`;
+        }
+      }
+      photosHtml += `</div>`;
+    }
+
+    // Signature
+    let sigHtml = '';
+    if (data.signature_image) {
+      const src = data.signature_image.startsWith('data:') ? data.signature_image : `data:image/png;base64,${data.signature_image}`;
+      sigHtml = `
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#718096;border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin:14px 0 10px;">Signature</div>
+        <div style="cursor:pointer;" onclick="openLightbox('${src}')"><img src="${src}" style="max-width:260px;max-height:70px;border:1px solid #E2E8F0;border-radius:6px;padding:4px;background:#fff;"></div>`;
+    }
+
+    return auditBar + bookingHtml + kycHtml + photosHtml + sigHtml;
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1264,6 +1414,11 @@
       ${sigHtml}
 
       ${status === 'pending_review' ? `
+        <div class="section-divider">Approver Details</div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:6px;">Your Phone Number (who is approving)</label>
+          <input id="approver-phone-${token}" type="tel" maxlength="10" placeholder="10-digit phone" style="width:200px;padding:8px 10px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;">
+        </div>
         <div class="section-divider">Staff Signature (Required to Approve)</div>
         <div style="margin-bottom:12px;">
           <canvas id="staff-sig-${token}" width="400" height="100" style="border:1.5px dashed #E2E8F0;border-radius:8px;cursor:crosshair;background:#fff;display:block;width:100%;max-width:400px;height:100px;touch-action:none;"></canvas>
@@ -1393,12 +1548,14 @@
     btn.innerHTML = '<span class="spinner"></span> Approving...';
 
     const overrides = collectOverrides(token);
+    const approverPhoneEl = document.getElementById(`approver-phone-${token}`);
+    const approvedByPhone = approverPhoneEl ? approverPhoneEl.value.trim() : '';
 
     try {
       const res = await fetch(`/api/onboarding/${token}/approve`, {
         method: 'POST',
         headers: pinHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ staff_signature: staffSig, overrides }),
+        body: JSON.stringify({ staff_signature: staffSig, approved_by_phone: approvedByPhone, overrides }),
       });
       // Parse body defensively — 500s may return HTML, not JSON
       let data = {};

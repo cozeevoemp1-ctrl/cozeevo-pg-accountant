@@ -927,6 +927,7 @@ def _add_tenant_sync(
     father_phone: str = "",
     address: str = "",
     emergency_contact: str = "",
+    emergency_contact_phone: str = "",
     emergency_relationship: str = "",
     email: str = "",
     occupation: str = "",
@@ -984,6 +985,7 @@ def _add_tenant_sync(
         father_phone_txt = f"'{father_phone}" if father_phone else ""
         office_phone_txt = f"'{office_phone}" if office_phone else ""
         emergency_contact_txt = f"'{emergency_contact}" if emergency_contact else ""
+        emergency_contact_phone_txt = f"'{emergency_contact_phone}" if emergency_contact_phone else ""
         id_number_txt = f"'{id_number}" if id_number else ""
         field_map = {
             "room": room_number,
@@ -1010,7 +1012,7 @@ def _add_tenant_sync(
             "education": education,
             "emergency contact": emergency_contact_txt,
             "emergency relationship": emergency_relationship,
-            "emergency phone": emergency_contact_txt,
+            "emergency phone": emergency_contact_phone_txt,
             "id type": id_type,
             "id number": id_number_txt,
             "office address": office_address,
@@ -1543,6 +1545,7 @@ async def add_tenant(
     father_phone: str = "",
     address: str = "",
     emergency_contact: str = "",
+    emergency_contact_phone: str = "",
     emergency_relationship: str = "",
     email: str = "",
     occupation: str = "",
@@ -1565,9 +1568,9 @@ async def add_tenant(
         _add_tenant_sync, room_number, name, phone, gender, building, floor,
         sharing, checkin, agreed_rent, deposit, booking, maintenance, notes,
         dob, father_name, father_phone, address, emergency_contact,
-        emergency_relationship, email, occupation, education, office_address,
-        office_phone, id_type, id_number, food_pref, entered_by,
-        advance_amount, advance_mode,
+        emergency_contact_phone, emergency_relationship, email, occupation,
+        education, office_address, office_phone, id_type, id_number, food_pref,
+        entered_by, advance_amount, advance_mode,
     )
 
 

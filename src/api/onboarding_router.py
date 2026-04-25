@@ -21,7 +21,7 @@ from typing import Optional
 from src.database.db_manager import get_session
 from src.database.models import (
     OnboardingSession, Room, Property, Tenant, Tenancy, TenancyStatus,
-    RentSchedule, RentStatus, Payment, PaymentMode, PaymentFor,
+    RentSchedule, RentStatus, Payment, PaymentMode, PaymentFor, AuthorizedUser,
 )
 from src.services.pdf_generator import HOUSE_RULES
 
@@ -320,9 +320,68 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
                 "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
                 "created_at": obs.created_at.isoformat() if obs.created_at else "",
                 "approved_at": obs.approved_at.isoformat() if obs.approved_at else "",
+                "approved_by_phone": obs.approved_by_phone or "",
                 "agreed_rent": float(obs.agreed_rent or 0),
             })
         return {"sessions": items}
+
+
+@router.get("/admin/{token}/detail")
+async def get_session_detail(token: str, request: Request):
+    """Full detail for any session status — used by admin dashboard expand."""
+    _check_admin_pin(request)
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+
+        room = await session.get(Room, obs.room_id) if obs.room_id else None
+        building = ""
+        if room and room.property_id:
+            prop = await session.get(Property, room.property_id)
+            building = prop.name if prop else ""
+        rt = room.room_type if room else None
+        sharing = rt.value if hasattr(rt, "value") else str(rt or "")
+
+        # Resolve approved_by name from AuthorizedUser table
+        approved_by_name = obs.approved_by_phone or ""
+        if obs.approved_by_phone:
+            staff = await session.scalar(
+                select(AuthorizedUser).where(AuthorizedUser.phone == obs.approved_by_phone)
+            )
+            if staff and staff.name:
+                approved_by_name = f"{staff.name} ({obs.approved_by_phone})"
+
+        td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+        return {
+            "status": obs.status,
+            "token": obs.token,
+            "stay_type": obs.stay_type or "monthly",
+            "room": {
+                "number": room.room_number if room else "",
+                "building": building,
+                "floor": str(room.floor or "") if room else "",
+                "sharing": sharing,
+            },
+            "agreed_rent": float(obs.agreed_rent or 0),
+            "security_deposit": float(obs.security_deposit or 0),
+            "maintenance_fee": float(obs.maintenance_fee or 0),
+            "booking_amount": float(obs.booking_amount or 0),
+            "advance_mode": obs.advance_mode or "",
+            "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
+            "lock_in_months": obs.lock_in_months or 0,
+            "special_terms": obs.special_terms or "",
+            "sharing_type": obs.sharing_type or "",
+            "tenant_data": td,
+            "signature_image": obs.signature_image or "",
+            "agreement_pdf_path": obs.agreement_pdf_path or "",
+            "created_by_phone": obs.created_by_phone or "",
+            "approved_by_phone": obs.approved_by_phone or "",
+            "approved_by_name": approved_by_name,
+            "created_at": obs.created_at.isoformat() if obs.created_at else "",
+            "approved_at": obs.approved_at.isoformat() if obs.approved_at else "",
+            "completed_at": obs.completed_at.isoformat() if obs.completed_at else "",
+        }
 
 
 @router.get("/admin/pending")
@@ -543,6 +602,7 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
 
 class ApproveRequest(BaseModel):
     staff_signature: str = ""  # base64 PNG data URL
+    approved_by_phone: str = ""  # phone of the staff member approving
     # Optional receptionist overrides — any field name in this dict replaces
     # the tenant-submitted value. Editable from the admin review screen.
     # Supported keys (financial): agreed_rent, security_deposit, maintenance_fee,
@@ -763,6 +823,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
 
             obs.status = "approved"
             obs.approved_at = datetime.utcnow()
+            obs.approved_by_phone = (req.approved_by_phone or "").strip() if req else ""
             obs.tenant_id = tenant.id
 
             # GSheets DAY WISE tab (retry 3x)
@@ -814,6 +875,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
                 lock_in_months=obs.lock_in_months or 0,
                 sharing_type=sharing_default,
+                entered_by="onboarding_form",
                 status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
             )
             session.add(tenancy)
@@ -848,6 +910,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
 
             obs.status = "approved"
             obs.approved_at = datetime.utcnow()
+            obs.approved_by_phone = (req.approved_by_phone or "").strip() if req else ""
             obs.tenant_id = tenant.id
             obs.tenancy_id = tenancy.id
 
@@ -862,7 +925,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 notes=obs.special_terms or "",
                 dob=td.get("date_of_birth", ""), father_name=td.get("father_name", ""),
                 father_phone=td.get("father_phone", ""), address=td.get("permanent_address", ""),
-                emergency_contact=td.get("emergency_contact_phone", ""),
+                emergency_contact=td.get("emergency_contact_name", ""),
+                emergency_contact_phone=td.get("emergency_contact_phone", ""),
                 emergency_relationship=td.get("emergency_contact_relationship", ""),
                 email=td.get("email", ""), occupation=td.get("occupation", ""),
                 education=td.get("educational_qualification", ""),

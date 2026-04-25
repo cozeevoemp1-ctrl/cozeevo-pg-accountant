@@ -83,8 +83,7 @@ async def handle_owner(
     # Financial intents are handled by AccountWorker (account_handler.py).
     # Only operational intents remain here.
     handlers = {
-        # "ADD_TENANT": DEPRECATED — now routes to START_ONBOARDING (unified web form)
-        # "ADD_TENANT":         _add_tenant_prompt,
+        "ADD_TENANT":         _add_tenant_prompt,
         "CHECKOUT":           _checkout_prompt,
         "SCHEDULE_CHECKOUT":  _checkout_prompt,   # same handler — date in entities distinguishes
         "UPDATE_CHECKIN":     _update_checkin,
@@ -4924,12 +4923,19 @@ async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncS
             msg = "\n".join(rebuilt_lines)
         return await _process_tenant_form(msg, ctx, session)
 
-    # ── No step-by-step — use digital form or image ──────────────────────
+    # ── No form data — show the fill-in template ────────────────────────
     return (
         "*New tenant check-in*\n\n"
-        "You can:\n"
-        "1. Send a *photo of the registration form* to auto-extract details\n"
-        "2. Use the *digital onboarding form* at /admin/onboarding to create a link"
+        "Reply with the details in this format:\n\n"
+        "Name: Rahul Kumar\n"
+        "Phone: 9876543210\n"
+        "Room: 305\n"
+        "Rent: 15000\n"
+        "Deposit: 15000\n"
+        "Advance: 5000\n"
+        "Checkin: 25/04/2026\n"
+        "Food: none\n\n"
+        "_Discount and Maintenance are optional. Send *cancel* to abort._"
     )
 
 
@@ -5181,6 +5187,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         security_deposit = deposit,
         booking_amount   = advance,
         maintenance_fee  = maintenance,
+        entered_by       = "whatsapp_bot",
         status           = TenancyStatus.active,
     )
     session.add(tenancy)

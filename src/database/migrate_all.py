@@ -1131,6 +1131,18 @@ async def run_extend_onboarding_sessions(conn) -> None:
     print("  [ok] onboarding_sessions extended")
 
 
+async def run_add_approved_by_phone_2026_04_25(conn) -> None:
+    """Add approved_by_phone to onboarding_sessions and entered_by to tenancies."""
+    print("\n-- Add approved_by_phone + entered_by (2026-04-25) --")
+    await conn.execute(text(
+        "ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS approved_by_phone VARCHAR(20)"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE tenancies ADD COLUMN IF NOT EXISTS entered_by VARCHAR(40)"
+    ))
+    print("  [ok] approved_by_phone, entered_by added")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1191,6 +1203,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_org_id_2026_04_19(conn)
             await run_add_staff_room_id_2026_04_20(conn)
             await run_allow_unassigned_room_2026_04_24(conn)
+            await run_add_approved_by_phone_2026_04_25(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

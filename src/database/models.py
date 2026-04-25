@@ -396,6 +396,7 @@ class Tenancy(Base):
     lock_in_months      = Column(Integer, default=0)
     lock_in_penalty     = Column(Numeric(12, 2), default=0)
     referral_source     = Column(String(120))
+    entered_by          = Column(String(40))    # "onboarding_form" | "whatsapp_bot" | "excel_import"
     notes               = Column(Text)
     created_at          = Column(DateTime, default=datetime.utcnow)
     updated_at          = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -842,6 +843,7 @@ class OnboardingSession(Base):
     expires_at        = Column(DateTime)
     completed_at      = Column(DateTime)
     approved_at       = Column(DateTime)
+    approved_by_phone = Column(String(20))
     created_at        = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
