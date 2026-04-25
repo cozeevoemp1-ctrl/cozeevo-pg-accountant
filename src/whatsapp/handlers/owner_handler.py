@@ -3761,6 +3761,13 @@ async def resolve_pending_action(
 # ── Checkout ──────────────────────────────────────────────────────────────────
 
 async def _checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    # If an image was attached (e.g. physical checkout form photo), extract via OCR
+    media_id   = entities.get("_media_id")
+    media_type = entities.get("_media_type")
+    media_mime = entities.get("_media_mime")
+    if media_id and media_type == "image":
+        return await _extract_checkout_from_image(media_id, media_mime or "image/jpeg", ctx, session)
+
     name = entities.get("name", "").strip()
     room = entities.get("room", "").strip()
     date_str = entities.get("date", "")
