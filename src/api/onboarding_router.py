@@ -1526,9 +1526,9 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
 @router.get("/admin/onboarding", response_class=HTMLResponse)
 async def get_session_creation_form(pin: str = None):
     """Serves a permanent form to create new onboarding sessions."""
-    if pin and pin != ADMIN_PIN:
-        raise HTTPException(403, "Invalid PIN")
-    return """
+    if not pin or pin != ADMIN_PIN:
+        raise HTTPException(403, "Access denied. Provide PIN: ?pin=YOUR_PIN")
+    _html = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -1855,3 +1855,4 @@ async def get_session_creation_form(pin: str = None):
     </body>
     </html>
     """
+    return _html.replace("'X-Admin-Pin': 'cozeevo2026'", f"'X-Admin-Pin': '{pin}'")

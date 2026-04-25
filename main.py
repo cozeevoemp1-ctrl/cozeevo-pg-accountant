@@ -144,7 +144,7 @@ app.include_router(chat_router)
 from src.api.reminder_router import router as reminder_router
 app.include_router(reminder_router)
 
-from src.api.onboarding_router import router as onboarding_router
+from src.api.onboarding_router import router as onboarding_router, _check_admin_pin
 app.include_router(onboarding_router)
 
 from src.api.checkout_router import router as checkout_router
@@ -164,8 +164,9 @@ import shutil, uuid, asyncio
 ingest_router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
 
 @ingest_router.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(request: Request, file: UploadFile = File(...)):
     """Upload a CSV/PDF for ingestion."""
+    _check_admin_pin(request)
     raw_dir = Path(os.getenv("DATA_RAW_DIR", "./data/raw"))
     raw_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,8 +182,9 @@ async def upload_file(file: UploadFile = File(...)):
     return {"status": "queued", "file": filename}
 
 @ingest_router.post("/scan")
-async def scan_raw_folder():
+async def scan_raw_folder(request: Request):
     """Scan data/raw/ for new unprocessed files and ingest them."""
+    _check_admin_pin(request)
     raw_dir     = Path(os.getenv("DATA_RAW_DIR", "./data/raw"))
     proc_dir    = Path(os.getenv("DATA_PROCESSED_DIR", "./data/processed"))
     proc_dir.mkdir(parents=True, exist_ok=True)
@@ -234,7 +236,8 @@ class ReconcileRequest(BaseModel):
     month:  Optional[int] = None
 
 @recon_router.post("")
-async def reconcile(req: ReconcileRequest):
+async def reconcile(request: Request, req: ReconcileRequest):
+    _check_admin_pin(request)
     from src.reports.reconciliation import ReconciliationEngine
     from datetime import datetime
     engine = ReconciliationEngine()
@@ -252,7 +255,8 @@ app.include_router(recon_router)
 report_router = APIRouter(prefix="/api/report", tags=["reports"])
 
 @report_router.post("/dashboard")
-async def generate_dashboard(req: ReconcileRequest):
+async def generate_dashboard(request: Request, req: ReconcileRequest):
+    _check_admin_pin(request)
     from src.reports.reconciliation import ReconciliationEngine
     from src.reports.report_generator import ReportGenerator
     from datetime import datetime
