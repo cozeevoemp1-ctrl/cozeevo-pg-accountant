@@ -753,30 +753,7 @@ async def resolve_pending_action(
             "biometric": "biometric_removed",
         }
 
-        # Edit a field (structured syntax: "edit field value")
-        if ans.startswith("edit "):
-            raw_edit = reply_text.strip()[5:].strip()
-            parts = raw_edit.split(None, 1)
-            if len(parts) < 2:
-                return "__KEEP_PENDING__Format: *edit field_name new_value*"
-
-            field_key = parts[0].lower()
-            new_val = parts[1].strip()
-            actual_key = _co_aliases.get(field_key)
-            if not actual_key:
-                return f"__KEEP_PENDING__Unknown field *{field_key}*. Try: name, room, date, deposit, deductions, refund, mode, room_key, wardrobe_key, biometric"
-
-            extracted = action_data.get("extracted", {})
-            extracted[actual_key] = new_val
-            action_data["extracted"] = extracted
-            await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
-
-            msg = format_checkout_data(extracted, "")
-            msg += "\n\nReply *yes* to process, *no* to cancel."
-            msg += "\nTo edit: *edit field_name new_value*"
-            return msg
-
-        # Natural language edit — parse unrecognized messages with LLM
+        # Parse everything except yes/no/cancel through LLM
         if step == "confirm_checkout_extracted" and ans not in ("yes", "y", "confirm", "ok", "done"):
             parsed = await _parse_checkout_edit_nl(reply_text.strip(), action_data.get("extracted", {}))
             if parsed.get("action") == "confirm":
@@ -789,8 +766,7 @@ async def resolve_pending_action(
                     action_data["extracted"] = extracted
                     await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
                     msg = format_checkout_data(extracted, "")
-                    msg += "\n\nReply *yes* to process, *no* to cancel."
-                    msg += "\nTo edit: *edit field_name new_value*"
+                    msg += "\n\nReply *yes* to confirm or tell me what to change."
                     return msg
 
         # Confirm and process checkout
