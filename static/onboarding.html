@@ -1182,6 +1182,26 @@
     document.getElementById('id-photo-input').click();
   });
 
+  // Compress an image File/Blob to a JPEG data URL at reduced size.
+  // maxDim: longest edge in px. quality: 0-1 JPEG quality.
+  function compressImage(file, maxDim, quality, callback) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function applySelfieDataUrl(dataUrl) {
     const wrap = document.getElementById('selfie-preview-wrap');
     wrap.innerHTML = '<img src="' + dataUrl + '" alt="Your photo">';
@@ -1195,14 +1215,12 @@
     const file = input.files && input.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { alert('Please select an image'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      applySelfieDataUrl(e.target.result);
-      // Persist to localStorage so Android camera-reload doesn't lose the photo
-      try { localStorage.setItem(draftKey() + '_selfie', e.target.result); } catch(ex) {}
-    };
-    reader.readAsDataURL(file);
+    if (file.size > 20 * 1024 * 1024) { alert('File too large (max 20MB)'); return; }
+    // Compress selfie to 600px, 75% quality — enough for ID purposes, ~80KB
+    compressImage(file, 600, 0.75, function(dataUrl) {
+      applySelfieDataUrl(dataUrl);
+      try { localStorage.setItem(draftKey() + '_selfie', dataUrl); } catch(ex) {}
+    });
   }
 
   function getUploadDataUrl(previewId) {
@@ -1242,11 +1260,9 @@
     const isImage = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf';
     if (!isImage && !isPdf) { alert('Please select an image or PDF file'); return; }
-    if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+    if (file.size > 20 * 1024 * 1024) { alert('File too large (max 20MB)'); return; }
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const dataUrl = e.target.result;
+    function processIdDataUrl(dataUrl) {
       // Show preview
       const preview = document.getElementById('id-photo-preview');
       if (isPdf) {
@@ -1322,8 +1338,16 @@
           statusEl.textContent = 'Could not read details — please fill manually.';
         });
       }
-    };
-    reader.readAsDataURL(file);
+    }
+
+    if (isPdf) {
+      const reader = new FileReader();
+      reader.onload = function(e) { processIdDataUrl(e.target.result); };
+      reader.readAsDataURL(file);
+    } else {
+      // Compress image to 1200px, 85% quality — readable for OCR, ~300KB
+      compressImage(file, 1200, 0.85, processIdDataUrl);
+    }
   }
 
   function setError(fieldId, errId) {
