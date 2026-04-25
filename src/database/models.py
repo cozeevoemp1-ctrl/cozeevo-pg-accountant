@@ -855,6 +855,48 @@ class OnboardingSession(Base):
     )
 
 
+class CheckoutSessionStatus:
+    pending        = "pending"
+    confirmed      = "confirmed"
+    auto_confirmed = "auto_confirmed"
+    rejected       = "rejected"
+    cancelled      = "cancelled"
+
+
+class CheckoutSession(Base):
+    __tablename__ = "checkout_sessions"
+
+    id                    = Column(Integer, primary_key=True)
+    token                 = Column(String(36), unique=True, nullable=False, index=True)
+    status                = Column(String(20), default=CheckoutSessionStatus.pending, nullable=False)
+    created_by_phone      = Column(String(20), nullable=False)
+    tenant_phone          = Column(String(20), nullable=False)
+    tenancy_id            = Column(Integer, ForeignKey("tenancies.id"), nullable=False)
+    checkout_date         = Column(Date, nullable=False)
+    room_key_returned     = Column(Boolean, nullable=False, default=False)
+    wardrobe_key_returned = Column(Boolean, nullable=False, default=False)
+    biometric_removed     = Column(Boolean, nullable=False, default=False)
+    room_condition_ok     = Column(Boolean, nullable=False, default=True)
+    damage_notes          = Column(Text, nullable=True)
+    security_deposit      = Column(Numeric(12, 2), nullable=False, default=0)
+    pending_dues          = Column(Numeric(12, 2), nullable=False, default=0)
+    deductions            = Column(Numeric(12, 2), nullable=False, default=0)
+    deduction_reason      = Column(Text, nullable=True)
+    refund_amount         = Column(Numeric(12, 2), nullable=False, default=0)
+    refund_mode           = Column(String(10), nullable=False)
+    rejection_reason      = Column(Text, nullable=True)
+    expires_at            = Column(DateTime, nullable=False)
+    confirmed_at          = Column(DateTime, nullable=True)
+    created_at            = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_checkout_sessions_token", "token"),
+        Index("ix_checkout_sessions_status", "status"),
+        Index("ix_checkout_sessions_tenant_phone", "tenant_phone"),
+        Index("ix_checkout_sessions_expires", "expires_at"),
+    )
+
+
 class CheckoutRecord(Base):
     """
     L3 — Offboarding checklist filled by owner/staff when a tenant checks out.
@@ -873,6 +915,12 @@ class CheckoutRecord(Base):
     deposit_refund_date      = Column(Date)           # NULL = not yet refunded
     actual_exit_date         = Column(Date)
     recorded_by              = Column(String(20))     # phone of staff who recorded it
+    biometric_removed        = Column(Boolean, default=False)
+    room_condition_ok        = Column(Boolean, default=True)
+    deductions               = Column(Numeric(12, 2), default=0)
+    deduction_reason         = Column(Text, nullable=True)
+    refund_mode              = Column(String(10), nullable=True)
+    checkout_session_id      = Column(Integer, ForeignKey("checkout_sessions.id"), nullable=True)
     created_at               = Column(DateTime, default=datetime.utcnow)
     updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
