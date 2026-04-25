@@ -80,9 +80,12 @@ async def intent_node(state: AgentState, config: RunnableConfig) -> dict:
     elif result.action in ("clarify", "ask_options") and result.reply:
         update["clarify_question"] = result.reply
         update["reply"]            = result.reply
+        update["pending_tool"]     = None   # don't carry stale tool across clarify rounds
 
     elif result.action == "converse" and result.reply:
-        update["reply"]  = result.reply
-        update["intent"] = "CONVERSE"
+        update["reply"]        = result.reply
+        update["intent"]       = "CONVERSE"
+        update["pending_tool"] = None
+        update["entities"]     = {}
 
     return update
