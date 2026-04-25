@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.52.5] — 2026-04-25 — Feat: conversational edits in checkout OCR confirm flow
+
+After OCR extracts checkout form data, any reply that isn't yes/no/cancel is parsed by
+Groq to identify a field change. Lokesh can say "change date to 30 April", "deposit was
+8000", "refund by UPI" — bot applies the change and re-shows the updated summary.
+Removed the rigid `edit field value` syntax entirely.
+
+### Files changed
+- `src/whatsapp/handlers/owner_handler.py` — `_parse_checkout_edit_nl` helper; Groq replaces structured `edit ` path
+
+### Deployed
+Live on VPS.
+
+---
+
 ## [1.52.4] — 2026-04-25 — Fix: room capacity check + admin dashboard UX + PDF OCR
 
 ### Room capacity bug
