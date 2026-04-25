@@ -2,6 +2,52 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.53.0] — 2026-04-25 — Feat: Checkout Form (admin web UI + WhatsApp confirm flow)
+
+Replaces WhatsApp-only conversational checkout with a structured 3-step admin form.
+Receptionist fills all checkout details in the browser, submits, and a WhatsApp summary
+is sent to the tenant. Tenant has 2 hours to YES/NO. No reply = auto-confirmed.
+
+### Phase 1 — Admin checkout form
+- **`/admin/checkout`** — new 3-step dark-theme wizard (tenant search → physical handover → financial settlement)
+- **`/api/checkout/tenants`** — autocomplete active tenants by name/room
+- **`/api/checkout/tenant/{tenancy_id}`** — pre-fetch deposit, dues, notice date
+- **`/api/checkout/create`** — create `CheckoutSession` + send WhatsApp to tenant
+- **`/api/checkout/status/{token}`** — poll session status every 8s on admin page
+- **`CheckoutSession` DB table** — pre-confirmation form state (22 cols, 5 status values)
+- **APScheduler job** — auto-confirms expired sessions every 15 min (`checkout_auto_confirm`)
+- **`_do_confirm_checkout()`** — shared helper: writes CheckoutRecord + Refund, marks tenancy exited, syncs Sheet
+- **`CHECKOUT_AGREE` / `CHECKOUT_REJECT` intents** — tenant YES/NO intercepted in `chat_api.py` before intent detection
+- **Nav bar** added to `/admin/onboarding` (Check-in / Checkout links)
+- **6 new columns** added to `checkout_records`: biometric_removed, room_condition_ok, deductions, deduction_reason, refund_mode, checkout_session_id
+- **16 new tests** (test_checkout_flow.py + test_checkout_router.py) — all passing
+
+### Phase 2 — Fix WhatsApp RECORD_CHECKOUT (conversational flow)
+- Added `ask_deductions` and `ask_deduction_reason` steps
+- Full financial summary shown before DB write (deposit, dues, deductions, refund)
+- DB write deferred to explicit YES confirmation only
+- Notice forfeiture logic applied to deduction pre-fill
+
+### Files changed
+- `static/checkout_admin.html` — new 3-step receptionist form
+- `static/admin_onboarding.html` — nav bar
+- `src/api/checkout_router.py` — new checkout API router
+- `src/database/models.py` — CheckoutSession model + CheckoutSessionStatus enum + 6 new CheckoutRecord cols
+- `src/database/migrate_all.py` — checkout_sessions migration + ALTER checkout_records
+- `src/whatsapp/intent_detector.py` — CHECKOUT_AGREE, CHECKOUT_REJECT intents
+- `src/whatsapp/handlers/owner_handler.py` — agree/reject handlers + _do_confirm_checkout + Phase 2 flow
+- `src/whatsapp/chat_api.py` — YES/NO intercept block
+- `src/whatsapp/gatekeeper.py` — route CHECKOUT_AGREE / CHECKOUT_REJECT
+- `src/scheduler.py` — auto-confirm APScheduler job
+- `main.py` — register checkout_router + /admin/checkout route
+- `tests/test_checkout_flow.py` — 7 new tests
+- `tests/test_checkout_router.py` — 9 new tests
+
+### Deployed
+Pending VPS deploy.
+
+---
+
 ## [1.52.5] — 2026-04-25 — Feat: conversational edits in checkout OCR confirm flow
 
 After OCR extracts checkout form data, any reply that isn't yes/no/cancel is parsed by
