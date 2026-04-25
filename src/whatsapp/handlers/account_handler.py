@@ -412,19 +412,27 @@ async def _do_log_payment_by_ids(
     if user_note:
         note_text += f" — {user_note}"
     from src.services.payments import log_payment as _log_payment
-    pay_result = await _log_payment(
-        tenancy_id=tenancy.id,
-        amount=amount_dec,
-        method=mode,
-        for_type="rent",
-        period_month=period_month.isoformat(),
-        recorded_by=ctx_name or "bot",
-        session=session,
-        notes=note_text,
-        source="whatsapp",
-        room_number=_room_obj.room_number if _room_obj else None,
-        entity_name=tenant.name,
-    )
+    try:
+        pay_result = await _log_payment(
+            tenancy_id=tenancy.id,
+            amount=amount_dec,
+            method=mode,
+            for_type="rent",
+            period_month=period_month.isoformat(),
+            recorded_by=ctx_name or "bot",
+            session=session,
+            notes=note_text,
+            source="whatsapp",
+            room_number=_room_obj.room_number if _room_obj else None,
+            entity_name=tenant.name,
+        )
+    except ValueError as _ve:
+        if "duplicate_payment" in str(_ve):
+            return (
+                f"Rs.{int(amount_dec):,} for {tenant.name} ({period_month.strftime('%b %Y')}) "
+                "was already logged — no duplicate created."
+            )
+        raise
     payment_id = pay_result.payment_id
     effective_due = pay_result.effective_due
     total_paid = pay_result.total_paid

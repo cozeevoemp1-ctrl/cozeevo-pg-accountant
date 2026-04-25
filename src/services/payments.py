@@ -22,6 +22,7 @@ NOTE: Do NOT write org_id — that column does not exist yet (Task 2 adds it).
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -211,6 +212,10 @@ async def log_payment(
                 received_by_staff_id = _staff.id
 
     # ── Create Payment row ─────────────────────────────────────────────────
+    _period_for_hash = (period if pay_for == PaymentFor.rent else None) or ""
+    _hash_raw = f"{tenancy.id}:{date.today()}:{amount_dec}:{pay_mode.value}:{_period_for_hash}:{pay_for.value}"
+    _unique_hash = hashlib.md5(_hash_raw.encode()).hexdigest()
+
     payment = Payment(
         tenancy_id=tenancy.id,
         amount=amount_dec,
@@ -222,9 +227,16 @@ async def log_payment(
         is_void=False,
         receipt_url=None,
         received_by_staff_id=received_by_staff_id,
+        unique_hash=_unique_hash,
     )
     session.add(payment)
-    await session.flush()  # get payment.id
+    try:
+        await session.flush()  # get payment.id — raises IntegrityError on duplicate hash
+    except Exception as _exc:
+        if "uq_payment_unique_hash" in str(_exc) or "unique_hash" in str(_exc):
+            await session.rollback()
+            raise ValueError("duplicate_payment") from _exc
+        raise
 
     # ── Update RentSchedule status + compute result fields ────────────────
     rs_status: Optional[RentStatus] = None

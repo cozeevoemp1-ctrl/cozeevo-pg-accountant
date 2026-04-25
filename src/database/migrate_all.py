@@ -1205,6 +1205,75 @@ async def _migrate_checkout_sessions(conn) -> None:
     print("  [ok] checkout_sessions table + checkout_records extensions ready")
 
 
+async def run_rent_schedule_cascade_2026_04_25(conn) -> None:
+    """Add ON DELETE CASCADE to rent_schedules.tenancy_id FK.
+    Safe: we never delete tenancies (policy is is_void/status), so this only
+    fires during test-data cleanup. Currently the missing cascade forces
+    manual DELETE FROM rent_schedules before deleting a test tenancy."""
+    print("\n-- rent_schedules FK → ON DELETE CASCADE (2026-04-25) --")
+    await conn.execute(text("""
+        DO $$
+        DECLARE
+            cname TEXT;
+        BEGIN
+            -- Find the FK constraint name (may differ from default across envs)
+            SELECT c.conname INTO cname
+            FROM pg_constraint c
+            JOIN pg_class t ON c.conrelid = t.oid
+            WHERE t.relname = 'rent_schedules'
+              AND c.contype = 'f'
+              AND c.conkey @> ARRAY[
+                  (SELECT attnum FROM pg_attribute
+                   WHERE attrelid = t.oid AND attname = 'tenancy_id')
+              ]::smallint[]
+            LIMIT 1;
+
+            IF cname IS NULL THEN
+                RAISE NOTICE 'No FK on rent_schedules.tenancy_id found — skipping';
+                RETURN;
+            END IF;
+
+            -- Check if already CASCADE (confdeltype = 'c')
+            IF EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = cname AND confdeltype = 'c'
+            ) THEN
+                RAISE NOTICE 'Already CASCADE — skipping';
+                RETURN;
+            END IF;
+
+            EXECUTE 'ALTER TABLE rent_schedules DROP CONSTRAINT ' || quote_ident(cname);
+            ALTER TABLE rent_schedules
+                ADD CONSTRAINT rent_schedules_tenancy_id_fkey
+                FOREIGN KEY (tenancy_id) REFERENCES tenancies(id) ON DELETE CASCADE;
+            RAISE NOTICE 'CASCADE added (was: %)', cname;
+        END $$
+    """))
+    print("  [ok] rent_schedules.tenancy_id → ON DELETE CASCADE")
+
+
+async def run_payment_unique_hash_2026_04_25(conn) -> None:
+    """Add unique_hash column + partial unique index to payments table.
+
+    Design:
+    - Column is nullable — existing rows keep NULL (no backfill needed).
+    - Index is partial (WHERE unique_hash IS NOT NULL) so NULLs are unconstrained.
+    - Bot's _do_log_payment_by_ids will write the hash on every new insert.
+    - If a duplicate WhatsApp message replays the same payment, the INSERT
+      fails with IntegrityError and the caller returns a clean 'already logged' message.
+    """
+    print("\n-- payments.unique_hash + partial unique index (2026-04-25) --")
+    await conn.execute(text(
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS unique_hash VARCHAR(64)"
+    ))
+    await conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_unique_hash
+        ON payments (unique_hash)
+        WHERE unique_hash IS NOT NULL
+    """))
+    print("  [ok] payments.unique_hash column + partial unique index ready")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1268,6 +1337,8 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_approved_by_phone_2026_04_25(conn)
             await run_add_cancellation_reason_2026_04_25b(conn)
             await _migrate_checkout_sessions(conn)
+            await run_rent_schedule_cascade_2026_04_25(conn)
+            await run_payment_unique_hash_2026_04_25(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

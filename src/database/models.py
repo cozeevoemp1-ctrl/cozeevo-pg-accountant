@@ -478,6 +478,7 @@ class Payment(Base):
     receipt_url         = Column(String(500), nullable=True)   # relative path to receipt image/PDF
     created_at          = Column(DateTime, default=datetime.utcnow)
     org_id              = Column(Integer, nullable=False, default=1, server_default="1")
+    unique_hash         = Column(String(64), nullable=True)    # dedup key — set by bot on insert
 
     tenancy           = relationship("Tenancy", back_populates="payments")
     received_by_staff = relationship("Staff", back_populates="payments")
