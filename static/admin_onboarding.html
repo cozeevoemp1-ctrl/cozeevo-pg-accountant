@@ -635,19 +635,22 @@
       <div class="card-header">
         <h2>All Sessions</h2>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <select id="filter-status" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
-            <option value="">All Status</option>
-            <option value="approved">Approved</option>
-            <option value="pending_review">Pending Review</option>
-            <option value="pending_tenant">Awaiting Tenant</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="expired">Expired (not filled)</option>
-            <option value="superseded">Superseded (replaced)</option>
-          </select>
-          <input type="date" id="filter-date-from" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
-          <input type="date" id="filter-date-to" onchange="loadHistory()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+          <!-- Status pill toggles — click to include/exclude -->
+          <div id="status-pills" style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button class="spill active" data-status="pending_review"  onclick="togglePill(this)" style="background:#FEF3C7;color:#92400E;border:1.5px solid #F59E0B;">Pending Review</button>
+            <button class="spill active" data-status="pending_tenant"  onclick="togglePill(this)" style="background:#EBF8FF;color:#2B6CB0;border:1.5px solid #63B3ED;">Awaiting Tenant</button>
+            <button class="spill active" data-status="approved"        onclick="togglePill(this)" style="background:#F0FFF4;color:#276749;border:1.5px solid #68D391;">Approved</button>
+            <button class="spill"        data-status="cancelled"       onclick="togglePill(this)" style="background:#F7FAFC;color:#A0AEC0;border:1.5px dashed #CBD5E1;">Cancelled</button>
+            <button class="spill"        data-status="expired"         onclick="togglePill(this)" style="background:#F7FAFC;color:#A0AEC0;border:1.5px dashed #CBD5E1;">Expired</button>
+          </div>
+          <input type="date" id="filter-date-from" onchange="applyFilter()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+          <input type="date" id="filter-date-to" onchange="applyFilter()" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
           <span id="history-count" style="font-size:12px;color:var(--muted);"></span>
         </div>
+        <style>
+          .spill { padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;cursor:pointer;transition:opacity .15s; }
+          .spill:not(.active) { opacity:.45; filter:grayscale(.4); }
+        </style>
       </div>
       <div class="card-body" style="padding:0;max-height:500px;overflow-y:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -693,30 +696,53 @@
   const statusBg    = { approved: '#DCFCE7', pending_review: '#FEF3C7', pending_tenant: '#DBEAFE', cancelled: '#FEE2E2', expired: '#F3F4F6', draft: '#F3F4F6' };
   const statusLabel = { approved: 'Approved', pending_review: 'Pending Review', pending_tenant: 'Awaiting Tenant', cancelled: 'Cancelled', expired: 'Expired (not filled)', draft: 'Draft' };
 
+  let _allSessions = [];  // full list fetched once (or on date change)
+
+  function togglePill(btn) {
+    btn.classList.toggle('active');
+    applyFilter();
+  }
+
+  function applyFilter() {
+    const activePills = new Set(
+      [...document.querySelectorAll('#status-pills .spill.active')].map(b => b.dataset.status)
+    );
+    const from = document.getElementById('filter-date-from').value;
+    const to   = document.getElementById('filter-date-to').value;
+    let filtered = _allSessions.filter(s => activePills.has(s.status));
+    if (from) filtered = filtered.filter(s => s.created_at >= from);
+    if (to)   filtered = filtered.filter(s => s.created_at <= to + 'T23:59:59');
+    renderHistoryRows(filtered);
+  }
+
   async function loadHistory() {
-    const status = document.getElementById('filter-status').value;
     const from = document.getElementById('filter-date-from').value;
     const to = document.getElementById('filter-date-to').value;
     const params = new URLSearchParams();
-    if (status) params.set('status', status);
     if (from) params.set('date_from', from);
     if (to) params.set('date_to', to);
     try {
       const res = await fetch(`/api/onboarding/admin/all?${params}`, { headers: pinHeaders() });
       if (!res.ok) return;
       const d = await res.json();
-      const body = document.getElementById('history-body');
-      document.getElementById('history-count').textContent = `${d.sessions.length} sessions`;
-      if (!d.sessions.length) {
-        body.innerHTML = '<tr><td colspan="9" style="padding:16px;text-align:center;color:var(--muted);">No sessions found</td></tr>';
-        return;
-      }
-      // Build rows — each data row + a hidden expand row below it
-      const checkinColors = { active: '#166534', no_show: '#92400E', exited: '#6B7280', cancelled: '#991B1B' };
-      const checkinBg     = { active: '#DCFCE7', no_show: '#FEF3C7', exited: '#F3F4F6', cancelled: '#FEE2E2' };
-      const checkinLabel  = { active: 'Checked In', no_show: 'No Show', exited: 'Checked Out', cancelled: 'Cancelled' };
-      const rows = [];
-      d.sessions.forEach(s => {
+      _allSessions = d.sessions;
+      applyFilter();
+    } catch(e) {}
+  }
+
+  function renderHistoryRows(sessions) {
+    const body = document.getElementById('history-body');
+    document.getElementById('history-count').textContent = `${sessions.length} sessions`;
+    if (!sessions.length) {
+      body.innerHTML = '<tr><td colspan="9" style="padding:16px;text-align:center;color:var(--muted);">No sessions found</td></tr>';
+      return;
+    }
+    // Build rows — each data row + a hidden expand row below it
+    const checkinColors = { active: '#166534', no_show: '#92400E', exited: '#6B7280', cancelled: '#991B1B' };
+    const checkinBg     = { active: '#DCFCE7', no_show: '#FEF3C7', exited: '#F3F4F6', cancelled: '#FEE2E2' };
+    const checkinLabel  = { active: 'Checked In', no_show: 'No Show', exited: 'Checked Out', cancelled: 'Cancelled' };
+    const rows = [];
+    sessions.forEach(s => {
         const pillLabel = s.status === 'expired' && s.expired_ago
           ? `${statusLabel[s.status]||s.status} · ${escHtml(s.expired_ago)}`
           : (statusLabel[s.status]||s.status);
@@ -746,8 +772,7 @@
             </td>
           </tr>`);
       });
-      body.innerHTML = rows.join('');
-    } catch(e) {}
+    body.innerHTML = rows.join('');
   }
 
   // ── Toggle history row expand ──────────────────────────────────────────────
