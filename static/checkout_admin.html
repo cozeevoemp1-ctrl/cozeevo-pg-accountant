@@ -5,69 +5,184 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout — Cozeevo Admin</title>
   <style>
-    :root { --pink: #EF1F9C; --blue: #00AEED; --bg: #0f0f1a; --card: #1a1a2e; --text: #e0e0e0; --muted: #888; }
+    :root {
+      --pink: #EF1F9C;
+      --pink-dark: #c9167e;
+      --blue: #00AEED;
+      --bg: #F9FAFB;
+      --card: #FFFFFF;
+      --text: #2D3748;
+      --sub: #718096;
+      --muted: #A0AEC0;
+      --border: #E2E8F0;
+      --green: #38A169;
+      --red: #E53E3E;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-lg: 0 4px 12px rgba(0,0,0,.1);
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
-    nav { background: var(--card); padding: 14px 24px; display: flex; align-items: center; gap: 24px; border-bottom: 1px solid #2a2a40; }
-    nav .brand { color: var(--pink); font-weight: 700; font-size: 16px; text-decoration: none; }
-    nav a { color: var(--muted); text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 6px; }
-    nav a.active, nav a:hover { background: rgba(239,31,156,0.12); color: var(--pink); }
-    .page { max-width: 680px; margin: 40px auto; padding: 0 20px; }
-    h1 { font-size: 22px; margin-bottom: 8px; }
-    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
-    .progress { display: flex; gap: 8px; margin-bottom: 32px; }
-    .step-dot { flex: 1; height: 4px; border-radius: 2px; background: #2a2a40; transition: background .3s; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header (matches onboarding) ── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    header img { height: 32px; width: auto; }
+    header h1 { font-size: 18px; font-weight: 700; color: var(--text); }
+    header h1 span { color: var(--pink); }
+
+    /* ── Page layout ── */
+    .page { max-width: 680px; margin: 32px auto; padding: 0 24px 60px; }
+
+    /* ── Progress bar ── */
+    .progress { display: flex; gap: 8px; margin-bottom: 28px; }
+    .step-dot { flex: 1; height: 4px; border-radius: 2px; background: var(--border); transition: background .3s; }
     .step-dot.active { background: var(--pink); }
-    .step-dot.done { background: var(--blue); }
-    .card { background: var(--card); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
-    .card h2 { font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 20px; }
-    .field { margin-bottom: 18px; }
-    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-    input, select, textarea { width: 100%; background: #0d0d1a; border: 1px solid #2a2a40; border-radius: 8px; color: var(--text); padding: 10px 14px; font-size: 14px; outline: none; }
-    input:focus, select:focus { border-color: var(--pink); }
+    .step-dot.done   { background: var(--blue); }
+
+    /* ── Step label ── */
+    .step-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 16px; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Form fields ── */
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(239,31,156,.08); }
     textarea { resize: vertical; min-height: 72px; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .toggle-group { display: flex; gap: 10px; }
-    .toggle-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #2a2a40; background: #0d0d1a; color: var(--muted); cursor: pointer; font-size: 14px; text-align: center; transition: all .2s; }
-    .toggle-btn.yes.selected { background: rgba(74,222,128,.15); border-color: #4ade80; color: #4ade80; }
-    .toggle-btn.no.selected  { background: rgba(239,68,68,.15);  border-color: #ef4444; color: #ef4444; }
-    .toggle-btn.ok.selected  { background: rgba(74,222,128,.15); border-color: #4ade80; color: #4ade80; }
+
+    /* ── Toggle buttons ── */
+    .toggle-group { display: flex; gap: 8px; }
+    .toggle-btn {
+      flex: 1; padding: 9px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--bg);
+      color: var(--sub); cursor: pointer; font-size: 14px;
+      font-weight: 500; text-align: center; transition: all .15s;
+    }
+    .toggle-btn:hover { border-color: var(--muted); }
+    .toggle-btn.yes.selected { background: #F0FFF4; border-color: #9AE6B4; color: var(--green); }
+    .toggle-btn.no.selected  { background: #FFF5F5; border-color: #FC8181; color: var(--red); }
+    .toggle-btn.ok.selected  { background: #F0FFF4; border-color: #9AE6B4; color: var(--green); }
+
+    /* ── Autocomplete ── */
     .autocomplete { position: relative; }
-    .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1px solid #2a2a40; border-radius: 8px; z-index: 100; max-height: 200px; overflow-y: auto; }
-    .suggestion-item { padding: 10px 14px; cursor: pointer; font-size: 14px; }
-    .suggestion-item:hover { background: rgba(239,31,156,.1); }
-    .settlement { background: #0d0d1a; border-radius: 8px; padding: 16px; margin-bottom: 18px; }
-    .settlement-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
-    .settlement-row.total { border-top: 1px solid #2a2a40; margin-top: 8px; padding-top: 10px; font-weight: 600; color: #4ade80; }
-    .btn-primary { width: 100%; background: var(--pink); border: none; color: white; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
-    .btn-primary:hover { opacity: .9; }
-    .btn-back { background: none; border: 1px solid #2a2a40; color: var(--muted); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; margin-right: 10px; }
-    .status-box { background: var(--card); border-radius: 12px; padding: 28px; text-align: center; display: none; }
-    .status-icon { font-size: 48px; margin-bottom: 16px; }
-    .status-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-    .status-sub { color: var(--muted); font-size: 14px; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 12px; }
-    .badge.pending  { background: rgba(251,191,36,.15); color: #fbbf24; }
-    .badge.confirmed { background: rgba(74,222,128,.15); color: #4ade80; }
-    .badge.auto_confirmed { background: rgba(0,174,237,.15); color: var(--blue); }
-    .badge.rejected { background: rgba(239,68,68,.15); color: #ef4444; }
+    .suggestions {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; z-index: 200;
+      max-height: 200px; overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+    .suggestion-item { padding: 10px 14px; cursor: pointer; font-size: 14px; color: var(--text); }
+    .suggestion-item:hover { background: rgba(239,31,156,.06); }
+
+    /* ── Settlement summary ── */
+    .settlement {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;
+    }
+    .settlement-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; color: var(--sub); }
+    .settlement-row.total {
+      border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px;
+      font-weight: 700; color: var(--green); font-size: 15px;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      width: 100%; background: var(--pink); border: none; color: white;
+      padding: 12px 28px; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover { background: var(--pink-dark); }
+    .btn-back {
+      background: none; border: 1px solid var(--border); color: var(--sub);
+      padding: 10px 20px; border-radius: 8px; cursor: pointer;
+      font-size: 14px; margin-right: 10px; transition: border-color .15s;
+    }
+    .btn-back:hover { border-color: var(--muted); }
+
+    /* ── Status box ── */
+    .status-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 36px 28px;
+      text-align: center; box-shadow: var(--shadow); display: none;
+    }
+    .status-icon { font-size: 44px; margin-bottom: 14px; }
+    .status-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .status-sub { color: var(--sub); font-size: 14px; }
+    .badge {
+      display: inline-block; padding: 4px 14px; border-radius: 12px;
+      font-size: 12px; font-weight: 600; margin-top: 12px;
+    }
+    .badge.pending       { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+    .badge.confirmed     { background: #F0FFF4; color: var(--green); border: 1px solid #9AE6B4; }
+    .badge.auto_confirmed{ background: #EBF8FF; color: #2B6CB0; border: 1px solid #90CDF4; }
+    .badge.rejected      { background: #FFF5F5; color: var(--red); border: 1px solid #FC8181; }
+
     .hidden { display: none !important; }
-    select option { background: #1a1a2e; }
   </style>
 </head>
 <body>
 
-<nav>
-  <a href="/admin/onboarding" class="brand">Cozeevo Admin</a>
-  <a href="/admin/onboarding">Check-in</a>
-  <a href="/admin/checkout" class="active">Checkout</a>
-</nav>
+<header>
+  <a href="https://getkozzy.com" target="_blank" style="display:flex;align-items:center;text-decoration:none;">
+    <img src="/static/logo.svg" alt="Cozeevo" onerror="this.style.display='none'">
+  </a>
+  <h1>Checkout <span>Management</span></h1>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+    <a href="/admin/onboarding" style="font-size:13px;font-weight:500;color:var(--sub);text-decoration:none;padding:6px 14px;border-radius:6px;">Check-in</a>
+    <a href="/admin/checkout" style="font-size:13px;font-weight:600;color:var(--pink);text-decoration:none;padding:6px 14px;border-radius:6px;background:rgba(239,31,156,.1);">Checkout</a>
+  </div>
+</header>
 
 <div class="page">
-  <h1>Checkout Form</h1>
-  <p class="subtitle">Fill all details. Tenant will receive a WhatsApp summary to confirm.</p>
 
-  <div class="progress">
+  <div class="progress" style="margin-top:24px;">
     <div class="step-dot active" id="dot1"></div>
     <div class="step-dot" id="dot2"></div>
     <div class="step-dot" id="dot3"></div>
@@ -79,7 +194,7 @@
       <h2>Step 1 — Tenant &amp; Date</h2>
       <div class="field autocomplete">
         <label>Tenant</label>
-        <input type="text" id="tenantSearch" placeholder="Search by name or room…" autocomplete="off">
+        <input type="text" id="tenantSearch" placeholder="Search by name or room number…" autocomplete="off">
         <div class="suggestions" id="suggestions" style="display:none"></div>
         <input type="hidden" id="tenancyId">
       </div>
@@ -129,7 +244,7 @@
       </div>
     </div>
     <button class="btn-back" onclick="goStep1()">← Back</button>
-    <button class="btn-primary" style="width:auto;display:inline-block;padding:14px 32px" onclick="goStep3()">Next: Settlement →</button>
+    <button class="btn-primary" style="width:auto;" onclick="goStep3()">Next: Settlement →</button>
   </div>
 
   <!-- Step 3 -->
@@ -166,18 +281,18 @@
         <input type="text" id="deductionReason" placeholder="e.g. paint damage, no notice given">
       </div>
       <div class="field">
-        <label>Refund Amount (₹) — editable</label>
+        <label>Refund Amount (₹) — editable override</label>
         <input type="number" id="refundAmount" oninput="refundOverridden = true">
       </div>
       <div class="settlement">
         <div class="settlement-row"><span>Security Deposit</span><span id="s_deposit">₹0</span></div>
-        <div class="settlement-row"><span>Pending Dues</span><span id="s_dues" style="color:#ef4444">- ₹0</span></div>
-        <div class="settlement-row"><span>Deductions</span><span id="s_deductions" style="color:#ef4444">- ₹0</span></div>
+        <div class="settlement-row"><span>Pending Dues</span><span id="s_dues" style="color:var(--red)">- ₹0</span></div>
+        <div class="settlement-row"><span>Deductions</span><span id="s_deductions" style="color:var(--red)">- ₹0</span></div>
         <div class="settlement-row total"><span>Refund</span><span id="s_refund">₹0</span></div>
       </div>
     </div>
     <button class="btn-back" onclick="goStep2()">← Back</button>
-    <button class="btn-primary" style="width:auto;display:inline-block;padding:14px 32px" onclick="submitForm()">Send to Tenant →</button>
+    <button class="btn-primary" style="width:auto;" onclick="submitForm()">Send to Tenant →</button>
   </div>
 
   <!-- Status box -->
@@ -187,8 +302,9 @@
     <div class="status-sub" id="statusSub">Waiting for confirmation…</div>
     <div class="badge pending" id="statusBadge">PENDING</div>
     <br><br>
-    <button class="btn-primary" onclick="resetForm()">New Checkout</button>
+    <button class="btn-primary" style="max-width:200px;margin:0 auto;" onclick="resetForm()">New Checkout</button>
   </div>
+
 </div>
 
 <script>
