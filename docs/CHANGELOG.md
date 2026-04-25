@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.54.0] — 2026-04-25 — KYC Storage Migration + Security Hardening
+
+### KYC files migrated to Supabase Storage
+- **`src/services/storage.py`** (new) — Supabase Storage REST wrapper (httpx, no new deps). Buckets: `kyc-documents`, `agreements`. Uses `SUPABASE_SERVICE_KEY` or falls back to `SUPABASE_KEY` (anon + RLS).
+- **`pdf_generator.py`** — Agreement PDFs now generated to BytesIO in-memory and uploaded to Supabase. Returns public URL.
+- **`onboarding_router.py`** — Selfie, ID proof, signature, staff_signature all uploaded to Supabase on submit/approve. Staff-signature GET/POST endpoints use Supabase download/upload.
+- **`admin_onboarding.html`** — Handles both old `/media/` relative paths and new `https://` Supabase URLs (backward-compat).
+- **`scripts/migrate_media_to_supabase.py`** — One-time migration script. Ran on VPS: 29 documents + 8 agreements + 1 staff signature uploaded. DB paths updated to Supabase URLs. Local VPS files deleted.
+- VPS `.env` — Added `SUPABASE_URL` and `SUPABASE_KEY`.
+- Supabase Storage buckets (`kyc-documents`, `agreements`) created with path-restricted INSERT/UPDATE RLS policies.
+- Audit trail intact: `documents.tenant_id` / `tenancy_id` FKs unchanged.
+
+### Security hardening
+- **`/api/ingest/upload`** — was fully open; added `_check_admin_pin`
+- **`/api/ingest/scan`** — was fully open; added `_check_admin_pin`
+- **`/api/reconcile`** — was fully open; added `_check_admin_pin`
+- **`/api/report/dashboard`** — was fully open; added `_check_admin_pin`
+- **`/api/onboarding/admin/onboarding`** — page was served without PIN (exposing hardcoded X-Admin-Pin in HTML source). Fixed: PIN now always required. PIN injected from validated URL param instead of hardcoded literal.
+- **Supabase Storage RLS** — INSERT policies restricted to known path prefixes (`onboarding/`, `staff-signatures/`, `receipts/`, `YYYY-MM/agreement_*.pdf`).
+
+---
+
 ## [1.53.0] — 2026-04-25 — Feat: Checkout Form (admin web UI + WhatsApp confirm flow)
 
 Replaces WhatsApp-only conversational checkout with a structured 3-step admin form.
