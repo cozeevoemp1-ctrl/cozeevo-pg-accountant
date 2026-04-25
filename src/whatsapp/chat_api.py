@@ -528,6 +528,25 @@ async def _process_message_inner(
             await session.commit()
             return OutboundReply(reply=flex_reply, intent="QUERY_FLEXIBLE", role=ctx.role)
 
+    # ── LangGraph active-thread fast-path ────────────────────────────
+    # Must run BEFORE the PydanticAI path — "yes" gets classified as UNKNOWN
+    # and would otherwise hit the converse handler and never reach the agent.
+    if _USE_PYDANTIC_AGENTS and ctx.role in ("admin", "owner", "receptionist") and intent not in _AGENT_INTENTS:
+        try:
+            from src.agent.graph import get_graph as _get_graph
+            _st = await _get_graph().aget_state({"configurable": {"thread_id": f"wa:{phone}"}})
+            if _st.values and _st.values.get("pending_tool"):
+                from src.agent.graph import run_agent as _run_agent
+                pg_id = await _resolve_pg_id(session)
+                ch_msg = _AgentChannelMessage(user_id=f"wa:{phone}", channel="whatsapp", text=message)
+                agent_reply = await _run_agent(channel_msg=ch_msg, session=session, pg_id=pg_id, role=ctx.role, name=ctx.name or "")
+                if agent_reply:
+                    await _log(session, phone, message, ctx.role, intent or "CONFIRMATION", agent_reply)
+                    await session.commit()
+                    return OutboundReply(reply=agent_reply, intent=intent or "CONFIRMATION", role=ctx.role)
+        except Exception as _e:
+            _chat_logger.warning("[agent fast-path] aget_state failed: %s", _e)
+
     # ── PydanticAI agent path (feature flag) ─────────────────────────
     if _USE_PYDANTIC_AGENTS and intent in ("UNKNOWN", "GENERAL"):
         pg_id = await _resolve_pg_id(session)
