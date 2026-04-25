@@ -128,22 +128,31 @@ async def find_overlap_conflict(
     end_date: Optional[_date],
     exclude_tenancy_id: Optional[int] = None,
 ) -> Optional[str]:
-    """Return the conflicting occupant's name if `room_id` is booked during
+    """Return a conflicting occupant's name if `room_id` is FULL during
     [start_date, end_date], else None.
 
-    Checks BOTH long-term tenancies AND day-stays. Used before a new
-    check-in or transfer to guarantee we don't double-book a bed.
+    Checks BOTH long-term tenancies AND day-stays. Only blocks when the
+    total beds consumed by overlapping occupants reaches max_occupancy —
+    a 3-sharing room with 2 tenants can still accept a third.
+    Premium sharing_type consumes all beds in the room.
     """
     far_future = _date(9999, 12, 31)
     period_end = end_date or far_future
 
+    # Fetch room capacity alongside room_number in one query.
+    room_row = (await session.execute(
+        select(Room.room_number, Room.max_occupancy).where(Room.id == room_id)
+    )).first()
+    if room_row is None:
+        return None
+    room_num, max_occ = room_row
+    max_occ = max_occ or 1
+
     # Long-term overlap — include no_show tenancies too. A no-show with
     # checkin_date in the future locks the bed FROM that date onward, so
     # a day-stay ending after the no-show's checkin would overbook.
-    # Example: Diksha is no_show with checkin May 1. A day-stay in the
-    # same room from Apr 29 – May 2 must be refused.
     q = (
-        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date, Tenancy.status)
+        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date, Tenancy.status, Tenancy.sharing_type)
         .join(Tenant, Tenant.id == Tenancy.tenant_id)
         .where(
             Tenancy.room_id == room_id,
@@ -152,20 +161,19 @@ async def find_overlap_conflict(
     )
     if exclude_tenancy_id:
         q = q.where(Tenancy.id != exclude_tenancy_id)
-    for name, checkin, checkout, status in (await session.execute(q)).all():
-        # No-show with no checkin_date means "expected to arrive but no
-        # date set" — treat as blocking the whole room to be safe.
+
+    beds_used = 0
+    conflict_names: list[str] = []
+    for name, checkin, checkout, status, sharing_type in (await session.execute(q)).all():
         existing_start = checkin or _date.min
         existing_end = checkout or far_future
         if start_date < existing_end and period_end > existing_start:
             label = f"{name} (booking)" if status == TenancyStatus.no_show else name
-            return label
+            conflict_names.append(label)
+            beds_used += max_occ if sharing_type == "premium" else 1
 
     # Day-stay overlap — match by room_number since DaywiseStay isn't
     # wired to Room by FK in the current schema.
-    room_num = (await session.execute(
-        select(Room.room_number).where(Room.id == room_id)
-    )).scalar_one_or_none()
     if room_num:
         dw_rows = (await session.execute(
             select(DaywiseStay.guest_name, DaywiseStay.checkin_date, DaywiseStay.checkout_date)
@@ -177,7 +185,11 @@ async def find_overlap_conflict(
         for name, chk, out in dw_rows:
             existing_end = out or far_future
             if start_date < existing_end and period_end > chk:
-                return f"{name} (day-stay)"
+                conflict_names.append(f"{name} (day-stay)")
+                beds_used += 1
+
+    if beds_used >= max_occ and conflict_names:
+        return conflict_names[0]
 
     return None
 
