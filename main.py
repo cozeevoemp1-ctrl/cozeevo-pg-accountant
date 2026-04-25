@@ -41,6 +41,8 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
                 or path.startswith("/onboard")  # tenant onboarding form (public)
                 or path.startswith("/admin/onboarding")  # admin onboarding panel
                 or path.startswith("/api/onboarding")  # all onboarding API endpoints
+                or path.startswith("/admin/checkout")   # admin checkout panel
+                or path.startswith("/api/checkout")     # all checkout API endpoints
                 or path.startswith("/api/sync")  # live source sheet sync (token-protected)
                 or path.startswith("/api/v2/app")):  # Owner PWA API — JWT-protected at endpoint level
             return await call_next(request)
@@ -144,6 +146,9 @@ app.include_router(reminder_router)
 
 from src.api.onboarding_router import router as onboarding_router
 app.include_router(onboarding_router)
+
+from src.api.checkout_router import router as checkout_router
+app.include_router(checkout_router)
 
 from src.api.sync_router import router as sync_router
 app.include_router(sync_router)
