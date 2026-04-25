@@ -62,9 +62,13 @@ async def test_checkout_happy_path_confirm_then_yes():
 
             r2 = await g.ainvoke({"last_message": "yes"}, config=cfg)
             assert "checked out" in r2["reply"].lower()
+            tool_out.assert_awaited_once()
             # State cleared after execution
             assert r2.get("intent") is None
             assert r2.get("pending_tool") is None
+
+            final = await g.aget_state(cfg)
+            assert final.values.get("entities") == {}
 
 
 @pytest.mark.asyncio
@@ -93,7 +97,7 @@ async def test_checkout_with_clarification_three_turns():
             assert "Ravi" in r1["reply"] or "Which" in r1["reply"]
 
             r2 = await g.ainvoke({"last_message": "sharma"}, config=cfg)
-            assert "305" in r2["reply"] or "confirm" in r2["reply"].lower()
+            assert "305" in r2["reply"] and ("yes" in r2["reply"].lower() or "confirm" in r2["reply"].lower())
 
             r3 = await g.ainvoke({"last_message": "yes"}, config=cfg)
             assert "checked out" in r3["reply"].lower()
@@ -142,7 +146,8 @@ async def test_payment_log_happy_path():
             s1 = make_initial_state(user_id="wa:test_payment", channel="whatsapp",
                                     role="admin", name="Kiran", last_message="ravi paid 5000 upi")
             r1 = await g.ainvoke(s1, config=cfg)
-            assert "5000" in r1["reply"] or "confirm" in r1["reply"].lower()
+            assert "5000" in r1["reply"]
 
             r2 = await g.ainvoke({"last_message": "yes"}, config=cfg)
-            assert "5000" in r2["reply"] or "logged" in r2["reply"].lower()
+            tool_out.assert_awaited_once()
+            assert "5000" in r2["reply"] or "logged" in r2["reply"]
