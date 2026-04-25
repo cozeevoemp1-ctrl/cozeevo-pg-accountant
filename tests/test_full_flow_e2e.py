@@ -34,7 +34,7 @@ from sqlalchemy import select, delete, func
 from src.database.db_manager import init_db, get_session
 from src.database.models import (
     PendingAction, Tenant, Tenancy, TenancyStatus, Payment, Expense, Refund,
-    Complaint, AuditLog, Vacation, Staff, Room,
+    Complaint, AuditLog, Vacation, Staff, Room, CheckoutRecord, RentSchedule,
 )
 from src.whatsapp.role_service import CallerContext, _normalize
 
@@ -1378,6 +1378,172 @@ async def test_my_payments_tenant(_phone_norm: str, t: tuple) -> tuple[bool, str
 
 # ─── Run all ───────────────────────────────────────────────────────────────
 
+async def test_record_checkout(ctx: CallerContext, phone_norm: str) -> tuple[bool, str]:
+    """RECORD_CHECKOUT: create test tenant, walk 5-question checklist, confirm, verify CheckoutRecord."""
+    import random, string
+    suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    test_name = f"ZzCkout{suffix}"
+    test_phone = f"+9100{random.randint(10000000, 99999999)}"
+
+    async with get_session() as s:
+        occupied = (await s.execute(
+            select(Tenancy.room_id).where(Tenancy.status == "active")
+        )).scalars().all()
+        where_clause = (Room.id.notin_(occupied),) if occupied else ()
+        free_room = (await s.execute(
+            select(Room).where(*where_clause, Room.is_staff_room == False, Room.active == True).limit(1)
+        )).scalar_one_or_none()
+        if not free_room:
+            return True, "skipped (no free room)"
+        from src.database.models import SharingType
+        tenant = Tenant(name=test_name, phone=test_phone)
+        s.add(tenant)
+        await s.flush()
+        tenancy = Tenancy(
+            tenant_id=tenant.id, room_id=free_room.id,
+            status=TenancyStatus.active,
+            checkin_date=date(2025, 1, 1),
+            agreed_rent=5000, security_deposit=10000,
+            sharing_type=SharingType.double,
+        )
+        s.add(tenancy)
+        await s.commit()
+        tenancy_id = tenancy.id
+
+    await _purge_pending(phone_norm)
+    try:
+        r1 = await _route_message(ctx, f"checkout {test_name}")
+        if not r1 or _looks_like_greeting(r1):
+            return False, f"[init] greeting/empty: {r1[:80]!r}"
+
+        # Confirm tenant choice → RECORD_CHECKOUT starts (step=ask_cupboard_key)
+        r2 = await _route_message(ctx, "1")
+        if not r2:
+            return False, "[pick-1] empty reply"
+
+        # 5-question checklist: cupboard, main key, damage, fingerprint, deductions
+        for step_msg in ("yes", "yes", "no", "yes", "0"):
+            r = await _route_message(ctx, step_msg)
+            if not r:
+                return False, f"[checklist {step_msg!r}] empty reply"
+
+        # Final confirm
+        r_final = await _route_message(ctx, "yes")
+        if not r_final or _looks_like_greeting(r_final):
+            return False, f"[confirm-yes] greeting/empty: {r_final[:80]!r}"
+        if r_final == "__EMPTY_REPLY_GUARD__":
+            return False, "[confirm-yes] empty handler reply"
+
+        async with get_session() as s:
+            tn = await s.get(Tenancy, tenancy_id)
+            if not tn or tn.status != TenancyStatus.exited:
+                return False, f"[verify] tenancy not exited (status={tn.status if tn else None}), reply={r_final[:80]!r}"
+            cr = (await s.execute(
+                select(CheckoutRecord).where(CheckoutRecord.tenancy_id == tenancy_id)
+            )).scalar_one_or_none()
+            if cr is None:
+                return False, f"[verify] CheckoutRecord not created, reply={r_final[:80]!r}"
+        return True, f"CheckoutRecord {cr.id} for tenancy {tenancy_id}"
+
+    finally:
+        async with get_session() as s:
+            await s.execute(delete(CheckoutRecord).where(CheckoutRecord.tenancy_id == tenancy_id))
+            await s.execute(delete(Refund).where(Refund.tenancy_id == tenancy_id))
+            await s.execute(delete(AuditLog).where(
+                AuditLog.entity_type == "tenancy", AuditLog.entity_id == tenancy_id
+            ))
+            await s.execute(delete(Tenancy).where(Tenancy.id == tenancy_id))
+            existing = (await s.execute(
+                select(Tenant).where(Tenant.phone == test_phone)
+            )).scalar_one_or_none()
+            if existing:
+                await s.delete(existing)
+            await s.commit()
+        await _purge_pending(phone_norm)
+
+
+async def test_add_tenant_confirm(ctx: CallerContext, phone_norm: str) -> tuple[bool, str]:
+    """ADD_TENANT: inject CONFIRM_ADD_TENANT pending → 'yes' → Tenant+Tenancy created → cleanup.
+
+    Tests the DB-write path (_do_add_tenant). Future checkin → no_show status,
+    no RentSchedule rows generated, advance=0 → no Payment row.
+    """
+    import random, json as _json
+    from datetime import datetime as _dt, timedelta as _td
+    suffix = random.randint(100000, 999999)
+    test_name = f"ZzAddTest{suffix}"
+    test_phone = f"999{suffix}"
+
+    async with get_session() as s:
+        occupied = (await s.execute(
+            select(Tenancy.room_id).where(Tenancy.status == "active")
+        )).scalars().all()
+        where_clause = (Room.id.notin_(occupied),) if occupied else ()
+        free_room = (await s.execute(
+            select(Room).where(*where_clause, Room.is_staff_room == False, Room.active == True).limit(1)
+        )).scalar_one_or_none()
+        if not free_room:
+            return True, "skipped (no free room)"
+
+        checkin_iso = date(date.today().year + 1, 1, 1).isoformat()  # future → no_show + no RentSchedule
+        pending_data = {
+            "name": test_name, "phone": test_phone,
+            "room_id": free_room.id, "room_number": free_room.room_number,
+            "base_rent": 5000, "deposit": 5000,
+            "advance": 0, "maintenance": 0,
+            "checkin_date": checkin_iso, "food_pref": "",
+            "discount": {}, "existing_tenant_id": None,
+        }
+        s.add(PendingAction(
+            phone=phone_norm, intent="CONFIRM_ADD_TENANT",
+            state="awaiting_confirmation",
+            action_data=_json.dumps(pending_data),
+            choices=_json.dumps([]),
+            expires_at=_dt.utcnow() + _td(minutes=15),
+        ))
+        await s.commit()
+
+    try:
+        r = await _route_message(ctx, "yes")
+        if not r or _looks_like_greeting(r):
+            return False, f"[yes] greeting/empty: {r[:80]!r}"
+        if r == "__EMPTY_REPLY_GUARD__":
+            return False, "[yes] empty handler reply"
+
+        async with get_session() as s:
+            tn = (await s.execute(
+                select(Tenant).where(Tenant.phone == test_phone)
+            )).scalar_one_or_none()
+            if not tn:
+                return False, f"[verify] Tenant not created, reply={r[:80]!r}"
+            tncy = (await s.execute(
+                select(Tenancy).where(Tenancy.tenant_id == tn.id)
+            )).scalar_one_or_none()
+            if not tncy:
+                return False, "[verify] Tenancy not created"
+        return True, f"Tenant {test_name} + Tenancy {tncy.id} created (no_show)"
+
+    finally:
+        async with get_session() as s:
+            tn = (await s.execute(
+                select(Tenant).where(Tenant.phone == test_phone)
+            )).scalar_one_or_none()
+            if tn:
+                tncys = (await s.execute(
+                    select(Tenancy).where(Tenancy.tenant_id == tn.id)
+                )).scalars().all()
+                for tncy_row in tncys:
+                    await s.execute(delete(RentSchedule).where(RentSchedule.tenancy_id == tncy_row.id))
+                    await s.execute(delete(Payment).where(Payment.tenancy_id == tncy_row.id))
+                    await s.execute(delete(AuditLog).where(
+                        AuditLog.entity_type == "tenancy", AuditLog.entity_id == tncy_row.id
+                    ))
+                    await s.delete(tncy_row)
+                await s.delete(tn)
+            await s.commit()
+        await _purge_pending(phone_norm)
+
+
 async def main():
     await init_db(os.getenv("DATABASE_URL"))
     phone_norm = _normalize(ADMIN_PHONE)
@@ -1423,6 +1589,9 @@ async def main():
         ("COMPLAINT_UPDATE (resolve)",   lambda: test_complaint_update(ctx, phone_norm, t)),
         ("MY_BALANCE (tenant role)",     lambda: test_my_balance_tenant(phone_norm, t)),
         ("MY_PAYMENTS (tenant role)",    lambda: test_my_payments_tenant(phone_norm, t)),
+        # ── Checkout & check-in ──────────────────────────────────────────────
+        ("RECORD_CHECKOUT full flow",    lambda: test_record_checkout(ctx, phone_norm)),
+        ("ADD_TENANT confirm → DB",      lambda: test_add_tenant_confirm(ctx, phone_norm)),
     ]
 
     ok, fail = 0, 0

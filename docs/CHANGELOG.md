@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.58.0] — 2026-04-25 — E2E test suite: RECORD_CHECKOUT + ADD_TENANT confirm + SOP update
+
+### test_full_flow_e2e.py: 33 → 35 scenarios
+Two previously-missing intents now covered end-to-end:
+- **RECORD_CHECKOUT full flow** — creates test tenant+tenancy, routes "checkout [name]" → "1" → walks 5-question checklist (keys/damage/fingerprint/deductions) → "yes", verifies `CheckoutRecord` created and `tenancy.status=exited`, full cleanup in `finally`
+- **ADD_TENANT confirm → DB** — injects `CONFIRM_ADD_TENANT` pending with future checkin, routes "yes", verifies `Tenant`+`Tenancy` rows created, full cleanup
+
+### SOP update (`memory/sop_testing.md`)
+Added mandatory rule: every new handler must have a corresponding E2E test in `test_full_flow_e2e.py` before shipping. Rule includes pattern reference to newest tests.
+
+---
+
 ## [1.57.0] — 2026-04-25 — E2E test suite: 7 missing intents + pre-push hook
 
 ### test_full_flow_e2e.py: 26 → 33 scenarios
