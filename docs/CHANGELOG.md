@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.55.0] — 2026-04-25 — Pessimistic locking + "where is X" intent
+
+### Pessimistic locking on tenancy mutations (`SELECT...FOR UPDATE`)
+Five mutation paths now lock the DB row before writing, preventing concurrent-request data corruption:
+- `_do_confirm_checkout` — locks `Tenancy` row + idempotency guard (already-exited check)
+- `_handle_checkout_agree` — locks `CheckoutSession` row + `confirmed_at` guard (prevents double-confirm if tenant sends YES twice)
+- `_do_room_transfer` — locks `Tenancy` row before `room_id` write
+- `_do_deposit_change` — locks `Tenancy` row before `security_deposit` write
+- `_do_rent_change` — locks `Tenancy` row before `agreed_rent` write
+
+### "Where is X" intent
+- `where is Raj` / `where is raj` / `which room is Raj in` → `QUERY_TENANT` (returns full account including room number)
+- Entity extractor updated with "where is X" fallback for lowercase names
+
+---
+
 ## [1.54.0] — 2026-04-25 — KYC Storage Migration + Security Hardening
 
 ### KYC files migrated to Supabase Storage
