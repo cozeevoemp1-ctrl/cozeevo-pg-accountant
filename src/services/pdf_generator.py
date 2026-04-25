@@ -41,7 +41,7 @@ HOUSE_RULES = [
 ]
 
 
-def _generate_pdf_bytes(obs, tenant_data: dict, room, building: str, sharing: str) -> tuple[bytes, str]:
+def _generate_pdf_bytes(obs, tenant_data: dict, room, building: str, sharing: str, receptionist_name: str = "") -> tuple[bytes, str]:
     """Generate agreement PDF in-memory. Returns (pdf_bytes, filename)."""
     filename = f"agreement_{obs.token[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     buf = io.BytesIO()
@@ -150,8 +150,11 @@ def _generate_pdf_bytes(obs, tenant_data: dict, room, building: str, sharing: st
         elements.append(Paragraph("✓ Agreement accepted", small))
 
     elements.append(Spacer(1, 5*mm))
+    footer_text = f"Date: {datetime.now().strftime('%d %b %Y')} | Ref: {obs.token[:8]}"
+    if receptionist_name:
+        footer_text += f" | Approved by: {receptionist_name}"
     elements.append(Paragraph(
-        f"Date: {datetime.now().strftime('%d %b %Y')} | Ref: {obs.token[:8]}",
+        footer_text,
         ParagraphStyle('Footer', parent=small, textColor=colors.grey)
     ))
 
@@ -159,11 +162,11 @@ def _generate_pdf_bytes(obs, tenant_data: dict, room, building: str, sharing: st
     return buf.getvalue(), filename
 
 
-async def generate_agreement_pdf(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
+async def generate_agreement_pdf(obs, tenant_data: dict, room, building: str, sharing: str, receptionist_name: str = "") -> str:
     """Generate PDF in-memory, upload to Supabase Storage, return public URL."""
     from . import storage
     pdf_bytes, filename = await asyncio.to_thread(
-        _generate_pdf_bytes, obs, tenant_data, room, building, sharing
+        _generate_pdf_bytes, obs, tenant_data, room, building, sharing, receptionist_name
     )
     month_dir = datetime.now().strftime("%Y-%m")
     path = f"{month_dir}/{filename}"

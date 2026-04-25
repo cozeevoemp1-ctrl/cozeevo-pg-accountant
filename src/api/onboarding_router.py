@@ -531,7 +531,14 @@ async def regen_pdf(token: str, request: Request):
         sharing = rt.value if hasattr(rt, "value") else str(rt or "")
 
         from src.services.pdf_generator import generate_agreement_pdf
-        pdf_path = await generate_agreement_pdf(obs, td, room, building, sharing)
+        receptionist_name = ""
+        if obs.approved_by_phone:
+            au = await session.scalar(
+                select(AuthorizedUser).where(AuthorizedUser.phone == obs.approved_by_phone)
+            )
+            if au:
+                receptionist_name = au.name
+        pdf_path = await generate_agreement_pdf(obs, td, room, building, sharing, receptionist_name)
         obs.agreement_pdf_path = pdf_path
         await session.commit()
 
@@ -1303,8 +1310,15 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         # PDF generation
         try:
             from src.services.pdf_generator import generate_agreement_pdf
+            receptionist_name = ""
+            if obs.approved_by_phone:
+                au = await session.scalar(
+                    select(AuthorizedUser).where(AuthorizedUser.phone == obs.approved_by_phone)
+                )
+                if au:
+                    receptionist_name = au.name
             pdf_path = await generate_agreement_pdf(
-                obs, td, room, building, sharing,
+                obs, td, room, building, sharing, receptionist_name,
             )
             obs.agreement_pdf_path = pdf_path
         except Exception as e:
