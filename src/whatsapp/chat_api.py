@@ -849,6 +849,8 @@ async def _process_message_inner(
         try:
             from src.agent.graph import run_agent
             pg_id = await _resolve_pg_id(session)
+            if not pg_id:
+                raise ValueError("no pg_id configured — skipping agent")
             ch_msg = _AgentChannelMessage(
                 user_id=f"wa:{phone}",
                 channel="whatsapp",
@@ -861,12 +863,13 @@ async def _process_message_inner(
                 role=ctx.role,
                 name=ctx.name or "",
             )
+            if not agent_reply:
+                raise ValueError("agent returned empty reply")
             await _log(session, phone, message, ctx.role, intent, agent_reply)
             await session.commit()
             return OutboundReply(reply=agent_reply, intent=intent, role=ctx.role)
         except Exception as _agent_exc:
-            import logging as _ag_log
-            _ag_log.getLogger(__name__).error(
+            _chat_logger.error(
                 "[agent] %s failed: %s", intent, _agent_exc, exc_info=True
             )
             # Fall through to gatekeeper — user always gets a reply
