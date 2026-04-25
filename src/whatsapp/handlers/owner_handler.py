@@ -209,12 +209,16 @@ async def _do_confirm_checkout(
     """
     from src.database.models import CheckoutSession  # avoid circular at module level
 
-    tenancy = await session.get(Tenancy, cs.tenancy_id)
+    tenancy = await session.scalar(
+        select(Tenancy).where(Tenancy.id == cs.tenancy_id).with_for_update()
+    )
     tenant_name = ""
     room_number = ""
     notice_str = None
 
     if tenancy:
+        if tenancy.status == TenancyStatus.exited:
+            return "Checkout already processed for this tenancy."
         tenancy.status = TenancyStatus.exited
         tenancy.checkout_date = cs.checkout_date
         tenant = await session.get(Tenant, tenancy.tenant_id)
@@ -379,10 +383,12 @@ async def _handle_checkout_agree(tenant_phone: str, session: "AsyncSession") -> 
         _sel(CheckoutSession).where(
             CheckoutSession.tenant_phone == tenant_phone,
             CheckoutSession.status == CheckoutSessionStatus.pending.value,
-        )
+        ).with_for_update()
     )
     if not cs:
         return "No pending checkout found. Please ask the receptionist to create a new one."
+    if cs.confirmed_at:
+        return "Checkout already confirmed."
 
     cs.status = CheckoutSessionStatus.confirmed.value
     summary = await _do_confirm_checkout(cs, session)
@@ -6226,7 +6232,9 @@ async def _do_daywise_transfer(action_data: dict, session: AsyncSession) -> str:
 
 
 async def _do_room_transfer(action_data: dict, session: AsyncSession) -> str:
-    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
+    tenancy = await session.scalar(
+        select(Tenancy).where(Tenancy.id == action_data["tenancy_id"]).with_for_update()
+    )
     if not tenancy:
         return "Tenancy record not found."
 

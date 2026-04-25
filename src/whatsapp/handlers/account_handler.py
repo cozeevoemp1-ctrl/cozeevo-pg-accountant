@@ -884,7 +884,9 @@ async def _deposit_change(entities: dict, ctx: CallerContext, session: AsyncSess
 async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str, session: AsyncSession, changed_by: str = "system") -> str:
     from src.database.models import AuditLog
     from src.integrations import gsheets as _gs
-    tenancy = await session.get(Tenancy, tenancy_id)
+    tenancy = await session.scalar(
+        select(Tenancy).where(Tenancy.id == tenancy_id).with_for_update()
+    )
     if not tenancy:
         return "Tenancy record not found."
     old_amount = int(tenancy.security_deposit or 0)
@@ -1568,7 +1570,9 @@ async def _do_rent_change(
 ) -> str:
     from src.database.models import AuditLog
     from src.integrations import gsheets as _gs
-    tenancy = await session.get(Tenancy, tenancy_id)
+    tenancy = await session.scalar(
+        select(Tenancy).where(Tenancy.id == tenancy_id).with_for_update()
+    )
     if not tenancy:
         return "Tenancy record not found."
 

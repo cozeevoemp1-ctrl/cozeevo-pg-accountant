@@ -236,6 +236,12 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:change|update|set|increase|decrease|revise|hike|reduce)\s+rent\s+(?:for|of)\s+\w", re.I), "RENT_CHANGE", 0.93),
     # "what is the rent for X" / "what's X's rent from July" — tenant account query
     (re.compile(r"(?:what(?:'?s|\s+is|\s+was)\s+(?:the\s+)?rent|rent\s+(?:for|of)\s+\w|how\s+much\s+(?:is|was)\s+(?:the\s+)?rent)", re.I), "QUERY_TENANT", 0.91),
+    # "where is Raj" / "which room is Raj in"
+    (re.compile(
+        r"(?:where\s+(?:is|are|does)\s+(?!(?:my|the|all|this|that|our)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?)"
+        r"|which\s+room\s+(?:is|does|has)\s+(?!(?:my|the|all)\b)([A-Za-z]{3,}(?:\s+[A-Za-z]+)?))",
+        re.I
+    ), "QUERY_TENANT", 0.91),
     # Specific tenant query — "Raj dues", "Jeevan balance", "room 203 balance"
     # Must come before QUERY_DUES catch-all. Three patterns:
     #   1. Named person + dues/balance/status/outstanding/account statement
@@ -672,6 +678,17 @@ def _extract_entities(text: str, intent: str) -> dict:
         qt_match = re.search(r"\b([a-z]{3,}(?:\s+[a-z]+)*)\s+(?:balance|dues|account|status|rent|payment|history|details)\b", text, re.I)
         if qt_match:
             candidate = qt_match.group(1).strip()
+            if candidate.lower() not in SKIP_WORDS:
+                entities["name"] = candidate
+
+    # Fallback for "where is X" / "which room is X" (names often lowercase in WhatsApp)
+    if "name" not in entities and intent == "QUERY_TENANT":
+        wi_match = re.search(
+            r"(?:where\s+(?:is|are|does)\s+|which\s+room\s+(?:is|does|has)\s+)([a-z]{3,}(?:\s+[a-z]+)?)",
+            text, re.I
+        )
+        if wi_match:
+            candidate = wi_match.group(1).strip()
             if candidate.lower() not in SKIP_WORDS:
                 entities["name"] = candidate
 
