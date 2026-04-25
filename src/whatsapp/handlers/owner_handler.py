@@ -4025,11 +4025,12 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
     name = entities.get("name", "").strip()
     room = entities.get("room", "").strip()
     date_str = entities.get("date", "")
+    vacate_str = entities.get("vacate_date", "")
 
     if not name and not room:
         return (
             "Who gave notice?\n"
-            "Say: *[Name] gave notice* or *[Name] gave notice on [date]*"
+            "Say: *[Name] gave notice* or *[Name] gave notice on [date], vacating [date]*"
         )
 
     # Notice date — if not specified, default to today but make it visible
@@ -4055,21 +4056,31 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         suggestions = await _find_similar_names(name, session) if name else []
         return _format_no_match_message(name or room, suggestions)
 
-    last_day = _calc_notice_last_day(notice_date_val)
+    # Vacate date: use explicit value if provided, else auto-calculate from notice date
+    custom_vacate = False
+    if vacate_str:
+        try:
+            last_day = date.fromisoformat(vacate_str)
+            custom_vacate = True
+        except ValueError:
+            last_day = _calc_notice_last_day(notice_date_val)
+    else:
+        last_day = _calc_notice_last_day(notice_date_val)
 
     # Deposit eligibility based on notice timing
     if notice_date_val.day <= _NOTICE_BY_DAY:
-        deposit_note = f"✅ On time — deposit eligible for refund on vacate.\nLast day: *{last_day.strftime('%d %b %Y')}*"
+        deposit_note = f"On time — deposit eligible for refund on vacate.\nVacate date: *{last_day.strftime('%d %b %Y')}*"
     else:
         deposit_note = (
-            f"⚠️ Late notice (after {_NOTICE_BY_DAY}th) — *deposit forfeited*.\n"
-            f"Last day extended to: *{last_day.strftime('%d %b %Y')}* (extra month charged)."
+            f"Late notice (after {_NOTICE_BY_DAY}th) — *deposit forfeited*.\n"
+            f"Vacate date: *{last_day.strftime('%d %b %Y')}*" +
+            ("" if custom_vacate else " (extra month charged).")
         )
 
     assumed_note = ""
     if date_assumed:
         assumed_note = (
-            f"\n📅 Notice date assumed as *TODAY ({notice_date_val.strftime('%d %b %Y')})*.\n"
+            f"\nNotice date assumed as TODAY ({notice_date_val.strftime('%d %b %Y')}).\n"
             f"If different, say: *{name or 'tenant'} gave notice on DD Mon*"
         )
 
@@ -4091,7 +4102,7 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         return (
             f"*Notice recorded — {tenant.name}* (Room {room_obj.room_number})\n"
             f"Notice date: {notice_date_val.strftime('%d %b %Y')}{assumed_note}\n"
-            f"Expected exit: {last_day.strftime('%d %b %Y')}\n\n"
+            f"Vacate date: {last_day.strftime('%d %b %Y')}\n\n"
             f"{deposit_note}{gsheets_note}"
         )
 
@@ -4102,7 +4113,7 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         "deposit_note": deposit_note,
     }
     await _save_pending(ctx.phone, "NOTICE_GIVEN", action_data, choices, session, state="awaiting_choice")
-    return _format_choices_message(search_term, choices, f"record notice (last day: {last_day.strftime('%d %b %Y')})")
+    return _format_choices_message(search_term, choices, f"record notice (vacate: {last_day.strftime('%d %b %Y')})")
 
 
 
@@ -7428,7 +7439,7 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
             intent="RECORD_CHECKOUT",
             action_data=json.dumps({"step": "confirm_tenant"}),
             choices=json.dumps(choices),
-            expires_at=datetime.utcnow() + timedelta(minutes=30),
+            expires_at=datetime.utcnow() + timedelta(hours=4),
         )
         session.add(pending)
         return "\n".join(lines)
@@ -7462,7 +7473,7 @@ async def _record_checkout(entities: dict, ctx: CallerContext, session: AsyncSes
             "room": room.room_number,
         }),
         choices=json.dumps([]),
-        expires_at=datetime.utcnow() + timedelta(minutes=30),
+        expires_at=datetime.utcnow() + timedelta(hours=4),
     )
     session.add(pending)
 

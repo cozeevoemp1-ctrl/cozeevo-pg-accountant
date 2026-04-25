@@ -395,7 +395,7 @@ async def _save_pending(phone: str, intent: str, action_data: dict, choices: lis
         state=state,   # None = legacy cascade; set = framework-routed
         action_data=json.dumps(action_data),
         choices=json.dumps(choices),
-        expires_at=datetime.utcnow() + timedelta(minutes=30),
+        expires_at=datetime.utcnow() + timedelta(hours=4),
         resolved=False,
     )
     session.add(pa)
