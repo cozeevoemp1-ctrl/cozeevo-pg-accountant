@@ -739,7 +739,21 @@ async def resolve_pending_action(
             pending.resolved = True
             return "Checkout cancelled."
 
-        # Edit a field
+        _co_aliases = {
+            "name": "name", "phone": "phone", "room": "room_number",
+            "room_number": "room_number",
+            "checkout_date": "checkout_date", "date": "checkout_date",
+            "deposit": "security_deposit", "security_deposit": "security_deposit",
+            "deductions": "deductions", "deduction": "deductions",
+            "reason": "deductions_reason",
+            "refund": "refund_amount", "refund_amount": "refund_amount",
+            "refund_mode": "refund_mode", "mode": "refund_mode",
+            "room_check": "room_investigation", "investigation": "room_investigation",
+            "room_key": "room_key_returned", "wardrobe_key": "wardrobe_key_returned",
+            "biometric": "biometric_removed",
+        }
+
+        # Edit a field (structured syntax: "edit field value")
         if ans.startswith("edit "):
             raw_edit = reply_text.strip()[5:].strip()
             parts = raw_edit.split(None, 1)
@@ -748,22 +762,7 @@ async def resolve_pending_action(
 
             field_key = parts[0].lower()
             new_val = parts[1].strip()
-
-            key_aliases = {
-                "name": "name", "phone": "phone", "room": "room_number",
-                "room_number": "room_number",
-                "checkout_date": "checkout_date", "date": "checkout_date",
-                "deposit": "security_deposit", "security_deposit": "security_deposit",
-                "deductions": "deductions", "deduction": "deductions",
-                "reason": "deductions_reason",
-                "refund": "refund_amount", "refund_amount": "refund_amount",
-                "refund_mode": "refund_mode", "mode": "refund_mode",
-                "room_check": "room_investigation", "investigation": "room_investigation",
-                "room_key": "room_key_returned", "wardrobe_key": "wardrobe_key_returned",
-                "biometric": "biometric_removed",
-            }
-
-            actual_key = key_aliases.get(field_key)
+            actual_key = _co_aliases.get(field_key)
             if not actual_key:
                 return f"__KEEP_PENDING__Unknown field *{field_key}*. Try: name, room, date, deposit, deductions, refund, mode, room_key, wardrobe_key, biometric"
 
@@ -776,6 +775,23 @@ async def resolve_pending_action(
             msg += "\n\nReply *yes* to process, *no* to cancel."
             msg += "\nTo edit: *edit field_name new_value*"
             return msg
+
+        # Natural language edit — parse unrecognized messages with LLM
+        if step == "confirm_checkout_extracted" and ans not in ("yes", "y", "confirm", "ok", "done"):
+            parsed = await _parse_checkout_edit_nl(reply_text.strip(), action_data.get("extracted", {}))
+            if parsed.get("action") == "confirm":
+                ans = "yes"  # fall through to confirm block below
+            elif parsed.get("field") and parsed.get("value") is not None:
+                actual_key = _co_aliases.get(parsed["field"])
+                if actual_key:
+                    extracted = action_data.get("extracted", {})
+                    extracted[actual_key] = str(parsed["value"])
+                    action_data["extracted"] = extracted
+                    await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
+                    msg = format_checkout_data(extracted, "")
+                    msg += "\n\nReply *yes* to process, *no* to cancel."
+                    msg += "\nTo edit: *edit field_name new_value*"
+                    return msg
 
         # Confirm and process checkout
         if step == "confirm_checkout_extracted" and ans in ("yes", "y", "confirm", "ok", "done"):
@@ -4922,6 +4938,37 @@ async def _process_checkout_from_form(
         result += "\n\nSend photo of *refund receipt slip* to save, or say *skip*."
 
     return result
+
+
+async def _parse_checkout_edit_nl(message: str, current_data: dict) -> dict:
+    """
+    Use LLM to parse a natural-language checkout edit into {field, value}.
+    Valid field keys match the _co_aliases in CHECKOUT_FORM_CONFIRM.
+    Returns {"field": alias_key, "value": str}, {"action": "confirm"}, or {}.
+    """
+    fields_desc = "\n".join(f"  {k}: {v}" for k, v in current_data.items() if v not in (None, ""))
+    prompt = (
+        "You parse WhatsApp messages that edit a PG tenant checkout form.\n\n"
+        f"Current form:\n{fields_desc}\n\n"
+        f'User message: "{message}"\n\n'
+        "Valid field aliases: name, phone, room, room_number, checkout_date, date, "
+        "deposit, security_deposit, deductions, deduction, reason, refund, refund_amount, "
+        "refund_mode, mode, room_check, investigation, room_key, wardrobe_key, biometric\n\n"
+        "If the user wants to change a field respond ONLY with JSON: "
+        '{"field": "<alias>", "value": "<new_value>"}\n'
+        'If the user is confirming (yes/ok/looks good/correct) respond: {"action": "confirm"}\n'
+        'If unclear respond: {"field": null, "value": null}'
+    )
+    try:
+        import json as _json, re as _re
+        from src.llm_gateway.claude_client import get_claude_client
+        raw = await get_claude_client()._call(prompt)
+        m = _re.search(r'\{[^{}]+\}', raw)
+        if m:
+            return _json.loads(m.group())
+    except Exception:
+        pass
+    return {}
 
 
 async def _extract_checkout_from_image(
