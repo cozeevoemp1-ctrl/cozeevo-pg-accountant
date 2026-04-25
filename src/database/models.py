@@ -855,7 +855,7 @@ class OnboardingSession(Base):
     )
 
 
-class CheckoutSessionStatus:
+class CheckoutSessionStatus(str, enum.Enum):
     pending        = "pending"
     confirmed      = "confirmed"
     auto_confirmed = "auto_confirmed"
@@ -867,8 +867,8 @@ class CheckoutSession(Base):
     __tablename__ = "checkout_sessions"
 
     id                    = Column(Integer, primary_key=True)
-    token                 = Column(String(36), unique=True, nullable=False, index=True)
-    status                = Column(String(20), default=CheckoutSessionStatus.pending, nullable=False)
+    token                 = Column(String(36), unique=True, nullable=False)
+    status                = Column(String(20), default=CheckoutSessionStatus.pending.value, nullable=False)
     created_by_phone      = Column(String(20), nullable=False)
     tenant_phone          = Column(String(20), nullable=False)
     tenancy_id            = Column(Integer, ForeignKey("tenancies.id"), nullable=False)
@@ -883,11 +883,11 @@ class CheckoutSession(Base):
     deductions            = Column(Numeric(12, 2), nullable=False, default=0)
     deduction_reason      = Column(Text, nullable=True)
     refund_amount         = Column(Numeric(12, 2), nullable=False, default=0)
-    refund_mode           = Column(String(10), nullable=False)
+    refund_mode           = Column(String(10), nullable=True)
     rejection_reason      = Column(Text, nullable=True)
     expires_at            = Column(DateTime, nullable=False)
     confirmed_at          = Column(DateTime, nullable=True)
-    created_at            = Column(DateTime, default=datetime.utcnow)
+    created_at            = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("ix_checkout_sessions_token", "token"),
