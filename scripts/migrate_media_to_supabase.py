@@ -150,14 +150,11 @@ def resolve_local_path(db_value: str) -> Path | None:
 def supabase_path_for(db_value: str, bucket: str) -> str:
     """
     Derive the Supabase object path from the existing DB relative path.
-    Keeps the same structure so existing organised paths are preserved.
+    Strips disk-root prefixes (static/, media/) and the bucket name itself
+    so the path inside the bucket doesn't repeat the bucket name.
     """
     stripped = db_value.lstrip("/")
-    for prefix in ("static/", "media/", "onboarding/"):
-        # keep onboarding/ prefix — it's part of the path
-        pass
-    # strip the common disk-root prefixes only
-    for prefix in ("static/", "media/"):
+    for prefix in ("static/", "media/", f"{bucket}/"):
         if stripped.startswith(prefix):
             stripped = stripped[len(prefix):]
     return stripped
