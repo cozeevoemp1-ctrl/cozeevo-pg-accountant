@@ -26,7 +26,7 @@ from ._base import BaseToolResult
 
 class CheckoutInput(BaseModel):
     tenancy_id: int
-    checkout_date: str      # ISO date "YYYY-MM-DD" — converted to date in _execute_checkout
+    checkout_date: str = ""  # ISO date "YYYY-MM-DD"; empty → defaults to today
     tenant_name: str = ""
     room: str = ""
 

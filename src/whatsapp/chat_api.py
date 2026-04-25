@@ -34,7 +34,7 @@ from src.database.models import PendingAction, PendingLearning, WhatsappLog, Mes
 from src.whatsapp.role_service import get_caller_context
 from src.whatsapp.intent_detector import detect_intent, IntentResult, _extract_entities, _INTENT_LABELS
 from src.whatsapp.gatekeeper import route
-from src.whatsapp.handlers.owner_handler import resolve_pending_action, handle_learn_command
+from src.whatsapp.handlers.owner_handler import resolve_pending_action, handle_learn_command, _extract_checkout_from_image
 from src.whatsapp.handlers.tenant_handler import get_active_onboarding, handle_onboarding_step, resolve_tenant_complaint
 from src.llm_gateway.claude_client import get_claude_client
 
@@ -844,8 +844,29 @@ async def _process_message_inner(
         intent_result.entities["_media_type"] = body.media_type
         intent_result.entities["_media_mime"] = body.media_mime
 
+    # ── Image + CHECKOUT → OCR extraction (bypasses agent flow which drops media_id) ──
+    if body.media_id and body.media_type == "image" and intent == "CHECKOUT":
+        from src.whatsapp.handlers.owner_handler import _extract_checkout_from_image
+        ocr_reply = await _extract_checkout_from_image(
+            body.media_id, body.media_mime or "image/jpeg", ctx, session,
+        )
+        await _log(session, phone, message, ctx.role, "CHECKOUT", ocr_reply)
+        await session.commit()
+        return OutboundReply(reply=ocr_reply, intent="CHECKOUT", role=ctx.role)
+
     # ── LangGraph agent path ───────────────────────────────────────────────
-    if _USE_PYDANTIC_AGENTS and intent in _AGENT_INTENTS and ctx.role in ("admin", "owner", "receptionist"):
+    # Also route here when the agent already has an active thread (e.g. user
+    # replying "yes" to a confirm prompt — "yes" alone isn't CHECKOUT intent).
+    _agent_has_active_thread = False
+    if _USE_PYDANTIC_AGENTS and ctx.role in ("admin", "owner", "receptionist") and intent not in _AGENT_INTENTS:
+        try:
+            from src.agent.graph import get_graph as _get_graph
+            _st = await _get_graph().aget_state({"configurable": {"thread_id": f"wa:{phone}"}})
+            _agent_has_active_thread = bool(_st.values and _st.values.get("pending_tool"))
+        except Exception:
+            pass
+
+    if _USE_PYDANTIC_AGENTS and (_agent_has_active_thread or intent in _AGENT_INTENTS) and ctx.role in ("admin", "owner", "receptionist"):
         try:
             from src.agent.graph import run_agent
             pg_id = await _resolve_pg_id(session)

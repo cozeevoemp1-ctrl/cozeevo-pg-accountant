@@ -43,8 +43,16 @@ async def _resolve_tenant_entities(name: str, session, existing_entities: dict) 
 
     if len(rows) == 1:
         tenant, tenancy, room = rows[0]
+        from datetime import date as _date
         return {
-            "entities": {**existing_entities, "tenant_id": tenant.id, "tenancy_id": tenancy.id},
+            "entities": {
+                **existing_entities,
+                "tenant_id":    tenant.id,
+                "tenancy_id":   tenancy.id,
+                "tenant_name":  tenant.name,
+                "room":         room.room_number if room else "",
+                "checkout_date": existing_entities.get("checkout_date") or _date.today().isoformat(),
+            },
             "clarify_question": None,
         }
     elif len(rows) == 0:
