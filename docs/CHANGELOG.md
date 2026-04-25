@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.52.2] — 2026-04-25 — Fix: April balance -2000 for future check-ins + sheet stability
+
+### Problem
+Future check-ins (May/June) with a ₹2,000 booking advance but no April `rent_schedule` row
+were showing balance = -2000 in the Operations sheet (0 rent_due − 2000 booking credit = -2000).
+
+### Fix
+`scripts/sync_sheet_from_db.py`: April balance formula now guards on `if rs else 0` —
+no rent_schedule means a future check-in, not an April due. Balance shows 0.
+
+### Stability fix (root cause of ₹2.15L spike)
+The ₹2.15L balance that reappeared ~3 hours after the April balance fix was caused by a
+VPS deploy race: old code (with hardcoded `april_balances` dict) ran when a WhatsApp bot
+message triggered `trigger_monthly_sheet_sync` during the deploy transition window.
+VPS now has correct code — all future bot-triggered syncs read from DB (MANUAL_LOCK rows).
+
+### Current state (stable)
+- DB: 20 PARTIAL rows with `adjustment_note = MANUAL_LOCK`, total ₹1,17,299
+- Sheet: April tab shows 20 PARTIAL, Total Dues = ₹1,17,299
+- Overnight source sync: PAUSED (scheduler.py line 173) — will not overwrite
+
+### Files changed
+- `scripts/sync_sheet_from_db.py` — `if rs else 0` guard for April future check-ins
+
+---
+
 ## [1.52.1] — 2026-04-25 — Fix: onboarding photo upload broken on all browsers
 
 Removed custom `getUserMedia` camera modal from the onboarding form. The modal was causing a silent failure: when camera permission was denied/dismissed, the fallback `file.click()` call was blocked by Chrome (and Safari) because the user-gesture token is consumed after `await getUserMedia`. Nothing happened — no camera, no file picker. Affected all browsers when camera permission was not pre-granted.

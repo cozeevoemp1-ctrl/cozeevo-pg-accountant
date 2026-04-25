@@ -185,6 +185,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Distinct from QUERY_VACANT_ROOMS (long-term) because this includes beds
     # reserved by future no-shows that are still free tonight.
     (re.compile(r"(?:(?:beds?|rooms?)\s+free\s+(?:tonight|today|now|on\s+[\w\s\d/-]+)|(?:how\s+many|any)\s+(?:beds?|rooms?)\s+free\s+(?:tonight|today|on\s+[\w\s\d/-]+)|day[-\s]*stay\s+availab|free\s+(?:beds?|rooms?)\s+for\s+day[-\s]*stay|day[-\s]*stay\s+(?:beds?|rooms?)\s+(?:free|available))", re.I), "DAYSTAY_AVAILABILITY", 0.94),
+    # Explicit notice given — BEFORE all query rules so "giving notice, last day X" routes here
+    (re.compile(r"gave\s+notice|giving\s+notice|serving\s+notice|on\s+notice\b", re.I), "NOTICE_GIVEN", 0.95),
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
     (re.compile(r"(?:what did we spend|expense report|total expenses?|expneses?\b|expenes?\b|expenses? (?:for|in|this|last|summary|breakdown|detail)|how much (?:spent|spend|expense)|list expenses?|show expenses?|monthly expenses?|weekly expenses?|daily expenses?|expense\s+(?:summary|breakdown|analysis)|(?:this|last)\s+(?:week|day)|today expenses?|yesterday expenses?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+expenses?|expenses?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "QUERY_EXPENSES", 0.91),
     # QUERY_RECEIPT — show receipt, get receipt (must come before REPORT)
@@ -882,5 +884,36 @@ def _extract_entities(text: str, intent: str) -> dict:
         r"\s*(?:delete|clear|remove|reset|wipe)\s+(?:tenant\s+)?notes?\b", text, re.I
     ):
         entities["action"] = "delete"
+
+    # NOTICE_GIVEN — split notice date and vacate date cleanly.
+    # Strategy:
+    #   1. vacate_date = date following a vacate keyword ("vacating", "leaving", "last day" …)
+    #   2. notice_date (entities["date"]) = date following "notice on" / "gave notice on"
+    #      If no explicit notice date, entities["date"] stays None → handler defaults to today.
+    #   This avoids the ambiguity where a single date in "gave notice, vacating 30 Apr"
+    #   is both the generic "date" and the vacate date.
+    if intent == "NOTICE_GIVEN":
+        _VACATE_KW = r"(?:vacating|vacates?|leaving|leaves?|exit(?:ing)?|last\s+day|checkout|checks?\s+out|moving\s+out)"
+        _DATE_FRAG = (
+            r"(?:\d{1,2})(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*(?:\s+\d{4})?"
+            r"|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(?:\d{1,2})(?:st|nd|rd|th)?(?:\s+\d{4})?"
+        )
+        # Extract vacate date (date after a vacate keyword)
+        vd_m = re.search(_VACATE_KW + r"[\s,on]+(" + _DATE_FRAG + r")", text, re.I)
+        if vd_m:
+            vd_val = _extract_date_entity(vd_m.group(1))
+            if vd_val:
+                entities["vacate_date"] = vd_val
+
+        # Re-extract notice date specifically from "notice on <date>" / "gave notice on <date>"
+        # so a lone "vacating 30 Apr" (no explicit notice date) doesn't pollute entities["date"].
+        nd_m = re.search(r"(?:gave|giving|serving)?\s*notice\s+on\s+(" + _DATE_FRAG + r")", text, re.I)
+        if nd_m:
+            nd_val = _extract_date_entity(nd_m.group(1))
+            if nd_val:
+                entities["date"] = nd_val
+        elif "vacate_date" in entities:
+            # Only a vacate date found — clear generic date so handler defaults notice to today
+            entities.pop("date", None)
 
     return entities

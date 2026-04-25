@@ -438,7 +438,9 @@ async def main(args):
             # Only subtract rent payments — booking/deposit credits are already
             # factored into the adjustment, so don't subtract them again.
             if period == date(2026, 4, 1):
-                balance = rent_due - total_paid - prepaid_credit
+                # No rent_schedule = future check-in; booking advance is a credit toward
+                # their first month, not an April due — show 0, not negative.
+                balance = (rent_due - total_paid - prepaid_credit) if rs else 0
             else:
                 balance = rent_due + int(prev_due_num) - effective_paid
 
