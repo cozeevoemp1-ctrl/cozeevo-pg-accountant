@@ -354,6 +354,7 @@ async def _handle_checkout_reject(
 
     cs.status = CheckoutSessionStatus.rejected.value
     cs.rejection_reason = reason
+    await session.flush()
 
     # Notify receptionist
     try:
