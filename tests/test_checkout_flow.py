@@ -291,6 +291,93 @@ async def test_intercept_no_with_reason_sets_checkout_reject(db_session, sample_
 
 
 @pytest.mark.asyncio
+async def test_checkout_agree_confirms_session_and_writes_record(db_session, sample_tenancy):
+    """CHECKOUT_AGREE writes CheckoutRecord, marks tenancy exited, sends WA."""
+    from src.whatsapp.handlers.owner_handler import _handle_checkout_agree
+    from src.database.models import CheckoutRecord, TenancyStatus, CheckoutSession, CheckoutSessionStatus
+
+    tenant_phone = "9876543210"
+
+    cs = CheckoutSession(
+        token="agree-test-001",
+        status=CheckoutSessionStatus.pending.value,
+        created_by_phone="9444296681",
+        tenant_phone=tenant_phone,
+        tenancy_id=sample_tenancy.id,
+        checkout_date=date.today(),
+        room_key_returned=True,
+        wardrobe_key_returned=True,
+        biometric_removed=True,
+        room_condition_ok=True,
+        security_deposit=Decimal("10000"),
+        pending_dues=Decimal("0"),
+        deductions=Decimal("0"),
+        refund_amount=Decimal("10000"),
+        refund_mode="upi",
+        expires_at=datetime.utcnow() + timedelta(hours=2),
+    )
+    db_session.add(cs)
+    await db_session.flush()
+
+    with patch("src.integrations.gsheets.record_checkout", new_callable=AsyncMock), \
+         patch("src.whatsapp.webhook_handler._send_whatsapp", new_callable=AsyncMock):
+        reply = await _handle_checkout_agree(tenant_phone, db_session)
+
+    assert reply
+
+    cr = await db_session.scalar(
+        select(CheckoutRecord).where(CheckoutRecord.tenancy_id == sample_tenancy.id)
+    )
+    assert cr is not None
+
+    await db_session.refresh(cs)
+    assert cs.status == CheckoutSessionStatus.confirmed.value
+
+    await db_session.refresh(sample_tenancy)
+    assert sample_tenancy.status == TenancyStatus.exited
+
+
+@pytest.mark.asyncio
+async def test_checkout_reject_voids_session_and_records_reason(db_session, sample_tenancy):
+    """CHECKOUT_REJECT marks session rejected with reason."""
+    from src.whatsapp.handlers.owner_handler import _handle_checkout_reject
+    from src.database.models import CheckoutSession, CheckoutSessionStatus
+
+    tenant_phone = "9876543210"
+
+    cs = CheckoutSession(
+        token="reject-test-001",
+        status=CheckoutSessionStatus.pending.value,
+        created_by_phone="9444296681",
+        tenant_phone=tenant_phone,
+        tenancy_id=sample_tenancy.id,
+        checkout_date=date.today(),
+        room_key_returned=True,
+        wardrobe_key_returned=True,
+        biometric_removed=True,
+        room_condition_ok=True,
+        security_deposit=Decimal("10000"),
+        pending_dues=Decimal("0"),
+        deductions=Decimal("0"),
+        refund_amount=Decimal("10000"),
+        refund_mode="upi",
+        expires_at=datetime.utcnow() + timedelta(hours=2),
+    )
+    db_session.add(cs)
+    await db_session.flush()
+
+    with patch("src.whatsapp.webhook_handler._send_whatsapp", new_callable=AsyncMock):
+        reply = await _handle_checkout_reject(
+            tenant_phone, "damage charge is wrong", db_session
+        )
+
+    assert reply
+    await db_session.refresh(cs)
+    assert cs.status == CheckoutSessionStatus.rejected.value
+    assert cs.rejection_reason == "damage charge is wrong"
+
+
+@pytest.mark.asyncio
 async def test_intercept_expired_session_not_matched(db_session, sample_tenancy):
     """Expired CheckoutSession should NOT be matched by the intercept query."""
     cs = CheckoutSession(

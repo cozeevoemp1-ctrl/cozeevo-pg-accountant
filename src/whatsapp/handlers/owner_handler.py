@@ -285,6 +285,104 @@ async def _do_confirm_checkout(
     )
 
 
+async def _handle_checkout_agree(tenant_phone: str, session: "AsyncSession") -> str:
+    """Tenant replied YES. Confirm checkout, write DB, send confirmed WA to tenant."""
+    from sqlalchemy import select as _sel
+    from src.database.models import CheckoutSession, CheckoutSessionStatus
+    cs = await session.scalar(
+        _sel(CheckoutSession).where(
+            CheckoutSession.tenant_phone == tenant_phone,
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+        )
+    )
+    if not cs:
+        return "No pending checkout found. Please ask the receptionist to create a new one."
+
+    cs.status = CheckoutSessionStatus.confirmed.value
+    summary = await _do_confirm_checkout(cs, session)
+
+    # Send checkout_confirmed to tenant
+    phone_wa = f"+91{tenant_phone}" if not tenant_phone.startswith("+") else tenant_phone
+    try:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        tenancy = await session.get(Tenancy, cs.tenancy_id)
+        room = await session.get(Room, tenancy.room_id) if tenancy else None
+        room_no = room.room_number if room else "?"
+        refund_line = (
+            f"Refund of Rs.{int(cs.refund_amount):,} will be processed by receptionist now."
+            if cs.refund_amount > 0 else ""
+        )
+        confirmed_msg = (
+            f"Your checkout from Room {room_no} on "
+            f"{cs.checkout_date.strftime('%d %b %Y')} is confirmed.\n"
+            + (f"{refund_line}\n" if refund_line else "")
+            + "Thank you for staying with Cozeevo."
+        )
+        await _send_whatsapp(phone_wa, confirmed_msg)
+    except Exception as _e:
+        logger.warning("Failed to send checkout_confirmed to tenant: %s", _e)
+
+    # Notify receptionist
+    try:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        recep_phone = (
+            f"+91{cs.created_by_phone}"
+            if not cs.created_by_phone.startswith("+")
+            else cs.created_by_phone
+        )
+        await _send_whatsapp(recep_phone, summary)
+    except Exception as _e:
+        logger.warning("Failed to notify receptionist on checkout confirm: %s", _e)
+
+    return summary
+
+
+async def _handle_checkout_reject(
+    tenant_phone: str, reason: str, session: "AsyncSession"
+) -> str:
+    """Tenant replied NO + reason. Void session, notify receptionist."""
+    from sqlalchemy import select as _sel
+    from src.database.models import CheckoutSession, CheckoutSessionStatus
+    cs = await session.scalar(
+        _sel(CheckoutSession).where(
+            CheckoutSession.tenant_phone == tenant_phone,
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+        )
+    )
+    if not cs:
+        return "No pending checkout found."
+
+    cs.status = CheckoutSessionStatus.rejected.value
+    cs.rejection_reason = reason
+
+    # Notify receptionist
+    try:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        tenancy = await session.get(Tenancy, cs.tenancy_id)
+        tenant  = await session.get(Tenant, tenancy.tenant_id) if tenancy else None
+        tenant_name = tenant.name if tenant else "Tenant"
+        room    = await session.get(Room, tenancy.room_id) if tenancy else None
+        room_no = room.room_number if room else "?"
+        recep_phone = (
+            f"+91{cs.created_by_phone}"
+            if not cs.created_by_phone.startswith("+")
+            else cs.created_by_phone
+        )
+        notif = (
+            f"{tenant_name} (Room {room_no}) rejected the checkout.\n"
+            f"Reason: {reason}\n"
+            f"Please resolve and create a new checkout session."
+        )
+        await _send_whatsapp(recep_phone, notif)
+    except Exception as _e:
+        logger.warning("Failed to notify receptionist on checkout rejection: %s", _e)
+
+    return (
+        "Understood. Your feedback has been sent to the receptionist. "
+        "They will contact you to resolve this."
+    )
+
+
 async def resolve_pending_action(
     pending: PendingAction, reply_text: str, session: AsyncSession,
     media_id: str | None = None, media_type: str | None = None, media_mime: str | None = None,
