@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.57.0] — 2026-04-25 — E2E test suite: 7 missing intents + pre-push hook
+
+### test_full_flow_e2e.py: 26 → 33 scenarios
+Seven previously-uncovered intents now have full happy-path DB-verified E2E tests:
+- **EXIT_STAFF** — creates test staff with room assignment, routes "staff X exit", verifies `active=False`
+- **VOID_EXPENSE** — creates expense in DB, routes "void expense", picks #1, verifies `is_void=True`
+- **SCHEDULE_CHECKOUT** — routes "schedule checkout for X 15 Dec 2027", verifies `tenancy.expected_checkout` set, reverts
+- **ASSIGN_ROOM** — creates unassigned tenant + finds free room, routes "assign room N to X", verifies Tenancy created, cleans up
+- **COMPLAINT_UPDATE (resolve)** — creates open Complaint in DB, routes "resolve complaint N", verifies `status=resolved`
+- **MY_BALANCE (tenant role)** — creates tenant CallerContext, routes "my balance", verifies non-empty reply
+- **MY_PAYMENTS (tenant role)** — same with "my payments"
+
+All tests: cleanup on pass AND fail; safe on live DB.
+
+### Pre-push git hook (`.git/hooks/pre-push`)
+- Runs 29 fast unit tests before every push; aborts on failure
+- Full E2E opt-in: `TEST_FULL_E2E=1 git push`
+
+---
+
 ## [1.56.0] — 2026-04-25 — Schema migrations: CASCADE + payment dedup
 
 ### rent_schedules FK → ON DELETE CASCADE

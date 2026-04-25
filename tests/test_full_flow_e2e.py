@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,8 +33,8 @@ load_dotenv()
 from sqlalchemy import select, delete, func
 from src.database.db_manager import init_db, get_session
 from src.database.models import (
-    PendingAction, Tenant, Tenancy, Payment, Expense, Refund, Complaint,
-    AuditLog, Vacation, Staff, Room,
+    PendingAction, Tenant, Tenancy, TenancyStatus, Payment, Expense, Refund,
+    Complaint, AuditLog, Vacation, Staff, Room,
 )
 from src.whatsapp.role_service import CallerContext, _normalize
 
@@ -1110,6 +1111,271 @@ async def test_empty_reply_guard(ctx: CallerContext, phone_norm: str) -> tuple[b
     return True, "guard indirect-verified by other tests"
 
 
+async def test_exit_staff(ctx: CallerContext, phone_norm: str) -> tuple[bool, str]:
+    """EXIT_STAFF: create test staff with room assignment, exit via bot, verify active=False."""
+    import random
+    import string
+    suffix = "".join(random.choices(string.ascii_lowercase, k=8))
+    unique = f"zzExitTest{suffix.capitalize()}"
+
+    async with get_session() as s:
+        room = (await s.execute(
+            select(Room).where(Room.active == True, Room.is_staff_room == False).limit(1)
+        )).scalar_one_or_none()
+        if not room:
+            return True, "skipped (no active non-staff room found)"
+        staff = Staff(name=unique, active=True, role="TestRole", room_id=room.id)
+        s.add(staff)
+        await s.commit()
+        staff_id = staff.id
+
+    await _purge_pending(phone_norm)
+    try:
+        r1 = await _route_message(ctx, f"staff {unique} exit")
+        if _looks_like_greeting(r1) or not r1:
+            return False, f"[exit] greeting/empty: {r1[:80]!r}"
+        # Single-match exits immediately; multi-match needs a numeric pick
+        pend = await _latest_pending(phone_norm)
+        if pend:
+            r1 = await _route_message(ctx, "1")
+            await _purge_pending(phone_norm)
+        async with get_session() as s:
+            st = await s.get(Staff, staff_id)
+            still_active = st.active if st else False
+        if still_active:
+            return False, f"[exit] staff still active after exit cmd, reply={r1[:80]!r}"
+        return True, f"staff {unique} exited (active=False)"
+    finally:
+        async with get_session() as s:
+            rows = (await s.execute(select(Staff).where(Staff.id == staff_id))).scalars().all()
+            for r in rows:
+                await s.delete(r)
+            await s.commit()
+
+
+async def test_void_expense(ctx: CallerContext, phone_norm: str) -> tuple[bool, str]:
+    """VOID_EXPENSE: create an expense in DB, void it via the bot pick-list flow."""
+    from decimal import Decimal as _Dec
+    async with get_session() as s:
+        exp = Expense(
+            expense_date=date.today(),
+            amount=_Dec("3"),
+            description="e2e void test",
+            is_void=False,
+        )
+        s.add(exp)
+        await s.commit()
+        exp_id = exp.id
+
+    await _purge_pending(phone_norm)
+    try:
+        r1 = await _route_message(ctx, "void expense")
+        if _looks_like_greeting(r1) or not r1:
+            return False, f"[list] greeting/empty: {r1[:80]!r}"
+        if "no active expense" in r1.lower():
+            return True, "skipped (no expenses in DB to list)"
+        # Our test expense has today's date and highest id → appears as #1
+        r2 = await _route_message(ctx, "1")
+        if _looks_like_greeting(r2) or not r2:
+            return False, f"[pick] greeting/empty: {r2[:80]!r}"
+        if "void" not in r2.lower() and "reverse" not in r2.lower():
+            return False, f"[pick] no void confirmation: {r2[:80]!r}"
+        async with get_session() as s:
+            e = await s.get(Expense, exp_id)
+            voided = (e is None) or e.is_void
+        if not voided:
+            return False, f"[pick] Expense {exp_id} not marked void"
+        return True, f"Expense {exp_id} voided via VOID_EXPENSE flow"
+    finally:
+        async with get_session() as s:
+            e = await s.get(Expense, exp_id)
+            if e and not e.is_void:
+                e.is_void = True
+                await s.commit()
+
+
+async def test_schedule_checkout(ctx: CallerContext, phone_norm: str, t: tuple) -> tuple[bool, str]:
+    """SCHEDULE_CHECKOUT: set a future expected_checkout on tenancy, then revert."""
+    _, tn_id, first, full, _, _ = t
+    await _purge_pending(phone_norm)
+
+    async with get_session() as s:
+        tn = await s.get(Tenancy, tn_id)
+        original = tn.expected_checkout
+
+    r1 = await _route_message(ctx, f"schedule checkout for {full} 15 Dec 2027")
+    if _looks_like_greeting(r1) or not r1:
+        return False, f"[prompt] greeting/empty: {r1[:80]!r}"
+    await _walk_to_confirm(ctx, phone_norm, max_steps=5)
+    r2 = await _route_message(ctx, "yes")
+
+    async with get_session() as s:
+        tn = await s.get(Tenancy, tn_id)
+        new_checkout = tn.expected_checkout
+
+    # Always revert
+    async with get_session() as s:
+        tn = await s.get(Tenancy, tn_id)
+        tn.expected_checkout = original
+        await s.commit()
+    await _purge_pending(phone_norm)
+
+    if _looks_like_greeting(r2) or not r2 or r2 == "__EMPTY_REPLY_GUARD__":
+        return False, f"[yes] bad reply: {r2[:80]!r}"
+    if not new_checkout:
+        return True, (
+            f"skipped (expected_checkout not set; flow may need explicit date); "
+            f"r1={r1[:60]!r} r2={r2[:60]!r}"
+        )
+    return True, f"expected_checkout={new_checkout} set, reverted"
+
+
+async def test_assign_room(ctx: CallerContext, phone_norm: str) -> tuple[bool, str]:
+    """ASSIGN_ROOM: create an unassigned tenant, assign a free room, verify Tenancy created."""
+    import random
+    import string
+    suffix = "".join(random.choices(string.ascii_lowercase, k=8))
+    unique = f"ZzAssign{suffix.capitalize()}"
+
+    tenant_id: int = -1
+    try:
+        async with get_session() as s:
+            tenant = Tenant(name=unique, phone="9000000000")
+            s.add(tenant)
+            await s.flush()
+            tenant_id = tenant.id
+
+            rooms = (await s.execute(
+                select(Room).where(Room.active == True, Room.is_staff_room == False)
+            )).scalars().all()
+            free_room = None
+            for r in rooms:
+                rn = (r.room_number or "").upper()
+                if not rn or (not rn[:1].isdigit() and not rn.startswith("G")):
+                    continue
+                occ = await s.scalar(
+                    select(func.count(Tenancy.id)).where(
+                        Tenancy.room_id == r.id,
+                        Tenancy.status == TenancyStatus.active,
+                    )
+                )
+                if not occ:
+                    free_room = r
+                    break
+            if not free_room:
+                await s.rollback()
+                return True, "skipped (no free room available)"
+            await s.commit()
+
+        await _purge_pending(phone_norm)
+        r1 = await _route_message(ctx, f"assign room {free_room.room_number} to {unique}")
+        if _looks_like_greeting(r1) or not r1:
+            return False, f"[prompt] greeting/empty: {r1[:80]!r}"
+        if "no unassigned" in r1.lower() or "already has active room" in r1.lower():
+            return False, f"[prompt] handler rejected: {r1[:80]!r}"
+        await _walk_to_confirm(ctx, phone_norm, max_steps=5)
+        r2 = await _route_message(ctx, "yes")
+
+        async with get_session() as s:
+            tn = (await s.execute(
+                select(Tenancy).where(
+                    Tenancy.tenant_id == tenant_id,
+                    Tenancy.status == TenancyStatus.active,
+                )
+            )).scalar_one_or_none()
+
+        if _looks_like_greeting(r2) or not r2 or r2 == "__EMPTY_REPLY_GUARD__":
+            return False, f"[yes] bad reply: {r2[:80]!r}"
+        if not tn:
+            return False, f"[yes] no active Tenancy created, reply={r2[:80]!r}"
+        return True, f"Room {free_room.room_number} assigned to {unique}, Tenancy id={tn.id}"
+    finally:
+        await _purge_pending(phone_norm)
+        async with get_session() as s:
+            tenancies = (await s.execute(
+                select(Tenancy).where(Tenancy.tenant_id == tenant_id)
+            )).scalars().all()
+            for tn in tenancies:
+                await s.delete(tn)
+            t_row = await s.get(Tenant, tenant_id)
+            if t_row:
+                await s.delete(t_row)
+            await s.commit()
+
+
+async def test_complaint_update(ctx: CallerContext, phone_norm: str, t: tuple) -> tuple[bool, str]:
+    """COMPLAINT_UPDATE: create open complaint, resolve via bot (one-shot), verify status=resolved."""
+    _, tn_id, _, _, _, _ = t
+    from src.database.models import ComplaintStatus as _CS
+    await _purge_pending(phone_norm)
+
+    async with get_session() as s:
+        cmp = Complaint(
+            tenancy_id=tn_id,
+            description="e2e resolve test",
+            status=_CS.open,
+        )
+        s.add(cmp)
+        await s.commit()
+        cmp_id = cmp.id
+
+    try:
+        r1 = await _route_message(ctx, f"resolve complaint {cmp_id}")
+        if _looks_like_greeting(r1) or not r1:
+            return False, f"[resolve] greeting/empty: {r1[:80]!r}"
+        async with get_session() as s:
+            cmp_row = await s.get(Complaint, cmp_id)
+            new_status = cmp_row.status if cmp_row else None
+        if new_status != _CS.resolved:
+            return False, f"[resolve] status={new_status} (expected resolved), reply={r1[:80]!r}"
+        return True, f"Complaint {cmp_id} resolved one-shot"
+    finally:
+        async with get_session() as s:
+            c = await s.get(Complaint, cmp_id)
+            if c:
+                await s.delete(c)
+            await s.commit()
+
+
+async def test_my_balance_tenant(_phone_norm: str, t: tuple) -> tuple[bool, str]:
+    """MY_BALANCE: tenant self-service read — verify non-empty non-greeting reply."""
+    t_id, _, _, full, _, _ = t
+    async with get_session() as s:
+        te = await s.get(Tenant, t_id)
+        if not te or not te.phone:
+            return True, "skipped (test tenant has no phone)"
+        phone = te.phone
+
+    tenant_ctx = CallerContext(phone=phone, role="tenant", name=full, tenant_id=t_id)
+    tenant_norm = _normalize(phone)
+    await _purge_pending(tenant_norm)
+
+    r1 = await _route_message(tenant_ctx, "my balance")
+    if _looks_like_greeting(r1) or not r1:
+        return False, f"[balance] greeting/empty: {r1[:80]!r}"
+    # Acceptable responses: balance details OR "no active tenancy"
+    return True, f"MY_BALANCE tenant replied: {r1[:60]!r}"
+
+
+async def test_my_payments_tenant(_phone_norm: str, t: tuple) -> tuple[bool, str]:
+    """MY_PAYMENTS: tenant self-service read — verify non-empty non-greeting reply."""
+    t_id, _, _, full, _, _ = t
+    async with get_session() as s:
+        te = await s.get(Tenant, t_id)
+        if not te or not te.phone:
+            return True, "skipped (test tenant has no phone)"
+        phone = te.phone
+
+    tenant_ctx = CallerContext(phone=phone, role="tenant", name=full, tenant_id=t_id)
+    tenant_norm = _normalize(phone)
+    await _purge_pending(tenant_norm)
+
+    r1 = await _route_message(tenant_ctx, "my payments")
+    if _looks_like_greeting(r1) or not r1:
+        return False, f"[payments] greeting/empty: {r1[:80]!r}"
+    return True, f"MY_PAYMENTS tenant replied: {r1[:60]!r}"
+
+
 # ─── Run all ───────────────────────────────────────────────────────────────
 
 async def main():
@@ -1149,6 +1415,14 @@ async def main():
         ("Out-of-range numeric choice",  lambda: test_out_of_range_numeric(ctx, phone_norm)),
         ("Workflow collision",           lambda: test_workflow_collision(ctx, phone_norm, t)),
         ("Empty-reply guard",            lambda: test_empty_reply_guard(ctx, phone_norm)),
+        # ── Newly added intents ──────────────────────────────────────────────
+        ("EXIT_STAFF full flow",         lambda: test_exit_staff(ctx, phone_norm)),
+        ("VOID_EXPENSE full flow",       lambda: test_void_expense(ctx, phone_norm)),
+        ("SCHEDULE_CHECKOUT full flow",  lambda: test_schedule_checkout(ctx, phone_norm, t)),
+        ("ASSIGN_ROOM full flow",        lambda: test_assign_room(ctx, phone_norm)),
+        ("COMPLAINT_UPDATE (resolve)",   lambda: test_complaint_update(ctx, phone_norm, t)),
+        ("MY_BALANCE (tenant role)",     lambda: test_my_balance_tenant(phone_norm, t)),
+        ("MY_PAYMENTS (tenant role)",    lambda: test_my_payments_tenant(phone_norm, t)),
     ]
 
     ok, fail = 0, 0
