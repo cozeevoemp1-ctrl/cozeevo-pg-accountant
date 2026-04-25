@@ -3944,7 +3944,7 @@ async def _do_checkout(
     # Late / no notice → deposit forfeited (owner keeps it) + extra month charged
     late_notice = not tenancy.notice_date or tenancy.notice_date.day > _NOTICE_BY_DAY
     if late_notice:
-        extra_month = tenancy.rent or Decimal("0")
+        extra_month = tenancy.agreed_rent or Decimal("0")
         net = Decimal("0") - o_rent - o_maintenance - extra_month
     else:
         extra_month = Decimal("0")
