@@ -64,6 +64,13 @@ async def lifespan(app: FastAPI):
     await init_db(db_url)
     logger.info("✓ Database initialized")
 
+    # Initialize LangGraph agent
+    import os as _os
+    _test_mode = _os.getenv("TEST_MODE", "0") == "1"
+    from src.agent.graph import init_agent
+    await init_agent(test_mode=_test_mode)
+    logger.info("✓ Agent graph initialized")
+
     # Auto-flip no_show → active for tenancies whose checkin_date has arrived
     try:
         from src.database.db_manager import get_session

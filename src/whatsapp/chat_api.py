@@ -41,6 +41,8 @@ from src.llm_gateway.claude_client import get_claude_client
 # PydanticAI agent system (feature flag controlled)
 _USE_PYDANTIC_AGENTS = os.getenv("USE_PYDANTIC_AGENTS", "false").lower() == "true"
 _DEFAULT_PG_ID = os.getenv("DEFAULT_PG_ID", "")
+from src.agent.config import AGENT_INTENTS as _AGENT_INTENTS
+from src.agent.channel import ChannelMessage as _AgentChannelMessage
 
 _chat_logger = logging.getLogger(__name__)
 
@@ -841,6 +843,33 @@ async def _process_message_inner(
         intent_result.entities["_media_id"] = body.media_id
         intent_result.entities["_media_type"] = body.media_type
         intent_result.entities["_media_mime"] = body.media_mime
+
+    # ── LangGraph agent path ───────────────────────────────────────────────
+    if _USE_PYDANTIC_AGENTS and intent in _AGENT_INTENTS and ctx.role in ("admin", "owner", "receptionist"):
+        try:
+            from src.agent.graph import run_agent
+            pg_id = await _resolve_pg_id(session)
+            ch_msg = _AgentChannelMessage(
+                user_id=f"wa:{phone}",
+                channel="whatsapp",
+                text=message,
+            )
+            agent_reply = await run_agent(
+                channel_msg=ch_msg,
+                session=session,
+                pg_id=pg_id,
+                role=ctx.role,
+                name=ctx.name or "",
+            )
+            await _log(session, phone, message, ctx.role, intent, agent_reply)
+            await session.commit()
+            return OutboundReply(reply=agent_reply, intent=intent, role=ctx.role)
+        except Exception as _agent_exc:
+            import logging as _ag_log
+            _ag_log.getLogger(__name__).error(
+                "[agent] %s failed: %s", intent, _agent_exc, exc_info=True
+            )
+            # Fall through to gatekeeper — user always gets a reply
 
     reply = await route(intent, intent_result.entities, ctx, message, session)
 
