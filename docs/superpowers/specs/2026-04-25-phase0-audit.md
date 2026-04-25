@@ -2,7 +2,7 @@
 
 Pre-migration audit. No code changed. Maps every file so Phase 1 (agent tool wrappers) knows what to preserve, wrap, and delete.
 
-Total: **92 Python files** across `src/` + `services/`. 36,505 source lines.
+Total: **106 Python files** across `src/` + `services/` (including `__init__.py` files). 36,691 source lines.
 
 ---
 
@@ -71,7 +71,7 @@ Total: **92 Python files** across `src/` + `services/`. 36,505 source lines.
 
 | File | Category | Lines | Fns | Notes |
 |---|---|---|---|---|
-| `gsheets.py` | SERVICE | 2384 | 50 | Google Sheets sync. All sheet write-back goes here. `_sync_tenant_all_fields_sync` (242 lines), `_add_tenant_sync` (230 lines), `_refresh_summary_sync` (196 lines). |
+| `gsheets.py` | SERVICE | 2384 | 50 | Google Sheets sync. All sheet write-back goes here. `_sync_tenant_all_fields_sync` (242 lines), `_add_tenant_sync` (230 lines), `_refresh_summary_sync` (196 lines). (50 top-level, ~5 nested) |
 
 ### `src/llm_gateway/` — LLM abstraction
 
@@ -206,7 +206,7 @@ The `state.py:parse()` function exists to centralize all text-to-structured-data
 Handler functions are making raw `session.execute()` / `session.scalar()` calls that should be in services:
 
 **`owner_handler.py` — 98 direct DB query calls** (most concentrated in `resolve_pending_action`):
-- `owner_handler.py:391-425` — room lookup + duplicate tenancy check inside checkin flow (should call `validators.check_no_active_tenancy` + `room_occupancy.check_room_bookable`)
+- `owner_handler.py:391-425` — room lookup + duplicate tenancy check inside checkin flow (should call `validators.check_no_active_tenancy` + `room_occupancy.check_room_bookable`). Note: `check_no_active_tenancy` is already imported at line 35 but never called — the inline check at lines 391–425 silently re-implements it.
 - `owner_handler.py:799-801` — tenant lookup by phone (should be a service helper)
 - `owner_handler.py:1265-1399` — expense category lookup, refund checks in checkout flow
 
@@ -235,9 +235,9 @@ Most critical:
 
 | File | Function | Lines | Priority |
 |---|---|---|---|
-| `owner_handler.py` | `resolve_pending_action` | 3554 | CRITICAL — split into resolver modules (Phase 2A started) |
+| `owner_handler.py` | `resolve_pending_action` | 3562 | CRITICAL — split into resolver modules (Phase 2A started) |
 | `chat_api.py` | `_process_message_inner` | 771 | HIGH — merges rate-limit + pending + intent + LLM path |
-| `onboarding_router.py` | `_approve_session_impl` | 516 | HIGH |
+| `onboarding_router.py` | `_approve_session_impl` | 520 | HIGH |
 | `owner_handler.py` | `_do_add_tenant` | 233 | MEDIUM |
 | `account_handler.py` | `_single_month_report` | 243 | MEDIUM — move DB queries to report service |
 | `account_handler.py` | `_do_log_payment_by_ids` | 243 | MEDIUM — logic mixed with formatting |
@@ -249,7 +249,7 @@ Most critical:
 | `gsheets.py` | `_refresh_summary_sync` | 196 | LOW |
 | `tenant_handler.py` | `handle_onboarding_step` | 196 | LOW |
 | `scheduler.py` | `_checkout_deposit_alerts` | 154 | LOW |
-| `owner_handler.py` | `_do_checkout` | 173 | LOW |
+| `owner_handler.py` | `_do_checkout` | 180 | LOW |
 | `owner_handler.py` | `_query_vacant_rooms` | 158 | LOW |
 | `account_handler.py` | `_do_rent_change` | 152 | LOW |
 
