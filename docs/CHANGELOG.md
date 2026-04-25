@@ -2,6 +2,47 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.52.0] — 2026-04-25 — LangGraph agent core: Phase 0 (audit) + Phase 1 (CHECKOUT + PAYMENT_LOG)
+
+Built the LangGraph-based agent core alongside the existing bot. Agent handles CHECKOUT and PAYMENT_LOG end-to-end (disambiguation → confirmation → execution) with full state persistence via MemorySaver (local) / AsyncPostgresSaver (VPS). Feature-flagged off on VPS via `USE_PYDANTIC_AGENTS=false`.
+
+### New files
+- **`src/agent/__init__.py`** — package exports (`ChannelMessage`, `ChannelResponse`, `init_agent`, `run_agent`)
+- **`src/agent/channel.py`** — `ChannelMessage` / `ChannelResponse` dataclasses
+- **`src/agent/state.py`** — `AgentState` TypedDict + `make_initial_state()`
+- **`src/agent/config.py`** — `AGENT_INTENTS` frozenset from env var
+- **`src/agent/graph.py`** — `build_graph()`, `init_agent()`, `run_agent()` — graph assembly + checkpointer init
+- **`src/agent/checkpointer.py`** — `make_memory_checkpointer()` (tests) / `make_postgres_checkpointer()` (prod, psycopg3)
+- **`src/agent/nodes/router.py`** — fast-path yes/no router (no LLM ~10% savings)
+- **`src/agent/nodes/intent.py`** — LLM classification + `_resolve_tenant_entities()` (name→tenancy_id DB lookup)
+- **`src/agent/nodes/clarify.py`** — echoes clarify question to user
+- **`src/agent/nodes/confirm.py`** — confirmation message templates for CHECKOUT + PAYMENT_LOG
+- **`src/agent/nodes/execute.py`** — dispatches to registered tool, clears state on success/error
+- **`src/agent/nodes/cancel.py`** — clears all flow state, sends cancellation reply
+- **`src/agent/tools/_base.py`** — `BaseToolResult(success, reply)`
+- **`src/agent/tools/checkout.py`** — `run_checkout()` wrapping `_do_checkout`
+- **`src/agent/tools/payment.py`** — `run_payment()` wrapping `_do_log_payment_by_ids`
+- **`tests/agent/`** — 38 tests (channel, state, router, intent, nodes, tools, e2e graph)
+- **`docs/superpowers/specs/2026-04-25-phase0-audit.md`** — codebase audit (106 files, 36,691 lines, design flaws)
+
+### Modified files
+- **`requirements.txt`** — added `langgraph>=0.2.28`, `langgraph-checkpoint-postgres>=2.0.0`, `psycopg[binary,pool]>=3.1.0`
+- **`.env.template`** — added `AGENT_INTENTS`, `DATABASE_URL_PSYCOPG`, `LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`
+- **`src/whatsapp/chat_api.py`** — agent routing block: if `USE_PYDANTIC_AGENTS=true` AND intent in `AGENT_INTENTS` AND role is admin/owner/receptionist → runs agent; errors fall through to existing gatekeeper
+- **`main.py`** — `init_agent(test_mode=...)` added to lifespan startup
+
+### Architecture
+Graph topology: `router → {intent, execute, cancel}`, `intent → {clarify, confirm, END}`, all leaf nodes → `END`. Thread ID = `user_id` (e.g. `wa:917845952289`). Tenant name→ID resolution via `_find_active_tenants_by_name()` + `_make_choices()` (same lookup as existing owner_handler). Multiple matches → numbered disambiguation without LLM.
+
+### Test results
+- Agent unit suite: **38/38 passing**
+- Golden suite (agent disabled): **64/100** — same 27 pre-existing failures; 9 bulk-run timing flickers (pass individually)
+
+### VPS status
+`USE_PYDANTIC_AGENTS=false` — agent NOT active on VPS. Enable after 48h local soak.
+
+---
+
 ## [1.51.13] — 2026-04-24 — Onboarding: PDF signature redesign, remove boxes, keep "I agree" confirmation
 
 Removed signature boxes from PDF (tenant and staff). Agreement now shows "✓ Agreed on [date], [time]" instead of signature space.
