@@ -1776,7 +1776,7 @@ async def resolve_pending_action(
         if step == "ask_deductions":
             try:
                 ded_amount = float(
-                    ans.replace(",", "").replace("rs", "").replace("₹", "").replace("Rs", "").strip()
+                    ans.replace(",", "").replace("Rs.", "").replace("Rs", "").replace("rs", "").replace("₹", "").strip()
                 )
             except ValueError:
                 return "__KEEP_PENDING__Please enter a number (e.g. *2000* or *0*)."
