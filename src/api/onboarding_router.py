@@ -573,21 +573,17 @@ async def regen_pdf(token: str, request: Request):
 
 # ── Staff signature store / retrieve ─────────────────────────────────────────
 
-def _staff_sig_path(phone: str):
-    from pathlib import Path
-    return Path(os.getenv("MEDIA_DIR", "media")) / "staff_signatures" / f"{phone.strip()}.png"
-
-
 @router.get("/staff-signature/{phone}")
 async def get_staff_signature(phone: str, request: Request):
     """Return saved staff signature as base64 PNG, or 404 if not saved yet."""
     _check_admin_pin(request)
-    p = _staff_sig_path(phone)
-    if not p.exists():
-        raise HTTPException(404, "No saved signature for this phone")
     import base64
-    data = base64.b64encode(p.read_bytes()).decode()
-    return {"data_url": f"data:image/png;base64,{data}"}
+    from services import storage as _storage
+    try:
+        data = await _storage.download(_storage.BUCKET_KYC, f"staff-signatures/{phone.strip()}.png")
+        return {"data_url": f"data:image/png;base64,{base64.b64encode(data).decode()}"}
+    except FileNotFoundError:
+        raise HTTPException(404, "No saved signature for this phone")
 
 
 @router.post("/staff-signature/{phone}")
@@ -599,10 +595,9 @@ async def save_staff_signature(phone: str, request: Request):
     if not data_url or "base64," not in data_url:
         raise HTTPException(400, "data_url required (base64 PNG)")
     import base64
+    from services import storage as _storage
     raw = base64.b64decode(data_url.split("base64,", 1)[1])
-    p = _staff_sig_path(phone)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_bytes(raw)
+    await _storage.upload(_storage.BUCKET_KYC, f"staff-signatures/{phone.strip()}.png", raw, "image/png")
     return {"status": "saved", "phone": phone}
 
 
@@ -870,10 +865,11 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
             obs.status = "expired"
             raise HTTPException(410, "This onboarding link has expired")
 
-        # Save uploaded files to disk
-        from pathlib import Path
+        # Upload files to Supabase Storage
         import base64 as b64mod
-        media_dir = Path(os.getenv("MEDIA_DIR", "media"))
+        import logging as _logging
+        from services import storage as _storage
+        _log = _logging.getLogger(__name__)
         token_short = obs.token[:8]
         saved_files = {}
 
@@ -882,34 +878,30 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
                 continue
             try:
                 header, b64_data = data_url.split("base64,", 1)
-                # Detect file type
                 if "pdf" in header:
-                    ext = ".pdf"
+                    ext, ct = ".pdf", "application/pdf"
                 elif "png" in header:
-                    ext = ".png"
+                    ext, ct = ".png", "image/png"
                 elif "webp" in header:
-                    ext = ".webp"
+                    ext, ct = ".webp", "image/webp"
                 else:
-                    ext = ".jpg"
-                save_dir = media_dir / "onboarding" / token_short
-                save_dir.mkdir(parents=True, exist_ok=True)
-                file_path = save_dir / f"{field_name}{ext}"
-                file_path.write_bytes(b64mod.b64decode(b64_data))
-                saved_files[field_name] = str(file_path.relative_to(media_dir))
-            except Exception:
-                pass  # non-fatal — form still submits
+                    ext, ct = ".jpg", "image/jpeg"
+                file_bytes = b64mod.b64decode(b64_data)
+                path = f"onboarding/{token_short}/{field_name}{ext}"
+                url = await _storage.upload(_storage.BUCKET_KYC, path, file_bytes, ct)
+                saved_files[field_name] = url
+            except Exception as _e:
+                _log.warning("KYC upload %s failed: %s", field_name, _e)
 
-        # Save signature to disk too
+        # Upload signature (base64 image) to Supabase
         if req.signature_image and "base64," in req.signature_image:
             try:
                 _, sig_b64 = req.signature_image.split("base64,", 1)
-                save_dir = media_dir / "onboarding" / token_short
-                save_dir.mkdir(parents=True, exist_ok=True)
-                sig_path = save_dir / "signature.png"
-                sig_path.write_bytes(b64mod.b64decode(sig_b64))
-                saved_files["signature"] = str(sig_path.relative_to(media_dir))
-            except Exception:
-                pass
+                path = f"onboarding/{token_short}/signature.png"
+                url = await _storage.upload(_storage.BUCKET_KYC, path, b64mod.b64decode(sig_b64), "image/png")
+                saved_files["signature"] = url
+            except Exception as _e:
+                _log.warning("Signature upload failed: %s", _e)
 
         tenant_data = req.model_dump(exclude={"signature_image", "id_photo", "selfie_photo"})
         tenant_data["saved_files"] = saved_files  # paths for approve step
@@ -1297,19 +1289,14 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             if not gsheets_note:
                 _logger.error("GSheets FAILED after 3 attempts for token %s", obs.token[:8])
 
-        # Save staff signature to disk
-        staff_sig_path = ""
+        # Save staff signature to Supabase Storage
         if req and req.staff_signature and "base64," in req.staff_signature:
             try:
                 import base64 as b64mod
-                from pathlib import Path
-                media_dir = Path(os.getenv("MEDIA_DIR", "media"))
+                from services import storage as _storage
                 _, sig_b64 = req.staff_signature.split("base64,", 1)
-                save_dir = media_dir / "onboarding" / obs.token[:8]
-                save_dir.mkdir(parents=True, exist_ok=True)
-                sig_file = save_dir / "staff_signature.png"
-                sig_file.write_bytes(b64mod.b64decode(sig_b64))
-                staff_sig_path = str(sig_file.relative_to(media_dir))
+                path = f"onboarding/{obs.token[:8]}/staff_signature.png"
+                await _storage.upload(_storage.BUCKET_KYC, path, b64mod.b64decode(sig_b64), "image/png")
             except Exception:
                 pass
 
@@ -1365,22 +1352,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 from src.whatsapp.webhook_handler import (
                     _send_whatsapp_document, _send_whatsapp, _send_whatsapp_template,
                 )
-                from pathlib import Path
-                # Build public URL for the PDF
-                base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-                # obs.agreement_pdf_path is already "agreements/YYYY-MM/agreement_*.pdf"
-                # (relative to MEDIA_DIR which contains agreements/) — don't prefix with
-                # /static/agreements/ or we get a doubled 'agreements/agreements/' URL.
-                pdf_url = f"{base_url}/static/{obs.agreement_pdf_path}"
-                # Also copy PDF to static dir so it's accessible
-                media_dir = Path(os.getenv("MEDIA_DIR", "media"))
-                src_pdf = media_dir / obs.agreement_pdf_path
-                static_pdf_dir = Path("static/agreements") / Path(obs.agreement_pdf_path).parent.name
-                static_pdf_dir.mkdir(parents=True, exist_ok=True)
-                static_pdf = static_pdf_dir / Path(obs.agreement_pdf_path).name
-                if src_pdf.exists():
-                    import shutil
-                    shutil.copy2(str(src_pdf), str(static_pdf))
+                # agreement_pdf_path is now a full Supabase Storage URL
+                pdf_url = obs.agreement_pdf_path
 
                 phone_wa = obs.tenant_phone.strip()
                 if not phone_wa.startswith("91"):

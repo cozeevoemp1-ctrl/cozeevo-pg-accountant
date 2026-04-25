@@ -829,7 +829,7 @@
         ${data.approved_at ? `<div><span style="color:#718096;font-weight:600;">Approved:</span> <span style="color:#276749;font-weight:700;">${fmtDate(data.approved_at)}</span></div>` : ''}
         ${data.approved_by_phone ? `<div><span style="color:#718096;font-weight:600;">Approved by:</span> <span style="color:#276749;font-weight:700;">${escHtml(approvedBy)}</span></div>` : ''}
         ${data.status === 'expired' ? `<div><span style="color:#c53030;font-weight:700;">Link expired — tenant did not fill the form.</span> Created: ${fmtDate(data.created_at)}</div>` : ''}
-        ${data.agreement_pdf_path ? `<div><a href="/static/${escHtml(data.agreement_pdf_path)}" target="_blank" style="color:var(--pink);font-weight:700;text-decoration:none;">View Agreement PDF</a></div>` : ''}
+        ${data.agreement_pdf_path ? `<div><a href="${data.agreement_pdf_path.startsWith('https://') ? escHtml(data.agreement_pdf_path) : '/static/'+escHtml(data.agreement_pdf_path)}" target="_blank" style="color:var(--pink);font-weight:700;text-decoration:none;">View Agreement PDF</a></div>` : ''}
       </div>`;
 
     // Booking section
@@ -883,11 +883,11 @@
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#718096;border-bottom:1px solid #E2E8F0;padding-bottom:6px;margin:14px 0 10px;">Documents</div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">`;
       if (savedFiles.selfie) {
-        const u = '/media/'+savedFiles.selfie;
+        const u = savedFiles.selfie.startsWith('https://') ? savedFiles.selfie : '/media/'+savedFiles.selfie;
         photosHtml += `<div style="text-align:center;cursor:pointer;" onclick="openLightbox('${u}')"><img src="${u}" style="width:72px;height:72px;object-fit:cover;border-radius:50%;border:2px solid #00AEED;"><div style="font-size:10px;color:#718096;margin-top:4px;">Selfie</div></div>`;
       }
       if (savedFiles.id_proof) {
-        const u = '/media/'+savedFiles.id_proof;
+        const u = savedFiles.id_proof.startsWith('https://') ? savedFiles.id_proof : '/media/'+savedFiles.id_proof;
         if (savedFiles.id_proof.endsWith('.pdf')) {
           photosHtml += `<div style="text-align:center;"><div style="width:72px;height:72px;background:#FEF2F2;border:2px solid #E53E3E;border-radius:8px;display:flex;align-items:center;justify-content:center;"><a href="${u}" target="_blank" style="color:#E53E3E;font-size:11px;font-weight:600;">PDF</a></div><div style="font-size:10px;color:#718096;margin-top:4px;">ID Proof</div></div>`;
         } else {
@@ -1350,14 +1350,14 @@
     } else if (savedFiles.selfie || savedFiles.id_proof) {
       photosHtml = `<div class="section-divider">Uploaded Documents</div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">`;
       if (savedFiles.selfie) {
-        const selfieUrl = '/media/' + savedFiles.selfie;
+        const selfieUrl = savedFiles.selfie.startsWith('https://') ? savedFiles.selfie : '/media/' + savedFiles.selfie;
         photosHtml += `<div style="text-align:center;cursor:pointer;" onclick="openLightbox('${selfieUrl}')">
           <img src="${selfieUrl}" alt="Selfie" style="width:80px;height:80px;object-fit:cover;border-radius:50%;border:2px solid #00AEED;">
           <div style="font-size:10px;color:#718096;margin-top:4px;">Selfie (click to enlarge)</div>
         </div>`;
       }
       if (savedFiles.id_proof) {
-        const idUrl = '/media/' + savedFiles.id_proof;
+        const idUrl = savedFiles.id_proof.startsWith('https://') ? savedFiles.id_proof : '/media/' + savedFiles.id_proof;
         if (savedFiles.id_proof.endsWith('.pdf')) {
           photosHtml += `<div style="text-align:center;">
             <div style="width:80px;height:80px;background:#FEF2F2;border:2px solid #E53E3E;border-radius:8px;display:flex;align-items:center;justify-content:center;">

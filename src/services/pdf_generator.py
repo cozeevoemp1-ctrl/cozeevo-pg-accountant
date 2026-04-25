@@ -1,13 +1,14 @@
 """
 src/services/pdf_generator.py
 Generate signed rental agreement PDF using reportlab.
+PDF is generated in-memory (BytesIO) and uploaded to Supabase Storage.
 """
 from __future__ import annotations
 
 import asyncio
+import io
 import os
 from datetime import datetime
-from pathlib import Path
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -15,10 +16,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
-
-
-MEDIA_DIR = Path(os.getenv("MEDIA_DIR", "media"))
-AGREEMENT_DIR = MEDIA_DIR / "agreements"
 
 
 HOUSE_RULES = [
@@ -44,14 +41,12 @@ HOUSE_RULES = [
 ]
 
 
-def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
-    """Generate agreement PDF. Returns relative path from MEDIA_DIR."""
-    save_dir = AGREEMENT_DIR / datetime.now().strftime("%Y-%m")
-    save_dir.mkdir(parents=True, exist_ok=True)
+def _generate_pdf_bytes(obs, tenant_data: dict, room, building: str, sharing: str) -> tuple[bytes, str]:
+    """Generate agreement PDF in-memory. Returns (pdf_bytes, filename)."""
     filename = f"agreement_{obs.token[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    filepath = save_dir / filename
+    buf = io.BytesIO()
 
-    doc = SimpleDocTemplate(str(filepath), pagesize=A4,
+    doc = SimpleDocTemplate(buf, pagesize=A4,
                             leftMargin=20*mm, rightMargin=20*mm,
                             topMargin=15*mm, bottomMargin=15*mm)
 
@@ -161,9 +156,15 @@ def _generate_pdf_sync(obs, tenant_data: dict, room, building: str, sharing: str
     ))
 
     doc.build(elements)
-    return str(filepath.relative_to(MEDIA_DIR))
+    return buf.getvalue(), filename
 
 
 async def generate_agreement_pdf(obs, tenant_data: dict, room, building: str, sharing: str) -> str:
-    """Async wrapper for PDF generation."""
-    return await asyncio.to_thread(_generate_pdf_sync, obs, tenant_data, room, building, sharing)
+    """Generate PDF in-memory, upload to Supabase Storage, return public URL."""
+    from . import storage
+    pdf_bytes, filename = await asyncio.to_thread(
+        _generate_pdf_bytes, obs, tenant_data, room, building, sharing
+    )
+    month_dir = datetime.now().strftime("%Y-%m")
+    path = f"{month_dir}/{filename}"
+    return await storage.upload(storage.BUCKET_AGREEMENTS, path, pdf_bytes, "application/pdf")
