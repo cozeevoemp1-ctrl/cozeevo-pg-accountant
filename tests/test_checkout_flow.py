@@ -23,6 +23,7 @@ from src.database.models import (
     Property, Room, RoomType,
     Tenant, Tenancy, TenancyStatus, StayType,
     CheckoutRecord, CheckoutSession, CheckoutSessionStatus,
+    Refund, RefundStatus,
 )
 
 
@@ -110,6 +111,7 @@ async def test_do_confirm_checkout_writes_checkout_record(db_session, sample_ten
     with patch("src.integrations.gsheets.record_checkout", new_callable=AsyncMock) as mock_gs:
         mock_gs.return_value = {"success": True}
         msg = await _do_confirm_checkout(cs, db_session)
+        mock_gs.assert_called_once()
 
     cr = await db_session.scalar(
         select(CheckoutRecord).where(CheckoutRecord.tenancy_id == sample_tenancy.id)
@@ -134,3 +136,16 @@ async def test_do_confirm_checkout_writes_checkout_record(db_session, sample_ten
     assert "checkout" in msg.lower() or "confirmed" in msg.lower(), f"Unexpected msg: {msg!r}"
     # Must include refund line
     assert "13,000" in msg or "13000" in msg, f"Refund amount missing from msg: {msg!r}"
+
+    # Verify Refund record was created
+    refund = await db_session.scalar(
+        select(Refund).where(Refund.tenancy_id == sample_tenancy.id)
+    )
+    assert refund is not None, "Refund record was not created"
+    assert refund.status == RefundStatus.pending
+    assert Decimal(str(refund.amount)) == Decimal("13000")
+    assert refund.reason == "paint damage"
+
+    # Verify confirmed_at was set on the session
+    await db_session.refresh(cs)
+    assert cs.confirmed_at is not None
