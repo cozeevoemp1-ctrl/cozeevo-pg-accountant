@@ -432,7 +432,15 @@ async def main(args):
             # includes security_deposit on the check-in month).
             deposit_credit = int(deposit_pay_map.get(tenancy.id, 0)) if is_first_month else 0
             effective_paid = total_paid + booking_credit + prepaid_credit + deposit_credit
-            balance = rent_due + int(prev_due_num) - effective_paid
+
+            # April 2026: balance is fully encoded in rent_schedule adjustment
+            # (set by fix_april_balances.py: adjustment = src_bal + paid - rent_due).
+            # Only subtract rent payments — booking/deposit credits are already
+            # factored into the adjustment, so don't subtract them again.
+            if period == date(2026, 4, 1):
+                balance = rent_due - total_paid - prepaid_credit
+            else:
+                balance = rent_due + int(prev_due_num) - effective_paid
 
             # Status
             if tenancy.status == TenancyStatus.exited:
