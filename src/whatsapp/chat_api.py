@@ -30,7 +30,7 @@ import re
 import re as _re
 
 from src.database.db_manager import get_db_session as get_session
-from src.database.models import PendingAction, PendingLearning, WhatsappLog, MessageDirection, CallerRole, ChatMessage
+from src.database.models import PendingAction, PendingLearning, WhatsappLog, MessageDirection, CallerRole, ChatMessage, CheckoutSession, CheckoutSessionStatus
 from src.whatsapp.role_service import get_caller_context
 from src.whatsapp.intent_detector import detect_intent, IntentResult, _extract_entities, _INTENT_LABELS
 from src.whatsapp.gatekeeper import route
@@ -512,10 +512,48 @@ async def _process_message_inner(
             await session.commit()
             return OutboundReply(reply=resolved_reply, intent="COMPLAINT_REGISTER", role=ctx.role)
 
+    # ── 2c. Checkout session intercept — tenant replying YES/NO ──────────
+    # Must run BEFORE intent detection so YES/NO aren't classified as other
+    # intents (UNKNOWN, GENERAL, etc.).
+    _co_msg_upper = message.strip().upper()
+    _checkout_intent_intercepted = False
+    if ctx.role in ("tenant", "lead", "unknown"):
+        _active_cs = await session.scalar(
+            select(CheckoutSession).where(
+                CheckoutSession.tenant_phone == phone,
+                CheckoutSession.status == CheckoutSessionStatus.pending.value,
+                CheckoutSession.expires_at > datetime.utcnow(),
+            )
+        )
+        if _active_cs:
+            if _co_msg_upper == "YES":
+                intent = "CHECKOUT_AGREE"
+                intent_result = IntentResult(intent="CHECKOUT_AGREE", confidence=1.0, entities={})
+                _checkout_intent_intercepted = True
+            elif _co_msg_upper.startswith("NO"):
+                reason = message.strip()[2:].strip()
+                if not reason:
+                    _no_reason_reply = (
+                        "Please provide a reason for rejection "
+                        "(e.g. *NO the damage charge is wrong*)."
+                    )
+                    await _log(session, phone, message, ctx.role, "CHECKOUT_REJECT", _no_reason_reply)
+                    await session.commit()
+                    return OutboundReply(reply=_no_reason_reply, intent="CHECKOUT_REJECT", role=ctx.role)
+                else:
+                    intent = "CHECKOUT_REJECT"
+                    intent_result = IntentResult(
+                        intent="CHECKOUT_REJECT",
+                        confidence=1.0,
+                        entities={"reason": reason},
+                    )
+                    _checkout_intent_intercepted = True
+
     # ── 3. Detect intent — Groq LLM primary, regex fast-path ────────────
     # Try regex first for speed (instant, free)
-    intent_result = detect_intent(message, ctx.role)
-    intent = intent_result.intent
+    if not _checkout_intent_intercepted:
+        intent_result = detect_intent(message, ctx.role)
+        intent = intent_result.intent
 
     # ── Follow-up detection: "show me the list", "break it down" etc. ──
     if intent in ("UNKNOWN", "GENERAL"):

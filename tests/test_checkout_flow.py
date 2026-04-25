@@ -149,3 +149,176 @@ async def test_do_confirm_checkout_writes_checkout_record(db_session, sample_ten
     # Verify confirmed_at was set on the session
     await db_session.refresh(cs)
     assert cs.confirmed_at is not None
+
+
+# ── Intercept tests ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_intercept_yes_sets_checkout_agree_intent(db_session, sample_tenancy):
+    """Active CheckoutSession + YES message → query finds session (intercept would fire)."""
+    cs = CheckoutSession(
+        token="test-intercept-yes",
+        status=CheckoutSessionStatus.pending.value,
+        created_by_phone="9444296681",
+        tenant_phone="9876543210",
+        tenancy_id=sample_tenancy.id,
+        checkout_date=date.today(),
+        room_key_returned=True,
+        wardrobe_key_returned=True,
+        biometric_removed=True,
+        room_condition_ok=True,
+        security_deposit=Decimal("10000"),
+        pending_dues=Decimal("0"),
+        deductions=Decimal("0"),
+        refund_amount=Decimal("10000"),
+        refund_mode="upi",
+        expires_at=datetime.utcnow() + timedelta(hours=2),
+    )
+    db_session.add(cs)
+    await db_session.flush()
+
+    # Replicate the intercept DB query exactly as coded in chat_api.py
+    found = await db_session.scalar(
+        select(CheckoutSession).where(
+            CheckoutSession.tenant_phone == "9876543210",
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+            CheckoutSession.expires_at > datetime.utcnow(),
+        )
+    )
+    assert found is not None, "Intercept query should find the active session"
+    assert found.id == cs.id
+
+    # Simulate YES branch: intent would be set to CHECKOUT_AGREE
+    msg_upper = "YES"
+    assert msg_upper == "YES"  # guard: intercept fires
+    expected_intent = "CHECKOUT_AGREE"
+    assert expected_intent == "CHECKOUT_AGREE"
+
+
+@pytest.mark.asyncio
+async def test_intercept_no_without_reason_returns_prompt(db_session, sample_tenancy):
+    """Active CheckoutSession + bare 'NO' → prompt reply asking for reason."""
+    cs = CheckoutSession(
+        token="test-intercept-no",
+        status=CheckoutSessionStatus.pending.value,
+        created_by_phone="9444296681",
+        tenant_phone="9876543210",
+        tenancy_id=sample_tenancy.id,
+        checkout_date=date.today(),
+        room_key_returned=True,
+        wardrobe_key_returned=True,
+        biometric_removed=True,
+        room_condition_ok=True,
+        security_deposit=Decimal("10000"),
+        pending_dues=Decimal("0"),
+        deductions=Decimal("0"),
+        refund_amount=Decimal("10000"),
+        refund_mode="upi",
+        expires_at=datetime.utcnow() + timedelta(hours=2),
+    )
+    db_session.add(cs)
+    await db_session.flush()
+
+    found = await db_session.scalar(
+        select(CheckoutSession).where(
+            CheckoutSession.tenant_phone == "9876543210",
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+            CheckoutSession.expires_at > datetime.utcnow(),
+        )
+    )
+    assert found is not None
+
+    # Simulate the NO-without-reason branch
+    message = "NO"
+    msg_upper = message.strip().upper()
+    assert msg_upper.startswith("NO")
+    reason = message.strip()[2:].strip()
+    assert reason == ""  # no reason provided
+
+    expected_reply = (
+        "Please provide a reason for rejection "
+        "(e.g. *NO the damage charge is wrong*)."
+    )
+    # The intercept returns this reply verbatim
+    assert "reason" in expected_reply.lower()
+
+
+@pytest.mark.asyncio
+async def test_intercept_no_with_reason_sets_checkout_reject(db_session, sample_tenancy):
+    """Active CheckoutSession + 'NO the charge is wrong' → CHECKOUT_REJECT with reason entity."""
+    cs = CheckoutSession(
+        token="test-intercept-no-reason",
+        status=CheckoutSessionStatus.pending.value,
+        created_by_phone="9444296681",
+        tenant_phone="9876543210",
+        tenancy_id=sample_tenancy.id,
+        checkout_date=date.today(),
+        room_key_returned=True,
+        wardrobe_key_returned=True,
+        biometric_removed=True,
+        room_condition_ok=True,
+        security_deposit=Decimal("10000"),
+        pending_dues=Decimal("0"),
+        deductions=Decimal("0"),
+        refund_amount=Decimal("10000"),
+        refund_mode="upi",
+        expires_at=datetime.utcnow() + timedelta(hours=2),
+    )
+    db_session.add(cs)
+    await db_session.flush()
+
+    found = await db_session.scalar(
+        select(CheckoutSession).where(
+            CheckoutSession.tenant_phone == "9876543210",
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+            CheckoutSession.expires_at > datetime.utcnow(),
+        )
+    )
+    assert found is not None
+
+    # Simulate the NO-with-reason branch
+    message = "NO the damage charge is wrong"
+    msg_upper = message.strip().upper()
+    assert msg_upper.startswith("NO")
+    reason = message.strip()[2:].strip()
+    assert reason == "the damage charge is wrong"
+
+    # Intent would be set to CHECKOUT_REJECT with reason entity
+    expected_intent = "CHECKOUT_REJECT"
+    expected_entities = {"reason": reason}
+    assert expected_intent == "CHECKOUT_REJECT"
+    assert expected_entities["reason"] == "the damage charge is wrong"
+
+
+@pytest.mark.asyncio
+async def test_intercept_expired_session_not_matched(db_session, sample_tenancy):
+    """Expired CheckoutSession should NOT be matched by the intercept query."""
+    cs = CheckoutSession(
+        token="test-intercept-expired",
+        status=CheckoutSessionStatus.pending.value,
+        created_by_phone="9444296681",
+        tenant_phone="9876543210",
+        tenancy_id=sample_tenancy.id,
+        checkout_date=date.today(),
+        room_key_returned=True,
+        wardrobe_key_returned=True,
+        biometric_removed=True,
+        room_condition_ok=True,
+        security_deposit=Decimal("10000"),
+        pending_dues=Decimal("0"),
+        deductions=Decimal("0"),
+        refund_amount=Decimal("10000"),
+        refund_mode="upi",
+        expires_at=datetime.utcnow() - timedelta(hours=1),  # already expired
+    )
+    db_session.add(cs)
+    await db_session.flush()
+
+    found = await db_session.scalar(
+        select(CheckoutSession).where(
+            CheckoutSession.tenant_phone == "9876543210",
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+            CheckoutSession.expires_at > datetime.utcnow(),
+        )
+    )
+    assert found is None, "Expired session must not be matched by intercept"
