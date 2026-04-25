@@ -2527,18 +2527,49 @@ async def resolve_pending_action(
         }
         await _save_pending(pending.phone, "RECORD_CHECKOUT", new_action, [], session)
 
-        # Show pre-checkout summary with auto-calculated dues
+        # Show pre-checkout summary with auto-calculated dues + refund estimate
         tenancy = await session.get(Tenancy, chosen["tenancy_id"])
-        deposit = int(tenancy.security_deposit or 0) if tenancy else 0
+        deposit  = int(tenancy.security_deposit or 0) if tenancy else 0
         o_rent, o_maint = await _calc_outstanding_dues(chosen["tenancy_id"], session)
-        notice_status = "On record" if (tenancy and tenancy.notice_date) else "No notice given"
+        total_dues = int(o_rent) + int(o_maint)
+
+        # Notice timing & deposit forfeiture
+        deposit_forfeited = False
+        if not (tenancy and tenancy.notice_date):
+            notice_line = "No notice given — *deposit forfeited*"
+            deposit_forfeited = True
+        elif tenancy.notice_date.day > _NOTICE_BY_DAY:
+            notice_line = (
+                f"Notice: {tenancy.notice_date.strftime('%d %b %Y')} "
+                f"(after {_NOTICE_BY_DAY}th) — *deposit forfeited*"
+            )
+            deposit_forfeited = True
+        else:
+            notice_line = (
+                f"Notice: {tenancy.notice_date.strftime('%d %b %Y')} "
+                f"(on time ✓) — deposit refundable"
+            )
+
+        if deposit_forfeited:
+            refund_est = 0
+            refund_line = f"Estimated refund: *Rs.0* (deposit forfeited)"
+        else:
+            refund_est = max(0, deposit - total_dues)
+            refund_line = (
+                f"Estimated refund: *Rs.{refund_est:,}*"
+                + (f" (deposit Rs.{deposit:,} − dues Rs.{total_dues:,})" if total_dues > 0 else f" (full deposit Rs.{deposit:,})")
+            )
+
+        checkin_str = tenancy.checkin_date.strftime('%d %b %Y') if (tenancy and tenancy.checkin_date) else "—"
 
         return (
-            f"*Checkout — {chosen['label']}*\n\n"
+            f"*Checkout — {chosen['label']}*\n"
+            f"Check-in: {checkin_str}\n\n"
             f"Deposit held: Rs.{deposit:,}\n"
             f"Unpaid rent: Rs.{int(o_rent):,}\n"
             f"Unpaid maintenance: Rs.{int(o_maint):,}\n"
-            f"Notice: {notice_status}\n\n"
+            f"{notice_line}\n"
+            f"{refund_line}\n\n"
             "*Please complete the checklist:*\n\n"
             "*Q1/5* Was the *cupboard/almirah key* returned?\n"
             "Reply: *yes* or *no*"
@@ -2576,10 +2607,17 @@ async def resolve_pending_action(
             )
 
     if chosen is not None and pending.intent == "NOTICE_GIVEN":
-        tenancy = await session.get(Tenancy, chosen["tenancy_id"])
+        # Yes/No overwrite confirmation (single-tenant path): tenancy_id in action_data
+        if chosen.get("index") == 2 or chosen.get("label") == "No":
+            return "Kept existing notice. No changes made."
+
+        tenancy_id = action_data.get("tenancy_id") or chosen.get("tenancy_id")
+        tenancy = await session.get(Tenancy, tenancy_id) if tenancy_id else None
         if tenancy:
             notice_date_val = None
             last_day_val = None
+            was_on_notice = tenancy.notice_date is not None
+            old_notice_str = tenancy.notice_date.strftime("%d %b %Y") if was_on_notice else None
             try:
                 notice_date_val = date.fromisoformat(action_data["notice_date"])
                 last_day_val = date.fromisoformat(action_data["last_day"])
@@ -2594,6 +2632,12 @@ async def resolve_pending_action(
                 last_day_fmt = last_day_str
             deposit_note = action_data.get("deposit_note", "")
 
+            # Resolve display name: single-tenant confirm stores it in action_data
+            display_name = (
+                action_data.get("tenant_name")
+                or chosen.get("label", "").split(" (Room")[0]
+            )
+
             # Google Sheets write-back
             gsheets_note = ""
             try:
@@ -2602,16 +2646,17 @@ async def resolve_pending_action(
                     from src.integrations.gsheets import record_notice as gsheets_notice
                     notice_fmt = notice_date_val.strftime("%d/%m/%Y") if notice_date_val else action_data.get("notice_date", "")
                     exit_fmt = last_day_val.strftime("%d/%m/%Y") if last_day_val else ""
-                    gs_r = await gsheets_notice(room_obj.room_number, chosen["label"].split(" (Room")[0], notice_fmt, exit_fmt)
+                    gs_r = await gsheets_notice(room_obj.room_number, display_name, notice_fmt, exit_fmt)
                     if gs_r.get("success"):
                         gsheets_note = "\nSheet updated"
             except Exception:
                 pass
 
+            overwrite_note = f"\n(Replaced previous notice: {old_notice_str})" if was_on_notice else ""
             return (
-                f"*Notice recorded — {chosen['label']}*\n"
+                f"*Notice recorded — {display_name}*{overwrite_note}\n"
                 f"Notice date: {action_data.get('notice_date', '')}\n"
-                f"Last day: {last_day_fmt}\n\n"
+                f"Vacate date: {last_day_fmt}\n\n"
                 f"{deposit_note}{gsheets_note}"
             )
         return "Tenancy not found."
@@ -4091,12 +4136,35 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
             f"If different, say: *{name or 'tenant'} gave notice on DD Mon*"
         )
 
+    action_data = {
+        "notice_date": notice_date_val.isoformat(),
+        "last_day": last_day.isoformat(),
+        "deposit_note": deposit_note,
+    }
+
     if len(rows) == 1:
         tenant, tenancy, room_obj = rows[0]
+
+        # If already on notice, ask before overwriting
+        if tenancy.notice_date:
+            old_notice = tenancy.notice_date.strftime("%d %b %Y")
+            old_exit = tenancy.expected_checkout.strftime("%d %b %Y") if tenancy.expected_checkout else "—"
+            action_data["tenancy_id"] = tenancy.id
+            action_data["room_number"] = room_obj.room_number
+            action_data["tenant_name"] = tenant.name
+            choices = [{"index": 1, "label": "Yes"}, {"index": 2, "label": "No"}]
+            await _save_pending(ctx.phone, "NOTICE_GIVEN", action_data, choices, session, state="awaiting_choice")
+            return (
+                f"*{tenant.name}* (Room {room_obj.room_number}) already on notice:\n"
+                f"Notice: {old_notice} · Exit: {old_exit}\n\n"
+                f"Replace with:\n"
+                f"Notice: {notice_date_val.strftime('%d %b %Y')} · Vacate: {last_day.strftime('%d %b %Y')}\n\n"
+                f"1. Yes, update  2. No, keep existing"
+            )
+
         tenancy.notice_date = notice_date_val
         tenancy.expected_checkout = last_day
 
-        # Google Sheets write-back
         gsheets_note = ""
         try:
             from src.integrations.gsheets import record_notice as gsheets_notice
@@ -4114,11 +4182,6 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         )
 
     choices = _make_choices(rows)
-    action_data = {
-        "notice_date": notice_date_val.isoformat(),
-        "last_day": last_day.isoformat(),
-        "deposit_note": deposit_note,
-    }
     await _save_pending(ctx.phone, "NOTICE_GIVEN", action_data, choices, session, state="awaiting_choice")
     return _format_choices_message(search_term, choices, f"record notice (vacate: {last_day.strftime('%d %b %Y')})")
 
