@@ -1216,8 +1216,8 @@
     if (!file) return;
     if (!file.type.startsWith('image/')) { alert('Please select an image'); return; }
     if (file.size > 20 * 1024 * 1024) { alert('File too large (max 20MB)'); return; }
-    // Compress selfie to 600px, 75% quality — enough for ID purposes, ~80KB
-    compressImage(file, 600, 0.75, function(dataUrl) {
+    // Compress selfie to 900px, 85% quality — clear portrait, ~200KB
+    compressImage(file, 900, 0.85, function(dataUrl) {
       applySelfieDataUrl(dataUrl);
       try { localStorage.setItem(draftKey() + '_selfie', dataUrl); } catch(ex) {}
     });
@@ -1344,9 +1344,14 @@
       const reader = new FileReader();
       reader.onload = function(e) { processIdDataUrl(e.target.result); };
       reader.readAsDataURL(file);
+      // PDF: auto-fill not available — tell user to enter number manually or switch to image
+      const statusEl = document.getElementById('id-extract-status');
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#E65100';
+      statusEl.textContent = 'PDF uploaded — Aadhaar number cannot be auto-read from PDFs. Please type the number below, or upload a photo of the card for auto-fill.';
     } else {
-      // Compress image to 1200px, 85% quality — readable for OCR, ~300KB
-      compressImage(file, 1200, 0.85, processIdDataUrl);
+      // Compress to 1800px, 92% quality — Aadhaar text fully readable for OCR, ~500KB
+      compressImage(file, 1800, 0.92, processIdDataUrl);
     }
   }
 
