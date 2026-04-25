@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cozeevo — Tenant Registration</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1262,22 +1264,21 @@
     if (!isImage && !isPdf) { alert('Please select an image or PDF file'); return; }
     if (file.size > 20 * 1024 * 1024) { alert('File too large (max 20MB)'); return; }
 
-    function processIdDataUrl(dataUrl) {
-      // Show preview
-      const preview = document.getElementById('id-photo-preview');
-      if (isPdf) {
-        preview.innerHTML = '<div style="text-align:center;padding:12px;"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div style="font-size:12px;color:#2D3748;margin-top:4px;word-break:break-all;">' + file.name + '</div></div>';
-      } else {
+    function processIdDataUrl(dataUrl, overrideMimeType) {
+      // Show preview (skip if caller already set it, e.g. PDF→canvas path)
+      if (!overrideMimeType) {
+        const preview = document.getElementById('id-photo-preview');
         preview.innerHTML = '<img src="' + dataUrl + '" alt="Preview">';
+        preview.classList.add('visible');
+        const area = document.getElementById('id-upload-area');
+        area.classList.add('has-file');
+        const placeholder = area.querySelector('.upload-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
       }
-      preview.classList.add('visible');
-      const area = document.getElementById('id-upload-area');
-      area.classList.add('has-file');
-      const placeholder = area.querySelector('.upload-placeholder');
-      if (placeholder) placeholder.style.display = 'none';
 
-      // Auto-extract for images only (PDFs can't be vision-extracted client-side)
-      if (isImage) {
+      // Run OCR for images — and for PDFs rendered to JPEG via PDF.js (overrideMimeType='image/jpeg')
+      const mimeForOcr = overrideMimeType || (isImage ? file.type : null);
+      if (mimeForOcr) {
         const statusEl = document.getElementById('id-extract-status');
         statusEl.style.display = 'block';
         statusEl.style.color = '#718096';
@@ -1287,7 +1288,7 @@
         fetch('/api/onboarding/' + token + '/extract-id', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ image_b64: dataUrl, mime_type: file.type }),
+          body: JSON.stringify({ image_b64: dataUrl, mime_type: mimeForOcr }),
         })
         .then(r => r.json())
         .then(data => {
@@ -1341,14 +1342,42 @@
     }
 
     if (isPdf) {
-      const reader = new FileReader();
-      reader.onload = function(e) { processIdDataUrl(e.target.result); };
-      reader.readAsDataURL(file);
-      // PDF: auto-fill not available — tell user to enter number manually or switch to image
+      // Render PDF page 1 to canvas → JPEG, then run through same OCR path as image
       const statusEl = document.getElementById('id-extract-status');
       statusEl.style.display = 'block';
-      statusEl.style.color = '#E65100';
-      statusEl.textContent = 'PDF uploaded — Aadhaar number cannot be auto-read from PDFs. Please type the number below, or upload a photo of the card for auto-fill.';
+      statusEl.style.color = '#718096';
+      statusEl.textContent = 'Converting PDF to image for OCR...';
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          if (!window.pdfjsLib) throw new Error('PDF.js not loaded');
+          const pdfData = new Uint8Array(e.target.result);
+          const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+          const page = await pdf.getPage(1);
+          // Scale=3 → ~300 DPI equivalent — makes Aadhaar text crisp for OCR
+          const viewport = page.getViewport({ scale: 3 });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          // Show the rendered image as preview
+          const preview = document.getElementById('id-photo-preview');
+          preview.innerHTML = '<img src="' + jpegDataUrl + '" style="max-width:100%;max-height:200px;border-radius:6px;">';
+          preview.classList.add('visible');
+          const area = document.getElementById('id-upload-area');
+          area.classList.add('has-file');
+          const ph = area.querySelector('.upload-placeholder');
+          if (ph) ph.style.display = 'none';
+          // Now run OCR on the rendered JPEG (same as image path)
+          processIdDataUrl(jpegDataUrl, 'image/jpeg');
+        } catch (err) {
+          statusEl.style.color = '#E65100';
+          statusEl.textContent = 'PDF preview failed — please type the Aadhaar number manually or upload a photo of the card.';
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
       // Compress to 1800px, 92% quality — Aadhaar text fully readable for OCR, ~500KB
       compressImage(file, 1800, 0.92, processIdDataUrl);
