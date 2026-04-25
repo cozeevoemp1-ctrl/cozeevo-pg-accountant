@@ -198,6 +198,278 @@ async def _apply_tenant_notes_from_payment(action_data: dict, session: AsyncSess
     return f'\nNotes updated: "{new_notes}"'
 
 
+async def _do_confirm_checkout(
+    cs: "CheckoutSession",
+    session: AsyncSession,
+) -> str:
+    """
+    Final checkout execution: write CheckoutRecord + Refund, mark tenancy exited,
+    sync Sheet. Returns a human-readable confirmation string.
+    Does NOT send WhatsApp — caller is responsible for that.
+    """
+    from src.database.models import CheckoutSession  # avoid circular at module level
+
+    tenancy = await session.get(Tenancy, cs.tenancy_id)
+    tenant_name = ""
+    room_number = ""
+    notice_str = None
+
+    if tenancy:
+        tenancy.status = TenancyStatus.exited
+        tenancy.checkout_date = cs.checkout_date
+        tenant = await session.get(Tenant, tenancy.tenant_id)
+        tenant_name = tenant.name if tenant else ""
+        room = await session.get(Room, tenancy.room_id)
+        room_number = room.room_number if room else ""
+        if tenancy.notice_date:
+            notice_str = tenancy.notice_date.strftime("%d/%m/%Y")
+
+    # Upsert CheckoutRecord (may already exist from old WhatsApp flow)
+    from sqlalchemy import select as _select
+    existing = await session.scalar(
+        _select(CheckoutRecord).where(CheckoutRecord.tenancy_id == cs.tenancy_id)
+    )
+    cr = existing or CheckoutRecord(tenancy_id=cs.tenancy_id)
+    cr.main_key_returned       = cs.room_key_returned
+    cr.cupboard_key_returned   = cs.wardrobe_key_returned
+    cr.biometric_removed       = cs.biometric_removed
+    cr.room_condition_ok       = cs.room_condition_ok
+    cr.damage_notes            = cs.damage_notes or None
+    cr.pending_dues_amount     = cs.pending_dues
+    cr.deposit_refunded_amount = cs.refund_amount
+    cr.deposit_refund_date     = cs.checkout_date if cs.refund_amount > 0 else None
+    cr.actual_exit_date        = cs.checkout_date
+    cr.recorded_by             = cs.created_by_phone
+    cr.deductions              = cs.deductions
+    cr.deduction_reason        = cs.deduction_reason
+    cr.refund_mode             = cs.refund_mode
+    cr.checkout_session_id     = cs.id
+    if not existing:
+        session.add(cr)
+
+    # Refund record
+    session.add(Refund(
+        tenancy_id  = cs.tenancy_id,
+        amount      = Decimal(str(cs.refund_amount)),
+        refund_date = cs.checkout_date if cs.refund_amount > 0 else None,
+        reason      = cs.deduction_reason or "checkout refund",
+        status      = RefundStatus.pending if cs.refund_amount > 0 else RefundStatus.cancelled,
+        notes       = f"Web checkout session {cs.token}",
+    ))
+
+    # Mark confirmed_at
+    cs.confirmed_at = datetime.utcnow()
+    await session.flush()
+
+    # Google Sheet sync
+    try:
+        from src.integrations.gsheets import record_checkout as _gs_checkout
+        await _gs_checkout(
+            room_number,
+            tenant_name,
+            notice_str,
+            cs.checkout_date.strftime("%d/%m/%Y"),
+        )
+    except Exception as _e:
+        logger.warning("Sheet sync failed on checkout confirm: %s", _e)
+
+    refund_line = (
+        f"Refund: Rs.{int(cs.refund_amount):,} via {cs.refund_mode}"
+        if cs.refund_amount > 0
+        else "No refund."
+    )
+    return (
+        f"Checkout confirmed — {tenant_name}, Room {room_number}\n"
+        f"Exit: {cs.checkout_date.strftime('%d %b %Y')}\n"
+        f"{refund_line}"
+    )
+
+
+async def _build_checkout_summary(action_data: dict, phone: str, session: "AsyncSession") -> str:
+    """
+    Build the full settlement summary for the RECORD_CHECKOUT confirm step.
+    Calculates financials from DB, saves updated action_data, returns the summary string.
+    Called after ask_deductions / ask_deduction_reason — before any DB writes.
+    """
+    tenancy_id = action_data.get("tenancy_id")
+    tenancy = await session.get(Tenancy, tenancy_id) if tenancy_id else None
+    deposit = int(tenancy.security_deposit or 0) if tenancy else 0
+
+    if tenancy_id:
+        try:
+            o_rent, o_maint = await _calc_outstanding_dues(tenancy_id, session)
+            pending_dues = int(o_rent) + int(o_maint)
+        except Exception:
+            pending_dues = 0
+    else:
+        pending_dues = 0
+
+    deductions = int(action_data.get("deductions", 0))
+    ded_reason = action_data.get("deduction_reason", "")
+
+    deposit_forfeited = False
+    notice_line = ""
+    if tenancy and not tenancy.notice_date:
+        deposit_forfeited = True
+        notice_line = "\nNo notice on record — *deposit forfeited*"
+    elif tenancy and tenancy.notice_date:
+        if tenancy.notice_date.day > _NOTICE_BY_DAY:
+            deposit_forfeited = True
+            notice_line = (
+                f"\nNotice: {tenancy.notice_date.strftime('%d %b %Y')} "
+                f"(after {_NOTICE_BY_DAY}th) — *deposit forfeited*"
+            )
+        else:
+            notice_line = (
+                f"\nNotice: {tenancy.notice_date.strftime('%d %b %Y')} "
+                f"(on/before {_NOTICE_BY_DAY}th) — eligible for refund"
+            )
+
+    if deposit_forfeited:
+        refund = 0
+    else:
+        refund = max(0, deposit - pending_dues - deductions)
+
+    action_data.update({
+        "auto_deposit": deposit,
+        "auto_dues": pending_dues,
+        "auto_refund": refund,
+        "deposit_forfeited": deposit_forfeited,
+    })
+    await _save_pending(phone, "RECORD_CHECKOUT", action_data, [], session)
+
+    exit_d_str = action_data.get("exit_date", "")
+    try:
+        exit_d = date.fromisoformat(exit_d_str) if exit_d_str else date.today()
+    except ValueError:
+        exit_d = date.today()
+
+    deduction_line = f"Deductions: -Rs.{deductions:,}" + (f" ({ded_reason})" if ded_reason else "")
+
+    if deposit_forfeited:
+        settlement = f"Deposit: Rs.{deposit:,}\n*FORFEITED — Refund: Rs.0*"
+    else:
+        settlement = (
+            f"Deposit held: Rs.{deposit:,}\n"
+            f"Pending dues: -Rs.{pending_dues:,}\n"
+            f"{deduction_line}\n"
+            f"{'─' * 25}\n"
+            f"*Refund: Rs.{refund:,}*"
+        )
+
+    return (
+        f"*Checkout Summary — {action_data.get('tenant_name', '')}*\n\n"
+        f"Exit date: {exit_d.strftime('%d %b %Y')}\n"
+        f"Cupboard key: {'Returned' if action_data.get('cupboard_key') else 'NOT returned'}\n"
+        f"Main key: {'Returned' if action_data.get('main_key') else 'NOT returned'}\n"
+        f"Damages: {action_data.get('damage') or 'None'}\n"
+        f"Fingerprint: {'Deleted' if action_data.get('fingerprint_deleted') else 'NOT deleted'}\n"
+        f"{notice_line}\n\n"
+        f"{settlement}\n\n"
+        "Reply *confirm* to save.\n"
+        "Reply *cancel* or *no* to abort."
+    )
+
+
+async def _handle_checkout_agree(tenant_phone: str, session: "AsyncSession") -> str:
+    """Tenant replied YES. Confirm checkout, write DB, send confirmed WA to tenant."""
+    from sqlalchemy import select as _sel
+    from src.database.models import CheckoutSession, CheckoutSessionStatus
+    cs = await session.scalar(
+        _sel(CheckoutSession).where(
+            CheckoutSession.tenant_phone == tenant_phone,
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+        )
+    )
+    if not cs:
+        return "No pending checkout found. Please ask the receptionist to create a new one."
+
+    cs.status = CheckoutSessionStatus.confirmed.value
+    summary = await _do_confirm_checkout(cs, session)
+
+    # Send checkout_confirmed to tenant
+    phone_wa = f"+91{tenant_phone}" if not tenant_phone.startswith("+") else tenant_phone
+    try:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        tenancy = await session.get(Tenancy, cs.tenancy_id)
+        room = await session.get(Room, tenancy.room_id) if tenancy else None
+        room_no = room.room_number if room else "?"
+        refund_line = (
+            f"Refund of Rs.{int(cs.refund_amount):,} will be processed by receptionist now."
+            if cs.refund_amount > 0 else ""
+        )
+        confirmed_msg = (
+            f"Your checkout from Room {room_no} on "
+            f"{cs.checkout_date.strftime('%d %b %Y')} is confirmed.\n"
+            + (f"{refund_line}\n" if refund_line else "")
+            + "Thank you for staying with Cozeevo."
+        )
+        await _send_whatsapp(phone_wa, confirmed_msg)
+    except Exception as _e:
+        logger.warning("Failed to send checkout_confirmed to tenant: %s", _e)
+
+    # Notify receptionist
+    try:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        recep_phone = (
+            f"+91{cs.created_by_phone}"
+            if not cs.created_by_phone.startswith("+")
+            else cs.created_by_phone
+        )
+        await _send_whatsapp(recep_phone, summary)
+    except Exception as _e:
+        logger.warning("Failed to notify receptionist on checkout confirm: %s", _e)
+
+    return summary
+
+
+async def _handle_checkout_reject(
+    tenant_phone: str, reason: str, session: "AsyncSession"
+) -> str:
+    """Tenant replied NO + reason. Void session, notify receptionist."""
+    from sqlalchemy import select as _sel
+    from src.database.models import CheckoutSession, CheckoutSessionStatus
+    cs = await session.scalar(
+        _sel(CheckoutSession).where(
+            CheckoutSession.tenant_phone == tenant_phone,
+            CheckoutSession.status == CheckoutSessionStatus.pending.value,
+        )
+    )
+    if not cs:
+        return "No pending checkout found."
+
+    cs.status = CheckoutSessionStatus.rejected.value
+    cs.rejection_reason = reason
+    await session.flush()
+
+    # Notify receptionist
+    try:
+        from src.whatsapp.webhook_handler import _send_whatsapp
+        tenancy = await session.get(Tenancy, cs.tenancy_id)
+        tenant  = await session.get(Tenant, tenancy.tenant_id) if tenancy else None
+        tenant_name = tenant.name if tenant else "Tenant"
+        room    = await session.get(Room, tenancy.room_id) if tenancy else None
+        room_no = room.room_number if room else "?"
+        recep_phone = (
+            f"+91{cs.created_by_phone}"
+            if not cs.created_by_phone.startswith("+")
+            else cs.created_by_phone
+        )
+        notif = (
+            f"{tenant_name} (Room {room_no}) rejected the checkout.\n"
+            f"Reason: {reason}\n"
+            f"Please resolve and create a new checkout session."
+        )
+        await _send_whatsapp(recep_phone, notif)
+    except Exception as _e:
+        logger.warning("Failed to notify receptionist on checkout rejection: %s", _e)
+
+    return (
+        "Understood. Your feedback has been sent to the receptionist. "
+        "They will contact you to resolve this."
+    )
+
+
 async def resolve_pending_action(
     pending: PendingAction, reply_text: str, session: AsyncSession,
     media_id: str | None = None, media_type: str | None = None, media_mime: str | None = None,
@@ -1489,70 +1761,34 @@ async def resolve_pending_action(
 
         if step == "ask_fingerprint":
             action_data["fingerprint_deleted"] = yes
+            action_data["step"] = "ask_deductions"
+            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+            return "*Q5/5* Any *deductions* from the deposit?\nEnter amount in Rs. or reply *0* for none."
+
+        if step == "ask_deductions":
+            try:
+                ded_amount = float(
+                    ans.replace(",", "").replace("Rs.", "").replace("Rs", "").replace("rs", "").replace("₹", "").strip()
+                )
+            except ValueError:
+                return "__KEEP_PENDING__Please enter a number (e.g. *2000* or *0*)."
+            action_data["deductions"] = ded_amount
+            if ded_amount > 0:
+                action_data["step"] = "ask_deduction_reason"
+                await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+                return "Reason for deduction? (e.g. *paint damage*, *no notice given*)"
+            else:
+                action_data["deductions"] = 0
+                action_data["deduction_reason"] = ""
+                action_data["step"] = "confirm_checkout"
+                await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
+                return await _build_checkout_summary(action_data, pending.phone, session)
+
+        if step == "ask_deduction_reason":
+            action_data["deduction_reason"] = reply_text.strip()
             action_data["step"] = "confirm_checkout"
             await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-
-            # Auto-calculate dues from DB
-            tenancy_id = action_data.get("tenancy_id")
-            tenancy = await session.get(Tenancy, tenancy_id) if tenancy_id else None
-            deposit = int(tenancy.security_deposit or 0) if tenancy else 0
-            maintenance = int(tenancy.maintenance_fee or 0) if tenancy else 0
-            o_rent, o_maint = await _calc_outstanding_dues(tenancy_id, session) if tenancy_id else (Decimal("0"), Decimal("0"))
-            total_dues = int(o_rent) + int(o_maint)
-
-            # Deposit forfeiture: notice after 5th = deposit forfeited, refund = 0
-            deposit_forfeited = False
-            notice_line = ""
-            if tenancy and not tenancy.notice_date:
-                deposit_forfeited = True
-                notice_line = "\nNo notice on record — *deposit forfeited*"
-            elif tenancy and tenancy.notice_date:
-                if tenancy.notice_date.day > _NOTICE_BY_DAY:
-                    deposit_forfeited = True
-                    notice_line = (f"\nNotice given: {tenancy.notice_date.strftime('%d %b %Y')} "
-                                   f"(after {_NOTICE_BY_DAY}th) — *deposit Rs.{deposit:,} forfeited*")
-                else:
-                    notice_line = (f"\nNotice given: {tenancy.notice_date.strftime('%d %b %Y')} "
-                                   f"(before {_NOTICE_BY_DAY}th) — deposit eligible for refund")
-
-            if deposit_forfeited:
-                refund = 0
-            else:
-                refund = max(0, deposit - total_dues - maintenance)
-
-            action_data["auto_dues"] = total_dues
-            action_data["auto_maintenance"] = maintenance
-            action_data["auto_deposit"] = deposit
-            action_data["auto_refund"] = refund
-            action_data["deposit_forfeited"] = deposit_forfeited
-            await _save_pending(pending.phone, "RECORD_CHECKOUT", action_data, [], session)
-
-            if deposit_forfeited:
-                settlement = (
-                    f"Deposit held: Rs.{deposit:,}\n"
-                    f"*FORFEITED — Refund: Rs.0*"
-                )
-            else:
-                settlement = (
-                    f"Deposit held: Rs.{deposit:,}\n"
-                    f"Unpaid rent: -Rs.{int(o_rent):,}\n"
-                    f"Maintenance: -Rs.{maintenance:,}\n"
-                    f"{'─' * 25}\n"
-                    f"*Refund: Rs.{refund:,}*"
-                )
-
-            return (
-                f"*Q5/5 — Settlement Summary*\n\n"
-                f"Exit date: {date.fromisoformat(action_data.get('exit_date', date.today().isoformat())).strftime('%d %b %Y')}\n"
-                f"Cupboard key: {'Returned' if action_data.get('cupboard_key') else 'NOT returned'}\n"
-                f"Main key: {'Returned' if action_data.get('main_key') else 'NOT returned'}\n"
-                f"Damages: {action_data.get('damage') or 'None'}\n"
-                f"Fingerprint: {'Deleted' if action_data.get('fingerprint_deleted') else 'NOT deleted'}\n"
-                f"{notice_line}\n\n"
-                f"{settlement}\n\n"
-                "Reply *confirm* to process checkout\n"
-                "or *cancel* to abort"
-            )
+            return await _build_checkout_summary(action_data, pending.phone, session)
 
         if step == "confirm_checkout":
             if ans in ("confirm", "yes", "y", "done", "ok", "proceed"):
@@ -1571,11 +1807,18 @@ async def resolve_pending_action(
                     deposit_refund_date=exit_date if refund_amt > 0 else None,
                     actual_exit_date=exit_date,
                     recorded_by=pending.phone,
+                    biometric_removed=action_data.get("fingerprint_deleted", False),
+                    deductions=Decimal(str(action_data.get("deductions", 0))),
+                    deduction_reason=action_data.get("deduction_reason") or None,
                 )
                 session.add(cr)
 
                 if tenancy_id:
-                    reason = "deposit forfeited — late notice" if deposit_forfeited else "deposit refund on checkout"
+                    _ded_reason = action_data.get("deduction_reason") or ""
+                    reason = (
+                        "deposit forfeited — late notice" if deposit_forfeited
+                        else (_ded_reason if _ded_reason else "deposit refund on checkout")
+                    )
                     session.add(Refund(
                         tenancy_id  = tenancy_id,
                         amount      = Decimal(str(refund_amt)),
@@ -1617,10 +1860,13 @@ async def resolve_pending_action(
                 if deposit_forfeited:
                     settlement_line = f"Deposit: Rs.{deposit:,} — *FORFEITED*\n*Refund: Rs.0*"
                 else:
+                    _ded = int(action_data.get("deductions", 0))
+                    _ded_r = action_data.get("deduction_reason") or ""
+                    _ded_line = f"Deductions: -Rs.{_ded:,}" + (f" ({_ded_r})" if _ded_r else "")
                     settlement_line = (
                         f"Deposit: Rs.{deposit:,}\n"
                         f"Dues deducted: -Rs.{action_data.get('auto_dues', 0):,}\n"
-                        f"Maintenance: -Rs.{action_data.get('auto_maintenance', 0):,}\n"
+                        f"{_ded_line}\n"
                         f"*Refund: Rs.{refund_amt:,}*"
                     )
 

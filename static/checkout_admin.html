@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout — Cozeevo Admin</title>
+  <style>
+    :root { --pink: #EF1F9C; --blue: #00AEED; --bg: #0f0f1a; --card: #1a1a2e; --text: #e0e0e0; --muted: #888; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+    nav { background: var(--card); padding: 14px 24px; display: flex; align-items: center; gap: 24px; border-bottom: 1px solid #2a2a40; }
+    nav .brand { color: var(--pink); font-weight: 700; font-size: 16px; text-decoration: none; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; padding: 6px 12px; border-radius: 6px; }
+    nav a.active, nav a:hover { background: rgba(239,31,156,0.12); color: var(--pink); }
+    .page { max-width: 680px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+    .progress { display: flex; gap: 8px; margin-bottom: 32px; }
+    .step-dot { flex: 1; height: 4px; border-radius: 2px; background: #2a2a40; transition: background .3s; }
+    .step-dot.active { background: var(--pink); }
+    .step-dot.done { background: var(--blue); }
+    .card { background: var(--card); border-radius: 12px; padding: 28px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 20px; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input, select, textarea { width: 100%; background: #0d0d1a; border: 1px solid #2a2a40; border-radius: 8px; color: var(--text); padding: 10px 14px; font-size: 14px; outline: none; }
+    input:focus, select:focus { border-color: var(--pink); }
+    textarea { resize: vertical; min-height: 72px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .toggle-group { display: flex; gap: 10px; }
+    .toggle-btn { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #2a2a40; background: #0d0d1a; color: var(--muted); cursor: pointer; font-size: 14px; text-align: center; transition: all .2s; }
+    .toggle-btn.yes.selected { background: rgba(74,222,128,.15); border-color: #4ade80; color: #4ade80; }
+    .toggle-btn.no.selected  { background: rgba(239,68,68,.15);  border-color: #ef4444; color: #ef4444; }
+    .toggle-btn.ok.selected  { background: rgba(74,222,128,.15); border-color: #4ade80; color: #4ade80; }
+    .autocomplete { position: relative; }
+    .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--card); border: 1px solid #2a2a40; border-radius: 8px; z-index: 100; max-height: 200px; overflow-y: auto; }
+    .suggestion-item { padding: 10px 14px; cursor: pointer; font-size: 14px; }
+    .suggestion-item:hover { background: rgba(239,31,156,.1); }
+    .settlement { background: #0d0d1a; border-radius: 8px; padding: 16px; margin-bottom: 18px; }
+    .settlement-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+    .settlement-row.total { border-top: 1px solid #2a2a40; margin-top: 8px; padding-top: 10px; font-weight: 600; color: #4ade80; }
+    .btn-primary { width: 100%; background: var(--pink); border: none; color: white; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .btn-primary:hover { opacity: .9; }
+    .btn-back { background: none; border: 1px solid #2a2a40; color: var(--muted); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; margin-right: 10px; }
+    .status-box { background: var(--card); border-radius: 12px; padding: 28px; text-align: center; display: none; }
+    .status-icon { font-size: 48px; margin-bottom: 16px; }
+    .status-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    .status-sub { color: var(--muted); font-size: 14px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-top: 12px; }
+    .badge.pending  { background: rgba(251,191,36,.15); color: #fbbf24; }
+    .badge.confirmed { background: rgba(74,222,128,.15); color: #4ade80; }
+    .badge.auto_confirmed { background: rgba(0,174,237,.15); color: var(--blue); }
+    .badge.rejected { background: rgba(239,68,68,.15); color: #ef4444; }
+    .hidden { display: none !important; }
+    select option { background: #1a1a2e; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/admin/onboarding" class="brand">Cozeevo Admin</a>
+  <a href="/admin/onboarding">Check-in</a>
+  <a href="/admin/checkout" class="active">Checkout</a>
+</nav>
+
+<div class="page">
+  <h1>Checkout Form</h1>
+  <p class="subtitle">Fill all details. Tenant will receive a WhatsApp summary to confirm.</p>
+
+  <div class="progress">
+    <div class="step-dot active" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+    <div class="step-dot" id="dot3"></div>
+  </div>
+
+  <!-- Step 1 -->
+  <div id="step1">
+    <div class="card">
+      <h2>Step 1 — Tenant &amp; Date</h2>
+      <div class="field autocomplete">
+        <label>Tenant</label>
+        <input type="text" id="tenantSearch" placeholder="Search by name or room…" autocomplete="off">
+        <div class="suggestions" id="suggestions" style="display:none"></div>
+        <input type="hidden" id="tenancyId">
+      </div>
+      <div class="field">
+        <label>Checkout Date</label>
+        <input type="date" id="checkoutDate">
+      </div>
+    </div>
+    <button class="btn-primary" onclick="goStep2()">Next: Physical Handover →</button>
+  </div>
+
+  <!-- Step 2 -->
+  <div id="step2" class="hidden">
+    <div class="card">
+      <h2>Step 2 — Physical Handover</h2>
+      <div class="field">
+        <label>Room Key Returned</label>
+        <div class="toggle-group">
+          <button class="toggle-btn yes" data-field="roomKey" data-val="true" onclick="setToggle(this)">Yes</button>
+          <button class="toggle-btn no"  data-field="roomKey" data-val="false" onclick="setToggle(this)">No</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Wardrobe Key Returned</label>
+        <div class="toggle-group">
+          <button class="toggle-btn yes" data-field="wardrobeKey" data-val="true" onclick="setToggle(this)">Yes</button>
+          <button class="toggle-btn no"  data-field="wardrobeKey" data-val="false" onclick="setToggle(this)">No</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Biometric Removed</label>
+        <div class="toggle-group">
+          <button class="toggle-btn yes" data-field="biometric" data-val="true" onclick="setToggle(this)">Yes</button>
+          <button class="toggle-btn no"  data-field="biometric" data-val="false" onclick="setToggle(this)">No</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Room Condition</label>
+        <div class="toggle-group">
+          <button class="toggle-btn ok yes" data-field="roomCondition" data-val="true" onclick="setToggle(this)">OK</button>
+          <button class="toggle-btn no"     data-field="roomCondition" data-val="false" onclick="setToggle(this)">Not OK</button>
+        </div>
+      </div>
+      <div class="field" id="damageField" style="display:none">
+        <label>Damage Notes *</label>
+        <textarea id="damageNotes" placeholder="Describe the damage…"></textarea>
+      </div>
+    </div>
+    <button class="btn-back" onclick="goStep1()">← Back</button>
+    <button class="btn-primary" style="width:auto;display:inline-block;padding:14px 32px" onclick="goStep3()">Next: Settlement →</button>
+  </div>
+
+  <!-- Step 3 -->
+  <div id="step3" class="hidden">
+    <div class="card">
+      <h2>Step 3 — Financial Settlement</h2>
+      <div class="row2">
+        <div class="field">
+          <label>Security Deposit (₹)</label>
+          <input type="number" id="deposit" oninput="calcRefund()">
+        </div>
+        <div class="field">
+          <label>Pending Dues (₹)</label>
+          <input type="number" id="pendingDues" oninput="calcRefund()">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Deductions (₹)</label>
+          <input type="number" id="deductions" value="0" oninput="calcRefund()">
+        </div>
+        <div class="field">
+          <label>Refund Mode</label>
+          <select id="refundMode">
+            <option value="">Select…</option>
+            <option value="cash">Cash</option>
+            <option value="upi">UPI</option>
+            <option value="bank">Bank Transfer</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" id="deductionReasonField" style="display:none">
+        <label>Deduction Reason *</label>
+        <input type="text" id="deductionReason" placeholder="e.g. paint damage, no notice given">
+      </div>
+      <div class="field">
+        <label>Refund Amount (₹) — editable</label>
+        <input type="number" id="refundAmount" oninput="refundOverridden = true">
+      </div>
+      <div class="settlement">
+        <div class="settlement-row"><span>Security Deposit</span><span id="s_deposit">₹0</span></div>
+        <div class="settlement-row"><span>Pending Dues</span><span id="s_dues" style="color:#ef4444">- ₹0</span></div>
+        <div class="settlement-row"><span>Deductions</span><span id="s_deductions" style="color:#ef4444">- ₹0</span></div>
+        <div class="settlement-row total"><span>Refund</span><span id="s_refund">₹0</span></div>
+      </div>
+    </div>
+    <button class="btn-back" onclick="goStep2()">← Back</button>
+    <button class="btn-primary" style="width:auto;display:inline-block;padding:14px 32px" onclick="submitForm()">Send to Tenant →</button>
+  </div>
+
+  <!-- Status box -->
+  <div class="status-box" id="statusBox">
+    <div class="status-icon">📋</div>
+    <div class="status-title" id="statusTitle">Sent to Tenant</div>
+    <div class="status-sub" id="statusSub">Waiting for confirmation…</div>
+    <div class="badge pending" id="statusBadge">PENDING</div>
+    <br><br>
+    <button class="btn-primary" onclick="resetForm()">New Checkout</button>
+  </div>
+</div>
+
+<script>
+const PIN = 'cozeevo2026';
+let state = { tenancyId: null, toggles: {} };
+let refundOverridden = false;
+let pollInterval = null;
+
+document.getElementById('checkoutDate').value = new Date().toISOString().split('T')[0];
+
+let searchTimer = null;
+document.getElementById('tenantSearch').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 2) { hideSuggestions(); return; }
+  searchTimer = setTimeout(() => fetchSuggestions(q), 250);
+});
+
+async function fetchSuggestions(q) {
+  const resp = await fetch(`/api/checkout/tenants?q=${encodeURIComponent(q)}`,
+    { headers: { 'X-Admin-Pin': PIN } });
+  if (!resp.ok) return;
+  const items = await resp.json();
+  const box = document.getElementById('suggestions');
+  box.innerHTML = '';
+  if (!items.length) { hideSuggestions(); return; }
+  items.forEach(item => {
+    const d = document.createElement('div');
+    d.className = 'suggestion-item';
+    d.textContent = item.label;
+    d.onclick = () => selectTenant(item);
+    box.appendChild(d);
+  });
+  box.style.display = 'block';
+}
+
+async function selectTenant(item) {
+  document.getElementById('tenantSearch').value = item.label;
+  document.getElementById('tenancyId').value = item.tenancy_id;
+  state.tenancyId = item.tenancy_id;
+  hideSuggestions();
+  const resp = await fetch(`/api/checkout/tenant/${item.tenancy_id}`,
+    { headers: { 'X-Admin-Pin': PIN } });
+  if (!resp.ok) return;
+  const d = await resp.json();
+  document.getElementById('deposit').value = d.security_deposit;
+  document.getElementById('pendingDues').value = d.pending_dues;
+  refundOverridden = false;
+  calcRefund();
+}
+
+function hideSuggestions() { document.getElementById('suggestions').style.display = 'none'; }
+document.addEventListener('click', e => { if (!e.target.closest('.autocomplete')) hideSuggestions(); });
+
+function setToggle(btn) {
+  const field = btn.dataset.field;
+  btn.closest('.toggle-group').querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.toggles[field] = btn.dataset.val === 'true';
+  if (field === 'roomCondition') {
+    document.getElementById('damageField').style.display = btn.dataset.val === 'false' ? 'block' : 'none';
+    if (btn.dataset.val === 'true') document.getElementById('damageNotes').value = '';
+  }
+}
+
+function calcRefund() {
+  const dep  = parseFloat(document.getElementById('deposit').value) || 0;
+  const dues = parseFloat(document.getElementById('pendingDues').value) || 0;
+  const ded  = parseFloat(document.getElementById('deductions').value) || 0;
+  document.getElementById('s_deposit').textContent = `₹${dep.toLocaleString()}`;
+  document.getElementById('s_dues').textContent = `- ₹${dues.toLocaleString()}`;
+  document.getElementById('s_deductions').textContent = `- ₹${ded.toLocaleString()}`;
+  const refund = Math.max(0, dep - dues - ded);
+  document.getElementById('s_refund').textContent = `₹${refund.toLocaleString()}`;
+  if (!refundOverridden) document.getElementById('refundAmount').value = refund;
+  document.getElementById('deductionReasonField').style.display = ded > 0 ? 'block' : 'none';
+}
+
+function updateProgress(step) {
+  [1,2,3].forEach(i => {
+    const dot = document.getElementById(`dot${i}`);
+    dot.className = 'step-dot' + (i < step ? ' done' : i === step ? ' active' : '');
+  });
+}
+
+function goStep1() {
+  document.getElementById('step1').classList.remove('hidden');
+  document.getElementById('step2').classList.add('hidden');
+  updateProgress(1);
+}
+
+function goStep2() {
+  if (!state.tenancyId) { alert('Please select a tenant first.'); return; }
+  if (!document.getElementById('checkoutDate').value) { alert('Please set a checkout date.'); return; }
+  document.getElementById('step1').classList.add('hidden');
+  document.getElementById('step2').classList.remove('hidden');
+  updateProgress(2);
+}
+
+function goStep3() {
+  const required = ['roomKey', 'wardrobeKey', 'biometric', 'roomCondition'];
+  for (const f of required) {
+    if (state.toggles[f] === undefined) { alert('Please answer all physical handover questions.'); return; }
+  }
+  if (state.toggles.roomCondition === false && !document.getElementById('damageNotes').value.trim()) {
+    alert('Please describe the damage.'); return;
+  }
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('step3').classList.remove('hidden');
+  updateProgress(3);
+  calcRefund();
+}
+
+async function submitForm() {
+  const deductions = parseFloat(document.getElementById('deductions').value) || 0;
+  if (deductions > 0 && !document.getElementById('deductionReason').value.trim()) {
+    alert('Please enter a deduction reason.'); return;
+  }
+  if (!document.getElementById('refundMode').value) {
+    alert('Please select a refund mode.'); return;
+  }
+
+  const payload = {
+    tenancy_id:            state.tenancyId,
+    checkout_date:         document.getElementById('checkoutDate').value,
+    room_key_returned:     state.toggles.roomKey,
+    wardrobe_key_returned: state.toggles.wardrobeKey,
+    biometric_removed:     state.toggles.biometric,
+    room_condition_ok:     state.toggles.roomCondition,
+    damage_notes:          document.getElementById('damageNotes').value.trim(),
+    security_deposit:      parseFloat(document.getElementById('deposit').value) || 0,
+    pending_dues:          parseFloat(document.getElementById('pendingDues').value) || 0,
+    deductions:            deductions,
+    deduction_reason:      document.getElementById('deductionReason').value.trim(),
+    refund_amount:         parseFloat(document.getElementById('refundAmount').value) || 0,
+    refund_mode:           document.getElementById('refundMode').value,
+    created_by_phone:      '',
+  };
+
+  const resp = await fetch('/api/checkout/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': PIN },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert('Error: ' + (err.detail || resp.status)); return;
+  }
+  const data = await resp.json();
+
+  document.getElementById('step3').classList.add('hidden');
+  document.getElementById('statusBox').style.display = 'block';
+  startPolling(data.token);
+}
+
+function startPolling(token) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(() => checkStatus(token), 8000);
+}
+
+async function checkStatus(token) {
+  const resp = await fetch(`/api/checkout/status/${token}`, { headers: { 'X-Admin-Pin': PIN } });
+  if (!resp.ok) return;
+  const d = await resp.json();
+  const badge = document.getElementById('statusBadge');
+  const title = document.getElementById('statusTitle');
+  const sub   = document.getElementById('statusSub');
+  badge.className = `badge ${d.status}`;
+  badge.textContent = d.status.replace('_', ' ').toUpperCase();
+  if (d.status === 'confirmed') {
+    clearInterval(pollInterval);
+    title.textContent = 'Tenant Confirmed';
+    sub.textContent = 'Checkout confirmed. DB and Sheet updated.';
+  } else if (d.status === 'auto_confirmed') {
+    clearInterval(pollInterval);
+    title.textContent = 'Auto-Confirmed';
+    sub.textContent = 'No response in 2 hours — checkout auto-confirmed.';
+  } else if (d.status === 'rejected') {
+    clearInterval(pollInterval);
+    title.textContent = 'Tenant Rejected';
+    sub.textContent = `Reason: ${d.rejection_reason || 'Not provided'}. Please resolve and create a new session.`;
+  }
+}
+
+function resetForm() {
+  clearInterval(pollInterval);
+  document.getElementById('statusBox').style.display = 'none';
+  document.getElementById('step1').classList.remove('hidden');
+  document.getElementById('step2').classList.add('hidden');
+  document.getElementById('step3').classList.add('hidden');
+  document.getElementById('tenantSearch').value = '';
+  document.getElementById('tenancyId').value = '';
+  document.getElementById('checkoutDate').value = new Date().toISOString().split('T')[0];
+  state = { tenancyId: null, toggles: {} };
+  refundOverridden = false;
+  updateProgress(1);
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('damageNotes').value = '';
+  document.getElementById('deposit').value = '';
+  document.getElementById('pendingDues').value = '';
+  document.getElementById('deductions').value = '0';
+  document.getElementById('refundAmount').value = '';
+  document.getElementById('refundMode').value = '';
+  document.getElementById('deductionReason').value = '';
+  calcRefund();
+}
+</script>
+</body>
+</html>
