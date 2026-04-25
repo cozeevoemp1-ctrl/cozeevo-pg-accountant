@@ -571,6 +571,154 @@ async def regen_pdf(token: str, request: Request):
         return {"status": "ok", "pdf_path": pdf_path, "whatsapp_sent": whatsapp_sent}
 
 
+# ── Staff signature store / retrieve ─────────────────────────────────────────
+
+def _staff_sig_path(phone: str):
+    from pathlib import Path
+    return Path(os.getenv("MEDIA_DIR", "media")) / "staff_signatures" / f"{phone.strip()}.png"
+
+
+@router.get("/staff-signature/{phone}")
+async def get_staff_signature(phone: str, request: Request):
+    """Return saved staff signature as base64 PNG, or 404 if not saved yet."""
+    _check_admin_pin(request)
+    p = _staff_sig_path(phone)
+    if not p.exists():
+        raise HTTPException(404, "No saved signature for this phone")
+    import base64
+    data = base64.b64encode(p.read_bytes()).decode()
+    return {"data_url": f"data:image/png;base64,{data}"}
+
+
+@router.post("/staff-signature/{phone}")
+async def save_staff_signature(phone: str, request: Request):
+    """Save (or overwrite) a staff member's signature. Accepts base64 PNG data URL."""
+    _check_admin_pin(request)
+    body = await request.json()
+    data_url = body.get("data_url", "")
+    if not data_url or "base64," not in data_url:
+        raise HTTPException(400, "data_url required (base64 PNG)")
+    import base64
+    raw = base64.b64decode(data_url.split("base64,", 1)[1])
+    p = _staff_sig_path(phone)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(raw)
+    return {"status": "saved", "phone": phone}
+
+
+@router.get("/staff-sign", response_class=HTMLResponse)
+async def staff_sign_page(request: Request, phone: str = ""):
+    """One-time signature collection page for staff. Opens signature pad, saves on submit."""
+    _check_admin_pin(request)
+    phone_val = phone or ""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Signature — Cozeevo</title>
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ font-family: -apple-system, sans-serif; background: #F9FAFB; display: flex; align-items: center;
+            justify-content: center; min-height: 100vh; padding: 20px; }}
+    .card {{ background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.1);
+              padding: 32px; max-width: 480px; width: 100%; }}
+    h2 {{ color: #1A202C; font-size: 20px; margin-bottom: 6px; }}
+    p {{ color: #718096; font-size: 13px; margin-bottom: 24px; }}
+    label {{ font-size: 12px; font-weight: 700; color: #4A5568; text-transform: uppercase;
+              letter-spacing: .4px; display: block; margin-bottom: 6px; }}
+    input {{ width: 100%; padding: 10px 12px; border: 1px solid #CBD5E1; border-radius: 6px;
+              font-size: 14px; margin-bottom: 18px; }}
+    canvas {{ border: 2px dashed #CBD5E1; border-radius: 8px; display: block; width: 100%;
+               height: 130px; touch-action: none; cursor: crosshair; background: #fff; }}
+    .row {{ display: flex; justify-content: space-between; align-items: center; margin-top: 6px; margin-bottom: 20px; }}
+    .row a {{ font-size: 12px; color: #EF1F9C; cursor: pointer; text-decoration: none; }}
+    .row span {{ font-size: 12px; color: #718096; }}
+    button {{ width: 100%; padding: 12px; background: #EF1F9C; color: #fff; border: none;
+               border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; }}
+    button:disabled {{ opacity: .5; cursor: not-allowed; }}
+    #msg {{ margin-top: 16px; padding: 12px; border-radius: 6px; font-size: 13px; display: none; }}
+    #msg.ok {{ background: #F0FFF4; color: #276749; border: 1px solid #9AE6B4; }}
+    #msg.err {{ background: #FFF5F5; color: #C53030; border: 1px solid #FC8181; }}
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>Staff Signature</h2>
+  <p>Sign once — this will be auto-used for all future approvals from your phone number.</p>
+  <label>Your Phone Number</label>
+  <input id="phone" type="tel" maxlength="10" placeholder="10-digit phone" value="{phone_val}">
+  <label>Draw Your Signature Below</label>
+  <canvas id="sig-canvas" width="800" height="200"></canvas>
+  <div class="row">
+    <span>Use your finger or mouse</span>
+    <a onclick="clearSig()">Clear</a>
+  </div>
+  <button id="saveBtn" onclick="save()">Save My Signature</button>
+  <div id="msg"></div>
+</div>
+<script>
+  const canvas = document.getElementById('sig-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#00AEED'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  let drawing = false, lx = 0, ly = 0, drawn = false;
+  function pos(e) {{
+    const r = canvas.getBoundingClientRect();
+    const scx = canvas.width / r.width, scy = canvas.height / r.height;
+    if (e.touches) return {{ x: (e.touches[0].clientX - r.left)*scx, y: (e.touches[0].clientY - r.top)*scy }};
+    return {{ x: (e.clientX - r.left)*scx, y: (e.clientY - r.top)*scy }};
+  }}
+  canvas.addEventListener('mousedown', e => {{ const p = pos(e); drawing=true; lx=p.x; ly=p.y; }});
+  canvas.addEventListener('mousemove', e => {{
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(p.x,p.y); ctx.stroke();
+    lx=p.x; ly=p.y; drawn=true;
+  }});
+  canvas.addEventListener('mouseup', () => drawing=false);
+  canvas.addEventListener('mouseleave', () => drawing=false);
+  canvas.addEventListener('touchstart', e => {{ e.preventDefault(); const p = pos(e); drawing=true; lx=p.x; ly=p.y; }}, {{passive:false}});
+  canvas.addEventListener('touchmove', e => {{
+    e.preventDefault(); if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(p.x,p.y); ctx.stroke();
+    lx=p.x; ly=p.y; drawn=true;
+  }}, {{passive:false}});
+  canvas.addEventListener('touchend', () => drawing=false);
+
+  function clearSig() {{ ctx.clearRect(0,0,canvas.width,canvas.height); drawn=false; }}
+
+  async function save() {{
+    const phone = document.getElementById('phone').value.trim();
+    if (!phone || phone.length !== 10) {{ showMsg('Enter a valid 10-digit phone number.', false); return; }}
+    if (!drawn) {{ showMsg('Please draw your signature first.', false); return; }}
+    const dataUrl = canvas.toDataURL('image/png');
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {{
+      const r = await fetch('/api/onboarding/staff-signature/' + phone, {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json', 'X-Admin-Pin': '{ADMIN_PIN}' }},
+        body: JSON.stringify({{ data_url: dataUrl }}),
+      }});
+      if (r.ok) {{
+        showMsg('Signature saved! This will be used automatically on future approvals.', true);
+      }} else {{
+        showMsg('Save failed: ' + (await r.text()), false);
+      }}
+    }} catch(e) {{ showMsg('Network error: ' + e, false); }}
+    btn.disabled = false; btn.textContent = 'Save My Signature';
+  }}
+
+  function showMsg(text, ok) {{
+    const el = document.getElementById('msg');
+    el.textContent = text; el.className = ok ? 'ok' : 'err'; el.style.display = 'block';
+  }}
+</script>
+</body>
+</html>"""
+
+
 _AADHAAR_EXTRACT_PROMPT = """You are extracting identity details from an Indian Aadhaar card photo.
 Return ONLY valid JSON with these fields. No markdown, no explanation.
 

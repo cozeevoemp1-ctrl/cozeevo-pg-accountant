@@ -1441,14 +1441,24 @@
         </div>
         <div style="margin-bottom:12px;">
           <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);display:block;margin-bottom:6px;">Your Phone Number (who is approving)</label>
-          <input id="approver-phone-${token}" type="tel" maxlength="10" placeholder="10-digit phone" style="width:200px;padding:8px 10px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;">
+          <input id="approver-phone-${token}" type="tel" maxlength="10" placeholder="10-digit phone" style="width:200px;padding:8px 10px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;" oninput="onApproverPhoneInput('${token}', this.value)">
         </div>
         <div class="section-divider">Staff Signature (Required to Approve)</div>
         <div style="margin-bottom:12px;">
-          <canvas id="staff-sig-${token}" width="400" height="100" style="border:1.5px dashed #E2E8F0;border-radius:8px;cursor:crosshair;background:#fff;display:block;width:100%;max-width:400px;height:100px;touch-action:none;"></canvas>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-            <span style="font-size:11px;color:#718096;">Sign as authorized staff</span>
-            <a href="#" onclick="clearStaffSig('${token}');return false;" style="font-size:11px;color:#EF1F9C;text-decoration:none;">Clear</a>
+          <!-- Saved-signature row (hidden until phone matched) -->
+          <div id="saved-sig-row-${token}" style="display:none;align-items:center;gap:10px;background:#F0FFF4;border:1px solid #9AE6B4;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+            <img id="saved-sig-preview-${token}" src="" style="height:40px;border:1px solid #CBD5E1;border-radius:4px;background:#fff;padding:2px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="use-saved-sig-${token}" checked onchange="onUseSavedSigToggle('${token}')"> Use my saved signature
+            </label>
+          </div>
+          <!-- Draw pad (shown when no saved sig or checkbox unchecked) -->
+          <div id="sig-pad-wrap-${token}">
+            <canvas id="staff-sig-${token}" width="400" height="100" style="border:1.5px dashed #E2E8F0;border-radius:8px;cursor:crosshair;background:#fff;display:block;width:100%;max-width:400px;height:100px;touch-action:none;"></canvas>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <span style="font-size:11px;color:#718096;">Sign as authorized staff</span>
+              <a href="#" onclick="clearStaffSig('${token}');return false;" style="font-size:11px;color:#EF1F9C;text-decoration:none;">Clear</a>
+            </div>
           </div>
         </div>
       ` : ''}
@@ -1527,9 +1537,38 @@
   }
 
   function getStaffSigDataUrl(token) {
+    // If saved-sig checkbox is visible and checked, use stored data URL
+    const chk = document.getElementById(`use-saved-sig-${token}`);
+    if (chk && chk.checked && staffSigState[token]?.savedUrl) {
+      return staffSigState[token].savedUrl;
+    }
     const canvas = document.getElementById(`staff-sig-${token}`);
     if (!canvas || !staffSigState[token]?.drawn) return '';
     return canvas.toDataURL('image/png');
+  }
+
+  // Called when approver phone is typed — try to load saved signature
+  async function onApproverPhoneInput(token, phone) {
+    if (phone.length !== 10) return;
+    try {
+      const r = await fetch(`/api/onboarding/staff-signature/${phone}`, { headers: pinHeaders() });
+      if (!r.ok) return;  // no saved sig — keep pad visible
+      const data = await r.json();
+      if (!data.data_url) return;
+      if (!staffSigState[token]) staffSigState[token] = {};
+      staffSigState[token].savedUrl = data.data_url;
+      // Show saved-sig row, hide pad
+      document.getElementById(`saved-sig-preview-${token}`).src = data.data_url;
+      document.getElementById(`saved-sig-row-${token}`).style.display = 'flex';
+      document.getElementById(`sig-pad-wrap-${token}`).style.display = 'none';
+    } catch(e) {}
+  }
+
+  // Toggle between saved sig and draw pad
+  function onUseSavedSigToggle(token) {
+    const chk = document.getElementById(`use-saved-sig-${token}`);
+    document.getElementById(`sig-pad-wrap-${token}`).style.display = chk.checked ? 'none' : 'block';
+    if (!chk.checked) setTimeout(() => initStaffSigCanvas(token), 50);
   }
 
   // ── Approve session ────────────────────────────────────────────────────────
