@@ -382,53 +382,6 @@
     .selfie-upload.has-photo { border: 3px solid #00AEED; }
     .selfie-upload img { width: 100%; height: 100%; object-fit: cover; }
 
-    /* Selfie camera modal */
-    .camera-modal {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center;
-    }
-    .camera-modal.active { display: flex; }
-    .camera-video-wrap {
-      position: relative; width: 280px; height: 340px; overflow: hidden; border-radius: 16px;
-    }
-    .camera-video-wrap video {
-      width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
-    }
-    .camera-oval-guide {
-      position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-      width: 180px; height: 240px; border: 3px dashed rgba(255,255,255,0.7); border-radius: 50%;
-      pointer-events: none;
-    }
-    .camera-hint {
-      color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 12px; text-align: center;
-    }
-    .camera-controls {
-      display: flex; gap: 24px; align-items: center; margin-top: 20px;
-    }
-    .camera-btn-capture {
-      width: 64px; height: 64px; border-radius: 50%; border: 4px solid #fff;
-      background: #EF1F9C; cursor: pointer; transition: transform 0.1s;
-    }
-    .camera-btn-capture:active { transform: scale(0.9); }
-    .camera-btn-cancel, .camera-btn-retake {
-      background: none; border: 1px solid rgba(255,255,255,0.5); color: #fff;
-      padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
-    }
-    .camera-preview-wrap {
-      display: none; flex-direction: column; align-items: center;
-    }
-    .camera-preview-wrap img {
-      width: 200px; height: 200px; object-fit: cover; border-radius: 50%;
-      border: 3px solid #00AEED;
-    }
-    .camera-preview-actions {
-      display: flex; gap: 16px; margin-top: 16px;
-    }
-    .camera-btn-use {
-      background: #00AEED; border: none; color: #fff; padding: 10px 24px;
-      border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
-    }
-
     /* Upload areas */
     .upload-area {
       border: 2px dashed #E8ECF0; border-radius: 10px; padding: 20px;
@@ -647,7 +600,7 @@
         </div>
       </div>
       <div class="photo-card" id="selfie-upload-area">
-        <input type="file" id="selfie-input" accept="image/*" style="display:none;" onchange="handleSelfieUpload(this)">
+        <input type="file" id="selfie-input" accept="image/*" capture="user" style="display:none;" onchange="handleSelfieUpload(this)">
         <div id="selfie-preview-wrap">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
         </div>
@@ -1585,108 +1538,5 @@
 </script>
 
 <!-- Selfie camera modal -->
-<div class="camera-modal" id="camera-modal">
-  <div id="camera-live">
-    <div class="camera-video-wrap">
-      <video id="camera-video" autoplay playsinline muted></video>
-      <div class="camera-oval-guide"></div>
-    </div>
-    <div class="camera-hint">Position your face inside the oval</div>
-    <div class="camera-controls">
-      <button type="button" class="camera-btn-cancel" onclick="closeCamera()">Cancel</button>
-      <button type="button" class="camera-btn-capture" onclick="capturePhoto()"></button>
-    </div>
-  </div>
-  <div class="camera-preview-wrap" id="camera-preview">
-    <img id="camera-preview-img" src="" alt="Captured">
-    <div class="camera-preview-actions">
-      <button type="button" class="camera-btn-retake" onclick="retakePhoto()">Retake</button>
-      <button type="button" class="camera-btn-use" onclick="usePhoto()">Use Photo</button>
-    </div>
-  </div>
-  <canvas id="camera-canvas" style="display:none;"></canvas>
-</div>
-
-<script>
-  // ── Selfie Camera Logic ─────────────────────────────────────────────────────
-  let cameraStream = null;
-
-  async function openCamera() {
-    const modal = document.getElementById('camera-modal');
-    const video = document.getElementById('camera-video');
-
-    try {
-      // Request camera FIRST, before showing modal
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 1280 },
-          aspectRatio: { ideal: 1 }
-        },
-        audio: false
-      });
-      video.srcObject = cameraStream;
-      // Only show modal after camera is ready
-      modal.classList.add('active');
-      document.getElementById('camera-live').style.display = '';
-      document.getElementById('camera-preview').style.display = 'none';
-    } catch (err) {
-      // Camera not available — fallback to file input
-      modal.classList.remove('active');
-      if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
-      document.getElementById('selfie-input').click();
-    }
-  }
-
-  function capturePhoto() {
-    const video = document.getElementById('camera-video');
-    const canvas = document.getElementById('camera-canvas');
-    // Capture at video's native resolution for best quality
-    const size = Math.min(video.videoWidth, video.videoHeight);
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    // Mirror + center crop to square
-    ctx.save();
-    ctx.translate(size, 0);
-    ctx.scale(-1, 1);
-    const sx = (video.videoWidth - size) / 2;
-    const sy = (video.videoHeight - size) / 2;
-    ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
-    ctx.restore();
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-    document.getElementById('camera-preview-img').src = dataUrl;
-    document.getElementById('camera-live').style.display = 'none';
-    document.getElementById('camera-preview').style.display = 'flex';
-  }
-
-  function retakePhoto() {
-    document.getElementById('camera-live').style.display = '';
-    document.getElementById('camera-preview').style.display = 'none';
-  }
-
-  function usePhoto() {
-    const dataUrl = document.getElementById('camera-preview-img').src;
-    const wrap = document.getElementById('selfie-preview-wrap');
-    wrap.innerHTML = '<img src="' + dataUrl + '" alt="Your photo" id="selfie-preview-img">';
-    const card = document.getElementById('selfie-upload-area');
-    card.classList.add('has-photo');
-    const label = card.querySelector('.photo-card-label');
-    if (label) label.style.display = 'none';
-    closeCamera();
-  }
-
-  function closeCamera() {
-    const modal = document.getElementById('camera-modal');
-    modal.classList.remove('active');
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(t => t.stop());
-      cameraStream = null;
-    }
-  }
-</script>
-
 </body>
 </html>
