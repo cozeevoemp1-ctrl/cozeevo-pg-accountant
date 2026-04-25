@@ -75,3 +75,6 @@ data/whatsapp_chats/**/*.docx
 data/whatsapp_chats/**/*.xlsx
 data/whatsapp_chats/**/*.pdf
 credentials/
+
+# Git worktrees
+.worktrees/
