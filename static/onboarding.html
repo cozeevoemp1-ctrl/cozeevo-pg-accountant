@@ -775,36 +775,39 @@
     <div class="step-subtitle">Government-issued photo ID for verification</div>
 
     <div class="field">
-      <label for="id-type">ID Type</label>
+      <label for="id-type" class="required">ID Type</label>
       <div class="select-wrapper">
-        <select id="id-type">
+        <select id="id-type" required>
           <option value="">Select ID type</option>
-          <option value="Aadhaar">Aadhaar Card</option>
+          <option value="Aadhaar" selected>Aadhaar Card</option>
           <option value="PAN">PAN Card</option>
           <option value="Passport">Passport</option>
           <option value="Driving License">Driving License</option>
           <option value="Voter ID">Voter ID</option>
         </select>
       </div>
+      <div class="error-msg" id="err-id-type">Please select an ID type</div>
     </div>
 
     <div class="field">
-      <label for="id-number">ID Number</label>
-      <input type="text" id="id-number" placeholder="Enter ID number" style="text-transform:uppercase;">
-    </div>
-
-    <div class="field">
-      <label>Upload ID Photo *</label>
+      <label>Upload ID Photo <span class="required-star">*</span></label>
       <div class="upload-area" id="id-upload-area">
-        <input type="file" id="id-photo-input" accept="image/*,application/pdf" style="display:none;" onchange="handleFileUpload(this, 'id-photo-preview', 'id-upload-area')">
+        <input type="file" id="id-photo-input" accept="image/*,application/pdf" style="display:none;" onchange="handleIdPhotoUpload(this)">
         <div id="id-photo-preview" class="upload-preview"></div>
         <div class="upload-placeholder" id="id-upload-placeholder">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span>Tap to upload ID proof</span>
-          <span style="font-size:11px; color:#A0AEC0;">Photo or PDF of your ID</span>
+          <span style="font-size:11px; color:#A0AEC0;">Photo or PDF · We'll auto-read your details</span>
         </div>
       </div>
+      <div id="id-extract-status" style="display:none; margin-top:6px; font-size:12px; color:#718096;"></div>
       <div class="error-msg" id="err-id-photo">Please upload a photo of your ID</div>
+    </div>
+
+    <div class="field">
+      <label for="id-number" class="required">ID Number</label>
+      <input type="text" id="id-number" placeholder="Auto-filled from photo · You can correct it" style="text-transform:uppercase;" required>
+      <div class="error-msg" id="err-id-number">Please enter your ID number</div>
     </div>
 
     <div style="background:#FFF8E1; border:1px solid #FFE082; border-radius:8px; padding:12px 14px; font-size:12px; color:#7B5E00; line-height:1.5; margin-top:4px;">
@@ -1131,6 +1134,21 @@
       }
     }
 
+    if (step === 4) {
+      const idType   = document.getElementById('id-type').value;
+      const idNumber = document.getElementById('id-number').value.trim();
+      const idPhoto  = document.getElementById('id-photo-input').files;
+
+      if (!idType)   { setError('id-type',   'err-id-type');   ok = false; }
+      if (!idNumber) { setError('id-number', 'err-id-number'); ok = false; }
+      if (idNumber && idType === 'Aadhaar' && stripDigits(idNumber).length !== 12) {
+        setError('id-number', 'err-id-number');
+        document.getElementById('err-id-number').textContent = 'Aadhaar number must be 12 digits';
+        ok = false;
+      }
+      if (!idPhoto || idPhoto.length === 0) { setError('id-upload-area', 'err-id-photo'); ok = false; }
+    }
+
     return ok;
   }
 
@@ -1193,6 +1211,96 @@
       area.classList.add('has-file');
       const placeholder = area.querySelector('.upload-placeholder');
       if (placeholder) placeholder.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleIdPhotoUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    if (!isImage && !isPdf) { alert('Please select an image or PDF file'); return; }
+    if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      // Show preview
+      const preview = document.getElementById('id-photo-preview');
+      if (isPdf) {
+        preview.innerHTML = '<div style="text-align:center;padding:12px;"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#E53E3E" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div style="font-size:12px;color:#2D3748;margin-top:4px;word-break:break-all;">' + file.name + '</div></div>';
+      } else {
+        preview.innerHTML = '<img src="' + dataUrl + '" alt="Preview">';
+      }
+      preview.classList.add('visible');
+      const area = document.getElementById('id-upload-area');
+      area.classList.add('has-file');
+      const placeholder = area.querySelector('.upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+
+      // Auto-extract for images only (PDFs can't be vision-extracted client-side)
+      if (isImage) {
+        const statusEl = document.getElementById('id-extract-status');
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#718096';
+        statusEl.textContent = 'Reading ID details...';
+
+        const token = extractToken();
+        fetch('/api/onboarding/' + token + '/extract-id', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ image_b64: dataUrl, mime_type: file.type }),
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error === 'extraction_unavailable') {
+            statusEl.textContent = 'Auto-fill not available — please fill details manually.';
+            return;
+          }
+          const f = data.fields || {};
+          let filled = [];
+
+          if (f.aadhaar_number) {
+            const numField = document.getElementById('id-number');
+            if (!numField.value.trim()) {
+              numField.value = f.aadhaar_number.replace(/\s/g, '').toUpperCase();
+              filled.push('ID number');
+            }
+            // Also set type to Aadhaar if not set
+            const typeField = document.getElementById('id-type');
+            if (!typeField.value) { typeField.value = 'Aadhaar'; }
+          }
+          if (f.name) {
+            const nameField = document.getElementById('name');
+            if (!nameField.value.trim()) { nameField.value = f.name; filled.push('name'); }
+          }
+          if (f.dob) {
+            const dobField = document.getElementById('dob');
+            if (dobField && !dobField.value.trim()) { dobField.value = f.dob; filled.push('date of birth'); }
+          }
+          if (f.gender) {
+            const gInput = document.querySelector('input[name="gender"][value="' + f.gender.charAt(0).toUpperCase() + f.gender.slice(1) + '"]');
+            if (gInput && !document.querySelector('input[name="gender"]:checked')) { gInput.checked = true; filled.push('gender'); }
+          }
+          if (f.address) {
+            const addrField = document.getElementById('perm-address');
+            if (addrField && !addrField.value.trim()) { addrField.value = f.address; filled.push('address'); }
+          }
+
+          if (filled.length > 0) {
+            statusEl.style.color = '#2E7D32';
+            statusEl.textContent = 'Extracted: ' + filled.join(', ') + ' — please verify';
+          } else {
+            statusEl.style.color = '#718096';
+            statusEl.textContent = 'Could not read details — please fill manually.';
+          }
+        })
+        .catch(() => {
+          statusEl.style.color = '#718096';
+          statusEl.textContent = 'Could not read details — please fill manually.';
+        });
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -1265,7 +1373,6 @@
     };
 
     // Validate mandatory uploads
-    if (!payload.selfie_photo) { showError('Please upload your selfie photo (Step 1).'); return; }
     if (!payload.id_photo) { showError('Please upload your ID proof document (Step 4).'); return; }
 
     showLoading('Submitting registration...');
