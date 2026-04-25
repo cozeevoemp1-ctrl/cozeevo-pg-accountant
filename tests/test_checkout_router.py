@@ -195,3 +195,88 @@ async def test_tenant_prefetch_returns_financial_data(async_client: AsyncClient,
     assert data["tenant_name"] == "Ravi Kumar"
     assert data["room_number"] == "301"
     assert data["phone"] == "9876543210"
+
+
+@pytest.mark.asyncio
+async def test_create_checkout_session_creates_db_row(async_client, db_session, sample_tenancy):
+    """POST /api/checkout/create creates CheckoutSession row."""
+    from datetime import date as _date
+    from unittest.mock import AsyncMock, patch
+
+    with patch("src.whatsapp.webhook_handler._send_whatsapp", new_callable=AsyncMock):
+        resp = await async_client.post(
+            "/api/checkout/create",
+            json={
+                "tenancy_id": sample_tenancy.id,
+                "checkout_date": _date.today().isoformat(),
+                "room_key_returned": True,
+                "wardrobe_key_returned": True,
+                "biometric_removed": False,
+                "room_condition_ok": True,
+                "damage_notes": "",
+                "security_deposit": 15000.0,
+                "pending_dues": 0.0,
+                "deductions": 2000.0,
+                "deduction_reason": "paint damage",
+                "refund_amount": 13000.0,
+                "refund_mode": "upi",
+                "created_by_phone": "9444296681",
+            },
+            headers={"X-Admin-Pin": "cozeevo2026"},
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "pending"
+    assert "token" in data
+    assert "expires_at" in data
+
+
+@pytest.mark.asyncio
+async def test_status_poll_returns_pending(async_client, db_session, sample_tenancy):
+    """GET /api/checkout/status/{token} returns pending status for new session."""
+    from datetime import date as _date
+    from unittest.mock import AsyncMock, patch
+
+    with patch("src.whatsapp.webhook_handler._send_whatsapp", new_callable=AsyncMock):
+        create_resp = await async_client.post(
+            "/api/checkout/create",
+            json={
+                "tenancy_id": sample_tenancy.id,
+                "checkout_date": _date.today().isoformat(),
+                "room_key_returned": True,
+                "wardrobe_key_returned": False,
+                "biometric_removed": True,
+                "room_condition_ok": True,
+                "damage_notes": "",
+                "security_deposit": 10000.0,
+                "pending_dues": 0.0,
+                "deductions": 0.0,
+                "deduction_reason": "",
+                "refund_amount": 10000.0,
+                "refund_mode": "cash",
+                "created_by_phone": "9444296681",
+            },
+            headers={"X-Admin-Pin": "cozeevo2026"},
+        )
+    assert create_resp.status_code == 200
+    token = create_resp.json()["token"]
+
+    status_resp = await async_client.get(
+        f"/api/checkout/status/{token}",
+        headers={"X-Admin-Pin": "cozeevo2026"},
+    )
+    assert status_resp.status_code == 200
+    status_data = status_resp.json()
+    assert status_data["status"] == "pending"
+    assert status_data["token"] == token
+    assert "expires_at" in status_data
+
+
+@pytest.mark.asyncio
+async def test_status_poll_404_for_unknown_token(async_client):
+    """GET /api/checkout/status/bogus returns 404."""
+    resp = await async_client.get(
+        "/api/checkout/status/not-a-real-token",
+        headers={"X-Admin-Pin": "cozeevo2026"},
+    )
+    assert resp.status_code == 404
