@@ -600,7 +600,7 @@
         </div>
       </div>
       <div class="photo-card" id="selfie-upload-area">
-        <input type="file" id="selfie-input" accept="image/*" style="display:none;" onchange="handleSelfieUpload(this)">
+        <input type="file" id="selfie-input" accept="image/*" capture="user" style="display:none;" onchange="handleSelfieUpload(this)">
         <div id="selfie-preview-wrap">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/></svg>
         </div>
@@ -934,10 +934,18 @@
     if (data.__step && data.__step > 1 && data.__step <= 5) {
       goToStep(data.__step);
     }
+    // Restore selfie photo if it survived (persisted separately due to size)
+    try {
+      const selfieUrl = localStorage.getItem(draftKey() + '_selfie');
+      if (selfieUrl) applySelfieDataUrl(selfieUrl);
+    } catch(ex) {}
   }
 
   function clearDraft() {
-    try { localStorage.removeItem(draftKey()); } catch (e) {}
+    try {
+      localStorage.removeItem(draftKey());
+      localStorage.removeItem(draftKey() + '_selfie');
+    } catch (e) {}
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -1166,6 +1174,15 @@
     document.getElementById('id-photo-input').click();
   });
 
+  function applySelfieDataUrl(dataUrl) {
+    const wrap = document.getElementById('selfie-preview-wrap');
+    wrap.innerHTML = '<img src="' + dataUrl + '" alt="Your photo">';
+    const card = document.getElementById('selfie-upload-area');
+    card.classList.add('has-photo');
+    const label = card.querySelector('.photo-card-label');
+    if (label) label.style.display = 'none';
+  }
+
   function handleSelfieUpload(input) {
     const file = input.files && input.files[0];
     if (!file) return;
@@ -1173,13 +1190,9 @@
     if (file.size > 10 * 1024 * 1024) { alert('File too large (max 10MB)'); return; }
     const reader = new FileReader();
     reader.onload = function(e) {
-      const wrap = document.getElementById('selfie-preview-wrap');
-      wrap.innerHTML = '<img src="' + e.target.result + '" alt="Your photo">';
-      const card = document.getElementById('selfie-upload-area');
-      card.classList.add('has-photo');
-      // Hide the label once photo is uploaded
-      const label = card.querySelector('.photo-card-label');
-      if (label) label.style.display = 'none';
+      applySelfieDataUrl(e.target.result);
+      // Persist to localStorage so Android camera-reload doesn't lose the photo
+      try { localStorage.setItem(draftKey() + '_selfie', e.target.result); } catch(ex) {}
     };
     reader.readAsDataURL(file);
   }
