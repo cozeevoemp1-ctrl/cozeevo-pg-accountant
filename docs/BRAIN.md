@@ -127,7 +127,7 @@
 | `rooms` | id, property_id, room_number (TEXT), room_type, max_occupancy, is_charged, is_staff_room | room_number is TEXT. is_charged=False for owner-free rooms (G05, G06 THOR). is_staff_room skips room from tenant occupancy. |
 | `rate_cards` | id, room_id, effective_from, effective_to (NULL=active), monthly_rent, daily_rate | Price history — new row when rent changes |
 | `tenants` | id, name, phone (UNIQUE), gender, id_proof_type | phone = WhatsApp identity key |
-| `staff` | id, property_id, name, phone, role, active | Lokesh, Lakshmi, Kiran, Chandra etc. |
+| `staff` | id, property_id, room_id, name, phone, role, salary, date_of_birth, aadhar_number, kyc_document_url, kyc_verified, join_date, exit_date, active | Lokesh, Lakshmi etc. kyc_verified=False until Aadhar/ID photo uploaded to Supabase Storage `kyc-documents/staff/`. |
 | `food_plans` | id, name, includes_lunch_box, monthly_cost | veg/non-veg/egg/none |
 | `expense_categories` | id, name, parent_id | Electricity, Water, Salary, etc. |
 

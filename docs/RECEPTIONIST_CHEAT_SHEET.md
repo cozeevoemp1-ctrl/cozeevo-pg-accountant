@@ -524,13 +524,29 @@ Values: `single`, `double`, `triple`, `premium`.
 
 ---
 
-### ADD PARTNER / STAFF
+### ADD PARTNER / STAFF (BOT ACCESS)
 
 | Message | What it does |
 |---------|-------------|
-| **add partner** | Add admin/power user |
-| **add staff** | Same |
+| **add partner** | Add admin/power user to bot |
 | **give access** | Same |
+
+---
+
+### STAFF MANAGEMENT
+
+| Message | What it does |
+|---------|-------------|
+| **show staff rooms** | List all staff rooms + who lives there + KYC status |
+| **add staff Raju \| Security \| 8000 \| 15-06-1990 \| 9876543210 \| 1234-5678-9012** | Register new staff — name \| role \| salary \| dob \| phone \| aadhar |
+| **add staff Raju \| Security \| 8000 \| 15-06-1990 \| 9876543210 \| 1234-5678-9012 \| room G05** | Same + assign to room immediately |
+| *(after add staff — send photo/PDF)* | Upload Aadhar / ID card → KYC saved to Supabase |
+| *(reply "skip")* | Skip KYC for now — staff marked KYC pending |
+| **staff Raju room G05** | Assign existing staff to a room |
+| **staff Raju exit** | Mark staff as exited, room flips back to revenue if empty |
+| **staff Raju left** | Same |
+
+> **KYC note:** Staff without uploaded ID are shown as `⚠ KYC pending` in `show staff rooms`. Upload anytime by triggering a new `add staff` command or waiting for the bot to prompt.
 
 ---
 

@@ -97,7 +97,10 @@ Kiran's Excel (offline)
 | `src/whatsapp/handlers/tenant_handler.py` | Tenant self-service |
 | `src/whatsapp/handlers/lead_handler.py` | Lead/sales handlers |
 | `src/whatsapp/handlers/_shared.py` | Shared fuzzy search |
+| `src/whatsapp/handlers/update_handler.py` | Update + staff handlers (add_staff, assign/exit staff, query staff rooms) |
 | `src/whatsapp/chat_api.py` | Webhook + pending state |
+| `src/whatsapp/media_handler.py` | WhatsApp media download + Supabase KYC upload |
+| `src/services/storage.py` | Supabase Storage wrapper (kyc-documents, agreements buckets) |
 | `src/database/models.py` | ORM models |
 | `src/database/migrate_all.py` | Master migration (append only, never remove) |
 

@@ -2,6 +2,38 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.64.0] — 2026-04-26 — Staff KYC onboarding + daywise rent change e2e tests
+
+### New: ADD_STAFF intent + KYC document upload
+- **`add staff [name] | role | salary | dob | phone | aadhar | room [num]`** — single-message bulk input creates a staff record with all details, then prompts for ID photo
+- **KYC flow**: bot asks for Aadhar/ID photo or PDF; user sends media → downloaded from WhatsApp Cloud API → uploaded to Supabase Storage `kyc-documents/staff/` → URL saved to `staff.kyc_document_url`, `kyc_verified=True`
+- **Skip**: reply `skip` to register staff without KYC; flagged as `⚠ KYC pending` in `show staff rooms`
+- **Validation**: wrong MIME type rejected with re-prompt; non-media reply keeps pending alive
+- **`assign staff [name] room [room]`**: no longer silently creates bare staff record — returns `add staff` help prompt when name not found
+
+### DB schema: Staff table additions
+- `salary NUMERIC(10,2)` — monthly salary
+- `date_of_birth DATE`
+- `aadhar_number VARCHAR(20)`
+- `kyc_document_url VARCHAR(500)` — Supabase Storage public URL
+- `kyc_verified BOOLEAN DEFAULT FALSE`
+- Migration: `run_add_staff_kyc_fields_2026_04_26` — runs in own transaction to avoid deadlock rollback from `run_allow_unassigned_room_2026_04_24`
+
+### New: media_handler helpers
+- `download_whatsapp_media_bytes(media_id)` — downloads from WhatsApp, returns `(bytes, mime_type)` without saving to disk
+- `upload_staff_kyc_to_supabase(media_id, staff_id, mime_type)` — download + upload in one call
+
+### E2E tests
+- **`tests/test_daywise_rent_e2e.py`** (new, 6/6): daywise rent change yes/no confirmation — command → pending, Yes → rate updated, No → rate unchanged, unrelated message → pending kept alive
+- **`tests/test_disambig_e2e.py`**: 15/15 pass — staff ASSIGN_STAFF_ROOM + EXIT_STAFF disambig confirmed working
+- **`tests/test_full_flow_e2e.py`**: ASSIGN_STAFF_ROOM + EXIT_STAFF full flows confirmed
+
+### Fixed
+- **Intent regex**: `ADD_STAFF` pattern uses `[A-Za-z][^\|]+\|` (was `[A-Za-z][A-Za-z ]+\|`) — now handles names with digits (e.g. TestKYC999)
+- **`sync_daywise_from_db.py`**: `active_count` now only counts tenancies where `checkout_date >= today` — was showing 6 instead of 1
+
+---
+
 ## [1.63.2] — 2026-04-26 — Checkout form UX fixes + WhatsApp template for guaranteed delivery
 
 ### Checkout form (`static/checkout_admin.html`)
