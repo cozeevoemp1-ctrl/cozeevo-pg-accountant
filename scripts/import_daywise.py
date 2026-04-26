@@ -25,7 +25,10 @@ from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 load_dotenv()
 
-from src.database.models import DaywiseStay  # noqa: E402
+from src.database.models import (  # noqa: E402
+    Tenant, Tenancy, TenancyStatus, StayType,
+    Payment, PaymentMode, PaymentFor, Room,
+)
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -173,49 +176,83 @@ def read_all_daywise():
 
 
 async def import_to_db(records, write=False):
-    """Insert into daywise_stays table, skip duplicates."""
+    """Insert into tenancies table as stay_type=daily, skip duplicates."""
     url = DATABASE_URL
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     engine = create_async_engine(url, echo=False)
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    stats = {'inserted': 0, 'skipped_dup': 0, 'skipped_nodate': 0}
+    stats = {'inserted': 0, 'skipped_dup': 0, 'skipped_nodate': 0, 'skipped_nophone': 0}
 
     async with Session() as session:
         for rec in records:
             if not rec['checkin_date']:
                 stats['skipped_nodate'] += 1
                 continue
+            if not rec['phone']:
+                stats['skipped_nophone'] += 1
+                continue
 
+            # Find or create Tenant by phone
+            tenant = await session.scalar(select(Tenant).where(Tenant.phone == rec['phone']))
+            if not tenant:
+                if not write:
+                    stats['inserted'] += 1   # count as would-insert in dry run
+                    continue
+                tenant = Tenant(name=rec['guest_name'], phone=rec['phone'])
+                session.add(tenant)
+                await session.flush()
+
+            # Skip if Tenancy already exists for this stay
             existing = await session.scalar(
-                select(DaywiseStay).where(DaywiseStay.unique_hash == rec['unique_hash'])
+                select(Tenancy).where(
+                    Tenancy.tenant_id == tenant.id,
+                    Tenancy.checkin_date == rec['checkin_date'],
+                    Tenancy.stay_type == StayType.daily,
+                )
             )
             if existing:
                 stats['skipped_dup'] += 1
                 continue
 
-            session.add(DaywiseStay(
-                room_number=rec['room_number'],
-                guest_name=rec['guest_name'],
-                phone=rec['phone'] or None,
+            if not write:
+                stats['inserted'] += 1
+                continue
+
+            # Find room
+            room_obj = await session.scalar(
+                select(Room).where(Room.room_number == rec['room_number'])
+            )
+
+            stay_status = TenancyStatus.active if str(rec['status'] or '').upper() in ('ACTIVE', 'CHECKIN') else TenancyStatus.exited
+            tenancy = Tenancy(
+                tenant_id=tenant.id,
+                room_id=room_obj.id if room_obj else None,
+                stay_type=StayType.daily,
+                status=stay_status,
                 checkin_date=rec['checkin_date'],
                 checkout_date=rec['checkout_date'],
-                num_days=rec['num_days'],
-                stay_period=rec['stay_period'],
-                sharing=rec['sharing'],
-                occupancy=rec['occupancy'],
+                expected_checkout=rec['checkout_date'],
+                agreed_rent=Decimal(str(rec['daily_rate'])),
                 booking_amount=Decimal(str(rec['booking_amount'])),
-                daily_rate=Decimal(str(rec['daily_rate'])),
-                total_amount=Decimal(str(rec['total_amount'])),
-                maintenance=Decimal(str(rec['maintenance'])),
-                payment_date=rec['payment_date'],
-                assigned_staff=rec['assigned_staff'] or None,
-                status=rec['status'],
-                comments=rec['comments'] or None,
-                source_file=rec['source_file'],
-                unique_hash=rec['unique_hash'],
-            ))
+                maintenance_fee=Decimal(str(rec['maintenance'])),
+                notes=rec['comments'] or '',
+                entered_by='excel_import',
+            )
+            session.add(tenancy)
+            await session.flush()
+
+            total_amount = float(rec['total_amount'] or 0)
+            if total_amount > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id,
+                    amount=Decimal(str(total_amount)),
+                    payment_mode=PaymentMode.cash,
+                    payment_date=rec['payment_date'] or rec['checkin_date'],
+                    for_type=PaymentFor.rent,
+                    notes='excel_import',
+                ))
             stats['inserted'] += 1
 
         if write:
@@ -304,6 +341,7 @@ async def main():
     print(f"\n  Inserted:       {stats['inserted']}")
     print(f"  Skipped (dup):  {stats['skipped_dup']}")
     print(f"  Skipped (date): {stats['skipped_nodate']}")
+    print(f"  Skipped (phone):{stats.get('skipped_nophone', 0)}")
 
     if args.sheet:
         print("\nStep 3: Writing Google Sheet...")
