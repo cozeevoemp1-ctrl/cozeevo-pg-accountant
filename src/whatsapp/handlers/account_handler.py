@@ -30,7 +30,7 @@ from sqlalchemy.orm import selectinload
 
 from src.utils.money import inr as _inr
 from src.database.models import (
-    AuditLog, Expense, Payment, PaymentFor, PaymentMode,
+    AuditLog, DaywiseStay, Expense, Payment, PaymentFor, PaymentMode,
     PendingAction, Refund, RefundStatus, RentSchedule, RentStatus,
     Room, SharingType, Tenant, Tenancy, TenancyStatus,
 )
@@ -1457,6 +1457,37 @@ async def _rent_change(entities: dict, ctx: CallerContext, session: AsyncSession
         return "Which tenant? Say: *[Name] rent is now [amount]*"
 
     if len(rows) == 0:
+        # Fall through to day-wise guests before giving up
+        if name and amount:
+            dw_rows = (await session.execute(
+                select(DaywiseStay).where(
+                    DaywiseStay.guest_name.ilike(f"%{name}%"),
+                    DaywiseStay.checkin_date <= date.today(),
+                    DaywiseStay.checkout_date >= date.today(),
+                    DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+                )
+            )).scalars().all()
+            if len(dw_rows) == 1:
+                dw = dw_rows[0]
+                action_data = {
+                    "daywise_id": dw.id,
+                    "guest_name": dw.guest_name,
+                    "room": dw.room_number,
+                    "new_rate": float(amount),
+                    "old_rate": float(dw.daily_rate or 0),
+                }
+                await _save_pending(ctx.phone, "DAYWISE_RENT_CHANGE", action_data, [], session)
+                return (
+                    f"*Day-wise rate change for {dw.guest_name}* (Room {dw.room_number})\n"
+                    f"Current: Rs.{int(dw.daily_rate or 0):,}/day\n"
+                    f"New rate: Rs.{int(amount):,}/day\n\n"
+                    "Reply *yes* to confirm or *no* to cancel."
+                )
+            if len(dw_rows) > 1:
+                names = "\n".join(f"{i+1}. {d.guest_name} (Room {d.room_number})" for i, d in enumerate(dw_rows))
+                choices = [{"seq": i+1, "daywise_id": d.id, "guest_name": d.guest_name, "room": d.room_number, "new_rate": float(amount), "old_rate": float(d.daily_rate or 0)} for i, d in enumerate(dw_rows)]
+                await _save_pending(ctx.phone, "DAYWISE_RENT_CHANGE_WHO", {"new_rate": float(amount)}, choices, session)
+                return f"Found {len(dw_rows)} day-wise guests matching *{name}* — which one?\n\n{names}\n\nReply *1* to *{len(dw_rows)}* to change daily rate to Rs.{int(amount):,}."
         suggestions = await _find_similar_names(name, session) if name else []
         return _format_no_match_message(name or room, suggestions)
 

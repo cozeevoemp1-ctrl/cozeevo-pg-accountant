@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     ActivityLog, ActivityLogType,
-    AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, Expense, ExpenseCategory,
+    AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, DaywiseStay, Expense, ExpenseCategory,
     Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, PgContact, Property, Refund, RefundStatus,
     RentSchedule, RentStatus, Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
@@ -2675,6 +2675,7 @@ async def resolve_pending_action(
         "ROOM_TRANSFER_DW_WHO", "ROOM_TRANSFER_DW_DEST", "ROOM_TRANSFER_DW_CONFIRM",
         "FIELD_UPDATE_WHO",
         "AWAITING_CLARIFICATION", "UPDATE_CHECKOUT_DATE", "ASSIGN_ROOM_STEP",
+        "DAYWISE_RENT_CHANGE", "DAYWISE_RENT_CHANGE_WHO",
     ):
         # Mark resolved so the NEXT user message starts a fresh flow
         # — otherwise the pending row stays alive and swallows their reply.
@@ -2947,6 +2948,48 @@ async def resolve_pending_action(
             is_discount=action_data.get("is_discount", False),
             reason=action_data.get("reason", ""),
             session=session,
+        )
+
+    # ── Day-wise rent change: disambiguation ──────────────────────────────────
+    if chosen is not None and pending.intent == "DAYWISE_RENT_CHANGE_WHO":
+        dw = await session.get(DaywiseStay, chosen["daywise_id"])
+        if not dw:
+            return "Day-wise guest not found."
+        action_data2 = {
+            "daywise_id": dw.id,
+            "guest_name": dw.guest_name,
+            "room": dw.room_number,
+            "new_rate": chosen["new_rate"],
+            "old_rate": float(dw.daily_rate or 0),
+        }
+        await _save_pending(pending.phone, "DAYWISE_RENT_CHANGE", action_data2, [], session)
+        return (
+            f"*Day-wise rate change for {dw.guest_name}* (Room {dw.room_number})\n"
+            f"Current: Rs.{int(dw.daily_rate or 0):,}/day\n"
+            f"New rate: Rs.{int(chosen['new_rate']):,}/day\n\n"
+            "Reply *yes* to confirm or *no* to cancel."
+        )
+
+    # ── Day-wise rent change: confirm ─────────────────────────────────────────
+    if pending.intent == "DAYWISE_RENT_CHANGE":
+        if is_negative(reply_text):
+            return "Cancelled."
+        if not is_affirmative(reply_text):
+            return "__KEEP_PENDING__Reply *yes* to confirm the daily rate change or *no* to cancel."
+        dw = await session.get(DaywiseStay, action_data["daywise_id"])
+        if not dw:
+            return "Day-wise guest not found."
+        old_rate = float(dw.daily_rate or 0)
+        new_rate = float(action_data["new_rate"])
+        dw.daily_rate = new_rate
+        if dw.num_days:
+            dw.total_amount = new_rate * dw.num_days + float(dw.maintenance or 0)
+        session.add(dw)
+        await session.commit()
+        return (
+            f"Daily rate updated for *{dw.guest_name}* (Room {dw.room_number})\n"
+            f"Rs.{int(old_rate):,} → Rs.{int(new_rate):,}/day"
+            + (f" | Total: Rs.{int(dw.total_amount):,}" if dw.num_days else "")
         )
 
     if chosen is not None and pending.intent == "QUERY_TENANT":
@@ -5408,17 +5451,14 @@ async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSessi
                 f"({len(occupants)}/{room_row.max_occupancy} occupants: {', '.join(occ_names)}).\n\n"
                 "Checkout an existing tenant first or use a different room.")
 
-    # Duplicate phone check
-    existing_tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
-    if existing_tenant:
-        active_tncy = await session.scalar(
-            select(Tenancy).where(Tenancy.tenant_id == existing_tenant.id, Tenancy.status == TenancyStatus.active)
-        )
-        if active_tncy:
-            r2 = await session.get(Room, active_tncy.room_id)
-            return (f"⚠️ Phone *{phone}* already belongs to *{existing_tenant.name}* "
-                    f"(active in Room {r2.room_number if r2 else '?'}).\n\n"
-                    "Cannot add duplicate — checkout current room first if this is a move.")
+    # Duplicate phone check — normalized to last 10 digits so +91 prefix variants match
+    from src.services.room_occupancy import get_active_tenancy_by_phone as _phone_dedup
+    _dup = await _phone_dedup(session, phone)
+    if _dup:
+        _dup_tenant, _dup_tncy, _dup_room = _dup
+        return (f"⚠️ Phone *{phone}* already belongs to *{_dup_tenant.name}* "
+                f"(active in Room {_dup_room.room_number}).\n\n"
+                "Cannot add duplicate — checkout current room first if this is a move.")
 
     # Parse amounts
     base_rent   = _parse_amount_field(rent_str)
@@ -5503,7 +5543,7 @@ async def _process_tenant_form(msg: str, ctx: CallerContext, session: AsyncSessi
         "advance": advance, "maintenance": maintenance,
         "checkin_date": checkin_iso, "food_pref": food_pref,
         "discount": discount_info,
-        "existing_tenant_id": existing_tenant.id if existing_tenant else None,
+        "existing_tenant_id": None,
     }
     session.add(PendingAction(
         phone=ctx.phone,
@@ -5544,15 +5584,27 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     discount     = data.get("discount") or {}
     existing_tid = data.get("existing_tenant_id")
 
-    # Tenant record
+    # Final phone dedup guard (normalized) — last line of defence before DB write
+    from src.services.room_occupancy import check_room_bookable, get_active_tenancy_by_phone as _phone_dedup2
+    _dup2 = await _phone_dedup2(session, phone)
+    if _dup2:
+        _dt, _dtn, _dr = _dup2
+        return (f"❌ Phone {phone} already belongs to {_dt.name} "
+                f"(active in Room {_dr.room_number}). Duplicate not created.")
+
+    # Tenant record — reuse existing tenant row if same phone already in DB
     gender = data.get("gender", "")
     food_pref = data.get("food_pref", "")
     if food_pref in ("none", "skip"):
         food_pref = ""
-    if existing_tid:
-        tenant = await session.get(Tenant, existing_tid)
-    else:
-        tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+    from src.services.room_occupancy import _normalize_phone as _np
+    _norm = _np(phone)
+    from sqlalchemy import func as _func
+    tenant = await session.scalar(
+        select(Tenant).where(
+            _func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm
+        )
+    )
     if not tenant:
         tenant = Tenant(name=name, phone=phone, gender=gender or None, food_preference=food_pref or None)
         session.add(tenant)
@@ -5568,7 +5620,6 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     # WhatsApp ADD_TENANT confirm path could create a tenancy in an already-
     # occupied premium / shared room AND push a TENANTS sheet row, leaving an
     # orphan if the conflict is later resolved manually (e.g. Pranav-in-305).
-    from src.services.room_occupancy import check_room_bookable
     _, _bookable_err = await check_room_bookable(
         session, room_number, checkin_date, None,
     )

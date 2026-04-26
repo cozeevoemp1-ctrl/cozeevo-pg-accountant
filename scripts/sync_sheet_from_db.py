@@ -325,8 +325,19 @@ async def main(args):
         try:
             ws = _get_worksheet_sync(tab_name)
             existing = ws.get_all_values()
-        except (gspread.exceptions.WorksheetNotFound, gspread.exceptions.APIError):
-            # Auto-create tab if missing (new month rollover)
+        except gspread.exceptions.WorksheetNotFound:
+            # Only auto-create if tab is for current month or earlier.
+            # Future months must be created by create_month.py (rollover) — not here.
+            today = date.today()
+            if (year, month) > (today.year, today.month):
+                print(f"  [skip] Tab '{tab_name}' doesn't exist and is a future month — use create_month.py to create it")
+                return
+            from src.integrations.gsheets import _get_spreadsheet_sync
+            ss = _get_spreadsheet_sync()
+            ws = ss.add_worksheet(title=tab_name, rows=300, cols=ncols)
+            print(f"  [new] Created tab '{tab_name}'")
+            existing = []
+        except gspread.exceptions.APIError:
             from src.integrations.gsheets import _get_spreadsheet_sync
             ss = _get_spreadsheet_sync()
             ws = ss.add_worksheet(title=tab_name, rows=300, cols=ncols)
