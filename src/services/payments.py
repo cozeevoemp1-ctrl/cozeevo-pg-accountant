@@ -147,9 +147,11 @@ async def log_payment(
     if tenancy is None:
         raise ValueError(f"Tenancy {tenancy_id} not found")
 
-    # ── Upsert RentSchedule (only for rent payments) ───────────────────────
+    is_daily = getattr(tenancy, "stay_type", None) and tenancy.stay_type.value == "daily"
+
+    # ── Upsert RentSchedule (only for monthly rent payments — skip daily stays) ──
     rs: Optional[RentSchedule] = None
-    if pay_for == PaymentFor.rent:
+    if pay_for == PaymentFor.rent and not is_daily:
         rs = await session.scalar(
             select(RentSchedule).where(
                 RentSchedule.tenancy_id == tenancy.id,
@@ -222,7 +224,7 @@ async def log_payment(
         payment_date=date.today(),
         payment_mode=pay_mode,
         for_type=pay_for,
-        period_month=period if pay_for == PaymentFor.rent else None,
+        period_month=period if (pay_for == PaymentFor.rent and not is_daily) else None,
         notes=notes or f"Logged by {recorded_by}",
         is_void=False,
         receipt_url=None,

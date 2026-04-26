@@ -539,17 +539,22 @@ async def main(args):
         thor_beds = (thor_t - thor_prem) + (thor_prem * 2)
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
-        # Billing and collection — Rent Due column already includes first-month deposit
-        total_prev_due = sum(pn(r[i_prev]) for r in data_rows)
-        total_cash = sum(pn(r[i_cash]) for r in data_rows)
-        total_upi = sum(pn(r[i_upi]) for r in data_rows)
-        total_collected = total_cash + total_upi
+        # Billing and collection
+        # Cash/UPI collected = all money received in April (active + exit tenants).
+        # Pending (Total Dues) = ACTIVE tenants only — no-show haven't checked in
+        # so their outstanding rent must NOT inflate the ops "pending" figure.
         i_balance = H["balance"]
-        total_dues = sum(max(0, int(pn(r[i_balance]))) for r in data_rows)
+        exit_rows = [r for r in data_rows if r[i_event] == "EXIT"]
+        collected_rows = active_rows + exit_rows
+        total_prev_due = sum(pn(r[i_prev]) for r in active_rows)
+        total_cash = sum(pn(r[i_cash]) for r in collected_rows)
+        total_upi = sum(pn(r[i_upi]) for r in collected_rows)
+        total_collected = total_cash + total_upi
+        total_dues = sum(max(0, int(pn(r[i_balance]))) for r in active_rows)
 
-        paid_count = sum(1 for r in data_rows if r[i_status] == "PAID")
-        partial_count = sum(1 for r in data_rows if r[i_status] == "PARTIAL")
-        unpaid_count = sum(1 for r in data_rows if r[i_status] == "UNPAID")
+        paid_count = sum(1 for r in active_rows if r[i_status] == "PAID")
+        partial_count = sum(1 for r in active_rows if r[i_status] == "PARTIAL")
+        unpaid_count = sum(1 for r in active_rows if r[i_status] == "UNPAID")
 
         # Vacant beds — daywise count via canonical helper so DASHBOARD,
         # bot queries, and this summary all agree. See

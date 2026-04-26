@@ -333,12 +333,16 @@ async def _do_log_payment_by_ids(
     if not ok:
         return reason
 
-    # Resolve period month
+    # Resolve period month (daily stays have no monthly billing period)
     current_month = date.today().replace(day=1)
-    try:
-        period_month = date.fromisoformat(period_month_str) if period_month_str else current_month
-    except ValueError:
-        period_month = current_month
+    is_daily_stay = tenancy.stay_type == StayType.daily
+    if is_daily_stay:
+        period_month = current_month  # used for labels only; service stores None
+    else:
+        try:
+            period_month = date.fromisoformat(period_month_str) if period_month_str else current_month
+        except ValueError:
+            period_month = current_month
 
     mode_lower = (mode or "cash").lower().strip()
     pay_mode = PaymentMode.upi if mode_lower in ("upi", "gpay", "phonepe", "paytm", "online", "transfer", "netbanking", "net banking", "neft", "imps", "bank") else PaymentMode.cash
@@ -380,9 +384,9 @@ async def _do_log_payment_by_ids(
                 "Reply *1* or *2*."
             )
 
-    # ── Wrong month check ──────────────────────────────────────────────────────
+    # ── Wrong month check (skip for daily stays — they have no monthly schedule) ──
     wrong_month_note = ""
-    if period_month != current_month:
+    if not is_daily_stay and period_month != current_month:
         target_rs = await session.scalar(
             select(RentSchedule).where(
                 RentSchedule.tenancy_id == tenancy.id,
@@ -517,7 +521,7 @@ async def _do_log_payment_by_ids(
         phone_wa = tenant_phone.lstrip("+").replace(" ", "")
         if not phone_wa.startswith("91"):
             phone_wa = "91" + phone_wa
-        period_label = f"{period_month.strftime('%B %Y')} rent"
+        period_label = "stay payment" if is_daily_stay else f"{period_month.strftime('%B %Y')} rent"
         paid_so_far_str = f"Rs.{int(total_paid):,}"
         bal = effective_due - total_paid
         if bal <= Decimal("0"):
@@ -555,10 +559,11 @@ async def _do_log_payment_by_ids(
         # ❌ DISABLED: Payment confirmation messages disabled per Kiran's instruction (was spamming tenants)
         # _aio.create_task(_send_payment_msg())
 
+    period_line = "" if is_daily_stay else f"Month: {period_month.strftime('%B %Y')}\n"
     return (
         f"*Payment logged — {tenant.name}{room_label}*\n"
         f"Amount: Rs.{int(amount_dec):,} ({mode.upper()})\n"
-        f"Month: {period_month.strftime('%B %Y')}\n"
+        f"{period_line}"
         f"Status: {status_str}"
         f"{underpayment_note}"
         f"{wrong_month_note}"

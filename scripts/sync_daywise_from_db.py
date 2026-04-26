@@ -110,7 +110,23 @@ async def main(args) -> None:
                 t.entered_by or "",
             ])
 
-        print(f"  Active today: {active_count} | Total revenue: Rs.{int(total_revenue):,}")
+        exited_count = sum(1 for r in data_rows if r[12] in ("EXIT", "EXITED"))
+        total_pending_balance = sum(float(r[11] or 0) for r in data_rows if float(r[11] or 0) > 0)
+
+        print(f"  Active today: {active_count} | Total revenue: Rs.{int(total_revenue):,} | Exits: {exited_count}")
+
+        ncols = len(MONTHLY_HEADERS)
+        def pad(cells):
+            return cells + [""] * (ncols - len(cells))
+
+        summary_row = pad([
+            "DAY WISE STAYS",
+            f"Total: {len(rows)} guests",
+            f"Active now: {active_count}",
+            f"Exits: {exited_count}",
+            f"Revenue: Rs.{int(total_revenue):,}",
+            f"Pending balance: Rs.{int(total_pending_balance):,}",
+        ])
 
         if not args.write:
             print("[DRY RUN] Not writing to sheet.")
@@ -126,13 +142,30 @@ async def main(args) -> None:
             ws = _get_worksheet_sync(TAB_NAME)
         except gspread.exceptions.WorksheetNotFound:
             ss = _get_spreadsheet_sync()
-            ws = ss.add_worksheet(title=TAB_NAME, rows=500, cols=len(MONTHLY_HEADERS))
+            ws = ss.add_worksheet(title=TAB_NAME, rows=500, cols=ncols)
 
-        all_rows = [MONTHLY_HEADERS] + data_rows
+        all_rows = [summary_row, MONTHLY_HEADERS] + data_rows
         ws.clear()
         if all_rows:
             ws.update(values=all_rows, range_name="A1", value_input_option="USER_ENTERED")
-        print(f"Written {len(data_rows)} rows to '{TAB_NAME}' tab.")
+
+        try:
+            ws.format(f"A1:S1", {
+                "textFormat": {"bold": True, "fontSize": 12,
+                               "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
+            })
+            ws.format(f"A2:S2", {
+                "textFormat": {"bold": True,
+                               "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+                "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
+                "horizontalAlignment": "CENTER",
+            })
+            ws.freeze(rows=2)
+        except Exception as e:
+            print(f"  [warn] formatting failed: {e}")
+
+        print(f"Written {len(data_rows)} rows to '{TAB_NAME}' tab (+ 1 dashboard row).")
 
     await engine.dispose()
 
