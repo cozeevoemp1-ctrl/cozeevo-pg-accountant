@@ -1,0 +1,145 @@
+"""GET /api/v2/app/reporting/kpi and GET /api/v2/app/activity/recent."""
+from __future__ import annotations
+
+from datetime import date
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select, desc
+
+from src.api.v2.auth import AppUser, get_current_user
+from src.database.db_manager import get_session
+from src.database.models import (
+    Complaint, ComplaintStatus,
+    Payment, PaymentFor,
+    Room, Tenancy, TenancyStatus,
+    Tenant,
+)
+from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
+
+router = APIRouter(prefix="/reporting")
+activity_router = APIRouter(prefix="/activity")
+
+
+@router.get("/kpi", response_model=KpiResponse)
+async def get_kpi(user: AppUser = Depends(get_current_user)):
+    today = date.today()
+    async with get_session() as session:
+        # Total revenue beds
+        total_beds = int(
+            await session.scalar(
+                select(func.coalesce(func.sum(Room.max_occupancy), 0))
+                .where(Room.is_staff_room == False)
+            ) or 0
+        )
+
+        # Occupied beds (active tenants, including premium=2 beds)
+        from sqlalchemy import case, literal_column
+        occupied_raw = await session.scalar(
+            select(
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                            else_=literal_column("1"),
+                        )
+                    ),
+                    0,
+                )
+            )
+            .select_from(Tenancy)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Room.is_staff_room == False,
+                Tenancy.status == TenancyStatus.active,
+            )
+        )
+        occupied_beds = int(occupied_raw or 0)
+        vacant_beds = max(total_beds - occupied_beds, 0)
+        occ_pct = round(occupied_beds / total_beds * 100, 1) if total_beds > 0 else 0.0
+
+        # Active tenants (people, not beds)
+        active_tenants = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Tenancy.status == TenancyStatus.active,
+                )
+            ) or 0
+        )
+
+        # Check-ins today
+        checkins_today = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .where(Tenancy.checkin_date == today)
+            ) or 0
+        )
+
+        # Checkouts today
+        checkouts_today = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .where(Tenancy.checkout_date == today)
+            ) or 0
+        )
+
+        # Open complaints
+        open_complaints = int(
+            await session.scalar(
+                select(func.count(Complaint.id))
+                .where(Complaint.status == ComplaintStatus.open)
+            ) or 0
+        )
+
+    return KpiResponse(
+        occupied_beds=occupied_beds,
+        total_beds=total_beds,
+        vacant_beds=vacant_beds,
+        occupancy_pct=occ_pct,
+        active_tenants=active_tenants,
+        checkins_today=checkins_today,
+        checkouts_today=checkouts_today,
+        open_complaints=open_complaints,
+    )
+
+
+@activity_router.get("/recent", response_model=ActivityResponse)
+async def get_recent_activity(
+    limit: int = 20,
+    user: AppUser = Depends(get_current_user),
+):
+    async with get_session() as session:
+        rows = (
+            await session.execute(
+                select(
+                    Tenant.name.label("tenant_name"),
+                    Room.room_number.label("room_number"),
+                    Payment.amount,
+                    Payment.payment_mode,
+                    Payment.for_type,
+                    Payment.payment_date,
+                )
+                .select_from(Payment)
+                .join(Tenancy, Tenancy.id == Payment.tenancy_id)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .outerjoin(Room, Room.id == Tenancy.room_id)
+                .where(Payment.is_void == False)
+                .order_by(desc(Payment.payment_date), desc(Payment.id))
+                .limit(limit)
+            )
+        ).all()
+
+    items = [
+        ActivityItem(
+            tenant_name=r.tenant_name or "",
+            room_number=r.room_number or "—",
+            amount=int(r.amount or 0),
+            method=r.payment_mode.value if hasattr(r.payment_mode, "value") else str(r.payment_mode or ""),
+            for_type=r.for_type.value if hasattr(r.for_type, "value") else str(r.for_type or ""),
+            payment_date=r.payment_date.isoformat() if r.payment_date else "",
+        )
+        for r in rows
+    ]
+    return ActivityResponse(items=items)

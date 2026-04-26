@@ -63,10 +63,42 @@ export interface PaymentCreate {
   notes?: string;
 }
 
+export interface KpiResponse {
+  occupied_beds: number;
+  total_beds: number;
+  vacant_beds: number;
+  occupancy_pct: number;
+  active_tenants: number;
+  checkins_today: number;
+  checkouts_today: number;
+  open_complaints: number;
+}
+
+export interface ActivityItem {
+  tenant_name: string;
+  room_number: string;
+  amount: number;
+  method: string;
+  for_type: string;
+  payment_date: string;
+}
+
+export interface ActivityResponse {
+  items: ActivityItem[];
+}
+
 // ── API calls ────────────────────────────────────────────────────────────────
 
 export function getCollectionSummary(periodMonth: string): Promise<CollectionSummary> {
   return _get(`/api/v2/app/reporting/collection?period_month=${encodeURIComponent(periodMonth)}`);
+}
+
+export function getKpi(): Promise<KpiResponse> {
+  return _get("/api/v2/app/reporting/kpi");
+}
+
+export function getRecentActivity(limit = 20): Promise<ActivityResponse> {
+  return _get(`/api/v2/app/activity/recent?limit=${limit}`);
 }
 
 export function createPayment(body: PaymentCreate): Promise<PaymentResponse> {
