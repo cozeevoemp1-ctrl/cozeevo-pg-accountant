@@ -1,7 +1,7 @@
 """Unified occupant-query framework.
 
 An occupant is anyone sleeping in a Cozeevo bed — long-term (`Tenancy`)
-OR short-stay (`DaywiseStay`). Every caller that asks:
+OR short-stay (`Tenancy(stay_type=daily)`). Every caller that asks:
 
     * who is in this room?
     * who has phone X?
@@ -27,8 +27,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
-    DaywiseStay,
     Room,
+    StayType,
     Tenancy,
     TenancyStatus,
     Tenant,
@@ -49,7 +49,7 @@ class Occupant:
     id: int
     name: str
     phone: Optional[str]
-    room_id: Optional[int]           # NULL for day-stays (DaywiseStay has no FK)
+    room_id: Optional[int]
     room_number: str
     checkin_date: _date
     checkout_date: Optional[_date]   # actual exit date if past; else expected for tenancy
@@ -97,24 +97,24 @@ def _tenancy_to_occupant(tc: Tenancy, tenant: Tenant, room: Room) -> Occupant:
     )
 
 
-def _daystay_to_occupant(d: DaywiseStay) -> Occupant:
+def _daystay_to_occupant(tc: Tenancy, tenant: Tenant, room: Optional[Room]) -> Occupant:
     return Occupant(
         kind="daystay",
-        id=d.id,
-        name=d.guest_name,
-        phone=d.phone,
-        room_id=None,
-        room_number=d.room_number,
-        checkin_date=d.checkin_date,
-        checkout_date=d.checkout_date,
-        expected_checkout=d.checkout_date,
+        id=tc.id,
+        name=tenant.name,
+        phone=tenant.phone,
+        room_id=room.id if room else None,
+        room_number=room.room_number if room else "",
+        checkin_date=tc.checkin_date,
+        checkout_date=tc.checkout_date,
+        expected_checkout=tc.expected_checkout or tc.checkout_date,
         notice_date=None,
-        rate=Decimal(str(d.daily_rate or 0)),
+        rate=Decimal(str(tc.agreed_rent or 0)),
         rate_unit="day",
         security_deposit=Decimal("0"),
-        notes=d.comments,
-        status=(d.status or "").upper(),
-    raw=d,
+        notes=tc.notes,
+        status=tc.status.value if hasattr(tc.status, "value") else str(tc.status),
+        raw=tc,
     )
 
 
@@ -163,30 +163,29 @@ async def find_occupants(
     tc_rows = (await session.execute(q)).all()
     occupants = [_tenancy_to_occupant(tc, t, rm) for t, tc, rm in tc_rows]
 
-    # ── Day-stays ──
-    dq = select(DaywiseStay)
+    # ── Day-stays (Tenancy(stay_type=daily)) ──
+    dq = (
+        select(Tenancy, Tenant, Room)
+        .join(Tenant, Tenant.id == Tenancy.tenant_id)
+        .outerjoin(Room, Room.id == Tenancy.room_id)
+        .where(Tenancy.stay_type == StayType.daily)
+    )
     if active_only:
         dq = dq.where(
-            DaywiseStay.checkin_date <= when,
-            DaywiseStay.checkout_date > when,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            Tenancy.checkin_date <= when,
+            Tenancy.checkout_date > when,
+            Tenancy.status == TenancyStatus.active,
         )
     if room_id is not None:
-        rm_num = (await session.execute(
-            select(Room.room_number).where(Room.id == room_id)
-        )).scalar_one_or_none()
-        if rm_num:
-            dq = dq.where(DaywiseStay.room_number == rm_num)
-        else:
-            dq = dq.where(DaywiseStay.id == -1)  # no match
+        dq = dq.where(Tenancy.room_id == room_id)
     if room:
-        dq = dq.where(DaywiseStay.room_number.ilike(f"%{room}%"))
+        dq = dq.where(Room.room_number.ilike(f"%{room}%"))
     if phone_key:
-        dq = dq.where(DaywiseStay.phone.ilike(f"%{phone_key}"))
+        dq = dq.where(Tenant.phone.ilike(f"%{phone_key}"))
     if name:
-        dq = dq.where(DaywiseStay.guest_name.ilike(f"%{name}%"))
-    dw_rows = (await session.execute(dq)).scalars().all()
-    occupants.extend(_daystay_to_occupant(d) for d in dw_rows)
+        dq = dq.where(Tenant.name.ilike(f"%{name}%"))
+    dw_rows = (await session.execute(dq)).all()
+    occupants.extend(_daystay_to_occupant(tc, t, rm) for tc, t, rm in dw_rows)
 
     return occupants
 
@@ -198,16 +197,12 @@ async def update_notes(
 ) -> None:
     """Set (or clear with None/"") the notes on the underlying row.
 
-    Writes to `Tenancy.notes` for long-term, `DaywiseStay.comments` for
-    day-stays. Caller must commit the session.
+    Both long-term and daily-stay occupants store notes in Tenancy.notes.
+    Caller must commit the session.
     """
     new = (text or "").strip() or None
-    if occupant.kind == "tenancy":
-        tc = occupant.raw  # type: Tenancy  # type: ignore[assignment]
-        tc.notes = new
-    else:
-        d = occupant.raw  # type: DaywiseStay  # type: ignore[assignment]
-        d.comments = new
+    tc = occupant.raw  # type: Tenancy  # type: ignore[assignment]
+    tc.notes = new
     occupant.notes = new
 
 

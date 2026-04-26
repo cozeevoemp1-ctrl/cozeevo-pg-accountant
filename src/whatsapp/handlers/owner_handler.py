@@ -29,7 +29,7 @@ from src.database.models import (
     ActivityLog, ActivityLogType,
     AuthorizedUser, CheckoutRecord, Complaint, ComplaintCategory, ComplaintStatus, DaywiseStay, Expense, ExpenseCategory,
     Payment, PaymentFor, PaymentMode, PendingAction, PendingLearning, LearnedRule, PgContact, Property, Refund, RefundStatus,
-    RentSchedule, RentStatus, Room, Staff, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
+    RentSchedule, RentStatus, Room, Staff, StayType, Tenant, Tenancy, TenancyStatus, UserRole, Vacation, OnboardingSession,
 )
 from src.whatsapp.role_service import CallerContext, _normalize as _normalize_phone
 from src.database.validators import check_no_active_tenancy, check_tenancy_active
@@ -6388,17 +6388,18 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
         room_data[room.id]["occupants"].append((tenant_name, (tenant_gender or "").lower()))
 
     # Day-wise guests per room (reduce free bed count)
-    from src.database.models import DaywiseStay
     from datetime import date as _date
     _today = _date.today()
     dw_per_room = {row[0]: row[1] for row in (await session.execute(
-        select(DaywiseStay.room_number, func.count())
+        select(Tenancy.room_id, func.count())
         .where(
-            DaywiseStay.checkin_date <= _today,
-            DaywiseStay.checkout_date >= _today,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.checkin_date <= _today,
+            Tenancy.checkout_date >= _today,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.room_id.isnot(None),
         )
-        .group_by(DaywiseStay.room_number)
+        .group_by(Tenancy.room_id)
     )).all()}
 
     # Premium rooms: fully occupied, no free beds
@@ -6418,7 +6419,7 @@ async def _query_beds_by_gender(gender: str, building_filter: str | None, sessio
             continue  # premium = both beds taken, not sellable
         occupants = data["occupants"]
         max_occ = room.max_occupancy or 2
-        dw_count = dw_per_room.get(room.room_number, 0)
+        dw_count = dw_per_room.get(rid, 0)
         total_occupied = len(occupants) + dw_count
         if total_occupied < max_occ:
             genders = [g for _, g in occupants]
@@ -6498,26 +6499,23 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
     tenant_counts = {row[0]: row[1] for row in (await session.execute(tenant_q)).all()}
 
     # Count day-wise guests currently occupying beds (checkin <= today <= checkout)
-    from src.database.models import DaywiseStay
     from datetime import date
     today = date.today()
     dw_q = (
-        select(DaywiseStay.room_number, func.count().label("cnt"))
+        select(Tenancy.room_id, func.count().label("cnt"))
         .where(
-            DaywiseStay.checkin_date <= today,
-            DaywiseStay.checkout_date >= today,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.checkin_date <= today,
+            Tenancy.checkout_date >= today,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.room_id.isnot(None),
         )
-        .group_by(DaywiseStay.room_number)
+        .group_by(Tenancy.room_id)
     )
     daywise_counts = {row[0]: row[1] for row in (await session.execute(dw_q)).all()}
 
-    # Map room_number -> room_id for daywise stays
-    room_number_to_id = {r.room_number: r.id for r, _ in all_rows}
-    for rn, cnt in daywise_counts.items():
-        rid = room_number_to_id.get(rn)
-        if rid:
-            tenant_counts[rid] = tenant_counts.get(rid, 0) + cnt
+    for rid, cnt in daywise_counts.items():
+        tenant_counts[rid] = tenant_counts.get(rid, 0) + cnt
 
     # Premium rooms: 1 person = BOTH beds booked, second bed NOT sellable
     premium_room_ids = {row[0] for row in (await session.execute(
@@ -6652,14 +6650,14 @@ async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSes
     ) or 0
 
     # Day-wise guests currently occupying beds
-    from src.database.models import DaywiseStay
     from datetime import date as _date
     _today = _date.today()
     daywise_beds = await session.scalar(
-        select(func.count()).select_from(DaywiseStay).where(
-            DaywiseStay.checkin_date <= _today,
-            DaywiseStay.checkout_date >= _today,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+        select(func.count()).select_from(Tenancy).where(
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.checkin_date <= _today,
+            Tenancy.checkout_date >= _today,
+            Tenancy.status == TenancyStatus.active,
         )
     ) or 0
 

@@ -32,7 +32,7 @@ from src.utils.money import inr as _inr
 from src.database.models import (
     AuditLog, DaywiseStay, Expense, Payment, PaymentFor, PaymentMode,
     PendingAction, Refund, RefundStatus, RentSchedule, RentStatus,
-    Room, SharingType, Tenant, Tenancy, TenancyStatus,
+    Room, SharingType, StayType, Tenant, Tenancy, TenancyStatus,
 )
 from src.whatsapp.role_service import CallerContext
 from src.database.validators import check_tenancy_active
@@ -1963,7 +1963,7 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     regular = active_tenants - premium_count
     net_income = int(collected) - int(total_expenses)
 
-    from src.database.models import Property, DaywiseStay
+    from src.database.models import Property
 
     # Day-wise guests currently occupying beds
     from datetime import date as _date
@@ -1971,10 +1971,11 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     daywise_beds = 0
     try:
         daywise_beds = await session.scalar(
-            select(func.count()).select_from(DaywiseStay).where(
-                DaywiseStay.checkin_date <= _today,
-                DaywiseStay.checkout_date >= _today,
-                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            select(func.count()).select_from(Tenancy).where(
+                Tenancy.stay_type == StayType.daily,
+                Tenancy.checkin_date <= _today,
+                Tenancy.checkout_date >= _today,
+                Tenancy.status == TenancyStatus.active,
             )
         ) or 0
     except Exception:
@@ -2008,22 +2009,24 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
             )
         )).all()}
 
-        # Daywise per room
+        # Daywise per room (Tenancy stay_type=daily, keyed by room_id)
         dw_per_room = {row[0]: row[1] for row in (await session.execute(
-            select(DaywiseStay.room_number, func.count())
+            select(Tenancy.room_id, func.count())
             .where(
-                DaywiseStay.checkin_date <= _today,
-                DaywiseStay.checkout_date >= _today,
-                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+                Tenancy.stay_type == StayType.daily,
+                Tenancy.checkin_date <= _today,
+                Tenancy.checkout_date >= _today,
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.room_id.isnot(None),
             )
-            .group_by(DaywiseStay.room_number)
+            .group_by(Tenancy.room_id)
         )).all()}
 
         for room, prop_name in all_rooms:
             if room.id in premium_room_ids:
                 continue  # premium = full room, 0 free
             block = "THOR" if "THOR" in prop_name.upper() else "HULK"
-            occupied = tenant_per_room.get(room.id, 0) + dw_per_room.get(room.room_number, 0)
+            occupied = tenant_per_room.get(room.id, 0) + dw_per_room.get(room.id, 0)
             free = (room.max_occupancy or 1) - occupied
             if free > 0:
                 building_vacant[block] += free

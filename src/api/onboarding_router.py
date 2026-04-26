@@ -179,7 +179,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
             from src.services.room_occupancy import get_room_occupants
             occ = await get_room_occupants(session, room)
             if occ.total_occupied >= (room.max_occupancy or 1):
-                occ_names = [t.name for t, _ in occ.tenancies] + [d.guest_name for d in occ.daywise]
+                occ_names = [t.name for t, _ in occ.tenancies] + [d.tenant.name for d in occ.daywise]
                 raise HTTPException(
                     409,
                     f"Room {room.room_number} is full "

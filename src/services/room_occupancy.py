@@ -1,8 +1,8 @@
 """Single source of truth for room-occupancy questions.
 
 A bed in Cozeevo can be occupied by EITHER a long-term `Tenancy` OR a
-short-stay `DaywiseStay`. Before this module existed, every caller
-rolled its own query and many forgot DaywiseStay, causing a whole class
+short-stay `Tenancy(stay_type=daily)`. Before this module existed, every caller
+rolled its own query and many forgot day-stays, causing a whole class
 of "room looks vacant but has a guest sleeping in it" bugs.
 
 All callers that need to ask:
@@ -23,11 +23,12 @@ from typing import Optional
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.database.models import (
-    DaywiseStay,
     Room,
     Staff,
+    StayType,
     Tenancy,
     TenancyStatus,
     Tenant,
@@ -90,12 +91,12 @@ class RoomOccupants:
     """Result of `get_room_occupants`.
 
     `tenancies` are (Tenant, Tenancy) pairs for long-term residents.
-    `daywise` are DaywiseStay rows for guests sleeping in the room today.
+    `daywise` are Tenancy(stay_type=daily) rows for guests sleeping in the room today.
     `total_occupied` counts humans, not beds (premium stays count as
     max_occupancy since one person reserves all beds).
     """
     tenancies: list[tuple[Tenant, Tenancy]]
-    daywise: list[DaywiseStay]
+    daywise: list[Tenancy]
 
     @property
     def total_occupied(self) -> int:
@@ -135,11 +136,14 @@ async def get_room_occupants(
     tenancies = [(t, tc) for t, tc in rows]
 
     dw = (await session.execute(
-        select(DaywiseStay).where(
-            DaywiseStay.room_number == room.room_number,
-            DaywiseStay.checkin_date <= when,
-            DaywiseStay.checkout_date > when,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+        select(Tenancy)
+        .options(selectinload(Tenancy.tenant))
+        .where(
+            Tenancy.room_id == room.id,
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.checkin_date <= when,
+            Tenancy.checkout_date > when,
+            Tenancy.status == TenancyStatus.active,
         )
     )).scalars().all()
 
@@ -224,21 +228,21 @@ async def find_overlap_conflict(
             conflict_names.append(label)
             beds_used += max_occ if sharing_type == "premium" else 1
 
-    # Day-stay overlap — match by room_number since DaywiseStay isn't
-    # wired to Room by FK in the current schema.
-    if room_num:
-        dw_rows = (await session.execute(
-            select(DaywiseStay.guest_name, DaywiseStay.checkin_date, DaywiseStay.checkout_date)
-            .where(
-                DaywiseStay.room_number == room_num,
-                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
-            )
-        )).all()
-        for name, chk, out in dw_rows:
-            existing_end = out or far_future
-            if start_date < existing_end and period_end > chk:
-                conflict_names.append(f"{name} (day-stay)")
-                beds_used += 1
+    # Day-stay overlap — Tenancy(stay_type=daily) is wired to Room by FK.
+    dw_rows = (await session.execute(
+        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date)
+        .join(Tenant, Tenant.id == Tenancy.tenant_id)
+        .where(
+            Tenancy.room_id == room_id,
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.status == TenancyStatus.active,
+        )
+    )).all()
+    for name, chk, out in dw_rows:
+        existing_end = out or far_future
+        if start_date < existing_end and period_end > chk:
+            conflict_names.append(f"{name} (day-stay)")
+            beds_used += 1
 
     if beds_used >= max_occ and conflict_names:
         return conflict_names[0]
@@ -374,13 +378,14 @@ async def beds_free_on_date(
 
     occupied_dw = await session.scalar(
         select(func.count())
-        .select_from(DaywiseStay)
-        .join(Room, Room.room_number == DaywiseStay.room_number)
+        .select_from(Tenancy)
+        .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
-            DaywiseStay.checkin_date <= when,
-            DaywiseStay.checkout_date > when,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.checkin_date <= when,
+            Tenancy.checkout_date > when,
+            Tenancy.status == TenancyStatus.active,
         )
     ) or 0
 
@@ -428,13 +433,14 @@ async def count_occupied_beds(
 
     dw = await session.scalar(
         select(func.count())
-        .select_from(DaywiseStay)
-        .join(Room, Room.room_number == DaywiseStay.room_number)
+        .select_from(Tenancy)
+        .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
-            DaywiseStay.checkin_date <= to_date,
-            DaywiseStay.checkout_date >= from_date,
-            DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.checkin_date <= to_date,
+            Tenancy.checkout_date >= from_date,
+            Tenancy.status == TenancyStatus.active,
         )
     ) or 0
 
