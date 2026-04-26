@@ -139,3 +139,36 @@ export function transcribeAudio(blob: Blob, mime: string): Promise<TranscribeRes
 export function extractPaymentIntent(transcript: string): Promise<PaymentIntent> {
   return _post("/api/v2/app/voice/intent", { transcript });
 }
+
+export interface TenantSearchResult {
+  tenancy_id: number;
+  tenant_id: number;
+  name: string;
+  phone: string;
+  room_number: string;
+  building_code: string;
+  rent: number;
+  status: string;
+}
+
+export interface TenantDues {
+  tenancy_id: number;
+  tenant_id: number;
+  name: string;
+  phone: string;
+  room_number: string;
+  building_code: string;
+  rent: number;
+  dues: number;
+  last_payment_date: string | null;
+  last_payment_amount: number | null;
+  period_month: string;
+}
+
+export function searchTenants(q: string): Promise<TenantSearchResult[]> {
+  return _get<TenantSearchResult[]>(`/api/v2/app/tenants/search?q=${encodeURIComponent(q)}`);
+}
+
+export function getTenantDues(tenancyId: number): Promise<TenantDues> {
+  return _get<TenantDues>(`/api/v2/app/tenants/${tenancyId}/dues`);
+}
