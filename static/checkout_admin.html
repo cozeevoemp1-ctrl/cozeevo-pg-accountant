@@ -301,7 +301,14 @@
     <div class="status-title" id="statusTitle">Sent to Tenant</div>
     <div class="status-sub" id="statusSub">Waiting for confirmation…</div>
     <div class="badge pending" id="statusBadge">PENDING</div>
-    <br><br>
+    <div id="manualLinkRow" style="display:none; margin-top:14px; text-align:center;">
+      <div style="font-size:12px; color:#555; margin-bottom:8px;">If WhatsApp didn't deliver, share manually:</div>
+      <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn-back" style="font-size:13px;" onclick="copyCheckoutLink()">Copy Link</button>
+        <button class="btn-back" style="font-size:13px;" onclick="openWhatsAppCheckout()">Open WhatsApp</button>
+      </div>
+    </div>
+    <br>
     <button class="btn-primary" style="max-width:200px;margin:0 auto;" onclick="resetForm()">New Checkout</button>
   </div>
 
@@ -309,7 +316,7 @@
 
 <script>
 const PIN = 'cozeevo2026';
-let state = { tenancyId: null, toggles: {} };
+let state = { tenancyId: null, toggles: {}, phone: '', confirmLink: '' };
 let refundOverridden = false;
 let pollInterval = null;
 
@@ -345,6 +352,7 @@ async function selectTenant(item) {
   document.getElementById('tenantSearch').value = item.label;
   document.getElementById('tenancyId').value = item.tenancy_id;
   state.tenancyId = item.tenancy_id;
+  state.phone = item.phone || '';
   hideSuggestions();
   const resp = await fetch(`/api/checkout/tenant/${item.tenancy_id}`,
     { headers: { 'X-Admin-Pin': PIN } });
@@ -423,7 +431,8 @@ async function submitForm() {
   if (deductions > 0 && !document.getElementById('deductionReason').value.trim()) {
     alert('Please enter a deduction reason.'); return;
   }
-  if (!document.getElementById('refundMode').value) {
+  const refundAmt = parseFloat(document.getElementById('refundAmount').value) || 0;
+  if (refundAmt > 0 && !document.getElementById('refundMode').value) {
     alert('Please select a refund mode.'); return;
   }
 
@@ -455,9 +464,11 @@ async function submitForm() {
     alert('Error: ' + (err.detail || resp.status)); return;
   }
   const data = await resp.json();
+  state.confirmLink = window.location.origin + '/checkout/' + data.token;
 
   document.getElementById('step3').classList.add('hidden');
   document.getElementById('statusBox').style.display = 'block';
+  document.getElementById('manualLinkRow').style.display = 'block';
   startPolling(data.token);
 }
 
@@ -493,13 +504,14 @@ async function checkStatus(token) {
 function resetForm() {
   clearInterval(pollInterval);
   document.getElementById('statusBox').style.display = 'none';
+  document.getElementById('manualLinkRow').style.display = 'none';
   document.getElementById('step1').classList.remove('hidden');
   document.getElementById('step2').classList.add('hidden');
   document.getElementById('step3').classList.add('hidden');
   document.getElementById('tenantSearch').value = '';
   document.getElementById('tenancyId').value = '';
   document.getElementById('checkoutDate').value = new Date().toISOString().split('T')[0];
-  state = { tenancyId: null, toggles: {} };
+  state = { tenancyId: null, toggles: {}, phone: '', confirmLink: '' };
   refundOverridden = false;
   updateProgress(1);
   document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
@@ -511,6 +523,25 @@ function resetForm() {
   document.getElementById('refundMode').value = '';
   document.getElementById('deductionReason').value = '';
   calcRefund();
+}
+
+function copyCheckoutLink() {
+  const link = state.confirmLink;
+  if (!link) return;
+  navigator.clipboard.writeText(link).then(() => alert('Link copied!')).catch(() => {
+    const el = document.createElement('textarea');
+    el.value = link; document.body.appendChild(el); el.select();
+    document.execCommand('copy'); document.body.removeChild(el);
+    alert('Link copied!');
+  });
+}
+
+function openWhatsAppCheckout() {
+  if (!state.confirmLink || !state.phone) return;
+  const digits = state.phone.replace(/\D/g, '');
+  const fullPhone = digits.startsWith('91') ? digits : '91' + digits;
+  const msg = encodeURIComponent('Hi! Please review and confirm your checkout details:\n' + state.confirmLink);
+  window.open('https://wa.me/' + fullPhone + '?text=' + msg, '_blank');
 }
 </script>
 </body>
