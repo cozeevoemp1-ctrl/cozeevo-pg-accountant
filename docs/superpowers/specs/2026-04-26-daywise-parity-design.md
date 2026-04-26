@@ -135,7 +135,12 @@ Already queries `Tenancy JOIN Tenant JOIN Room`. Daily tenants are found automat
 
 ---
 
+## In Scope (clarification)
+
+**Onboarding form `is_daily` path** (`src/api/onboarding_router.py` ~line 1189) — currently writes to `DaywiseStay`. This MUST be updated as part of this spec to write `Tenant + Tenancy(stay_type=daily) + Payment` instead. The form itself (fields, UI) is unchanged — only the write target changes.
+
+The `add_daywise_stay()` GSheets call also changes to write to the DAY WISE tab using MONTHLY_HEADERS format.
+
 ## Out of Scope
-- Onboarding form for day-wise (handled in a future spec)
-- day-wise guests in monthly billing reports (they appear in DAY WISE tab only)
+- Day-wise guests in monthly billing reports (they appear in DAY WISE tab only)
 - Historical DaywiseStay data correction (migration is best-effort, source_file=MIGRATED marks them)
