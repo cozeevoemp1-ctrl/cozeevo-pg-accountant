@@ -2,6 +2,37 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.60.0] — 2026-04-26 — Security hygiene: sig-check hardening, correlation IDs, /media auth, token rotation
+
+### Remove WHATSAPP_SKIP_SIG_CHECK bypass (`webhook_handler.py`)
+- Env var escape hatch removed entirely; signature check is now unconditional
+- Was never set on VPS, but the bypass path no longer exists in code
+
+### Request correlation IDs (`webhook_handler.py`, `chat_api.py`)
+- Meta `msg_id` now passed through as `message_id` on `InboundMessage` (was always `None`)
+- `_process_message_inner` derives a 12-char `req_id` from `message_id` (or new UUID)
+- Three log lines per request: entry (`phone`, `msg[:60]`), intent (`intent`, `conf`, `role`), routing (`intent`)
+- Traces a message from webhook → intent detection → handler dispatch without touching handlers
+
+### `/media` endpoint: unauthenticated static mount → PIN-protected (`main.py`)
+- Replaced `StaticFiles("/media")` mount with `GET /media/{path:path}` that requires admin PIN
+- Accepts `X-Admin-Pin` header or `?pin=` query param (same as all other admin endpoints)
+- Path traversal guard: rejects any path that resolves outside `media_dir`
+- `admin_onboarding.html`: local `/media/` image URLs now append `?pin=<ADMIN_PIN>`
+
+### Token rotation endpoint (`main.py`)
+- `POST /api/admin/rotate-token?which=dashboard|sync|all` (localhost-only + admin PIN)
+- Generates new `secrets.token_urlsafe(32)` tokens, updates in-memory vars immediately via `sys.modules`
+- Writes new values to `.env` file for persistence across restarts
+- Returns new token value(s) in response so admin can update callers
+
+### Cheat sheet Section 0 (`docs/CHEAT_SHEET_PRINTABLE.md`)
+- Added "SOMEONE CAME TO PAY" as the first section, above Section 1
+- Three options: check balance first / step-by-step / one-shot
+- Notes on multi-name disambiguation and cash+UPI split
+
+---
+
 ## [1.59.0] — 2026-04-25 — Security hardening: auth header, MIME validation, log permissions, retry
 
 ### Dashboard auth: query param → Authorization header
