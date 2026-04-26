@@ -321,15 +321,20 @@ class Staff(Base):
     """PG staff — managers, housekeeping, security."""
     __tablename__ = "staff"
 
-    id          = Column(Integer, primary_key=True)
-    property_id = Column(Integer, ForeignKey("properties.id"))
-    room_id     = Column(Integer, ForeignKey("rooms.id"), nullable=True)  # room the staff lives in
-    name        = Column(String(120), nullable=False)
-    phone       = Column(String(20))
-    role        = Column(String(60))     # Manager / Housekeeping / Security
-    join_date   = Column(Date)
-    exit_date   = Column(Date)           # NULL = still active
-    active      = Column(Boolean, default=True)
+    id               = Column(Integer, primary_key=True)
+    property_id      = Column(Integer, ForeignKey("properties.id"))
+    room_id          = Column(Integer, ForeignKey("rooms.id"), nullable=True)
+    name             = Column(String(120), nullable=False)
+    phone            = Column(String(20))
+    role             = Column(String(60))      # Manager / Housekeeping / Security
+    salary           = Column(Numeric(10, 2))  # monthly salary
+    date_of_birth    = Column(Date)
+    aadhar_number    = Column(String(20))
+    kyc_document_url = Column(String(500))     # Supabase Storage URL
+    kyc_verified     = Column(Boolean, default=False)
+    join_date        = Column(Date)
+    exit_date        = Column(Date)            # NULL = still active
+    active           = Column(Boolean, default=True)
 
     property  = relationship("Property", back_populates="staff")
     room      = relationship("Room", foreign_keys=[room_id])

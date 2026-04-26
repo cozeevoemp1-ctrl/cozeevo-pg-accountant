@@ -695,6 +695,135 @@ async def resolve_field_update(
     return "Update cancelled."
 
 
+# ── ADD STAFF ──────────────────────────────────────────────────────────────
+
+async def add_staff(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """
+    Create a new staff member from a pipe-separated message, then ask for KYC photo.
+
+    Expected format (order matters, all after name are optional):
+      add staff Raju | Security | 8000 | 01-01-1995 | 9876543210 | 1234-5678-9012 | room G05
+                       role       salary  dob           phone         aadhar           room
+    """
+    from decimal import Decimal as _D
+    import re as _re
+    from datetime import date as _date
+
+    raw = (entities.get("_raw_message") or "").strip()
+    # Strip the trigger prefix ("add staff ") and split on pipes
+    body = _re.sub(r"^(?:add|register|new)\s+staff\s+", "", raw, flags=_re.I).strip()
+    parts = [p.strip() for p in body.split("|")]
+
+    if not parts or not parts[0]:
+        return (
+            "To add a new staff member, send:\n"
+            "_add staff [name] | role | salary | dob | phone | aadhar | room [num]_\n"
+            "e.g. _add staff Raju | Security | 8000 | 01-01-1995 | 9876543210 | 1234-5678-9012 | room G05_\n"
+            "Fields after name are optional but KYC photo will be required."
+        )
+
+    name = parts[0]
+    role = parts[1] if len(parts) > 1 else None
+    salary = None
+    dob = None
+    phone = None
+    aadhar = None
+    room_num = None
+
+    if len(parts) > 2:
+        try:
+            salary = _D(parts[2].replace(",", "").replace("rs", "").replace("₹", "").strip())
+        except Exception:
+            pass
+    if len(parts) > 3:
+        raw_dob = parts[3].strip()
+        for fmt in ("%d-%m-%Y", "%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                dob = _date(*[int(x) for x in _re.split(r"[-/]", raw_dob)])
+                break
+            except Exception:
+                pass
+    if len(parts) > 4:
+        phone = _re.sub(r"\D", "", parts[4])[:15] or None
+    if len(parts) > 5:
+        aadhar = parts[5].strip() or None
+    # Room: look for "room G05" in last part(s) or dedicated field
+    for part in parts[6:]:
+        rm = _re.search(r"(?:room\s+)?([A-Za-z]?\d{2,4}[A-Za-z]?)", part, _re.I)
+        if rm:
+            room_num = rm.group(1).upper()
+            break
+
+    # Resolve room
+    room = None
+    if room_num:
+        room = (await session.execute(
+            select(Room).where(Room.room_number == room_num)
+        )).scalar_one_or_none()
+        if not room:
+            return f"Room *{room_num}* not found. Check room number and retry."
+
+    # Determine property_id
+    prop_id = room.property_id if room else None
+    if not prop_id:
+        first_prop = (await session.execute(select(Property).limit(1))).scalar_one_or_none()
+        prop_id = first_prop.id if first_prop else None
+
+    staff = Staff(
+        name=name, property_id=prop_id,
+        room_id=room.id if room else None,
+        role=role, salary=salary, date_of_birth=dob,
+        phone=phone, aadhar_number=aadhar,
+        kyc_verified=False, active=True,
+        join_date=_date.today(),
+    )
+    session.add(staff)
+    await session.flush()  # get staff.id for the pending
+
+    if room and not room.is_staff_room:
+        room.is_staff_room = True
+        session.add(AuditLog(
+            changed_by=ctx.phone or "system",
+            entity_type="room", entity_id=room.id,
+            entity_name=room.room_number, field="is_staff_room",
+            old_value="False", new_value="True",
+            room_number=room.room_number, source="whatsapp",
+        ))
+        try:
+            from src.integrations import gsheets as _gs
+            from datetime import date as _d
+            _t = _d.today()
+            _gs.trigger_monthly_sheet_sync(_t.month, _t.year)
+        except Exception:
+            pass
+
+    session.add(AuditLog(
+        changed_by=ctx.phone or "system",
+        entity_type="staff", entity_id=staff.id,
+        entity_name=name, field="created",
+        old_value=None, new_value=name,
+        source="whatsapp",
+    ))
+
+    # Save pending to await KYC document
+    await _save_pending(
+        ctx.phone, "ADD_STAFF_KYC",
+        {"staff_id": staff.id, "staff_name": name},
+        [], session,
+    )
+
+    lines = [f"*Staff added — {name}*"]
+    if role:   lines.append(f"Role: {role}")
+    if salary: lines.append(f"Salary: Rs.{int(salary):,}/month")
+    if dob:    lines.append(f"DOB: {dob.strftime('%d-%m-%Y')}")
+    if phone:  lines.append(f"Phone: {phone}")
+    if aadhar: lines.append(f"Aadhar: {aadhar}")
+    if room:   lines.append(f"Room: {room.room_number}")
+    lines.append("\n*Send a photo or PDF of their Aadhar / ID card to complete KYC.*")
+    lines.append("_(Reply *skip* to skip KYC for now — you can upload later.)_")
+    return "\n".join(lines)
+
+
 # ── QUERY STAFF ROOMS ──────────────────────────────────────────────────────
 
 async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -722,7 +851,9 @@ async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSe
         occupants = by_room.get(room.id, [])
         if occupants:
             names = ", ".join(
-                f"{s.name}" + (f" ({s.role})" if s.role else "")
+                f"{s.name}"
+                + (f" ({s.role})" if s.role else "")
+                + ("" if s.kyc_verified else " ⚠ KYC pending")
                 for s in occupants
             )
             occ = f"{len(occupants)} staff — {names}"
@@ -735,6 +866,7 @@ async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSe
         f"*Staff Rooms* ({len(rows)} rooms, excluded from revenue):\n\n"
         + "\n".join(lines)
         + "\n\nAssign: _staff [name] room [num]_ • Exit: _staff [name] exit_"
+        + "\nAdd new: _add staff [name] | role | salary | dob | phone | aadhar | room [num]_"
     )
 
 
@@ -788,7 +920,14 @@ async def assign_staff_to_room(entities: dict, ctx: CallerContext, session: Asyn
         lines.append(f"\nOr reply *cancel* to abort.")
         return "\n".join(lines)
 
-    staff = exact_matches[0] if exact_matches else None
+    if not exact_matches:
+        return (
+            f"No active staff named *{name}* found.\n"
+            f"To register a new staff member, send:\n"
+            f"_add staff {name} | role | salary | dob | phone | aadhar | room {room_num}_\n"
+            f"e.g. _add staff {name} | Security | 8000 | 01-01-1995 | 9876543210 | 1234-5678-9012 | room {room_num}_"
+        )
+    staff = exact_matches[0]
     return await _apply_staff_assignment(staff, name, room, role, phone, ctx, session)
 
 

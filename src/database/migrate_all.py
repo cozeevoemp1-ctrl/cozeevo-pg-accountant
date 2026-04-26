@@ -1152,6 +1152,22 @@ async def run_add_cancellation_reason_2026_04_25b(conn) -> None:
     print("  [ok] cancellation_reason added")
 
 
+async def run_add_staff_kyc_fields_2026_04_26(conn) -> None:
+    """Add salary, date_of_birth, aadhar_number, kyc_document_url, kyc_verified to staff."""
+    print("\n-- Add staff KYC fields (2026-04-26) --")
+    for col_name, col_def in [
+        ("salary",           "NUMERIC(10,2)"),
+        ("date_of_birth",    "DATE"),
+        ("aadhar_number",    "VARCHAR(20)"),
+        ("kyc_document_url", "VARCHAR(500)"),
+        ("kyc_verified",     "BOOLEAN DEFAULT FALSE"),
+    ]:
+        await conn.execute(text(
+            f"ALTER TABLE staff ADD COLUMN IF NOT EXISTS {col_name} {col_def}"
+        ))
+    print("  [ok] staff KYC fields added")
+
+
 async def _migrate_checkout_sessions(conn) -> None:
     """Create checkout_sessions table and extend checkout_records."""
     await conn.execute(text("""
@@ -1344,6 +1360,9 @@ async def main(args: argparse.Namespace) -> None:
             await run_simplify_roles_2026_04_01(engine)
         except Exception as e:
             print(f"  [warn] simplify_roles failed (non-fatal): {e}")
+        # Staff KYC fields — own transaction (main tx may be aborted by deadlock in earlier step)
+        async with engine.begin() as conn2:
+            await run_add_staff_kyc_fields_2026_04_26(conn2)
         if args.seed:
             async with engine.begin() as conn2:
                 await run_seed(conn2)

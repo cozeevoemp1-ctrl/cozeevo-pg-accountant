@@ -306,7 +306,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"rent (?:is now|from\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next)|change|increase|hike|reduce|decrease)|new rent|from \w+ rent|rent to \d|from\s+next\s+month\s+rent|room\s+[\w-]+\s+rent\s+(?:\d|updated?|changed?|revised?)|(?:change|update|revise|set|increase)\s+rent\b|room\s+[\w-]+\s+to\s+\d{4,}|increase\s+rent\s+(?:for\s+)?room|(?:change|update|revise|set|increase)\s+rent\s+(?:for\s+)?(?:room|[A-Z][a-z]+)\b", re.I), "RENT_CHANGE", 0.91),
     # One-time discount / concession / surcharge
     (re.compile(r"(?:concession|discount|waive|deduct|give.*less|less this month|reduce this month|reduce\s+\w+'?s?\s+rent\s+by|extra charge|add.*surcharge|add.*electricity|add.*food charge)", re.I), "RENT_DISCOUNT", 0.90),
-    # Add partner / staff
+    # Add new staff member with details (pipe-separated) — must come before ADD_PARTNER
+    (re.compile(r"(?:add|register|new)\s+staff\s+[A-Za-z][^\|]+\|", re.I), "ADD_STAFF", 0.97),
+    # Add partner / staff (bot access only)
     (re.compile(r"(?:add partner|add owner|add power user|new admin|give access|add\s+staff\b(?!\s+room))", re.I), "ADD_PARTNER", 0.97),
     # WiFi password — owner reads or sets WiFi credentials
     (re.compile(r"(?:set\s+wifi|update\s+wifi|change\s+wifi|wifi\s+(?:ssid|network|password)\s+\w+|set\s+(?:floor|common)\s+wifi)", re.I), "SET_WIFI", 0.95),

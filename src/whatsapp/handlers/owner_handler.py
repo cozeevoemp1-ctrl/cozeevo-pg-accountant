@@ -57,6 +57,7 @@ from src.whatsapp.handlers.update_handler import (
     query_staff_rooms as _query_staff_rooms,
     assign_staff_to_room as _assign_staff_to_room,
     exit_staff_from_room as _exit_staff_from_room,
+    add_staff as _add_staff,
 )
 from services.property_logic import (
     NOTICE_BY_DAY,
@@ -132,6 +133,7 @@ async def handle_owner(
         "QUERY_STAFF_ROOMS":  _query_staff_rooms,
         "ASSIGN_STAFF_ROOM":  _assign_staff_to_room,
         "EXIT_STAFF":         _exit_staff_from_room,
+        "ADD_STAFF":          _add_staff,
         "CHANGE_ROOM":        _room_transfer_prompt,  # alias for ROOM_TRANSFER
         "ASSIGN_ROOM":        _assign_room_prompt,
         "QUERY_UNHANDLED":    _query_unhandled,
@@ -1634,6 +1636,48 @@ async def resolve_pending_action(
             staff, staff.name, room,
             action_data.get("role"), action_data.get("phone"),
             _ctx, session,
+        )
+
+    if pending.intent == "ADD_STAFF_KYC":
+        staff_id   = action_data.get("staff_id")
+        staff_name = action_data.get("staff_name", "Staff")
+        # Allow skipping KYC
+        if reply_text.strip().lower() in ("skip", "later", "no", "cancel"):
+            pending.resolved = True
+            return (
+                f"KYC skipped for *{staff_name}*. Staff is active but marked as KYC pending.\n"
+                "Upload later by sending their photo again when a KYC prompt appears."
+            )
+        # Must have media
+        if not media_id:
+            return (
+                f"__KEEP_PENDING__Please send a *photo or PDF* of {staff_name}'s ID card (Aadhar / Passport / DL).\n"
+                "Or reply *skip* to register without KYC for now."
+            )
+        # Validate mime type
+        allowed_mimes = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+        if media_mime and media_mime not in allowed_mimes:
+            return (
+                f"__KEEP_PENDING__File type *{media_mime}* not accepted. "
+                "Please send a *JPEG, PNG, or PDF* of the ID card."
+            )
+        # Download from WhatsApp → upload to Supabase Storage
+        from src.whatsapp.media_handler import upload_staff_kyc_to_supabase
+        kyc_url = await upload_staff_kyc_to_supabase(media_id, staff_id, media_mime)
+        if not kyc_url:
+            return (
+                "__KEEP_PENDING__Could not save the document — please try sending it again."
+            )
+        from src.database.models import Staff as _Staff
+        staff = await session.get(_Staff, staff_id)
+        if staff:
+            staff.kyc_document_url = kyc_url
+            staff.kyc_verified = True
+        pending.resolved = True
+        return (
+            f"*KYC saved for {staff_name}* ✓\n"
+            f"Document uploaded and linked to their profile.\n"
+            f"Staff registration complete."
         )
 
     if pending.intent == "CONFIRM_DEPOSIT_REFUND":
