@@ -125,6 +125,17 @@ async def room_lookup(room_number: str, request: Request):
 async def create_session(req: CreateSessionRequest, request: Request):
     _check_admin_pin(request)
     _rate_check(f"create:{request.client.host}", 10, 60)  # 10/min
+
+    # Phone must have exactly 10 digits after stripping country code/punctuation
+    import re as _re
+    _phone_digits = _re.sub(r"\D", "", req.tenant_phone or "")
+    if len(_phone_digits) < 10:
+        raise HTTPException(
+            400,
+            f"Tenant phone must be at least 10 digits — got {len(_phone_digits)} "
+            f"from '{req.tenant_phone}'. Enter 10-digit number without country code."
+        )
+
     if req.booking_amount > 0 and not req.advance_mode:
         raise HTTPException(400, "Payment method (cash/upi) required when booking amount > 0")
 

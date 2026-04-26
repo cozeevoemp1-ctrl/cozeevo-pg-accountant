@@ -502,7 +502,7 @@
 
             <div class="form-group">
               <label for="tenant_phone">Tenant Phone</label>
-              <input type="tel" id="tenant_phone" name="tenant_phone" placeholder="10 digits" maxlength="10" required>
+              <input type="tel" id="tenant_phone" name="tenant_phone" placeholder="10-digit number (or +91XXXXXXXXXX)" maxlength="13" required>
             </div>
 
             <div class="form-group">
@@ -947,11 +947,16 @@
     const errEl = document.getElementById('create-error');
     errEl.classList.remove('show');
 
-    const phone = document.getElementById('tenant_phone').value.trim();
-    if (!/^\d{10}$/.test(phone)) {
-      showAlert(errEl, 'Tenant phone must be exactly 10 digits.');
+    const rawPhone = document.getElementById('tenant_phone').value.trim();
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    const phone = phoneDigits.length > 10 ? phoneDigits.slice(-10) : phoneDigits;
+    if (phone.length !== 10) {
+      showAlert(errEl, `Phone number must be 10 digits (got ${phone.length}). Enter digits only, e.g. 9080887810.`);
+      document.getElementById('tenant_phone').focus();
       return;
     }
+    // Normalise the field so what gets submitted is always clean 10 digits
+    document.getElementById('tenant_phone').value = phone;
 
     const bookingAmt = parseFloat(document.getElementById('booking_amount').value) || 0;
     if (bookingAmt > 0) {

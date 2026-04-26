@@ -674,11 +674,14 @@ async def resolve_pending_action(
                 hint = f"\nDid you mean: {', '.join(f'*{r}*' for r in similar)}?" if similar else ""
                 return f"__KEEP_PENDING__Room *{room_str}* not found.{hint}\n\nUse *edit room T-201* to correct."
 
-            # Check duplicate phone
+            # Validate and normalise phone
             phone_raw = extracted.get("phone", "")
             phone_clean = re.sub(r"[^0-9]", "", phone_raw)
             if len(phone_clean) > 10:
                 phone_clean = phone_clean[-10:]
+            if phone_clean and len(phone_clean) < 10:
+                return (f"__KEEP_PENDING__Phone *{phone_raw}* has only {len(phone_clean)} digit(s) — "
+                        "must be 10 digits (without +91).\n\nUse *edit phone* to correct.")
             if phone_clean and len(phone_clean) == 10:
                 existing = await session.scalar(select(Tenant).where(Tenant.phone == phone_clean))
                 if existing:
