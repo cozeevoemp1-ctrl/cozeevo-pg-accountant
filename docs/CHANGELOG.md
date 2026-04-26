@@ -2,6 +2,36 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.63.1] — 2026-04-26 — Fix checkout/check-in form correction flow + testing SOP
+
+### Bug fix: field revert in multi-step OCR form corrections
+- **Root cause**: `CHECKOUT_FORM_CONFIRM` and `FORM_EXTRACT_CONFIRM` were calling `_save_pending()` on edit (creates new PendingAction), then returning without `__KEEP_PENDING__`. Timing between new-pending creation and old-pending resolution could cause field revert.
+- **Fix**: Update `pending.action_data` directly on the ORM object + return `__KEEP_PENDING__` prefix. No new PendingAction created. Field state guaranteed to persist across turns.
+- Lokesh bug: room 906→206 was reverting to 906 when phone was corrected next — now fixed.
+
+### New: phone mismatch guardrail (CHECKOUT_FORM_CONFIRM)
+- When form has matching name/room but phone ≠ DB records, bot warns user before proceeding
+- Step: `phone_mismatch` — user must reply *yes* (proceed anyway) or *edit phone [correct]* to fix
+- Prevents silent wrong-tenant checkout when OCR misreads phone number
+
+### Improved: checkout form edit reliability
+- Added regex `edit field_name value` path before LLM fallback (same as check-in form)
+- LLM (`_parse_checkout_edit_nl`) is now only called for natural-language edits, not structured `edit X Y` commands
+- Natural language edits still work via LLM fallback
+
+### Testing SOP
+- Updated `memory/sop_testing.md` with mandatory mid-flow correction test matrix
+- Regression test added to `tests/test_form_extract_flow.py`:
+  - `checkin multi-edit: name held after phone edit`
+  - `checkout multi-edit: room held (no revert)` — the Lokesh bug
+- 48/48 tests pass on VPS
+
+### Files changed
+- `src/whatsapp/handlers/owner_handler.py` — CHECKOUT_FORM_CONFIRM + FORM_EXTRACT_CONFIRM handlers
+- `tests/test_form_extract_flow.py` — new multi-turn correction + checkout OCR tests
+
+---
+
 ## [1.63.0] — 2026-04-26 — Day-Wise Parity: all guests in Tenancy(stay_type=daily)
 
 ### Architecture change
