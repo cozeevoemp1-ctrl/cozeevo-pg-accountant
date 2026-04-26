@@ -32,11 +32,21 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 TAB_NAME = "DAY WISE"
-MONTHLY_HEADERS = [
+
+# Columns mirror every field from the day-wise onboarding form + DB
+HEADERS = [
+    # Identity
     "Room", "Name", "Phone", "Building", "Sharing",
-    "Rent", "Days", "Deposit", "Rent Due", "Cash", "UPI",
-    "Total Paid", "Balance", "Status", "Check-in",
-    "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
+    # Financial (receptionist-set)
+    "Rent/Day", "Days", "Booking Amt", "Security Dep", "Maintenance",
+    "Rent Due", "Cash", "UPI", "Total Paid", "Balance",
+    # Status & dates
+    "Status", "Check-in", "Checkout",
+    # KYC (tenant-filled)
+    "Gender", "Food Pref", "ID Type", "ID Number",
+    "Emergency Contact", "Emergency Phone", "Email",
+    # Admin
+    "Notes", "Entered By",
 ]
 
 
@@ -66,19 +76,26 @@ async def main(args) -> None:
         for t in rows:
             tenant = t.tenant
             room = t.room
-            checkin = t.checkin_date.strftime("%d/%m/%Y") if t.checkin_date else ""
+            checkin  = t.checkin_date.strftime("%d/%m/%Y")  if t.checkin_date  else ""
             checkout = t.checkout_date.strftime("%d/%m/%Y") if t.checkout_date else ""
-            num_days = max(1, (t.checkout_date - t.checkin_date).days) if (t.checkout_date and t.checkin_date) else 0
-            daily_rate = float(t.agreed_rent or 0)
-            maintenance = float(t.maintenance_fee or 0)
-            booking_amount = float(t.booking_amount or 0)
-            rent_due = round(daily_rate * num_days + maintenance, 2)
 
-            non_void = [p for p in t.payments if not p.is_void]
+            # Inclusive day count: Apr 10 → Apr 30 = 21 days (both days count)
+            if t.checkout_date and t.checkin_date:
+                num_days = (t.checkout_date - t.checkin_date).days + 1
+            else:
+                num_days = 0
+
+            daily_rate      = float(t.agreed_rent or 0)
+            maintenance     = float(t.maintenance_fee or 0)
+            booking_amount  = float(t.booking_amount or 0)
+            security_dep    = float(t.security_deposit or 0)
+            rent_due        = round(daily_rate * num_days + maintenance, 2)
+
+            non_void  = [p for p in t.payments if not p.is_void]
             cash_paid = sum(float(p.amount or 0) for p in non_void if p.payment_mode == PaymentMode.cash)
-            upi_paid = sum(float(p.amount or 0) for p in non_void if p.payment_mode != PaymentMode.cash)
+            upi_paid  = sum(float(p.amount or 0) for p in non_void if p.payment_mode != PaymentMode.cash)
             total_paid = round(cash_paid + upi_paid, 2)
-            balance = round(rent_due - total_paid, 2)
+            balance    = round(rent_due - total_paid, 2)
 
             display_status = str(t.status.value if hasattr(t.status, "value") else t.status).upper()
             is_still_active = t.status == TenancyStatus.active and not (t.checkout_date and t.checkout_date < today)
@@ -88,39 +105,52 @@ async def main(args) -> None:
                 active_count += 1
             total_revenue += total_paid
 
-            phone = tenant.phone if tenant else ""
+            phone     = tenant.phone if tenant else ""
             prop_name = (room.property.name if room and room.property else "") or ""
-            building = prop_name.replace("Cozeevo ", "").strip()
-            sharing = str(t.sharing_type.value if t.sharing_type else "Day-Stay")
+            building  = prop_name.replace("Cozeevo ", "").strip()
+            sharing   = str(t.sharing_type.value if t.sharing_type else "Day-Stay")
+
             data_rows.append([
                 room.room_number if room else "",
                 tenant.name if tenant else "",
                 f"'{phone}" if phone else "",
                 building,
                 sharing,
+                # Financial
                 daily_rate,
                 num_days,
                 booking_amount,
+                security_dep,
+                maintenance,
                 rent_due,
                 round(cash_paid, 2),
                 round(upi_paid, 2),
                 total_paid,
                 balance,
+                # Status & dates
                 display_status,
                 checkin,
-                "",
-                checkout,                               # clean date in Event col
+                checkout,
+                # KYC
+                tenant.gender if tenant else "",
+                tenant.food_preference if tenant else "",
+                tenant.id_proof_type if tenant else "",
+                tenant.id_proof_number if tenant else "",
+                tenant.emergency_contact_name if tenant else "",
+                tenant.emergency_contact_phone if tenant else "",
+                tenant.email if tenant else "",
+                # Admin
                 t.notes or "",
-                "",
                 t.entered_by or "",
             ])
 
-        exited_count = sum(1 for r in data_rows if r[12] in ("EXIT", "EXITED"))
-        total_pending_balance = sum(float(r[11] or 0) for r in data_rows if float(r[11] or 0) > 0)
+        # Balance column is index 14
+        exited_count          = sum(1 for r in data_rows if r[15] in ("EXIT", "EXITED"))
+        total_pending_balance = sum(float(r[14] or 0) for r in data_rows if float(r[14] or 0) > 0)
 
         print(f"  Active today: {active_count} | Total revenue: Rs.{int(total_revenue):,} | Exits: {exited_count}")
 
-        ncols = len(MONTHLY_HEADERS)
+        ncols = len(HEADERS)
         def pad(cells):
             return cells + [""] * (ncols - len(cells))
 
@@ -137,7 +167,7 @@ async def main(args) -> None:
             print("[DRY RUN] Not writing to sheet.")
             if data_rows:
                 r = data_rows[0]
-                print(f"  Sample row: {r[:4]}")
+                print(f"  Sample row: {r[:6]}")
             return
 
         from src.integrations.gsheets import _get_worksheet_sync, _get_spreadsheet_sync
@@ -149,18 +179,19 @@ async def main(args) -> None:
             ss = _get_spreadsheet_sync()
             ws = ss.add_worksheet(title=TAB_NAME, rows=500, cols=ncols)
 
-        all_rows = [summary_row, MONTHLY_HEADERS] + data_rows
+        all_rows = [summary_row, HEADERS] + data_rows
         ws.clear()
         if all_rows:
             ws.update(values=all_rows, range_name="A1", value_input_option="USER_ENTERED")
 
+        last_col = chr(ord("A") + ncols - 1)
         try:
-            ws.format(f"A1:S1", {
+            ws.format(f"A1:{last_col}1", {
                 "textFormat": {"bold": True, "fontSize": 12,
                                "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                 "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
             })
-            ws.format(f"A2:S2", {
+            ws.format(f"A2:{last_col}2", {
                 "textFormat": {"bold": True,
                                "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                 "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
