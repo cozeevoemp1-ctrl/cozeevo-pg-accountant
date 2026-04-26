@@ -5597,8 +5597,9 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     food_pref = data.get("food_pref", "")
     if food_pref in ("none", "skip"):
         food_pref = ""
-    from src.services.room_occupancy import _normalize_phone as _np
+    from src.services.room_occupancy import _normalize_phone as _np, canonical_phone as _canon
     _norm = _np(phone)
+    phone = _canon(phone)  # always store as +91XXXXXXXXXX
     from sqlalchemy import func as _func
     tenant = await session.scalar(
         select(Tenant).where(
@@ -7764,12 +7765,17 @@ async def _start_onboarding(entities: dict, ctx: CallerContext, session: AsyncSe
     if not name:
         name = "New Tenant"
 
-    # Normalize to 10 digits
-    phone = phone.lstrip("+").lstrip("91") if len(phone) > 10 else phone
+    # Normalize to canonical +91XXXXXXXXXX for storage
+    from src.services.room_occupancy import canonical_phone as _canon, _normalize_phone as _np3
+    phone = _canon(phone)
+    _norm3 = _np3(phone)
 
-    # Find or create Tenant
+    # Find or create Tenant (normalized lookup)
+    from sqlalchemy import func as _func3
     result = await session.execute(
-        select(Tenant).where(Tenant.phone == phone)
+        select(Tenant).where(
+            _func3.right(_func3.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm3
+        )
     )
     tenant = result.scalars().first()
     if not tenant:

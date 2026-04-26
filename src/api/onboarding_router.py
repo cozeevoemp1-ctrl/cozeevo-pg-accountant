@@ -141,12 +141,18 @@ async def create_session(req: CreateSessionRequest, request: Request):
                 old_obs.status = "cancelled"
                 old_obs.cancellation_reason = "superseded"
 
-        # Check if tenant already exists in system
-        existing_tenant = None
+        # Hard-block if this phone already has an active tenancy anywhere
         if req.tenant_phone:
-            existing_tenant = await session.scalar(
-                select(Tenant).where(Tenant.phone == req.tenant_phone)
-            )
+            from src.services.room_occupancy import get_active_tenancy_by_phone
+            existing_active = await get_active_tenancy_by_phone(session, req.tenant_phone)
+            if existing_active:
+                _et, _etn, _er = existing_active
+                raise HTTPException(
+                    409,
+                    f"Phone {req.tenant_phone} already has an active tenancy for "
+                    f"{_et.name} in Room {_er.room_number}. "
+                    "Checkout their current room first, or use a different phone number."
+                )
 
         # Lookup room if provided, otherwise allow future room assignment
         room = None
@@ -158,6 +164,18 @@ async def create_session(req: CreateSessionRequest, request: Request):
             if room.property_id:
                 prop = await session.get(Property, room.property_id)
                 building = prop.name if prop else ""
+            # Capacity check at session-create time — warn receptionist before sending link
+            from src.services.room_occupancy import get_room_occupants
+            occ = await get_room_occupants(session, room)
+            if occ.total_occupied >= (room.max_occupancy or 1):
+                occ_names = [t.name for t, _ in occ.tenancies] + [d.guest_name for d in occ.daywise]
+                raise HTTPException(
+                    409,
+                    f"Room {room.room_number} is full "
+                    f"({occ.total_occupied}/{room.max_occupancy} beds — "
+                    f"{', '.join(occ_names)}). "
+                    "Checkout an existing tenant or choose a different room."
+                )
 
         token = str(uuid.uuid4())
         obs = OnboardingSession(
@@ -254,7 +272,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
                 "floor": str(room.floor or "") if room else "",
                 "sharing": sharing
             },
-            "warning": f"⚠️ Tenant already exists in system (phone: {req.tenant_phone})" if existing_tenant else None,
+            "warning": None,
         }
 
 
@@ -1079,12 +1097,18 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             prop = await session.get(Property, room.property_id)
             building = prop.name if prop else ""
 
-        phone = td["phone"].strip()
-        if len(phone) > 10:
-            phone = phone[-10:]
+        from src.services.room_occupancy import canonical_phone as _canon
+        phone = _canon(td["phone"])
 
-        # Create or find tenant
-        tenant = await session.scalar(select(Tenant).where(Tenant.phone == phone))
+        # Create or find tenant (normalized lookup so +91/91/bare all match)
+        from src.services.room_occupancy import _normalize_phone as _np2
+        from sqlalchemy import func as _func2
+        _norm10 = _np2(phone)
+        tenant = await session.scalar(
+            select(Tenant).where(
+                _func2.right(_func2.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm10
+            )
+        )
         if not tenant:
             tenant = Tenant(
                 name=td["name"], phone=phone, gender=td.get("gender"),
@@ -1114,9 +1138,21 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         checkin = obs.checkin_date or date.today()
         is_daily = obs.stay_type == "daily"
 
+        # Phone dedup guard — block if this phone already has an active tenancy
+        from src.services.room_occupancy import check_room_bookable, get_active_tenancy_by_phone
+        existing_active = await get_active_tenancy_by_phone(session, phone)
+        if existing_active:
+            _et, _etn, _er = existing_active
+            if _etn.id != (obs.tenancy_id or -1):  # don't block re-approvals of same session
+                raise HTTPException(
+                    409,
+                    f"Phone {phone} already has an active tenancy for "
+                    f"{_et.name} in Room {_er.room_number}. "
+                    "Cannot create duplicate. Checkout their current room first."
+                )
+
         # Double-booking guard — only if room is assigned
         if room:
-            from src.services.room_occupancy import check_room_bookable
             _guard_checkout = None
             if is_daily:
                 _guard_checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))

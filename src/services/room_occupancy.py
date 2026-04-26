@@ -16,6 +16,7 @@ inline. If you find you need a new question answered, add it here.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date as _date
 from typing import Optional
@@ -31,6 +32,57 @@ from src.database.models import (
     TenancyStatus,
     Tenant,
 )
+
+
+def _normalize_phone(phone: str) -> str:
+    """Strip country code / punctuation and return the last 10 digits.
+
+    Treats '9080887810', '+919080887810', '919080887810' as identical.
+    Returns '' if fewer than 10 digits are present (malformed / placeholder).
+    """
+    digits = re.sub(r"\D", "", phone or "")
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
+def canonical_phone(phone: str) -> str:
+    """Normalize any phone input to +91XXXXXXXXXX for DB storage.
+
+    Call this before saving any phone to the tenants table so that
+    '9080887810', '+919080887810', '919080887810' all become
+    '+919080887810' and dedup checks never miss due to format difference.
+    Returns the original string unchanged if fewer than 10 digits found.
+    """
+    last10 = _normalize_phone(phone)
+    if len(last10) == 10:
+        return f"+91{last10}"
+    return phone or ""
+
+
+async def get_active_tenancy_by_phone(
+    session: AsyncSession,
+    phone: str,
+) -> Optional[tuple[Tenant, Tenancy, Room]]:
+    """Return (Tenant, Tenancy, Room) if *phone* has an active tenancy, else None.
+
+    Normalizes both the query phone AND every stored tenant phone to the last
+    10 digits before comparing, so '+919080887810' and '9080887810' match.
+    Uses a PostgreSQL regexp_replace so the comparison is a single indexed scan.
+    """
+    normalized = _normalize_phone(phone)
+    if not normalized:
+        return None
+    row = (await session.execute(
+        select(Tenant, Tenancy, Room)
+        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(
+            Tenancy.status == TenancyStatus.active,
+            func.right(
+                func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10
+            ) == normalized,
+        )
+    )).first()
+    return row  # (Tenant, Tenancy, Room) or None
 
 
 @dataclass
