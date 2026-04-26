@@ -22,7 +22,7 @@
  * looks up data by name — never by position.
  */
 
-const TOTAL_BEDS = 291;
+const TOTAL_BEDS = 294; // updated 2026-04-26; 295 when G20 returns to revenue May 2026
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/i;
 const DROPDOWN_CELL = "E1";  // Where the month picker lives on DASHBOARD

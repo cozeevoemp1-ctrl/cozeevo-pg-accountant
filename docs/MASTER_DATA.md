@@ -39,7 +39,7 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 |---|---|---|---|---|---|
 | Cozeevo THOR | G + 1-6 + 7 | 12 (x01-x12) | 701, 702 | G01-G10 | **84** |
 | Cozeevo HULK | G + 1-6 | 12 (x13-x24) | none | G11-G20 | **82** |
-| **Total** | | | | | **166** (9 staff, 157 revenue) |
+| **Total** | | | | | **166** (8 staff, 158 revenue) |
 
 ### Room Numbering Convention
 - THOR: `{floor}{01-12}` — e.g. 101, 212, 312, 601
@@ -52,9 +52,7 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 ## Staff Rooms (excluded from revenue)
 
 > **Live source of truth:** `rooms.is_staff_room = True` in Supabase.
-> Run `show staff rooms` on bot for current state.
 > **Update this table + BRAIN.md** whenever a room is permanently added or removed as staff quarters.
-> Bot will remind you in the confirm reply when a room flag changes.
 
 | Room | Property | Beds | Notes |
 |---|---|---|---|
@@ -65,10 +63,11 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | 701 | THOR | 1 | Staff quarters (permanent) |
 | 702 | THOR | 1 | Staff quarters (permanent) |
 | G12 | HULK | 3 | Staff quarters (permanent) |
-| 114 | HULK | 2 | Staff quarters (permanent) |
-| 618 | HULK | 2 | Staff quarters (permanent) |
+| G20 | HULK | 1 | Staff quarters (temporary — until April 2026 end, returns to revenue May 2026) |
 
-**Total staff rooms: 9** (THOR 6 + HULK 3) — verify with `show staff rooms`
+**Total staff rooms: 8** (THOR 6 + HULK 2) — **294 revenue beds currently; 295 from May 2026 when G20 returns**
+
+> **Changed 2026-04-26:** 114 and 618 moved from staff → revenue (paying tenants moved in). G20 moved to staff temporarily until April end.
 
 ---
 
@@ -77,23 +76,25 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
 | THOR | 78 | 14 | 61 | 3 | **145** |
-| HULK | 79 | 14 | 63 | 2 | **146** |
-| **Total** | **157** | **28** | **124** | **5** | **291** |
+| HULK | 80 | 13 | 65 | 2 | **149** |
+| **Total** | **158** | **27** | **126** | **5** | **294** |
+
+> When G20 returns to revenue (May 2026): HULK singles = 14, HULK total = 150, grand total = **295**.
 
 ### Bed Count Formula
 ```
 Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
                    = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
-                   = 28 + 248 + 15
-                   = 291
+                   = 27 + 252 + 15
+                   = 294  (295 when G20 returns)
 ```
 
 ### Corner Room Rule (applies to BOTH buildings)
 - First room on each floor (x01 THOR / x13 HULK) = **single** (1 bed)
 - Last room on each floor (x12 THOR / x24 HULK) = **single** (1 bed)
 - Ground floor first (G01 THOR / G11 HULK) = **single** (1 bed)
-- Ground floor last (G10 THOR / G20 HULK) = **single** (1 bed)
-- Floor 7: 702 (THOR only) = **single** (1 bed)
+- Ground floor last (G10 THOR / G20 HULK) = **single** (1 bed) — G20 currently staff
+- Floor 7: 702 (THOR only) = **single** (1 bed, staff)
 
 ---
 
@@ -114,7 +115,7 @@ Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
 ## Occupancy Calculation Rules
 
 ```
-Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 291)
+Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 294)
                      Calculated dynamically from rooms table, never hardcoded.
 
 Occupied Beds      = SUM(
@@ -147,7 +148,7 @@ Reporting format:
 
 ---
 
-## THOR Room Layout (79 revenue + 5 staff = 84)
+## THOR Room Layout (78 revenue + 6 staff = 84)
 
 | Floor | Rooms | Count | Sharing Types |
 |---|---|---|---|
@@ -158,21 +159,22 @@ Reporting format:
 | 4 | 401-412 | 12 | 401=1, 402-411=2, 412=1 |
 | 5 | 501-512 | 12 | 501=1, 502-511=2, 512=1 |
 | 6 | 601-612 | 12 | 601=1, 602-611=2, 612=1 |
-| 7 | 701-702 | 2 | **701=staff**, 702=1 |
+| 7 | 701-702 | 2 | **701=staff**, **702=staff** |
 
-## HULK Room Layout (79 revenue + 3 staff = 82)
+## HULK Room Layout (80 revenue + 2 staff = 82)
 
 | Floor | Rooms | Count | Sharing Types |
 |---|---|---|---|
-| G | G11-G20 | 10 | G11=1, **G12=staff**, G13-G14=3, G15-G19=2, G20=1 |
-| 1 | 113-124 | 12 | 113=1, **114=staff**, 115-123=2, 124=1 |
+| G | G11-G20 | 10 | G11=1, **G12=staff**, G13-G14=3, G15-G19=2, **G20=staff(temp)** |
+| 1 | 113-124 | 12 | 113=1, 114=2, 115-123=2, 124=1 |
 | 2 | 213-224 | 12 | 213=1, 214-223=2, 224=1 |
 | 3 | 313-324 | 12 | 313=1, 314-323=2, 324=1 |
 | 4 | 413-424 | 12 | 413=1, 414-423=2, 424=1 |
 | 5 | 513-524 | 12 | 513=1, 514-523=2, 524=1 |
-| 6 | 613-624 | 12 | 613=1, 614-617=2, **618=staff**, 619-623=2, 624=1 |
+| 6 | 613-624 | 12 | 613=1, 614-617=2, 618=2, 619-623=2, 624=1 |
 
 ---
 
 ## Changelog
 - 2026-03-23: Initial master data created from owner confirmation
+- 2026-04-26: 114 + 618 moved from staff → revenue. G20 moved to staff (temporary, until April 2026 end — returns to revenue May 2026). G05 corrected to staff (was wrongly revenue in DB). G13 corrected to room_type=triple in DB. Revenue beds: 291 → 294 (295 from May 2026).

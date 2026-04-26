@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Optional
 
 from loguru import logger
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -557,8 +557,10 @@ async def _update_single_room(room_num: str, desc: str, ctx: CallerContext, sess
         except Exception:
             pass
         if new_val:
-            return f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations)."
-        return f"Room *{room_num}* is now a *revenue room* (included in calculations)."
+            return (f"Room *{room_num}* marked as *staff room* (excluded from revenue calculations).\n"
+                    "_(Update MASTER_DATA.md + BRAIN.md staff quarters table.)_")
+        return (f"Room *{room_num}* is now a *revenue room* (included in calculations).\n"
+                "_(Update MASTER_DATA.md + BRAIN.md if this is permanent.)_")
 
     return (
         f"Room *{room_num}* — what to change?\n"
@@ -868,6 +870,50 @@ async def query_staff_rooms(entities: dict, ctx: CallerContext, session: AsyncSe
         + "\n\nAssign: _staff [name] room [num]_ • Exit: _staff [name] exit_"
         + "\nAdd new: _add staff [name] | role | salary | dob | phone | aadhar | room [num]_"
     )
+
+
+# ── MASTER DATA SUMMARY ────────────────────────────────────────────────────
+
+async def show_master_data(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Live DB snapshot of master data — use to verify MASTER_DATA.md is current."""
+    # Staff rooms
+    staff_room_rows = (await session.execute(
+        select(Room.room_number, Property.name.label("bldg"), Room.max_occupancy)
+        .join(Property, Property.id == Room.property_id, isouter=True)
+        .where(Room.is_staff_room == True)
+        .order_by(Property.name, Room.room_number)
+    )).all()
+
+    # Revenue bed count per property
+    rev_rows = (await session.execute(
+        select(
+            Property.name.label("bldg"),
+            func.count(Room.id).label("rooms"),
+            func.sum(Room.max_occupancy).label("beds"),
+        )
+        .join(Property, Property.id == Room.property_id, isouter=True)
+        .where(Room.is_staff_room == False, Room.active == True)
+        .group_by(Property.name)
+        .order_by(Property.name)
+    )).all()
+
+    lines = ["*Master Data — Live from DB*\n"]
+
+    lines.append(f"*Staff rooms ({len(staff_room_rows)}):*")
+    for rn, bldg, beds in staff_room_rows:
+        lines.append(f"  {rn} ({bldg}) — {beds} bed(s)")
+
+    lines.append("")
+    lines.append("*Revenue rooms:*")
+    total_rooms, total_beds = 0, 0
+    for bldg, rooms, beds in rev_rows:
+        lines.append(f"  {bldg}: {rooms} rooms, {beds} beds")
+        total_rooms += rooms or 0
+        total_beds += beds or 0
+    lines.append(f"  *Total: {total_rooms} rooms, {total_beds} beds*")
+
+    lines.append("\n_(Compare with MASTER_DATA.md — update if different.)_")
+    return "\n".join(lines)
 
 
 # ── ASSIGN / EXIT STAFF TO ROOM ────────────────────────────────────────────

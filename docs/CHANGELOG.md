@@ -2,6 +2,45 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.66.0] — 2026-04-26 — Master data audit: 291→294 beds + room corrections
+
+### DB corrections (live)
+- **Room 114** (Pooja + Arun RL, tenancy 895+896): `status=exited→active`, `checkout_date=2026-05-19`. Audit_log written.
+- **G05**: `is_staff_room=False→True` — was wrongly marked as revenue (3 extra beds). Staff triple.
+- **G13**: `room_type='double'→'triple'` — inconsistent with `max_occupancy=3`. Now correct.
+- **G20**: Confirmed `is_staff_room=True` (temp staff room until April 2026 end; returns to revenue in May).
+- **12 corner rooms** (THOR x01/x12, HULK x13/x24): verified `room_type='single', max_occ=1` — physically single beds, NOT room attributes of premium sharing.
+
+### Bed count corrected: 291→294
+- Root cause: G05 wrongly revenue (+3 beds) and G20 wrongly staff (−1 bed) = net +2 vs 295 expected.
+- 114+618 confirmed revenue (already correct in DB after prior session fix).
+- Correct formula: `27×1 + 126×2 + 5×3 = 27+252+15 = 294`.
+- G20 temporary staff until April end → returns to revenue May 2026 → 295 beds from May.
+
+### Files updated: 291→294
+- `docs/MASTER_DATA.md` — complete rewrite: staff table, revenue counts, floor layouts, changelog
+- `docs/BRAIN.md` — staff rooms table + revenue summary
+- `docs/BUSINESS_LOGIC.md` — TOTAL_BEDS constant + staff rooms list
+- `docs/REPORTING.md` — TOTAL_REVENUE_BEDS constant + staff rooms excluded
+- `docs/SHEET_LOGIC.md` — Vacant formula + occupancy %
+- `src/integrations/gsheets.py:175` — `TOTAL_BEDS = 294`
+- `scripts/clean_and_load.py:23` — `TOTAL_BEDS = 294`
+- `scripts/gsheet_apps_script.js:25` — `const TOTAL_BEDS = 294`
+- `scripts/gsheet_dashboard_webapp.js:19` — `const TOTAL_BEDS = 294`
+- `src/whatsapp/handlers/account_handler.py:2121` — fallback 294
+
+### New: `show master data` bot command
+- `SHOW_MASTER_DATA` intent (update_handler.py `show_master_data()`) — live DB query of staff rooms + revenue bed count per property
+- Bot replies with current staff rooms, revenue rooms/beds per building and total
+- Includes reminder to compare with MASTER_DATA.md and update if different
+- `_update_single_room` (mark/unmark staff room) now appends doc-update reminder in reply
+
+### Memory / pending tasks
+- `memory/reference_master_data.md` updated: 294 beds, corrected staff list, G20 temp note
+- `memory/project_pending_tasks.md` updated: G20→revenue (May), room 114 May rent (Rs.7,967 each)
+
+---
+
 ## [1.65.0] — 2026-04-26 — Delete HTML dashboard + fix daywise tenant balance display
 
 ### Removed: HTML web dashboard

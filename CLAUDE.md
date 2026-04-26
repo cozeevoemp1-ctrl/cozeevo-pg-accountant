@@ -35,6 +35,20 @@ Before closing any feature, run through this checklist:
 
 **If you touch a field, grep the entire project for it. Update every file that reads or writes it.**
 
+## When `is_staff_room` changes on any room (CRITICAL)
+Every staff room change must touch ALL of the following — no exceptions:
+1. `UPDATE rooms SET is_staff_room=... WHERE room_number='...'` — DB first
+2. `docs/MASTER_DATA.md` — staff table + revenue totals + building floor layout
+3. `docs/BRAIN.md` — staff rooms section + revenue summary
+4. `docs/BUSINESS_LOGIC.md`, `docs/REPORTING.md`, `docs/SHEET_LOGIC.md` — TOTAL_BEDS constant
+5. `src/integrations/gsheets.py` — `TOTAL_BEDS`
+6. `scripts/clean_and_load.py` — `TOTAL_BEDS`
+7. `scripts/gsheet_apps_script.js` — `const TOTAL_BEDS`
+8. `scripts/gsheet_dashboard_webapp.js` — `const TOTAL_BEDS`
+9. `src/whatsapp/handlers/account_handler.py` — fallback TOTAL_BEDS
+10. Re-run `scripts/sync_sheet_from_db.py --write` for current month
+Bot command `show master data` gives the live DB snapshot — compare with MASTER_DATA.md before/after.
+
 ## Data sync rule (CRITICAL)
 **DB is single source of truth. All changes go through the bot.**
 - Bot writes DB first (with audit_log), then mirrors to Sheet via `gsheets.update_tenant_field()`

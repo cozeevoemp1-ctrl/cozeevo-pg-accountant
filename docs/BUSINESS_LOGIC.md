@@ -16,12 +16,12 @@ Total beds are calculated dynamically from the rooms table, never hardcoded:
 TOTAL_BEDS = SUM(max_occupancy) WHERE is_staff_room = False
 ```
 
-**Current totals (as of 2026-03-23):**
+**Current totals (updated 2026-04-26):**
 - THOR: 145 beds (78 revenue rooms)
-- HULK: 146 beds (79 revenue rooms)
-- **Total: 291 beds**
+- HULK: 149 beds (80 revenue rooms)
+- **Total: 294 beds** (295 from May 2026 when G20 returns to revenue)
 
-Staff rooms excluded: THOR (G05, G06, 107, 108, 701, 702) + HULK (G12, 114, 618)
+Staff rooms excluded: THOR (G05, G06, 107, 108, 701, 702) + HULK (G12, G20[temp until Apr end])
 
 ### 1.2 Occupied Beds Calculation
 
@@ -95,7 +95,7 @@ active_beds = regular + (premium_count * 2)
 ```
 Checked-in: {active_beds} beds ({regular} regular + {premium_count} premium)
 No-show: {no_show} beds reserved
-Vacant: {291 - active_beds - no_show} beds
+Vacant: {294 - active_beds - no_show} beds
 ```
 
 ---
@@ -337,7 +337,7 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| TOTAL_BEDS | 291 | Dynamic from rooms table |
+| TOTAL_BEDS | 294 | Dynamic from rooms table (295 from May 2026) |
 | NOTICE_BY_DAY | 5 | Deposit eligibility cutoff |
 | OVERPAYMENT_NOISE_RS | 10 | Payment rounding tolerance |
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection window |

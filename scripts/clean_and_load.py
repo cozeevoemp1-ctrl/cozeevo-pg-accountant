@@ -20,7 +20,7 @@ from google.oauth2.service_account import Credentials
 EXCEL_FILE = "Cozeevo Monthly stay (4).xlsx"
 NEW_SHEET = "1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw"
 CREDS = "credentials/gsheets_service_account.json"
-TOTAL_BEDS = 291
+TOTAL_BEDS = 294  # updated 2026-04-26; 295 when G20 returns to revenue May 2026
 
 # ── Shared functions (identical to full_report.py) ───────────────────────────
 

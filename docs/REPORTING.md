@@ -145,13 +145,14 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 ### 3.1 Capacity (Canonical — verified from DB 2026-04-08)
 
 ```
-TOTAL_REVENUE_BEDS = 291
-  THOR: 145 beds (79 revenue rooms)
-  HULK: 146 beds (79 revenue rooms)
+TOTAL_REVENUE_BEDS = 294  (295 from May 2026 when G20 returns to revenue)
+  THOR: 145 beds (78 revenue rooms)
+  HULK: 149 beds (80 revenue rooms)
 
-Staff rooms EXCLUDED (9 rooms):
+Staff rooms EXCLUDED (8 rooms, updated 2026-04-26):
   THOR: G05(3), G06(2), 107(2), 108(2), 701(1), 702(1)
-  HULK: G12(3), 114(2), 618(2)
+  HULK: G12(3), G20(1)[temp until Apr end]
+  — 114 and 618 moved to revenue 2026-04-26
 ```
 
 ### 3.2 Formula
@@ -455,7 +456,7 @@ For month M:
 
 | Constant | Value | Where Used |
 |---|---|---|
-| TOTAL_REVENUE_BEDS | 291 | Occupancy KPI |
+| TOTAL_REVENUE_BEDS | 294 | Occupancy KPI (295 from May 2026) |
 | THOR_BEDS | 145 | Property occupancy |
 | HULK_BEDS | 146 | Property occupancy |
 | NOTICE_BY_DAY | 5 | Deposit eligibility |

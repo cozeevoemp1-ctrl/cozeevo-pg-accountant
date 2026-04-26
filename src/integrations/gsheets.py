@@ -172,7 +172,7 @@ T_NOTES = _T["T_NOTES"]
 T_EVENT = _T["T_EVENT"]
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers (legacy default)
-TOTAL_BEDS = 291
+TOTAL_BEDS = 294  # updated 2026-04-26; 295 when G20 returns to revenue May 2026
 
 
 def _locate_monthly_header(all_vals: list[list]) -> tuple[int, int]:
