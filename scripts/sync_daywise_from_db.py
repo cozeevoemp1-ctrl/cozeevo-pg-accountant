@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, selectinload
 
-from src.database.models import Tenancy, StayType, TenancyStatus, PaymentMode
+from src.database.models import Tenancy, StayType, TenancyStatus, PaymentMode, Room
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 if DATABASE_URL.startswith("postgresql://"):
@@ -49,7 +49,7 @@ async def main(args) -> None:
             select(Tenancy)
             .options(
                 selectinload(Tenancy.tenant),
-                selectinload(Tenancy.room),
+                selectinload(Tenancy.room).selectinload(Room.property),
                 selectinload(Tenancy.payments),
             )
             .where(Tenancy.stay_type == StayType.daily)
@@ -89,12 +89,15 @@ async def main(args) -> None:
             total_revenue += total_paid
 
             phone = tenant.phone if tenant else ""
+            prop_name = (room.property.name if room and room.property else "") or ""
+            building = prop_name.replace("Cozeevo ", "").strip()
+            sharing = str(t.sharing_type.value if t.sharing_type else "Day-Stay")
             data_rows.append([
                 room.room_number if room else "",
                 tenant.name if tenant else "",
                 f"'{phone}" if phone else "",
-                "",                                     # Building (Room has no building field)
-                str(t.sharing_type.value if t.sharing_type else ""),
+                building,
+                sharing,
                 daily_rate,
                 booking_amount,
                 rent_due,
@@ -105,7 +108,7 @@ async def main(args) -> None:
                 display_status,
                 checkin,
                 "",
-                f"checkout: {checkout}" if checkout else "",
+                checkout,                               # clean date in Event col
                 t.notes or "",
                 "",
                 t.entered_by or "",
