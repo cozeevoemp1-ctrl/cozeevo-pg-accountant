@@ -245,6 +245,82 @@ async def test():
         r = await resolve_pending_action(doc_pa4, "cancel", session)
         check("docs: cancel", "cancelled" in (r or "").lower())
 
+        # ── Multi-turn correction test (field revert regression) ─────────
+        # This tests the Lokesh bug: room 906→206 must NOT revert when phone is corrected next.
+        print("\n== Multi-turn correction (field revert regression) ==")
+
+        # Check-in form multi-turn: edit name then edit phone — both must hold
+        checkin_pa = PendingAction(
+            phone="7845952289", intent="FORM_EXTRACT_CONFIRM",
+            action_data=json.dumps({
+                "step": "confirm_extracted",
+                "extracted": {"name": "WrongName", "phone": "0000000000", "room_number": "G17", "monthly_rent": "22000"},
+                "provider": "haiku",
+            }),
+            choices="[]",
+            expires_at=datetime.utcnow() + timedelta(minutes=30),
+        )
+        # Turn 1: correct name
+        r1 = await resolve_pending_action(checkin_pa, "edit name Soumya Devi", session)
+        check("checkin edit name: accepted", "Soumya Devi" in (r1 or ""))
+        # Turn 2: correct phone — using the SAME pending object (which was updated in-place)
+        import json as _json
+        ad2 = _json.loads(checkin_pa.action_data)
+        check("checkin edit name: persisted in pending", ad2.get("extracted", {}).get("name") == "Soumya Devi")
+        await resolve_pending_action(checkin_pa, "edit phone 9876543210", session)
+        ad3 = _json.loads(checkin_pa.action_data)
+        check("checkin multi-edit: name held after phone edit", ad3.get("extracted", {}).get("name") == "Soumya Devi")
+        check("checkin multi-edit: phone updated", ad3.get("extracted", {}).get("phone") == "9876543210")
+
+        # ── Checkout form OCR test (CHECKOUT_FORM_CONFIRM) ────────────────
+        print("\n== Checkout Form OCR Flow ==")
+
+        checkout_extracted = {
+            "name": "Soumya", "room_number": "906", "phone": "1111111111",
+            "checkout_date": "26/04/2026", "security_deposit": "20000",
+        }
+        co_pa = PendingAction(
+            phone="7845952289", intent="CHECKOUT_FORM_CONFIRM",
+            action_data=json.dumps({
+                "step": "confirm_checkout_extracted",
+                "extracted": dict(checkout_extracted),
+            }),
+            choices="[]",
+            expires_at=datetime.utcnow() + timedelta(minutes=30),
+        )
+
+        # Test: edit room 206
+        r = await resolve_pending_action(co_pa, "edit room 206", session)
+        check("checkout edit room: accepted", "__KEEP_PENDING__" in (r or "") and "206" in (r or ""))
+        ad = _json.loads(co_pa.action_data)
+        check("checkout edit room: persisted in pending", ad.get("extracted", {}).get("room_number") == "206")
+
+        # Test: edit phone — room must NOT revert to 906
+        r = await resolve_pending_action(co_pa, "edit phone 9876543210", session)
+        ad2 = _json.loads(co_pa.action_data)
+        check("checkout multi-edit: room held (no revert)", ad2.get("extracted", {}).get("room_number") == "206")
+        check("checkout multi-edit: phone updated", ad2.get("extracted", {}).get("phone") == "9876543210")
+
+        # Test: edit unknown field
+        co_pa2 = PendingAction(
+            phone="7845952289", intent="CHECKOUT_FORM_CONFIRM",
+            action_data=json.dumps({"step": "confirm_checkout_extracted", "extracted": dict(checkout_extracted)}),
+            choices="[]",
+            expires_at=datetime.utcnow() + timedelta(minutes=30),
+        )
+        r = await resolve_pending_action(co_pa2, "edit nonexistentfield blah", session)
+        check("checkout edit unknown field: error", "Unknown field" in (r or "") or "Valid" in (r or ""))
+
+        # Test: cancel
+        co_pa3 = PendingAction(
+            phone="7845952289", intent="CHECKOUT_FORM_CONFIRM",
+            action_data=json.dumps({"step": "confirm_checkout_extracted", "extracted": dict(checkout_extracted)}),
+            choices="[]",
+            expires_at=datetime.utcnow() + timedelta(minutes=30),
+        )
+        r = await resolve_pending_action(co_pa3, "cancel", session)
+        check("checkout cancel", "cancelled" in (r or "").lower())
+
         print(f"\n{'='*40}")
         print(f"Results: {passed} passed, {failed} failed out of {passed+failed}")
         if failed:
