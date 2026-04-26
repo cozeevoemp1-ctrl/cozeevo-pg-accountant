@@ -94,21 +94,17 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     """
     raw_body = await request.body()
 
-    # -- Verify Meta signature (REQUIRED in prod) ------------------------------
-    # WHATSAPP_APP_SECRET MUST be set or signature check explicitly disabled
-    # via WHATSAPP_SKIP_SIG_CHECK=1 (dev/local-test only). In prod, missing or
-    # placeholder secret = reject every request — fail closed, never open.
+    # -- Verify Meta signature (REQUIRED) --------------------------------------
+    # WHATSAPP_APP_SECRET must be set. Fail closed — reject all requests if
+    # secret is missing or placeholder. No dev bypass available.
     app_secret = os.getenv("WHATSAPP_APP_SECRET", "")
-    skip_check = os.getenv("WHATSAPP_SKIP_SIG_CHECK") == "1"
-    if not skip_check:
-        if not app_secret or app_secret == "PASTE_YOUR_META_APP_SECRET_HERE":
-            logger.error("[Webhook] WHATSAPP_APP_SECRET not configured — rejecting "
-                         "request. Set the secret or WHATSAPP_SKIP_SIG_CHECK=1 for dev.")
-            raise HTTPException(status_code=503, detail="Webhook not configured")
-        sig_header = request.headers.get("X-Hub-Signature-256", "")
-        if not _verify_meta_signature(raw_body, sig_header, app_secret):
-            logger.warning("[Webhook] Signature verification failed — request rejected")
-            raise HTTPException(status_code=403, detail="Invalid signature")
+    if not app_secret or app_secret == "PASTE_YOUR_META_APP_SECRET_HERE":
+        logger.error("[Webhook] WHATSAPP_APP_SECRET not configured — rejecting request.")
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+    sig_header = request.headers.get("X-Hub-Signature-256", "")
+    if not _verify_meta_signature(raw_body, sig_header, app_secret):
+        logger.warning("[Webhook] Signature verification failed — request rejected")
+        raise HTTPException(status_code=403, detail="Invalid signature")
 
     try:
         import json
@@ -233,7 +229,7 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
             async with _session_factory() as session:
                 result = await process_message(
                     body=InboundMessage(
-                        phone=from_number, message=body, message_id=None,
+                        phone=from_number, message=body, message_id=msg_id,
                         media_type=_media_type,
                         media_id=media_id if _media_type else None,
                         media_mime=media_mime if _media_type else None,

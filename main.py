@@ -292,10 +292,21 @@ static_dir = Path("./static")
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Media files (uploaded photos, PDFs, agreements)
+# Media files (uploaded photos, PDFs, agreements) — PIN-protected endpoint
 media_dir = Path(os.getenv("MEDIA_DIR", "./media"))
 media_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
+
+@app.get("/media/{path:path}")
+async def serve_media(path: str, request: Request):
+    """Serve media files. Requires admin PIN (X-Admin-Pin header or ?pin= query param)."""
+    _check_admin_pin(request)
+    # Prevent path traversal
+    full_path = (media_dir / path).resolve()
+    if not str(full_path).startswith(str(media_dir.resolve())):
+        raise HTTPException(400, "Invalid path")
+    if not full_path.exists() or not full_path.is_file():
+        raise HTTPException(404, "File not found")
+    return FileResponse(str(full_path))
 
 # Documents (receipts, invoices, ID proofs, licenses)
 docs_dir = Path(os.getenv("DATA_DOCUMENTS_DIR", "./data/documents"))
@@ -361,6 +372,67 @@ async def reject(entity_id: int, request: Request):
     return {"status": "rejected"}
 
 app.include_router(entity_router)
+
+# ── Admin token rotation (localhost only — middleware enforces this) ────────
+
+import secrets as _secrets
+
+def _update_env_key(key: str, value: str) -> None:
+    """Update or append a key=value line in the .env file."""
+    env_path = Path(".env")
+    if not env_path.exists():
+        return
+    lines = env_path.read_text(encoding="utf-8").splitlines()
+    new_lines, found = [], False
+    for line in lines:
+        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+            new_lines.append(f"{key}={value}")
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f"{key}={value}")
+    env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
+admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+@admin_router.post("/rotate-token")
+async def rotate_token(request: Request, which: str = "all"):
+    """
+    Rotate dashboard and/or sync bearer tokens in-memory and in .env.
+    ?which=dashboard|sync|all (default: all)
+    Requires X-Admin-Pin header or ?pin= query param.
+    Endpoint is localhost-only (middleware) + admin PIN.
+    """
+    _check_admin_pin(request)
+    result: dict = {}
+
+    import sys as _sys
+
+    if which in ("dashboard", "all"):
+        new_token = _secrets.token_urlsafe(32)
+        _dr = _sys.modules.get("src.api.dashboard_router")
+        if _dr:
+            _dr._TOKEN = new_token    # updates in-memory auth check immediately
+        _update_env_key("DASHBOARD_TOKEN", new_token)
+        result["dashboard_token"] = new_token
+
+    if which in ("sync", "all"):
+        new_token = _secrets.token_urlsafe(32)
+        _sr = _sys.modules.get("src.api.sync_router")
+        if _sr:
+            _sr.SYNC_TOKEN = new_token  # updates in-memory auth check immediately
+        _update_env_key("SYNC_WEBHOOK_TOKEN", new_token)
+        result["sync_token"] = new_token
+
+    if not result:
+        raise HTTPException(400, "which must be 'dashboard', 'sync', or 'all'")
+
+    logger.info("Token(s) rotated: %s", list(result.keys()))
+    return result
+
+app.include_router(admin_router)
 
 # ── Test utilities (TEST_MODE=1 only) ────────────────────────────────────
 

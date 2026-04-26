@@ -115,6 +115,10 @@ async def _process_message_inner(
 ) -> OutboundReply:
     phone   = body.phone.strip()
     message = body.message.strip()
+    # Short correlation ID — first 12 chars of Meta msg_id (or random) for log tracing
+    import uuid as _uuid
+    _req_id = (body.message_id or _uuid.uuid4().hex)[:12]
+    _chat_logger.info("[%s] phone=%s msg=%s", _req_id, phone[-4:], message[:60])
 
     # ── 0. Admin !learn command — intercept before any other processing ──
     if message.startswith("!learn"):
@@ -560,6 +564,7 @@ async def _process_message_inner(
     if not _checkout_intent_intercepted:
         intent_result = detect_intent(message, ctx.role)
         intent = intent_result.intent
+        _chat_logger.info("[%s] intent=%s conf=%.2f role=%s", _req_id, intent, intent_result.confidence, ctx.role)
 
     # ── Follow-up detection: "show me the list", "break it down" etc. ──
     if intent in ("UNKNOWN", "GENERAL"):
@@ -958,6 +963,7 @@ async def _process_message_inner(
             )
             # Fall through to gatekeeper — user always gets a reply
 
+    _chat_logger.info("[%s] routing intent=%s", _req_id, intent)
     reply = await route(intent, intent_result.entities, ctx, message, session)
 
     # ── 4a. No reply = bot disabled for this role (tenant/lead) ───────────
