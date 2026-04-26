@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.67.0] — 2026-04-26 — DASHBOARD_SUMMARY handler: all 6 Sheet rows queryable via bot
+
+### Added
+- `DASHBOARD_SUMMARY` intent + `_dashboard_summary` handler in `account_handler.py`
+  - Row 1 OCCUPANCY: total beds, occupied (regular/premium beds/day-stay), vacant tonight, reserved (no-show), available long-term
+  - Row 2 BUILDINGS: THOR + HULK occupied beds and tenant count
+  - Row 3 COLLECTION: collected (rent+maint), month target, previous month dues
+  - Row 4 STATUS: paid/partial/unpaid/no-show counts for current month
+  - Row 5 NOTICE: upcoming vacates grouped by month (expected_checkout)
+  - Row 6 DEPOSITS: held / maintenance / refundable totals
+- Intent triggers: "dashboard", "show dashboard", "full dashboard", "all stats", "property overview", "full overview"
+- Added to `FINANCIAL_INTENTS` + `handle_account()` dispatcher
+- 5 new golden tests G101–G105; 80/105 suite passing, 0 regressions
+- Deployed and verified on VPS
+
+### Known issue (next session)
+- COLLECTION "dues" line shows previous month outstanding; Kiran flagged should show current month outstanding — fix pending
+
+### Docs
+- `docs/BOT_FLOWS.md` — DASHBOARD_SUMMARY + SHOW_MASTER_DATA added to intent catalog
+- `docs/RECEPTIONIST_CHEAT_SHEET.md` — DASHBOARD SUMMARY section added
+
+---
+
 ## [1.66.3] — 2026-04-26 — Sheet→DB reload: April 2026 + Day Wise
 
 ### New script: `scripts/reload_from_sheet.py`
