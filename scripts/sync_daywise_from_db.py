@@ -92,7 +92,7 @@ async def main(args) -> None:
                 room.room_number if room else "",
                 tenant.name if tenant else "",
                 f"'{phone}" if phone else "",
-                room.building if room else "",
+                "",                                     # Building (Room has no building field)
                 str(t.sharing_type.value if t.sharing_type else ""),
                 daily_rate,
                 booking_amount,
