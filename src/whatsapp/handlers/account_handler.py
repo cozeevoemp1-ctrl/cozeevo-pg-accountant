@@ -1340,6 +1340,52 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
 
     room_obj = await session.get(Room, tenancy.room_id)
     room_label = room_obj.room_number if room_obj else "?"
+    sharing_label = tenancy.sharing_type.value if tenancy.sharing_type else ""
+
+    # ── Daywise tenant — separate display ────────────────────────────────────
+    if tenancy.stay_type == StayType.daily:
+        today = date.today()
+        end = tenancy.checkout_date or today
+        num_days = max((end - tenancy.checkin_date).days, 0)
+        daily_rate = Decimal(str(tenancy.agreed_rent or 0))
+        maint = Decimal(str(tenancy.maintenance_fee or 0))
+        total_owed = daily_rate * num_days + maint
+        total_paid = await session.scalar(
+            select(func.sum(Payment.amount)).where(
+                Payment.tenancy_id == tenancy.id,
+                Payment.is_void == False,
+            )
+        ) or Decimal("0")
+        balance = max(Decimal("0"), total_owed - Decimal(str(total_paid)))
+        lines = [
+            f"*{tenant.name}* (Day-stay)",
+            f"Phone: {tenant.phone or '—'}",
+            f"Room: {room_label}" + (f" ({sharing_label})" if sharing_label else ""),
+            f"Daily rate: Rs.{int(daily_rate):,}/day",
+            f"Check-in: {tenancy.checkin_date.strftime('%d %b %Y')}",
+            f"Days stayed: {num_days}",
+            f"Total owed: Rs.{int(total_owed):,}",
+            f"Paid so far: Rs.{int(total_paid):,}",
+        ]
+        if balance > 0:
+            lines.append(f"*Balance due: Rs.{int(balance):,}*")
+        else:
+            lines.append("All dues cleared!")
+        payments_result = await session.execute(
+            select(Payment).where(
+                Payment.tenancy_id == tenancy.id,
+                Payment.is_void == False,
+            ).order_by(Payment.payment_date)
+        )
+        payments = payments_result.scalars().all()
+        if payments:
+            lines += ["", "*Payments received:*"]
+            for p in payments:
+                pdate = p.payment_date.strftime("%d %b") if p.payment_date else "?"
+                pmode = p.payment_mode.value.capitalize() if p.payment_mode else ""
+                lines.append(f"  {pdate}: Rs.{int(p.amount):,} ({pmode})")
+        return "\n".join(lines)
+    # ─────────────────────────────────────────────────────────────────────────
 
     current_month = date.today().replace(day=1)
     rs = await session.scalar(
@@ -1351,8 +1397,6 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
 
     status_str = rs.status.value.upper() if rs else "No record"
     o_rent, o_maintenance = await _calc_outstanding_dues(tenancy.id, session)
-
-    sharing_label = tenancy.sharing_type.value if tenancy.sharing_type else ""
 
     # Deposit gap line
     if tenancy.security_deposit and tenancy.security_deposit > 0:

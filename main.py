@@ -33,10 +33,7 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
         path = request.url.path
 
-        # Webhook, health, and dashboard are public
-        # Dashboard API is token-protected at the endpoint level
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
-                or path.startswith("/dashboard") or path.startswith("/api/dashboard")
                 or path.startswith("/static") or path.startswith("/media")
                 or path.startswith("/onboard")  # tenant onboarding form (public)
                 or path.startswith("/admin/onboarding")  # admin onboarding panel
@@ -92,10 +89,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("No-show auto-flip failed: %s", e)
 
-    # Dashboard temp-file cleanup (existing lightweight scheduler)
-    from src.dashboard.cleanup import start_cleanup_scheduler
-    cleanup_scheduler = start_cleanup_scheduler()
-
     # Retry any failed Sheet writes from previous session
     try:
         from src.integrations.gsheets import retry_failed_writes
@@ -113,7 +106,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     stop_scheduler(pg_scheduler)
-    cleanup_scheduler.shutdown(wait=False)
     logger.info("PG Accountant API shutting down.")
 
 
@@ -135,9 +127,6 @@ app.add_middleware(LocalOnlyMiddleware)
 
 from src.whatsapp.webhook_handler import router as whatsapp_router
 app.include_router(whatsapp_router)
-
-from src.api.dashboard_router import router as dashboard_router
-app.include_router(dashboard_router)
 
 from src.whatsapp.chat_api import router as chat_router
 app.include_router(chat_router)
@@ -266,27 +255,9 @@ app.include_router(recon_router)
 
 report_router = APIRouter(prefix="/api/report", tags=["reports"])
 
-@report_router.post("/dashboard")
-async def generate_dashboard(request: Request, req: ReconcileRequest):
-    _check_admin_pin(request)
-    from src.reports.reconciliation import ReconciliationEngine
-    from src.reports.report_generator import ReportGenerator
-    from datetime import datetime
-    engine = ReconciliationEngine()
-    gen    = ReportGenerator()
-    now    = datetime.now()
-    data   = await engine.monthly_reconcile(req.year or now.year, req.month or now.month)
-    url    = await gen.generate_dashboard(data, req.period)
-    return {"url": url}
-
 app.include_router(report_router)
 
-# ── Dashboard file serving ────────────────────────────────────────────────
-
-# Legacy generated-report dashboards
-dashboard_dir = Path(os.getenv("DASHBOARD_DIR", "./dashboards"))
-dashboard_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/dashboards", StaticFiles(directory=str(dashboard_dir), html=True), name="dashboards")
+# ── Static / media serving ────────────────────────────────────────────────
 
 # Static assets (source-controlled)
 static_dir = Path("./static")
@@ -313,10 +284,6 @@ async def serve_media(path: str, request: Request):
 docs_dir = Path(os.getenv("DATA_DOCUMENTS_DIR", "./data/documents"))
 if docs_dir.exists():
     app.mount("/documents", StaticFiles(directory=str(docs_dir)), name="documents")
-
-@app.get("/dashboard")
-async def dashboard_page():
-    return FileResponse(str(static_dir / "dashboard.html"))
 
 @app.get("/onboard/{token}", response_class=HTMLResponse)
 async def serve_onboarding_form(token: str):
@@ -407,10 +374,10 @@ def _update_env_key(key: str, value: str) -> None:
 admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @admin_router.post("/rotate-token")
-async def rotate_token(request: Request, which: str = "all"):
+async def rotate_token(request: Request, which: str = "sync"):
     """
-    Rotate dashboard and/or sync bearer tokens in-memory and in .env.
-    ?which=dashboard|sync|all (default: all)
+    Rotate sync bearer token in-memory and in .env.
+    ?which=sync (only valid value)
     Requires X-Admin-Pin header or ?pin= query param.
     Endpoint is localhost-only (middleware) + admin PIN.
     """
@@ -419,24 +386,16 @@ async def rotate_token(request: Request, which: str = "all"):
 
     import sys as _sys
 
-    if which in ("dashboard", "all"):
-        new_token = _secrets.token_urlsafe(32)
-        _dr = _sys.modules.get("src.api.dashboard_router")
-        if _dr:
-            _dr._TOKEN = new_token    # updates in-memory auth check immediately
-        _update_env_key("DASHBOARD_TOKEN", new_token)
-        result["dashboard_token"] = new_token
-
     if which in ("sync", "all"):
         new_token = _secrets.token_urlsafe(32)
         _sr = _sys.modules.get("src.api.sync_router")
         if _sr:
-            _sr.SYNC_TOKEN = new_token  # updates in-memory auth check immediately
+            _sr.SYNC_TOKEN = new_token
         _update_env_key("SYNC_WEBHOOK_TOKEN", new_token)
         result["sync_token"] = new_token
 
     if not result:
-        raise HTTPException(400, "which must be 'dashboard', 'sync', or 'all'")
+        raise HTTPException(400, "which must be 'sync'")
 
     logger.info("Token(s) rotated: %s", list(result.keys()))
     return result

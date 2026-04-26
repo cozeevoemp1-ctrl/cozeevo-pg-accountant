@@ -7,7 +7,6 @@ from __future__ import annotations
 import csv
 import io
 import os
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -17,11 +16,8 @@ from loguru import logger
 
 class ReportGenerator:
     def __init__(self):
-        self.exports_dir   = Path(os.getenv("DATA_EXPORTS_DIR", "./data/exports"))
-        self.dashboard_dir = Path(os.getenv("DASHBOARD_DIR", "./dashboards"))
-        self.base_url      = os.getenv("DASHBOARD_BASE_URL", "http://localhost:8000")
+        self.exports_dir = Path(os.getenv("DATA_EXPORTS_DIR", "./data/exports"))
         self.exports_dir.mkdir(parents=True, exist_ok=True)
-        self.dashboard_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Text summary ──────────────────────────────────────────────────────
 
@@ -112,17 +108,3 @@ class ReportGenerator:
         exporter = ExcelExporter(self.exports_dir)
         return await exporter.export(data, period)
 
-    # ── HTML Dashboard ────────────────────────────────────────────────────
-
-    async def generate_dashboard(self, data: dict, period: str = "monthly") -> str:
-        from src.dashboard.html_generator import generate_html_dashboard
-        uid      = uuid.uuid4().hex[:8]
-        filename = f"dashboard_{uid}.html"
-        out_path = self.dashboard_dir / filename
-
-        html = generate_html_dashboard(data, period)
-        out_path.write_text(html, encoding="utf-8")
-
-        url = f"{self.base_url}/dashboard/{filename}"
-        logger.info(f"Dashboard created: {url}")
-        return url
