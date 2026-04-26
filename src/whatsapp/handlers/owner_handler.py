@@ -650,14 +650,14 @@ async def resolve_pending_action(
                 return "__KEEP_PENDING__Format: *edit field_name new_value*\nExample: *edit name Rahul Sharma*"
 
             action_data["extracted"] = extracted
-            await _save_pending(pending.phone, "FORM_EXTRACT_CONFIRM", action_data, [], session)
+            pending.action_data = json.dumps(action_data)  # update in-place — prevents field revert
 
             msg = format_extracted_data(extracted, "")
             if errors:
                 msg += f"\n\nUnknown fields (skipped): {', '.join(errors)}"
             msg += "\n\nReply *yes* to save, *no* to cancel."
             msg += "\nTo edit more: *edit field_name new_value*"
-            return msg
+            return "__KEEP_PENDING__" + msg
 
         # ── Confirm and save — run room validation first ────────────────
         if step == "confirm_extracted" and ans in ("yes", "y", "confirm", "save", "ok", "done"):
@@ -1012,7 +1012,6 @@ async def resolve_pending_action(
     # ── Checkout form extraction confirmation ────────────────────────────
     if pending.intent == "CHECKOUT_FORM_CONFIRM":
         from src.whatsapp.form_extractor import format_checkout_data
-        from src.whatsapp.handlers._shared import _save_pending
         ans = reply_text.strip().lower()
         step = action_data.get("step", "")
 
@@ -1033,33 +1032,55 @@ async def resolve_pending_action(
             "room_key": "room_key_returned", "wardrobe_key": "wardrobe_key_returned",
             "biometric": "biometric_removed",
         }
+        _confirm_steps = ("confirm_checkout_extracted", "phone_mismatch")
 
-        # Parse everything except yes/no/cancel through LLM
-        if step == "confirm_checkout_extracted" and ans not in ("yes", "y", "confirm", "ok", "done"):
-            parsed = await _parse_checkout_edit_nl(reply_text.strip(), action_data.get("extracted", {}))
-            if parsed.get("action") == "confirm":
-                ans = "yes"  # fall through to confirm block below
-            elif parsed.get("field") and parsed.get("value") is not None:
-                actual_key = _co_aliases.get(parsed["field"])
-                if actual_key:
-                    extracted = action_data.get("extracted", {})
-                    extracted[actual_key] = str(parsed["value"])
-                    action_data["extracted"] = extracted
-                    await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
-                    msg = format_checkout_data(extracted, "")
-                    msg += "\n\nReply *yes* to confirm or tell me what to change."
-                    return msg
-
-        # Confirm and process checkout
-        if step == "confirm_checkout_extracted" and ans in ("yes", "y", "confirm", "ok", "done"):
+        # ── Edit a field (regex first, LLM fallback) ─────────────────────
+        if step in _confirm_steps and ans not in ("yes", "y", "confirm", "ok", "done"):
             extracted = action_data.get("extracted", {})
+            updated_key = None
 
-            # Find the tenant
+            if ans.startswith("edit "):
+                # Reliable regex path: "edit field value"
+                raw = reply_text.strip()[5:]
+                parts = raw.split(None, 1)
+                if len(parts) == 2:
+                    field_key = parts[0].lower().rstrip(":")
+                    new_val = parts[1].lstrip(": ").strip()
+                    actual_key = _co_aliases.get(field_key)
+                    if actual_key:
+                        extracted[actual_key] = new_val
+                        updated_key = actual_key
+                    else:
+                        valid = "name, phone, room, date, deposit, deductions, reason, refund, refund_mode, room_key, wardrobe_key, biometric"
+                        return f"__KEEP_PENDING__Unknown field *{field_key}*.\nValid: {valid}"
+            else:
+                # Natural language fallback via LLM
+                parsed = await _parse_checkout_edit_nl(reply_text.strip(), extracted)
+                if parsed.get("action") == "confirm":
+                    ans = "yes"  # fall through to confirm block
+                elif parsed.get("field") and parsed.get("value") is not None:
+                    actual_key = _co_aliases.get(parsed["field"])
+                    if actual_key:
+                        extracted[actual_key] = str(parsed["value"])
+                        updated_key = actual_key
+
+            if updated_key:
+                # Update pending in-place — prevents field revert across turns
+                action_data["extracted"] = extracted
+                action_data["step"] = "confirm_checkout_extracted"
+                pending.action_data = json.dumps(action_data)
+                msg = format_checkout_data(extracted, "")
+                msg += "\n\nReply *yes* to confirm or tell me what to change.\nFormat: *edit field_name new_value*  (e.g. *edit room 206*)"
+                return "__KEEP_PENDING__" + msg
+
+        # ── Confirm and process checkout ──────────────────────────────────
+        if step in _confirm_steps and ans in ("yes", "y", "confirm", "ok", "done"):
+            extracted = action_data.get("extracted", {})
             name = extracted.get("name", "")
             room_str = extracted.get("room_number", "")
             phone_raw = extracted.get("phone", "")
 
-            # Search by name first, then room
+            # Search by name first, then room, then phone
             rows = await _find_active_tenants_by_name(name, session) if name else []
             if not rows and room_str:
                 rows = await _find_active_tenants_by_room(room_str, session)
@@ -1078,7 +1099,8 @@ async def resolve_pending_action(
                             rows = [(t, tncy, r)]
 
             if not rows:
-                return f"__KEEP_PENDING__No active tenant found for *{name}* / Room *{room_str}*.\nUse *edit name* or *edit room* to correct."
+                return (f"__KEEP_PENDING__No active tenant found for *{name}* / Room *{room_str}*.\n"
+                        f"Use *edit name [name]* or *edit room [room]* to correct.")
 
             if len(rows) > 1:
                 lines = ["Multiple matches:\n"]
@@ -1089,11 +1111,24 @@ async def resolve_pending_action(
                     {"tenant_id": t.id, "tenancy_id": tncy.id, "name": t.name, "room": rm.room_number}
                     for t, tncy, rm in rows
                 ]
-                await _save_pending(pending.phone, "CHECKOUT_FORM_CONFIRM", action_data, [], session)
-                return "\n".join(lines) + "\n\nReply with number."
+                pending.action_data = json.dumps(action_data)
+                return "__KEEP_PENDING__" + "\n".join(lines) + "\n\nReply with number."
 
-            # Single match — process checkout
             tenant, tenancy, room_obj = rows[0]
+
+            # Phone mismatch guardrail — warn before proceeding
+            if step != "phone_mismatch" and phone_raw:
+                phone_clean = re.sub(r"[^0-9]", "", phone_raw)[-10:]
+                db_phone = (tenant.phone or "")[-10:]
+                if phone_clean and db_phone and phone_clean != db_phone:
+                    action_data["step"] = "phone_mismatch"
+                    pending.action_data = json.dumps(action_data)
+                    return (
+                        f"__KEEP_PENDING__Found *{tenant.name}* in Room *{room_obj.room_number}*.\n"
+                        f"Phone on form: *{phone_raw}* — doesn't match our records (*{tenant.phone}*).\n\n"
+                        f"Reply *yes* to proceed anyway, or *edit phone {tenant.phone}* to correct the form."
+                    )
+
             return await _process_checkout_from_form(
                 extracted, tenant, tenancy, room_obj, action_data, pending, session,
             )
@@ -1113,8 +1148,8 @@ async def resolve_pending_action(
                     )
             return f"__KEEP_PENDING__Reply with a number (1-{len(candidates)})."
 
-        if step == "confirm_checkout_extracted":
-            return "__KEEP_PENDING__Reply *yes* to process checkout, *no* to cancel, or *edit field value*."
+        if step in _confirm_steps:
+            return "__KEEP_PENDING__Reply *yes* to process checkout, *no* to cancel, or *edit field_name value*.\nExample: *edit room 206*"
 
     # ── Document collection (ID proofs + rules page after check-in) ───────
     if pending.intent == "COLLECT_DOCS":
