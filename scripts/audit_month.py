@@ -144,7 +144,9 @@ async def main(period: date, partial_only: bool):
                 st = "NOSH"; noshow_n += 1
                 tot_due  += due
                 tot_upi  += bk_paid                 # booking advance (usually UPI)
-                tot_bal  += max(0, balance)
+                # Only count dues for no-shows whose check-in was due this month or earlier
+                if tenancy.checkin_date < next_period:
+                    tot_bal += max(0, balance)
                 if not partial_only:
                     print(
                         f"{room.room_number:<6} {tenant.name[:24]:<24} {'no_show':<10} "

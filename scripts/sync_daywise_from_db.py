@@ -81,9 +81,10 @@ async def main(args) -> None:
             balance = round(rent_due - total_paid, 2)
 
             display_status = str(t.status.value if hasattr(t.status, "value") else t.status).upper()
-            if t.status == TenancyStatus.active and t.checkout_date and t.checkout_date < today:
+            is_still_active = t.status == TenancyStatus.active and not (t.checkout_date and t.checkout_date < today)
+            if not is_still_active and t.status == TenancyStatus.active:
                 display_status = "EXIT"
-            if t.status == TenancyStatus.active:
+            if is_still_active:
                 active_count += 1
             total_revenue += total_paid
 

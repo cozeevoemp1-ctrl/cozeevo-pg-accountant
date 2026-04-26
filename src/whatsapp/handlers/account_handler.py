@@ -1532,6 +1532,22 @@ async def _rent_change(entities: dict, ctx: CallerContext, session: AsyncSession
     tenant, tenancy, room_obj = rows[0]
     old_rent = int(tenancy.agreed_rent or 0)
 
+    # Daywise tenants: no RentSchedule, no one-time/permanent choice.
+    # Just update agreed_rent (= daily rate) directly.
+    if tenancy.stay_type == StayType.daily:
+        action_data = {
+            "tenancy_id": tenancy.id, "tenant_name": tenant.name,
+            "new_amount": amount, "is_daywise": True,
+            "reason": f"daily rate change from Rs.{old_rent:,}",
+        }
+        await _save_pending(ctx.phone, "RENT_CHANGE", action_data, [], session)
+        return (
+            f"*Daily rate change — {tenant.name}* (Room {room_obj.room_number})\n"
+            f"Current rate: Rs.{old_rent:,}/day\n"
+            f"New rate: Rs.{int(amount):,}/day\n\n"
+            "Reply *Yes* to confirm or *No* to cancel."
+        )
+
     option_choices = [
         {"seq": 1, "label": f"Only {effective_month.strftime('%b %Y')} (one month)"},
         {"seq": 2, "label": f"Permanent from {effective_month.strftime('%b %Y')} onwards"},

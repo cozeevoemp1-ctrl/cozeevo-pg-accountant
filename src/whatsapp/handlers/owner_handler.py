@@ -2943,7 +2943,41 @@ async def resolve_pending_action(
         )
 
     if pending.intent == "RENT_CHANGE":
-        # choices here are option-picks: seq 1=one-time, seq 2=permanent
+        # Daywise tenants: Yes/No confirm, then direct agreed_rent update.
+        if action_data.get("is_daywise"):
+            ans = reply_text.strip().lower()
+            if ans in ("no", "cancel", "n"):
+                return "Cancelled. Daily rate not changed."
+            if ans not in ("yes", "y", "confirm", "ok"):
+                return "__KEEP_PENDING__Reply *Yes* to confirm or *No* to cancel."
+            from src.database.models import AuditLog
+            tenancy = await session.scalar(
+                select(Tenancy).where(Tenancy.id == action_data["tenancy_id"]).with_for_update()
+            )
+            if not tenancy:
+                return "Tenancy not found."
+            old_rate = int(tenancy.agreed_rent or 0)
+            tenancy.agreed_rent = Decimal(str(action_data["new_amount"]))
+            session.add(AuditLog(
+                changed_by=pending.phone,
+                entity_type="tenancy",
+                entity_id=tenancy.id,
+                entity_name=action_data["tenant_name"],
+                field="agreed_rent",
+                old_value=str(old_rate),
+                new_value=str(int(action_data["new_amount"])),
+                source="whatsapp",
+                note=action_data.get("reason", "daily rate change"),
+            ))
+            from src.integrations import gsheets as _gs
+            _gs.trigger_monthly_sheet_sync(date.today().month, date.today().year)
+            return (
+                f"*Daily rate updated — {action_data['tenant_name']}*\n"
+                f"Was: Rs.{old_rate:,}/day\n"
+                f"Now: Rs.{int(action_data['new_amount']):,}/day"
+            )
+
+        # Monthly tenants: seq 1=one-time, seq 2=permanent
         if chosen is None:
             return "__KEEP_PENDING__Reply *1* for one-time or *2* for permanent change."
         permanent = (chosen.get("seq", 1) == 2)

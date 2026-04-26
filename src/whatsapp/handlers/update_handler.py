@@ -130,22 +130,75 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
 
 async def update_rent(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """Change a tenant's agreed rent amount."""
+    from src.database.models import StayType
+    from src.whatsapp.handlers._shared import _find_active_tenants_by_room
+
     desc = (entities.get("description") or entities.get("_raw_message") or "").strip()
     name = entities.get("name", "").strip()
-    amount = entities.get("amount")
 
-    # Extract amount from description if not in entities
+    # Always re-extract amount from raw message to avoid entity extractor
+    # picking up a room number (e.g. "219") instead of the rent amount.
+    # Priority: "to <N>" > "<N> per day/month" > 4+ digit bare number > entities fallback.
+    amount = None
+    m = re.search(r"\bto\s+(?:rs\.?\s*)?(\d[\d,]+)", desc, re.I)
+    if not m:
+        m = re.search(r"(\d[\d,]+)\s*(?:rs|rupees|/-|per\s+(?:month|day))", desc, re.I)
+    if not m:
+        m = re.search(r"(?:rs\.?\s*)?(\d{4,})", desc, re.I)
+    if m:
+        amount = m.group(1).replace(",", "")
     if not amount:
-        m = re.search(r"(\d[\d,]*)\s*(?:rs|rupees|/-|per\s+month)?", desc, re.I)
-        if m:
-            amount = m.group(1).replace(",", "")
+        amount = entities.get("amount")
 
     if not amount:
         return "What's the new rent? Reply: *[Name] rent [amount]*\nExample: _Raj rent 14000_"
 
-    # Extract name from description
+    # Try room-number lookup first when message contains a room pattern
+    room_m = re.search(r"\b([A-Z]?\d{3}[A-Z]?(?:-[A-Z])?)(?:\s|$)", desc, re.I)
+    room_from_desc = room_m.group(1) if room_m else entities.get("room", "")
+
+    if room_from_desc:
+        rows = await _find_active_tenants_by_room(room_from_desc, session)
+        if len(rows) == 1:
+            tenant, tenancy, room_obj = rows[0]
+            new_amount = int(amount)
+            old_rate = int(tenancy.agreed_rent or 0)
+            is_daywise = tenancy.stay_type == StayType.daily
+
+            if is_daywise:
+                action_data = {
+                    "tenancy_id": tenancy.id, "tenant_name": tenant.name,
+                    "new_amount": new_amount, "is_daywise": True,
+                    "reason": f"daily rate change from Rs.{old_rate:,}",
+                }
+                await _save_pending(ctx.phone, "RENT_CHANGE", action_data, [], session)
+                return (
+                    f"*Daily rate change — {tenant.name}* (Room {room_obj.room_number})\n"
+                    f"Current rate: Rs.{old_rate:,}/day\n"
+                    f"New rate: Rs.{new_amount:,}/day\n\n"
+                    "Reply *Yes* to confirm or *No* to cancel."
+                )
+
+            # Monthly tenant via room lookup — use CONFIRM_FIELD_UPDATE
+            action_data = {
+                "tenancy_id": tenancy.id, "field": "agreed_rent",
+                "old_value": old_rate, "new_value": new_amount,
+                "tenant_name": tenant.name,
+            }
+            choices = [
+                {"seq": 1, "intent": "CONFIRM_UPDATE", "label": "Yes, update"},
+                {"seq": 2, "intent": "CANCEL_UPDATE", "label": "No, cancel"},
+            ]
+            await _save_pending(ctx.phone, "CONFIRM_FIELD_UPDATE", action_data, choices, session)
+            return (
+                f"Update *{tenant.name}* (Room {room_obj.room_number})?\n\n"
+                f"Rent: Rs.{old_rate:,} → *Rs.{new_amount:,}*\n\n"
+                "Reply *1* to confirm or *2* to cancel."
+            )
+
+    # Fall back to name-based lookup
     if not name:
-        clean = re.sub(r"\b(change|update|set|modify|rent|amount|to|for|is|rs|rupees|per|month|\d+)\b", "", desc, flags=re.I).strip()
+        clean = re.sub(r"\b(change|update|set|modify|rent|amount|to|for|is|rs|rupees|per|month|day|\d+)\b", "", desc, flags=re.I).strip()
         name = clean.strip(".,! ")
 
     if not name or len(name) < 2:
