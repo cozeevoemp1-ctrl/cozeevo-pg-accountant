@@ -427,6 +427,7 @@ async def import_to_db(records, write=False):
                     booking_amount=Decimal(str(rec['booking'])),
                     maintenance_fee=Decimal(str(rec['maintenance'])),
                     notes=rec['permanent_note'] or None,
+                    entered_by="excel_import",
                 )
                 session.add(tenancy)
                 await session.flush()

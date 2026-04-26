@@ -68,7 +68,7 @@ async def main(write: bool):
                 continue
             if not t.tenancies:
                 continue
-            ten = next((x for x in t.tenancies if x.room), None)
+            ten = next((x for x in t.tenancies if x.room and str(getattr(x.stay_type, 'value', x.stay_type) or '') != 'daily'), None)
             if not ten:
                 continue
             missing.append((t, ten))
