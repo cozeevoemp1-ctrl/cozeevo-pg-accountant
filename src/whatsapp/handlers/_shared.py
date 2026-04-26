@@ -255,39 +255,6 @@ async def _find_active_tenants_by_name(name: str, session: AsyncSession):
     return []
 
 
-async def _find_active_daywise_by_name(name: str, session: AsyncSession):
-    """Return DaywiseStay rows for guests whose name matches and whose stay
-    covers today. Used by ROOM_TRANSFER when no monthly tenancy matches —
-    Lokesh still says "move X to Y" for day-wise guests.
-    """
-    from datetime import date as _date
-    from src.database.models import DaywiseStay
-    today = _date.today()
-
-    async def _search(pattern: str):
-        result = await session.execute(
-            select(DaywiseStay)
-            .where(
-                DaywiseStay.guest_name.ilike(pattern),
-                DaywiseStay.checkin_date <= today,
-                DaywiseStay.checkout_date >= today,
-                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
-            )
-            .order_by(DaywiseStay.checkin_date.desc())
-        )
-        return list(result.scalars().all())
-
-    first_word = name.split()[0] if name else name
-    if len(first_word) >= 3:
-        rows = await _search(f"{first_word}%")
-        if rows:
-            return rows
-    if " " in name.strip():
-        rows = await _search(f"%{name}%")
-        if rows:
-            return rows
-    return await _search(f"%{name}%")
-
 
 async def _find_active_tenants_by_room(room_str: str, session: AsyncSession):
     """
