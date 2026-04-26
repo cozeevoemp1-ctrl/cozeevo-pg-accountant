@@ -20,7 +20,7 @@ from typing import Optional
 
 from src.database.db_manager import get_session
 from src.database.models import (
-    OnboardingSession, Room, Property, Tenant, Tenancy, TenancyStatus,
+    OnboardingSession, Room, Property, Tenant, Tenancy, TenancyStatus, StayType,
     RentSchedule, RentStatus, Payment, PaymentMode, PaymentFor, AuthorizedUser,
 )
 from src.services.pdf_generator import HOUSE_RULES
@@ -1187,49 +1187,64 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         effective_sharing = None
 
         if is_daily:
-            # ── Daily stay path ────────────────────────────────────────────
-            from src.database.models import DaywiseStay
+            # ── Daily stay path — writes Tenancy(stay_type=daily) ──────────
             checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
             num_days = obs.num_days or max(1, (checkout - checkin).days)
-            total_amount = float(obs.agreed_rent or 0)  # agreed_rent stores total for daily
+            total_paid = float(obs.agreed_rent or 0)  # agreed_rent stores total paid for daily
 
-            dw = DaywiseStay(
-                room_number=room.room_number if room else "TBD",
-                guest_name=td["name"],
-                phone=phone,
+            tenancy = Tenancy(
+                tenant_id=tenant.id,
+                room_id=room.id if room else None,
+                stay_type=StayType.daily,
+                status=TenancyStatus.active,
                 checkin_date=checkin,
                 checkout_date=checkout,
-                num_days=num_days,
-                stay_period=f"{checkin.strftime('%d/%m')}-{checkout.strftime('%d/%m')}",
-                sharing=1,
+                expected_checkout=checkout,
+                agreed_rent=obs.daily_rate or 0,        # per-day rate
                 booking_amount=obs.booking_amount or 0,
-                daily_rate=obs.daily_rate or 0,
-                total_amount=total_amount,
-                maintenance=obs.maintenance_fee or 0,
-                status="ACTIVE",
-                comments=obs.special_terms or "",
+                maintenance_fee=obs.maintenance_fee or 0,
+                notes=obs.special_terms or "",
+                entered_by="onboarding_form",
             )
-            session.add(dw)
+            session.add(tenancy)
             await session.flush()
+
+            if total_paid > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id,
+                    amount=obs.agreed_rent,
+                    payment_date=checkin,
+                    payment_mode=PaymentMode.cash,
+                    for_type=PaymentFor.rent,
+                    notes="day-stay onboarding payment",
+                ))
 
             obs.status = "approved"
             obs.approved_at = datetime.utcnow()
             obs.approved_by_phone = (req.approved_by_phone or "").strip() if req else ""
             obs.tenant_id = tenant.id
+            obs.tenancy_id = tenancy.id
 
             # GSheets DAY WISE tab (retry 3x)
             for attempt in range(3):
                 try:
                     from src.integrations.gsheets import add_daywise_stay as gsheets_dw
                     gs_r = await gsheets_dw(
-                        room_number=room.room_number if room else "TBD", guest_name=td["name"], phone=phone_sheet,
-                        checkin=checkin.strftime("%d/%m/%Y"),
-                        stay_period=dw.stay_period, num_days=num_days,
+                        room_number=room.room_number if room else "TBD",
+                        tenant_name=td["name"],
+                        phone=phone_sheet,
+                        building=room.building if room else "",
+                        sharing=sharing,
                         daily_rate=float(obs.daily_rate or 0),
+                        num_days=num_days,
                         booking_amount=float(obs.booking_amount or 0),
-                        total=total_amount, maintenance=float(obs.maintenance_fee or 0),
-                        sharing=sharing, status="ACTIVE",
-                        comments=obs.special_terms or "",
+                        total_paid=total_paid,
+                        maintenance=float(obs.maintenance_fee or 0),
+                        checkin=checkin.strftime("%d/%m/%Y"),
+                        checkout=checkout.strftime("%d/%m/%Y"),
+                        status="ACTIVE",
+                        notes=obs.special_terms or "",
+                        entered_by="onboarding_form",
                     )
                     if gs_r.get("success"):
                         gsheets_note = " | DAY WISE Sheet updated"
