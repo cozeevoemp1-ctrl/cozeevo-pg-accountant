@@ -6,19 +6,25 @@ type: project
 
 ## Active / Next Up
 
-1. **Set Maharajan's daywise rate via bot** — agreed_rent is currently Rs.0 on VPS (room 219, tenancy 945). Send: `change 219 rent to [actual rate] per day` then confirm Yes.
-2. **All DaywiseStay attributes editable via bot** — user asked "all attributes in daystay also should be editable via helper functions". Not started.
-3. **Agent Phase 2** — Enable `USE_PYDANTIC_AGENTS=true` on VPS. 48h soak window was ready 2026-04-27. Check if still valid.
-4. **Task 6 (Supabase Auth)** — Kiran must configure Phone provider in Supabase dashboard.
-5. **Task 23 (Vercel staging deploy)** — Connect `web/` to Vercel.
-6. **`test_activity_log.py` broken** — pre-existing failure (`sys.exit()` at module level). Investigate separately.
-7. **Chandra off-book cash** — Mar Rs.1.6L + Apr Rs.15.5K. Decide if we log as explicit entries.
-8. **70 unclassified bank txns** — Kiran to fill yellow column in `data/reports/unclassified_review.xlsx`.
-9. **WhatsApp template approval** — `cozeevo_checkin_form` still PENDING from Meta.
+1. **DASHBOARD_SUMMARY "dues" line fix** — Kiran flagged COLLECTION shows "Mar 2026 dues: Rs.15,500" but it should show CURRENT MONTH (April) outstanding dues amount. Change `prev_dues` query to show current month pending+partial total in `_dashboard_summary`. Kiran expects ~Rs.3L.
+2. **Set Maharajan's daywise rate via bot** — agreed_rent is currently Rs.0 on VPS (room 219, tenancy 945). Send: `change 219 rent to [actual rate] per day` then confirm Yes.
+3. **All DaywiseStay attributes editable via bot** — user asked "all attributes in daystay also should be editable via helper functions". Not started.
+4. **Agent Phase 2** — Enable `USE_PYDANTIC_AGENTS=true` on VPS. 48h soak window was ready 2026-04-27. Check if still valid.
+5. **Task 6 (Supabase Auth)** — Kiran must configure Phone provider in Supabase dashboard.
+6. **Task 23 (Vercel staging deploy)** — Connect `web/` to Vercel.
+7. **`test_activity_log.py` broken** — pre-existing failure (`sys.exit()` at module level). Investigate separately.
+8. **Chandra off-book cash** — Mar Rs.1.6L + Apr Rs.15.5K. Decide if we log as explicit entries.
+9. **70 unclassified bank txns** — Kiran to fill yellow column in `data/reports/unclassified_review.xlsx`.
+10. **WhatsApp template approval** — `cozeevo_checkin_form` still PENDING from Meta.
 
 ## Paused
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
+
+## Recently Completed (v1.67.0 — 2026-04-26)
+
+- **DASHBOARD_SUMMARY handler** — all 6 Sheet-dashboard rows queryable via bot (occupancy, buildings, collection, status, notice, deposits). Deployed to VPS. 5 golden tests G101-G105 all pass.
+- **BOT_FLOWS.md + RECEPTIONIST_CHEAT_SHEET.md** — DASHBOARD_SUMMARY + SHOW_MASTER_DATA added
 
 ## Recently Completed (v1.65.0 — 2026-04-26)
 
