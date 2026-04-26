@@ -42,6 +42,7 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
                 or path.startswith("/admin/onboarding")  # admin onboarding panel
                 or path.startswith("/api/onboarding")  # all onboarding API endpoints
                 or path.startswith("/admin/checkout")   # admin checkout panel
+                or path.startswith("/checkout")         # tenant checkout confirm page (public)
                 or path.startswith("/api/checkout")     # all checkout API endpoints
                 or path.startswith("/api/sync")  # live source sheet sync (token-protected)
                 or path.startswith("/api/v2/app")):  # Owner PWA API — JWT-protected at endpoint level
@@ -337,6 +338,14 @@ async def serve_admin_onboarding():
 async def serve_admin_checkout():
     """Serve the admin checkout panel."""
     form_path = Path("static/checkout_admin.html")
+    if not form_path.exists():
+        return HTMLResponse("<h1>Checkout form not available yet</h1>", status_code=404)
+    return HTMLResponse(form_path.read_text(encoding="utf-8"))
+
+@app.get("/checkout/{token}", response_class=HTMLResponse)
+async def serve_checkout_confirm(_token: str):
+    """Serve the tenant-facing checkout summary + confirm/dispute page."""
+    form_path = Path("static/checkout_confirm.html")
     if not form_path.exists():
         return HTMLResponse("<h1>Checkout form not available yet</h1>", status_code=404)
     return HTMLResponse(form_path.read_text(encoding="utf-8"))

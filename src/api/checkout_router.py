@@ -170,28 +170,22 @@ async def create_checkout_session(req: CreateCheckoutRequest, request: Request):
         session.add(cs)
         await session.flush()
 
+        import os as _os
+        base_url = _os.getenv("BASE_URL", "https://api.getkozzy.com")
+        confirm_link = f"{base_url}/checkout/{cs.token}"
+
         room_number = room.room_number if room else "?"
-        key_line    = f"Room key: {'Returned' if cs.room_key_returned else 'Not returned'}"
-        ward_line   = f"Wardrobe key: {'Returned' if cs.wardrobe_key_returned else 'Not returned'}"
-        bio_line    = f"Biometric: {'Removed' if cs.biometric_removed else 'Not removed'}"
-        room_line   = f"Room condition: {'OK' if cs.room_condition_ok else 'Damage noted'}"
         refund_line = (
-            f"Refund: Rs.{int(cs.refund_amount):,} via {cs.refund_mode}"
+            f"Refund: Rs.{int(cs.refund_amount):,} via {cs.refund_mode.upper()}"
             if cs.refund_amount > 0 else "Refund: Rs.0"
         )
 
         msg = (
             f"Hi {tenant.name}, your checkout from Room {room_number} "
             f"on {checkout_date.strftime('%d %b %Y')} has been recorded.\n\n"
-            f"Summary:\n"
-            f"- {key_line}\n"
-            f"- {ward_line}\n"
-            f"- {bio_line}\n"
-            f"- {room_line}\n"
-            f"- {refund_line}\n\n"
-            f"Reply *YES* to confirm.\n"
-            f"If you disagree, reply *NO* followed by your reason "
-            f"(e.g. NO the damage charge is wrong).\n"
+            f"{refund_line}\n\n"
+            f"Please review the full summary and confirm or dispute:\n"
+            f"{confirm_link}\n\n"
             f"If no response in 2 hours, this will be auto-confirmed."
         )
 
@@ -227,3 +221,132 @@ async def poll_session_status(token: str, request: Request):
             "rejection_reason": cs.rejection_reason,
             "expires_at": cs.expires_at.isoformat(),
         }
+
+
+# ── Tenant-facing endpoints (token is the auth) ──────────────────────────────
+
+@router.get("/summary/{token}")
+async def get_checkout_summary(token: str):
+    """Tenant opens this to see checkout summary before confirming."""
+    async with get_session() as session:
+        cs = await session.scalar(
+            select(CheckoutSession).where(CheckoutSession.token == token)
+        )
+        if not cs:
+            raise HTTPException(404, "Checkout session not found")
+        tenancy = await session.get(Tenancy, cs.tenancy_id)
+        tenant  = await session.get(Tenant, tenancy.tenant_id) if tenancy else None
+        room    = await session.get(Room, tenancy.room_id) if tenancy else None
+        return {
+            "token": cs.token,
+            "status": cs.status,
+            "tenant_name": tenant.name if tenant else "",
+            "room_number": room.room_number if room else "?",
+            "checkout_date": cs.checkout_date.isoformat(),
+            "room_key_returned": cs.room_key_returned,
+            "wardrobe_key_returned": cs.wardrobe_key_returned,
+            "biometric_removed": cs.biometric_removed,
+            "room_condition_ok": cs.room_condition_ok,
+            "damage_notes": cs.damage_notes or "",
+            "security_deposit": float(cs.security_deposit),
+            "pending_dues": float(cs.pending_dues),
+            "deductions": float(cs.deductions),
+            "deduction_reason": cs.deduction_reason or "",
+            "refund_amount": float(cs.refund_amount),
+            "refund_mode": cs.refund_mode or "",
+            "expires_at": cs.expires_at.isoformat(),
+        }
+
+
+class TenantRespondRequest(BaseModel):
+    decision: str   # "confirm" or "dispute"
+    reason: str = ""
+
+
+@router.post("/respond/{token}")
+async def tenant_respond(token: str, req: TenantRespondRequest):
+    """Tenant confirms or disputes checkout via the web link."""
+    if req.decision not in ("confirm", "dispute"):
+        raise HTTPException(400, "decision must be 'confirm' or 'dispute'")
+
+    async with get_session() as session:
+        cs = await session.scalar(
+            select(CheckoutSession)
+            .where(CheckoutSession.token == token)
+            .with_for_update()
+        )
+        if not cs:
+            raise HTTPException(404, "Checkout session not found")
+        if cs.status != CheckoutSessionStatus.pending.value:
+            raise HTTPException(409, f"Session already {cs.status}")
+
+        if req.decision == "confirm":
+            cs.status = CheckoutSessionStatus.confirmed.value
+            from src.whatsapp.handlers.owner_handler import _do_confirm_checkout
+            summary = await _do_confirm_checkout(cs, session)
+
+            # Notify tenant
+            phone_wa = (
+                f"+91{cs.tenant_phone}"
+                if not cs.tenant_phone.startswith("+") else cs.tenant_phone
+            )
+            tenancy = await session.get(Tenancy, cs.tenancy_id)
+            room    = await session.get(Room, tenancy.room_id) if tenancy else None
+            room_no = room.room_number if room else "?"
+            refund_line = (
+                f"Refund of Rs.{int(cs.refund_amount):,} will be processed by the receptionist."
+                if cs.refund_amount > 0 else ""
+            )
+            confirmed_msg = (
+                f"Your checkout from Room {room_no} on "
+                f"{cs.checkout_date.strftime('%d %b %Y')} is confirmed.\n"
+                + (f"{refund_line}\n" if refund_line else "")
+                + "Thank you for staying with Cozeevo."
+            )
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                await _send_whatsapp(phone_wa, confirmed_msg)
+            except Exception as _e:
+                logger.warning("Failed to send checkout confirmed to tenant: %s", _e)
+
+            # Notify receptionist
+            try:
+                recep_phone = (
+                    f"+91{cs.created_by_phone}"
+                    if not cs.created_by_phone.startswith("+") else cs.created_by_phone
+                )
+                await _send_whatsapp(recep_phone, summary)
+            except Exception as _e:
+                logger.warning("Failed to notify receptionist: %s", _e)
+
+            await session.commit()
+            return {"status": "confirmed"}
+
+        else:  # dispute
+            cs.status = CheckoutSessionStatus.rejected.value
+            cs.rejection_reason = req.reason or "Tenant disputed via web form"
+            await session.flush()
+
+            # Notify receptionist
+            try:
+                tenancy = await session.get(Tenancy, cs.tenancy_id)
+                tenant  = await session.get(Tenant, tenancy.tenant_id) if tenancy else None
+                room    = await session.get(Room, tenancy.room_id) if tenancy else None
+                tenant_name = tenant.name if tenant else "Tenant"
+                room_no = room.room_number if room else "?"
+                recep_phone = (
+                    f"+91{cs.created_by_phone}"
+                    if not cs.created_by_phone.startswith("+") else cs.created_by_phone
+                )
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                await _send_whatsapp(
+                    recep_phone,
+                    f"{tenant_name} (Room {room_no}) disputed the checkout.\n"
+                    f"Reason: {cs.rejection_reason}\n"
+                    "Please follow up and create a new checkout session."
+                )
+            except Exception as _e:
+                logger.warning("Failed to notify receptionist of dispute: %s", _e)
+
+            await session.commit()
+            return {"status": "disputed"}

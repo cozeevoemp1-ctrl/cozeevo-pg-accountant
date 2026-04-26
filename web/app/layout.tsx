@@ -1,5 +1,6 @@
 import { DM_Sans } from "next/font/google";
 import type { Metadata, Viewport } from "next";
+import { AuthProvider } from "@/components/auth/auth-provider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -29,7 +30,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={dmSans.variable}>
-      <body className="bg-bg text-ink font-sans min-h-screen">{children}</body>
+      <body className="bg-bg text-ink font-sans min-h-screen">
+          <AuthProvider>{children}</AuthProvider>
+        </body>
     </html>
   );
 }

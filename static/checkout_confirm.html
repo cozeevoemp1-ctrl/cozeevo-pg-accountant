@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout Summary — Cozeevo</title>
+  <style>
+    :root {
+      --pink: #EF1F9C;
+      --blue: #00AEED;
+      --bg: #F9FAFB;
+      --card: #FFFFFF;
+      --text: #2D3748;
+      --sub: #718096;
+      --border: #E2E8F0;
+      --green: #38A169;
+      --red: #E53E3E;
+      --shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      min-height: 100vh;
+    }
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow);
+    }
+    header img { height: 30px; width: auto; }
+    header h1 { font-size: 17px; font-weight: 700; color: var(--text); }
+    header h1 span { color: var(--pink); }
+
+    .page { max-width: 540px; margin: 28px auto; padding: 0 20px 60px; }
+
+    /* Loading / error states */
+    #loading, #error-state, #done-state {
+      text-align: center; padding: 48px 24px;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--pink);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error-state p, #done-state p { color: var(--sub); margin-top: 8px; font-size: 14px; }
+    #error-state h2, #done-state h2 { font-size: 20px; }
+    #done-state h2 { color: var(--green); }
+    #error-state h2 { color: var(--red); }
+
+    /* Summary card */
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--sub);
+      margin-bottom: 14px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      gap: 12px;
+    }
+    .row:last-child { border-bottom: none; }
+    .row-label { color: var(--sub); flex-shrink: 0; }
+    .row-value { font-weight: 500; text-align: right; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-yes { background: #C6F6D5; color: #276749; }
+    .badge-no  { background: #FED7D7; color: #9B2C2C; }
+
+    /* Financial highlight */
+    .refund-highlight {
+      background: linear-gradient(135deg, #ebfff7 0%, #e6f7ff 100%);
+      border: 1px solid #9AE6B4;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .refund-highlight .label { color: var(--sub); font-size: 13px; }
+    .refund-highlight .amount { font-size: 22px; font-weight: 700; color: var(--green); }
+    .refund-highlight .mode { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
+    /* Action section */
+    #action-section { margin-top: 4px; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); opacity: .9; }
+    .btn-confirm { background: var(--green); color: #fff; margin-bottom: 12px; }
+    .btn-dispute { background: var(--card); color: var(--red); border: 1.5px solid var(--red); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Dispute reason panel */
+    #dispute-panel {
+      display: none;
+      margin-top: 8px;
+    }
+    #dispute-panel textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      resize: vertical;
+      min-height: 80px;
+      margin-bottom: 10px;
+      font-family: inherit;
+    }
+    #dispute-panel textarea:focus { outline: none; border-color: var(--pink); }
+    .btn-submit-dispute {
+      background: var(--red); color: #fff;
+      width: 100%; padding: 13px;
+      border-radius: 10px;
+      font-size: 15px; font-weight: 600;
+      border: none; cursor: pointer;
+    }
+
+    /* Expire notice */
+    .expire-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--sub);
+      margin-top: 14px;
+    }
+
+    /* Expired banner */
+    .expired-banner {
+      background: #FFF5F5;
+      border: 1px solid #FEB2B2;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #C53030;
+      font-size: 13px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="/static/kozzy_logo.svg" alt="Cozeevo" onerror="this.style.display='none'">
+  <h1>Cozeevo <span>Checkout</span></h1>
+</header>
+
+<div class="page">
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Loading your checkout summary…</p>
+  </div>
+
+  <!-- Error -->
+  <div id="error-state" style="display:none">
+    <h2>Session not found</h2>
+    <p>This link may have expired or is invalid.<br>Please contact the receptionist.</p>
+  </div>
+
+  <!-- Already responded -->
+  <div id="done-state" style="display:none">
+    <h2 id="done-title">Already submitted</h2>
+    <p id="done-msg">Your response has already been recorded.</p>
+  </div>
+
+  <!-- Main content -->
+  <div id="main-content" style="display:none">
+
+    <div id="expired-banner" class="expired-banner" style="display:none">
+      This session has expired and been auto-confirmed. If you have concerns, contact the receptionist.
+    </div>
+
+    <!-- Tenant / room info -->
+    <div class="card">
+      <div class="card-title">Checkout Details</div>
+      <div class="row">
+        <span class="row-label">Name</span>
+        <span class="row-value" id="s-name">—</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Room</span>
+        <span class="row-value" id="s-room">—</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Checkout Date</span>
+        <span class="row-value" id="s-date">—</span>
+      </div>
+    </div>
+
+    <!-- Physical handover -->
+    <div class="card">
+      <div class="card-title">Physical Handover</div>
+      <div class="row">
+        <span class="row-label">Room Key</span>
+        <span class="row-value" id="s-room-key">—</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Wardrobe Key</span>
+        <span class="row-value" id="s-ward-key">—</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Biometric</span>
+        <span class="row-value" id="s-bio">—</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Room Condition</span>
+        <span class="row-value" id="s-condition">—</span>
+      </div>
+      <div class="row" id="damage-row" style="display:none">
+        <span class="row-label">Damage Notes</span>
+        <span class="row-value" id="s-damage" style="color:#C53030">—</span>
+      </div>
+    </div>
+
+    <!-- Financial settlement -->
+    <div class="card">
+      <div class="card-title">Financial Settlement</div>
+      <div class="row">
+        <span class="row-label">Security Deposit</span>
+        <span class="row-value" id="s-deposit">—</span>
+      </div>
+      <div class="row">
+        <span class="row-label">Pending Dues</span>
+        <span class="row-value" id="s-dues">—</span>
+      </div>
+      <div class="row" id="deduct-row" style="display:none">
+        <span class="row-label">Deductions</span>
+        <span class="row-value" style="color:#C53030" id="s-deduct">—</span>
+      </div>
+      <div class="row" id="deduct-reason-row" style="display:none">
+        <span class="row-label">Reason</span>
+        <span class="row-value" id="s-deduct-reason" style="color:var(--sub);font-style:italic">—</span>
+      </div>
+    </div>
+
+    <!-- Refund highlight -->
+    <div class="refund-highlight" id="refund-box">
+      <div>
+        <div class="label">Refund Amount</div>
+        <div class="mode" id="s-refund-mode">—</div>
+      </div>
+      <div class="amount" id="s-refund">Rs.0</div>
+    </div>
+
+    <!-- Actions -->
+    <div id="action-section">
+      <button class="btn btn-confirm" id="btn-confirm" onclick="submitConfirm()">
+        Confirm Checkout
+      </button>
+      <button class="btn btn-dispute" id="btn-dispute" onclick="toggleDispute()">
+        Dispute / Disagree
+      </button>
+      <div id="dispute-panel">
+        <textarea id="dispute-reason" placeholder="Describe what you disagree with…"></textarea>
+        <button class="btn-submit-dispute" onclick="submitDispute()">Submit Dispute</button>
+      </div>
+    </div>
+
+    <div class="expire-note" id="expire-note"></div>
+
+  </div><!-- /main-content -->
+</div><!-- /page -->
+
+<script>
+  const token = location.pathname.split('/').pop();
+  let sessionData = null;
+
+  function fmtRs(v) {
+    return 'Rs.' + Math.round(v).toLocaleString('en-IN');
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function badge(ok, yesText, noText) {
+    return ok
+      ? `<span class="badge badge-yes">&#10003; ${yesText}</span>`
+      : `<span class="badge badge-no">&#10007; ${noText}</span>`;
+  }
+
+  async function load() {
+    try {
+      const r = await fetch(`/api/checkout/summary/${token}`);
+      if (!r.ok) { showError(); return; }
+      sessionData = await r.json();
+      render(sessionData);
+    } catch(e) {
+      showError();
+    }
+  }
+
+  function showError() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-state').style.display = 'block';
+  }
+
+  function render(d) {
+    document.getElementById('loading').style.display = 'none';
+
+    // Already responded
+    if (d.status === 'confirmed' || d.status === 'auto_confirmed') {
+      document.getElementById('done-title').textContent = 'Checkout Confirmed';
+      document.getElementById('done-msg').textContent =
+        'Your checkout has been confirmed. Thank you for staying with Cozeevo.';
+      document.getElementById('done-state').style.display = 'block';
+      return;
+    }
+    if (d.status === 'rejected') {
+      document.getElementById('done-title').textContent = 'Dispute Submitted';
+      document.getElementById('done-title').style.color = 'var(--red)';
+      document.getElementById('done-msg').textContent =
+        'Your dispute has been recorded. The receptionist will follow up.';
+      document.getElementById('done-state').style.display = 'block';
+      return;
+    }
+    if (d.status === 'cancelled') {
+      document.getElementById('error-state').querySelector('h2').textContent = 'Session Cancelled';
+      document.getElementById('error-state').querySelector('p').textContent =
+        'This checkout session was cancelled. Please contact the receptionist.';
+      document.getElementById('error-state').style.display = 'block';
+      return;
+    }
+
+    // Show main content
+    document.getElementById('main-content').style.display = 'block';
+
+    // Expired?
+    const expired = new Date(d.expires_at) < new Date();
+    if (expired) {
+      document.getElementById('expired-banner').style.display = 'block';
+      document.getElementById('action-section').style.display = 'none';
+    }
+
+    // Tenant / room
+    document.getElementById('s-name').textContent = d.tenant_name || '—';
+    document.getElementById('s-room').textContent = d.room_number ? 'Room ' + d.room_number : '—';
+    document.getElementById('s-date').textContent = fmtDate(d.checkout_date);
+
+    // Physical
+    document.getElementById('s-room-key').innerHTML  = badge(d.room_key_returned, 'Returned', 'Not returned');
+    document.getElementById('s-ward-key').innerHTML  = badge(d.wardrobe_key_returned, 'Returned', 'Not returned');
+    document.getElementById('s-bio').innerHTML       = badge(d.biometric_removed, 'Removed', 'Not removed');
+    document.getElementById('s-condition').innerHTML = badge(d.room_condition_ok, 'Good condition', 'Damage noted');
+    if (d.damage_notes) {
+      document.getElementById('damage-row').style.display = 'flex';
+      document.getElementById('s-damage').textContent = d.damage_notes;
+    }
+
+    // Financial
+    document.getElementById('s-deposit').textContent = fmtRs(d.security_deposit);
+    document.getElementById('s-dues').textContent = d.pending_dues > 0
+      ? `- ${fmtRs(d.pending_dues)}` : fmtRs(0);
+    if (d.deductions > 0) {
+      document.getElementById('deduct-row').style.display = 'flex';
+      document.getElementById('s-deduct').textContent = `- ${fmtRs(d.deductions)}`;
+    }
+    if (d.deduction_reason) {
+      document.getElementById('deduct-reason-row').style.display = 'flex';
+      document.getElementById('s-deduct-reason').textContent = d.deduction_reason;
+    }
+
+    // Refund
+    document.getElementById('s-refund').textContent = fmtRs(d.refund_amount);
+    if (d.refund_amount <= 0) {
+      document.getElementById('s-refund').style.color = 'var(--sub)';
+    }
+    document.getElementById('s-refund-mode').textContent =
+      d.refund_mode ? 'via ' + d.refund_mode.toUpperCase() : '';
+
+    // Expire note
+    if (!expired) {
+      const exp = new Date(d.expires_at);
+      document.getElementById('expire-note').textContent =
+        'Auto-confirmed if no response by ' +
+        exp.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) +
+        ' on ' + exp.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    }
+  }
+
+  function toggleDispute() {
+    const panel = document.getElementById('dispute-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function submitConfirm() {
+    const btn = document.getElementById('btn-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Confirming…';
+    try {
+      const r = await fetch(`/api/checkout/respond/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'confirm', reason: '' }),
+      });
+      if (r.ok) {
+        document.getElementById('main-content').style.display = 'none';
+        document.getElementById('done-title').textContent = 'Checkout Confirmed';
+        document.getElementById('done-msg').textContent =
+          'Your checkout is confirmed. Thank you for staying with Cozeevo.';
+        document.getElementById('done-state').style.display = 'block';
+      } else {
+        const data = await r.json().catch(() => ({}));
+        alert(data.detail || 'Could not confirm. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Confirm Checkout';
+      }
+    } catch(e) {
+      alert('Network error. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Confirm Checkout';
+    }
+  }
+
+  async function submitDispute() {
+    const reason = document.getElementById('dispute-reason').value.trim();
+    if (!reason) {
+      alert('Please describe what you disagree with.');
+      return;
+    }
+    const btn = document.querySelector('.btn-submit-dispute');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    try {
+      const r = await fetch(`/api/checkout/respond/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: 'dispute', reason }),
+      });
+      if (r.ok) {
+        document.getElementById('main-content').style.display = 'none';
+        document.getElementById('done-title').textContent = 'Dispute Submitted';
+        document.getElementById('done-title').style.color = 'var(--red)';
+        document.getElementById('done-msg').textContent =
+          'Your dispute has been recorded. The receptionist will follow up with you.';
+        document.getElementById('done-state').style.display = 'block';
+      } else {
+        const data = await r.json().catch(() => ({}));
+        alert(data.detail || 'Could not submit. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Submit Dispute';
+      }
+    } catch(e) {
+      alert('Network error. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Submit Dispute';
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>
