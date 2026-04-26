@@ -2,6 +2,71 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.69.0] — 2026-04-27 — PWA rent collection form: numpad, tenant search, dues preview, E2E tests
+
+### Built
+- **`src/api/v2/tenants.py`** — two new endpoints:
+  - `GET /api/v2/app/tenants/search?q=` — fuzzy search active/no_show tenancies by name/room/phone (max 10)
+  - `GET /api/v2/app/tenants/{tenancy_id}/dues` — current month dues (rent − payments), last payment info
+- **`src/api/v2/app_router.py`** — registered tenants router
+- **`src/api/v2/payments.py`** — fixed critical Sheet sync gap: now calls `gsheets.update_payment()` after DB commit (same 10s timeout pattern as WhatsApp handler — was silently missing before)
+- **`web/lib/api.ts`** — added `searchTenants()`, `getTenantDues()`, `TenantSearchResult`, `TenantDues` interfaces
+- **`web/components/forms/tenant-search.tsx`** — debounced autocomplete with dropdown + selected pill + clear
+- **`web/components/forms/confirmation-card.tsx`** — universal bottom-sheet safety gate before any DB write
+- **`web/components/forms/numpad.tsx`** — phone-style numpad (suggest-amount pills, 0 spans 2 cols, backspace)
+- **`web/app/payment/new/page.tsx`** — full rebuild: TenantSearch → dues preview → Numpad → method tiles → ConfirmationCard → VoiceSheet → success screen
+- **`web/e2e/payment-collection.spec.ts`** — 10/10 Playwright scenarios passing (numpad, error states, method pills, voice button)
+- **`web/playwright.config.ts`** — created with chromium + webServer auto-start config
+
+### UI mockups created (approved by Kiran)
+- `.superpowers/brainstorm/ui-options/payment-collection.html` — 3 states × mobile + web
+- `.superpowers/brainstorm/ui-options/dashboard-expandable.html` — expandable KPI tiles + Smart Query bar
+
+### Design decisions (approved)
+- **Numpad** for amount entry (phone-style, like Powdur) — not text input
+- **Mobile hybrid** (phone frame + bottom sheet) AND **web left sidebar** — both required
+- **Dashboard KPI tiles are expandable** — tap tile → inline list (dues, check-ins, checkouts, occupancy)
+- **Smart Query** replaces "Dues Query" everywhere — AI bar that answers any operational question ("female double-sharing rooms with 1 bed free?")
+- **Check-in + checkout forms** must be adapted to same design (next session work)
+
+### Branch
+`feature/pwa-forms-rent-collection` pushed to GitHub. Needs merge + VPS deploy.
+
+### Tests
+- Backend: 11 new tests (v2 tenants) passing, 52 pre-push unit tests passing
+- Frontend: 10 Playwright E2E scenarios passing, tsc zero errors, Next.js build clean
+
+---
+
+## [1.68.0] — 2026-04-26 — Product pivot: Kozzy Digital Receptionist (forms + voice + WhatsApp)
+
+### Decision
+Strategic pivot from WhatsApp-only bot to three-track platform:
+- **Track A (forms)** — PWA staff app for Lokesh: collect payment, check-in, checkout, dues, day-wise, rental changes. Critical path. Ships first.
+- **Track B (voice)** — "Hey Kozzy" wake word + tap-to-talk on shared reception phone. Groq Whisper Turbo. EN/TA/TE/HI. Ships after forms.
+- **Track C (WhatsApp)** — Existing bot maintained for owners + tenants. No new features required.
+
+### Why
+Receptionist (Lokesh) cannot use natural language chat reliably for financial data entry. Staff have phones only — no laptops. Forms + voice = right interface for front desk.
+
+### What WhatsApp commands do
+Continue working for owners (Kiran, Prabhakaran) and tenants. Three frontends, one backend, one DB.
+
+### Pricing updated
+- Growth ₹799 — forms app added
+- Pro ₹1999 — forms + voice added
+
+### Docs updated
+- `docs/superpowers/specs/2026-04-26-kozzy-digital-receptionist-design.md` — full product spec
+- `docs/planning/ROADMAP.md` — three-track plan + confidence levels
+- `docs/business/PRICING.md` — forms + voice tiers added
+
+### Implementation plan
+Next: `writing-plans` skill → implementation plan for Track A (forms critical path).
+Three-agent parallel execution: Agent A (forms), Agent B (voice), Agent C (WhatsApp parity).
+
+---
+
 ## [1.67.0] — 2026-04-26 — DASHBOARD_SUMMARY handler: all 6 Sheet rows queryable via bot
 
 ### Added
