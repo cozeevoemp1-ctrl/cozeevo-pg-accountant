@@ -2,6 +2,36 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.62.0] — 2026-04-26 — PWA Plan 1 Tasks 16–22: voice, payment page, collection breakdown
+
+### Voice pipeline (Tasks 16–18)
+- `web/lib/voice.ts` — `useVoiceRecorder()` hook: MediaRecorder API, webm+opus / mp4 fallback, mic permission request, chunk streaming
+- `web/components/voice/mic-button.tsx` — standalone mic button (reusable)
+- `web/components/voice/voice-sheet.tsx` — full-screen modal: records → transcribes → extracts intent → shows confirm view with extracted fields; handles errors at each stage
+- `src/services/voice.py` — Groq Whisper Large v3 Turbo transcription wrapper
+- `src/services/intent_voice.py` — PydanticAI + Llama 3.3 70B payment intent extraction (`log_payment` / `check_balance` / `unknown`); falls back to raw Groq JSON mode if PydanticAI not installed
+- `src/schemas/voice.py` — `TranscribeResponse`, `IntentRequest`, `PaymentIntentResponse` Pydantic models
+- `src/api/v2/voice.py` — `POST /api/v2/app/voice/transcribe` (multipart audio → Whisper) + `POST /api/v2/app/voice/intent` (transcript → structured intent); both admin/staff only
+- Registered in `app_router.py`
+
+### Payment entry screen (Task 19)
+- `web/app/payment/new/page.tsx` — voice-first payment form: pre-fills from voice intent (via URL params from HomeTabBar, or direct VoiceSheet confirm); manual fallback for all fields; success flash with amount + method
+
+### Collection breakdown screen (Tasks 21–22)
+- `web/app/collection/breakdown/page.tsx` — server component, reads `/api/v2/app/reporting/collection`; 3 sections per REPORTING.md §4.2: "Counted in Total" (rent + maintenance), "Pending", "Tracked separately (NOT in total)" (deposits + advances)
+- Home page: tapping overview card navigates to breakdown
+
+### Tab bar + voice flow wiring (Tasks 16/19)
+- `web/components/home/home-tab-bar.tsx` — client component with 5-tab bottom nav; centre CTA opens VoiceSheet, on intent navigates to `/payment/new?amount=...&method=...`; replaces inline `HomeTabBar` placeholder
+- Home page updated: renders `<HomeTabBar>` below content, overview card wrapped in `<Link href="/collection/breakdown">`
+
+### API additions
+- `web/lib/api.ts` — `transcribeAudio(blob, mime)` → `_postForm` multipart; `extractPaymentIntent(transcript)` → JSON; `TranscribeResponse` + `PaymentIntent` types
+
+### VPS: deployed, service active
+
+---
+
 ## [1.61.0] — 2026-04-26 — PWA Plan 1 Tasks 4/5/9/10 + checkout web confirm page
 
 ### Backend: `/api/v2/app/payments` + `/api/v2/app/reporting/collection`
