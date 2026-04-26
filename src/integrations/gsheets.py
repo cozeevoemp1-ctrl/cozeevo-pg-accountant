@@ -723,10 +723,11 @@ def _update_payment_sync(
     month: Optional[int] = None,
     year: Optional[int] = None,
     entered_by: str = "",
+    is_daily: bool = False,
 ) -> dict:
     """
-    Update payment in the monthly tab. ADDs amount to Cash or UPI column.
-    Returns result dict.
+    Update payment in the monthly tab (or DAY WISE tab for daily stays).
+    ADDs amount to Cash or UPI column. Returns result dict.
     """
     # Input validation
     if not amount or amount <= 0:
@@ -744,7 +745,10 @@ def _update_payment_sync(
     if year is None:
         year = today.year
 
-    tab_name = _month_tab_for(month, year)
+    if is_daily:
+        tab_name = "DAY WISE"
+    else:
+        tab_name = _month_tab_for(month, year)
 
     result: dict[str, Any] = {
         "success": False,
@@ -758,7 +762,7 @@ def _update_payment_sync(
         "error": None,
     }
 
-    if _is_frozen_month(month, year):
+    if not is_daily and _is_frozen_month(month, year):
         result["error"] = f"Refused write to frozen tab '{tab_name}' (Dec 2025–Mar 2026 is read-only)"
         logger.warning("GSheets update_payment: blocked frozen-month write to %s", tab_name)
         return result
@@ -1315,9 +1319,10 @@ async def update_payment(
     month: Optional[int] = None,
     year: Optional[int] = None,
     entered_by: str = "",
+    is_daily: bool = False,
 ) -> dict:
     """
-    Async entry point — update payment in Google Sheet monthly tab.
+    Async entry point — update payment in Google Sheet monthly tab (or DAY WISE for daily stays).
 
     Args:
         room_number: e.g. "102"
@@ -1327,11 +1332,12 @@ async def update_payment(
         month: month number (1-12). None = current month
         year: year. None = current year
         entered_by: name of person who logged this payment (for audit trail)
+        is_daily: True for Tenancy(stay_type=daily) — writes to DAY WISE tab
 
     Returns dict: success, row, tab, rent_due, total_paid, balance, overpayment, warning, error
     """
     return await asyncio.to_thread(
-        _update_payment_sync, room_number, tenant_name, amount, method, month, year, entered_by,
+        _update_payment_sync, room_number, tenant_name, amount, method, month, year, entered_by, is_daily,
     )
 
 

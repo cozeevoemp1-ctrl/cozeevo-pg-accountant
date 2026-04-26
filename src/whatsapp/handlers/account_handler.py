@@ -500,6 +500,7 @@ async def _do_log_payment_by_ids(
                 month=period_month.month,
                 year=period_month.year,
                 entered_by=ctx_name or "bot",
+                is_daily=(tenancy.stay_type == StayType.daily),
             ), timeout=10)
         except _aio.TimeoutError:
             import logging as _logging
