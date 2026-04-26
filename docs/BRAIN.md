@@ -63,7 +63,6 @@
   |       +-- _shared.py          (fuzzy search, pending)   |
   |                                                        |
   |  Also:                                                 |
-  |  +- dashboard_router.py  -> REST API for web dashboard  |
   |  +- gsheets.py           -> Google Sheets read/write    |
   |  +- finance_handler.py   -> bank statement processing   |
   |                                                        |
@@ -334,7 +333,6 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/whatsapp/handlers/tenant_handler.py` | Tenant self-service (disabled) |
 | `src/whatsapp/handlers/lead_handler.py` | Sales conversation (disabled) |
 | `src/whatsapp/handlers/_shared.py` | Fuzzy search, disambiguation, pending helpers |
-| `src/api/dashboard_router.py` | REST API for web dashboard |
 | `src/integrations/gsheets.py` | Google Sheets read/write |
 | `src/database/models.py` | 26 ORM table definitions |
 | `src/database/db_manager.py` | DB Manager + CRUD |

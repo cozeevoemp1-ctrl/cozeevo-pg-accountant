@@ -26,8 +26,7 @@ Before closing any feature, run through this checklist:
 6. `scripts/import_daywise.py` — Day-wise short-stay importer (DB + Sheet)
 7. `scripts/gsheet_apps_script.js` — Apps Script dashboard (reads monthly tabs)
 6. `scripts/gsheet_dashboard_webapp.js` — Apps Script web dashboard
-7. `src/api/dashboard_router.py` + `static/dashboard.html` — web dashboard
-8. `src/whatsapp/intent_detector.py` — new intents registered
+7. `src/whatsapp/intent_detector.py` — new intents registered
 9. `src/whatsapp/handlers/owner_handler.py` — handler map + disambiguation
 10. `src/integrations/gsheets.py` — Sheet write-back (payments, checkins, etc.)
 11. `docs/` — BRAIN.md, BOT_FLOWS.md, cheat sheets, CHANGELOG

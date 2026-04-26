@@ -8,7 +8,7 @@ Complete documentation of all business logic, calculations, and decision rules u
 
 ### 1.1 Total Bed Capacity (Dynamic)
 
-**File:** `src/api/dashboard_router.py:99-102`, `src/whatsapp/handlers/owner_handler.py:1808-1810`
+**File:** `src/whatsapp/handlers/owner_handler.py`
 
 Total beds are calculated dynamically from the rooms table, never hardcoded:
 
@@ -25,7 +25,7 @@ Staff rooms excluded: THOR (G05, G06, 107, 108, 701, 702) + HULK (G12, 114, 618)
 
 ### 1.2 Occupied Beds Calculation
 
-**Files:** `src/api/dashboard_router.py:108-125`, `src/whatsapp/handlers/owner_handler.py:1821-1826`
+**Files:** `src/whatsapp/handlers/owner_handler.py`
 
 **Key Rule:** Premium tenancy = 1 person occupies ALL beds in the room (max_occupancy). Regular tenancy = 1 person = 1 bed.
 
@@ -43,7 +43,7 @@ WHERE Room.is_staff_room = False
 
 ### 1.3 No-Show Beds
 
-**File:** `src/api/dashboard_router.py:294-304`, `src/whatsapp/handlers/owner_handler.py:1834-1843`
+**File:** `src/whatsapp/handlers/owner_handler.py`
 
 No-show = booked but not yet arrived. Count ALL no-shows regardless of checkin_date (includes future bookings).
 
@@ -102,7 +102,7 @@ Vacant: {291 - active_beds - no_show} beds
 
 ## 2. DUES SCOPING RULE (LOCKED)
 
-**Files:** `docs/REPORTING.md:105-135`, `src/api/dashboard_router.py:145-161`, `src/whatsapp/handlers/account_handler.py:671-728`
+**Files:** `docs/REPORTING.md:105-135`, `src/whatsapp/handlers/account_handler.py` → `_query_dues()`, `_report()`
 
 ### 2.1 Three Conditions (All Required)
 
@@ -124,12 +124,10 @@ outstanding = effective_due - paid
 IF outstanding > 0: include in dues list
 ```
 
-### 2.3 Applied In (4 Locations)
+### 2.3 Applied In (2 Locations)
 
-1. `dashboard_router.py:145-161` -- KPI dues_outstanding
-2. `dashboard_router.py:432-437` -- /api/dashboard/dues endpoint
-3. `account_handler.py:1203-1212` -- _report() function
-4. `account_handler.py:698-710` -- _query_dues() function
+1. `account_handler.py` → `_report()` function
+2. `account_handler.py` → `_query_dues()` function
 
 **Test:** `tests/test_dues_month_scope.py` -- 10/10 passing
 
@@ -147,7 +145,7 @@ Public helpers:
 **Callers (don't inline the queries, import from here):**
 - `owner_handler._room_status`, `_query_vacant_rooms`, `_query_occupancy`
 - `account_handler._monthly_report`
-- `dashboard_router` occupancy KPI
+- `owner_handler._query_occupancy`
 - `_shared._check_room_overlap`
 - `sync_sheet_from_db` dashboard summary
 
@@ -373,9 +371,9 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 
 | Calculation | Primary Location | Also In |
 |---|---|---|
-| Occupancy % | `dashboard_router.py:108-128` | `owner_handler.py:1821-1826` |
-| Dues Outstanding | `dashboard_router.py:145-161` | `account_handler.py:671-728` |
-| Collection Rate | `dashboard_router.py:255-268` | -- |
+| Occupancy % | `owner_handler.py` | -- |
+| Dues Outstanding | `account_handler.py` → `_query_dues()` | -- |
+| Collection Rate | `account_handler.py` → `_report()` | -- |
 | Monthly Report | `account_handler.py:1157-1249` | -- |
 | Rent Change | `account_handler.py:893-1107` | -- |
 | Checkout Settlement | `owner_handler.py:818-902` | -- |

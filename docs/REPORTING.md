@@ -133,12 +133,10 @@ FOR EACH qualifying tenant:
 
 New arrivals in month M haven't had time to pay yet. They're not "overdue" — they just checked in. Only chase tenants who were already there before the month started.
 
-### 2.4 Applied In (4 places — must be consistent)
+### 2.4 Applied In (2 places — must be consistent)
 
-1. `dashboard_router.py` → KPI `dues_outstanding`
-2. `dashboard_router.py` → `/api/dashboard/dues` endpoint
-3. `account_handler.py` → `_report()` function
-4. `account_handler.py` → `_query_dues()` function
+1. `account_handler.py` → `_report()` function
+2. `account_handler.py` → `_query_dues()` function
 
 ---
 
