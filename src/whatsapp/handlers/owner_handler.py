@@ -2970,7 +2970,7 @@ async def resolve_pending_action(
                 note=action_data.get("reason", "daily rate change"),
             ))
             from src.integrations import gsheets as _gs
-            _gs.trigger_monthly_sheet_sync(date.today().month, date.today().year)
+            _gs.trigger_daywise_sheet_sync()
             return (
                 f"*Daily rate updated — {action_data['tenant_name']}*\n"
                 f"Was: Rs.{old_rate:,}/day\n"
