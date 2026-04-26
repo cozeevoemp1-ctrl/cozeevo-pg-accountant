@@ -176,23 +176,29 @@ async def create_checkout_session(req: CreateCheckoutRequest, request: Request):
 
         room_number = room.room_number if room else "?"
         refund_line = (
-            f"Refund: Rs.{int(cs.refund_amount):,} via {cs.refund_mode.upper()}"
-            if cs.refund_amount > 0 else "Refund: Rs.0"
+            f"Rs.{int(cs.refund_amount):,} via {cs.refund_mode.upper()}"
+            if cs.refund_amount > 0 else "Rs.0 (no refund)"
         )
-
-        msg = (
-            f"Hi {tenant.name}, your checkout from Room {room_number} "
-            f"on {checkout_date.strftime('%d %b %Y')} has been recorded.\n\n"
-            f"{refund_line}\n\n"
-            f"Please review the full summary and confirm or dispute:\n"
-            f"{confirm_link}\n\n"
-            f"If no response in 2 hours, this will be auto-confirmed."
-        )
+        date_str = checkout_date.strftime('%d %b %Y')
 
         phone_wa = f"+91{tenant.phone}" if not tenant.phone.startswith("+") else tenant.phone
         try:
-            from src.whatsapp.webhook_handler import _send_whatsapp
-            await _send_whatsapp(phone_wa, msg)
+            from src.whatsapp.webhook_handler import _send_whatsapp_template, _send_whatsapp
+            sent = await _send_whatsapp_template(
+                phone_wa, "checkout_confirmation",
+                [tenant.name, room_number, date_str, refund_line, confirm_link]
+            )
+            if not sent:
+                # Fallback: free-form (works only if tenant messaged bot within 24h)
+                msg = (
+                    f"Hi {tenant.name}, your checkout from Room {room_number} "
+                    f"on {date_str} has been recorded.\n\n"
+                    f"Refund: {refund_line}\n\n"
+                    f"Please review and confirm or dispute:\n"
+                    f"{confirm_link}\n\n"
+                    f"If no response in 2 hours, this will be auto-confirmed."
+                )
+                await _send_whatsapp(phone_wa, msg)
         except Exception as _e:
             logger.warning("WhatsApp send failed for checkout request: %s", _e)
 
