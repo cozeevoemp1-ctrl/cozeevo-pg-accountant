@@ -398,8 +398,17 @@ async def _send_whatsapp(to_number: str, message: str, *, intent: str = "OUTBOUN
         logger.warning(f"[Meta] whatsapp_log write failed: {_log_err}")
 
 
-async def _send_whatsapp_template(to_number: str, template_name: str, parameters: list[str]):
-    """Send WhatsApp template message — works without 24hr window."""
+async def _send_whatsapp_template(
+    to_number: str,
+    template_name: str,
+    parameters: list[str],
+    url_button_token: str | None = None,
+):
+    """Send WhatsApp template message — works without 24hr window.
+
+    url_button_token: if the template has a URL button with a variable suffix,
+    pass the token/suffix here and it will be sent as the button parameter.
+    """
     token    = os.getenv("WHATSAPP_TOKEN", "")
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
     if not (token and phone_id):
@@ -408,6 +417,14 @@ async def _send_whatsapp_template(to_number: str, template_name: str, parameters
     import httpx
     url     = f"https://graph.facebook.com/v25.0/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    components = [{"type": "body", "parameters": [{"type": "text", "text": p} for p in parameters]}]
+    if url_button_token:
+        components.append({
+            "type": "button",
+            "sub_type": "url",
+            "index": 0,
+            "parameters": [{"type": "text", "text": url_button_token}],
+        })
     body    = {
         "messaging_product": "whatsapp",
         "to": to,
@@ -415,10 +432,7 @@ async def _send_whatsapp_template(to_number: str, template_name: str, parameters
         "template": {
             "name": template_name,
             "language": {"code": "en"},
-            "components": [{
-                "type": "body",
-                "parameters": [{"type": "text", "text": p} for p in parameters]
-            }]
+            "components": components,
         }
     }
     success = False

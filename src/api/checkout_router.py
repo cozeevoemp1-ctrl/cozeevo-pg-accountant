@@ -185,8 +185,9 @@ async def create_checkout_session(req: CreateCheckoutRequest, request: Request):
         try:
             from src.whatsapp.webhook_handler import _send_whatsapp_template, _send_whatsapp
             sent = await _send_whatsapp_template(
-                phone_wa, "checkout_confirmation",
-                [tenant.name, room_number, date_str, refund_line, confirm_link]
+                phone_wa, "checkout_review",
+                [tenant.name, room_number, date_str, refund_line],
+                url_button_token=cs.token,
             )
             if not sent:
                 # Fallback: free-form (works only if tenant messaged bot within 24h)
