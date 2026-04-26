@@ -127,11 +127,28 @@ Already queries `Tenancy JOIN Tenant JOIN Room`. Daily tenants are found automat
 
 ---
 
+## Additional Scope (from self-review)
+
+**TENANTS sheet tab** — after merge, daily-stay Tenancies live in the same `tenancies` table. TENANTS tab must include them. Add a `Stay Type` column (daily/monthly) so staff can distinguish. `sync_sheet_from_db.py` (TENANTS tab writer) updates its query to include `stay_type=daily` rows.
+
+**Payment routing in `gsheets.update_payment()`** — currently always writes to monthly tab. After merge, if `tenancy.stay_type == "daily"`, route to DAY WISE tab instead (same Cash/UPI/Balance columns, no `month` parameter needed — match by room + name).
+
+**`import_daywise.py`** — currently writes to `DaywiseStay` directly. After merge, rewrites to create `Tenant + Tenancy(stay_type=daily)` rows. Excel import path treated same as onboarding path.
+
+**Occupancy queries** — 11 call sites across `room_occupancy.py`, `occupants.py`, `account_handler.py`, `owner_handler.py`, `_shared.py` all query `DaywiseStay` directly. After merge, all switch to `Tenancy WHERE stay_type=daily`.
+
+**`_find_active_daywise_by_name` in `_shared.py`** — becomes redundant. Remove it; callers use `_find_active_tenants_by_name` which finds both types.
+
+**ROOM_TRANSFER_DW_*** handlers in `owner_handler.py`** — currently update `DaywiseStay.room_number` directly. After merge, use the same `ROOM_TRANSFER` flow as monthly (updates `Tenancy.room_id`). Remove the three DW-specific pending action branches.
+
+**OnboardingSession terminology** — uses `stay_type == "daily"` (not `is_daily`). Spec language updated to match.
+
+**Dashboard revenue** — uses `bank_transactions` table, not `DaywiseStay` or `Payment`. No dashboard change needed.
+
 ## What Stays the Same
 - Monthly billing flow, RentSchedule, rollover — untouched
 - Frozen month logic — untouched
-- Tenant KYC, onboarding form — can optionally capture day-wise guests via same form
-- TENANTS sheet tab — add `stay_type` column so staff can see daily vs monthly
+- Dashboard revenue queries — untouched (bank_transactions source)
 
 ---
 
