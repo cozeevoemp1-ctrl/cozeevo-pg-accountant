@@ -2,6 +2,50 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.63.0] — 2026-04-26 — Day-Wise Parity: all guests in Tenancy(stay_type=daily)
+
+### Architecture change
+- Unified day-wise stays into `Tenancy(stay_type=daily)` — `DaywiseStay` table retained as archive, all new writes use `Tenancy`
+- All bot handlers, sheet columns, and payment flows now treat day-stays identically to monthly tenants
+
+### Migration (VPS)
+- `scripts/migrate_daywise_to_tenancy.py`: migrated 33 DaywiseStay rows → Tenancy + Payment; 66 skipped (no phone); 2 skipped (duplicates)
+- Migration is idempotent (source_file=MIGRATED tombstone + duplicate check)
+
+### New/changed files
+- **`src/services/occupants.py`**: day-stay query uses `Tenancy(stay_type=daily)` — no more DaywiseStay
+- **`src/services/room_occupancy.py`**: `RoomOccupants.daywise: list[Tenancy]`; all 3 occupancy callsites updated
+- **`src/api/onboarding_router.py`**: `is_daily` approval path writes Tenancy + Payment
+- **`scripts/import_daywise.py`**: Excel import writes Tenancy instead of DaywiseStay
+- **`src/integrations/gsheets.py`**: DAY WISE tab uses MONTHLY_HEADERS (19 cols); `update_payment` routes daily-stay payments to DAY WISE tab via `is_daily=True`
+- **`src/whatsapp/handlers/account_handler.py`**: QUERY_DUES includes daily-tenant balances; removed DAYWISE_RENT_CHANGE handler; `gsheets_update` passes `is_daily`
+- **`src/whatsapp/handlers/owner_handler.py`**: removed ROOM_TRANSFER_DW_*, DAYWISE_RENT_CHANGE_WHO handlers; `_find_active_daywise_by_name` removed
+- **`scripts/sync_daywise_from_db.py`**: rewrites DAY WISE tab from Tenancy(stay_type=daily) with MONTHLY_HEADERS
+- DAY WISE sheet: 33 rows written (6 active guests, Rs.5.36L total revenue)
+
+### Deployed
+- VPS restarted, service active
+
+---
+
+## [1.62.1] — 2026-04-26 — Phone normalization: DB + Sheet in sync
+
+### DB migration
+- Normalized 6 raw 10-digit tenant phones to `+91XXXXXXXXXX` format in DB (`tenants` table)
+- DB now has uniform phone format: all real phones stored as `+91XXXXXXXXXX`, NOPHONE_ placeholders unchanged
+
+### Sheet sync
+- Re-synced April 2026 monthly tab from DB — 282 rows written with normalized phones
+- `sync_sheet_from_db.py --write` regenerates monthly tab from DB (tenant.phone = DB value)
+- Principle enforced: Sheet is a mirror of DB; same field, same format everywhere
+
+### Context
+- `canonical_phone()` (shipped previous session) normalizes all NEW writes
+- This migration cleans up the 6 existing records that pre-dated that function
+- NOPHONE_ placeholders (13 records) are intentional — left unchanged
+
+---
+
 ## [1.62.0] — 2026-04-26 — PWA Plan 1 Tasks 16–22: voice, payment page, collection breakdown
 
 ### Voice pipeline (Tasks 16–18)

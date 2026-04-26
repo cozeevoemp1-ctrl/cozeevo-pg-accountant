@@ -6,20 +6,17 @@ type: project
 
 ## Active / Next Up
 
-1. **Review `docs/DATA_ARCHITECTURE.md`** — Kiran to approve design doc before Step 1 refactor (create `src/data/schemas.py`).
-2. **Sheet sync completion** — background job at session end was still running (`sync_sheet_from_db.py` for Dec/Jan/Feb/Mar/Apr). Verify monthly tabs match DB after wake. Also run `import_daywise.py` for DAY WISE tab.
-3. **Chandra off-book cash** — Mar Rs.1.6L + Apr Rs.15.5K confirmed by Kiran. Documented in `RENT_RECONCILIATION.md`. Not yet added to DB — decide if we log as explicit entries with note "Off-book Chandra collection".
-4. **Data architecture migration** (6 sessions) — after doc approval:
-   - Step 1: Define schemas in `src/data/schemas.py`
-   - Step 2: Refactor `import_april.py` (replace `COL_X = N` with header lookup)
-   - Step 3: Refactor `clean_and_load.py::read_history`
-   - Step 4: Unify bank statement readers
-   - Step 5: Consolidate publishers
-   - Step 6: CI check + docs
-5. **70 unclassified bank txns** — generic UPI with no description. Kiran to fill yellow column in `data/reports/unclassified_review.xlsx`.
+1. **WhatsApp smoke test** — send these to the live bot to verify day-wise parity:
+   - "how many guests today" → should count day-stay guests
+   - "[DayWise GuestName] balance" → should return balance (dues − paid)
+   - "change [DayWise GuestName] rent 600" → should update Tenancy.agreed_rent
+   - "move [DayWise GuestName] to room 305" → should use regular ROOM_TRANSFER flow
+2. **`test_activity_log.py` broken** — pre-existing failure (`sys.exit()` at module level). Investigate separately; not caused by day-wise work.
+3. **Review `docs/DATA_ARCHITECTURE.md`** — Kiran to approve design doc before Step 1 refactor.
+4. **Chandra off-book cash** — Mar Rs.1.6L + Apr Rs.15.5K. Decide if we log as explicit entries.
+5. **70 unclassified bank txns** — Kiran to fill yellow column in `data/reports/unclassified_review.xlsx`.
 6. **WhatsApp template approval** — `cozeevo_checkin_form` still PENDING from Meta.
-7. **VPS deploy** — v1.33.0 needs deploy after local test.
-8. **PydanticAI integration** — 3-session plan (see `project_pydanticai_plan.md`).
+7. **PydanticAI integration** — 3-session plan (see `project_pydanticai_plan.md`).
 
 ## Paused
 
