@@ -20,8 +20,8 @@ Day-wise guests become first-class `Tenant` + `Tenancy(stay_type=daily)` records
 
 ## Schema Changes
 
-### 1. `Tenant.phone` — make nullable
-Day-wise guests may not have a phone. Currently `NOT NULL UNIQUE`. Change to nullable; uniqueness check skipped when NULL.
+### 1. `Tenant.phone` — stays `NOT NULL UNIQUE`
+Phone is mandatory for all guests including day-wise. During migration, any legacy `DaywiseStay` row with no phone is skipped and flagged for manual entry. New day-wise check-ins require phone at the point of registration.
 
 ### 2. `Tenancy` — no new columns needed
 `stay_type = "daily"` (enum already exists) is the only distinguishing flag.  
@@ -66,11 +66,12 @@ Kept in DB as read-only historical archive. No new records written after migrati
 One-time script: `scripts/migrate_daywise_to_tenancy.py`
 
 For each DaywiseStay row:
-1. Look up existing Tenant by phone (if phone matches, reuse — same person returning)
-2. If no match, create new Tenant with name, phone (nullable)
-3. Create Tenancy(stay_type=daily) with field mapping above
-4. If `total_amount > 0`, create one Payment row for the amount paid
-5. Mark DaywiseStay row with `source_file = "MIGRATED"` (tombstone, no delete)
+1. **Skip if no phone** — log to `migration_skipped.txt` for manual follow-up (phone is mandatory)
+2. Look up existing Tenant by phone (if phone matches, reuse — same person returning)
+3. If no match, create new Tenant with name, phone
+4. Create Tenancy(stay_type=daily) with field mapping above
+5. If `total_amount > 0`, create one Payment row for the amount paid
+6. Mark DaywiseStay row with `source_file = "MIGRATED"` (tombstone, no delete)
 
 Idempotent: skip rows where Tenancy with matching room + checkin_date + Tenant already exists.
 
