@@ -33,6 +33,16 @@ async function _post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function _postForm<T>(path: string, form: FormData): Promise<T> {
+  const headers = await _authHeaders();
+  const res = await fetch(`${BASE_URL}${path}`, { method: "POST", headers, body: form });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `POST ${path} → ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 // ── Typed response shapes ────────────────────────────────────────────────────
 
 export interface CollectionSummary {
@@ -87,6 +97,21 @@ export interface ActivityResponse {
   items: ActivityItem[];
 }
 
+export interface TranscribeResponse {
+  text: string;
+  language: string;
+  duration_seconds: number;
+}
+
+export interface PaymentIntent {
+  intent: string;
+  amount: number | null;
+  tenant_name: string | null;
+  tenant_room: string | null;
+  method: string | null;
+  for_type: string;
+}
+
 // ── API calls ────────────────────────────────────────────────────────────────
 
 export function getCollectionSummary(periodMonth: string): Promise<CollectionSummary> {
@@ -103,4 +128,14 @@ export function getRecentActivity(limit = 20): Promise<ActivityResponse> {
 
 export function createPayment(body: PaymentCreate): Promise<PaymentResponse> {
   return _post("/api/v2/app/payments", body);
+}
+
+export function transcribeAudio(blob: Blob, mime: string): Promise<TranscribeResponse> {
+  const form = new FormData();
+  form.append("audio", blob, mime.includes("mp4") ? "audio.mp4" : "audio.webm");
+  return _postForm("/api/v2/app/voice/transcribe", form);
+}
+
+export function extractPaymentIntent(transcript: string): Promise<PaymentIntent> {
+  return _post("/api/v2/app/voice/intent", { transcript });
 }
