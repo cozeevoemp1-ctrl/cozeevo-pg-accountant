@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.61.0] — 2026-04-26 — PWA Plan 1 Tasks 4/5/9/10 + checkout web confirm page
+
+### Backend: `/api/v2/app/payments` + `/api/v2/app/reporting/collection`
+- `POST /api/v2/app/payments` — JWT-authenticated payment logging via the Owner PWA; resolves active tenancy from `tenant_id`, calls `src/services/payments.log_payment`, returns `payment_id` + `new_balance`; 409 on duplicate hash
+- `GET /api/v2/app/reporting/collection?period_month=YYYY-MM` — collection summary per REPORTING.md §4.2; returns `expected`, `collected` (rent+maintenance only), `pending`, `collection_pct`, breakdowns, `overdue_count`
+- `src/schemas/payments.py` + `src/schemas/reporting.py` — Pydantic request/response models
+- `src/services/reporting.py` — `collection_summary()` async service using existing SQLAlchemy models
+
+### Frontend: UI primitives + Supabase auth layer
+- `web/components/ui/` — Card, Button, ProgressBar, IconTile, Pill, TabBar (design tokens from tailwind.config.ts)
+- `web/lib/supabase.ts` — createBrowserClient wrapper; `web/lib/auth.ts` — signInWithPhone, verifyOtp, getSession, signOut; `web/lib/api.ts` — typed fetch client for backend endpoints
+- `web/components/auth/auth-provider.tsx` — AuthProvider context + useAuth hook; wired into `app/layout.tsx`
+- Installed `@supabase/ssr@0.10.2` and `@supabase/supabase-js@2.104.1`
+
+### Checkout: web-based confirm page
+- `/checkout/{token}` — tenant-facing HTML page to review and confirm/dispute checkout (replaced inline YES/NO WhatsApp flow)
+- WhatsApp message now sends a link: `https://api.getkozzy.com/checkout/{token}`
+- `GET /api/checkout/summary/{token}`, `/confirm`, `/dispute` — public endpoints (token is the auth)
+
 ## [1.60.0] — 2026-04-26 — Security hygiene: sig-check hardening, correlation IDs, /media auth, token rotation
 
 ### Remove WHATSAPP_SKIP_SIG_CHECK bypass (`webhook_handler.py`)
