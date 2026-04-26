@@ -1,14 +1,16 @@
 """POST /api/v2/app/payments — log a payment via the Owner PWA."""
 from __future__ import annotations
 
+import asyncio
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import Tenancy, TenancyStatus, Tenant
+from src.database.models import Room, StayType, Tenancy, TenancyStatus, Tenant
 from src.schemas.payments import PaymentCreate, PaymentResponse
 from src.services.payments import log_payment
 
@@ -61,6 +63,30 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
             "[PWA] payment logged: tenant=%s tenancy=%s amount=%s by=%s",
             body.tenant_id, tenancy.id, body.amount, user.phone,
         )
+
+        # Mirror to Google Sheet (same pattern as WhatsApp handler — 10s timeout)
+        room = await session.get(Room, tenancy.room_id)
+        if room and tenant:
+            try:
+                from src.integrations.gsheets import update_payment as gsheets_update
+                period = datetime.strptime(body.period_month, "%Y-%m")
+                await asyncio.wait_for(
+                    gsheets_update(
+                        room_number=room.room_number,
+                        tenant_name=tenant.name,
+                        amount=float(body.amount),
+                        method=body.method.lower(),
+                        month=period.month,
+                        year=period.year,
+                        entered_by=user.phone or user.user_id,
+                        is_daily=(tenancy.stay_type == StayType.daily),
+                    ),
+                    timeout=10,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("[PWA] GSheets write-back timed out (10s)")
+            except Exception as exc:
+                logger.warning("[PWA] GSheets write-back failed: %s", exc)
 
         return PaymentResponse(
             payment_id=result.payment_id,
