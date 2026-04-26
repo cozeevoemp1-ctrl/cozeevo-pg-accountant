@@ -34,7 +34,7 @@ if DATABASE_URL.startswith("postgresql://"):
 TAB_NAME = "DAY WISE"
 MONTHLY_HEADERS = [
     "Room", "Name", "Phone", "Building", "Sharing",
-    "Rent", "Deposit", "Rent Due", "Cash", "UPI",
+    "Rent", "Days", "Deposit", "Rent Due", "Cash", "UPI",
     "Total Paid", "Balance", "Status", "Check-in",
     "Notice Date", "Event", "Notes", "Prev Due", "Entered By",
 ]
@@ -99,6 +99,7 @@ async def main(args) -> None:
                 building,
                 sharing,
                 daily_rate,
+                num_days,
                 booking_amount,
                 rent_due,
                 round(cash_paid, 2),
