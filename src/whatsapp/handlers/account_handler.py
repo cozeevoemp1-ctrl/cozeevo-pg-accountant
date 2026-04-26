@@ -74,6 +74,7 @@ FINANCIAL_INTENTS: frozenset[str] = frozenset({
     "QUERY_REFUNDS",
     "BANK_REPORT",
     "BANK_DEPOSIT_MATCH",
+    "DASHBOARD_SUMMARY",
 })
 
 
@@ -98,8 +99,9 @@ async def handle_account(
         "VOID_PAYMENT":   _void_payment,
         "VOID_EXPENSE":   _void_expense,
         "DEPOSIT_CHANGE": _deposit_change,
-        "ADD_REFUND":     _add_refund,
-        "QUERY_REFUNDS":  _query_refunds,
+        "ADD_REFUND":       _add_refund,
+        "QUERY_REFUNDS":    _query_refunds,
+        "DASHBOARD_SUMMARY": _dashboard_summary,
     }
     # Bank analytics — delegated to finance_handler
     if intent == "BANK_REPORT":
@@ -2541,6 +2543,276 @@ async def _do_add_refund_by_ids(
         f"Status: Pending\n\n"
         "Mark as processed once payment is sent."
     )
+
+
+# ── Dashboard summary ──────────────────────────────────────────────────────────
+
+async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """All 6 Sheet-dashboard rows queryable via bot: occupancy, buildings,
+    collection, status, notice, deposits."""
+    from src.database.models import Property
+    from collections import defaultdict
+
+    today = date.today()
+    current_month = today.replace(day=1)
+    prev_month = (current_month - timedelta(days=1)).replace(day=1)
+    month_label = current_month.strftime("%b %Y")
+
+    # ── Revenue rooms ────────────────────────────────────────────────────────
+    room_rows = (await session.execute(
+        select(Room, Property.name.label("prop_name"))
+        .join(Property, Property.id == Room.property_id)
+        .where(Room.active == True, Room.is_staff_room == False)
+    )).all()
+
+    total_beds = sum(r.max_occupancy or 1 for r, _ in room_rows)
+    room_id_to_max = {r.id: (r.max_occupancy or 1) for r, _ in room_rows}
+    room_id_to_bld = {
+        r.id: ("THOR" if "THOR" in pn.upper() else "HULK")
+        for r, pn in room_rows
+    }
+
+    # ── Occupancy (Row 1) ────────────────────────────────────────────────────
+    # Regular monthly active (non-premium): 1 bed each
+    regular_count = await session.scalar(
+        select(func.count(Tenancy.id)).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.stay_type == StayType.monthly,
+            or_(Tenancy.sharing_type != SharingType.premium, Tenancy.sharing_type.is_(None)),
+        )
+    ) or 0
+
+    # Premium active: each person occupies all beds in their room
+    premium_room_ids = (await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.sharing_type == SharingType.premium,
+            Tenancy.room_id.isnot(None),
+        )
+    )).scalars().all()
+    premium_beds = sum(room_id_to_max.get(rid, 2) for rid in premium_room_ids)
+
+    # Day-stay guests active tonight
+    daywise_tonight = await session.scalar(
+        select(func.count(Tenancy.id)).where(
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= today,
+            Tenancy.checkout_date >= today,
+            Tenancy.room_id.isnot(None),
+        )
+    ) or 0
+
+    # No-shows: booked but not arrived — beds reserved for future
+    no_show_count = await session.scalar(
+        select(func.count(Tenancy.id)).where(Tenancy.status == TenancyStatus.no_show)
+    ) or 0
+
+    beds_occupied = regular_count + premium_beds + daywise_tonight
+    vacant_tonight = total_beds - beds_occupied
+    vacant_long_term = max(0, vacant_tonight - no_show_count)
+
+    # ── Buildings (Row 2) ────────────────────────────────────────────────────
+    bld_stats: dict[str, dict] = {
+        "THOR": {"total": 0, "occupied": 0, "tenants": 0},
+        "HULK": {"total": 0, "occupied": 0, "tenants": 0},
+    }
+    for r, pn in room_rows:
+        blk = "THOR" if "THOR" in pn.upper() else "HULK"
+        bld_stats[blk]["total"] += r.max_occupancy or 1
+
+    # Per-room occupied beds (active monthly tenants)
+    active_monthly = (await session.execute(
+        select(Tenancy.room_id, Tenancy.sharing_type)
+        .where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.stay_type == StayType.monthly,
+            Tenancy.room_id.isnot(None),
+        )
+    )).all()
+
+    room_occ: dict[int, int] = defaultdict(int)
+    for rid, stype in active_monthly:
+        if stype == SharingType.premium:
+            room_occ[rid] = room_id_to_max.get(rid, 2)
+        else:
+            if room_occ[rid] < room_id_to_max.get(rid, 1):
+                room_occ[rid] += 1
+
+    # Add day-stay per room
+    dw_per_room = dict((await session.execute(
+        select(Tenancy.room_id, func.count().label("cnt"))
+        .where(
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= today,
+            Tenancy.checkout_date >= today,
+            Tenancy.room_id.isnot(None),
+        )
+        .group_by(Tenancy.room_id)
+    )).all())
+
+    for rid, cnt in dw_per_room.items():
+        room_occ[rid] = min(room_occ.get(rid, 0) + cnt, room_id_to_max.get(rid, 1))
+
+    for rid, occ in room_occ.items():
+        blk = room_id_to_bld.get(rid)
+        if blk:
+            bld_stats[blk]["occupied"] += occ
+
+    # Tenant count per building (for display)
+    all_active_room_ids = (await session.execute(
+        select(Tenancy.room_id).where(
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.room_id.isnot(None),
+        )
+    )).scalars().all()
+    for rid in all_active_room_ids:
+        blk = room_id_to_bld.get(rid)
+        if blk:
+            bld_stats[blk]["tenants"] += 1
+
+    # ── Collection (Row 3) ───────────────────────────────────────────────────
+    rent_collected = await session.scalar(
+        select(func.sum(Payment.amount)).where(
+            Payment.period_month == current_month,
+            Payment.for_type == PaymentFor.rent,
+            Payment.is_void == False,
+        )
+    ) or Decimal("0")
+
+    maint_collected = await session.scalar(
+        select(func.sum(Payment.amount)).where(
+            Payment.period_month == current_month,
+            Payment.for_type == PaymentFor.maintenance,
+            Payment.is_void == False,
+        )
+    ) or Decimal("0")
+
+    total_collected = rent_collected + maint_collected
+
+    prev_dues = await session.scalar(
+        select(func.sum(RentSchedule.rent_due)).where(
+            RentSchedule.period_month == prev_month,
+            RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
+        )
+    ) or Decimal("0")
+
+    total_expected = await session.scalar(
+        select(func.sum(RentSchedule.rent_due)).where(
+            RentSchedule.period_month == current_month,
+        )
+    ) or Decimal("0")
+
+    # ── Status counts (Row 4) ────────────────────────────────────────────────
+    paid_count = await session.scalar(
+        select(func.count(RentSchedule.id)).where(
+            RentSchedule.period_month == current_month,
+            RentSchedule.status == RentStatus.paid,
+        )
+    ) or 0
+    partial_count = await session.scalar(
+        select(func.count(RentSchedule.id)).where(
+            RentSchedule.period_month == current_month,
+            RentSchedule.status == RentStatus.partial,
+        )
+    ) or 0
+    unpaid_count = await session.scalar(
+        select(func.count(RentSchedule.id)).where(
+            RentSchedule.period_month == current_month,
+            RentSchedule.status == RentStatus.pending,
+        )
+    ) or 0
+
+    # ── Notice (Row 5): upcoming scheduled vacates grouped by month ──────────
+    # Use extract year/month to avoid date_trunc parameterization bug in asyncpg
+    notice_rows = (await session.execute(
+        select(
+            func.extract("year",  Tenancy.expected_checkout).label("y"),
+            func.extract("month", Tenancy.expected_checkout).label("m"),
+            func.count().label("cnt"),
+        )
+        .where(
+            Tenancy.expected_checkout.isnot(None),
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.expected_checkout >= today,
+        )
+        .group_by(
+            func.extract("year",  Tenancy.expected_checkout),
+            func.extract("month", Tenancy.expected_checkout),
+        )
+        .order_by(
+            func.extract("year",  Tenancy.expected_checkout),
+            func.extract("month", Tenancy.expected_checkout),
+        )
+    )).all()
+
+    # ── Deposits (Row 6) ────────────────────────────────────────────────────
+    held = await session.scalar(
+        select(func.sum(Tenancy.security_deposit)).where(
+            Tenancy.status == TenancyStatus.active,
+        )
+    ) or Decimal("0")
+
+    maint_fee = await session.scalar(
+        select(func.sum(Tenancy.maintenance_fee)).where(
+            Tenancy.status == TenancyStatus.active,
+        )
+    ) or Decimal("0")
+
+    refundable = max(Decimal("0"), held - maint_fee)
+
+    # ── Format ───────────────────────────────────────────────────────────────
+    prev_label = prev_month.strftime("%b %Y")
+    SEP = "─" * 28
+
+    lines = [
+        f"*Dashboard — {month_label}*",
+        SEP,
+        "",
+        "*OCCUPANCY*",
+        f"  Total beds    : {total_beds}",
+        f"  Occupied      : {beds_occupied}  (regular {regular_count} + premium beds {premium_beds} + day-stay {daywise_tonight})",
+        f"  Vacant tonight: {vacant_tonight}  (reserved {no_show_count} | available {vacant_long_term})",
+        "",
+        "*BUILDINGS*",
+    ]
+    for blk in ["THOR", "HULK"]:
+        bd = bld_stats[blk]
+        lines.append(f"  {blk}: {bd['occupied']}/{bd['total']} beds  ({bd['tenants']} tenants)")
+
+    lines += [
+        "",
+        f"*COLLECTION ({month_label})*",
+        f"  Collected : Rs.{int(total_collected):,}  (rent Rs.{int(rent_collected):,} + maint Rs.{int(maint_collected):,})",
+        f"  Target    : Rs.{int(total_expected):,}",
+        f"  {prev_label} dues: Rs.{int(prev_dues):,}",
+        "",
+        f"*STATUS ({month_label})*",
+        f"  Paid: {paid_count}  Partial: {partial_count}  Unpaid: {unpaid_count}  No-show: {no_show_count}",
+        "",
+        "*NOTICE (upcoming vacate)*",
+    ]
+
+    if notice_rows:
+        for row in notice_rows:
+            try:
+                m_lbl = date(int(row[0]), int(row[1]), 1).strftime("%b %Y")
+            except Exception:
+                m_lbl = "?"
+            lines.append(f"  {m_lbl}: {row[2]}")
+    else:
+        lines.append("  None on record")
+
+    lines += [
+        "",
+        "*DEPOSITS*",
+        f"  Held        : Rs.{int(held):,}",
+        f"  Maintenance : Rs.{int(maint_fee):,}",
+        f"  Refundable  : Rs.{int(refundable):,}",
+    ]
+
+    return "\n".join(lines)
 
 
 # ── Fallback ───────────────────────────────────────────────────────────────────

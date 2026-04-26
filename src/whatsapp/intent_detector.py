@@ -204,6 +204,9 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:bank\s+report|bank\s+statement\s+(?:report|summary|analysis|p&l)|statement\s+report|bank\s+p&l|bank\s+analysis|show\s+bank\s+(?:report|summary|expenses?|income)|analyze\s+bank|bank\s+expense\s+(?:report|summary|breakdown)|income\s+expense\s+report|p&l\s+(?:for|of|report)\b)", re.I), "BANK_REPORT", 0.94),
     # Complaint REGISTER with "report" verb — "report plumbing issue" = file complaint (before REPORT)
     (re.compile(r"^report\s+(?:plumbing|electrical|electric|water|fan|ac|air.?con|pest|toilet|door|window|lift|wifi|internet|issue|problem|complaint|broken|leak|not\s+working)", re.I), "COMPLAINT_REGISTER", 0.93),
+    # Dashboard summary — all 6 rows (occupancy, buildings, collection, status, notice, deposits)
+    # MUST come before REPORT which catches "summary"
+    (re.compile(r"(?:show\s+)?(?:full\s+)?dashboard(?:\s+(?:summary|overview|stats?))?|(?:all\s+)?(?:property|pg)\s+(?:overview|stats?|summary)|all\s+stats?\b|(?:show\s+)?(?:full|complete)\s+(?:overview|stats?)", re.I), "DASHBOARD_SUMMARY", 0.93),
     # Report — early catch for "occupancy report", "monthly report" before other patterns grab them
     (re.compile(r"(?:occupancy\s+report|\w+(?:\s+\w+)?\s+report\b|monthly\s+report)", re.I), "REPORT", 0.92),
     # Report — general

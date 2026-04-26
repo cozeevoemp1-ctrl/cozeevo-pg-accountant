@@ -2653,5 +2653,134 @@
         ]
       }
     ]
+  },
+  {
+    "id": "G101",
+    "name": "Dashboard — 'show dashboard' returns all 6 rows",
+    "category": "dashboard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "show dashboard",
+        "expected_intent": "DASHBOARD_SUMMARY",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "Dashboard",
+          "OCCUPANCY",
+          "BUILDINGS",
+          "COLLECTION",
+          "STATUS",
+          "NOTICE",
+          "DEPOSITS",
+          "Total beds",
+          "Held"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception",
+          "None"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "G102",
+    "name": "Dashboard — bare 'dashboard' also routes to DASHBOARD_SUMMARY",
+    "category": "dashboard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dashboard",
+        "expected_intent": "DASHBOARD_SUMMARY",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "OCCUPANCY",
+          "COLLECTION",
+          "DEPOSITS"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "G103",
+    "name": "Dashboard — 'all stats' also routes to DASHBOARD_SUMMARY",
+    "category": "dashboard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "all stats",
+        "expected_intent": "DASHBOARD_SUMMARY",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "OCCUPANCY",
+          "DEPOSITS"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "G104",
+    "name": "Dashboard — occupancy numbers are non-negative and total beds shown",
+    "category": "dashboard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "dashboard summary",
+        "expected_intent": "DASHBOARD_SUMMARY",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "Total beds",
+          "Occupied",
+          "Vacant tonight",
+          "THOR",
+          "HULK",
+          "Collected",
+          "Paid",
+          "Refundable"
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception",
+          "None",
+          "Error"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "G105",
+    "name": "Dashboard — deposit math shown (Held / Maintenance / Refundable)",
+    "category": "dashboard",
+    "turns": [
+      {
+        "role": "admin",
+        "input": "full dashboard",
+        "expected_intent": "DASHBOARD_SUMMARY",
+        "expected_state": "idle",
+        "reply_must_contain": [
+          "Held",
+          "Maintenance",
+          "Refundable",
+          "Rs."
+        ],
+        "reply_must_not_contain": [
+          "error",
+          "traceback",
+          "exception"
+        ]
+      }
+    ]
   }
 ]
