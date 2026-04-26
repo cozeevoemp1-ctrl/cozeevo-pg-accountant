@@ -3,6 +3,23 @@
 
 ---
 
+## 0. SOMEONE CAME TO PAY — START HERE
+
+> Pick any of these 3 ways to log rent:
+
+| Option | You Say | What Happens |
+|---|---|---|
+| **1. Check balance first** | **Raj balance** | Bot shows how much Raj owes → you decide how much to collect |
+|   | Then: **Raj paid 14000 cash** | Logs payment |
+| **2. Step-by-step** | **collect rent** | Bot asks *Who paid?* → you say *Raj* → bot shows balance → you enter amounts |
+| **3. One-shot** | **Raj paid 14000 cash** | Bot shows summary → *Confirm? Yes/No* → say *yes* |
+
+**Don't know the name exactly?** Say **Raj paid** and if multiple Rajs exist, the bot will show a numbered list — just reply with the number.
+
+**Cash + UPI split?** Say: **Raj paid 5000 cash 9000 upi**
+
+---
+
 ## 1. COLLECT RENT (Payment)
 
 | # | You Say (BLUE) | Bot Asks/Does (GREEN) |
