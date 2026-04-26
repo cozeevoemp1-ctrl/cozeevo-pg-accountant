@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import or_, select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1025,6 +1025,7 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
         calendar.monthrange(query_month.year, query_month.month)[1],
     )
 
+    # ── Monthly tenant dues ────────────────────────────────────────────────────
     result = await session.execute(
         select(Tenant.name, RentSchedule.rent_due, RentSchedule.status)
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
@@ -1040,7 +1041,42 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
     )
     rows = result.all()
 
-    if not rows:
+    # ── Daily-stay dues (computed on-the-fly) ─────────────────────────────────
+    _paid_sq = (
+        select(Payment.tenancy_id, func.sum(Payment.amount).label("total_paid"))
+        .group_by(Payment.tenancy_id)
+        .subquery()
+    )
+    dw_rows = (await session.execute(
+        select(
+            Tenant.name,
+            Tenancy.agreed_rent,
+            Tenancy.checkin_date,
+            Tenancy.checkout_date,
+            Tenancy.maintenance_fee,
+            func.coalesce(_paid_sq.c.total_paid, 0).label("total_paid"),
+        )
+        .join(Tenant, Tenant.id == Tenancy.tenant_id)
+        .outerjoin(_paid_sq, _paid_sq.c.tenancy_id == Tenancy.id)
+        .where(
+            Tenancy.stay_type == StayType.daily,
+            Tenancy.status == TenancyStatus.active,
+            Tenancy.checkin_date <= query_month_last,
+            or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > query_month),
+        )
+        .order_by(Tenant.name)
+    )).all()
+
+    dw_dues: list[tuple[str, Decimal]] = []
+    for dw_name, daily_rate, checkin, checkout, maint, paid in dw_rows:
+        end = checkout or today
+        num_days = max((end - checkin).days, 0)
+        owed = Decimal(str(daily_rate or 0)) * num_days + Decimal(str(maint or 0))
+        balance = owed - Decimal(str(paid or 0))
+        if balance > 0:
+            dw_dues.append((dw_name, balance))
+
+    if not rows and not dw_dues:
         return f"All tenants are paid up for {query_month.strftime('%B %Y')}!"
 
     lines = [f"*Pending dues — {query_month.strftime('%B %Y')}*\n"]
@@ -1053,6 +1089,14 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
         status_str = "Partial" if status == RentStatus.partial else "Pending"
         lines.append(f"• {name}: Rs.{int(rent_due or 0):,} ({status_str})")
         total += rent_due or Decimal("0")
+
+    if dw_dues:
+        if rows:
+            lines.append("")
+        lines.append("*Day-stays:*")
+        for dw_name, balance in dw_dues:
+            lines.append(f"• {dw_name} (day-stay): Rs.{int(balance):,}")
+            total += balance
 
     lines.append(f"\n*Total outstanding: Rs.{int(total):,}*")
     return "\n".join(lines)
