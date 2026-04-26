@@ -1474,42 +1474,67 @@ async def void_payment(
 
 # ── Day-wise stay Sheet writer ────────────────────────────────────────────────
 
+def _build_daywise_row(
+    room_number: str, tenant_name: str, phone: str, building: str,
+    sharing: str, daily_rate: float, num_days: int, booking_amount: float,
+    total_paid: float, maintenance: float, checkin: str, checkout: str,
+    status: str, notes: str, entered_by: str,
+) -> list:
+    """Build a MONTHLY_HEADERS-aligned row for a daily-stay tenant."""
+    rent_due = round(daily_rate * num_days + maintenance, 2)
+    balance = round(rent_due - total_paid, 2)
+    # MONTHLY_HEADERS order:
+    # Room|Name|Phone|Building|Sharing|Rent|Deposit|Rent Due|Cash|UPI|Total Paid|Balance|Status|Check-in|Notice Date|Event|Notes|Prev Due|Entered By
+    return [
+        room_number,                            # Room
+        tenant_name,                            # Name
+        f"'{phone}" if phone else "",           # Phone (prefix ' so Sheets treats as text)
+        building,                               # Building
+        sharing,                                # Sharing
+        daily_rate,                             # Rent (= daily rate)
+        booking_amount,                         # Deposit (= advance/booking)
+        rent_due,                               # Rent Due
+        total_paid,                             # Cash (total shown as cash; mode tracked in Payment)
+        0,                                      # UPI
+        total_paid,                             # Total Paid
+        balance,                                # Balance
+        status,                                 # Status
+        checkin,                                # Check-in
+        "",                                     # Notice Date
+        f"checkout: {checkout}" if checkout else "",  # Event
+        notes,                                  # Notes
+        "",                                     # Prev Due
+        entered_by,                             # Entered By
+    ]
+
+
 def _add_daywise_stay_sync(
-    room_number: str, guest_name: str, phone: str, checkin: str,
-    stay_period: str, num_days: int, daily_rate: float, booking_amount: float,
-    total: float, maintenance: float, sharing: str, status: str, comments: str,
+    room_number: str, tenant_name: str = "", phone: str = "", building: str = "",
+    sharing: str = "", daily_rate: float = 0, num_days: int = 0,
+    booking_amount: float = 0, total_paid: float = 0, maintenance: float = 0,
+    checkin: str = "", checkout: str = "", status: str = "ACTIVE",
+    notes: str = "", entered_by: str = "",
+    **_kwargs,   # swallow legacy keyword args gracefully
 ) -> dict:
-    """Add a row to the DAY WISE tab. Header-based mapping."""
+    """Append a day-wise stay row to DAY WISE tab using MONTHLY_HEADERS format."""
     result = {"success": False, "row": None, "error": None}
     try:
         ws = _get_worksheet_sync("DAY WISE")
         all_vals = ws.get_all_values()
-        # Headers at row 2
-        headers = [h.strip().lower() for h in all_vals[1]] if len(all_vals) > 1 else []
-        phone_txt = f"'{phone}" if phone else ""
-        field_map = {
-            "room": room_number,
-            "guest name": guest_name,
-            "phone": phone_txt,
-            "check-in": checkin,
-            "checkin": checkin,
-            "stay period": stay_period,
-            "days": num_days,
-            "daily rate": daily_rate,
-            "booking amt": booking_amount,
-            "booking amount": booking_amount,
-            "total": total,
-            "maintenance": maintenance,
-            "sharing": sharing,
-            "staff": "",
-            "status": status,
-            "comments": comments,
-            "source": "onboarding_form",
-        }
-        row = [""] * len(headers)
-        for i, h in enumerate(headers):
-            if h in field_map:
-                row[i] = field_map[h]
+
+        # Ensure header row exists at row 1
+        if not all_vals or [h.strip() for h in all_vals[0]] != MONTHLY_HEADERS:
+            ws.update(values=[MONTHLY_HEADERS], range_name="A1",
+                      value_input_option="USER_ENTERED")
+            all_vals = ws.get_all_values()
+
+        row = _build_daywise_row(
+            room_number=room_number, tenant_name=tenant_name, phone=phone,
+            building=building, sharing=sharing, daily_rate=daily_rate,
+            num_days=num_days, booking_amount=booking_amount, total_paid=total_paid,
+            maintenance=maintenance, checkin=checkin, checkout=checkout,
+            status=status, notes=notes, entered_by=entered_by,
+        )
         next_row = len(all_vals) + 1
         ws.update(values=[row], range_name=f"A{next_row}", value_input_option="USER_ENTERED")
         result["success"] = True
