@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.65.0] — 2026-04-26 — Delete HTML dashboard + fix daywise tenant balance display
+
+### Removed: HTML web dashboard
+- Deleted `src/dashboard/` module (cleanup.py, html_generator.py, __init__.py)
+- Deleted `src/api/dashboard_router.py` (561 lines)
+- Deleted `static/dashboard.html`
+- Removed all `main.py` wiring: cleanup scheduler, `/dashboards` static mount, `GET /dashboard` route, dashboard_router include, `/api/report/dashboard` endpoint, dashboard branch in token rotation
+- Removed stale test scripts that imported deleted module: `tests/diag_dues3.py`, `tests/test_dues_month_scope.py`
+- `src/reports/report_generator.py` cleaned up: removed `dashboard_dir`, `generate_dashboard()` method
+
+### Fixed: daywise tenant balance display (`_do_query_tenant_by_id`)
+- "Maharajan balance" now shows correct daywise view: `Rs.X/day`, days stayed, total owed, total paid, balance due, individual payment history
+- Previously showed broken data: `Rs.X/month`, "This month: No record" (because daywise tenants have no RentSchedule rows), and "All dues cleared!" (from empty outstanding calc)
+
+### Investigation: daywise tenant fallback in all handlers
+- All handler lookups (`_find_active_tenants_by_name`, `_find_active_tenants_by_room`) have **no `stay_type` filter** — daywise tenants are already found by every handler
+- COLLECT_RENT, CHECKOUT, UPDATE_RENT, VOID_PAYMENT, QUERY_RECEIPT all work correctly for daywise tenants (no fallback needed, single shared lookup returns both types)
+- `_query_dues` (who owes) already had separate daywise block — confirmed correct
+- 52/52 unit tests pass; daywise e2e 6/6 pass
+
+---
+
 ## [1.64.0] — 2026-04-26 — Staff KYC onboarding + daywise rent change e2e tests
 
 ### New: ADD_STAFF intent + KYC document upload
