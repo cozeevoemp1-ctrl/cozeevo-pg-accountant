@@ -69,12 +69,8 @@ async def main(period: date, partial_only: bool):
                         Tenancy.checkout_date >= period,
                         Tenancy.checkout_date <  next_period,
                     ),
-                    # no-shows whose check-in falls in this month
-                    and_(
-                        Tenancy.status == TenancyStatus.no_show,
-                        Tenancy.checkin_date >= period,
-                        Tenancy.checkin_date <  next_period,
-                    ),
+                    # all no-shows carry forward until receptionist checks them in
+                    Tenancy.status == TenancyStatus.no_show,
                     # any tenancy with rent schedule / payment this period
                     Tenancy.id.in_(tids_all) if tids_all else False,
                 )
@@ -139,10 +135,8 @@ async def main(period: date, partial_only: bool):
         for tenancy, tenant, room in rows:
             agreed = int(tenancy.agreed_rent or 0)
 
-            # ── No-show row (only for this month's check-in) ─────────────
+            # ── No-show row (carries forward until checked in) ───────────
             if tenancy.status == TenancyStatus.no_show:
-                if not (period <= tenancy.checkin_date < next_period):
-                    continue
                 bk_paid  = int(noshow_bk_map.get(tenancy.id, Decimal("0")))
                 deposit  = int(tenancy.security_deposit or 0)
                 due      = deposit + agreed          # total to pay to move in
