@@ -51,19 +51,24 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 
 ## Staff Rooms (excluded from revenue)
 
+> **Live source of truth:** `rooms.is_staff_room = True` in Supabase.
+> Run `show staff rooms` on bot for current state.
+> **Update this table + BRAIN.md** whenever a room is permanently added or removed as staff quarters.
+> Bot will remind you in the confirm reply when a room flag changes.
+
 | Room | Property | Beds | Notes |
 |---|---|---|---|
-| G05 | THOR | 3 | Staff quarters |
-| G06 | THOR | 2 | Staff quarters |
-| 107 | THOR | 2 | Staff quarters |
-| 108 | THOR | 2 | Staff quarters |
-| 701 | THOR | 1 | Staff quarters (floor 7) |
-| 702 | THOR | 1 | Staff quarters (floor 7) |
-| G12 | HULK | 3 | Staff quarters |
-| 114 | HULK | 2 | Staff quarters |
-| 618 | HULK | 2 | Staff quarters |
+| G05 | THOR | 3 | Staff quarters (permanent) |
+| G06 | THOR | 2 | Staff quarters (permanent) |
+| 107 | THOR | 2 | Staff quarters (permanent) |
+| 108 | THOR | 2 | Staff quarters (permanent) |
+| 701 | THOR | 1 | Staff quarters (permanent) |
+| 702 | THOR | 1 | Staff quarters (permanent) |
+| G12 | HULK | 3 | Staff quarters (permanent) |
+| 114 | HULK | 2 | Staff quarters (permanent) |
+| 618 | HULK | 2 | Staff quarters (permanent) |
 
-**Total staff rooms: 9** (THOR 6 + HULK 3)
+**Total staff rooms: 9** (THOR 6 + HULK 3) — verify with `show staff rooms`
 
 ---
 

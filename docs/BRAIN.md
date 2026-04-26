@@ -511,18 +511,22 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 
 > For detailed floor-by-floor room layouts, see `docs/MASTER_DATA.md`.
 
-### Staff Rooms (9 total — excluded from occupancy/revenue counts)
+### Staff Rooms (excluded from occupancy/revenue counts)
+
+> **Live source of truth:** `rooms.is_staff_room = True` in DB. Run `show staff rooms` on bot for current state.
+> Update this table and MASTER_DATA.md whenever a room is permanently added or removed as staff quarters.
+
 | Room | Property | Beds | Notes |
 |------|----------|------|-------|
-| G05  | THOR | 3 | Staff quarters |
-| G06  | THOR | 2 | Staff quarters |
-| 107  | THOR | 2 | Staff quarters |
-| 108  | THOR | 2 | Staff quarters |
-| 701  | THOR | 1 | Staff quarters (floor 7) |
-| 702  | THOR | 1 | Staff quarters (floor 7) |
-| G12  | HULK | 3 | Staff quarters |
-| 114  | HULK | 2 | Staff quarters |
-| 618  | HULK | 2 | Staff quarters |
+| G05  | THOR | 3 | Staff quarters (permanent) |
+| G06  | THOR | 2 | Staff quarters (permanent) |
+| 107  | THOR | 2 | Staff quarters (permanent) |
+| 108  | THOR | 2 | Staff quarters (permanent) |
+| 701  | THOR | 1 | Staff quarters (permanent) |
+| 702  | THOR | 1 | Staff quarters (permanent) |
+| G12  | HULK | 3 | Staff quarters (permanent) |
+| 114  | HULK | 2 | Staff quarters (permanent) |
+| 618  | HULK | 2 | Staff quarters (permanent) |
 
 ### Revenue Summary
 

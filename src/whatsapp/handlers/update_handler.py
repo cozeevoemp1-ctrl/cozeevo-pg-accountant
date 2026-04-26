@@ -982,10 +982,12 @@ async def _apply_staff_assignment(
             pass
 
     verb = "Added" if created else "Assigned"
+    note = ("\n\n_(Permanent change? Update MASTER_DATA.md + BRAIN.md "
+            "staff quarters table.)_") if room_flag_changed else ""
     return (f"{verb} *{staff.name}*"
             + (f" ({staff.role})" if staff.role else "")
             + f" to room *{room.room_number}*. Room is now a staff room "
-              "(excluded from availability).")
+              "(excluded from availability)." + note)
 
 
 async def exit_staff_from_room(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
@@ -1079,7 +1081,8 @@ async def _apply_staff_exit(staff, ctx: CallerContext, session: AsyncSession) ->
                 except Exception:
                     pass
                 msg_room_freed = (f"\nRoom *{room.room_number}* is now a revenue room "
-                                  "and will appear in available rooms.")
+                                  "and will appear in available rooms.\n"
+                                  "_(Update MASTER_DATA.md + BRAIN.md if this is permanent.)_")
             elif remaining is not None:
                 msg_room_freed = (f"\nRoom *{room.room_number}* still has other staff — "
                                   "kept as staff room.")
