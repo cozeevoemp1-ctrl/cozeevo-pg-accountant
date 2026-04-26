@@ -24,6 +24,35 @@ All notable changes to PG Accountant will be documented here.
 
 ---
 
+## [1.65.1] — 2026-04-26 — Day-wise sheet column parity, semantic refs, dues clearance
+
+### Fixed: "Could you clarify?" on basic payment commands
+- **Root cause**: `USE_PYDANTIC_AGENTS=true` on VPS + `AGENT_INTENTS` defaulting to `"CHECKOUT,PAYMENT_LOG"` → all payment messages routed to LangGraph agent which failed validation and returned "Could you clarify?" instead of logging the payment
+- **Fix**: Set `USE_PYDANTIC_AGENTS=false` on VPS. Agent work moved to `agent-dev` branch — must not run in production without explicit re-enable approval.
+
+### Fixed: day-wise rent change not syncing to sheet
+- **Root cause**: `owner_handler.py` day-wise rent confirm handler called `trigger_monthly_sheet_sync()` instead of `trigger_daywise_sheet_sync()`
+- **Fix**: One-line correction in `src/whatsapp/handlers/owner_handler.py`
+
+### Improved: `scripts/sync_daywise_from_db.py` — full column parity + semantic refs
+- **27 columns** now matching every field from the day-wise onboarding form + DB (was ~18, missing Building, Sharing, Checkout, Security Dep, Maintenance, all KYC fields)
+- **Inclusive day count**: `(checkout - checkin).days + 1` — Apr 10→Apr 30 = 21 days (was 20)
+- **Building**: eager-loaded via `selectinload(Room.property)`, strips "Cozeevo " prefix → THOR/HULK
+- **Semantic column refs**: `C = {h: i for i, h in enumerate(HEADERS)}` dict — replaces all `r[14]`-style magic indices. Enforced as project standard.
+- **Dict-based row build**: each row built as `{col_name: value}`, converted to ordered list via `HEADERS` at write time — column order can never drift
+- **`col_letter(n)`** helper: correct A/Z/AA/AB notation (fixes `chr(ord("A")+26)` → `"["` formatting bug for >26 columns)
+
+### New: `scripts/clear_daywise_dues.py`
+- One-time script to zero out outstanding balances for all exited day-wise tenancies
+- Inserts a `for_type=other` clearing payment (not classified as rent) with note "Balance write-off — dues received but not recorded"
+- Skips active tenancies and tenancies where balance ≤ 0
+- **Ran on 2026-04-26**: cleared 21 tenancies, Rs.1,70,050 total. Sheet shows Balance=0 for all exited stays.
+
+### Memory
+- `feedback_sheet_column_references.md` — standard: always `C["ColName"]` + `col_letter()`, never `r[index]` or `chr(ord("A")+n)`
+
+---
+
 ## [1.64.0] — 2026-04-26 — Staff KYC onboarding + daywise rent change e2e tests
 
 ### New: ADD_STAFF intent + KYC document upload
