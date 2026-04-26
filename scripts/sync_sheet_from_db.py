@@ -540,17 +540,34 @@ async def main(args):
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
         # Billing and collection
-        # Cash/UPI collected = all money received in April (active + exit tenants).
-        # Pending (Total Dues) = ACTIVE tenants only — no-show haven't checked in
-        # so their outstanding rent must NOT inflate the ops "pending" figure.
+        # Cash/UPI collected = all money received this period (active + exit tenants).
+        # Total Dues = active tenant balances + no-show balances whose checkin_date
+        # falls within this period (they should have arrived; outstanding is real).
         i_balance = H["balance"]
+        i_checkin = H["check-in"]
         exit_rows = [r for r in data_rows if r[i_event] == "EXIT"]
         collected_rows = active_rows + exit_rows
         total_prev_due = sum(pn(r[i_prev]) for r in active_rows)
         total_cash = sum(pn(r[i_cash]) for r in collected_rows)
         total_upi = sum(pn(r[i_upi]) for r in collected_rows)
         total_collected = total_cash + total_upi
-        total_dues = sum(max(0, int(pn(r[i_balance]))) for r in active_rows)
+
+        def _parse_checkin_dd_mm(s) -> "date | None":
+            try:
+                from datetime import datetime as _dt
+                return _dt.strptime(str(s).strip(), "%d/%m/%Y").date()
+            except (ValueError, AttributeError):
+                return None
+
+        # No-shows whose checkin is on or before period end count toward dues.
+        noshow_dues_rows = [
+            r for r in noshow_rows
+            if (cd := _parse_checkin_dd_mm(r[i_checkin])) is not None and cd < next_period
+        ]
+        total_dues = (
+            sum(max(0, int(pn(r[i_balance]))) for r in active_rows)
+            + sum(max(0, int(pn(r[i_balance]))) for r in noshow_dues_rows)
+        )
 
         paid_count = sum(1 for r in active_rows if r[i_status] == "PAID")
         partial_count = sum(1 for r in active_rows if r[i_status] == "PARTIAL")
