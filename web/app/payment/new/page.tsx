@@ -1,231 +1,317 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createPayment } from "@/lib/api";
-import type { PaymentIntent } from "@/lib/api";
-import { VoiceSheet } from "@/components/voice/voice-sheet";
-import { rupee } from "@/lib/format";
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { TenantSearch } from "@/components/forms/tenant-search"
+import { ConfirmationCard } from "@/components/forms/confirmation-card"
+import { Numpad } from "@/components/forms/numpad"
+import { VoiceSheet } from "@/components/voice/voice-sheet"
+import {
+  createPayment,
+  getTenantDues,
+  TenantSearchResult,
+  TenantDues,
+  PaymentIntent,
+} from "@/lib/api"
 
-type Method = "UPI" | "CASH" | "BANK" | "CARD" | "OTHER";
-type ForType = "rent" | "deposit" | "maintenance" | "booking" | "adjustment";
+type Method = "UPI" | "CASH" | "BANK" | "CARD" | "OTHER"
+type ForType = "rent" | "deposit" | "maintenance" | "booking" | "adjustment"
 
-interface FormState {
-  tenant_id: string;
-  tenant_name: string;
-  amount: string;
-  method: Method;
-  for_type: ForType;
-  period_month: string;
-  notes: string;
-}
+const METHODS: { value: Method; label: string; icon: string }[] = [
+  { value: "CASH", label: "Cash", icon: "💵" },
+  { value: "UPI", label: "UPI", icon: "📱" },
+  { value: "BANK", label: "Bank", icon: "🏦" },
+  { value: "OTHER", label: "Other", icon: "💳" },
+]
+
+const FOR_TYPES: { value: ForType; label: string }[] = [
+  { value: "rent", label: "Rent" },
+  { value: "deposit", label: "Deposit" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "booking", label: "Advance" },
+  { value: "adjustment", label: "Adjustment" },
+]
 
 function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
 }
 
 export default function NewPaymentPage() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const [showVoice, setShowVoice] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const router = useRouter()
 
-  const [form, setForm] = useState<FormState>({
-    tenant_id: "",
-    tenant_name: params.get("tenant_name") ?? "",
-    amount: params.get("amount") ?? "",
-    method: (params.get("method") as Method) ?? "CASH",
-    for_type: (params.get("for_type") as ForType) ?? "rent",
-    period_month: currentMonth(),
-    notes: "",
-  });
+  const [tenant, setTenant] = useState<TenantSearchResult | null>(null)
+  const [dues, setDues] = useState<TenantDues | null>(null)
+  const [amount, setAmount] = useState("")
+  const [method, setMethod] = useState<Method>("CASH")
+  const [forType, setForType] = useState<ForType>("rent")
+  const [periodMonth, setPeriodMonth] = useState(currentMonth())
+  const [notes, setNotes] = useState("")
 
-  function set(field: keyof FormState, value: string) {
-    setForm((f) => ({ ...f, [field]: value }));
-  }
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [showVoice, setShowVoice] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
+  const [voiceHint, setVoiceHint] = useState("")
 
-  function handleIntent(intent: PaymentIntent) {
-    setShowVoice(false);
-    setForm((f) => ({
-      ...f,
-      tenant_name: intent.tenant_name ?? f.tenant_name,
-      amount: intent.amount != null ? String(intent.amount) : f.amount,
-      method: (intent.method as Method) ?? f.method,
-      for_type: (intent.for_type as ForType) ?? f.for_type,
-    }));
-  }
-
-  async function handleSubmit() {
-    setError("");
-    const amt = parseInt(form.amount, 10);
-    if (!form.tenant_id || isNaN(amt) || amt <= 0) {
-      setError("Tenant ID and a valid amount are required.");
-      return;
+  async function handleTenantSelect(t: TenantSearchResult) {
+    setTenant(t)
+    setDues(null)
+    try {
+      const d = await getTenantDues(t.tenancy_id)
+      setDues(d)
+      if (!amount && d.dues > 0) setAmount(String(Math.round(d.dues)))
+    } catch {
+      // dues preview is best-effort
     }
-    setSubmitting(true);
+  }
+
+  function handleVoiceIntent(intent: PaymentIntent) {
+    setShowVoice(false)
+    if (intent.amount) setAmount(String(intent.amount))
+    if (intent.method) setMethod((intent.method.toUpperCase() as Method) ?? "CASH")
+    if (intent.for_type) setForType(intent.for_type as ForType)
+    if (intent.tenant_room) setVoiceHint(intent.tenant_room)
+    else if (intent.tenant_name) setVoiceHint(intent.tenant_name)
+  }
+
+  function handleReview() {
+    setError("")
+    if (!tenant) { setError("Select a tenant first"); return }
+    if (!amount || Number(amount) <= 0) { setError("Enter a valid amount"); return }
+    setShowConfirm(true)
+  }
+
+  async function handleConfirm() {
+    if (!tenant) return
+    setSubmitting(true)
+    setError("")
     try {
       await createPayment({
-        tenant_id: parseInt(form.tenant_id, 10),
-        amount: amt,
-        method: form.method,
-        for_type: form.for_type,
-        period_month: form.period_month,
-        notes: form.notes,
-      });
-      setSuccess(true);
-      setTimeout(() => router.replace("/"), 1500);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to log payment");
+        tenant_id: tenant.tenant_id,
+        amount: Number(amount),
+        method,
+        for_type: forType,
+        period_month: periodMonth,
+        notes: notes || undefined,
+      })
+      setShowConfirm(false)
+      setSuccess(true)
+    } catch (err) {
+      setShowConfirm(false)
+      setError(err instanceof Error ? err.message : "Payment failed. Try again.")
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
   }
+
+  const balanceAfter = dues ? dues.dues - Number(amount || 0) : null
 
   if (success) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen gap-3 px-6">
-        <div className="w-16 h-16 rounded-full bg-tile-green flex items-center justify-center text-3xl">
-          ✓
+      <main className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 gap-5">
+        <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
+        <div className="text-center">
+          <h1 className="text-xl font-extrabold text-ink">Payment Saved!</h1>
+          <p className="text-sm text-ink-muted mt-1">Synced to Supabase + Ops Sheet</p>
         </div>
-        <p className="text-lg font-bold text-status-paid">Payment logged!</p>
-        <p className="text-sm text-ink-muted">
-          {rupee(parseInt(form.amount, 10))} · {form.method}
-        </p>
+        {tenant && (
+          <div className="w-full max-w-sm bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-2">
+            <Row label="Tenant" value={tenant.name} />
+            <Row label="Room" value={`${tenant.room_number} · ${tenant.building_code}`} />
+            <Row label="Amount" value={`₹${Number(amount).toLocaleString("en-IN")}`} pink />
+            <Row label="Method" value={method} />
+            {dues && (
+              <Row
+                label="Balance"
+                value={balanceAfter !== null && balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${Math.max(0, balanceAfter ?? 0).toLocaleString("en-IN")} remaining`}
+              />
+            )}
+          </div>
+        )}
+        <div className="flex gap-3 w-full max-w-sm">
+          <button
+            onClick={() => { setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes("") }}
+            className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm"
+          >
+            + New
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="flex-1 rounded-pill bg-brand-pink py-3 text-white font-bold text-sm"
+          >
+            ← Home
+          </button>
+        </div>
       </main>
-    );
+    )
   }
 
   return (
-    <>
-      <main className="flex flex-col gap-4 px-4 pt-6 pb-24 max-w-lg mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="w-9 h-9 rounded-full bg-[#F0EDE9] flex items-center justify-center text-ink-muted"
-            aria-label="Back"
-          >
-            ←
-          </button>
-          <h1 className="text-lg font-extrabold text-ink">Log Payment</h1>
-          <button
-            onClick={() => setShowVoice(true)}
-            className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink/10 text-brand-pink text-xs font-semibold"
-          >
-            <span>🎤</span> Voice
-          </button>
+    <main className="min-h-screen bg-bg">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+        <button
+          onClick={() => router.back()}
+          className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
+          aria-label="Back"
+        >
+          ←
+        </button>
+        <h1 className="text-lg font-extrabold text-ink">Collect Payment</h1>
+        <button
+          onClick={() => setShowVoice(true)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink text-white text-xs font-bold shadow"
+          aria-label="Voice input"
+        >
+          🎙 Hey Kozzy
+        </button>
+      </div>
+
+      <div className="px-4 pt-4 pb-32 flex flex-col gap-4 max-w-lg mx-auto">
+        {/* Tenant search */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <TenantSearch
+            onSelect={handleTenantSelect}
+            defaultValue={voiceHint}
+            placeholder="Search by name, room, phone…"
+          />
         </div>
 
-        {/* Form */}
-        <div className="flex flex-col gap-3">
-          <Field label="Tenant ID *">
-            <input
-              type="number"
-              value={form.tenant_id}
-              onChange={(e) => set("tenant_id", e.target.value)}
-              placeholder="e.g. 42"
-              className={inputClass}
-            />
-          </Field>
-
-          {form.tenant_name && (
-            <p className="text-xs text-ink-muted -mt-1 px-1">
-              From voice: <span className="font-semibold text-ink">{form.tenant_name}</span>
-            </p>
-          )}
-
-          <Field label="Amount (₹) *">
-            <input
-              type="number"
-              value={form.amount}
-              onChange={(e) => set("amount", e.target.value)}
-              placeholder="8000"
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="Method">
-            <select
-              value={form.method}
-              onChange={(e) => set("method", e.target.value as Method)}
-              className={inputClass}
-            >
-              <option value="CASH">Cash</option>
-              <option value="UPI">UPI</option>
-              <option value="BANK">Bank Transfer</option>
-              <option value="CARD">Card</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </Field>
-
-          <Field label="For">
-            <select
-              value={form.for_type}
-              onChange={(e) => set("for_type", e.target.value as ForType)}
-              className={inputClass}
-            >
-              <option value="rent">Rent</option>
-              <option value="deposit">Deposit</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="booking">Booking Advance</option>
-              <option value="adjustment">Adjustment</option>
-            </select>
-          </Field>
-
-          <Field label="Month">
-            <input
-              type="month"
-              value={form.period_month}
-              onChange={(e) => set("period_month", e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="Notes">
-            <input
-              type="text"
-              value={form.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              placeholder="Optional"
-              className={inputClass}
-            />
-          </Field>
-        </div>
-
-        {error && (
-          <p className="text-xs text-status-warn text-center">{error}</p>
+        {/* Dues preview */}
+        {dues && (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex justify-between items-center">
+            <div>
+              <p className="text-xs text-ink-muted font-medium">Outstanding this month</p>
+              <p className={`text-lg font-extrabold mt-0.5 ${dues.dues > 0 ? "text-status-warn" : "text-status-paid"}`}>
+                {dues.dues > 0 ? `₹${dues.dues.toLocaleString("en-IN")} due` : "Fully paid ✓"}
+              </p>
+            </div>
+            {dues.last_payment_date && (
+              <div className="text-right">
+                <p className="text-xs text-ink-muted">Last paid</p>
+                <p className="text-xs font-semibold text-ink">₹{(dues.last_payment_amount ?? 0).toLocaleString("en-IN")}</p>
+              </div>
+            )}
+          </div>
         )}
 
+        {/* Numpad */}
+        <Numpad
+          value={amount}
+          onChange={setAmount}
+          suggestAmounts={dues && dues.dues > 0 ? [Math.round(dues.dues)] : []}
+        />
+
+        {/* Method pills */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
+          <div className="grid grid-cols-4 gap-2">
+            {METHODS.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setMethod(m.value)}
+                className={`rounded-tile py-2.5 text-center border-2 transition-colors ${
+                  method === m.value
+                    ? "border-brand-pink bg-tile-pink"
+                    : "border-[#E2DEDD] bg-bg"
+                }`}
+              >
+                <div className="text-lg">{m.icon}</div>
+                <div className={`text-[10px] font-bold mt-1 ${method === m.value ? "text-brand-pink" : "text-ink"}`}>{m.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* For type + period */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment For</p>
+          <div className="flex gap-2 flex-wrap">
+            {FOR_TYPES.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setForType(f.value)}
+                className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                  forType === f.value
+                    ? "bg-brand-pink text-white border-brand-pink"
+                    : "bg-bg text-ink border-[#E2DEDD]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2 items-center">
+            <label className="text-xs text-ink-muted font-medium whitespace-nowrap">Period</label>
+            <input
+              type="month"
+              value={periodMonth}
+              onChange={(e) => setPeriodMonth(e.target.value)}
+              className="flex-1 rounded-pill border border-[#E2DEDD] bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-brand-pink"
+            />
+          </div>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Note (optional)…"
+            className="mt-2 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
+          />
+        </div>
+
+        {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
+      </div>
+
+      {/* Sticky CTA */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-8 pt-3 bg-bg border-t border-[#F0EDE9]">
         <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full py-4 rounded-card bg-brand-pink text-white font-bold text-sm disabled:opacity-50 mt-2"
+          onClick={handleReview}
+          className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80"
         >
-          {submitting ? "Logging…" : "Log Payment"}
+          Review &amp; Confirm →
         </button>
-      </main>
+      </div>
+
+      {showConfirm && tenant && (
+        <ConfirmationCard
+          title="Record Payment"
+          fields={[
+            { label: "Tenant", value: `${tenant.name} · Room ${tenant.room_number}` },
+            { label: "Amount", value: `₹${Number(amount).toLocaleString("en-IN")}`, highlight: true },
+            { label: "Method", value: `${METHODS.find(m => m.value === method)?.icon} ${method}` },
+            { label: "For", value: FOR_TYPES.find(f => f.value === forType)?.label ?? forType },
+            { label: "Period", value: periodMonth },
+            ...(notes ? [{ label: "Note", value: notes }] : []),
+            ...(balanceAfter !== null ? [{
+              label: "Balance after",
+              value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${balanceAfter.toLocaleString("en-IN")} remaining`,
+            }] : []),
+          ]}
+          onConfirm={handleConfirm}
+          onEdit={() => setShowConfirm(false)}
+          loading={submitting}
+        />
+      )}
 
       {showVoice && (
         <VoiceSheet
           onClose={() => setShowVoice(false)}
-          onPaymentIntent={handleIntent}
+          onPaymentIntent={handleVoiceIntent}
         />
       )}
-    </>
-  );
+    </main>
+  )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, value, pink }: { label: string; value: string; pink?: boolean }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-semibold text-ink-muted">{label}</label>
-      {children}
+    <div className="flex justify-between py-1.5 border-b border-[#F5F5F5] last:border-none">
+      <span className="text-xs text-ink-muted">{label}</span>
+      <span className={`text-xs font-semibold ${pink ? "text-brand-pink text-sm font-extrabold" : "text-ink"}`}>{value}</span>
     </div>
-  );
+  )
 }
-
-const inputClass =
-  "w-full px-4 py-3 rounded-pill border border-[#E2DEDD] bg-surface text-sm text-ink outline-none focus:border-brand-pink transition-colors";
