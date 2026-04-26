@@ -135,6 +135,20 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 
 ---
 
+### DASHBOARD SUMMARY
+
+| Message | What it does |
+|---------|-------------|
+| **show dashboard** | All 6 rows: occupancy, buildings, collection, status, notice, deposits |
+| **dashboard** | Same |
+| **dashboard summary** | Same |
+| **all stats** | Same |
+| **full overview** | Same |
+| **show master data** | Live DB snapshot: staff rooms + revenue bed counts by building |
+| **master data summary** | Same |
+
+---
+
 ### REPORTS
 
 | Message | What it does |
