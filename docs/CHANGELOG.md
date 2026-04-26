@@ -2,6 +2,50 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.66.3] — 2026-04-26 — Sheet→DB reload: April 2026 + Day Wise
+
+### New script: `scripts/reload_from_sheet.py`
+Drop+reload April 2026 and Day Wise data in DB from Google Sheet (sheet = source of truth).
+- `reload_april()`: drops April rent RS + rent Payments, reloads from APRIL 2026 tab (cash+UPI, skips NO_SHOW, deduplicates RS per tenancy)
+- `reload_daywise()`: drops all `stay_type=daily` tenancies + payments, reloads from DAY WISE tab
+- RS status reconcile: after loading, marks each April RS `paid/partial/pending` based on payments (217 paid, 18 partial, 5 pending after April reload)
+- `resync_tenants_master()`: adds monthly tenants missing from TENANTS tab; deduplicates by phone+name to prevent re-adding across runs
+- Usage: `venv/Scripts/python scripts/reload_from_sheet.py` (dry run), `--write` to apply
+
+### Bugfixes
+- `scripts/import_april.py`: added `entered_by="excel_import"` to Tenancy (was None — untraceable)
+- `scripts/resync_missing_tenants_to_sheet.py`: filter `stay_type != daily` (daywise guests don't belong in TENANTS master)
+
+### Root cause: Navdaap missing from TENANTS
+`import_april.py --write` (no `--sheet` flag) wrote DB only; `sync_sheet_from_db.py` later wrote to April tab; TENANTS master never updated. Fixed by resync_tenants_master.
+
+### Pending balance: 3.27L (sheet) vs bot
+Sheet 3.27L = ALL balances including 18 NO_SHOW rows (booking advances). Excluding NO_SHOW = 3.09L. Bot counts active monthly tenants only — structural gap, not a bug.
+
+---
+
+## [1.66.2] — 2026-04-26 — Debug: Prashant onboarding session investigation
+
+### Investigation only — no code changed
+- Prashant (9080887810) onboarding session showed "Cancelled" — Kiran thought it was lost
+- Root cause: session created Apr 25 at 10:32 UTC with 2-hour expiry window (old bug, now fixed to 48h); link expired at 18:02 IST before Prashant filled it
+- Lokesh manually cancelled the expired session; then added Prashant via WhatsApp bot instead
+- Tenancy IS active: Prasanth.P, Room G09, ₹10,500/month, checked in Apr 25 — nothing lost
+- Missing KYC on Prashant's record: no ID proof type/number, no email, no selfie/signature, no agreement PDF (added via bot, not form)
+
+---
+
+## [1.66.1] — 2026-04-26 — Design session: OCR onboarding
+
+### Discussion only — no code changed
+- Explored onboarding via form OCR: receptionist WhatsApps photo of filled paper form → extract fields → pre-fill onboarding session
+- Recommendation: Claude Haiku vision (`claude-haiku-4-5`) via Anthropic API — best accuracy for structured form extraction
+- Alternative: Groq llama-4-scout (vision) — stays single-vendor but less reliable for key-value extraction
+- Bot commands for onboarding documented: `start onboarding for [Name]`, `onboarding status`, `approve onboarding [id]`
+- ADD_TENANT deprecation confirmed (2026-04-24); unified web form is the only path
+
+---
+
 ## [1.66.0] — 2026-04-26 — Master data audit: 291→294 beds + room corrections
 
 ### DB corrections (live)
