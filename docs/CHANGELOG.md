@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.63.2] — 2026-04-26 — Checkout form UX fixes + WhatsApp template for guaranteed delivery
+
+### Checkout form (`static/checkout_admin.html`)
+- **Refund mode no longer required when refund = 0** — validation skips if refund amount is zero
+- **Manual WhatsApp/copy link added** — after form submission, status box shows "Copy Link" + "Open WhatsApp" buttons as fallback; WhatsApp opens pre-filled with tenant phone + confirm link
+
+### WhatsApp delivery (`src/api/checkout_router.py`, `src/whatsapp/webhook_handler.py`)
+- **Root cause of silent failures**: checkout was sending free-form text via `_send_whatsapp`, silently dropped by Meta for users outside the 24h window
+- **Fix**: switched to `checkout_review` template (UTILITY, "Review & Confirm" URL button → `https://api.getkozzy.com/checkout/{token}`) — bypasses 24h window
+- **Fallback**: free-form text if template send fails
+- **`_send_whatsapp_template`** extended with `url_button_token` param for URL button templates
+- **`checkout_review` template** submitted to Meta (ID 1733208487500578, PENDING approval)
+
+---
+
 ## [1.63.1] — 2026-04-26 — Fix checkout/check-in form correction flow + testing SOP
 
 ### Bug fix: field revert in multi-step OCR form corrections
