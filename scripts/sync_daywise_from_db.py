@@ -34,6 +34,7 @@ if DATABASE_URL.startswith("postgresql://"):
 TAB_NAME = "DAY WISE"
 
 # Columns mirror every field from the day-wise onboarding form + DB
+# STANDARD: never reference columns by numeric index — always use C["Column Name"]
 HEADERS = [
     # Identity
     "Room", "Name", "Phone", "Building", "Sharing",
@@ -48,6 +49,22 @@ HEADERS = [
     # Admin
     "Notes", "Entered By",
 ]
+
+# Semantic column lookup: C["Balance"] == 14, C["Status"] == 15, etc.
+# Use this everywhere instead of magic numbers — immune to column reorder.
+C = {h: i for i, h in enumerate(HEADERS)}
+
+
+def col_letter(n: int) -> str:
+    """Convert 1-based column number to sheet letter notation (A, Z, AA, AB…)."""
+    s = ""
+    while n:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+
+LAST_COL = col_letter(len(HEADERS))  # "AA" for 27 columns
 
 
 async def main(args) -> None:
@@ -110,43 +127,45 @@ async def main(args) -> None:
             building  = prop_name.replace("Cozeevo ", "").strip()
             sharing   = str(t.sharing_type.value if t.sharing_type else "Day-Stay")
 
-            data_rows.append([
-                room.room_number if room else "",
-                tenant.name if tenant else "",
-                f"'{phone}" if phone else "",
-                building,
-                sharing,
-                # Financial
-                daily_rate,
-                num_days,
-                booking_amount,
-                security_dep,
-                maintenance,
-                rent_due,
-                round(cash_paid, 2),
-                round(upi_paid, 2),
-                total_paid,
-                balance,
-                # Status & dates
-                display_status,
-                checkin,
-                checkout,
-                # KYC
-                tenant.gender if tenant else "",
-                tenant.food_preference if tenant else "",
-                tenant.id_proof_type if tenant else "",
-                tenant.id_proof_number if tenant else "",
-                tenant.emergency_contact_name if tenant else "",
-                tenant.emergency_contact_phone if tenant else "",
-                tenant.email if tenant else "",
-                # Admin
-                t.notes or "",
-                t.entered_by or "",
-            ])
+            # Build row as dict keyed by column name — order is set by HEADERS at write time.
+            # Adding a new column = add to HEADERS + add key here. No index arithmetic needed.
+            row_dict = {
+                "Room":              room.room_number if room else "",
+                "Name":              tenant.name if tenant else "",
+                "Phone":             f"'{phone}" if phone else "",
+                "Building":          building,
+                "Sharing":           sharing,
+                "Rent/Day":          daily_rate,
+                "Days":              num_days,
+                "Booking Amt":       booking_amount,
+                "Security Dep":      security_dep,
+                "Maintenance":       maintenance,
+                "Rent Due":          rent_due,
+                "Cash":              round(cash_paid, 2),
+                "UPI":               round(upi_paid, 2),
+                "Total Paid":        total_paid,
+                "Balance":           balance,
+                "Status":            display_status,
+                "Check-in":          checkin,
+                "Checkout":          checkout,
+                "Gender":            tenant.gender if tenant else "",
+                "Food Pref":         tenant.food_preference if tenant else "",
+                "ID Type":           tenant.id_proof_type if tenant else "",
+                "ID Number":         tenant.id_proof_number if tenant else "",
+                "Emergency Contact": tenant.emergency_contact_name if tenant else "",
+                "Emergency Phone":   tenant.emergency_contact_phone if tenant else "",
+                "Email":             tenant.email if tenant else "",
+                "Notes":             t.notes or "",
+                "Entered By":        t.entered_by or "",
+            }
+            # Convert to ordered list following HEADERS — this is the only place positional order matters
+            data_rows.append([row_dict[h] for h in HEADERS])
 
-        # Balance column is index 14
-        exited_count          = sum(1 for r in data_rows if r[15] in ("EXIT", "EXITED"))
-        total_pending_balance = sum(float(r[14] or 0) for r in data_rows if float(r[14] or 0) > 0)
+        # Use C["ColumnName"] for all summary lookups — never magic numbers
+        exited_count          = sum(1 for r in data_rows if r[C["Status"]] in ("EXIT", "EXITED"))
+        total_pending_balance = sum(
+            float(r[C["Balance"]] or 0) for r in data_rows if float(r[C["Balance"]] or 0) > 0
+        )
 
         print(f"  Active today: {active_count} | Total revenue: Rs.{int(total_revenue):,} | Exits: {exited_count}")
 
@@ -184,14 +203,13 @@ async def main(args) -> None:
         if all_rows:
             ws.update(values=all_rows, range_name="A1", value_input_option="USER_ENTERED")
 
-        last_col = chr(ord("A") + ncols - 1)
         try:
-            ws.format(f"A1:{last_col}1", {
+            ws.format(f"A1:{LAST_COL}1", {
                 "textFormat": {"bold": True, "fontSize": 12,
                                "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                 "backgroundColor": {"red": 0.12, "green": 0.18, "blue": 0.35},
             })
-            ws.format(f"A2:{last_col}2", {
+            ws.format(f"A2:{LAST_COL}2", {
                 "textFormat": {"bold": True,
                                "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
                 "backgroundColor": {"red": 0.20, "green": 0.24, "blue": 0.40},
