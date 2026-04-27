@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.2] — 2026-04-27 — Daywise checkout fix + production deploy
+
+### Daywise checkout routing (`src/whatsapp/handlers/owner_handler.py`)
+- `resolve_pending_action`: routes `record_type=daywise_stays` to new `_do_checkout_daywise` (was falling through to monthly checklist)
+- `_do_checkout`: triggers `trigger_daywise_sheet_sync` for `stay_type=daily` tenancies instead of calling monthly `record_checkout`
+- New `_do_checkout_daywise`: marks `daywise_stays.status=EXIT`, commits, triggers DAY WISE sheet sync
+
+### Production deploy
+- Merged `feature/pwa-forms-rent-collection` → `master` (66 files, ~8700 insertions)
+- VPS restarted — `api.getkozzy.com/healthz` confirmed `{"status":"ok"}`
+- Vercel auto-deploy triggered for `app.getkozzy.com`
+
+---
+
 ## [1.73.1] — 2026-04-27 — Backup cleanup + pull-to-refresh + checkin sheet sync
 
 ### Backup table dropped
