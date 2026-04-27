@@ -614,7 +614,7 @@ async def get_staff_signature(phone: str, request: Request):
     """Return saved staff signature as base64 PNG, or 404 if not saved yet."""
     _check_admin_pin(request)
     import base64
-    from services import storage as _storage
+    from src.services import storage as _storage
     try:
         data = await _storage.download(_storage.BUCKET_KYC, f"staff-signatures/{phone.strip()}.png")
         return {"data_url": f"data:image/png;base64,{base64.b64encode(data).decode()}"}
@@ -631,7 +631,7 @@ async def save_staff_signature(phone: str, request: Request):
     if not data_url or "base64," not in data_url:
         raise HTTPException(400, "data_url required (base64 PNG)")
     import base64
-    from services import storage as _storage
+    from src.services import storage as _storage
     raw = base64.b64decode(data_url.split("base64,", 1)[1])
     await _storage.upload(_storage.BUCKET_KYC, f"staff-signatures/{phone.strip()}.png", raw, "image/png")
     return {"status": "saved", "phone": phone}
@@ -904,7 +904,7 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
         # Upload files to Supabase Storage
         import base64 as b64mod
         import logging as _logging
-        from services import storage as _storage
+        from src.services import storage as _storage
         _log = _logging.getLogger(__name__)
         token_short = obs.token[:8]
         saved_files = {}
@@ -1362,7 +1362,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         if req and req.staff_signature and "base64," in req.staff_signature:
             try:
                 import base64 as b64mod
-                from services import storage as _storage
+                from src.services import storage as _storage
                 _, sig_b64 = req.staff_signature.split("base64,", 1)
                 path = f"onboarding/{obs.token[:8]}/staff_signature.png"
                 await _storage.upload(_storage.BUCKET_KYC, path, b64mod.b64decode(sig_b64), "image/png")
