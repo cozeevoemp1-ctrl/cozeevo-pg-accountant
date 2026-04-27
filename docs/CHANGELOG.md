@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.0] — 2026-04-27 — Day-wise dedup guardrails + TENANTS master tab sync
+
+### Day-wise tenants no longer bleed into monthly tabs (`scripts/sync_sheet_from_db.py`)
+- Added `Tenancy.stay_type != StayType.daily` filter to the monthly-tab query
+- Previously any bot operation (payment, rent change) triggered `sync_sheet_from_db.py` which regenerated all monthly tabs — day-wise tenants appeared there too
+
+### Day-wise approval now writes to TENANTS master tab (`src/api/onboarding_router.py`)
+- After day-wise guest is approved + DAY WISE tab written, also calls `add_tenant(tenants_only=True, ...)` with full KYC fields
+- TENANTS tab is master data — all tenants (daily and monthly) must appear there
+
+### `add_tenant` / `_add_tenant_sync` — new `tenants_only` flag (`src/integrations/gsheets.py`)
+- Pass `tenants_only=True` to write only to TENANTS master tab, skipping the monthly tab write
+- Early return placed correctly inside the flag check — monthly-tab failure still returns `success=False` for monthly tenants
+
+### ADD_TENANT bot flow disabled (`src/whatsapp/handlers/owner_handler.py`)
+- `_add_tenant_prompt` now immediately returns redirect to `app.getkozzy.com/onboarding`
+- Eliminates duplicate-creation risk (Praveen Kumar incident: bot used 11 min after form approval)
+- Old form-parsing code left as dead code for reference
+
+---
+
 ## [1.72.0] — 2026-04-27 — Data integrity: historical payments freeze + March gap fixed + deposits KPI corrected
 
 ### DB-level freeze trigger (`payments_freeze`)
