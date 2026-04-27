@@ -10,6 +10,7 @@ from src.api.v2.auth_hooks import router as auth_hooks_router
 from src.api.v2.checkin import router as checkin_router
 from src.api.v2.kpi import activity_router, router as kpi_router
 from src.api.v2.payments import router as payments_router
+from src.api.v2.reminders import router as reminders_router
 from src.api.v2.reporting import router as reporting_router
 from src.api.v2.tenants import router as tenants_router
 from src.api.v2.voice import router as voice_router
@@ -25,6 +26,7 @@ router.include_router(payments_router)
 router.include_router(reporting_router)
 router.include_router(tenants_router)
 router.include_router(voice_router)
+router.include_router(reminders_router)
 
 
 @router.get("/health")

@@ -15,6 +15,7 @@ from src.database.models import (
     Payment,
     PaymentFor,
     Property,
+    RentRevision,
     RentSchedule,
     Room,
     Tenancy,
@@ -29,6 +30,68 @@ router = APIRouter()
 def _building_code(property_name: str) -> str:
     """Extract building code from property name, e.g. 'Cozeevo THOR' → 'THOR'."""
     return property_name.split()[-1] if property_name else ""
+
+
+@router.get("/tenants/list")
+async def list_tenants(_user: AppUser = Depends(get_current_user)):
+    """All active/no_show tenants with current month dues for the Manage hub."""
+    today = date.today()
+    period = date(today.year, today.month, 1)
+    next_m = today.month % 12 + 1
+    next_y = today.year + (1 if today.month == 12 else 0)
+    period_end = date(next_y, next_m, 1)
+
+    async with get_session() as session:
+        paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
+            .where(
+                Payment.is_void == False,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
+                    and_(
+                        Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                        Payment.period_month == None,
+                        Payment.payment_date >= period,
+                        Payment.payment_date < period_end,
+                    ),
+                ),
+            )
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
+        rows = (await session.execute(
+            select(Tenancy, Tenant, Room, Property,
+                   RentSchedule.rent_due, RentSchedule.adjustment,
+                   func.coalesce(paid_subq.c.paid, 0).label("paid"))
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Tenancy.room_id == Room.id)
+            .join(Property, Room.property_id == Property.id)
+            .outerjoin(RentSchedule, and_(
+                RentSchedule.tenancy_id == Tenancy.id,
+                RentSchedule.period_month == period,
+            ))
+            .outerjoin(paid_subq, paid_subq.c.tenancy_id == Tenancy.id)
+            .where(Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
+            .order_by(Room.room_number)
+        )).all()
+
+    result = []
+    for tenancy, tenant, room, prop, rent_due, adjustment, paid in rows:
+        rd = float(rent_due or tenancy.agreed_rent or 0)
+        adj = float(adjustment or 0)
+        dues = max(rd + adj - float(paid), 0.0)
+        result.append({
+            "tenancy_id": tenancy.id,
+            "tenant_id": tenant.id,
+            "name": tenant.name,
+            "phone": tenant.phone,
+            "room_number": room.room_number,
+            "building_code": _building_code(prop.name),
+            "rent": float(tenancy.agreed_rent or 0),
+            "dues": dues,
+            "status": tenancy.status.value,
+        })
+    return result
 
 
 @router.get("/tenants/search")
@@ -170,4 +233,87 @@ async def get_tenant_dues(
         "last_payment_date": last_payment.payment_date.isoformat() if last_payment else None,
         "last_payment_amount": float(last_payment.amount) if last_payment else None,
         "period_month": period_month.strftime("%Y-%m"),
+    }
+
+
+@router.patch("/tenants/{tenancy_id}")
+async def update_tenant(
+    tenancy_id: int,
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    async with get_session() as session:
+        row = await session.execute(
+            select(Tenancy, Tenant)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .where(Tenancy.id == tenancy_id)
+        )
+        result = row.first()
+
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Tenancy {tenancy_id} not found")
+
+    tenancy, tenant = result
+
+    async with get_session() as session:
+        # Re-fetch within the write session so SQLAlchemy tracks changes
+        row2 = await session.execute(
+            select(Tenancy, Tenant)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .where(Tenancy.id == tenancy_id)
+        )
+        tenancy, tenant = row2.first()
+
+        # RentRevision if agreed_rent changes
+        if "agreed_rent" in body:
+            new_rent = body["agreed_rent"]
+            current_rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
+            if float(new_rent) != current_rent:
+                revision = RentRevision(
+                    tenancy_id=tenancy_id,
+                    old_rent=current_rent,
+                    new_rent=new_rent,
+                    effective_date=date.today(),
+                    changed_by=user.user_id or "pwa",
+                    reason=body.get("rent_change_reason", ""),
+                    org_id=tenancy.org_id,
+                )
+                session.add(revision)
+
+        # Tenant fields
+        if "name" in body:
+            tenant.name = body["name"]
+        if "phone" in body:
+            tenant.phone = body["phone"]
+        if "email" in body:
+            tenant.email = body["email"]
+        if "tenant_notes" in body:
+            tenant.notes = body["tenant_notes"]
+
+        # Tenancy fields
+        if "agreed_rent" in body:
+            tenancy.agreed_rent = body["agreed_rent"]
+        if "security_deposit" in body:
+            tenancy.security_deposit = body["security_deposit"]
+        if "expected_checkout" in body:
+            tenancy.expected_checkout = body["expected_checkout"]
+        if "tenancy_notes" in body:
+            tenancy.notes = body["tenancy_notes"]
+
+        session.add(tenancy)
+        session.add(tenant)
+        await session.commit()
+        await session.refresh(tenancy)
+        await session.refresh(tenant)
+
+    return {
+        "tenancy_id": tenancy.id,
+        "tenant_id": tenant.id,
+        "name": tenant.name,
+        "phone": tenant.phone,
+        "email": tenant.email,
+        "agreed_rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
+        "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
+        "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
+        "notes": tenancy.notes,
     }

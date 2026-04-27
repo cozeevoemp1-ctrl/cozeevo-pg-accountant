@@ -3,9 +3,17 @@
 import { usePathname } from "next/navigation";
 import { HomeTabBar } from "./home-tab-bar";
 
-/** Renders the persistent nav on all pages except /login and /onboarding (public forms). */
+// Nav is hidden on focused form/action pages — they have their own header + back button.
+// /tenants (hub list) keeps nav; /tenants/[id]/edit does not.
+function hideNav(pathname: string): boolean {
+  if (pathname === "/login") return true;
+  if (["/onboarding", "/payment/", "/checkin/", "/reminders/"].some((p) => pathname.startsWith(p))) return true;
+  if (/^\/tenants\/\d+/.test(pathname)) return true;
+  return false;
+}
+
 export function NavWrapper() {
   const pathname = usePathname();
-  if (pathname === "/login" || pathname.startsWith("/onboarding")) return null;
+  if (hideNav(pathname)) return null;
   return <HomeTabBar />;
 }

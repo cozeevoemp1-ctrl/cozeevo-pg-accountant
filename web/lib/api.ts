@@ -234,3 +234,84 @@ export function getCheckinPreview(tenancyId: number, actualDate: string): Promis
 export function recordCheckin(body: CheckinCreate): Promise<CheckinResponse> {
   return _post<CheckinResponse>("/api/v2/app/checkin", body);
 }
+
+// ── Tenant list + patch ──────────────────────────────────────────────────────
+
+export interface TenantListItem {
+  tenancy_id: number;
+  tenant_id: number;
+  name: string;
+  phone: string;
+  room_number: string;
+  building_code: string;
+  rent: number;
+  dues: number;
+  status: string;
+}
+
+export interface PatchTenantBody {
+  name?: string;
+  phone?: string;
+  email?: string;
+  tenant_notes?: string;
+  agreed_rent?: number;
+  security_deposit?: number;
+  expected_checkout?: string;
+  tenancy_notes?: string;
+  rent_change_reason?: string;
+}
+
+export interface PatchTenantResponse {
+  tenancy_id: number;
+  tenant_id: number;
+  name: string;
+  phone: string;
+  email: string | null;
+  agreed_rent: number;
+  security_deposit: number;
+  expected_checkout: string | null;
+  notes: string | null;
+}
+
+async function _patch<T>(path: string, body: unknown): Promise<T> {
+  const headers = { ...(await _authHeaders()), "Content-Type": "application/json" };
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `PATCH ${path} → ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export function getTenantsList(): Promise<TenantListItem[]> {
+  return _get<TenantListItem[]>("/api/v2/app/tenants/list");
+}
+
+export function patchTenant(tenancyId: number, body: PatchTenantBody): Promise<PatchTenantResponse> {
+  return _patch<PatchTenantResponse>(`/api/v2/app/tenants/${tenancyId}`, body);
+}
+
+// ── Reminders ────────────────────────────────────────────────────────────────
+
+export interface OverdueTenant {
+  tenancy_id: number;
+  tenant_id: number;
+  name: string;
+  phone: string;
+  room: string;
+  dues: number;
+  reminder_count: number;
+  last_reminded_at: string | null;
+}
+
+export function getOverdueTenants(): Promise<OverdueTenant[]> {
+  return _get<OverdueTenant[]>("/api/v2/app/reminders/overdue");
+}
+
+export function sendReminder(body: { tenancy_id?: number; send_all?: boolean }): Promise<{ sent: number[]; failed: number[] }> {
+  return _post<{ sent: number[]; failed: number[] }>("/api/v2/app/reminders/send", body);
+}

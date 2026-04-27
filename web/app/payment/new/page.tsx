@@ -173,7 +173,7 @@ export default function NewPaymentPage() {
         </button>
       </div>
 
-      <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
+      <div className="px-4 pt-4 pb-32 flex flex-col gap-4 max-w-lg mx-auto">
         {/* Tenant search */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <TenantSearch
@@ -271,8 +271,8 @@ export default function NewPaymentPage() {
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
       </div>
 
-      {/* Sticky CTA — sits above the floating nav pill (~80px) */}
-      <div className="fixed bottom-[80px] left-0 right-0 px-4 pb-2 pt-3 bg-bg border-t border-[#F0EDE9]">
+      {/* Sticky CTA */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-8 pt-3 bg-bg border-t border-[#F0EDE9]">
         <button
           onClick={handleReview}
           className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80"

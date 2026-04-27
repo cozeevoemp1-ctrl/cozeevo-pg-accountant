@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { TabBar } from "@/components/ui/tab-bar";
 import { VoiceSheet } from "@/components/voice/voice-sheet";
@@ -10,6 +10,14 @@ export function HomeTabBar() {
   const router = useRouter();
   const pathname = usePathname();
   const [voiceOpen, setVoiceOpen] = useState(false);
+
+  useEffect(() => {
+    router.prefetch("/");
+    router.prefetch("/payment/new");
+    router.prefetch("/collection/breakdown");
+    router.prefetch("/tenants");
+    router.prefetch("/reminders");
+  }, [router]);
 
   function handleIntent(intent: PaymentIntent) {
     setVoiceOpen(false);
