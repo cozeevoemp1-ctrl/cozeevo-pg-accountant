@@ -2808,6 +2808,20 @@ async def resolve_pending_action(
         except ValueError:
             checkout_date_val = date.today()
 
+        # ── daywise_stays record (historical import) ──────────────────────
+        if chosen.get("record_type") == "daywise_stays":
+            return await _do_checkout_daywise(chosen["stay_id"], session)
+
+        # ── tenancy day-wise (bot-added, stay_type=daily) ──────────────────
+        tenancy_check = await session.get(Tenancy, chosen["tenancy_id"])
+        if tenancy_check and tenancy_check.stay_type == StayType.daily:
+            return await _do_checkout(
+                tenancy_id=chosen["tenancy_id"],
+                tenant_name=chosen["label"],
+                checkout_date_val=checkout_date_val,
+                session=session,
+            )
+
         if checkout_date_val > date.today():
             # Future date → schedule only, no checklist yet
             return await _do_checkout(
@@ -2817,7 +2831,7 @@ async def resolve_pending_action(
                 session=session,
             )
 
-        # Today/past → start checklist
+        # Today/past → start checklist (monthly tenants only)
         new_action = {
             "step": "ask_cupboard_key",
             "tenancy_id": chosen["tenancy_id"],
@@ -4176,6 +4190,27 @@ async def _checkout_prompt(entities: dict, ctx: CallerContext, session: AsyncSes
         search_term = f"Room {room}"
 
     if len(rows) == 0:
+        # Fallback: search daywise_stays
+        from src.whatsapp.handlers._shared import _find_daywise_by_name, _find_daywise_by_room, _make_daywise_choices
+        dw_rows = await _find_daywise_by_name(name, session) if name else []
+        if not dw_rows and room:
+            dw_rows = await _find_daywise_by_room(room, session)
+        if dw_rows:
+            choices = _make_daywise_choices(dw_rows)
+            intent_type = "SCHEDULE_CHECKOUT" if is_future_checkout else "CHECKOUT"
+            action_data = {"name_raw": search_term, "checkout_date": date_str}
+            await _save_pending(ctx.phone, intent_type, action_data, choices, session, state="awaiting_choice")
+            if len(dw_rows) == 1:
+                ds = dw_rows[0]
+                checkin_str = ds.checkin_date.strftime("%d %b %Y") if ds.checkin_date else "?"
+                date_line = f"\nCheckout date: {checkout_date_val.strftime('%d %b %Y')}" if checkout_date_val else ""
+                return (
+                    f"Confirm checkout for *{ds.guest_name}* (Room {ds.room_number})?\n\n"
+                    f"Checkin: {checkin_str}{date_line}\n\n"
+                    f"Reply *1* to confirm."
+                )
+            label = f"checkout on {checkout_date_val.strftime('%d %b %Y')}" if checkout_date_val else "checkout"
+            return _format_choices_message(search_term, choices, label)
         suggestions = await _find_similar_names(name, session) if name else []
         return _format_no_match_message(name or room, suggestions)
 
@@ -4305,7 +4340,16 @@ async def _do_checkout(
     # ── Google Sheets write-back (fire-and-forget) ──
     gsheets_note = ""
     room_obj = await session.get(Room, tenancy.room_id) if tenancy.room_id else None
-    if room_obj:
+    is_daywise_stay = tenancy.stay_type == StayType.daily
+    if is_daywise_stay:
+        try:
+            from src.integrations import gsheets as _gs
+            _gs.trigger_daywise_sheet_sync()
+            gsheets_note = "\nSheet updated: DAY WISE"
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).warning("trigger_daywise_sheet_sync failed: %s", e)
+    elif room_obj:
         try:
             from src.integrations.gsheets import record_checkout as gsheets_checkout
             notice_str = tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None
@@ -4396,6 +4440,25 @@ async def _do_checkout(
         "1. Collect room keys\n"
         "2. Process deposit refund → *refund [amount] to [Name]*"
         f"{gsheets_note}"
+    )
+
+
+async def _do_checkout_daywise(stay_id: int, session: AsyncSession) -> str:
+    """Mark a daywise_stays record as EXIT."""
+    from src.database.models import DaywiseStay
+    ds = await session.get(DaywiseStay, stay_id)
+    if not ds:
+        return "Day-stay record not found."
+    ds.status = "EXIT"
+    await session.commit()
+    from src.integrations import gsheets as _gs
+    _gs.trigger_daywise_sheet_sync()
+    checkout_str = ds.checkout_date.strftime("%d %b %Y") if ds.checkout_date else "not set"
+    return (
+        f"*Checkout recorded — {ds.guest_name}*\n"
+        f"Room: {ds.room_number}\n"
+        f"Date: {checkout_str}\n\n"
+        "Sheet updated: DAY WISE"
     )
 
 

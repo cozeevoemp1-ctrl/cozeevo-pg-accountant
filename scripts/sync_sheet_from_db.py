@@ -576,6 +576,20 @@ async def main(args):
                 DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
             )
         )).scalar() or 0
+        # New-style daily stays use Tenancy.stay_type=daily (onboarding form).
+        # These are excluded from the monthly tab rows but still occupy beds tonight.
+        daywise_beds += (await session.execute(
+            select(func.count()).select_from(Tenancy)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Room.is_staff_room == False,
+                Room.room_number != "UNASSIGNED",
+                Tenancy.stay_type == StayType.daily,
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.checkin_date <= date.today(),
+                or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > date.today()),
+            )
+        )).scalar() or 0
 
         # Two distinct vacancy views:
         #  - vacant_tonight  = beds physically empty TONIGHT (day-stay eligible).
