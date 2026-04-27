@@ -149,6 +149,7 @@ async def find_occupants(
         select(Tenant, Tenancy, Room)
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(Room, Room.id == Tenancy.room_id)
+        .where(Tenancy.stay_type == StayType.monthly)
     )
     if active_only:
         q = q.where(Tenancy.status == TenancyStatus.active)
