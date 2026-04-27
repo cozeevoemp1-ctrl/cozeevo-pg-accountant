@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.4] — 2026-04-27 — Day-wise handler parity (all bot flows cover daywise_stays)
+
+### Day-wise guest parity — every handler now covers both data stores
+- **`src/services/occupants.py`**: Added `stay_type == monthly` filter to first query in `find_occupants` — was returning day-stay tenancies twice (once as `kind=tenancy`, once as `kind=daystay`)
+- **`src/whatsapp/handlers/_shared.py`**: Added `_find_daywise_by_name`, `_find_daywise_by_room`, `_make_daywise_choices` — fallback search helpers for historical `daywise_stays` records (Excel-imported, no FK to Tenant)
+- **`src/whatsapp/handlers/owner_handler.py`**:
+  - `_checkout_prompt` / `_update_checkout_date` / `_update_checkin` prompt functions: all fall back to `daywise_stays` when no monthly tenancy matches by name or room
+  - `_do_checkout`: branches on `stay_type == daily` — calls `trigger_daywise_sheet_sync` then early-returns (skips settlement/WhatsApp template which don't apply)
+  - New `_do_checkout_daywise(stay_id, checkout_date)`: sets `status=EXIT` + `checkout_date`, commits, syncs DAY WISE sheet
+  - `_do_update_checkout_date` / new `_do_update_daywise_checkout_date`: validates date, updates `checkout_date` + `num_days`, commits, syncs
+  - `_do_update_checkin` / new `_do_update_daywise_checkin`: same pattern for checkin date
+  - Pending CHECKOUT / UPDATE_CHECKOUT_DATE / UPDATE_CHECKIN handlers: route `record_type=daywise_stays` choices to the new `_do_*_daywise` functions
+  - `_query_checkins` / `_query_checkouts`: now query `daywise_stays` for same month window, merge-sort entries by date descending, label day-stay rows with `(day-stay)`; day-stay tenancies also get `(day-stay)` label
+- **`src/whatsapp/intent_detector.py`**: Extended `UPDATE_CHECKOUT_DATE` regex — added `(?:update|correct|change|modify)\s+room\s+[\w-]+\s+check.?out` so "change room 218 checkout date" routes correctly
+- **Golden test**: 76/105 pass; 29 pre-existing failures (none related to day-wise changes)
+
+---
+
 ## [1.73.3] — 2026-04-27 — Vacant count sync + Sanskar cleanup + dues investigation
 
 ### Vacant beds — sheet and PWA now agree at 28
