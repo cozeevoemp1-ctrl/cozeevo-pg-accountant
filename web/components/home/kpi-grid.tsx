@@ -11,6 +11,40 @@ interface KpiGridProps {
 }
 
 type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | null;
+type RentRange = "all" | "lt12" | "12to15" | "15to20" | "gt20";
+type GenderFilter = "all" | "male" | "female" | "empty";
+
+const RENT_RANGES: { value: RentRange; label: string }[] = [
+  { value: "all", label: "All rents" },
+  { value: "lt12", label: "< ₹12k" },
+  { value: "12to15", label: "₹12k–15k" },
+  { value: "15to20", label: "₹15k–20k" },
+  { value: "gt20", label: "> ₹20k" },
+];
+
+const GENDER_FILTERS: { value: GenderFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "empty", label: "Empty" },
+];
+
+function inRentRange(rent: number | undefined, range: RentRange): boolean {
+  if (range === "all" || rent === undefined) return true;
+  if (range === "lt12") return rent < 12000;
+  if (range === "12to15") return rent >= 12000 && rent < 15000;
+  if (range === "15to20") return rent >= 15000 && rent < 20000;
+  if (range === "gt20") return rent >= 20000;
+  return true;
+}
+
+function matchesGender(gender: string | undefined, filter: GenderFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "empty") return gender === "empty";
+  if (filter === "male") return gender === "male";
+  if (filter === "female") return gender === "female";
+  return true;
+}
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -62,21 +96,41 @@ export function KpiGrid({ data }: KpiGridProps) {
   const [open, setOpen] = useState<TileKey>(null);
   const [items, setItems] = useState<KpiDetailItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+
+  // Occupied filters
+  const [nameSearch, setNameSearch] = useState("");
+  const [rentRange, setRentRange] = useState<RentRange>("all");
+
+  // Vacant filters
+  const [roomSearch, setRoomSearch] = useState("");
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
+
+  // Tenant detail
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
   async function toggle(key: TileKey) {
-    if (open === key) { setOpen(null); setSearch(""); setSelected(null); return; }
+    if (open === key) {
+      setOpen(null);
+      resetFilters();
+      return;
+    }
     setOpen(key);
-    setSearch("");
-    setSelected(null);
+    resetFilters();
     setLoading(true);
     try {
       const res = await getKpiDetail(key!);
       setItems(res.items);
     } catch { setItems([]); }
     setLoading(false);
+  }
+
+  function resetFilters() {
+    setNameSearch("");
+    setRentRange("all");
+    setRoomSearch("");
+    setGenderFilter("all");
+    setSelected(null);
   }
 
   async function selectItem(item: KpiDetailItem) {
@@ -90,13 +144,25 @@ export function KpiGrid({ data }: KpiGridProps) {
     setDetailLoading(false);
   }
 
-  const filtered = search.trim()
-    ? items.filter(
-        (it) =>
-          it.name.toLowerCase().includes(search.toLowerCase()) ||
-          it.room.toLowerCase().includes(search.toLowerCase())
-      )
-    : items;
+  // Apply filters based on open tile
+  const filtered = items.filter((it) => {
+    if (open === "occupied" || open === "checkins_today" || open === "checkouts_today") {
+      const matchName =
+        !nameSearch.trim() ||
+        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+        it.room.toLowerCase().includes(nameSearch.toLowerCase());
+      const matchRent = inRentRange(it.rent, rentRange);
+      return matchName && matchRent;
+    }
+    if (open === "vacant") {
+      const matchRoom =
+        !roomSearch.trim() ||
+        it.room.toLowerCase().includes(roomSearch.toLowerCase());
+      const matchGender = matchesGender(it.gender, genderFilter);
+      return matchRoom && matchGender;
+    }
+    return true;
+  });
 
   return (
     <div className="flex flex-col gap-0">
@@ -141,28 +207,65 @@ export function KpiGrid({ data }: KpiGridProps) {
         )}
       </div>
 
-      {/* Expandable panel */}
       {open && (
         <div className="mt-2 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden">
-          {/* Search */}
-          <div className="px-3 pt-3 pb-2">
-            <input
-              type="text"
-              placeholder="Search name or room…"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setSelected(null); }}
-              className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
-            />
-          </div>
 
-          {/* Fixed-height scrollable list */}
+          {/* Filter bar — occupied/checkins/checkouts: name search + rent range */}
+          {(open === "occupied" || open === "checkins_today" || open === "checkouts_today") && (
+            <div className="px-3 pt-3 pb-2 flex gap-2">
+              <input
+                type="text"
+                placeholder="Name or room…"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+                className="flex-1 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              />
+              <select
+                value={rentRange}
+                onChange={(e) => setRentRange(e.target.value as RentRange)}
+                className="text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-2 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+              >
+                {RENT_RANGES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Filter bar — vacant: room search + gender filter pills */}
+          {open === "vacant" && (
+            <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
+              <input
+                type="text"
+                placeholder="Search room…"
+                value={roomSearch}
+                onChange={(e) => setRoomSearch(e.target.value)}
+                className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              />
+              <div className="flex gap-1.5">
+                {GENDER_FILTERS.map((gf) => (
+                  <button
+                    key={gf.value}
+                    onClick={() => setGenderFilter(gf.value)}
+                    className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
+                      genderFilter === gf.value
+                        ? "bg-brand-pink text-white border-brand-pink"
+                        : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    }`}
+                  >
+                    {gf.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Scrollable list */}
           <div className="overflow-y-auto px-3" style={{ maxHeight: "256px" }}>
             {loading ? (
               <p className="text-xs text-ink-muted text-center py-4">Loading…</p>
             ) : filtered.length === 0 ? (
-              <p className="text-xs text-ink-muted text-center py-4">
-                {search ? "No matches" : "No records found"}
-              </p>
+              <p className="text-xs text-ink-muted text-center py-4">No matches</p>
             ) : (
               <div className="flex flex-col divide-y divide-[#F0EDE9]">
                 {filtered.map((item, i) => (

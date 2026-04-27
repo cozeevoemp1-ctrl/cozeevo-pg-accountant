@@ -109,7 +109,15 @@ export function getRecentActivity(limit = 20, token?: string): Promise<ActivityR
   return _get(`/api/v2/app/activity/recent?limit=${limit}`, token);
 }
 
-export interface KpiDetailItem { tenancy_id?: number; name: string; room: string; detail: string; }
+export interface KpiDetailItem {
+  tenancy_id?: number;
+  name: string;
+  room: string;
+  detail: string;
+  rent?: number;        // occupied items only
+  free_beds?: number;  // vacant items only
+  gender?: string;     // vacant items: "male" | "female" | "mixed" | "empty" | "unknown"
+}
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
 export function getKpiDetail(type: string): Promise<KpiDetail> {
