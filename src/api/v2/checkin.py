@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -241,7 +241,6 @@ async def record_physical_checkin(
         except Exception as exc:
             logger.warning("[PWA] GSheets write-back failed on checkin: %s", exc)
 
-    deposit     = float(tenancy.security_deposit or 0)
     booking_amt = float(tenancy.booking_amount or 0)
     collected   = body.amount_collected
     first_total = preview["first_month_total"]
@@ -277,14 +276,13 @@ def _notify_checkin_bg(tenant: Tenant, room: Room, actual_date: date,
 
             room_number  = room.room_number if room else "—"
             date_str     = actual_date.strftime("%d %b %Y")
-            rent_str     = f"{int(tenant.agreed_rent or 0):,}" if hasattr(tenant, 'agreed_rent') else "—"
-            # Reuse approved cozeevo_booking_confirmation template (name, room, date, rent, deposit)
-            # This goes out immediately; a dedicated checkin template is pending Meta approval.
+            # cozeevo_checkin_welcome: name, room, date, rent, deposit (PENDING approval)
+            # Falls back to cozeevo_booking_confirmation (same vars, already APPROVED)
             rent_val    = preview["agreed_rent"]
             deposit_val = preview["security_deposit"]
             tpl_sent = await _send_whatsapp_template(
                 phone,
-                "cozeevo_booking_confirmation",
+                "cozeevo_checkin_welcome",
                 [
                     tenant.name,
                     room_number,
@@ -293,6 +291,18 @@ def _notify_checkin_bg(tenant: Tenant, room: Room, actual_date: date,
                     f"Rs.{int(deposit_val):,}",
                 ],
             )
+            if not tpl_sent:
+                tpl_sent = await _send_whatsapp_template(
+                    phone,
+                    "cozeevo_booking_confirmation",
+                    [
+                        tenant.name,
+                        room_number,
+                        date_str,
+                        f"Rs.{int(rent_val):,}",
+                        f"Rs.{int(deposit_val):,}",
+                    ],
+                )
 
             # Supplementary free-text with payment details (works within 24hr window)
             collected   = body.amount_collected
