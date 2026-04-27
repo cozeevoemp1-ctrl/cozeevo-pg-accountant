@@ -177,4 +177,5 @@ Reporting format:
 
 ## Changelog
 - 2026-03-23: Initial master data created from owner confirmation
+- 2026-04-27: Fixed room 120 max_occupancy 3→2 in DB (was a data entry error; docs always said double). Total revenue beds confirmed 294 for April 2026.
 - 2026-04-26: 114 + 618 moved from staff → revenue. G20 moved to staff (temporary, until April 2026 end — returns to revenue May 2026). G05 corrected to staff (was wrongly revenue in DB). G13 corrected to room_type=triple in DB. Revenue beds: 291 → 294 (295 from May 2026).

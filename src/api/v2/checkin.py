@@ -264,6 +264,10 @@ async def record_physical_checkin(
     # ── WhatsApp notification ─────────────────────────────────────────────
     _notify_checkin_bg(tenant, room, actual_date, body, preview)
 
+    # ── Sheet occupancy refresh (keeps sheet in sync with PWA KPI) ────────
+    from src.integrations.gsheets import trigger_monthly_sheet_sync
+    trigger_monthly_sheet_sync(actual_date.month, actual_date.year)
+
     # ── Google Sheet write-back ───────────────────────────────────────────
     if body.amount_collected > 0 and room and tenant:
         try:

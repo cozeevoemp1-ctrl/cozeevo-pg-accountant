@@ -1,6 +1,7 @@
 import { DM_Sans } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -31,7 +32,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={dmSans.variable}>
       <body className="bg-bg text-ink font-sans min-h-screen" suppressHydrationWarning>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <PullToRefresh>{children}</PullToRefresh>
+          </AuthProvider>
         </body>
     </html>
   );

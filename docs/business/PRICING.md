@@ -7,13 +7,23 @@
 
 ## Tiers
 
+> Updated 2026-04-26: PWA (forms + voice) added. Growth = forms. Pro = forms + voice.
+
 | Feature | **Starter** (Free) | **Growth** ₹799/month | **Pro** ₹1,999/month |
 |---|---|---|---|
 | **Who** | Try it out | 1 property, up to 50 beds | Multi-property, 200+ beds |
-| WhatsApp AI Bot | ✅ | ✅ | ✅ |
+| WhatsApp AI Bot (owner + tenant) | ✅ | ✅ | ✅ |
 | Tenant queries (own rent, dues, room) | ✅ | ✅ | ✅ |
 | Owner queries (who paid, overdue) | ✅ | ✅ | ✅ |
 | Occupancy status | ✅ | ✅ | ✅ |
+| **Kozzy PWA — Staff forms app** | ❌ | ✅ | ✅ |
+| **Collect payment (form)** | ❌ | ✅ | ✅ |
+| **Check-in / Check-out (form)** | ❌ | ✅ | ✅ |
+| **Day-wise booking (form)** | ❌ | ✅ | ✅ |
+| **Dues query (form)** | ❌ | ✅ | ✅ |
+| **"Hey Kozzy" voice assistant** | ❌ | ❌ | ✅ |
+| **Tap-to-talk voice commands** | ❌ | ❌ | ✅ |
+| **Multi-language voice (EN/TA/TE/HI)** | ❌ | ❌ | ✅ |
 | Tenant onboarding (KYC via WhatsApp) | ❌ | ✅ | ✅ |
 | Checkout checklist | ❌ | ✅ | ✅ |
 | P&L from bank statement (PDF upload) | ❌ | ✅ | ✅ |
@@ -59,7 +69,9 @@
 | **Cozeevo Growth** | **₹799/month** |
 | **Cozeevo Pro** | **₹1,999/month** |
 
-**The pitch:** *"One WhatsApp number manages your entire PG — tenant queries, rent tracking, P&L reports, onboarding — no app to install, no staff training needed."*
+**The pitch:** *"Your staff gets an app. You get WhatsApp. Your tenants get WhatsApp. One system, one source of truth."*
+
+**Voice cost per Pro customer:** ~₹250–400/month (Groq Whisper Turbo at 4hrs/day). Margin at Pro: ~₹1,500+/month.
 
 ---
 

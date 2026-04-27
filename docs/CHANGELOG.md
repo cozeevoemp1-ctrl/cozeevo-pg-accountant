@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.1] — 2026-04-27 — Backup cleanup + pull-to-refresh + checkin sheet sync
+
+### Backup table dropped
+- `payments_backup_20260427` (1662 rows) confirmed clean and dropped from Supabase — data integrity verified: DB = ops sheet = PWA for all 5 months
+
+### Pull-to-refresh component (`web/components/ui/pull-to-refresh.tsx`)
+- Native mobile pull-to-refresh on PWA (`web/app/layout.tsx` wraps AuthProvider with PullToRefresh)
+- CSS animation `kozzy-spin` added to `web/app/globals.css`
+
+### Checkin triggers sheet sync (`src/api/v2/checkin.py`)
+- `record_physical_checkin` now calls `trigger_monthly_sheet_sync` after checkin — keeps ops sheet occupancy in sync with PWA KPI without manual resync
+
+### Gitignore updated
+- Added `.playwright-mcp/`, `web/test-results/`, `web/tsconfig.tsbuildinfo`, `media/` — keep test artifacts out of repo
+
+---
+
 ## [1.73.0] — 2026-04-27 — Day-wise dedup guardrails + TENANTS master tab sync
 
 ### Day-wise tenants no longer bleed into monthly tabs (`scripts/sync_sheet_from_db.py`)
