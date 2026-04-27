@@ -4,7 +4,7 @@
  */
 import { supabase } from "./supabase";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com";
 
 async function _authHeaders(token?: string): Promise<Record<string, string>> {
   const tok = token ?? (await supabase().auth.getSession()).data.session?.access_token;
@@ -119,9 +119,10 @@ export interface KpiDetailItem {
   name: string;
   room: string;
   detail: string;
-  rent?: number;        // occupied items only
+  rent?: number;       // occupied items only
   free_beds?: number;  // vacant items only
   gender?: string;     // vacant items: "male" | "female" | "mixed" | "empty" | "unknown"
+  stay_type?: string;  // checkins/checkouts: "monthly" | "daily"
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
