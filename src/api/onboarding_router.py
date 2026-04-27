@@ -1233,7 +1233,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                         room_number=room.room_number if room else "TBD",
                         tenant_name=td["name"],
                         phone=phone_sheet,
-                        building=room.building if room else "",
+                        building=building,
                         sharing=sharing,
                         daily_rate=float(obs.daily_rate or 0),
                         num_days=num_days,
