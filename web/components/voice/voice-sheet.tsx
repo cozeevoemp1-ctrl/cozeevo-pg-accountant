@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSpeechInput } from "@/lib/voice";
-import { extractPaymentIntent } from "@/lib/api";
+import { parseVoiceIntent } from "@/lib/parse-intent";
 import type { PaymentIntent } from "@/lib/api";
 
 interface VoiceSheetProps {
@@ -40,16 +40,11 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speech.state]);
 
-  async function handleExtract(text: string) {
+  function handleExtract(text: string) {
     setStep("extracting");
-    try {
-      const pi = await extractPaymentIntent(text);
-      setIntent(pi);
-      setStep("confirm");
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Intent extraction failed");
-      setStep("error");
-    }
+    const pi = parseVoiceIntent(text);
+    setIntent(pi);
+    setStep("confirm");
   }
 
   function handleStop() {
@@ -193,11 +188,7 @@ function ConfirmView({
         )}
       </div>
 
-      {intent.intent !== "log_payment" && (
-        <p className="text-xs text-status-warn">
-          Could not recognise a payment. Please try again or use the manual form.
-        </p>
-      )}
+      <VoiceSummary intent={intent} />
 
       <div className="flex gap-3 mt-auto">
         <button
@@ -215,6 +206,45 @@ function ConfirmView({
         </button>
       </div>
     </div>
+  );
+}
+
+function VoiceSummary({ intent }: { intent: PaymentIntent }) {
+  const found: string[] = [];
+  const missing: string[] = [];
+
+  if (intent.amount != null) found.push(`₹${intent.amount.toLocaleString("en-IN")}`);
+  else missing.push("amount");
+
+  if (intent.tenant_name) found.push(intent.tenant_name);
+  else missing.push("tenant name");
+
+  if (intent.method) found.push(intent.method);
+  else missing.push("payment method");
+
+  if (missing.length === 0) {
+    return (
+      <p className="text-xs text-status-paid font-medium">
+        All details captured. Tap Confirm to log.
+      </p>
+    );
+  }
+
+  if (intent.intent !== "log_payment") {
+    return (
+      <p className="text-xs text-status-warn">
+        No amount heard — can&apos;t log a payment. Try again: &ldquo;8000 Ravi cash&rdquo;
+      </p>
+    );
+  }
+
+  const foundStr = found.length ? `Got ${found.join(", ")}.` : "";
+  const missStr = `Still need: ${missing.join(", ")} — fill it below before confirming.`;
+
+  return (
+    <p className="text-xs text-status-warn">
+      {foundStr} {missStr}
+    </p>
   );
 }
 
