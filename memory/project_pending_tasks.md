@@ -31,6 +31,12 @@ type: project
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
 
+## Recently Completed (v1.73.8 — 2026-04-27)
+
+- **First-month dues inflation fixed** — deposit/booking payments (period_month=NULL) now counted in dues calc. Was affecting 28 April tenants / ₹3.9L invisible to old query. Arumugam 513: ₹32k → ₹5k.
+- **PWA dues tile deployed** — rebuilt Next.js on VPS; "Open complaints" replaced with expandable dues tile.
+- **Full amounts everywhere** — ₹1.98L → ₹19,80,000 on PWA and Sheet COLLECTION row.
+
 ## Recently Completed (v1.73.5 — 2026-04-27)
 
 - **Full amounts everywhere** — PWA KPI tile + Google Sheet COLLECTION row now show `12,90,183` instead of `12.90L`. Applies to all future monthly tabs permanently.
