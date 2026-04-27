@@ -2,6 +2,35 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.72.0] — 2026-04-27 — Data integrity: historical payments freeze + March gap fixed + deposits KPI corrected
+
+### DB-level freeze trigger (`payments_freeze`)
+- `payments_freeze_check()` trigger blocks any INSERT/UPDATE/DELETE on payments rows where `period_month < date_trunc('month', CURRENT_DATE)` — automatically advances each month
+- Escape hatch: `SET LOCAL app.allow_historical_write = 'true'` in the same transaction (for legitimate admin corrections)
+- Applied directly to Supabase and added to `src/database/migrate_all.py` (`run_payments_freeze_trigger_2026_04_27`) so fresh installs also get it
+
+### Pre-April payments corrected (Dec 2025 – Mar 2026)
+- **Jan 2026**: restored from `payments_backup_20260427` — Cash ₹3,00,572 / UPI ₹5,30,575 = ₹8,31,147 ✓
+- **Feb 2026**: restored from backup — Cash ₹6,53,300 / UPI ₹23,24,048 = ₹29,77,348 ✓
+- **Dec 2025**: restored from backup — UPI ₹12,800 only ✓
+- **Mar 2026**: 9 tenants were skipped by reload script (room number mismatch between ops sheet and DB). Fixed via `scripts/fix_march_skipped.py` using name-only matching. Mar total now Cash ₹10,94,220 / UPI ₹28,89,193 = **₹39,83,413** ✓
+
+### Deposits KPI fixed (`src/services/reporting.py`, `src/api/v2/kpi.py`)
+- `deposits_breakdown()` now queries `tenancies.security_deposit + tenancies.maintenance_fee` for active tenants — correct source of truth (agreement values)
+- Replaced previous `total_deposits_held()` which was summing payment transactions (gave ₹40,40,000 instead of ₹34,27,325)
+- `/api/v2/app/reporting/deposits-held` returns `{ held, maintenance, refundable }` where `refundable = held - maintenance`
+- PWA Money Dashboard updated to show 3-row deposits section (Refundable / Maintenance / Total)
+
+### Cash/UPI method breakdown on Money Dashboard
+- `CollectionSummaryResponse` Pydantic model now includes `method_breakdown: dict[str, int]`
+- Was computed in service but silently stripped by FastAPI's response model — now correctly returned and displayed
+
+### New scripts
+- `scripts/reload_pre_april_payments.py` — drop + reload Dec–Mar payments from ops sheet (semantic column lookup, safety checks, backup verification)
+- `scripts/fix_march_skipped.py` — targeted fix for 9 tenants whose sheet room numbers differ from DB; name-only matching with freeze escape hatch
+
+---
+
 ## [1.71.0] — 2026-04-27 — PWA: KPI panels v2, money dashboard, VPS deploy at app.getkozzy.com
 
 ### PWA deployed to production
