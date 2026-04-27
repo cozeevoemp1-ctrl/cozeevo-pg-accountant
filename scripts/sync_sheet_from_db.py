@@ -559,27 +559,12 @@ async def main(args):
         partial_count = sum(1 for r in active_rows if r[i_status] == "PARTIAL")
         unpaid_count = sum(1 for r in active_rows if r[i_status] == "UNPAID")
 
-        # Vacant beds — daywise count via canonical helper so DASHBOARD,
-        # bot queries, and this summary all agree. See
-        # src/services/room_occupancy.py.
         total_rev_beds = (await session.execute(
             select(func.sum(Room.max_occupancy)).where(Room.active == True, Room.is_staff_room == False)
         )).scalar() or 0
-        # New-style daily stays use Tenancy.stay_type=daily (onboarding form).
-        # Count these first — they are the authoritative record for any guest
-        # who went through the new onboarding flow.
-        from src.database.models import DaywiseStay
-        new_daily_rooms_subq = (
-            select(Room.room_number)
-            .join(Tenancy, Tenancy.room_id == Room.id)
-            .where(
-                Tenancy.stay_type == StayType.daily,
-                Tenancy.status == TenancyStatus.active,
-                Tenancy.checkin_date <= date.today(),
-                or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > date.today()),
-            )
-            .scalar_subquery()
-        )
+        # Day-wise: count only from tenancies (stay_type=daily) — the canonical
+        # source for all new day-wise guests. Old daywise_stays table is legacy
+        # and intentionally excluded.
         daywise_beds = (await session.execute(
             select(func.count()).select_from(Tenancy)
             .join(Room, Room.id == Tenancy.room_id)
@@ -590,20 +575,6 @@ async def main(args):
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.checkin_date <= date.today(),
                 or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > date.today()),
-            )
-        )).scalar() or 0
-        # Old-style DaywiseStay records (pre-onboarding-form era). Only count
-        # rooms NOT already covered by a new-style Tenancy.daily to avoid
-        # double-counting guests who have both records (e.g. Maharajan/219).
-        daywise_beds += (await session.execute(
-            select(func.count()).select_from(DaywiseStay)
-            .join(Room, Room.room_number == DaywiseStay.room_number)
-            .where(
-                Room.is_staff_room == False,
-                DaywiseStay.checkin_date <= date.today(),
-                DaywiseStay.checkout_date > date.today(),
-                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
-                DaywiseStay.room_number.notin_(new_daily_rooms_subq),
             )
         )).scalar() or 0
 
