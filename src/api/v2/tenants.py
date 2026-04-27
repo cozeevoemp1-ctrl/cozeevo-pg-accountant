@@ -120,15 +120,12 @@ async def get_tenant_dues(
     rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
     paid = float(paid_result) if paid_result is not None else 0.0
 
-    # Use RentSchedule.rent_due when available (includes deposit for check-in month)
+    # rent_due from RentSchedule is the source of truth — already set from ops sheet
+    # (fix_april_dues.py locked these to exact sheet balances, advance already factored in)
     rent_due = float(rs.rent_due) if rs else rent
 
-    # Booking advance counts as credit only in the check-in month
+    dues = max(rent_due - paid, 0.0)
     booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
-    checkin_month = date(tenancy.checkin_date.year, tenancy.checkin_date.month, 1) if tenancy.checkin_date else None
-    booking_credit = booking_amount if checkin_month == period_month else 0.0
-
-    dues = max(rent_due - paid - booking_credit, 0.0)
 
     # Last payment (any type, not voided) for this tenancy
     async with get_session() as session:
