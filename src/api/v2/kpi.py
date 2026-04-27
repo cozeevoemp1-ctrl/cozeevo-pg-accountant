@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select, desc, or_, and_
+from sqlalchemy import case, func, literal_column, select, desc, or_, and_
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -35,7 +35,6 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         )
 
         # Occupied beds (active tenants, including premium=2 beds)
-        from sqlalchemy import case, literal_column
         occupied_raw = await session.scalar(
             select(
                 func.coalesce(
@@ -191,9 +190,19 @@ async def get_kpi_detail(
             ]}
 
         elif type == "vacant":
-            # Rooms with at least one free bed (includes partial vacancies)
+            # Count occupied BEDS per room (premium tenant = max_occupancy beds, else 1)
+            # so that premium-occupied rooms don't appear as having free beds.
             occ_subq = (
-                select(Tenancy.room_id, func.count(Tenancy.id).label("occ"))
+                select(
+                    Tenancy.room_id,
+                    func.sum(
+                        case(
+                            (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                            else_=literal_column("1"),
+                        )
+                    ).label("occ"),
+                )
+                .join(Room, Room.id == Tenancy.room_id)
                 .where(Tenancy.status == TenancyStatus.active)
                 .group_by(Tenancy.room_id)
                 .subquery()
