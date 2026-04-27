@@ -126,7 +126,7 @@ app.add_middleware(LocalOnlyMiddleware)
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://localhost:3000", "https://kozzy.vercel.app"],
+    allow_origins=["http://localhost:3001", "http://localhost:3000", "https://kozzy.vercel.app", "https://app.getkozzy.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
