@@ -45,6 +45,7 @@ export interface CollectionSummary {
   deposits_received: number;
   booking_advances: number;
   overdue_count: number;
+  method_breakdown: Record<string, number>;
 }
 
 export interface PaymentResponse {
@@ -99,6 +100,10 @@ export interface PaymentIntent {
 
 export function getCollectionSummary(periodMonth: string, token?: string): Promise<CollectionSummary> {
   return _get(`/api/v2/app/reporting/collection?period_month=${encodeURIComponent(periodMonth)}`, token);
+}
+
+export function getDepositsHeld(token?: string): Promise<{ total_deposits_held: number }> {
+  return _get("/api/v2/app/reporting/deposits-held", token);
 }
 
 export function getKpi(token?: string): Promise<KpiResponse> {

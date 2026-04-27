@@ -8,7 +8,7 @@ Deposits and booking advances are tracked but NOT counted in Total Collection.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
@@ -37,6 +37,7 @@ class CollectionSummary:
     deposits_received: int
     booking_advances: int
     overdue_count: int
+    method_breakdown: dict[str, int] = field(default_factory=dict)  # cash/upi/bank_transfer/cheque
 
 
 async def collection_summary(
@@ -102,6 +103,28 @@ async def collection_summary(
     pending = max(expected - collected, 0)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
+    # ── Payment method breakdown (cash / upi / bank_transfer / cheque) ─────────
+    method_rows = (
+        await session.execute(
+            select(
+                Payment.payment_mode,
+                func.sum(Payment.amount).label("total"),
+            )
+            .join(Tenancy, Tenancy.id == Payment.tenancy_id)
+            .where(
+                Payment.period_month == from_date,
+                Payment.is_void == False,
+                Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
+            )
+            .group_by(Payment.payment_mode)
+        )
+    ).all()
+
+    method_breakdown: dict[str, int] = {}
+    for row in method_rows:
+        key = row.payment_mode.value if hasattr(row.payment_mode, "value") else str(row.payment_mode or "other")
+        method_breakdown[key] = int(row.total or 0)
+
     # ── Overdue count — tenants with partial/pending rent for THIS month ───────
     overdue_count = int(
         await session.scalar(
@@ -127,4 +150,19 @@ async def collection_summary(
         deposits_received=deposits_received,
         booking_advances=booking_advances,
         overdue_count=overdue_count,
+        method_breakdown=method_breakdown,
     )
+
+
+async def total_deposits_held(*, session: AsyncSession) -> int:
+    """Sum of all security deposit payments ever received (not voided).
+    This is the cumulative refundable amount held across all tenants.
+    """
+    result = await session.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(
+            Payment.for_type == PaymentFor.deposit,
+            Payment.is_void == False,
+        )
+    )
+    return int(result or 0)
