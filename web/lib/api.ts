@@ -71,7 +71,7 @@ export interface KpiResponse {
   active_tenants: number;
   checkins_today: number;
   checkouts_today: number;
-  open_complaints: number;
+  overdue_tenants: number;
 }
 
 export interface ActivityItem {

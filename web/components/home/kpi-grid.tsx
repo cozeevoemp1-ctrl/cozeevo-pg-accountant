@@ -10,7 +10,7 @@ interface KpiGridProps {
   data: KpiResponse;
 }
 
-type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | null;
+type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | null;
 type RentRange = "all" | "lt12" | "12to15" | "15to20" | "gt20";
 type GenderFilter = "all" | "male" | "female" | "empty";
 type StayFilter = "all" | "monthly" | "daily";
@@ -157,12 +157,12 @@ export function KpiGrid({ data }: KpiGridProps) {
 
   // Apply filters based on open tile
   const filtered = items.filter((it) => {
-    if (open === "occupied") {
+    if (open === "occupied" || open === "dues") {
       const matchName =
         !nameSearch.trim() ||
         it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
         it.room.toLowerCase().includes(nameSearch.toLowerCase());
-      return matchName && inRentRange(it.rent, rentRange);
+      return open === "dues" ? matchName : matchName && inRentRange(it.rent, rentRange);
     }
     if (open === "checkins_today" || open === "checkouts_today") {
       const matchName =
@@ -203,9 +203,11 @@ export function KpiGrid({ data }: KpiGridProps) {
           color="pink"
         />
         <IconTile
-          icon="⚠️" label="Open complaints"
-          value={data.open_complaints}
-          color={data.open_complaints > 0 ? "orange" : "green"}
+          icon="💸" label="Overdue tenants"
+          value={data.overdue_tenants}
+          color={data.overdue_tenants > 0 ? "orange" : "green"}
+          active={open === "dues"}
+          onClick={() => toggle("dues")}
         />
         {(data.checkins_today > 0 || data.checkouts_today > 0) && (
           <>
@@ -227,6 +229,19 @@ export function KpiGrid({ data }: KpiGridProps) {
 
       {open && (
         <div className="mt-2 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden">
+
+          {/* Filter bar — dues: name search only */}
+          {open === "dues" && (
+            <div className="px-3 pt-3 pb-2">
+              <input
+                type="text"
+                placeholder="Name or room…"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+                className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              />
+            </div>
+          )}
 
           {/* Filter bar — occupied: name search + rent range */}
           {open === "occupied" && (
@@ -330,7 +345,7 @@ export function KpiGrid({ data }: KpiGridProps) {
                       <p className="text-[10px] text-ink-muted">Room {item.room}</p>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-medium text-ink-muted">{item.detail}</p>
+                      <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
                       {item.tenancy_id && (
                         <span className="text-xs text-brand-pink font-bold">
                           {selected?.tenancy_id === item.tenancy_id ? "▾" : "›"}

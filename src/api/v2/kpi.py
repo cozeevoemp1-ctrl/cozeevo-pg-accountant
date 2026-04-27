@@ -9,9 +9,9 @@ from sqlalchemy import func, select, desc
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
-    Complaint, ComplaintStatus,
     DaywiseStay,
     Payment, PaymentFor,
+    RentSchedule,
     Room, Tenancy, TenancyStatus,
     Tenant,
 )
@@ -89,11 +89,28 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Open complaints
-        open_complaints = int(
+        # Overdue tenants — active tenancies with rent_due > paid for current month
+        period = date(today.year, today.month, 1)
+        paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
+            .where(
+                Payment.period_month == period,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+            )
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
+        overdue_tenants = int(
             await session.scalar(
-                select(func.count(Complaint.id))
-                .where(Complaint.status == ComplaintStatus.open)
+                select(func.count(RentSchedule.id))
+                .outerjoin(paid_subq, paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
+                .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+                .where(
+                    RentSchedule.period_month == period,
+                    Tenancy.status == TenancyStatus.active,
+                    RentSchedule.rent_due > func.coalesce(paid_subq.c.paid, 0),
+                )
             ) or 0
         )
 
@@ -105,7 +122,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         active_tenants=active_tenants,
         checkins_today=checkins_today,
         checkouts_today=checkouts_today,
-        open_complaints=open_complaints,
+        overdue_tenants=overdue_tenants,
     )
 
 
@@ -227,6 +244,48 @@ async def get_kpi_detail(
             return {"type": type, "items": [
                 {"tenancy_id": r.id, "name": r.name, "room": r.room_number,
                  "detail": f"₹{int(r.agreed_rent or 0):,}/mo", "rent": int(r.agreed_rent or 0)}
+                for r in rows
+            ]}
+
+        elif type == "dues":
+            period = date(today.year, today.month, 1)
+            paid_subq = (
+                select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
+                .where(
+                    Payment.period_month == period,
+                    Payment.for_type == PaymentFor.rent,
+                    Payment.is_void == False,
+                )
+                .group_by(Payment.tenancy_id)
+                .subquery()
+            )
+            rows = (await session.execute(
+                select(
+                    Tenancy.id,
+                    Tenant.name,
+                    Room.room_number,
+                    RentSchedule.rent_due,
+                    func.coalesce(paid_subq.c.paid, 0).label("paid"),
+                )
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
+                .outerjoin(paid_subq, paid_subq.c.tenancy_id == Tenancy.id)
+                .where(
+                    RentSchedule.period_month == period,
+                    Tenancy.status == TenancyStatus.active,
+                    RentSchedule.rent_due > func.coalesce(paid_subq.c.paid, 0),
+                )
+                .order_by(desc(RentSchedule.rent_due - func.coalesce(paid_subq.c.paid, 0)))
+            )).all()
+            return {"type": type, "items": [
+                {
+                    "tenancy_id": r.id,
+                    "name": r.name,
+                    "room": r.room_number,
+                    "detail": f"₹{int(r.rent_due - r.paid):,}",
+                    "dues": int(r.rent_due - r.paid),
+                }
                 for r in rows
             ]}
 

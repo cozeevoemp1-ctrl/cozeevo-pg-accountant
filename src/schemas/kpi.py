@@ -11,7 +11,7 @@ class KpiResponse(BaseModel):
     active_tenants: int
     checkins_today: int
     checkouts_today: int
-    open_complaints: int
+    overdue_tenants: int
 
 
 class ActivityItem(BaseModel):
