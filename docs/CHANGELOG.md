@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.69.1] — 2026-04-27 — Hotfix: onboarding form submission failure
+
+### Fixed
+- **`src/api/onboarding_router.py`** — 4 occurrences of `from services import storage` changed to `from src.services import storage`. The top-level `services/` package has no `storage` module; the import crashed `tenant_submit`, `approve`, and staff-signature GET/POST handlers. The error propagated through `LocalOnlyMiddleware.call_next()`, dropping the HTTP connection — so `res.json()` failed on the client and showed the fallback "Submission failed. Please try again." instead of a real error message.
+
+### Root cause
+Wrong import path introduced when KYC file upload was added (commit `97cec97`, 2026-04-19). `src.services.storage` is the correct path (consistent with all other imports in the same file). The top-level `services/` stub has only `property_logic.py`.
+
+### Deployed
+Cherry-picked to master, VPS restarted. Confirmed clean startup via journalctl.
+
+---
+
 ## [1.69.0] — 2026-04-27 — PWA rent collection form: numpad, tenant search, dues preview, E2E tests
 
 ### Built
