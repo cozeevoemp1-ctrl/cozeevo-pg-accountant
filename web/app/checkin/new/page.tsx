@@ -306,8 +306,8 @@ export default function NewCheckinPage() {
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
       </div>
 
-      {/* Sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 pb-8 pt-3 bg-bg border-t border-[#F0EDE9]">
+      {/* Sticky CTA — sits above the floating nav pill (~80px) */}
+      <div className="fixed bottom-[80px] left-0 right-0 px-4 pb-2 pt-3 bg-bg border-t border-[#F0EDE9]">
         <button
           onClick={handleReview}
           disabled={!tenant || !preview || loadingPrev}
