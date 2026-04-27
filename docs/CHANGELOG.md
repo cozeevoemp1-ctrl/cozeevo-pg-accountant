@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.9] — 2026-04-27 — KPI dues card + monthly rollover carry-forward
+
+### Bug fix — dues card now shows 18 tenants / ₹88,766 (matching ops sheet)
+- **`src/api/v2/kpi.py`** — KPI summary tile (overdue count + total) and dues expansion view both now use `effective_due = rent_due + adjustment` instead of bare `rent_due`. WHERE, ORDER BY, detail label, and `dues` field all updated.
+- **`src/services/monthly_rollover.py`** — new `_prev_outstanding()` helper queries previous month's unpaid balance using the same payment formula (rent period-match + deposit/booking calendar-month match). `generate_rent_schedule_for_month()` now sets `adjustment = carry` and `adjustment_note = "Month YYYY carry-forward: ₹X,XXX"` on new rows for active tenants with outstanding balances.
+- **Impact**: April 2026 dues card correctly shows all 18 unpaid tenants. May 2026 rollover will automatically carry forward any unpaid April dues into the `adjustment` column.
+
+---
+
 ## [1.73.8] — 2026-04-27 — First-month dues inflated bug fix (28 tenants / ₹3.9L)
 
 ### Bug fix — deposit+booking payments now count toward dues calculation
