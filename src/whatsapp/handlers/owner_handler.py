@@ -4941,8 +4941,11 @@ async def _do_update_daywise_checkin(
     if ds.checkout_date:
         ds.num_days = (ds.checkout_date - new_checkin).days
     await session.commit()
-    from src.integrations import gsheets as _gs
-    _gs.trigger_daywise_sheet_sync()
+    try:
+        from src.integrations import gsheets as _gs
+        _gs.trigger_daywise_sheet_sync()
+    except Exception:
+        pass
     return (
         f"*Checkin updated — {guest_name}*\n"
         f"Was: {old_str}\n"
