@@ -172,3 +172,54 @@ export function searchTenants(q: string): Promise<TenantSearchResult[]> {
 export function getTenantDues(tenancyId: number): Promise<TenantDues> {
   return _get<TenantDues>(`/api/v2/app/tenants/${tenancyId}/dues`);
 }
+
+// ── Physical check-in ────────────────────────────────────────────────────────
+
+export interface CheckinPreview {
+  tenancy_id: number;
+  tenant_id: number;
+  name: string;
+  phone: string;
+  room_number: string;
+  building_code: string;
+  actual_date: string;
+  agreed_checkin_date: string | null;
+  agreed_rent: number;
+  security_deposit: number;
+  booking_amount: number;
+  prorated_rent: number;
+  first_month_total: number;
+  balance_due: number;
+  overpayment: number;
+  date_changed: boolean;
+}
+
+export interface CheckinResponse {
+  tenancy_id: number;
+  checkin_date_used: string;
+  date_changed: boolean;
+  prorated_rent: number;
+  first_month_total: number;
+  booking_amount: number;
+  amount_collected: number;
+  balance_remaining: number;
+  payment_id: number | null;
+}
+
+export interface CheckinCreate {
+  tenancy_id: number;
+  actual_checkin_date: string;
+  amount_collected: number;
+  payment_method: string;
+  notes?: string;
+}
+
+export function getCheckinPreview(tenancyId: number, actualDate: string): Promise<CheckinPreview> {
+  return _get<CheckinPreview>(
+    `/api/v2/app/tenants/${tenancyId}/checkin-preview?actual_date=${encodeURIComponent(actualDate)}`
+  );
+}
+
+export function recordCheckin(body: CheckinCreate): Promise<CheckinResponse> {
+  return _post<CheckinResponse>("/api/v2/app/checkin", body);
+}
