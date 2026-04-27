@@ -133,9 +133,10 @@ async def get_tenant_dues(
 
     # rent_due from RentSchedule is the source of truth — already set from ops sheet
     # (fix_april_dues.py locked these to exact sheet balances, advance already factored in)
-    rent_due = float(rs.rent_due) if rs else rent
+    rent_due   = float(rs.rent_due)   if rs else rent
+    adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
 
-    dues = max(rent_due - paid, 0.0)
+    dues = max(rent_due + adjustment - paid, 0.0)
     booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
 
     # Last payment (any type, not voided) for this tenancy
@@ -159,6 +160,8 @@ async def get_tenant_dues(
         "building_code": _building_code(prop.name),
         "rent": rent,
         "rent_due": rent_due,
+        "adjustment": adjustment,
+        "adjustment_note": rs.adjustment_note if rs else None,
         "booking_amount": booking_amount,
         "dues": dues,
         "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
