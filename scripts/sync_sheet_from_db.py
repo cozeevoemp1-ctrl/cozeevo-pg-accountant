@@ -28,7 +28,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, selectinload
 from src.database.models import (
-    Tenancy, Tenant, Room, Property, TenancyStatus,
+    Tenancy, Tenant, Room, Property, TenancyStatus, StayType,
     RentSchedule, RentStatus, Payment, PaymentFor, Staff,
 )
 # Canonical column list (single source of truth). Row width and column
@@ -120,6 +120,8 @@ async def main(args):
             .join(Room, Room.id == Tenancy.room_id)
             .join(Property, Property.id == Room.property_id)
             .where(
+                # Day-wise stays have their own DAY WISE tab — exclude from monthly tabs
+                Tenancy.stay_type != StayType.daily,
                 or_(
                     # All active tenancies
                     Tenancy.status == TenancyStatus.active,
