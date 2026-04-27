@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession } from "@/lib/auth-server";
 import { getCollectionSummary, getKpi, getRecentActivity } from "@/lib/api";
 import { Greeting } from "@/components/home/greeting";
 import { OverviewCard } from "@/components/home/overview-card";
@@ -25,10 +25,11 @@ export default async function HomePage() {
   const period = _periodMonth(now);
   const monthLabel = _monthLabel(now);
 
+  const token = session.session.access_token;
   const [collection, kpi, activity] = await Promise.allSettled([
-    getCollectionSummary(period),
-    getKpi(),
-    getRecentActivity(15),
+    getCollectionSummary(period, token),
+    getKpi(token),
+    getRecentActivity(15, token),
   ]);
 
   return (

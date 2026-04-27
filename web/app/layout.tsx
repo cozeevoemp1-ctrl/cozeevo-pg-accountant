@@ -30,7 +30,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={dmSans.variable}>
-      <body className="bg-bg text-ink font-sans min-h-screen">
+      <body className="bg-bg text-ink font-sans min-h-screen" suppressHydrationWarning>
           <AuthProvider>{children}</AuthProvider>
         </body>
     </html>

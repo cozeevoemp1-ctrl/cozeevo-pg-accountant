@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession } from "@/lib/auth-server";
 import { getCollectionSummary } from "@/lib/api";
 import { rupee } from "@/lib/format";
 import { Card } from "@/components/ui/card";
@@ -22,9 +22,10 @@ export default async function CollectionBreakdownPage() {
   const period = _periodMonth(now);
   const monthLabel = _monthLabel(now);
 
+  const token = session.session.access_token;
   let data;
   try {
-    data = await getCollectionSummary(period);
+    data = await getCollectionSummary(period, token);
   } catch {
     return (
       <main className="px-4 pt-6 pb-24 max-w-lg mx-auto">

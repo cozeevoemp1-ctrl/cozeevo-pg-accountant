@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useVoiceRecorder } from "@/lib/voice";
-import { transcribeAudio, extractPaymentIntent } from "@/lib/api";
+import { useSpeechInput } from "@/lib/voice";
+import { extractPaymentIntent } from "@/lib/api";
 import type { PaymentIntent } from "@/lib/api";
 
 interface VoiceSheetProps {
@@ -10,12 +10,11 @@ interface VoiceSheetProps {
   onPaymentIntent: (intent: PaymentIntent) => void;
 }
 
-type SheetStep = "recording" | "transcribing" | "extracting" | "confirm" | "error";
+type SheetStep = "recording" | "extracting" | "confirm" | "error";
 
 export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
-  const recorder = useVoiceRecorder();
+  const speech = useSpeechInput();
   const [step, setStep] = useState<SheetStep>("recording");
-  const [transcript, setTranscript] = useState("");
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const startedRef = useRef(false);
@@ -24,40 +23,37 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
   useEffect(() => {
     if (!startedRef.current) {
       startedRef.current = true;
-      recorder.start();
+      speech.start();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When recording stops, transcribe
+  // When speech is done, send transcript to LLM for intent extraction
   useEffect(() => {
-    if (recorder.state === "stopped" && recorder.audioBlob) {
-      handleTranscribe(recorder.audioBlob, recorder.mimeType);
+    if (speech.state === "stopped" && speech.transcript) {
+      handleExtract(speech.transcript);
     }
-    if (recorder.state === "error" && recorder.error) {
-      setErrorMsg(recorder.error);
+    if (speech.state === "error" || speech.state === "unsupported") {
+      setErrorMsg(speech.error ?? "Something went wrong");
       setStep("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.state]);
+  }, [speech.state]);
 
-  async function handleTranscribe(blob: Blob, mime: string) {
-    setStep("transcribing");
+  async function handleExtract(text: string) {
+    setStep("extracting");
     try {
-      const result = await transcribeAudio(blob, mime);
-      setTranscript(result.text);
-      setStep("extracting");
-      const pi = await extractPaymentIntent(result.text);
+      const pi = await extractPaymentIntent(text);
       setIntent(pi);
       setStep("confirm");
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Something went wrong");
+      setErrorMsg(e instanceof Error ? e.message : "Intent extraction failed");
       setStep("error");
     }
   }
 
   function handleStop() {
-    recorder.stop();
+    speech.stop();
   }
 
   function handleConfirm() {
@@ -72,18 +68,17 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
 
         {step === "recording" && (
           <RecordingView
-            state={recorder.state}
+            state={speech.state}
             onStop={handleStop}
             onCancel={onClose}
           />
         )}
 
-        {step === "transcribing" && <ProcessingView label="Transcribing audio…" />}
         {step === "extracting" && <ProcessingView label="Understanding your note…" />}
 
         {step === "confirm" && intent && (
           <ConfirmView
-            transcript={transcript}
+            transcript={speech.transcript}
             intent={intent}
             onConfirm={handleConfirm}
             onCancel={onClose}

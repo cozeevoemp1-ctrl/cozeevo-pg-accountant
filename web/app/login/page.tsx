@@ -2,43 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PhoneInput } from "@/components/auth/phone-input";
-import { OtpInput } from "@/components/auth/otp-input";
-import { signInWithPhone, verifyOtp } from "@/lib/auth";
-
-type Step = "phone" | "otp";
+import { signInWithEmail } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("cozeevoemp1@gmail.com");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSendOtp = async (ph: string) => {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error: err } = await signInWithPhone(ph);
+    const { error: err } = await signInWithEmail(email, password);
     setLoading(false);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setPhone(ph);
-    setStep("otp");
-  };
-
-  const handleVerify = async (otp: string) => {
-    setLoading(true);
-    setError(null);
-    const { error: err } = await verifyOtp(phone, otp);
-    setLoading(false);
-    if (err) {
-      setError(err);
-      return;
-    }
+    if (err) { setError(err); return; }
     router.replace("/");
-  };
+  }
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen px-6 py-12">
@@ -55,22 +36,41 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <div className="bg-surface rounded-card shadow-sm p-6">
-          <h2 className="text-base font-bold text-ink mb-5">
-            {step === "phone" ? "Sign in" : "Enter code"}
-          </h2>
-          {step === "phone" ? (
-            <PhoneInput onSubmit={handleSendOtp} loading={loading} error={error} />
-          ) : (
-            <OtpInput
-              phone={phone}
-              onSubmit={handleVerify}
-              onBack={() => { setStep("phone"); setError(null); }}
-              loading={loading}
-              error={error}
+        <form onSubmit={handleSubmit} className="bg-surface rounded-card shadow-sm p-6 flex flex-col gap-4">
+          <h2 className="text-base font-bold text-ink">Sign in</h2>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className="rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
+              suppressHydrationWarning
             />
-          )}
-        </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className="rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
+              suppressHydrationWarning
+            />
+          </div>
+          {error && <p className="text-xs text-status-warn font-medium">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-pill bg-brand-pink py-3 text-white font-bold text-sm active:opacity-80 disabled:opacity-40"
+          >
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
       </div>
     </main>
   );
