@@ -2810,10 +2810,11 @@ async def resolve_pending_action(
 
         # ── daywise_stays record (historical import) ──────────────────────
         if chosen.get("record_type") == "daywise_stays":
-            return await _do_checkout_daywise(chosen["stay_id"], session)
+            return await _do_checkout_daywise(chosen["stay_id"], session, checkout_date=checkout_date_val)
 
         # ── tenancy day-wise (bot-added, stay_type=daily) ──────────────────
-        tenancy_check = await session.get(Tenancy, chosen["tenancy_id"])
+        tenancy_id = chosen.get("tenancy_id")
+        tenancy_check = await session.get(Tenancy, tenancy_id) if tenancy_id else None
         if tenancy_check and tenancy_check.stay_type == StayType.daily:
             return await _do_checkout(
                 tenancy_id=chosen["tenancy_id"],
@@ -4371,6 +4372,13 @@ async def _do_checkout(
             except Exception:
                 pass
 
+    if tenancy.stay_type == StayType.daily:
+        return (
+            f"*Checkout recorded — {tenant_name}*\n"
+            f"Date: {checkout_date_val.strftime('%d %b %Y')}"
+            f"{gsheets_note}"
+        )
+
     # ── Checkout confirmation WhatsApp template (fire-and-forget) ──
     # Template: cozeevo_checkout_confirmation — 5 vars
     # Falls back to free-text inside the 24-hr session window if PENDING.
@@ -4443,17 +4451,21 @@ async def _do_checkout(
     )
 
 
-async def _do_checkout_daywise(stay_id: int, session: AsyncSession) -> str:
+async def _do_checkout_daywise(stay_id: int, session: AsyncSession, checkout_date: "date | None" = None) -> str:
     """Mark a daywise_stays record as EXIT."""
     from src.database.models import DaywiseStay
     ds = await session.get(DaywiseStay, stay_id)
     if not ds:
         return "Day-stay record not found."
+    if checkout_date:
+        ds.checkout_date = checkout_date
+    elif not ds.checkout_date:
+        ds.checkout_date = date.today()
     ds.status = "EXIT"
     await session.commit()
     from src.integrations import gsheets as _gs
     _gs.trigger_daywise_sheet_sync()
-    checkout_str = ds.checkout_date.strftime("%d %b %Y") if ds.checkout_date else "not set"
+    checkout_str = ds.checkout_date.strftime("%d %b %Y")
     return (
         f"*Checkout recorded — {ds.guest_name}*\n"
         f"Room: {ds.room_number}\n"
