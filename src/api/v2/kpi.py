@@ -15,7 +15,7 @@ from src.database.models import (
     Tenant,
 )
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
-from src.services.reporting import total_deposits_held
+from src.services.reporting import deposits_breakdown
 
 router = APIRouter(prefix="/reporting")
 activity_router = APIRouter(prefix="/activity")
@@ -234,10 +234,10 @@ async def get_kpi_detail(
 
 @router.get("/deposits-held")
 async def get_deposits_held(_user: AppUser = Depends(get_current_user)):
-    """Total security deposits held (cumulative, all time, not voided)."""
+    """Security deposit breakdown from active tenancy agreements."""
     async with get_session() as session:
-        total = await total_deposits_held(session=session)
-    return {"total_deposits_held": total}
+        data = await deposits_breakdown(session=session)
+    return data
 
 
 @activity_router.get("/recent", response_model=ActivityResponse)

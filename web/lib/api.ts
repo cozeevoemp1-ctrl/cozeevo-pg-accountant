@@ -102,7 +102,7 @@ export function getCollectionSummary(periodMonth: string, token?: string): Promi
   return _get(`/api/v2/app/reporting/collection?period_month=${encodeURIComponent(periodMonth)}`, token);
 }
 
-export function getDepositsHeld(token?: string): Promise<{ total_deposits_held: number }> {
+export function getDepositsHeld(token?: string): Promise<{ held: number; maintenance: number; refundable: number }> {
   return _get("/api/v2/app/reporting/deposits-held", token);
 }
 

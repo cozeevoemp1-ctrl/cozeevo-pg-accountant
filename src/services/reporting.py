@@ -154,15 +154,23 @@ async def collection_summary(
     )
 
 
-async def total_deposits_held(*, session: AsyncSession) -> int:
-    """Sum of all security deposit payments ever received (not voided).
-    This is the cumulative refundable amount held across all tenants.
+async def deposits_breakdown(*, session: AsyncSession) -> dict[str, int]:
+    """Return security deposit and maintenance fee totals from active tenancy agreements.
+
+    Returns held (security deposits), maintenance (non-refundable), and refundable
+    (held minus maintenance) — matches the Google Sheet DEPOSITS section.
     """
-    result = await session.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(
-            Payment.for_type == PaymentFor.deposit,
-            Payment.is_void == False,
-        )
+    result = await session.execute(
+        select(
+            func.coalesce(func.sum(Tenancy.security_deposit), 0).label("security"),
+            func.coalesce(func.sum(Tenancy.maintenance_fee), 0).label("maintenance"),
+        ).where(Tenancy.status == TenancyStatus.active)
     )
-    return int(result or 0)
+    row = result.one()
+    security = int(row.security or 0)
+    maintenance = int(row.maintenance or 0)
+    return {
+        "held": security,
+        "maintenance": maintenance,
+        "refundable": max(security - maintenance, 0),
+    }

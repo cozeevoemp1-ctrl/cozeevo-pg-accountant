@@ -52,14 +52,14 @@ export default async function CollectionBreakdownPage({
 
   const token = session.session.access_token;
   let data;
-  let depositsHeld = 0;
+  let depositsData = { held: 0, maintenance: 0, refundable: 0 };
   try {
     const [col, dep] = await Promise.all([
       getCollectionSummary(period, token),
       getDepositsHeld(token),
     ]);
     data = col;
-    depositsHeld = dep.total_deposits_held;
+    depositsData = dep;
   } catch {
     return (
       <main className="px-4 pt-6 pb-24 max-w-lg mx-auto">
@@ -150,15 +150,19 @@ export default async function CollectionBreakdownPage({
         />
       )}
 
-      {/* Deposits held — cumulative, not month-filtered */}
-      <Card className="p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide mb-1 text-brand-pink">Security deposits held</p>
-        <p className="text-xs text-ink-muted mb-3">All refundable deposits received — cumulative, not month-filtered.</p>
-        <div className="flex justify-between pt-2 border-t border-[#F0EDE9]">
-          <span className="text-sm font-semibold text-ink">Total held</span>
-          <span className="text-sm font-bold text-brand-pink">{rupee(depositsHeld)}</span>
-        </div>
-      </Card>
+      {/* Deposits held — from active tenancy agreements */}
+      <Section
+        title="Security deposits held"
+        accent="text-brand-pink"
+        items={[
+          { label: "Refundable", value: depositsData.refundable },
+          { label: "Maintenance (non-refundable)", value: depositsData.maintenance },
+        ]}
+        total={depositsData.held}
+        totalLabel="Total held"
+        totalColor="text-brand-pink"
+        note="From active tenancy agreements. Net refundable = held minus maintenance."
+      />
 
       {/* Deposits this month */}
       {(data.deposits_received > 0 || data.booking_advances > 0) && (
