@@ -562,8 +562,10 @@ def parse_allocation_override(text: str, months: list[dict]) -> list[dict] | Non
 
 async def _find_daywise_by_name(name: str, session: AsyncSession) -> list:
     """Search daywise_stays by guest_name (case-insensitive substring)."""
+    if not name:
+        return []
     from src.database.models import DaywiseStay
-    first_word = name.split()[0] if name else name
+    first_word = name.split()[0]
     result = await session.execute(
         select(DaywiseStay)
         .where(DaywiseStay.guest_name.ilike(f"{first_word}%"))
@@ -594,7 +596,7 @@ async def _find_daywise_by_room(room: str, session: AsyncSession) -> list:
     return list(result.scalars().all())
 
 
-def _make_daywise_choices(rows) -> list[dict]:
+def _make_daywise_choices(rows: list) -> list[dict]:
     """Convert DaywiseStay rows into numbered choice dicts.
 
     Uses stay_id + record_type so pending handlers can route to daywise_stays
