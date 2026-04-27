@@ -25,9 +25,23 @@ All notable changes to PG Accountant will be documented here.
 - `CollectionSummaryResponse` Pydantic model now includes `method_breakdown: dict[str, int]`
 - Was computed in service but silently stripped by FastAPI's response model — now correctly returned and displayed
 
+### March 31 pre-payments reclassified
+- 8 tenants who physically paid on March 31 (payment_date=2026-03-31) had period_month=April — moved to period_month=March per business rule: money received date = collection month
+- Rupali, Shivang, Jitendra, Abhishek Vishwakarma, Akshit, Sachin Kumar Yadav, Yatam Ramakanth, Shashank — Cash ₹71,500 + UPI ₹53,000 moved from April → March
+- March total updated: Cash 11,65,720 + UPI 29,42,193 = ₹41,07,913
+- April total updated: Cash 12,90,183 + UPI 31,54,345 = ₹44,44,528
+
+### No-show payments now counted in collection
+- `sync_sheet_from_db.py`: `collected_rows` now includes `noshow_rows` — booking advance / token payments from no-show tenants count as monthly collection receipts
+
+### Full sheet sync (DB → ops sheet, all months)
+- All 5 monthly tabs (Dec 2025 – Apr 2026) written from DB using `sync_sheet_from_db.py --write` (Dec–Mar with `--force-frozen`)
+- DB = ops sheet verified 3-way for Jan/Feb (source sheet also matches); Mar/Apr ops sheet matches DB
+
 ### New scripts
 - `scripts/reload_pre_april_payments.py` — drop + reload Dec–Mar payments from ops sheet (semantic column lookup, safety checks, backup verification)
 - `scripts/fix_march_skipped.py` — targeted fix for 9 tenants whose sheet room numbers differ from DB; name-only matching with freeze escape hatch
+- `scripts/_compare_all_sources.py` — 3-way comparison utility: DB vs ops sheet vs source sheet (History tab)
 
 ---
 
