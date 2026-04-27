@@ -9,7 +9,6 @@ from sqlalchemy import func, select, desc
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
-    DaywiseStay,
     Payment, PaymentFor,
     Property,
     RentSchedule,

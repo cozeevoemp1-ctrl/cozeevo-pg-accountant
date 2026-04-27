@@ -1214,7 +1214,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     tenancy_id=tenancy.id,
                     amount=obs.agreed_rent,
                     payment_date=checkin,
-                    payment_mode=PaymentMode.cash,
+                    payment_mode=PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash,
                     for_type=PaymentFor.rent,
                     notes="day-stay onboarding payment",
                 ))

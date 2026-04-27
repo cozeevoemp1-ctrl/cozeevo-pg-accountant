@@ -2559,7 +2559,6 @@ async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncS
 
     today = date.today()
     current_month = today.replace(day=1)
-    prev_month = (current_month - timedelta(days=1)).replace(day=1)
     month_label = current_month.strftime("%b %Y")
 
     # ── Revenue rooms ────────────────────────────────────────────────────────
@@ -2695,9 +2694,9 @@ async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncS
 
     total_collected = rent_collected + maint_collected
 
-    prev_dues = await session.scalar(
+    current_dues = await session.scalar(
         select(func.sum(RentSchedule.rent_due)).where(
-            RentSchedule.period_month == prev_month,
+            RentSchedule.period_month == current_month,
             RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
         )
     ) or Decimal("0")
@@ -2767,7 +2766,6 @@ async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncS
     refundable = max(Decimal("0"), held - maint_fee)
 
     # ── Format ───────────────────────────────────────────────────────────────
-    prev_label = prev_month.strftime("%b %Y")
     SEP = "─" * 28
 
     lines = [
@@ -2790,7 +2788,7 @@ async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncS
         f"*COLLECTION ({month_label})*",
         f"  Collected : Rs.{int(total_collected):,}  (rent Rs.{int(rent_collected):,} + maint Rs.{int(maint_collected):,})",
         f"  Target    : Rs.{int(total_expected):,}",
-        f"  {prev_label} dues: Rs.{int(prev_dues):,}",
+        f"  {month_label} dues: Rs.{int(current_dues):,}",
         "",
         f"*STATUS ({month_label})*",
         f"  Paid: {paid_count}  Partial: {partial_count}  Unpaid: {unpaid_count}  No-show: {no_show_count}",
