@@ -36,12 +36,11 @@ def prorated_first_month_rent(agreed_rent, checkin: date) -> Decimal:
 def first_month_rent_due(tenancy: "Tenancy", period_month: date) -> Decimal:
     """Return the Rent Due for a given period.
 
-    First month (where ``period_month`` matches the tenancy's check-in
-    month): prorated rent + deposit. Deposit bundling mirrors the sheet
-    "Rent Due" column and the printed receipt logic. Proration follows
-    the standard cycle: ``floor(rent * days_billed / days_in_month)``
-    where ``days_billed = days_in_month - checkin.day + 1``.
-    All other months use the plain agreed rent.
+    First month: prorated_rent + deposit − booking_amount.
+    Booking advance is already received before check-in and reduces
+    what the tenant still owes — so it is netted out of rent_due at
+    save time rather than deducted again at display time.
+    All other months: agreed_rent.
     """
     rent = Decimal(str(tenancy.agreed_rent or 0))
     checkin = getattr(tenancy, "checkin_date", None)
@@ -49,6 +48,7 @@ def first_month_rent_due(tenancy: "Tenancy", period_month: date) -> Decimal:
         return rent
     if period_month == checkin.replace(day=1):
         prorated = prorated_first_month_rent(rent, checkin)
-        deposit = Decimal(str(tenancy.security_deposit or 0))
-        return prorated + deposit
+        deposit  = Decimal(str(tenancy.security_deposit or 0))
+        booking  = Decimal(str(tenancy.booking_amount or 0))
+        return max(prorated + deposit - booking, Decimal("0"))
     return rent
