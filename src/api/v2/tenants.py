@@ -15,6 +15,7 @@ from src.database.models import (
     Payment,
     PaymentFor,
     Property,
+    RentSchedule,
     Room,
     Tenancy,
     TenancyStatus,
@@ -98,8 +99,8 @@ async def get_tenant_dues(
     today = date.today()
     period_month = date(today.year, today.month, 1)
 
-    # Sum rent payments for this tenancy in the current period
     async with get_session() as session:
+        # Rent paid this period
         paid_result = await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.tenancy_id == tenancy_id,
@@ -108,10 +109,26 @@ async def get_tenant_dues(
                 Payment.is_void == False,
             )
         )
+        # RentSchedule for this period (has correct rent_due: rent+deposit for first month)
+        rs = await session.scalar(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy_id,
+                RentSchedule.period_month == period_month,
+            )
+        )
 
     rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
     paid = float(paid_result) if paid_result is not None else 0.0
-    dues = max(rent - paid, 0.0)
+
+    # Use RentSchedule.rent_due when available (includes deposit for check-in month)
+    rent_due = float(rs.rent_due) if rs else rent
+
+    # Booking advance counts as credit only in the check-in month
+    booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
+    checkin_month = date(tenancy.checkin_date.year, tenancy.checkin_date.month, 1) if tenancy.checkin_date else None
+    booking_credit = booking_amount if checkin_month == period_month else 0.0
+
+    dues = max(rent_due - paid - booking_credit, 0.0)
 
     # Last payment (any type, not voided) for this tenancy
     async with get_session() as session:
@@ -133,6 +150,8 @@ async def get_tenant_dues(
         "room_number": room.room_number,
         "building_code": _building_code(prop.name),
         "rent": rent,
+        "rent_due": rent_due,
+        "booking_amount": booking_amount,
         "dues": dues,
         "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
         "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
