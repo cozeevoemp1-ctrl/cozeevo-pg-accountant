@@ -2,6 +2,82 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.71.0] — 2026-04-27 — PWA: KPI panels v2, money dashboard, VPS deploy at app.getkozzy.com
+
+### PWA deployed to production
+- **`app.getkozzy.com`** live on VPS (port 3001, `kozzy-pwa` systemd service, nginx proxy, Let's Encrypt SSL)
+- Branch: `feature/pwa-forms-rent-collection` (running on VPS, not yet merged to master)
+- Root cause of all 500s: `src/api/v2/auth.py` had stale pre-ES256 code never committed; fixed by committing all missing backend files and deploying
+- CORS: added `https://app.getkozzy.com` to `main.py` `allow_origins`
+
+### KPI panels — expanded + searchable (`web/components/home/kpi-grid.tsx`)
+- **Occupied**: name/room search + rent range dropdown (All / <12k / 12–15k / 15–20k / >20k)
+- **Vacant**: room search + gender pills (All / Male / Female / Empty). Shows **partial vacancies** — room with 3/4 beds taken appears as "1 bed free · Male"
+- **Check-ins / Check-outs today**: name/room search + stay-type pills (All / Regular / Day-wise)
+- All panels: click tenant row → inline `TenantDetailCard` showing check-in date, agreed rent, security deposit, maintenance, dues this month, last payment
+- 256px fixed scroll; filters + selection reset when panel closes or tile toggled
+
+### Backend: kpi-detail enriched (`src/api/v2/kpi.py`)
+- `occupied` items: `tenancy_id`, `rent` added
+- `checkins_today` items: `tenancy_id`, `rent`, `stay_type` added
+- `checkouts_today` items: `tenancy_id`, `stay_type` added
+- `vacant` items: rewritten with LEFT JOIN occupancy subquery + separate gender query → returns `free_beds` + `gender` (male/female/mixed/empty/unknown); partially-occupied rooms now appear
+- New endpoint `GET /api/v2/app/reporting/deposits-held` → cumulative non-voided deposit sum (all time)
+
+### Backend: tenant dues endpoint (`src/api/v2/tenants.py`)
+- `GET /api/v2/app/tenants/{tenancy_id}/dues` now returns `checkin_date`, `security_deposit`, `maintenance_fee`
+
+### Backend: reporting service (`src/services/reporting.py`)
+- `CollectionSummary` — added `method_breakdown: dict[str, int]` (grouped by payment_mode, rent+maintenance only)
+- New `total_deposits_held(*, session) -> int` — all-time cumulative deposit payments (non-voided)
+
+### Backend: auth (`src/api/v2/auth.py`)
+- Switched HS256 → **ES256 via PyJWKClient** (PyJWT + cryptography). Supabase uses ECC keys; old HMAC-based check was crashing every VPS API call with 500.
+
+### Money dashboard (`web/app/collection/breakdown/page.tsx`)
+- Server component with `searchParams: Promise<{ month?: string }>`
+- Month navigation `‹ April 2026 ›` via `?month=YYYY-MM` links; `›` disabled on current month
+- Sections: summary + progress bar, rent collected (pure rent + maintenance split), payment method breakdown (Cash/UPI/Bank transfer/Cheque), pending dues, deposits held (cumulative), deposits received this month (shown separately, not in collection total)
+
+### Frontend API layer (`web/lib/api.ts`)
+- `CollectionSummary`: `method_breakdown: Record<string, number>`
+- `KpiDetailItem`: `rent?`, `free_beds?`, `gender?`, `stay_type?`
+- `TenantDues`: `checkin_date`, `security_deposit`, `maintenance_fee`
+- New: `getDepositsHeld()`, `getKpiDetail()`, `getTenantDues()`
+
+### New auth/session infrastructure
+- `web/lib/auth-server.ts` — server-side `getSession()` via `createSupabaseServer()`
+- `web/lib/supabase-server.ts` — `createServerClient` from `@supabase/ssr` with Next.js cookies()
+- `web/middleware.ts` — refresh Supabase tokens on every request
+
+### Infrastructure
+- Cloudflare DNS for `getkozzy.com` under `kirankumarpemmasani@gmail.com` (not `cozeevoemp1@gmail.com`) — noted in memory
+
+---
+
+## [1.70.0] — 2026-04-27 — April dues reconciliation, sync shutdown, PWA voice fix, VPS deploy
+
+### April data cleanup (one-time ops)
+- **`scripts/fix_april_dues.py`** (new) — reconciles April DB balances against "april dues .xlsx": sets exact adjustment field for 18 people with dues, zeroes 30 others, all tagged `adjustment_note="MANUAL_LOCK"` so no formula ever overwrites them
+- **APScheduler job purged** — `overnight_source_sync` job was persisted in `apscheduler_jobs` DB table even though the code was commented out; deleted directly from DB. This was the root cause of duplicate tenancies (Praveen Kumar, Tanya Rishikesh) being created by 3 AM syncs
+- **Sync endpoints de-registered** — `sync_router` (`/api/sync/source-sheet`) and `/api/admin/rotate-token` removed from `main.py`; all source-sheet auto-syncs are now fully off
+- **Tanya Rishikesh duplicate resolved** — deleted second tenancy (1054) + tenant (933) created by consecutive sync runs; moved auto-synced payment to correct tenancy (919)
+- **Total dues KPI fixed** — `scripts/sync_sheet_from_db.py` no longer includes no-show tenants in total dues; KPI dropped from ₹2,65,203 → ₹88,766 (active tenants only; no-shows count in the month they check in)
+
+### PWA voice — complete rewrite (no backend calls)
+- **`web/lib/voice.ts`** — replaced `useVoiceRecorder` (MediaRecorder → Whisper upload) with `useSpeechInput` (browser-native `SpeechRecognition` API); transcription is now on-device, zero network calls
+- **`web/lib/parse-intent.ts`** (new) — client-side JS parser extracts amount, name, room, method from transcript using regex; replaces Groq LLM intent extraction API call entirely
+- **`web/components/voice/voice-sheet.tsx`** — removed two-step Whisper → LLM pipeline; now speech → local parse → confirm card. Added `VoiceSummary` component that tells user in plain English what was and wasn't understood ("Got ₹8,000, Ravi. Still need: payment method")
+- **`web/lib/api.ts`** — removed `transcribeAudio`, `TranscribeResponse`, `_postForm`; default `BASE_URL` changed from `http://localhost:8000` to `https://api.getkozzy.com` (fixes "Failed to fetch" on production)
+
+### VPS deploy
+- PWA rebuilt and restarted on VPS (`kozzy-pwa.service`); `app.getkozzy.com` now serving latest build pointing to `https://api.getkozzy.com`
+
+### Branch
+`feature/pwa-forms-rent-collection` — all changes on this branch, not yet merged to master
+
+---
+
 ## [1.69.1] — 2026-04-27 — Hotfix: onboarding form submission failure
 
 ### Fixed
