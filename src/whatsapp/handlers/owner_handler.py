@@ -7066,13 +7066,17 @@ async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSess
     if not rows and not dw_rows:
         return f"No new check-ins this month ({today.strftime('%B %Y')})."
 
-    total = len(rows) + len(dw_rows)
-    lines = [f"*Check-ins — {today.strftime('%B %Y')}* ({total} total)\n"]
+    entries: list[tuple[date, str]] = []
     for name, checkin, room_num, stay_type in rows:
         tag = " (day-stay)" if stay_type and stay_type.value == "daily" else ""
-        lines.append(f"• {name}{tag} (Room {room_num}) — {checkin.strftime('%d %b')}")
+        entries.append((checkin, f"• {name}{tag} (Room {room_num}) — {checkin.strftime('%d %b')}"))
     for name, checkin, room_num in dw_rows:
-        lines.append(f"• {name} (day-stay) (Room {room_num}) — {checkin.strftime('%d %b')}")
+        entries.append((checkin, f"• {name} (day-stay) (Room {room_num}) — {checkin.strftime('%d %b')}"))
+    entries.sort(key=lambda x: x[0], reverse=True)
+
+    total = len(entries)
+    lines = [f"*Check-ins — {today.strftime('%B %Y')}* ({total} total)\n"]
+    lines.extend(line for _, line in entries)
     return "\n".join(lines)
 
 
@@ -7110,14 +7114,19 @@ async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSes
     if not rows and not dw_rows:
         return f"No check-outs this month ({today.strftime('%B %Y')})."
 
-    total = len(rows) + len(dw_rows)
-    lines = [f"*Check-outs — {today.strftime('%B %Y')}* ({total} total)\n"]
+    entries: list[tuple[date, str]] = []
     for name, checkout, room_num, stay_type in rows:
         tag = " (day-stay)" if stay_type and stay_type.value == "daily" else ""
-        lines.append(f"• {name}{tag} (Room {room_num}) — {checkout.strftime('%d %b')}")
+        entries.append((checkout, f"• {name}{tag} (Room {room_num}) — {checkout.strftime('%d %b')}"))
     for name, checkout, room_num in dw_rows:
         chk = checkout.strftime("%d %b") if checkout else "?"
-        lines.append(f"• {name} (day-stay) (Room {room_num}) — {chk}")
+        sort_key = checkout if checkout else date.min
+        entries.append((sort_key, f"• {name} (day-stay) (Room {room_num}) — {chk}"))
+    entries.sort(key=lambda x: x[0], reverse=True)
+
+    total = len(entries)
+    lines = [f"*Check-outs — {today.strftime('%B %Y')}* ({total} total)\n"]
+    lines.extend(line for _, line in entries)
     return "\n".join(lines)
 
 
