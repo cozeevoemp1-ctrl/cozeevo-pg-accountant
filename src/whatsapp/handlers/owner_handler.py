@@ -7036,10 +7036,12 @@ async def _query_all_notices(_entities: dict, _ctx: CallerContext, session: Asyn
 # ── Checkins this month ────────────────────────────────────────────────────────
 
 async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    from src.database.models import DaywiseStay
     today = date.today()
     month_start = today.replace(day=1)
+
     result = await session.execute(
-        select(Tenant.name, Tenancy.checkin_date, Room.room_number)
+        select(Tenant.name, Tenancy.checkin_date, Room.room_number, Tenancy.stay_type)
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
@@ -7049,21 +7051,40 @@ async def _query_checkins(entities: dict, ctx: CallerContext, session: AsyncSess
         .order_by(Tenancy.checkin_date.desc())
     )
     rows = result.all()
-    if not rows:
+
+    # Also include daywise_stays checkins this month
+    dw_result = await session.execute(
+        select(DaywiseStay.guest_name, DaywiseStay.checkin_date, DaywiseStay.room_number)
+        .where(
+            DaywiseStay.checkin_date >= month_start,
+            DaywiseStay.checkin_date <= today,
+        )
+        .order_by(DaywiseStay.checkin_date.desc())
+    )
+    dw_rows = dw_result.all()
+
+    if not rows and not dw_rows:
         return f"No new check-ins this month ({today.strftime('%B %Y')})."
-    lines = [f"*Check-ins — {today.strftime('%B %Y')}* ({len(rows)} total)\n"]
-    for name, checkin, room_num in rows:
-        lines.append(f"• {name} (Room {room_num}) — {checkin.strftime('%d %b')}")
+
+    total = len(rows) + len(dw_rows)
+    lines = [f"*Check-ins — {today.strftime('%B %Y')}* ({total} total)\n"]
+    for name, checkin, room_num, stay_type in rows:
+        tag = " (day-stay)" if stay_type and stay_type.value == "daily" else ""
+        lines.append(f"• {name}{tag} (Room {room_num}) — {checkin.strftime('%d %b')}")
+    for name, checkin, room_num in dw_rows:
+        lines.append(f"• {name} (day-stay) (Room {room_num}) — {checkin.strftime('%d %b')}")
     return "\n".join(lines)
 
 
 # ── Checkouts this month ───────────────────────────────────────────────────────
 
 async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    from src.database.models import DaywiseStay
     today = date.today()
     month_start = today.replace(day=1)
+
     result = await session.execute(
-        select(Tenant.name, Tenancy.checkout_date, Room.room_number)
+        select(Tenant.name, Tenancy.checkout_date, Room.room_number, Tenancy.stay_type)
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
@@ -7074,11 +7095,29 @@ async def _query_checkouts(entities: dict, ctx: CallerContext, session: AsyncSes
         .order_by(Tenancy.checkout_date.desc())
     )
     rows = result.all()
-    if not rows:
+
+    # Also include daywise_stays checkouts this month
+    dw_result = await session.execute(
+        select(DaywiseStay.guest_name, DaywiseStay.checkout_date, DaywiseStay.room_number)
+        .where(
+            DaywiseStay.checkout_date >= month_start,
+            DaywiseStay.checkout_date <= today,
+        )
+        .order_by(DaywiseStay.checkout_date.desc())
+    )
+    dw_rows = dw_result.all()
+
+    if not rows and not dw_rows:
         return f"No check-outs this month ({today.strftime('%B %Y')})."
-    lines = [f"*Check-outs — {today.strftime('%B %Y')}* ({len(rows)} total)\n"]
-    for name, checkout, room_num in rows:
-        lines.append(f"• {name} (Room {room_num}) — {checkout.strftime('%d %b')}")
+
+    total = len(rows) + len(dw_rows)
+    lines = [f"*Check-outs — {today.strftime('%B %Y')}* ({total} total)\n"]
+    for name, checkout, room_num, stay_type in rows:
+        tag = " (day-stay)" if stay_type and stay_type.value == "daily" else ""
+        lines.append(f"• {name}{tag} (Room {room_num}) — {checkout.strftime('%d %b')}")
+    for name, checkout, room_num in dw_rows:
+        chk = checkout.strftime("%d %b") if checkout else "?"
+        lines.append(f"• {name} (day-stay) (Room {room_num}) — {chk}")
     return "\n".join(lines)
 
 
