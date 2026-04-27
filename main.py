@@ -140,9 +140,6 @@ app.include_router(onboarding_router)
 from src.api.checkout_router import router as checkout_router
 app.include_router(checkout_router)
 
-from src.api.sync_router import router as sync_router
-app.include_router(sync_router)
-
 from src.api.v2 import app_router
 app.include_router(app_router)
 
@@ -348,59 +345,6 @@ async def reject(entity_id: int, request: Request):
     return {"status": "rejected"}
 
 app.include_router(entity_router)
-
-# ── Admin token rotation (localhost only — middleware enforces this) ────────
-
-import secrets as _secrets
-
-def _update_env_key(key: str, value: str) -> None:
-    """Update or append a key=value line in the .env file."""
-    env_path = Path(".env")
-    if not env_path.exists():
-        return
-    lines = env_path.read_text(encoding="utf-8").splitlines()
-    new_lines, found = [], False
-    for line in lines:
-        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
-            new_lines.append(f"{key}={value}")
-            found = True
-        else:
-            new_lines.append(line)
-    if not found:
-        new_lines.append(f"{key}={value}")
-    env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-
-
-admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-@admin_router.post("/rotate-token")
-async def rotate_token(request: Request, which: str = "sync"):
-    """
-    Rotate sync bearer token in-memory and in .env.
-    ?which=sync (only valid value)
-    Requires X-Admin-Pin header or ?pin= query param.
-    Endpoint is localhost-only (middleware) + admin PIN.
-    """
-    _check_admin_pin(request)
-    result: dict = {}
-
-    import sys as _sys
-
-    if which in ("sync", "all"):
-        new_token = _secrets.token_urlsafe(32)
-        _sr = _sys.modules.get("src.api.sync_router")
-        if _sr:
-            _sr.SYNC_TOKEN = new_token
-        _update_env_key("SYNC_WEBHOOK_TOKEN", new_token)
-        result["sync_token"] = new_token
-
-    if not result:
-        raise HTTPException(400, "which must be 'sync'")
-
-    logger.info("Token(s) rotated: %s", list(result.keys()))
-    return result
-
-app.include_router(admin_router)
 
 # ── Test utilities (TEST_MODE=1 only) ────────────────────────────────────
 
