@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select, desc
+from sqlalchemy import func, select, desc, or_, and_
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -91,12 +91,24 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
 
         # Overdue tenants — active tenancies with rent_due > paid for current month
         period = date(today.year, today.month, 1)
+        next_m = today.month % 12 + 1
+        next_y = today.year + (1 if today.month == 12 else 0)
+        period_end = date(next_y, next_m, 1)
         paid_subq = (
             select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
             .where(
-                Payment.period_month == period,
-                Payment.for_type == PaymentFor.rent,
                 Payment.is_void == False,
+                or_(
+                    # Regular rent payments for this period
+                    and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
+                    # Deposit/booking paid in this calendar month (period_month=NULL for these)
+                    and_(
+                        Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                        Payment.period_month == None,
+                        Payment.payment_date >= period,
+                        Payment.payment_date < period_end,
+                    ),
+                ),
             )
             .group_by(Payment.tenancy_id)
             .subquery()
@@ -256,12 +268,22 @@ async def get_kpi_detail(
 
         elif type == "dues":
             period = date(today.year, today.month, 1)
+            next_m = today.month % 12 + 1
+            next_y = today.year + (1 if today.month == 12 else 0)
+            period_end = date(next_y, next_m, 1)
             paid_subq = (
                 select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
                 .where(
-                    Payment.period_month == period,
-                    Payment.for_type == PaymentFor.rent,
                     Payment.is_void == False,
+                    or_(
+                        and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
+                        and_(
+                            Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                            Payment.period_month == None,
+                            Payment.payment_date >= period,
+                            Payment.payment_date < period_end,
+                        ),
+                    ),
                 )
                 .group_by(Payment.tenancy_id)
                 .subquery()

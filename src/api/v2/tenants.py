@@ -7,7 +7,7 @@ import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -99,14 +99,25 @@ async def get_tenant_dues(
     today = date.today()
     period_month = date(today.year, today.month, 1)
 
+    next_m = today.month % 12 + 1
+    next_y = today.year + (1 if today.month == 12 else 0)
+    period_end = date(next_y, next_m, 1)
+
     async with get_session() as session:
-        # Rent paid this period
+        # Rent paid this period — includes deposit/booking paid in same calendar month
         paid_result = await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.tenancy_id == tenancy_id,
-                Payment.for_type == PaymentFor.rent,
-                Payment.period_month == period_month,
                 Payment.is_void == False,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period_month),
+                    and_(
+                        Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                        Payment.period_month == None,
+                        Payment.payment_date >= period_month,
+                        Payment.payment_date < period_end,
+                    ),
+                ),
             )
         )
         # RentSchedule for this period (has correct rent_due: rent+deposit for first month)
