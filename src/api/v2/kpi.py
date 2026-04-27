@@ -24,11 +24,11 @@ activity_router = APIRouter(prefix="/activity")
 async def get_kpi(user: AppUser = Depends(get_current_user)):
     today = date.today()
     async with get_session() as session:
-        # Total revenue beds
+        # Total revenue beds (exclude UNASSIGNED placeholder room)
         total_beds = int(
             await session.scalar(
                 select(func.coalesce(func.sum(Room.max_occupancy), 0))
-                .where(Room.is_staff_room == False)
+                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED")
             ) or 0
         )
 
@@ -50,6 +50,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .join(Room, Room.id == Tenancy.room_id)
             .where(
                 Room.is_staff_room == False,
+                Room.room_number != "UNASSIGNED",
                 Tenancy.status == TenancyStatus.active,
             )
         )
@@ -64,6 +65,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
                     Tenancy.status == TenancyStatus.active,
                 )
             ) or 0
@@ -103,6 +105,70 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         checkouts_today=checkouts_today,
         open_complaints=open_complaints,
     )
+
+
+@router.get("/kpi-detail")
+async def get_kpi_detail(
+    type: str,
+    user: AppUser = Depends(get_current_user),
+):
+    """Return the underlying rows for a KPI tile."""
+    today = date.today()
+    async with get_session() as session:
+        if type == "checkins_today":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date, Tenancy.agreed_rent)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(Tenancy.checkin_date == today)
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {"tenancy_id": r.id, "name": r.name, "room": r.room_number, "detail": f"₹{int(r.agreed_rent or 0):,}/mo"}
+                for r in rows
+            ]}
+
+        elif type == "checkouts_today":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(Tenancy.checkout_date == today)
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {"tenancy_id": r.id, "name": r.name, "room": r.room_number, "detail": "Check-out today"}
+                for r in rows
+            ]}
+
+        elif type == "vacant":
+            rows = (await session.execute(
+                select(Room.room_number, Room.max_occupancy)
+                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED")
+                .where(~Room.id.in_(
+                    select(Tenancy.room_id).where(Tenancy.status == TenancyStatus.active)
+                ))
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {"name": f"Room {r.room_number}", "room": r.room_number, "detail": f"{r.max_occupancy} bed(s)"}
+                for r in rows
+            ]}
+
+        elif type == "occupied":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.agreed_rent)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED", Tenancy.status == TenancyStatus.active)
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {"tenancy_id": r.id, "name": r.name, "room": r.room_number, "detail": f"₹{int(r.agreed_rent or 0):,}/mo"}
+                for r in rows
+            ]}
+
+    return {"type": type, "items": []}
 
 
 @activity_router.get("/recent", response_model=ActivityResponse)

@@ -6,15 +6,14 @@ import { supabase } from "./supabase";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-async function _authHeaders(): Promise<Record<string, string>> {
-  const { data } = await supabase().auth.getSession();
-  const token = data.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+async function _authHeaders(token?: string): Promise<Record<string, string>> {
+  const tok = token ?? (await supabase().auth.getSession()).data.session?.access_token;
+  return tok ? { Authorization: `Bearer ${tok}` } : {};
 }
 
-async function _get<T>(path: string): Promise<T> {
-  const headers = await _authHeaders();
-  const res = await fetch(`${BASE_URL}${path}`, { headers });
+async function _get<T>(path: string, token?: string): Promise<T> {
+  const headers = await _authHeaders(token);
+  const res = await fetch(`${BASE_URL}${path}`, { headers, cache: "no-store" });
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -26,16 +25,6 @@ async function _post<T>(path: string, body: unknown): Promise<T> {
     headers,
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error((detail as { detail?: string }).detail ?? `POST ${path} → ${res.status}`);
-  }
-  return res.json() as Promise<T>;
-}
-
-async function _postForm<T>(path: string, form: FormData): Promise<T> {
-  const headers = await _authHeaders();
-  const res = await fetch(`${BASE_URL}${path}`, { method: "POST", headers, body: form });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     throw new Error((detail as { detail?: string }).detail ?? `POST ${path} → ${res.status}`);
@@ -97,12 +86,6 @@ export interface ActivityResponse {
   items: ActivityItem[];
 }
 
-export interface TranscribeResponse {
-  text: string;
-  language: string;
-  duration_seconds: number;
-}
-
 export interface PaymentIntent {
   intent: string;
   amount: number | null;
@@ -114,26 +97,27 @@ export interface PaymentIntent {
 
 // ── API calls ────────────────────────────────────────────────────────────────
 
-export function getCollectionSummary(periodMonth: string): Promise<CollectionSummary> {
-  return _get(`/api/v2/app/reporting/collection?period_month=${encodeURIComponent(periodMonth)}`);
+export function getCollectionSummary(periodMonth: string, token?: string): Promise<CollectionSummary> {
+  return _get(`/api/v2/app/reporting/collection?period_month=${encodeURIComponent(periodMonth)}`, token);
 }
 
-export function getKpi(): Promise<KpiResponse> {
-  return _get("/api/v2/app/reporting/kpi");
+export function getKpi(token?: string): Promise<KpiResponse> {
+  return _get("/api/v2/app/reporting/kpi", token);
 }
 
-export function getRecentActivity(limit = 20): Promise<ActivityResponse> {
-  return _get(`/api/v2/app/activity/recent?limit=${limit}`);
+export function getRecentActivity(limit = 20, token?: string): Promise<ActivityResponse> {
+  return _get(`/api/v2/app/activity/recent?limit=${limit}`, token);
+}
+
+export interface KpiDetailItem { tenancy_id?: number; name: string; room: string; detail: string; }
+export interface KpiDetail { type: string; items: KpiDetailItem[]; }
+
+export function getKpiDetail(type: string): Promise<KpiDetail> {
+  return _get(`/api/v2/app/reporting/kpi-detail?type=${type}`);
 }
 
 export function createPayment(body: PaymentCreate): Promise<PaymentResponse> {
   return _post("/api/v2/app/payments", body);
-}
-
-export function transcribeAudio(blob: Blob, mime: string): Promise<TranscribeResponse> {
-  const form = new FormData();
-  form.append("audio", blob, mime.includes("mp4") ? "audio.mp4" : "audio.webm");
-  return _postForm("/api/v2/app/voice/transcribe", form);
 }
 
 export function extractPaymentIntent(transcript: string): Promise<PaymentIntent> {
@@ -160,6 +144,9 @@ export interface TenantDues {
   building_code: string;
   rent: number;
   dues: number;
+  checkin_date: string | null;
+  security_deposit: number;
+  maintenance_fee: number;
   last_payment_date: string | null;
   last_payment_amount: number | null;
   period_month: string;
