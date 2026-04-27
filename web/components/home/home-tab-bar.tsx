@@ -13,7 +13,6 @@ export function HomeTabBar() {
 
   function handleIntent(intent: PaymentIntent) {
     setVoiceOpen(false);
-    // Pass intent as search params to payment page
     const params = new URLSearchParams();
     if (intent.amount != null) params.set("amount", String(intent.amount));
     if (intent.method) params.set("method", intent.method);
@@ -23,51 +22,52 @@ export function HomeTabBar() {
     router.push(`/payment/new?${params.toString()}`);
   }
 
+  const active =
+    pathname === "/"                     ? "home"       :
+    pathname.startsWith("/payment")      ? "payments"   :
+    pathname.startsWith("/collection")   ? "collection" :
+    pathname.startsWith("/tenants") || pathname.startsWith("/onboarding") || pathname.startsWith("/checkin") ? "manage" :
+    pathname.startsWith("/reminders")    ? "reminders"  :
+    "home";
+
   return (
     <>
       <TabBar
-        activeKey={
-          pathname === "/"                   ? "home"       :
-          pathname.startsWith("/payment")    ? "payment"    :
-          pathname.startsWith("/collection") ? "collection" :
-          pathname.startsWith("/onboarding") || pathname.startsWith("/checkin") ? "tenants" :
-          "home"
-        }
+        activeKey={active}
         items={[
           {
             key: "home",
             label: "Home",
-            icon: "🏠",
+            icon: <HomeIcon />,
             onClick: () => router.push("/"),
           },
           {
             key: "payments",
             label: "Payments",
-            icon: "📋",
+            icon: <PayIcon />,
             onClick: () => router.push("/payment/new"),
           },
           {
             key: "voice",
             label: "Voice",
-            icon: <MicSvg />,
+            icon: <MicIcon />,
             isCta: true,
             onClick: () => setVoiceOpen(true),
           },
           {
             key: "collection",
             label: "Collection",
-            icon: "📊",
+            icon: <ChartIcon />,
             onClick: () => router.push("/collection/breakdown"),
           },
           {
-            key: "tenants",
-            label: "Tenants",
-            icon: "👤",
-            onClick: () => router.push("/onboarding/new"),
+            key: "manage",
+            label: "Manage",
+            icon: <ManageIcon />,
+            onClick: () => router.push("/tenants"),
           },
         ]}
       />
-
       {voiceOpen && (
         <VoiceSheet onClose={() => setVoiceOpen(false)} onPaymentIntent={handleIntent} />
       )}
@@ -75,13 +75,54 @@ export function HomeTabBar() {
   );
 }
 
-function MicSvg() {
+function HomeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 12L12 3l9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M5 10v11h14V10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function PayIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="2"/>
+      <path d="M2 10h20" stroke="currentColor" strokeWidth="2"/>
+      <path d="M6 15h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function MicIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor" />
-      <path d="M5 10a7 7 0 0 0 14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/>
+      <path d="M5 10a7 7 0 0 0 14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function ChartIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="12" width="4" height="9" rx="1" fill="currentColor" opacity="0.6"/>
+      <rect x="10" y="7" width="4" height="14" rx="1" fill="currentColor"/>
+      <rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor" opacity="0.6"/>
+    </svg>
+  );
+}
+
+function ManageIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
+      <path d="M3 21v-2a7 7 0 0 1 12-4.9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="18" cy="18" r="3" stroke="currentColor" strokeWidth="2"/>
+      <path d="M18 15v-1M18 22v-1M15 18h-1M22 18h-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
     </svg>
   );
 }

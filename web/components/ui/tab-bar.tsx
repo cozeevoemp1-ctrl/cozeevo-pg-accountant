@@ -7,7 +7,6 @@ export interface TabBarItem {
   key: string;
   label: string;
   icon: ReactNode;
-  /** When true, renders as the centre mic-style action button */
   isCta?: boolean;
   href?: string;
   onClick?: () => void;
@@ -20,35 +19,37 @@ interface TabBarProps {
 
 export function TabBar({ items, activeKey }: TabBarProps) {
   return (
-    <nav className="fixed bottom-0 inset-x-0 bg-surface border-t border-[#E2DEDD] flex items-center justify-around h-16 px-2 z-50 safe-area-inset-bottom">
-      {items.map((item) => {
-        const isActive = item.key === activeKey;
-        if (item.isCta) {
+    <div className="fixed bottom-0 inset-x-0 z-50 flex justify-center pb-5 px-6 pointer-events-none">
+      <nav className="pointer-events-auto flex items-center gap-1 bg-[#1C1C1E] rounded-full px-3 py-2 shadow-2xl">
+        {items.map((item) => {
+          const isActive = item.key === activeKey;
+          if (item.isCta) {
+            return (
+              <button
+                key={item.key}
+                onClick={item.onClick}
+                aria-label={item.label}
+                className="flex items-center justify-center w-12 h-12 mx-1 rounded-full bg-brand-pink text-white shadow-lg active:scale-95 transition-transform"
+              >
+                {item.icon}
+              </button>
+            );
+          }
           return (
             <button
               key={item.key}
               onClick={item.onClick}
               aria-label={item.label}
-              className="flex items-center justify-center w-14 h-14 -mt-5 rounded-full bg-brand-pink text-white shadow-lg active:scale-95 transition-transform"
+              className={clsx(
+                "flex items-center justify-center w-11 h-11 rounded-full transition-all duration-200",
+                isActive ? "bg-brand-pink text-white" : "text-[#8E8E93]",
+              )}
             >
               {item.icon}
             </button>
           );
-        }
-        return (
-          <button
-            key={item.key}
-            onClick={item.onClick}
-            className={clsx(
-              "flex flex-col items-center gap-0.5 flex-1 py-1 text-[10px] font-medium transition-colors",
-              isActive ? "text-brand-pink" : "text-ink-muted",
-            )}
-          >
-            <span className="text-xl">{item.icon}</span>
-            {item.label}
-          </button>
-        );
-      })}
-    </nav>
+        })}
+      </nav>
+    </div>
   );
 }

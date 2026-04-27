@@ -5,7 +5,6 @@ import { Greeting } from "@/components/home/greeting";
 import { OverviewCard } from "@/components/home/overview-card";
 import { KpiGrid } from "@/components/home/kpi-grid";
 import { ActivityFeed } from "@/components/home/activity-feed";
-import { HomeTabBar } from "@/components/home/home-tab-bar";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
@@ -33,40 +32,36 @@ export default async function HomePage() {
   ]);
 
   return (
-    <>
-      <main className="flex flex-col gap-5 px-4 pt-6 pb-24 max-w-lg mx-auto">
-        <Greeting session={session} />
+    <main className="flex flex-col gap-5 px-4 pt-6 pb-32 max-w-lg mx-auto">
+      <Greeting session={session} />
 
-        {collection.status === "fulfilled" && (
-          <Link href="/collection/breakdown" className="block">
-            <OverviewCard data={collection.value} month={monthLabel} />
-          </Link>
-        )}
+      {collection.status === "fulfilled" && (
+        <Link href="/collection/breakdown" className="block">
+          <OverviewCard data={collection.value} month={monthLabel} />
+        </Link>
+      )}
 
-        {kpi.status === "fulfilled" && (
-          <section>
-            <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
-              Today at a glance
-            </h2>
-            <KpiGrid data={kpi.value} />
-          </section>
-        )}
-
+      {kpi.status === "fulfilled" && (
         <section>
           <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
-            Recent payments
+            Today at a glance
           </h2>
-          <Card className="px-4 py-1">
-            {activity.status === "fulfilled" ? (
-              <ActivityFeed items={activity.value.items} />
-            ) : (
-              <p className="text-sm text-ink-muted py-4 text-center">Unable to load activity</p>
-            )}
-          </Card>
+          <KpiGrid data={kpi.value} />
         </section>
-      </main>
+      )}
 
-      <HomeTabBar />
-    </>
+      <section>
+        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
+          Recent payments
+        </h2>
+        <Card className="px-4 py-1">
+          {activity.status === "fulfilled" ? (
+            <ActivityFeed items={activity.value.items} />
+          ) : (
+            <p className="text-sm text-ink-muted py-4 text-center">Unable to load activity</p>
+          )}
+        </Card>
+      </section>
+    </main>
   );
 }

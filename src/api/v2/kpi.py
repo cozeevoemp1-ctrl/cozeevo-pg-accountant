@@ -34,18 +34,20 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Occupied beds (active tenants, including premium=2 beds)
-        occupied_raw = await session.scalar(
+        # Occupied beds — per-room sum capped at max_occupancy so overcrowded
+        # rooms don't pull vacant_beds below the true available count.
+        from sqlalchemy import least as sql_least
+        per_room_occ = (
             select(
-                func.coalesce(
+                func.least(
                     func.sum(
                         case(
                             (Tenancy.sharing_type == "premium", Room.max_occupancy),
                             else_=literal_column("1"),
                         )
                     ),
-                    0,
-                )
+                    Room.max_occupancy,
+                ).label("capped_occ")
             )
             .select_from(Tenancy)
             .join(Room, Room.id == Tenancy.room_id)
@@ -54,6 +56,11 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 Room.room_number != "UNASSIGNED",
                 Tenancy.status == TenancyStatus.active,
             )
+            .group_by(Room.id, Room.max_occupancy)
+            .subquery()
+        )
+        occupied_raw = await session.scalar(
+            select(func.coalesce(func.sum(per_room_occ.c.capped_occ), 0))
         )
         occupied_beds = int(occupied_raw or 0)
         vacant_beds = max(total_beds - occupied_beds, 0)
