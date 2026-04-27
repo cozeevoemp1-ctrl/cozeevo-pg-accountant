@@ -2897,6 +2897,13 @@ async def resolve_pending_action(
         )
 
     if chosen is not None and pending.intent == "UPDATE_CHECKIN":
+        if chosen.get("record_type") == "daywise_stays":
+            return await _do_update_daywise_checkin(
+                stay_id=chosen["stay_id"],
+                guest_name=chosen["label"],
+                new_checkin_str=action_data.get("new_checkin", ""),
+                session=session,
+            )
         return await _do_update_checkin(
             tenancy_id=chosen["tenancy_id"],
             tenant_name=chosen["label"],
@@ -4675,6 +4682,29 @@ async def _update_checkin(entities: dict, ctx: CallerContext, session: AsyncSess
         search_term = f"Room {room}"
 
     if len(rows) == 0:
+        from src.whatsapp.handlers._shared import _find_daywise_by_name, _find_daywise_by_room, _make_daywise_choices
+        dw_rows = await _find_daywise_by_name(name, session) if name else []
+        if not dw_rows and room:
+            dw_rows = await _find_daywise_by_room(room, session)
+        if dw_rows:
+            choices = _make_daywise_choices(dw_rows)
+            dw_action = {"name_raw": search_term, "new_checkin": date_str, "record_type": "daywise_stays"}
+            if len(dw_rows) == 1:
+                ds = dw_rows[0]
+                if ds.checkout_date and new_checkin >= ds.checkout_date:
+                    return (
+                        f"Invalid: new checkin {new_checkin.strftime('%d %b %Y')} is on/after "
+                        f"checkout {ds.checkout_date.strftime('%d %b %Y')}."
+                    )
+                await _save_pending(ctx.phone, "UPDATE_CHECKIN", dw_action, choices, session)
+                return (
+                    f"Update checkin for *{ds.guest_name}* (Room {ds.room_number})?\n\n"
+                    f"Current: {ds.checkin_date.strftime('%d %b %Y') if ds.checkin_date else '?'}\n"
+                    f"New:     {new_checkin.strftime('%d %b %Y')}\n\n"
+                    f"Reply *1* to confirm."
+                )
+            await _save_pending(ctx.phone, "UPDATE_CHECKIN", dw_action, choices, session)
+            return _format_choices_message(search_term, choices, f"update checkin to {new_checkin.strftime('%d %b %Y')}")
         suggestions = await _find_similar_names(name, session) if name else []
         return _format_no_match_message(name or room, suggestions)
 
@@ -4843,22 +4873,39 @@ async def _do_update_checkin(
 
     old_checkin = tenancy.checkin_date
     tenancy.checkin_date = new_checkin
+    await session.commit()
 
     # Google Sheets write-back
     gsheets_note = ""
-    try:
-        room_obj = await session.get(Room, tenancy.room_id)
-        if room_obj:
-            from src.integrations.gsheets import update_checkin as gsheets_update_checkin
-            gs_r = await gsheets_update_checkin(
-                room_obj.room_number, tenant_name, new_checkin.strftime("%d/%m/%Y")
-            )
-            if gs_r.get("success"):
-                gsheets_note = "\nSheet updated"
-    except Exception as e:
-        import logging as _log
-        _log.getLogger(__name__).error("GSheets update_checkin failed: %s", e)
+    if tenancy.stay_type == StayType.daily:
+        try:
+            from src.integrations import gsheets as _gs
+            _gs.trigger_daywise_sheet_sync()
+            gsheets_note = "\nSheet updated: DAY WISE"
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).warning("trigger_daywise_sheet_sync failed: %s", e)
+    else:
+        try:
+            room_obj = await session.get(Room, tenancy.room_id)
+            if room_obj:
+                from src.integrations.gsheets import update_checkin as gsheets_update_checkin
+                gs_r = await gsheets_update_checkin(
+                    room_obj.room_number, tenant_name, new_checkin.strftime("%d/%m/%Y")
+                )
+                if gs_r.get("success"):
+                    gsheets_note = "\nSheet updated"
+        except Exception as e:
+            import logging as _log
+            _log.getLogger(__name__).error("GSheets update_checkin failed: %s", e)
 
+    if tenancy.stay_type == StayType.daily:
+        return (
+            f"*Checkin updated — {tenant_name}*\n"
+            f"Was: {old_checkin.strftime('%d %b %Y')}\n"
+            f"Now: {new_checkin.strftime('%d %b %Y')}"
+            f"{gsheets_note}"
+        )
     return (
         f"*Checkin updated — {tenant_name}*\n"
         f"Was: {old_checkin.strftime('%d %b %Y')}\n"
@@ -4866,6 +4913,40 @@ async def _do_update_checkin(
         f"{gsheets_note}\n\n"
         "Note: rent schedule rows are not auto-adjusted.\n"
         "Send *report* to verify dues."
+    )
+
+
+async def _do_update_daywise_checkin(
+    stay_id: int,
+    guest_name: str,
+    new_checkin_str: str,
+    session: AsyncSession,
+) -> str:
+    """Update checkin_date on a daywise_stays record."""
+    from src.database.models import DaywiseStay
+    ds = await session.get(DaywiseStay, stay_id)
+    if not ds:
+        return "Day-stay record not found."
+    try:
+        new_checkin = date.fromisoformat(new_checkin_str)
+    except (ValueError, TypeError):
+        return "Invalid date. Please try again."
+    if ds.checkout_date and new_checkin >= ds.checkout_date:
+        return (
+            f"Cannot update: new checkin {new_checkin.strftime('%d %b %Y')} is on/after "
+            f"checkout {ds.checkout_date.strftime('%d %b %Y')}."
+        )
+    old_str = ds.checkin_date.strftime("%d %b %Y") if ds.checkin_date else "not set"
+    ds.checkin_date = new_checkin
+    if ds.checkout_date:
+        ds.num_days = (ds.checkout_date - new_checkin).days
+    await session.commit()
+    from src.integrations import gsheets as _gs
+    _gs.trigger_daywise_sheet_sync()
+    return (
+        f"*Checkin updated — {guest_name}*\n"
+        f"Was: {old_str}\n"
+        f"Now: {new_checkin.strftime('%d %b %Y')}"
     )
 
 
