@@ -2,6 +2,35 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.8] — 2026-04-27 — First-month dues inflated bug fix (28 tenants / ₹3.9L)
+
+### Bug fix — deposit+booking payments now count toward dues calculation
+- **Root cause**: `rent_schedule.rent_due` for first-month tenants bundles deposit (e.g. ₹22k rent + ₹22k deposit = ₹44k). But deposit/booking payments have `period_month=NULL` and `for_type=deposit/booking`, so the old `paid` query (filter: `for_type=rent AND period_month=Apr`) missed them entirely.
+- **`src/api/v2/kpi.py`** — `paid_subq` now uses `OR`: rent payments for the period, OR deposit/booking payments with `period_month=NULL` and `payment_date` within the period month. Applied in both `/kpi` and `/kpi-detail?type=dues`.
+- **`src/api/v2/tenants.py`** — same fix in `get_tenant_dues`; also picks up `rs.adjustment` field.
+- **Impact**: 28 April check-ins affected; ₹3,90,000 in payments now correctly counted. Example: Arumugam Sathish (513) was showing ₹32,000 dues, now shows ₹5,000.
+
+---
+
+## [1.73.7] — 2026-04-27 — Dashboard dues fix + day-stay payment mode fix
+
+### Bug fixes
+- **`src/whatsapp/handlers/account_handler.py`** — `show dashboard` dues line now shows current month (Apr 2026) outstanding instead of previous month (Mar 2026); removed unused `prev_month`/`prev_label` variables
+- **`src/api/onboarding_router.py`** — day-stay onboarding payment no longer hardcodes CASH; now reads `obs.advance_mode` (UPI or CASH) same as monthly path
+- **`src/api/v2/kpi.py`** — removed unused `DaywiseStay` import (leftover from earlier refactor)
+
+---
+
+## [1.73.6] — 2026-04-27 — Dues tile replaces complaints on PWA home
+
+### PWA home screen
+- **`web/components/home/kpi-grid.tsx`** — replaced "Open complaints" tile with "Dues pending" tile showing total outstanding amount (Indian comma format) + overdue tenant count; expandable list has name/room search + THOR/HULK building filter pills; vacant list gender filter restored
+- **`src/api/v2/kpi.py`** — `/kpi` now returns `overdue_amount` (sum of unpaid rent); `/kpi-detail?type=dues` returns per-tenant dues with building from Property join
+- **`src/schemas/kpi.py`** — added `overdue_amount: float` to `KpiResponse`
+- **`web/lib/api.ts`** — added `overdue_amount`, `dues?`, `building?` fields to typed interfaces
+
+---
+
 ## [1.73.5] — 2026-04-27 — Full amounts everywhere (no L/Cr abbreviation)
 
 ### Format fix — all KPI surfaces now show full Indian comma amounts
