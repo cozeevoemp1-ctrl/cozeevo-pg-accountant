@@ -13,6 +13,7 @@ interface KpiGridProps {
 type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | null;
 type RentRange = "all" | "lt12" | "12to15" | "15to20" | "gt20";
 type GenderFilter = "all" | "male" | "female" | "empty";
+type StayFilter = "all" | "monthly" | "daily";
 
 const RENT_RANGES: { value: RentRange; label: string }[] = [
   { value: "all", label: "All rents" },
@@ -20,6 +21,12 @@ const RENT_RANGES: { value: RentRange; label: string }[] = [
   { value: "12to15", label: "₹12k–15k" },
   { value: "15to20", label: "₹15k–20k" },
   { value: "gt20", label: "> ₹20k" },
+];
+
+const STAY_FILTERS: { value: StayFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "monthly", label: "Regular" },
+  { value: "daily", label: "Day-wise" },
 ];
 
 const GENDER_FILTERS: { value: GenderFilter; label: string }[] = [
@@ -105,6 +112,9 @@ export function KpiGrid({ data }: KpiGridProps) {
   const [roomSearch, setRoomSearch] = useState("");
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
 
+  // Check-in/checkout filters
+  const [stayFilter, setStayFilter] = useState<StayFilter>("all");
+
   // Tenant detail
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -130,6 +140,7 @@ export function KpiGrid({ data }: KpiGridProps) {
     setRentRange("all");
     setRoomSearch("");
     setGenderFilter("all");
+    setStayFilter("all");
     setSelected(null);
   }
 
@@ -146,13 +157,20 @@ export function KpiGrid({ data }: KpiGridProps) {
 
   // Apply filters based on open tile
   const filtered = items.filter((it) => {
-    if (open === "occupied" || open === "checkins_today" || open === "checkouts_today") {
+    if (open === "occupied") {
       const matchName =
         !nameSearch.trim() ||
         it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
         it.room.toLowerCase().includes(nameSearch.toLowerCase());
-      const matchRent = inRentRange(it.rent, rentRange);
-      return matchName && matchRent;
+      return matchName && inRentRange(it.rent, rentRange);
+    }
+    if (open === "checkins_today" || open === "checkouts_today") {
+      const matchName =
+        !nameSearch.trim() ||
+        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+        it.room.toLowerCase().includes(nameSearch.toLowerCase());
+      const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
+      return matchName && matchStay;
     }
     if (open === "vacant") {
       const matchRoom =
@@ -210,8 +228,8 @@ export function KpiGrid({ data }: KpiGridProps) {
       {open && (
         <div className="mt-2 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden">
 
-          {/* Filter bar — occupied/checkins/checkouts: name search + rent range */}
-          {(open === "occupied" || open === "checkins_today" || open === "checkouts_today") && (
+          {/* Filter bar — occupied: name search + rent range */}
+          {open === "occupied" && (
             <div className="px-3 pt-3 pb-2 flex gap-2">
               <input
                 type="text"
@@ -229,6 +247,34 @@ export function KpiGrid({ data }: KpiGridProps) {
                   <option key={r.value} value={r.value}>{r.label}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Filter bar — checkins/checkouts: name search + stay type pills */}
+          {(open === "checkins_today" || open === "checkouts_today") && (
+            <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
+              <input
+                type="text"
+                placeholder="Name or room…"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+                className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              />
+              <div className="flex gap-1.5">
+                {STAY_FILTERS.map((sf) => (
+                  <button
+                    key={sf.value}
+                    onClick={() => setStayFilter(sf.value)}
+                    className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
+                      stayFilter === sf.value
+                        ? "bg-brand-pink text-white border-brand-pink"
+                        : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    }`}
+                  >
+                    {sf.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
