@@ -113,11 +113,13 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .group_by(Payment.tenancy_id)
             .subquery()
         )
+        adj = func.coalesce(RentSchedule.adjustment, 0)
+        effective_due = RentSchedule.rent_due + adj
         overdue_rows = (await session.execute(
             select(
                 func.count(RentSchedule.id),
                 func.coalesce(
-                    func.sum(RentSchedule.rent_due - func.coalesce(paid_subq.c.paid, 0)),
+                    func.sum(effective_due - func.coalesce(paid_subq.c.paid, 0)),
                     0,
                 ),
             )
@@ -126,7 +128,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .where(
                 RentSchedule.period_month == period,
                 Tenancy.status == TenancyStatus.active,
-                RentSchedule.rent_due > func.coalesce(paid_subq.c.paid, 0),
+                effective_due > func.coalesce(paid_subq.c.paid, 0),
             )
         )).one()
         overdue_tenants = int(overdue_rows[0] or 0)
@@ -288,13 +290,14 @@ async def get_kpi_detail(
                 .group_by(Payment.tenancy_id)
                 .subquery()
             )
+            eff_due_col = (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)).label("effective_due")
             rows = (await session.execute(
                 select(
                     Tenancy.id,
                     Tenant.name,
                     Room.room_number,
                     Property.name.label("property_name"),
-                    RentSchedule.rent_due,
+                    eff_due_col,
                     func.coalesce(paid_subq.c.paid, 0).label("paid"),
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
@@ -305,9 +308,9 @@ async def get_kpi_detail(
                 .where(
                     RentSchedule.period_month == period,
                     Tenancy.status == TenancyStatus.active,
-                    RentSchedule.rent_due > func.coalesce(paid_subq.c.paid, 0),
+                    (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)) > func.coalesce(paid_subq.c.paid, 0),
                 )
-                .order_by(desc(RentSchedule.rent_due - func.coalesce(paid_subq.c.paid, 0)))
+                .order_by(desc(RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0) - func.coalesce(paid_subq.c.paid, 0)))
             )).all()
             return {"type": type, "items": [
                 {
@@ -315,8 +318,8 @@ async def get_kpi_detail(
                     "name": r.name,
                     "room": r.room_number,
                     "building": (r.property_name or "").split()[-1] if r.property_name else "",
-                    "detail": f"₹{int(r.rent_due - r.paid):,}",
-                    "dues": int(r.rent_due - r.paid),
+                    "detail": f"₹{int(r.effective_due - r.paid):,}",
+                    "dues": int(r.effective_due - r.paid),
                 }
                 for r in rows
             ]}

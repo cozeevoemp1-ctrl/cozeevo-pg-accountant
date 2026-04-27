@@ -22,17 +22,54 @@ import math
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 from loguru import logger
 
 from src.database.db_manager import get_session
 from src.database.models import (
-    Tenancy, TenancyStatus, RentSchedule, RentStatus,
+    Payment, PaymentFor, Tenancy, TenancyStatus, RentSchedule, RentStatus,
 )
 
 
 def _days_in_month(year: int, month: int) -> int:
     return calendar.monthrange(year, month)[1]
+
+
+async def _prev_outstanding(session, tenancy_id: int, prev_period: date) -> Decimal:
+    """Return unpaid dues from prev_period, or 0."""
+    rs = (await session.execute(
+        select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy_id,
+            RentSchedule.period_month == prev_period,
+        )
+    )).scalar()
+    if not rs:
+        return Decimal("0")
+
+    # prev_end = first day of current period (exclusive upper bound for payment_date)
+    prev_end = date(
+        prev_period.year + (1 if prev_period.month == 12 else 0),
+        prev_period.month % 12 + 1,
+        1,
+    )
+    paid = await session.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.tenancy_id == tenancy_id,
+            Payment.is_void == False,
+            or_(
+                and_(Payment.for_type == PaymentFor.rent,
+                     Payment.period_month == prev_period),
+                and_(
+                    Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                    Payment.period_month == None,
+                    Payment.payment_date >= prev_period,
+                    Payment.payment_date < prev_end,
+                ),
+            ),
+        )
+    )
+    due = rs.rent_due + (rs.adjustment or Decimal("0")) - Decimal(str(paid or 0))
+    return max(due, Decimal("0"))
 
 
 async def generate_rent_schedule_for_month(year: int, month: int) -> dict:
@@ -47,7 +84,7 @@ async def generate_rent_schedule_for_month(year: int, month: int) -> dict:
     m_end = date(year, month, days)
 
     stats = {"created": 0, "skipped_existing": 0, "skipped_exited": 0,
-             "noshow": 0, "first_month": 0}
+             "noshow": 0, "first_month": 0, "carry_forward": 0}
 
     async with get_session() as session:
         # Pull only carryable tenancies (active + no_show)
@@ -106,11 +143,28 @@ async def generate_rent_schedule_for_month(year: int, month: int) -> dict:
                 rent_due = Decimal(str(prorated))
                 stats["first_month"] += 1
 
+            # Carry forward unpaid dues from previous month (active only)
+            carry = Decimal("0")
+            carry_note = None
+            if tn.status == TenancyStatus.active:
+                prev_m = 12 if period.month == 1 else period.month - 1
+                prev_y = period.year - 1 if period.month == 1 else period.year
+                prev_period = date(prev_y, prev_m, 1)
+                carry = await _prev_outstanding(session, tn.id, prev_period)
+                if carry > 0:
+                    carry_note = (
+                        f"{prev_period.strftime('%B %Y')} carry-forward: "
+                        f"₹{int(carry):,}"
+                    )
+                    stats["carry_forward"] += 1
+
             session.add(RentSchedule(
                 tenancy_id=tn.id,
                 period_month=period,
                 rent_due=rent_due,
                 maintenance_due=Decimal("0"),
+                adjustment=carry,
+                adjustment_note=carry_note,
                 status=rs_status,
                 due_date=period,
             ))
@@ -120,8 +174,9 @@ async def generate_rent_schedule_for_month(year: int, month: int) -> dict:
 
     logger.info(
         "[monthly_rollover] period=%s created=%d skipped_existing=%d "
-        "skipped_exited=%d noshow=%d first_month=%d",
+        "skipped_exited=%d noshow=%d first_month=%d carry_forward=%d",
         period.isoformat(), stats["created"], stats["skipped_existing"],
-        stats["skipped_exited"], stats["noshow"], stats["first_month"]
+        stats["skipped_exited"], stats["noshow"], stats["first_month"],
+        stats["carry_forward"],
     )
     return stats
