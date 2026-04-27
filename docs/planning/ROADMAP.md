@@ -44,7 +44,7 @@ Ship in 2 weeks                     Ship in 4 weeks                 No new featu
 
 ### Blockers
 - Supabase Auth (phone OTP) — Kiran must enable Phone provider + set SMS webhook (Task 6)
-- Vercel deploy — env vars + domain (Task 23)
+- VPS deploy — kozzy-pwa.service (Next.js on Hostinger VPS)
 
 ---
 
@@ -104,7 +104,7 @@ One scenario set. All three input methods must pass the same tests.
 - All Track A screens built + Playwright tests pass
 - Lokesh onboarded — stops using WhatsApp for data entry
 - Auth working (Supabase phone OTP)
-- Deployed to Vercel (staging)
+- Deployed to VPS (kozzy-pwa.service, app.getkozzy.com)
 
 ### Phase 2 — Voice layer (weeks 3–4)
 - Wake word "Hey Kozzy" + tap-to-talk
