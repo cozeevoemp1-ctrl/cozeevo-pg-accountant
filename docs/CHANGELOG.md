@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.5] — 2026-04-27 — Full amounts everywhere (no L/Cr abbreviation)
+
+### Format fix — all KPI surfaces now show full Indian comma amounts
+- **`web/lib/format.ts`**: `rupeeL` now delegates to `rupee()` always — PWA KPI tile shows `₹19,80,000` not `₹1.98L`
+- **`src/integrations/gsheets.py`**: `_lk` now uses Indian comma grouping — Sheet COLLECTION summary row shows `12,90,183` not `12.90L`
+- **`tests/test_first_month_rent_due.py`**: Added `booking_amount` to `_FakeTenancy` to match updated `rent_schedule.py` — 52/52 tests pass
+- April 2026 sheet manually re-synced via `sync_sheet_from_db.py --write` to apply new format immediately
+
+---
+
 ## [1.73.4] — 2026-04-27 — Day-wise handler parity (all bot flows cover daywise_stays)
 
 ### Day-wise guest parity — every handler now covers both data stores

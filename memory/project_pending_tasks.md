@@ -31,6 +31,10 @@ type: project
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
 
+## Recently Completed (v1.73.5 — 2026-04-27)
+
+- **Full amounts everywhere** — PWA KPI tile + Google Sheet COLLECTION row now show `12,90,183` instead of `12.90L`. Applies to all future monthly tabs permanently.
+
 ## Recently Completed (v1.71.0 — 2026-04-27)
 
 - **PWA deployed at app.getkozzy.com** — nginx + systemd + SSL on VPS. Auth fixed (ES256/PyJWKClient). CORS updated.
