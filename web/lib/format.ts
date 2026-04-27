@@ -15,3 +15,7 @@ export function rupee(n: number): string {
   }
   return `₹${indianNumber(n)}`;
 }
+
+export function rupeeL(n: number): string {
+  return rupee(n);
+}

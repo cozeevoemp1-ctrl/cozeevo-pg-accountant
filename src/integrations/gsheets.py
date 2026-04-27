@@ -667,10 +667,19 @@ def _refresh_summary_sync(tab_name: str) -> None:
         occ_pct = f"{beds / TOTAL_BEDS * 100:.1f}" if TOTAL_BEDS > 0 else "0"
         pending = max(0, int(balance_total))
 
-        # Format number as lakh string for summary rows
         def _lk(n):
-            n = float(n or 0)
-            return f"{n/100000:.2f}L" if abs(n) >= 100000 else f"{int(n):,}"
+            v = int(round(float(n or 0)))
+            s = str(abs(v))
+            if len(s) > 3:
+                last3, rest = s[-3:], s[:-3]
+                groups = []
+                while len(rest) > 2:
+                    groups.insert(0, rest[-2:])
+                    rest = rest[:-2]
+                if rest:
+                    groups.insert(0, rest)
+                s = ",".join(groups) + "," + last3
+            return f"-{s}" if v < 0 else s
 
         # New layout uses canonical MONTHLY_HEADERS (header-driven, no hardcoding).
         # Old layout was a fixed 15-column legacy format.
