@@ -1254,6 +1254,44 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 if attempt < 2:
                     await _aio.sleep(2 * (attempt + 1))
 
+            # GSheets TENANTS master tab (day-wise guests still appear in master)
+            try:
+                from src.integrations.gsheets import add_tenant as gsheets_add_tenant
+                await gsheets_add_tenant(
+                    room_number=room.room_number if room else "TBD",
+                    name=td["name"],
+                    phone=phone_sheet,
+                    gender=td.get("gender", ""),
+                    building=building,
+                    floor=td.get("floor", ""),
+                    sharing=sharing,
+                    checkin=checkin.strftime("%d/%m/%Y"),
+                    agreed_rent=float(obs.daily_rate or 0),
+                    deposit=0.0,
+                    booking=float(obs.booking_amount or 0),
+                    maintenance=float(obs.maintenance_fee or 0),
+                    notes=obs.special_terms or "",
+                    dob=td.get("dob", ""),
+                    father_name=td.get("father_name", ""),
+                    father_phone=td.get("father_phone", ""),
+                    address=td.get("address", ""),
+                    emergency_contact=td.get("emergency_contact", ""),
+                    emergency_contact_phone=td.get("emergency_contact_phone", ""),
+                    emergency_relationship=td.get("emergency_relationship", ""),
+                    email=td.get("email", ""),
+                    occupation=td.get("occupation", ""),
+                    education=td.get("education", ""),
+                    office_address=td.get("office_address", ""),
+                    office_phone=td.get("office_phone", ""),
+                    id_type=td.get("id_type", ""),
+                    id_number=td.get("id_number", ""),
+                    food_pref=td.get("food_pref", ""),
+                    entered_by="onboarding_form",
+                    tenants_only=True,
+                )
+            except Exception as e:
+                _logger.warning("GSheets TENANTS tab update failed for day-wise %s: %s", td["name"], e)
+
         else:
             # ── Monthly stay path ──────────────────────────────────────────
             # Resolve tenancy.sharing_type in this priority:

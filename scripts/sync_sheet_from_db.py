@@ -542,13 +542,12 @@ async def main(args):
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
         # Billing and collection
-        # Cash/UPI collected = all money received this period (active + exit tenants).
+        # Cash/UPI collected = all money received this period (active + exit + no-show).
+        # No-show advance payments are real receipts — count them in collection.
         # Total Dues = active (checked-in) tenants only.
-        # No-shows are excluded — their dues count in the month their status
-        # changes from no_show to active (when they actually check in).
         i_balance = H["balance"]
         exit_rows = [r for r in data_rows if r[i_event] == "EXIT"]
-        collected_rows = active_rows + exit_rows
+        collected_rows = active_rows + exit_rows + noshow_rows
         total_prev_due = sum(pn(r[i_prev]) for r in active_rows)
         total_cash = sum(pn(r[i_cash]) for r in collected_rows)
         total_upi = sum(pn(r[i_upi]) for r in collected_rows)
@@ -792,9 +791,9 @@ async def main(args):
     print("\nDone.")
 
 
-# Frozen months — mirror Cozeevo Monthly stay source sheet and must never
-# be regenerated from DB. If you need to reload them, use
-# scripts/mirror_march_source_to_ops.py (or an equivalent per-month mirror).
+# Frozen months — DB is source of truth. These months are verified correct
+# and protected by the payments_freeze DB trigger. Do NOT re-sync without
+# explicit approval. Use --force-frozen only for deliberate corrections.
 FROZEN_MONTHS = {
     (2025, 12), (2026, 1), (2026, 2), (2026, 3),
 }

@@ -5380,7 +5380,13 @@ async def _extract_tenant_from_image(
 
 
 async def _add_tenant_prompt(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    msg = entities.get("description", "").strip()
+    return (
+        "To add a new tenant, use the onboarding form at app.getkozzy.com/onboarding\n\n"
+        "The form handles KYC, room assignment, and updates all systems automatically."
+    )
+
+    # ── DEPRECATED — kept for reference only — do not re-enable ──────────
+    msg = entities.get("description", "").strip()  # type: ignore[unreachable]
 
     # ── Image-based form extraction ───────────────────────────────────────
     media_id = entities.get("_media_id")
