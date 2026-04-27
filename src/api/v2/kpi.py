@@ -118,27 +118,36 @@ async def get_kpi_detail(
     async with get_session() as session:
         if type == "checkins_today":
             rows = (await session.execute(
-                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date, Tenancy.agreed_rent)
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date, Tenancy.agreed_rent, Tenancy.stay_type)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(Tenancy.checkin_date == today)
                 .order_by(Room.room_number)
             )).all()
             return {"type": type, "items": [
-                {"tenancy_id": r.id, "name": r.name, "room": r.room_number, "detail": f"₹{int(r.agreed_rent or 0):,}/mo"}
+                {
+                    "tenancy_id": r.id, "name": r.name, "room": r.room_number,
+                    "detail": f"₹{int(r.agreed_rent or 0):,}/mo",
+                    "rent": int(r.agreed_rent or 0),
+                    "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
+                }
                 for r in rows
             ]}
 
         elif type == "checkouts_today":
             rows = (await session.execute(
-                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date)
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.stay_type)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(Tenancy.checkout_date == today)
                 .order_by(Room.room_number)
             )).all()
             return {"type": type, "items": [
-                {"tenancy_id": r.id, "name": r.name, "room": r.room_number, "detail": "Check-out today"}
+                {
+                    "tenancy_id": r.id, "name": r.name, "room": r.room_number,
+                    "detail": "Check-out today",
+                    "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
+                }
                 for r in rows
             ]}
 
