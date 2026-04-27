@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.3] — 2026-04-27 — Vacant count sync + Sanskar cleanup + dues investigation
+
+### Vacant beds — sheet and PWA now agree at 28
+- `scripts/sync_sheet_from_db.py`: removed legacy `daywise_stays` table count; day-wise beds now counted from `tenancies(stay_type=daily)` only — same source as kpi.py
+- `src/api/v2/kpi.py`: reverted erroneous `DaywiseStay` addition (was showing 27 instead of 28)
+- VPS switched from `feature/pwa-forms-rent-collection` → `master` (master was 10 commits ahead with checkin/checkout/daywise fixes)
+
+### Sanskar Bharadia (605) duplicate removed
+- Old tenancy (749, exited, +917742488168) had Jan/Feb payments (₹56K) imported from Excel
+- Active tenancy (900, +919971427645) had Mar/Apr payments — same person, split across two DB entries
+- Moved Jan/Feb payments from tenancy 749 → 900, deleted tenancy 749 + tenant 752
+- Sheet re-synced: EXIT row gone, all Sanskar payment history now on tenancy 900
+
+### Total Dues ₹1,74,766 — root cause identified (no change needed)
+- Previous dues ₹88,766 → jumped ₹86K after March 31 payment reclassification (prev session)
+- 5 tenants (Rupali/201, Shivang/324, Jitendra/316, Sachin/215, Abhishek/121) had payments moved period_month April→March; now show UNPAID for April
+- Confirmed correct per business rule (receipt date = collection month); will fix via bot when they pay
+
+### Room 314 phone duplicate — confirmed edge case
+- Bhanu Prakash 314 shares phone with spouse — husband/wife same number, legitimate
+
+---
+
 ## [1.73.2] — 2026-04-27 — Daywise checkout fix + production deploy
 
 ### Daywise checkout routing (`src/whatsapp/handlers/owner_handler.py`)
