@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.3] — 2026-04-27 — PWA check-in now handles no_show tenants
+
+### `src/api/v2/checkin.py` — no_show → active on physical arrival
+- POST `/checkin` now accepts tenancies with `status = no_show` (previously rejected with 404)
+- Flips status to `active` in the same transaction as payment recording
+- Tenant search already returned no_show tenants (`tenants.py:50`) — this unblocks the full flow
+- Navdaap Gupta (Room 506, arriving Apr 28) can use PWA form; bot "Navdaap arrived" still works too
+
+---
+
 ## [1.73.2] — 2026-04-27 — Daywise checkout fix + production deploy
 
 ### Daywise checkout routing (`src/whatsapp/handlers/owner_handler.py`)

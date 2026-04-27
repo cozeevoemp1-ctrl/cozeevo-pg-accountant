@@ -186,14 +186,14 @@ async def record_physical_checkin(
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room,   Tenancy.room_id   == Room.id)
             .where(
-                Tenancy.id     == body.tenancy_id,
-                Tenancy.status == TenancyStatus.active,
+                Tenancy.id == body.tenancy_id,
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
             )
         )
         result = row.first()
 
     if result is None:
-        raise HTTPException(status_code=404, detail=f"No active tenancy {body.tenancy_id}")
+        raise HTTPException(status_code=404, detail=f"Tenancy {body.tenancy_id} not found or not eligible for check-in")
 
     tenancy, tenant, room = result
 
@@ -206,6 +206,10 @@ async def record_physical_checkin(
         tenancy = await session.get(Tenancy, body.tenancy_id)
         tenant  = await session.get(Tenant, tenancy.tenant_id)
         room    = await session.get(Room,   tenancy.room_id)
+
+        # Flip no_show → active when tenant physically arrives
+        if tenancy.status == TenancyStatus.no_show:
+            tenancy.status = TenancyStatus.active
 
         # Update check-in date if it changed
         if date_changed:
