@@ -26,7 +26,13 @@ export function HomeTabBar() {
   return (
     <>
       <TabBar
-        activeKey={pathname === "/" ? "home" : pathname.startsWith("/payment") ? "payment" : "home"}
+        activeKey={
+          pathname === "/"                   ? "home"       :
+          pathname.startsWith("/payment")    ? "payment"    :
+          pathname.startsWith("/collection") ? "collection" :
+          pathname.startsWith("/onboarding") || pathname.startsWith("/checkin") ? "tenants" :
+          "home"
+        }
         items={[
           {
             key: "home",
@@ -54,9 +60,10 @@ export function HomeTabBar() {
             onClick: () => router.push("/collection/breakdown"),
           },
           {
-            key: "more",
-            label: "More",
-            icon: "⋯",
+            key: "tenants",
+            label: "Tenants",
+            icon: "👤",
+            onClick: () => router.push("/onboarding/new"),
           },
         ]}
       />

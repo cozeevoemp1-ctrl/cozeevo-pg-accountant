@@ -70,12 +70,14 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
             try:
                 from src.integrations.gsheets import update_payment as gsheets_update
                 period = datetime.strptime(body.period_month, "%Y-%m")
+                from src.services.payments import _resolve_payment_mode
+                resolved_method = _resolve_payment_mode(body.method).value
                 await asyncio.wait_for(
                     gsheets_update(
                         room_number=room.room_number,
                         tenant_name=tenant.name,
                         amount=float(body.amount),
-                        method=body.method.lower(),
+                        method=resolved_method,
                         month=period.month,
                         year=period.year,
                         entered_by=user.phone or user.user_id,

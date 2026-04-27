@@ -25,6 +25,16 @@ from src.services.rent_schedule import first_month_rent_due, prorated_first_mont
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Maps PWA method strings to PaymentMode enum (must stay in sync with PWA Method type)
+_CHECKIN_METHOD_MAP: dict[str, PaymentMode] = {
+    "CASH":          PaymentMode.cash,
+    "UPI":           PaymentMode.upi,
+    "BANK":          PaymentMode.bank_transfer,
+    "BANK_TRANSFER": PaymentMode.bank_transfer,
+    "OTHER":         PaymentMode.cash,
+    "CHEQUE":        PaymentMode.cheque,
+}
+
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,8 +45,8 @@ def _parse_date(s: str) -> date:
         raise HTTPException(status_code=400, detail=f"Invalid date: {s!r} — expected YYYY-MM-DD")
 
 
-def _calc_preview(tenancy: Tenancy, actual_date: date) -> dict:
-    """Return the full payment breakdown for a given actual check-in date."""
+def _calc_monthly_preview(tenancy: Tenancy, actual_date: date) -> dict:
+    """Return the first-month payment breakdown for a monthly tenant."""
     rent        = Decimal(str(tenancy.agreed_rent or 0))
     deposit     = Decimal(str(tenancy.security_deposit or 0))
     booking_amt = Decimal(str(tenancy.booking_amount or 0))
@@ -44,6 +54,7 @@ def _calc_preview(tenancy: Tenancy, actual_date: date) -> dict:
     first_month = prorated + deposit
     balance_due = first_month - booking_amt
     return {
+        "stay_type":      "monthly",
         "agreed_rent":    float(rent),
         "security_deposit": float(deposit),
         "booking_amount": float(booking_amt),
@@ -53,7 +64,45 @@ def _calc_preview(tenancy: Tenancy, actual_date: date) -> dict:
         "overpayment":    float(max(-balance_due, Decimal("0"))),
         "date_changed":   actual_date != tenancy.checkin_date,
         "agreed_checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
+        # day-wise fields (null for monthly)
+        "daily_rate": None,
+        "num_days": None,
+        "checkout_date": None,
+        "total_stay_amount": None,
     }
+
+
+def _calc_daily_preview(tenancy: Tenancy, actual_date: date) -> dict:
+    """Return the stay payment breakdown for a daily tenant."""
+    daily_rate  = Decimal(str(tenancy.agreed_rent or 0))   # agreed_rent = rate/day
+    booking_amt = Decimal(str(tenancy.booking_amount or 0))
+    checkout_dt = tenancy.checkout_date
+    num_days    = max((checkout_dt - actual_date).days, 1) if checkout_dt else 1
+    total_amt   = daily_rate * num_days
+    balance_due = total_amt - booking_amt
+    return {
+        "stay_type":      "daily",
+        "agreed_rent":    float(daily_rate),
+        "security_deposit": 0.0,
+        "booking_amount": float(booking_amt),
+        "prorated_rent":  0.0,
+        "first_month_total": float(total_amt),   # repurposed: total stay cost
+        "balance_due":    float(max(balance_due, Decimal("0"))),
+        "overpayment":    float(max(-balance_due, Decimal("0"))),
+        "date_changed":   actual_date != tenancy.checkin_date,
+        "agreed_checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
+        # day-wise specific
+        "daily_rate":        float(daily_rate),
+        "num_days":          num_days,
+        "checkout_date":     checkout_dt.isoformat() if checkout_dt else None,
+        "total_stay_amount": float(total_amt),
+    }
+
+
+def _calc_preview(tenancy: Tenancy, actual_date: date) -> dict:
+    if tenancy.stay_type == StayType.daily:
+        return _calc_daily_preview(tenancy, actual_date)
+    return _calc_monthly_preview(tenancy, actual_date)
 
 
 # ── GET preview ──────────────────────────────────────────────────────────────
@@ -80,9 +129,6 @@ async def checkin_preview(
         raise HTTPException(status_code=404, detail=f"Tenancy {tenancy_id} not found")
 
     tenancy, tenant, room, prop = result
-
-    if tenancy.stay_type != StayType.monthly:
-        raise HTTPException(status_code=400, detail="Physical check-in only applies to monthly tenants")
 
     preview = _calc_preview(tenancy, parsed_date)
     return {
@@ -129,10 +175,9 @@ async def record_physical_checkin(
 
     actual_date = _parse_date(body.actual_checkin_date)
 
-    try:
-        method = PaymentMode(body.payment_method.upper())
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown payment method: {body.payment_method}")
+    method = _CHECKIN_METHOD_MAP.get(body.payment_method.upper())
+    if method is None:
+        raise HTTPException(status_code=400, detail=f"Unknown payment method: {body.payment_method!r} — use CASH, UPI, BANK, or CHEQUE")
 
     async with get_session() as session:
         # Load tenancy + related
@@ -152,11 +197,9 @@ async def record_physical_checkin(
 
     tenancy, tenant, room = result
 
-    if tenancy.stay_type != StayType.monthly:
-        raise HTTPException(status_code=400, detail="Physical check-in only applies to monthly tenants")
-
-    preview     = _calc_preview(tenancy, actual_date)
+    preview      = _calc_preview(tenancy, actual_date)
     date_changed = preview["date_changed"]
+    is_daily     = tenancy.stay_type == StayType.daily
 
     async with get_session() as session:
         # Re-load tenancy in this session for mutation
@@ -164,45 +207,47 @@ async def record_physical_checkin(
         tenant  = await session.get(Tenant, tenancy.tenant_id)
         room    = await session.get(Room,   tenancy.room_id)
 
-        # Update check-in date and recalculate rent schedule if date changed
+        # Update check-in date if it changed
         if date_changed:
             tenancy.checkin_date = actual_date
-            period = date(actual_date.year, actual_date.month, 1)
 
-            # Update or create first-month RentSchedule row
-            rs = await session.scalar(
-                select(RentSchedule).where(
-                    RentSchedule.tenancy_id  == tenancy.id,
-                    RentSchedule.period_month == period,
+        if not is_daily:
+            # Monthly: recalculate first-month RentSchedule if date changed
+            if date_changed:
+                period = date(actual_date.year, actual_date.month, 1)
+                rs = await session.scalar(
+                    select(RentSchedule).where(
+                        RentSchedule.tenancy_id   == tenancy.id,
+                        RentSchedule.period_month == period,
+                    )
                 )
-            )
-            new_rent_due = first_month_rent_due(tenancy, period)
-            if rs:
-                rs.rent_due = new_rent_due
-            else:
-                session.add(RentSchedule(
-                    tenancy_id    = tenancy.id,
-                    period_month  = period,
-                    rent_due      = new_rent_due,
-                    maintenance_due = tenancy.maintenance_fee or Decimal("0"),
-                    status        = RentStatus.pending,
-                    due_date      = period,
-                ))
+                new_rent_due = first_month_rent_due(tenancy, period)
+                if rs:
+                    rs.rent_due = new_rent_due
+                else:
+                    session.add(RentSchedule(
+                        tenancy_id      = tenancy.id,
+                        period_month    = period,
+                        rent_due        = new_rent_due,
+                        maintenance_due = tenancy.maintenance_fee or Decimal("0"),
+                        status          = RentStatus.pending,
+                        due_date        = period,
+                    ))
             await session.flush()
 
         # Log payment if amount > 0
         payment_id = None
         if body.amount_collected > 0:
-            period_month = date(actual_date.year, actual_date.month, 1)
+            period_month_str = actual_date.strftime("%Y-%m")
             result = await log_payment(
                 tenancy_id   = tenancy.id,
                 amount       = Decimal(str(body.amount_collected)),
                 method       = method,
                 for_type     = PaymentFor.rent,
-                period_month = period_month.strftime("%Y-%m"),
+                period_month = period_month_str,
                 recorded_by  = user.phone or user.user_id,
                 session      = session,
-                notes        = body.notes or "Physical check-in payment",
+                notes        = body.notes or ("Daily stay check-in payment" if is_daily else "Physical check-in payment"),
                 source       = "physical_checkin",
                 room_number  = room.room_number if room else None,
                 entity_name  = tenant.name if tenant else None,
@@ -223,16 +268,17 @@ async def record_physical_checkin(
     if body.amount_collected > 0 and room and tenant:
         try:
             from src.integrations.gsheets import update_payment as gsheets_update
+            gsheets_method = method.value   # use the resolved PaymentMode enum value (e.g. "bank_transfer")
             await asyncio.wait_for(
                 gsheets_update(
                     room_number  = room.room_number,
                     tenant_name  = tenant.name,
                     amount       = float(body.amount_collected),
-                    method       = body.payment_method.lower(),
+                    method       = gsheets_method,
                     month        = actual_date.month,
                     year         = actual_date.year,
                     entered_by   = user.phone or user.user_id,
-                    is_daily     = False,
+                    is_daily     = is_daily,
                 ),
                 timeout=10,
             )

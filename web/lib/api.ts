@@ -185,14 +185,21 @@ export interface CheckinPreview {
   building_code: string;
   actual_date: string;
   agreed_checkin_date: string | null;
+  stay_type: "monthly" | "daily";
+  // monthly
   agreed_rent: number;
   security_deposit: number;
   booking_amount: number;
   prorated_rent: number;
-  first_month_total: number;
+  first_month_total: number;  // for daily: total stay cost
   balance_due: number;
   overpayment: number;
   date_changed: boolean;
+  // daily-specific (null for monthly)
+  daily_rate: number | null;
+  num_days: number | null;
+  checkout_date: string | null;
+  total_stay_amount: number | null;
 }
 
 export interface CheckinResponse {

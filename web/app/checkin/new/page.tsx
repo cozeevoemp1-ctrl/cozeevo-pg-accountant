@@ -15,11 +15,15 @@ import {
 type Method = "CASH" | "UPI" | "BANK" | "OTHER"
 
 const METHODS: { value: Method; label: string; icon: string }[] = [
-  { value: "CASH", label: "Cash", icon: "💵" },
-  { value: "UPI",  label: "UPI",  icon: "📱" },
-  { value: "BANK", label: "Bank", icon: "🏦" },
-  { value: "OTHER",label: "Other",icon: "💳" },
+  { value: "CASH",  label: "Cash",   icon: "💵" },
+  { value: "UPI",   label: "UPI",    icon: "📱" },
+  { value: "BANK",  label: "Bank",   icon: "🏦" },
+  { value: "OTHER", label: "Other",  icon: "💳" },
 ]
+
+function fmtINR(n: number) {
+  return `₹${Math.round(n).toLocaleString("en-IN")}`
+}
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
@@ -126,15 +130,16 @@ export default function NewCheckinPage() {
           {preview.date_changed && (
             <Row label="Agreed date" value={fmtDate(preview.agreed_checkin_date ?? "")} muted />
           )}
-          <Row label="Monthly rent" value={`₹${preview.agreed_rent.toLocaleString("en-IN")}`} />
-          <Row label="First month total" value={`₹${Math.round(preview.first_month_total).toLocaleString("en-IN")}`} />
-          <Row label="Advance paid" value={`₹${Math.round(preview.booking_amount).toLocaleString("en-IN")}`} />
+          <Row label={preview.stay_type === "daily" ? "Daily rate" : "Monthly rent"}
+               value={preview.stay_type === "daily" ? `${fmtINR(preview.agreed_rent)}/day` : fmtINR(preview.agreed_rent)} />
+          <Row label={preview.stay_type === "daily" ? "Total stay cost" : "First month total"} value={fmtINR(preview.first_month_total)} />
+          <Row label="Advance paid" value={fmtINR(preview.booking_amount)} />
           {collected > 0 && (
-            <Row label="Collected today" value={`₹${collected.toLocaleString("en-IN")} (${method})`} pink />
+            <Row label="Collected today" value={`${fmtINR(collected)} (${method})`} pink />
           )}
           <Row
             label="Balance remaining"
-            value={result && result.balanceRemaining <= 0 ? "₹0 (Cleared)" : `₹${Math.round(result?.balanceRemaining ?? 0).toLocaleString("en-IN")}`}
+            value={result && result.balanceRemaining <= 0 ? "₹0 (Cleared)" : fmtINR(result?.balanceRemaining ?? 0)}
           />
         </div>
         <div className="flex gap-3 w-full max-w-sm">
@@ -196,28 +201,57 @@ export default function NewCheckinPage() {
         )}
 
         {/* Booking summary */}
-        {preview && !loadingPrev && (
+        {preview && !loadingPrev && preview.stay_type === "monthly" && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               First Month Breakdown
             </p>
             <div className="flex flex-col gap-1.5">
-              <Row label="Monthly rent"      value={`₹${preview.agreed_rent.toLocaleString("en-IN")}`} />
-              <Row label="Days billed"       value={`${fmtDate(actualDate)} → end of month`} muted />
-              <Row label="Prorated rent"     value={`₹${Math.round(preview.prorated_rent).toLocaleString("en-IN")}`} />
-              <Row label="Security deposit"  value={`₹${Math.round(preview.security_deposit).toLocaleString("en-IN")}`} />
+              <Row label="Monthly rent"     value={fmtINR(preview.agreed_rent)} />
+              <Row label="Days billed"      value={`${fmtDate(actualDate)} → end of month`} muted />
+              <Row label="Prorated rent"    value={fmtINR(preview.prorated_rent)} />
+              <Row label="Security deposit" value={fmtINR(preview.security_deposit)} />
               <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
-                <Row label="Total due (first month)"
-                  value={`₹${Math.round(preview.first_month_total).toLocaleString("en-IN")}`} />
-                <Row label="Advance already paid"
-                  value={`− ₹${Math.round(preview.booking_amount).toLocaleString("en-IN")}`} />
+                <Row label="Total due (first month)" value={fmtINR(preview.first_month_total)} />
+                <Row label="Advance already paid"    value={`− ${fmtINR(preview.booking_amount)}`} />
                 <Row
                   label={preview.balance_due > 0 ? "Balance to collect now" : preview.overpayment > 0 ? "Credit (overpaid)" : "Fully covered"}
                   value={
                     preview.balance_due > 0
-                      ? `₹${Math.round(preview.balance_due).toLocaleString("en-IN")}`
+                      ? fmtINR(preview.balance_due)
                       : preview.overpayment > 0
-                        ? `₹${Math.round(preview.overpayment).toLocaleString("en-IN")} credit`
+                        ? `${fmtINR(preview.overpayment)} credit`
+                        : "₹0"
+                  }
+                  pink={preview.balance_due > 0}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Day-wise stay breakdown */}
+        {preview && !loadingPrev && preview.stay_type === "daily" && (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Breakdown</p>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-tile-blue text-brand-blue">Day-wise</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Row label="Daily rate"      value={`${fmtINR(preview.daily_rate ?? 0)} / day`} />
+              <Row label="Check-in"        value={fmtDate(actualDate)} />
+              <Row label="Check-out"       value={preview.checkout_date ? fmtDate(preview.checkout_date) : "—"} />
+              <Row label="Days"            value={`${preview.num_days ?? 0} days`} />
+              <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
+                <Row label="Total stay cost"      value={fmtINR(preview.total_stay_amount ?? 0)} />
+                <Row label="Advance already paid" value={`− ${fmtINR(preview.booking_amount)}`} />
+                <Row
+                  label={preview.balance_due > 0 ? "Balance to collect now" : preview.overpayment > 0 ? "Credit (overpaid)" : "Fully covered"}
+                  value={
+                    preview.balance_due > 0
+                      ? fmtINR(preview.balance_due)
+                      : preview.overpayment > 0
+                        ? `${fmtINR(preview.overpayment)} credit`
                         : "₹0"
                   }
                   pink={preview.balance_due > 0}
