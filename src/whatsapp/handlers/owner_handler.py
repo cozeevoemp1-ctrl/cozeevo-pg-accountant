@@ -1778,6 +1778,13 @@ async def resolve_pending_action(
         date_iso = _extract_date_entity(reply_text.strip())
         if not date_iso:
             return "__KEEP_PENDING__Couldn't parse that date. Try: *15 April* or *15/04/2026*"
+        if action_data.get("record_type") == "daywise_stays":
+            stay_id = action_data.get("stay_id") or (choices[0].get("stay_id") if choices else None)
+            guest_name = action_data.get("guest_name", action_data.get("name_raw", ""))
+            if not stay_id:
+                return "Something went wrong. Please try again: *change checkout date [Name] to [date]*"
+            return await _do_update_daywise_checkout_date(stay_id, guest_name, date_iso, session)
+        # existing tenancy path continues below unchanged...
         # Resolve tenant — might be from choices or from single match
         tenancy_id = action_data.get("tenancy_id")
         tenant_name = action_data.get("tenant_name", "")
@@ -2898,6 +2905,28 @@ async def resolve_pending_action(
         )
 
     if chosen is not None and pending.intent == "UPDATE_CHECKOUT_DATE":
+        if chosen.get("record_type") == "daywise_stays":
+            new_checkout_str = action_data.get("new_checkout", "")
+            if new_checkout_str:
+                return await _do_update_daywise_checkout_date(
+                    stay_id=chosen["stay_id"],
+                    guest_name=chosen["label"],
+                    new_checkout_str=new_checkout_str,
+                    session=session,
+                )
+            # No date — ask for it
+            from src.database.models import DaywiseStay
+            ds = await session.get(DaywiseStay, chosen["stay_id"])
+            old_str = ds.checkout_date.strftime("%d %b %Y") if (ds and ds.checkout_date) else "not set"
+            action_data["stay_id"] = chosen["stay_id"]
+            action_data["guest_name"] = chosen["label"]
+            await _save_pending(pending.phone, "UPDATE_CHECKOUT_DATE_ASK", action_data, [], session)
+            return (
+                f"*{chosen['label']}*\n"
+                f"Current checkout: {old_str}\n\n"
+                f"*New checkout date?* (e.g. *15 April* or *15/04/2026*)"
+            )
+        # existing tenancy path continues below unchanged...
         new_checkout_str = action_data.get("new_checkout", "")
         if new_checkout_str:
             return await _do_update_checkout_date(
@@ -4862,6 +4891,35 @@ async def _update_checkout_date(entities: dict, ctx: CallerContext, session: Asy
         search_term = f"Room {room}"
 
     if len(rows) == 0:
+        from src.whatsapp.handlers._shared import _find_daywise_by_name, _find_daywise_by_room, _make_daywise_choices
+        dw_rows = await _find_daywise_by_name(name, session) if name else []
+        if not dw_rows and room:
+            dw_rows = await _find_daywise_by_room(room, session)
+        if dw_rows:
+            choices = _make_daywise_choices(dw_rows)
+            dw_action = {"name_raw": search_term, "new_checkout": date_str, "record_type": "daywise_stays"}
+            if len(dw_rows) == 1:
+                ds = dw_rows[0]
+                old_str = ds.checkout_date.strftime("%d %b %Y") if ds.checkout_date else "not set"
+                if date_str:
+                    await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE", dw_action, choices, session)
+                    new_checkout = date.fromisoformat(date_str)
+                    return (
+                        f"Update checkout for *{ds.guest_name}* (Room {ds.room_number})?\n\n"
+                        f"Current: {old_str}\n"
+                        f"New:     {new_checkout.strftime('%d %b %Y')}\n\n"
+                        f"Reply *1* to confirm."
+                    )
+                else:
+                    await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE_ASK", dw_action, choices, session)
+                    return (
+                        f"*{ds.guest_name}* (Room {ds.room_number})\n"
+                        f"Current checkout: {old_str}\n\n"
+                        f"*New checkout date?* (e.g. *15 April* or *15/04/2026*)"
+                    )
+            await _save_pending(ctx.phone, "UPDATE_CHECKOUT_DATE", dw_action, choices, session)
+            action_label = f"update checkout to {date_str}" if date_str else "update checkout date"
+            return _format_choices_message(search_term, choices, action_label)
         suggestions = await _find_similar_names(name, session) if name else []
         return _format_no_match_message(name or room, suggestions)
 
@@ -4927,17 +4985,57 @@ async def _do_update_checkout_date(
     tenancy.checkout_date = new_checkout
     await session.flush()
 
-    # Push Checkout Date to TENANTS sheet — dashboard occupancy / exit
-    # KPIs read this column.
-    try:
-        import asyncio as _aio
-        from src.integrations.gsheets import sync_tenant_all_fields as _sync
-        _aio.create_task(_sync(tenancy.tenant_id))
-    except Exception:
-        pass  # fire-and-forget; DB is authoritative
+    # Push Checkout Date to sheet — dashboard occupancy / exit KPIs read this column.
+    if tenancy.stay_type == StayType.daily:
+        try:
+            from src.integrations import gsheets as _gs
+            _gs.trigger_daywise_sheet_sync()
+        except Exception:
+            pass
+    else:
+        try:
+            import asyncio as _aio
+            from src.integrations.gsheets import sync_tenant_all_fields as _sync
+            _aio.create_task(_sync(tenancy.tenant_id))
+        except Exception:
+            pass  # fire-and-forget; DB is authoritative
 
     return (
         f"*Checkout date updated — {tenant_name}*\n"
+        f"Was: {old_str}\n"
+        f"Now: {new_checkout.strftime('%d %b %Y')}\n\n"
+        "Send *report* to verify."
+    )
+
+
+async def _do_update_daywise_checkout_date(
+    stay_id: int,
+    guest_name: str,
+    new_checkout_str: str,
+    session: AsyncSession,
+) -> str:
+    """Update checkout_date on a daywise_stays record."""
+    from src.database.models import DaywiseStay
+    ds = await session.get(DaywiseStay, stay_id)
+    if not ds:
+        return "Day-stay record not found."
+    try:
+        new_checkout = date.fromisoformat(new_checkout_str)
+    except (ValueError, TypeError):
+        return "Invalid date. Please try again."
+    if new_checkout <= ds.checkin_date:
+        return (
+            f"Cannot update: new checkout {new_checkout.strftime('%d %b %Y')} is on/before "
+            f"checkin {ds.checkin_date.strftime('%d %b %Y')}."
+        )
+    old_str = ds.checkout_date.strftime("%d %b %Y") if ds.checkout_date else "not set"
+    ds.checkout_date = new_checkout
+    ds.num_days = (new_checkout - ds.checkin_date).days
+    await session.commit()
+    from src.integrations import gsheets as _gs
+    _gs.trigger_daywise_sheet_sync()
+    return (
+        f"*Checkout date updated — {guest_name}*\n"
         f"Was: {old_str}\n"
         f"Now: {new_checkout.strftime('%d %b %Y')}\n\n"
         "Send *report* to verify."
