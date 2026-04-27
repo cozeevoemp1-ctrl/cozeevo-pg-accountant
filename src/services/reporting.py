@@ -55,7 +55,7 @@ async def collection_summary(
         raw = raw + "-01"
     from_date = date.fromisoformat(raw).replace(day=1)
 
-    # ── Expected (rent_due + maintenance_due + adjustment, active tenants checked in before month) ──
+    # ── Expected = sum of all rent_schedule rows for this month (active tenants) ──
     expected_raw = await session.scalar(
         select(
             func.sum(
@@ -68,7 +68,6 @@ async def collection_summary(
         .where(
             RentSchedule.period_month == from_date,
             Tenancy.status == TenancyStatus.active,
-            Tenancy.checkin_date < from_date,
         )
     )
     expected = int(expected_raw or 0)
@@ -112,7 +111,6 @@ async def collection_summary(
                 RentSchedule.period_month == from_date,
                 RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
                 Tenancy.status == TenancyStatus.active,
-                Tenancy.checkin_date < from_date,
             )
         )
         or 0
