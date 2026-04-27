@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, type KpiDetailItem, type TenantDues } from "@/lib/api";
-import { rupee } from "@/lib/format";
+import { rupee, rupeeL } from "@/lib/format";
 import type { KpiResponse } from "@/lib/api";
 
 interface KpiGridProps {
@@ -115,6 +115,10 @@ export function KpiGrid({ data }: KpiGridProps) {
   // Check-in/checkout filters
   const [stayFilter, setStayFilter] = useState<StayFilter>("all");
 
+  // Dues filters
+  type BuildingFilter = "all" | "THOR" | "HULK";
+  const [buildingFilter, setBuildingFilter] = useState<BuildingFilter>("all");
+
   // Tenant detail
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -141,6 +145,7 @@ export function KpiGrid({ data }: KpiGridProps) {
     setRoomSearch("");
     setGenderFilter("all");
     setStayFilter("all");
+    setBuildingFilter("all");
     setSelected(null);
   }
 
@@ -157,12 +162,20 @@ export function KpiGrid({ data }: KpiGridProps) {
 
   // Apply filters based on open tile
   const filtered = items.filter((it) => {
-    if (open === "occupied" || open === "dues") {
+    if (open === "dues") {
       const matchName =
         !nameSearch.trim() ||
         it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
         it.room.toLowerCase().includes(nameSearch.toLowerCase());
-      return open === "dues" ? matchName : matchName && inRentRange(it.rent, rentRange);
+      const matchBuilding = buildingFilter === "all" || it.building === buildingFilter;
+      return matchName && matchBuilding;
+    }
+    if (open === "occupied") {
+      const matchName =
+        !nameSearch.trim() ||
+        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+        it.room.toLowerCase().includes(nameSearch.toLowerCase());
+      return matchName && inRentRange(it.rent, rentRange);
     }
     if (open === "checkins_today" || open === "checkouts_today") {
       const matchName =
@@ -203,8 +216,8 @@ export function KpiGrid({ data }: KpiGridProps) {
           color="pink"
         />
         <IconTile
-          icon="💸" label="Overdue tenants"
-          value={data.overdue_tenants}
+          icon="💸" label={`Dues pending · ${data.overdue_tenants}`}
+          value={rupeeL(data.overdue_amount)}
           color={data.overdue_tenants > 0 ? "orange" : "green"}
           active={open === "dues"}
           onClick={() => toggle("dues")}
@@ -230,9 +243,9 @@ export function KpiGrid({ data }: KpiGridProps) {
       {open && (
         <div className="mt-2 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden">
 
-          {/* Filter bar — dues: name search only */}
+          {/* Filter bar — dues: name search + building pills */}
           {open === "dues" && (
-            <div className="px-3 pt-3 pb-2">
+            <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
               <input
                 type="text"
                 placeholder="Name or room…"
@@ -240,6 +253,21 @@ export function KpiGrid({ data }: KpiGridProps) {
                 onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
                 className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
               />
+              <div className="flex gap-1.5">
+                {(["all", "THOR", "HULK"] as const).map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setBuildingFilter(b)}
+                    className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
+                      buildingFilter === b
+                        ? "bg-brand-pink text-white border-brand-pink"
+                        : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    }`}
+                  >
+                    {b === "all" ? "All" : b}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

@@ -11,6 +11,7 @@ from src.database.db_manager import get_session
 from src.database.models import (
     DaywiseStay,
     Payment, PaymentFor,
+    Property,
     RentSchedule,
     Room, Tenancy, TenancyStatus,
     Tenant,
@@ -101,18 +102,24 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .group_by(Payment.tenancy_id)
             .subquery()
         )
-        overdue_tenants = int(
-            await session.scalar(
-                select(func.count(RentSchedule.id))
-                .outerjoin(paid_subq, paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
-                .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
-                .where(
-                    RentSchedule.period_month == period,
-                    Tenancy.status == TenancyStatus.active,
-                    RentSchedule.rent_due > func.coalesce(paid_subq.c.paid, 0),
-                )
-            ) or 0
-        )
+        overdue_rows = (await session.execute(
+            select(
+                func.count(RentSchedule.id),
+                func.coalesce(
+                    func.sum(RentSchedule.rent_due - func.coalesce(paid_subq.c.paid, 0)),
+                    0,
+                ),
+            )
+            .outerjoin(paid_subq, paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
+            .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+            .where(
+                RentSchedule.period_month == period,
+                Tenancy.status == TenancyStatus.active,
+                RentSchedule.rent_due > func.coalesce(paid_subq.c.paid, 0),
+            )
+        )).one()
+        overdue_tenants = int(overdue_rows[0] or 0)
+        overdue_amount = float(overdue_rows[1] or 0)
 
     return KpiResponse(
         occupied_beds=occupied_beds,
@@ -123,6 +130,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         checkins_today=checkins_today,
         checkouts_today=checkouts_today,
         overdue_tenants=overdue_tenants,
+        overdue_amount=overdue_amount,
     )
 
 
@@ -170,7 +178,7 @@ async def get_kpi_detail(
             ]}
 
         elif type == "vacant":
-            # Rooms where occupied_count < max_occupancy (includes partial vacancies)
+            # Rooms with at least one free bed (includes partial vacancies)
             occ_subq = (
                 select(Tenancy.room_id, func.count(Tenancy.id).label("occ"))
                 .where(Tenancy.status == TenancyStatus.active)
@@ -264,11 +272,13 @@ async def get_kpi_detail(
                     Tenancy.id,
                     Tenant.name,
                     Room.room_number,
+                    Property.name.label("property_name"),
                     RentSchedule.rent_due,
                     func.coalesce(paid_subq.c.paid, 0).label("paid"),
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
+                .join(Property, Property.id == Room.property_id)
                 .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
                 .outerjoin(paid_subq, paid_subq.c.tenancy_id == Tenancy.id)
                 .where(
@@ -283,6 +293,7 @@ async def get_kpi_detail(
                     "tenancy_id": r.id,
                     "name": r.name,
                     "room": r.room_number,
+                    "building": (r.property_name or "").split()[-1] if r.property_name else "",
                     "detail": f"₹{int(r.rent_due - r.paid):,}",
                     "dues": int(r.rent_due - r.paid),
                 }

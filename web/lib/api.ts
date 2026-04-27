@@ -72,6 +72,7 @@ export interface KpiResponse {
   checkins_today: number;
   checkouts_today: number;
   overdue_tenants: number;
+  overdue_amount: number;
 }
 
 export interface ActivityItem {
@@ -123,6 +124,8 @@ export interface KpiDetailItem {
   free_beds?: number;  // vacant items only
   gender?: string;     // vacant items: "male" | "female" | "mixed" | "empty" | "unknown"
   stay_type?: string;  // checkins/checkouts: "monthly" | "daily"
+  dues?: number;       // dues items only
+  building?: string;   // dues items: "THOR" | "HULK"
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 

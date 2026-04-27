@@ -12,6 +12,7 @@ class KpiResponse(BaseModel):
     checkins_today: int
     checkouts_today: int
     overdue_tenants: int
+    overdue_amount: float
 
 
 class ActivityItem(BaseModel):
