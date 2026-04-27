@@ -556,3 +556,60 @@ def parse_allocation_override(text: str, months: list[dict]) -> list[dict] | Non
         return result
 
     return None
+
+
+# ── Day-wise stay search helpers ─────────────────────────────────────────────
+
+async def _find_daywise_by_name(name: str, session: AsyncSession) -> list:
+    """Search daywise_stays by guest_name (case-insensitive substring)."""
+    if not name:
+        return []
+    from src.database.models import DaywiseStay
+    first_word = name.split()[0]
+    result = await session.execute(
+        select(DaywiseStay)
+        .where(DaywiseStay.guest_name.ilike(f"{first_word}%"))
+        .order_by(DaywiseStay.checkin_date.desc())
+        .limit(5)
+    )
+    rows = result.scalars().all()
+    if not rows and len(name) >= 3:
+        result = await session.execute(
+            select(DaywiseStay)
+            .where(DaywiseStay.guest_name.ilike(f"%{name}%"))
+            .order_by(DaywiseStay.checkin_date.desc())
+            .limit(5)
+        )
+        rows = result.scalars().all()
+    return list(rows)
+
+
+async def _find_daywise_by_room(room: str, session: AsyncSession) -> list:
+    """Search daywise_stays by room_number (case-insensitive)."""
+    from src.database.models import DaywiseStay
+    result = await session.execute(
+        select(DaywiseStay)
+        .where(DaywiseStay.room_number.ilike(f"%{room}%"))
+        .order_by(DaywiseStay.checkin_date.desc())
+        .limit(5)
+    )
+    return list(result.scalars().all())
+
+
+def _make_daywise_choices(rows: list) -> list[dict]:
+    """Convert DaywiseStay rows into numbered choice dicts.
+
+    Uses stay_id + record_type so pending handlers can route to daywise_stays
+    write paths instead of tenancy write paths.
+    """
+    choices = []
+    for i, ds in enumerate(rows[:5], 1):
+        checkin_str = ds.checkin_date.strftime("%d %b") if ds.checkin_date else "?"
+        checkout_str = ds.checkout_date.strftime("%d %b") if ds.checkout_date else "?"
+        choices.append({
+            "seq": i,
+            "stay_id": ds.id,
+            "record_type": "daywise_stays",
+            "label": f"{ds.guest_name} (Room {ds.room_number}, {checkin_str}–{checkout_str})",
+        })
+    return choices

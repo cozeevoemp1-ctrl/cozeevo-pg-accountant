@@ -15,6 +15,7 @@ from src.database.models import (
     Tenant,
 )
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
+from src.services.reporting import deposits_breakdown
 
 router = APIRouter(prefix="/reporting")
 activity_router = APIRouter(prefix="/activity")
@@ -24,11 +25,11 @@ activity_router = APIRouter(prefix="/activity")
 async def get_kpi(user: AppUser = Depends(get_current_user)):
     today = date.today()
     async with get_session() as session:
-        # Total revenue beds
+        # Total revenue beds (exclude UNASSIGNED placeholder room)
         total_beds = int(
             await session.scalar(
                 select(func.coalesce(func.sum(Room.max_occupancy), 0))
-                .where(Room.is_staff_room == False)
+                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED")
             ) or 0
         )
 
@@ -50,6 +51,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .join(Room, Room.id == Tenancy.room_id)
             .where(
                 Room.is_staff_room == False,
+                Room.room_number != "UNASSIGNED",
                 Tenancy.status == TenancyStatus.active,
             )
         )
@@ -64,6 +66,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
                     Tenancy.status == TenancyStatus.active,
                 )
             ) or 0
@@ -103,6 +106,138 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         checkouts_today=checkouts_today,
         open_complaints=open_complaints,
     )
+
+
+@router.get("/kpi-detail")
+async def get_kpi_detail(
+    type: str,
+    user: AppUser = Depends(get_current_user),
+):
+    """Return the underlying rows for a KPI tile."""
+    today = date.today()
+    async with get_session() as session:
+        if type == "checkins_today":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date, Tenancy.agreed_rent, Tenancy.stay_type)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(Tenancy.checkin_date == today)
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {
+                    "tenancy_id": r.id, "name": r.name, "room": r.room_number,
+                    "detail": f"₹{int(r.agreed_rent or 0):,}/mo",
+                    "rent": int(r.agreed_rent or 0),
+                    "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
+                }
+                for r in rows
+            ]}
+
+        elif type == "checkouts_today":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.stay_type)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(Tenancy.checkout_date == today)
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {
+                    "tenancy_id": r.id, "name": r.name, "room": r.room_number,
+                    "detail": "Check-out today",
+                    "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
+                }
+                for r in rows
+            ]}
+
+        elif type == "vacant":
+            # Rooms where occupied_count < max_occupancy (includes partial vacancies)
+            occ_subq = (
+                select(Tenancy.room_id, func.count(Tenancy.id).label("occ"))
+                .where(Tenancy.status == TenancyStatus.active)
+                .group_by(Tenancy.room_id)
+                .subquery()
+            )
+            room_rows = (await session.execute(
+                select(
+                    Room.id,
+                    Room.room_number,
+                    Room.max_occupancy,
+                    func.coalesce(occ_subq.c.occ, 0).label("occupied_count"),
+                )
+                .outerjoin(occ_subq, occ_subq.c.room_id == Room.id)
+                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED")
+                .having(func.coalesce(occ_subq.c.occ, 0) < Room.max_occupancy)
+                .group_by(Room.id, Room.room_number, Room.max_occupancy, occ_subq.c.occ)
+                .order_by(Room.room_number)
+            )).all()
+
+            # Fetch genders for partially-occupied rooms in one query
+            room_ids = [r.id for r in room_rows if r.occupied_count > 0]
+            gender_map: dict[int, set] = {}
+            if room_ids:
+                gender_rows = (await session.execute(
+                    select(Tenancy.room_id, Tenant.gender)
+                    .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                    .where(Tenancy.status == TenancyStatus.active, Tenancy.room_id.in_(room_ids))
+                )).all()
+                for gr in gender_rows:
+                    gender_map.setdefault(gr.room_id, set()).add((gr.gender or "").lower())
+
+            def _room_gender(room_id: int, occupied_count: int) -> str:
+                if occupied_count == 0:
+                    return "empty"
+                genders = gender_map.get(room_id, set())
+                genders.discard("")
+                if not genders:
+                    return "unknown"
+                if genders == {"male"}:
+                    return "male"
+                if genders == {"female"}:
+                    return "female"
+                return "mixed"
+
+            items = []
+            for r in room_rows:
+                free = r.max_occupancy - r.occupied_count
+                gender = _room_gender(r.id, r.occupied_count)
+                gender_label = {"male": "Male", "female": "Female", "mixed": "Mixed", "empty": "", "unknown": ""}.get(gender, "")
+                detail_parts = [f"{free} bed{'s' if free > 1 else ''} free"]
+                if gender_label:
+                    detail_parts.append(gender_label)
+                items.append({
+                    "name": f"Room {r.room_number}",
+                    "room": r.room_number,
+                    "detail": " · ".join(detail_parts),
+                    "free_beds": free,
+                    "gender": gender,
+                })
+            return {"type": type, "items": items}
+
+        elif type == "occupied":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.agreed_rent)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED", Tenancy.status == TenancyStatus.active)
+                .order_by(Room.room_number)
+            )).all()
+            return {"type": type, "items": [
+                {"tenancy_id": r.id, "name": r.name, "room": r.room_number,
+                 "detail": f"₹{int(r.agreed_rent or 0):,}/mo", "rent": int(r.agreed_rent or 0)}
+                for r in rows
+            ]}
+
+    return {"type": type, "items": []}
+
+
+@router.get("/deposits-held")
+async def get_deposits_held(_user: AppUser = Depends(get_current_user)):
+    """Security deposit breakdown from active tenancy agreements."""
+    async with get_session() as session:
+        data = await deposits_breakdown(session=session)
+    return data
 
 
 @activity_router.get("/recent", response_model=ActivityResponse)

@@ -28,7 +28,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, selectinload
 from src.database.models import (
-    Tenancy, Tenant, Room, Property, TenancyStatus,
+    Tenancy, Tenant, Room, Property, TenancyStatus, StayType,
     RentSchedule, RentStatus, Payment, PaymentFor, Staff,
 )
 # Canonical column list (single source of truth). Row width and column
@@ -120,6 +120,8 @@ async def main(args):
             .join(Room, Room.id == Tenancy.room_id)
             .join(Property, Property.id == Room.property_id)
             .where(
+                # Day-wise stays have their own DAY WISE tab — exclude from monthly tabs
+                Tenancy.stay_type != StayType.daily,
                 or_(
                     # All active tenancies
                     Tenancy.status == TenancyStatus.active,
@@ -540,34 +542,18 @@ async def main(args):
         hulk_beds = (hulk_t - hulk_prem) + (hulk_prem * 2)
 
         # Billing and collection
-        # Cash/UPI collected = all money received this period (active + exit tenants).
-        # Total Dues = active tenant balances + no-show balances whose checkin_date
-        # falls within this period (they should have arrived; outstanding is real).
+        # Cash/UPI collected = all money received this period (active + exit + no-show).
+        # No-show advance payments are real receipts — count them in collection.
+        # Total Dues = active (checked-in) tenants only.
         i_balance = H["balance"]
-        i_checkin = H["check-in"]
         exit_rows = [r for r in data_rows if r[i_event] == "EXIT"]
-        collected_rows = active_rows + exit_rows
+        collected_rows = active_rows + exit_rows + noshow_rows
         total_prev_due = sum(pn(r[i_prev]) for r in active_rows)
         total_cash = sum(pn(r[i_cash]) for r in collected_rows)
         total_upi = sum(pn(r[i_upi]) for r in collected_rows)
         total_collected = total_cash + total_upi
 
-        def _parse_checkin_dd_mm(s) -> "date | None":
-            try:
-                from datetime import datetime as _dt
-                return _dt.strptime(str(s).strip(), "%d/%m/%Y").date()
-            except (ValueError, AttributeError):
-                return None
-
-        # No-shows whose checkin is on or before period end count toward dues.
-        noshow_dues_rows = [
-            r for r in noshow_rows
-            if (cd := _parse_checkin_dd_mm(r[i_checkin])) is not None and cd < next_period
-        ]
-        total_dues = (
-            sum(max(0, int(pn(r[i_balance]))) for r in active_rows)
-            + sum(max(0, int(pn(r[i_balance]))) for r in noshow_dues_rows)
-        )
+        total_dues = sum(max(0, int(pn(r[i_balance]))) for r in active_rows)
 
         paid_count = sum(1 for r in active_rows if r[i_status] == "PAID")
         partial_count = sum(1 for r in active_rows if r[i_status] == "PARTIAL")
@@ -588,6 +574,20 @@ async def main(args):
                 DaywiseStay.checkin_date <= date.today(),
                 DaywiseStay.checkout_date > date.today(),
                 DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            )
+        )).scalar() or 0
+        # New-style daily stays use Tenancy.stay_type=daily (onboarding form).
+        # These are excluded from the monthly tab rows but still occupy beds tonight.
+        daywise_beds += (await session.execute(
+            select(func.count()).select_from(Tenancy)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Room.is_staff_room == False,
+                Room.room_number != "UNASSIGNED",
+                Tenancy.stay_type == StayType.daily,
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.checkin_date <= date.today(),
+                or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > date.today()),
             )
         )).scalar() or 0
 
@@ -805,9 +805,9 @@ async def main(args):
     print("\nDone.")
 
 
-# Frozen months — mirror Cozeevo Monthly stay source sheet and must never
-# be regenerated from DB. If you need to reload them, use
-# scripts/mirror_march_source_to_ops.py (or an equivalent per-month mirror).
+# Frozen months — DB is source of truth. These months are verified correct
+# and protected by the payments_freeze DB trigger. Do NOT re-sync without
+# explicit approval. Use --force-frozen only for deliberate corrections.
 FROZEN_MONTHS = {
     (2025, 12), (2026, 1), (2026, 2), (2026, 3),
 }

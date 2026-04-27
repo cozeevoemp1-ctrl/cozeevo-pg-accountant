@@ -944,9 +944,11 @@ def _add_tenant_sync(
     entered_by: str = "",
     advance_amount: float = 0,
     advance_mode: str = "",
+    tenants_only: bool = False,
 ) -> dict:
     """
     Add tenant to TENANTS master tab AND current monthly tab.
+    Pass tenants_only=True to skip the monthly tab write (e.g. day-wise guests).
     Returns result dict.
     """
     result: dict[str, Any] = {
@@ -1054,6 +1056,10 @@ def _add_tenant_sync(
         tenants_ws.update(values=[tenants_row], range_name=f"A{t_next}", value_input_option="USER_ENTERED")
         result["tenants_row"] = t_next
         logger.info("GSheets: added tenant %s to TENANTS tab at row %d", name, result["tenants_row"])
+
+        if tenants_only:
+            result["success"] = True
+            return result
 
         # -- Monthly tab (use checkin month, not current month) --
         checkin_month, checkin_year = None, None
@@ -1589,9 +1595,11 @@ async def add_tenant(
     entered_by: str = "",
     advance_amount: float = 0,
     advance_mode: str = "",
+    tenants_only: bool = False,
 ) -> dict:
     """
     Async entry point — add tenant to TENANTS tab + current monthly tab.
+    Pass tenants_only=True to write only to TENANTS master tab (e.g. day-wise guests).
 
     Returns dict: success, tenants_row, monthly_row, monthly_tab, error
     """
@@ -1601,7 +1609,7 @@ async def add_tenant(
         dob, father_name, father_phone, address, emergency_contact,
         emergency_contact_phone, emergency_relationship, email, occupation,
         education, office_address, office_phone, id_type, id_number, food_pref,
-        entered_by, advance_amount, advance_mode,
+        entered_by, advance_amount, advance_mode, tenants_only,
     )
 
 

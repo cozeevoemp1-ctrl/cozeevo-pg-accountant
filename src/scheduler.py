@@ -169,14 +169,6 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # ❌ PAUSED: Overnight source sync disabled for manual WhatsApp testing
-    # scheduler.add_job(
-    #     _overnight_source_sync,
-    #     trigger=CronTrigger(hour=3, minute=0),   # every day at 3am IST
-    #     id="overnight_source_sync",
-    #     name="Overnight Source Sheet Reconciliation — 3am daily",
-    #     replace_existing=True,
-    # )
 
     # Prep reminders — TWO separate messages at 08:00 IST daily.
     # Each message is only sent if its target day actually has movements;
@@ -771,74 +763,6 @@ async def _monthly_tab_rollover() -> None:
         logger.error("[Scheduler] Monthly rollover exception: %s", e)
 
 
-# ── Job: Overnight Source Sheet Reconciliation ─────────────────────────────────
-
-async def _overnight_source_sync() -> None:
-    """
-    Runs every day at 03:00 IST.
-    Pull source sheet (Kiran's April Month Collection) → DB → re-sync Operations sheet.
-    Catches anything the live webhook missed during the day.
-    """
-    import asyncio
-    import subprocess
-    import sys as _sys
-    py = _sys.executable
-
-    async def _alert(stage: str, detail: str):
-        """Notify admin on overnight-sync failure so silent corruption can't drift."""
-        if not _ADMIN_PHONE:
-            return
-        try:
-            from src.whatsapp.webhook_handler import _send_whatsapp
-            await _send_whatsapp(
-                _ADMIN_PHONE,
-                f"⚠️ Overnight source-sync FAILED at stage: {stage}\n"
-                f"Detail: {detail[:300]}\nCheck server logs."
-            )
-        except Exception as send_err:
-            logger.error("[Scheduler] Failed to send overnight-sync alert: %s", send_err)
-
-    try:
-        # 1. Pull source → DB
-        result = await asyncio.to_thread(
-            subprocess.run,
-            [py, "scripts/sync_from_source_sheet.py", "--write"],
-            capture_output=True, text=True, timeout=600,
-        )
-        if result.returncode != 0:
-            logger.error("[Scheduler] Overnight source sync (pull) failed: %s", result.stderr[-500:])
-            await _alert("source pull", result.stderr or result.stdout or "")
-            return
-        logger.info("[Scheduler] Overnight source sync — DB updated")
-
-        # 2. Re-sync current month Operations sheet (returncode now checked)
-        today = date.today()
-        result2 = await asyncio.to_thread(
-            subprocess.run,
-            [py, "scripts/sync_sheet_from_db.py",
-             "--month", str(today.month), "--year", str(today.year), "--write"],
-            capture_output=True, text=True, timeout=600,
-        )
-        if result2.returncode != 0:
-            logger.error("[Scheduler] Operations sheet refresh failed: %s", result2.stderr[-500:])
-            await _alert("sheet refresh", result2.stderr or result2.stdout or "")
-            return
-        logger.info("[Scheduler] Operations sheet refreshed")
-
-        # 3. Re-sync DAY WISE tab (returncode now checked)
-        result3 = await asyncio.to_thread(
-            subprocess.run,
-            [py, "scripts/sync_daywise_from_db.py", "--write"],
-            capture_output=True, text=True, timeout=300,
-        )
-        if result3.returncode != 0:
-            logger.error("[Scheduler] DAY WISE refresh failed: %s", result3.stderr[-500:])
-            await _alert("daywise refresh", result3.stderr or result3.stdout or "")
-            return
-        logger.info("[Scheduler] DAY WISE refreshed — overnight reconciliation complete")
-    except Exception as e:
-        logger.error("[Scheduler] Overnight source sync failed: %s", e)
-        await _alert("exception", str(e))
 
 
 # ── Job: Checkout Deposit Alerts ───────────────────────────────────────────────

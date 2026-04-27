@@ -7,6 +7,8 @@ interface IconTileProps {
   value: string | number;
   color?: "green" | "pink" | "blue" | "orange";
   className?: string;
+  active?: boolean;
+  onClick?: () => void;
 }
 
 const COLOR_MAP = {
@@ -17,23 +19,26 @@ const COLOR_MAP = {
 };
 
 export function IconTile({
-  icon,
-  label,
-  value,
-  color = "blue",
-  className,
+  icon, label, value, color = "blue", className, active, onClick,
 }: IconTileProps) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <div
+    <Tag
+      onClick={onClick}
       className={clsx(
-        "flex flex-col gap-1.5 rounded-tile p-3",
+        "flex flex-col gap-1.5 rounded-tile p-3 text-left w-full transition-all",
         COLOR_MAP[color],
+        active && "ring-2 ring-brand-pink",
+        onClick && "active:scale-[0.97] cursor-pointer",
         className,
       )}
     >
-      <div className="text-xl">{icon}</div>
+      <div className="flex justify-between items-start">
+        <div className="text-xl">{icon}</div>
+        {onClick && <span className="text-[10px] opacity-50">{active ? "▲" : "▼"}</span>}
+      </div>
       <div className="text-xs font-medium opacity-70">{label}</div>
       <div className="text-lg font-bold leading-tight">{value}</div>
-    </div>
+    </Tag>
   );
 }

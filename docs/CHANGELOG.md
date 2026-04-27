@@ -2,6 +2,241 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.1] — 2026-04-27 — Backup cleanup + pull-to-refresh + checkin sheet sync
+
+### Backup table dropped
+- `payments_backup_20260427` (1662 rows) confirmed clean and dropped from Supabase — data integrity verified: DB = ops sheet = PWA for all 5 months
+
+### Pull-to-refresh component (`web/components/ui/pull-to-refresh.tsx`)
+- Native mobile pull-to-refresh on PWA (`web/app/layout.tsx` wraps AuthProvider with PullToRefresh)
+- CSS animation `kozzy-spin` added to `web/app/globals.css`
+
+### Checkin triggers sheet sync (`src/api/v2/checkin.py`)
+- `record_physical_checkin` now calls `trigger_monthly_sheet_sync` after checkin — keeps ops sheet occupancy in sync with PWA KPI without manual resync
+
+### Gitignore updated
+- Added `.playwright-mcp/`, `web/test-results/`, `web/tsconfig.tsbuildinfo`, `media/` — keep test artifacts out of repo
+
+---
+
+## [1.73.0] — 2026-04-27 — Day-wise dedup guardrails + TENANTS master tab sync
+
+### Day-wise tenants no longer bleed into monthly tabs (`scripts/sync_sheet_from_db.py`)
+- Added `Tenancy.stay_type != StayType.daily` filter to the monthly-tab query
+- Previously any bot operation (payment, rent change) triggered `sync_sheet_from_db.py` which regenerated all monthly tabs — day-wise tenants appeared there too
+
+### Day-wise approval now writes to TENANTS master tab (`src/api/onboarding_router.py`)
+- After day-wise guest is approved + DAY WISE tab written, also calls `add_tenant(tenants_only=True, ...)` with full KYC fields
+- TENANTS tab is master data — all tenants (daily and monthly) must appear there
+
+### `add_tenant` / `_add_tenant_sync` — new `tenants_only` flag (`src/integrations/gsheets.py`)
+- Pass `tenants_only=True` to write only to TENANTS master tab, skipping the monthly tab write
+- Early return placed correctly inside the flag check — monthly-tab failure still returns `success=False` for monthly tenants
+
+### ADD_TENANT bot flow disabled (`src/whatsapp/handlers/owner_handler.py`)
+- `_add_tenant_prompt` now immediately returns redirect to `app.getkozzy.com/onboarding`
+- Eliminates duplicate-creation risk (Praveen Kumar incident: bot used 11 min after form approval)
+- Old form-parsing code left as dead code for reference
+
+---
+
+## [1.72.0] — 2026-04-27 — Data integrity: historical payments freeze + March gap fixed + deposits KPI corrected
+
+### DB-level freeze trigger (`payments_freeze`)
+- `payments_freeze_check()` trigger blocks any INSERT/UPDATE/DELETE on payments rows where `period_month < date_trunc('month', CURRENT_DATE)` — automatically advances each month
+- Escape hatch: `SET LOCAL app.allow_historical_write = 'true'` in the same transaction (for legitimate admin corrections)
+- Applied directly to Supabase and added to `src/database/migrate_all.py` (`run_payments_freeze_trigger_2026_04_27`) so fresh installs also get it
+
+### Pre-April payments corrected (Dec 2025 – Mar 2026)
+- **Jan 2026**: restored from `payments_backup_20260427` — Cash ₹3,00,572 / UPI ₹5,30,575 = ₹8,31,147 ✓
+- **Feb 2026**: restored from backup — Cash ₹6,53,300 / UPI ₹23,24,048 = ₹29,77,348 ✓
+- **Dec 2025**: restored from backup — UPI ₹12,800 only ✓
+- **Mar 2026**: 9 tenants were skipped by reload script (room number mismatch between ops sheet and DB). Fixed via `scripts/fix_march_skipped.py` using name-only matching. Mar total now Cash ₹10,94,220 / UPI ₹28,89,193 = **₹39,83,413** ✓
+
+### Deposits KPI fixed (`src/services/reporting.py`, `src/api/v2/kpi.py`)
+- `deposits_breakdown()` now queries `tenancies.security_deposit + tenancies.maintenance_fee` for active tenants — correct source of truth (agreement values)
+- Replaced previous `total_deposits_held()` which was summing payment transactions (gave ₹40,40,000 instead of ₹34,27,325)
+- `/api/v2/app/reporting/deposits-held` returns `{ held, maintenance, refundable }` where `refundable = held - maintenance`
+- PWA Money Dashboard updated to show 3-row deposits section (Refundable / Maintenance / Total)
+
+### Cash/UPI method breakdown on Money Dashboard
+- `CollectionSummaryResponse` Pydantic model now includes `method_breakdown: dict[str, int]`
+- Was computed in service but silently stripped by FastAPI's response model — now correctly returned and displayed
+
+### March 31 pre-payments reclassified
+- 8 tenants who physically paid on March 31 (payment_date=2026-03-31) had period_month=April — moved to period_month=March per business rule: money received date = collection month
+- Rupali, Shivang, Jitendra, Abhishek Vishwakarma, Akshit, Sachin Kumar Yadav, Yatam Ramakanth, Shashank — Cash ₹71,500 + UPI ₹53,000 moved from April → March
+- March total updated: Cash 11,65,720 + UPI 29,42,193 = ₹41,07,913
+- April total updated: Cash 12,90,183 + UPI 31,54,345 = ₹44,44,528
+
+### No-show payments now counted in collection
+- `sync_sheet_from_db.py`: `collected_rows` now includes `noshow_rows` — booking advance / token payments from no-show tenants count as monthly collection receipts
+
+### Full sheet sync (DB → ops sheet, all months)
+- All 5 monthly tabs (Dec 2025 – Apr 2026) written from DB using `sync_sheet_from_db.py --write` (Dec–Mar with `--force-frozen`)
+- DB = ops sheet verified 3-way for Jan/Feb (source sheet also matches); Mar/Apr ops sheet matches DB
+
+### New scripts
+- `scripts/reload_pre_april_payments.py` — drop + reload Dec–Mar payments from ops sheet (semantic column lookup, safety checks, backup verification)
+- `scripts/fix_march_skipped.py` — targeted fix for 9 tenants whose sheet room numbers differ from DB; name-only matching with freeze escape hatch
+- `scripts/_compare_all_sources.py` — 3-way comparison utility: DB vs ops sheet vs source sheet (History tab)
+
+---
+
+## [1.71.0] — 2026-04-27 — PWA: KPI panels v2, money dashboard, VPS deploy at app.getkozzy.com
+
+### PWA deployed to production
+- **`app.getkozzy.com`** live on VPS (port 3001, `kozzy-pwa` systemd service, nginx proxy, Let's Encrypt SSL)
+- Branch: `feature/pwa-forms-rent-collection` (running on VPS, not yet merged to master)
+- Root cause of all 500s: `src/api/v2/auth.py` had stale pre-ES256 code never committed; fixed by committing all missing backend files and deploying
+- CORS: added `https://app.getkozzy.com` to `main.py` `allow_origins`
+
+### KPI panels — expanded + searchable (`web/components/home/kpi-grid.tsx`)
+- **Occupied**: name/room search + rent range dropdown (All / <12k / 12–15k / 15–20k / >20k)
+- **Vacant**: room search + gender pills (All / Male / Female / Empty). Shows **partial vacancies** — room with 3/4 beds taken appears as "1 bed free · Male"
+- **Check-ins / Check-outs today**: name/room search + stay-type pills (All / Regular / Day-wise)
+- All panels: click tenant row → inline `TenantDetailCard` showing check-in date, agreed rent, security deposit, maintenance, dues this month, last payment
+- 256px fixed scroll; filters + selection reset when panel closes or tile toggled
+
+### Backend: kpi-detail enriched (`src/api/v2/kpi.py`)
+- `occupied` items: `tenancy_id`, `rent` added
+- `checkins_today` items: `tenancy_id`, `rent`, `stay_type` added
+- `checkouts_today` items: `tenancy_id`, `stay_type` added
+- `vacant` items: rewritten with LEFT JOIN occupancy subquery + separate gender query → returns `free_beds` + `gender` (male/female/mixed/empty/unknown); partially-occupied rooms now appear
+- New endpoint `GET /api/v2/app/reporting/deposits-held` → cumulative non-voided deposit sum (all time)
+
+### Backend: tenant dues endpoint (`src/api/v2/tenants.py`)
+- `GET /api/v2/app/tenants/{tenancy_id}/dues` now returns `checkin_date`, `security_deposit`, `maintenance_fee`
+
+### Backend: reporting service (`src/services/reporting.py`)
+- `CollectionSummary` — added `method_breakdown: dict[str, int]` (grouped by payment_mode, rent+maintenance only)
+- New `total_deposits_held(*, session) -> int` — all-time cumulative deposit payments (non-voided)
+
+### Backend: auth (`src/api/v2/auth.py`)
+- Switched HS256 → **ES256 via PyJWKClient** (PyJWT + cryptography). Supabase uses ECC keys; old HMAC-based check was crashing every VPS API call with 500.
+
+### Money dashboard (`web/app/collection/breakdown/page.tsx`)
+- Server component with `searchParams: Promise<{ month?: string }>`
+- Month navigation `‹ April 2026 ›` via `?month=YYYY-MM` links; `›` disabled on current month
+- Sections: summary + progress bar, rent collected (pure rent + maintenance split), payment method breakdown (Cash/UPI/Bank transfer/Cheque), pending dues, deposits held (cumulative), deposits received this month (shown separately, not in collection total)
+
+### Frontend API layer (`web/lib/api.ts`)
+- `CollectionSummary`: `method_breakdown: Record<string, number>`
+- `KpiDetailItem`: `rent?`, `free_beds?`, `gender?`, `stay_type?`
+- `TenantDues`: `checkin_date`, `security_deposit`, `maintenance_fee`
+- New: `getDepositsHeld()`, `getKpiDetail()`, `getTenantDues()`
+
+### New auth/session infrastructure
+- `web/lib/auth-server.ts` — server-side `getSession()` via `createSupabaseServer()`
+- `web/lib/supabase-server.ts` — `createServerClient` from `@supabase/ssr` with Next.js cookies()
+- `web/middleware.ts` — refresh Supabase tokens on every request
+
+### Infrastructure
+- Cloudflare DNS for `getkozzy.com` under `kirankumarpemmasani@gmail.com` (not `cozeevoemp1@gmail.com`) — noted in memory
+
+---
+
+## [1.70.0] — 2026-04-27 — April dues reconciliation, sync shutdown, PWA voice fix, VPS deploy
+
+### April data cleanup (one-time ops)
+- **`scripts/fix_april_dues.py`** (new) — reconciles April DB balances against "april dues .xlsx": sets exact adjustment field for 18 people with dues, zeroes 30 others, all tagged `adjustment_note="MANUAL_LOCK"` so no formula ever overwrites them
+- **APScheduler job purged** — `overnight_source_sync` job was persisted in `apscheduler_jobs` DB table even though the code was commented out; deleted directly from DB. This was the root cause of duplicate tenancies (Praveen Kumar, Tanya Rishikesh) being created by 3 AM syncs
+- **Sync endpoints de-registered** — `sync_router` (`/api/sync/source-sheet`) and `/api/admin/rotate-token` removed from `main.py`; all source-sheet auto-syncs are now fully off
+- **Tanya Rishikesh duplicate resolved** — deleted second tenancy (1054) + tenant (933) created by consecutive sync runs; moved auto-synced payment to correct tenancy (919)
+- **Total dues KPI fixed** — `scripts/sync_sheet_from_db.py` no longer includes no-show tenants in total dues; KPI dropped from ₹2,65,203 → ₹88,766 (active tenants only; no-shows count in the month they check in)
+
+### PWA voice — complete rewrite (no backend calls)
+- **`web/lib/voice.ts`** — replaced `useVoiceRecorder` (MediaRecorder → Whisper upload) with `useSpeechInput` (browser-native `SpeechRecognition` API); transcription is now on-device, zero network calls
+- **`web/lib/parse-intent.ts`** (new) — client-side JS parser extracts amount, name, room, method from transcript using regex; replaces Groq LLM intent extraction API call entirely
+- **`web/components/voice/voice-sheet.tsx`** — removed two-step Whisper → LLM pipeline; now speech → local parse → confirm card. Added `VoiceSummary` component that tells user in plain English what was and wasn't understood ("Got ₹8,000, Ravi. Still need: payment method")
+- **`web/lib/api.ts`** — removed `transcribeAudio`, `TranscribeResponse`, `_postForm`; default `BASE_URL` changed from `http://localhost:8000` to `https://api.getkozzy.com` (fixes "Failed to fetch" on production)
+
+### VPS deploy
+- PWA rebuilt and restarted on VPS (`kozzy-pwa.service`); `app.getkozzy.com` now serving latest build pointing to `https://api.getkozzy.com`
+
+### Branch
+`feature/pwa-forms-rent-collection` — all changes on this branch, not yet merged to master
+
+---
+
+## [1.69.1] — 2026-04-27 — Hotfix: onboarding form submission failure
+
+### Fixed
+- **`src/api/onboarding_router.py`** — 4 occurrences of `from services import storage` changed to `from src.services import storage`. The top-level `services/` package has no `storage` module; the import crashed `tenant_submit`, `approve`, and staff-signature GET/POST handlers. The error propagated through `LocalOnlyMiddleware.call_next()`, dropping the HTTP connection — so `res.json()` failed on the client and showed the fallback "Submission failed. Please try again." instead of a real error message.
+
+### Root cause
+Wrong import path introduced when KYC file upload was added (commit `97cec97`, 2026-04-19). `src.services.storage` is the correct path (consistent with all other imports in the same file). The top-level `services/` stub has only `property_logic.py`.
+
+### Deployed
+Cherry-picked to master, VPS restarted. Confirmed clean startup via journalctl.
+
+---
+
+## [1.69.0] — 2026-04-27 — PWA rent collection form: numpad, tenant search, dues preview, E2E tests
+
+### Built
+- **`src/api/v2/tenants.py`** — two new endpoints:
+  - `GET /api/v2/app/tenants/search?q=` — fuzzy search active/no_show tenancies by name/room/phone (max 10)
+  - `GET /api/v2/app/tenants/{tenancy_id}/dues` — current month dues (rent − payments), last payment info
+- **`src/api/v2/app_router.py`** — registered tenants router
+- **`src/api/v2/payments.py`** — fixed critical Sheet sync gap: now calls `gsheets.update_payment()` after DB commit (same 10s timeout pattern as WhatsApp handler — was silently missing before)
+- **`web/lib/api.ts`** — added `searchTenants()`, `getTenantDues()`, `TenantSearchResult`, `TenantDues` interfaces
+- **`web/components/forms/tenant-search.tsx`** — debounced autocomplete with dropdown + selected pill + clear
+- **`web/components/forms/confirmation-card.tsx`** — universal bottom-sheet safety gate before any DB write
+- **`web/components/forms/numpad.tsx`** — phone-style numpad (suggest-amount pills, 0 spans 2 cols, backspace)
+- **`web/app/payment/new/page.tsx`** — full rebuild: TenantSearch → dues preview → Numpad → method tiles → ConfirmationCard → VoiceSheet → success screen
+- **`web/e2e/payment-collection.spec.ts`** — 10/10 Playwright scenarios passing (numpad, error states, method pills, voice button)
+- **`web/playwright.config.ts`** — created with chromium + webServer auto-start config
+
+### UI mockups created (approved by Kiran)
+- `.superpowers/brainstorm/ui-options/payment-collection.html` — 3 states × mobile + web
+- `.superpowers/brainstorm/ui-options/dashboard-expandable.html` — expandable KPI tiles + Smart Query bar
+
+### Design decisions (approved)
+- **Numpad** for amount entry (phone-style, like Powdur) — not text input
+- **Mobile hybrid** (phone frame + bottom sheet) AND **web left sidebar** — both required
+- **Dashboard KPI tiles are expandable** — tap tile → inline list (dues, check-ins, checkouts, occupancy)
+- **Smart Query** replaces "Dues Query" everywhere — AI bar that answers any operational question ("female double-sharing rooms with 1 bed free?")
+- **Check-in + checkout forms** must be adapted to same design (next session work)
+
+### Branch
+`feature/pwa-forms-rent-collection` pushed to GitHub. Needs merge + VPS deploy.
+
+### Tests
+- Backend: 11 new tests (v2 tenants) passing, 52 pre-push unit tests passing
+- Frontend: 10 Playwright E2E scenarios passing, tsc zero errors, Next.js build clean
+
+---
+
+## [1.68.0] — 2026-04-26 — Product pivot: Kozzy Digital Receptionist (forms + voice + WhatsApp)
+
+### Decision
+Strategic pivot from WhatsApp-only bot to three-track platform:
+- **Track A (forms)** — PWA staff app for Lokesh: collect payment, check-in, checkout, dues, day-wise, rental changes. Critical path. Ships first.
+- **Track B (voice)** — "Hey Kozzy" wake word + tap-to-talk on shared reception phone. Groq Whisper Turbo. EN/TA/TE/HI. Ships after forms.
+- **Track C (WhatsApp)** — Existing bot maintained for owners + tenants. No new features required.
+
+### Why
+Receptionist (Lokesh) cannot use natural language chat reliably for financial data entry. Staff have phones only — no laptops. Forms + voice = right interface for front desk.
+
+### What WhatsApp commands do
+Continue working for owners (Kiran, Prabhakaran) and tenants. Three frontends, one backend, one DB.
+
+### Pricing updated
+- Growth ₹799 — forms app added
+- Pro ₹1999 — forms + voice added
+
+### Docs updated
+- `docs/superpowers/specs/2026-04-26-kozzy-digital-receptionist-design.md` — full product spec
+- `docs/planning/ROADMAP.md` — three-track plan + confidence levels
+- `docs/business/PRICING.md` — forms + voice tiers added
+
+### Implementation plan
+Next: `writing-plans` skill → implementation plan for Track A (forms critical path).
+Three-agent parallel execution: Agent A (forms), Agent B (voice), Agent C (WhatsApp parity).
+
+---
+
 ## [1.67.0] — 2026-04-26 — DASHBOARD_SUMMARY handler: all 6 Sheet rows queryable via bot
 
 ### Added

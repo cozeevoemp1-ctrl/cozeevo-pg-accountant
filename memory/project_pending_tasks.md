@@ -6,22 +6,40 @@ type: project
 
 ## Active / Next Up
 
-1. **DASHBOARD_SUMMARY "dues" line fix** — Kiran flagged COLLECTION shows "Mar 2026 dues: Rs.15,500" but it should show CURRENT MONTH (April) outstanding dues amount. Change `prev_dues` query to show current month pending+partial total in `_dashboard_summary`. Kiran expects ~Rs.3L.
-2. **Set Maharajan's daywise rate via bot** — agreed_rent is currently Rs.0 on VPS (room 219, tenancy 945). Send: `change 219 rent to [actual rate] per day` then confirm Yes.
-3. **All DaywiseStay attributes editable via bot** — user asked "all attributes in daystay also should be editable via helper functions". Not started.
-4. **Agent Phase 2** — Enable `USE_PYDANTIC_AGENTS=true` on VPS. 48h soak window was ready 2026-04-27. Check if still valid.
-5. **Task 6 (Supabase Auth)** — Kiran must configure Phone provider in Supabase dashboard.
-6. **Task 23 (Vercel staging deploy)** — Connect `web/` to Vercel.
-7. **`test_activity_log.py` broken** — pre-existing failure (`sys.exit()` at module level). Investigate separately.
-8. **Chandra off-book cash** — Mar Rs.1.6L + Apr Rs.15.5K. Decide if we log as explicit entries.
-9. **70 unclassified bank txns** — Kiran to fill yellow column in `data/reports/unclassified_review.xlsx`.
-10. **WhatsApp template approval** — `cozeevo_checkin_form` still PENDING from Meta.
+### PWA — next features (Track A, agreed by Kiran)
+1. **Checkout PWA page** — `/checkout/new` form: tenant search → preview outstanding + deposit → collect/refund → confirmation. Backend endpoint needed (`POST /api/v2/app/checkout`).
+2. **Tenant list page** — dedicated `/tenants` page listing all active tenants with room, rent, dues badge. Tap row → dues detail card + quick pay button.
+3. **Onboarding form in PWA** — move static HTML at `api.getkozzy.com/admin/onboarding` into `app.getkozzy.com/onboarding/new`. Reuse existing backend (`/api/v2/onboarding/*`). OCR photo pre-fill (backlog).
+4. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
+5. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
+
+### Bot / backend
+6. **DASHBOARD_SUMMARY "dues" line fix** — COLLECTION shows "Mar 2026 dues: Rs.15,500" but should show CURRENT MONTH (April) outstanding. Change `prev_dues` query in `_dashboard_summary`. Kiran expects ~Rs.3L.
+7. **Set Maharajan's daywise rate via bot** — agreed_rent Rs.0 on VPS (room 219, tenancy 945). `change 219 rent to [rate] per day` → Yes.
+8. **All DaywiseStay attributes editable via bot** — not started.
+9. **Agent Phase 2** — Enable `USE_PYDANTIC_AGENTS=true` on VPS. 48h soak was ready 2026-04-27. Check if still valid.
+10. **`test_activity_log.py` broken** — pre-existing failure (`sys.exit()` at module level). Investigate separately.
+11. **Chandra off-book cash** — Mar Rs.1.6L + Apr Rs.15.5K. Decide if we log as explicit entries.
+12. **70 unclassified bank txns** — Kiran to fill yellow column in `data/reports/unclassified_review.xlsx`.
+13. **WhatsApp template approval** — `cozeevo_checkin_form` still PENDING from Meta.
+
+### Infra
+14. **Merge `feature/pwa-forms-rent-collection` → master** — PWA is stable on VPS; needs merge so VPS tracks master.
+15. **Task 6 (Supabase Phone Auth)** — Kiran must configure Phone provider in Supabase dashboard.
 
 ## Paused
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
 
-## Recently Completed (v1.67.0 — 2026-04-26)
+## Recently Completed (v1.71.0 — 2026-04-27)
+
+- **PWA deployed at app.getkozzy.com** — nginx + systemd + SSL on VPS. Auth fixed (ES256/PyJWKClient). CORS updated.
+- **KPI panels v2** — occupied (name search + rent filter), vacant (room search + gender pills + partial vacancies), checkins/checkouts (name search + stay-type pills: All/Regular/Day-wise)
+- **Tenant detail card** — click any tenant in KPI panel → see check-in date, rent, deposit, maintenance, dues, last payment
+- **Money dashboard** — month nav, cash/UPI/bank breakdown, pure rent total, cumulative deposits held
+- **Backend**: kpi-detail enriched (tenancy_id, rent, stay_type, free_beds, gender), deposits-held endpoint, reporting method_breakdown, total_deposits_held service function
+
+## Recently Completed (v1.69.0–v1.69.1 — 2026-04-27)
 
 - **DASHBOARD_SUMMARY handler** — all 6 Sheet-dashboard rows queryable via bot (occupancy, buildings, collection, status, notice, deposits). Deployed to VPS. 5 golden tests G101-G105 all pass.
 - **BOT_FLOWS.md + RECEPTIONIST_CHEAT_SHEET.md** — DASHBOARD_SUMMARY + SHOW_MASTER_DATA added

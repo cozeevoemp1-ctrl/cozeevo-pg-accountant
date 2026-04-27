@@ -493,9 +493,13 @@ async def _do_log_payment_by_ids(
     room_obj = _room_obj or await session.get(Room, tenancy.room_id)
     room_label = f" (Room {room_obj.room_number})" if room_obj else ""
 
-    # ── Google Sheets write-back (with 10s timeout — never hangs) ────────────
+    # ── Google Sheets write-back ──────────────────────────────────────────────
     import asyncio as _aio
-    if room_obj:
+    if is_daily_stay:
+        # Day-wise: regenerate full DAY WISE tab from DB (correct columns/totals)
+        from src.integrations import gsheets as _gs
+        _gs.trigger_daywise_sheet_sync()
+    elif room_obj:
         try:
             from src.integrations.gsheets import update_payment as gsheets_update
             await _aio.wait_for(gsheets_update(
@@ -506,7 +510,7 @@ async def _do_log_payment_by_ids(
                 month=period_month.month,
                 year=period_month.year,
                 entered_by=ctx_name or "bot",
-                is_daily=(tenancy.stay_type == StayType.daily),
+                is_daily=False,
             ), timeout=10)
         except _aio.TimeoutError:
             import logging as _logging

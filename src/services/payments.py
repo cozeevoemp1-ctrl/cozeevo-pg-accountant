@@ -68,15 +68,37 @@ class PaymentResult:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-_UPI_KEYWORDS = frozenset(
-    {"upi", "gpay", "phonepe", "paytm", "online", "transfer",
-     "netbanking", "net banking", "neft", "imps", "bank"}
-)
+_METHOD_TO_MODE: dict[str, PaymentMode] = {
+    # UPI apps
+    "upi":         PaymentMode.upi,
+    "gpay":        PaymentMode.upi,
+    "googlepay":   PaymentMode.upi,
+    "phonepe":     PaymentMode.upi,
+    "paytm":       PaymentMode.upi,
+    "online":      PaymentMode.upi,
+    # Bank transfer (was incorrectly grouped with UPI before)
+    "bank":            PaymentMode.bank_transfer,
+    "bank_transfer":   PaymentMode.bank_transfer,
+    "banktransfer":    PaymentMode.bank_transfer,
+    "transfer":        PaymentMode.bank_transfer,
+    "netbanking":      PaymentMode.bank_transfer,
+    "net banking":     PaymentMode.bank_transfer,
+    "neft":            PaymentMode.bank_transfer,
+    "imps":            PaymentMode.bank_transfer,
+    "rtgs":            PaymentMode.bank_transfer,
+    # Cheque
+    "cheque": PaymentMode.cheque,
+    "check":  PaymentMode.cheque,
+    # Cash
+    "cash":  PaymentMode.cash,
+    "card":  PaymentMode.cash,   # no card enum — fall back to cash
+    "other": PaymentMode.cash,
+}
 
 
 def _resolve_payment_mode(method: str) -> PaymentMode:
-    """Map a free-text method string to a PaymentMode enum value."""
-    return PaymentMode.upi if (method or "").lower().strip() in _UPI_KEYWORDS else PaymentMode.cash
+    """Map a free-text or PWA method string to a PaymentMode enum value."""
+    return _METHOD_TO_MODE.get((method or "").lower().strip(), PaymentMode.cash)
 
 
 def _resolve_for_type(for_type: str) -> PaymentFor:

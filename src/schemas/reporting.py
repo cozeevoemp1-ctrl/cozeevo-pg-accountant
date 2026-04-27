@@ -13,3 +13,4 @@ class CollectionSummaryResponse(BaseModel):
     deposits_received: int
     booking_advances: int
     overdue_count: int
+    method_breakdown: dict[str, int] = {}

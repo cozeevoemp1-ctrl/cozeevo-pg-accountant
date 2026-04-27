@@ -8,7 +8,7 @@ Deposits and booking advances are tracked but NOT counted in Total Collection.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
@@ -37,6 +37,7 @@ class CollectionSummary:
     deposits_received: int
     booking_advances: int
     overdue_count: int
+    method_breakdown: dict[str, int] = field(default_factory=dict)  # cash/upi/bank_transfer/cheque
 
 
 async def collection_summary(
@@ -55,7 +56,7 @@ async def collection_summary(
         raw = raw + "-01"
     from_date = date.fromisoformat(raw).replace(day=1)
 
-    # ── Expected (rent_due + maintenance_due + adjustment, active tenants checked in before month) ──
+    # ── Expected = sum of all rent_schedule rows for this month (active tenants) ──
     expected_raw = await session.scalar(
         select(
             func.sum(
@@ -68,7 +69,6 @@ async def collection_summary(
         .where(
             RentSchedule.period_month == from_date,
             Tenancy.status == TenancyStatus.active,
-            Tenancy.checkin_date < from_date,
         )
     )
     expected = int(expected_raw or 0)
@@ -103,6 +103,28 @@ async def collection_summary(
     pending = max(expected - collected, 0)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
+    # ── Payment method breakdown (cash / upi / bank_transfer / cheque) ─────────
+    method_rows = (
+        await session.execute(
+            select(
+                Payment.payment_mode,
+                func.sum(Payment.amount).label("total"),
+            )
+            .join(Tenancy, Tenancy.id == Payment.tenancy_id)
+            .where(
+                Payment.period_month == from_date,
+                Payment.is_void == False,
+                Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
+            )
+            .group_by(Payment.payment_mode)
+        )
+    ).all()
+
+    method_breakdown: dict[str, int] = {}
+    for row in method_rows:
+        key = row.payment_mode.value if hasattr(row.payment_mode, "value") else str(row.payment_mode or "other")
+        method_breakdown[key] = int(row.total or 0)
+
     # ── Overdue count — tenants with partial/pending rent for THIS month ───────
     overdue_count = int(
         await session.scalar(
@@ -112,7 +134,6 @@ async def collection_summary(
                 RentSchedule.period_month == from_date,
                 RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
                 Tenancy.status == TenancyStatus.active,
-                Tenancy.checkin_date < from_date,
             )
         )
         or 0
@@ -129,4 +150,27 @@ async def collection_summary(
         deposits_received=deposits_received,
         booking_advances=booking_advances,
         overdue_count=overdue_count,
+        method_breakdown=method_breakdown,
     )
+
+
+async def deposits_breakdown(*, session: AsyncSession) -> dict[str, int]:
+    """Return security deposit and maintenance fee totals from active tenancy agreements.
+
+    Returns held (security deposits), maintenance (non-refundable), and refundable
+    (held minus maintenance) — matches the Google Sheet DEPOSITS section.
+    """
+    result = await session.execute(
+        select(
+            func.coalesce(func.sum(Tenancy.security_deposit), 0).label("security"),
+            func.coalesce(func.sum(Tenancy.maintenance_fee), 0).label("maintenance"),
+        ).where(Tenancy.status == TenancyStatus.active)
+    )
+    row = result.one()
+    security = int(row.security or 0)
+    maintenance = int(row.maintenance or 0)
+    return {
+        "held": security,
+        "maintenance": maintenance,
+        "refundable": max(security - maintenance, 0),
+    }

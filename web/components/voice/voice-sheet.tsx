@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useVoiceRecorder } from "@/lib/voice";
-import { transcribeAudio, extractPaymentIntent } from "@/lib/api";
+import { useSpeechInput } from "@/lib/voice";
+import { parseVoiceIntent } from "@/lib/parse-intent";
 import type { PaymentIntent } from "@/lib/api";
 
 interface VoiceSheetProps {
@@ -10,12 +10,11 @@ interface VoiceSheetProps {
   onPaymentIntent: (intent: PaymentIntent) => void;
 }
 
-type SheetStep = "recording" | "transcribing" | "extracting" | "confirm" | "error";
+type SheetStep = "recording" | "extracting" | "confirm" | "error";
 
 export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
-  const recorder = useVoiceRecorder();
+  const speech = useSpeechInput();
   const [step, setStep] = useState<SheetStep>("recording");
-  const [transcript, setTranscript] = useState("");
   const [intent, setIntent] = useState<PaymentIntent | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const startedRef = useRef(false);
@@ -24,40 +23,32 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
   useEffect(() => {
     if (!startedRef.current) {
       startedRef.current = true;
-      recorder.start();
+      speech.start();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When recording stops, transcribe
+  // When speech is done, send transcript to LLM for intent extraction
   useEffect(() => {
-    if (recorder.state === "stopped" && recorder.audioBlob) {
-      handleTranscribe(recorder.audioBlob, recorder.mimeType);
+    if (speech.state === "stopped" && speech.transcript) {
+      handleExtract(speech.transcript);
     }
-    if (recorder.state === "error" && recorder.error) {
-      setErrorMsg(recorder.error);
+    if (speech.state === "error" || speech.state === "unsupported") {
+      setErrorMsg(speech.error ?? "Something went wrong");
       setStep("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recorder.state]);
+  }, [speech.state]);
 
-  async function handleTranscribe(blob: Blob, mime: string) {
-    setStep("transcribing");
-    try {
-      const result = await transcribeAudio(blob, mime);
-      setTranscript(result.text);
-      setStep("extracting");
-      const pi = await extractPaymentIntent(result.text);
-      setIntent(pi);
-      setStep("confirm");
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : "Something went wrong");
-      setStep("error");
-    }
+  function handleExtract(text: string) {
+    setStep("extracting");
+    const pi = parseVoiceIntent(text);
+    setIntent(pi);
+    setStep("confirm");
   }
 
   function handleStop() {
-    recorder.stop();
+    speech.stop();
   }
 
   function handleConfirm() {
@@ -72,18 +63,17 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
 
         {step === "recording" && (
           <RecordingView
-            state={recorder.state}
+            state={speech.state}
             onStop={handleStop}
             onCancel={onClose}
           />
         )}
 
-        {step === "transcribing" && <ProcessingView label="Transcribing audio…" />}
         {step === "extracting" && <ProcessingView label="Understanding your note…" />}
 
         {step === "confirm" && intent && (
           <ConfirmView
-            transcript={transcript}
+            transcript={speech.transcript}
             intent={intent}
             onConfirm={handleConfirm}
             onCancel={onClose}
@@ -198,11 +188,7 @@ function ConfirmView({
         )}
       </div>
 
-      {intent.intent !== "log_payment" && (
-        <p className="text-xs text-status-warn">
-          Could not recognise a payment. Please try again or use the manual form.
-        </p>
-      )}
+      <VoiceSummary intent={intent} />
 
       <div className="flex gap-3 mt-auto">
         <button
@@ -220,6 +206,45 @@ function ConfirmView({
         </button>
       </div>
     </div>
+  );
+}
+
+function VoiceSummary({ intent }: { intent: PaymentIntent }) {
+  const found: string[] = [];
+  const missing: string[] = [];
+
+  if (intent.amount != null) found.push(`₹${intent.amount.toLocaleString("en-IN")}`);
+  else missing.push("amount");
+
+  if (intent.tenant_name) found.push(intent.tenant_name);
+  else missing.push("tenant name");
+
+  if (intent.method) found.push(intent.method);
+  else missing.push("payment method");
+
+  if (missing.length === 0) {
+    return (
+      <p className="text-xs text-status-paid font-medium">
+        All details captured. Tap Confirm to log.
+      </p>
+    );
+  }
+
+  if (intent.intent !== "log_payment") {
+    return (
+      <p className="text-xs text-status-warn">
+        No amount heard — can&apos;t log a payment. Try again: &ldquo;8000 Ravi cash&rdquo;
+      </p>
+    );
+  }
+
+  const foundStr = found.length ? `Got ${found.join(", ")}.` : "";
+  const missStr = `Still need: ${missing.join(", ")} — fill it below before confirming.`;
+
+  return (
+    <p className="text-xs text-status-warn">
+      {foundStr} {missStr}
+    </p>
   );
 }
 

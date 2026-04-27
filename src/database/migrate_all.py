@@ -1320,6 +1320,44 @@ async def run_enable_rls_all_tables(conn) -> None:
     print(f"  [ok] RLS enabled on {enabled} tables")
 
 
+async def run_payments_freeze_trigger_2026_04_27(conn) -> None:
+    """Freeze trigger: block writes to historical payments (period_month < current month).
+    Escape hatch: SET LOCAL app.allow_historical_write = 'true' in the same transaction."""
+    await conn.execute(text("""
+        CREATE OR REPLACE FUNCTION payments_freeze_check()
+        RETURNS trigger AS $$
+        DECLARE
+            freeze_before date;
+            affected_period date;
+        BEGIN
+            freeze_before := date_trunc('month', CURRENT_DATE)::date;
+            IF TG_OP = 'DELETE' THEN
+                affected_period := OLD.period_month;
+            ELSE
+                affected_period := NEW.period_month;
+            END IF;
+            IF affected_period IS NOT NULL AND affected_period < freeze_before THEN
+                IF current_setting('app.allow_historical_write', true) IS DISTINCT FROM 'true' THEN
+                    RAISE EXCEPTION
+                        'FROZEN: payments for period_month % are frozen (before %). '
+                        'Run: SET LOCAL app.allow_historical_write = ''true''; first.',
+                        affected_period, freeze_before;
+                END IF;
+            END IF;
+            IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS payments_freeze ON payments;
+
+        CREATE TRIGGER payments_freeze
+        BEFORE INSERT OR UPDATE OR DELETE ON payments
+        FOR EACH ROW EXECUTE FUNCTION payments_freeze_check();
+    """))
+    print("  [ok] payments_freeze trigger installed")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1355,6 +1393,7 @@ async def main(args: argparse.Namespace) -> None:
             await _migrate_checkout_sessions(conn)
             await run_rent_schedule_cascade_2026_04_25(conn)
             await run_payment_unique_hash_2026_04_25(conn)
+            await run_payments_freeze_trigger_2026_04_27(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)
