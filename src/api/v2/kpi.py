@@ -10,6 +10,7 @@ from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
     Complaint, ComplaintStatus,
+    DaywiseStay,
     Payment, PaymentFor,
     Room, Tenancy, TenancyStatus,
     Tenant,
@@ -56,6 +57,19 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             )
         )
         occupied_beds = int(occupied_raw or 0)
+
+        # Add legacy day-wise guests (old daywise_stays table, migrated from Excel).
+        # New day-wise use Tenancy(stay_type=daily) and are already included above.
+        old_daywise = int(await session.scalar(
+            select(func.count()).select_from(DaywiseStay)
+            .where(
+                DaywiseStay.checkin_date <= today,
+                DaywiseStay.checkout_date > today,
+                DaywiseStay.status.notin_(["EXIT", "CANCELLED"]),
+            )
+        ) or 0)
+        occupied_beds += old_daywise
+
         vacant_beds = max(total_beds - occupied_beds, 0)
         occ_pct = round(occupied_beds / total_beds * 100, 1) if total_beds > 0 else 0.0
 
