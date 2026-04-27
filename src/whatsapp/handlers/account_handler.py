@@ -702,6 +702,17 @@ async def _do_void_payment(payment_id: int, tenant_name: str, session: AsyncSess
     if not payment:
         return "Payment record not found."
 
+    # Freeze guard: past months are locked — voiding is not allowed.
+    current_period = date.today().replace(day=1)
+    pay_period = payment.period_month
+    if not pay_period and payment.payment_date:
+        pay_period = payment.payment_date.replace(day=1)
+    if pay_period and pay_period < current_period:
+        return (
+            f"Cannot void — {pay_period.strftime('%B %Y')} is a closed period. "
+            "Past month records are frozen. Use the adjustment line on the current month to correct discrepancies."
+        )
+
     payment.is_void = True
 
     # ── Audit trail ──────────────────────────────────────────────────────────

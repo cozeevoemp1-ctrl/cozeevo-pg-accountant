@@ -148,6 +148,21 @@ function lockAllSheets() {
   );
 }
 
+function _isClosedMonth_(tabName) {
+  // Returns true if tabName refers to a month BEFORE the current calendar month.
+  const match = tabName.trim().toUpperCase().match(/^([A-Z]+)\s+(\d{4})$/);
+  if (!match) return false;
+  const monthIdx = MONTH_NAMES.indexOf(match[1]);
+  if (monthIdx === -1) return false;
+  const tabYear = parseInt(match[2], 10);
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth(); // 0-indexed
+  if (tabYear < curYear) return true;
+  if (tabYear === curYear && monthIdx < curMonth) return true;
+  return false;
+}
+
 function onSheetEdit(e) {
   try {
     const sheet = e.source.getActiveSheet();
@@ -159,6 +174,16 @@ function onSheetEdit(e) {
         refreshDashboardContent_();
       }
     } else if (MONTH_TAB_RE.test(name.toUpperCase())) {
+      // Freeze guard: past months are read-only mirrors of DB — warn on edit.
+      if (_isClosedMonth_(name)) {
+        SpreadsheetApp.getUi().alert(
+          "Closed Period",
+          name + " is a closed period. Past month data is a read-only mirror of the database.\n\n" +
+          "To correct a discrepancy, use the Adjustment line on the current month row in the app or bot.",
+          SpreadsheetApp.getUi().ButtonSet.OK
+        );
+        return;
+      }
       // New layout (sync_sheet_from_db.py) puts header at row 7, with 5
       // summary cards at rows 2-6. The legacy updateMonthSummary writes to
       // rows 2-3 — skip it on the new layout to avoid corrupting cards.

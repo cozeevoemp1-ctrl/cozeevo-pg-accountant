@@ -165,6 +165,16 @@ async def log_payment(
     pay_for = _resolve_for_type(for_type)
     period = _parse_period_month(period_month)
 
+    # Freeze guard: past calendar months are locked — no new payments allowed.
+    # Future months are fine (advance payments). Current month is always fine.
+    current_period = date.today().replace(day=1)
+    if period < current_period:
+        raise ValueError(
+            f"period_frozen: {period.strftime('%B %Y')} is closed — "
+            "payments cannot be added to past months. "
+            "Use the adjustment line on the current month row to correct discrepancies."
+        )
+
     tenancy: Optional[Tenancy] = await session.get(Tenancy, tenancy_id)
     if tenancy is None:
         raise ValueError(f"Tenancy {tenancy_id} not found")

@@ -80,6 +80,10 @@ export default function NewPaymentPage() {
     setError("")
     if (!tenant) { setError("Select a tenant first"); return }
     if (!amount || Number(amount) <= 0) { setError("Enter a valid amount"); return }
+    if (periodMonth < currentMonth()) {
+      setError(`${periodMonth} is a closed period — payments cannot be recorded for past months. Use the adjustment line to correct discrepancies.`)
+      return
+    }
     setShowConfirm(true)
   }
 
@@ -250,6 +254,7 @@ export default function NewPaymentPage() {
             <input
               type="month"
               value={periodMonth}
+              min={currentMonth()}
               onChange={(e) => setPeriodMonth(e.target.value)}
               className="flex-1 rounded-pill border border-[#E2DEDD] bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-brand-pink"
             />
