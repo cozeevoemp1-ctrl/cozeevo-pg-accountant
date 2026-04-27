@@ -20,10 +20,11 @@ from src.services.rent_schedule import first_month_rent_due, prorated_first_mont
 
 
 class _FakeTenancy:
-    def __init__(self, agreed_rent, security_deposit, checkin_date):
+    def __init__(self, agreed_rent, security_deposit, checkin_date, booking_amount=0):
         self.agreed_rent = Decimal(str(agreed_rent))
         self.security_deposit = Decimal(str(security_deposit))
         self.checkin_date = checkin_date
+        self.booking_amount = Decimal(str(booking_amount))
 
 
 def test_first_month_prorates_and_bundles_deposit():
