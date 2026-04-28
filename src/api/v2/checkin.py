@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date
+from datetime import date, time as dt_time
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -157,11 +157,12 @@ async def checkin_preview(
 # ── POST check-in ─────────────────────────────────────────────────────────────
 
 class CheckinRequest(BaseModel):
-    tenancy_id:        int
-    actual_checkin_date: str        # YYYY-MM-DD — actual day tenant physically arrived
-    amount_collected:  float        # what was collected today (can be 0)
-    payment_method:    str          # CASH / UPI / BANK_TRANSFER / CHEQUE
-    notes:             str = ""
+    tenancy_id:          int
+    actual_checkin_date: str         # YYYY-MM-DD — actual day tenant physically arrived
+    amount_collected:    float       # what was collected today (can be 0)
+    payment_method:      str         # CASH / UPI / BANK_TRANSFER / CHEQUE
+    notes:               str = ""
+    actual_checkin_time: str | None = None  # HH:MM — day-wise stays only
 
 
 class CheckinResponse(BaseModel):
@@ -241,6 +242,14 @@ async def record_physical_checkin(
         # Update check-in date if it changed
         if date_changed:
             tenancy.checkin_date = actual_date
+
+        # Store check-in time for day-wise stays
+        if is_daily and body.actual_checkin_time:
+            try:
+                h, m = body.actual_checkin_time.split(":")
+                tenancy.checkin_time = dt_time(int(h), int(m))
+            except Exception:
+                pass
 
         if not is_daily:
             # Monthly: recalculate first-month RentSchedule if date changed

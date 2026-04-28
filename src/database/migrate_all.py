@@ -1370,6 +1370,16 @@ async def run_payments_freeze_trigger_2026_04_27(conn) -> None:
     print("  [ok] payments_freeze trigger installed")
 
 
+async def run_add_daywise_time_fields_2026_04_28(conn) -> None:
+    """Add checkin_time + checkout_time to tenancies for day-wise stay time tracking."""
+    await conn.execute(text("""
+        ALTER TABLE tenancies
+            ADD COLUMN IF NOT EXISTS checkin_time  TIME,
+            ADD COLUMN IF NOT EXISTS checkout_time TIME
+    """))
+    print("  [ok] tenancies.checkin_time + checkout_time added")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1407,6 +1417,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_rent_schedule_cascade_2026_04_25(conn)
             await run_payment_unique_hash_2026_04_25(conn)
             await run_payments_freeze_trigger_2026_04_27(conn)
+            await run_add_daywise_time_fields_2026_04_28(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

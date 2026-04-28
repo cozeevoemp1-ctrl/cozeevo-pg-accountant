@@ -32,6 +32,11 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function nowTime(): string {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+}
+
 function fmtDate(iso: string): string {
   if (!iso) return "—"
   const [y, m, d] = iso.split("-")
@@ -87,6 +92,9 @@ export default function NewCheckoutPage() {
   const [result,       setResult]       = useState<CheckoutCreateResponse | null>(null)
   const [pollStatus,   setPollStatus]   = useState<string>("")
 
+  // Day-wise checkout time
+  const [checkoutTime, setCheckoutTime] = useState(nowTime())
+
   // Manual refund override (for anomalies when deposit is forfeited)
   const [refundOverride,     setRefundOverride]     = useState<number | null>(null)
   const [showRefundOverride, setShowRefundOverride] = useState(false)
@@ -107,11 +115,22 @@ export default function NewCheckoutPage() {
 
   const expectedLastDay = prefetch?.notice_date ? calcLastDay(prefetch.notice_date) : null
 
+  // Day-wise extra nights: if checkoutDate > booked checkout date
+  const isDaily = prefetch?.stay_type === "daily"
+  const extraNights = (() => {
+    if (!isDaily || !prefetch?.booked_checkout_date) return 0
+    const booked = new Date(prefetch.booked_checkout_date + "T00:00:00")
+    const actual = new Date(checkoutDate + "T00:00:00")
+    return Math.max(0, Math.round((actual.getTime() - booked.getTime()) / (1000 * 60 * 60 * 24)))
+  })()
+  const extraCharge = extraNights * (prefetch?.daily_rate ?? 0)
+  const totalPendingDues = (prefetch?.pending_dues ?? 0) + extraCharge
+
   // Derived: refund = max(deposit - maintenance_fee - unpaid_rent - deductions, 0)
   // Forfeited deposits → auto refund = 0 (override available)
   const deductionsNum  = Number(deductions) || 0
   const autoRefund = prefetch && !depositForfeited
-    ? Math.max(prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues - deductionsNum, 0)
+    ? Math.max(prefetch.security_deposit - prefetch.maintenance_fee - totalPendingDues - deductionsNum, 0)
     : 0
   const refundAmount = refundOverride !== null ? refundOverride : autoRefund
 
@@ -145,6 +164,7 @@ export default function NewCheckoutPage() {
     setRefundOverride(null)
     setShowRefundOverride(false)
     setRefundOverrideVal("0")
+    setCheckoutTime(nowTime())
   }
 
   function handleReview() {
@@ -169,11 +189,12 @@ export default function NewCheckoutPage() {
         room_condition_ok:     conditionOk,
         damage_notes:          conditionOk ? "" : damageNotes,
         security_deposit:      prefetch.security_deposit,
-        pending_dues:          prefetch.pending_dues,
+        pending_dues:          totalPendingDues,
         deductions:            deductionsNum,
         deduction_reason:      deductionReason || undefined,
         refund_amount:         refundAmount,
         refund_mode:           refundMode.toLowerCase(),
+        checkout_time:         isDaily ? checkoutTime : undefined,
       })
       setShowConfirm(false)
       setResult(res)
@@ -208,6 +229,7 @@ export default function NewCheckoutPage() {
     setRoomKey(false); setWardrobeKey(false)
     setBiometric(false); setConditionOk(true); setDamageNotes("")
     setRefundOverride(null); setShowRefundOverride(false); setRefundOverrideVal("0")
+    setCheckoutTime(nowTime())
     setResult(null); setPollStatus(""); setError("")
   }
 
@@ -235,8 +257,8 @@ export default function NewCheckoutPage() {
           <Row label="Checkout date"    value={fmtDate(checkoutDate)} />
           <Row label="Security deposit" value={fmtINR(prefetch.security_deposit)} />
           <Row label="Maintenance fee"  value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
-          {prefetch.pending_dues > 0 && (
-            <Row label="Unpaid rent" value={`− ${fmtINR(prefetch.pending_dues)}`} />
+          {totalPendingDues > 0 && (
+            <Row label="Unpaid rent" value={`− ${fmtINR(totalPendingDues)}`} />
           )}
           {deductionsNum > 0 && (
             <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
@@ -285,7 +307,7 @@ export default function NewCheckoutPage() {
           />
         </div>
 
-        {/* Checkout date */}
+        {/* Checkout date (+ time for day-wise) */}
         {tenant && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
@@ -297,6 +319,48 @@ export default function NewCheckoutPage() {
               onChange={(e) => setCheckoutDate(e.target.value)}
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
             />
+            {isDaily && (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
+                  Checkout Time
+                </p>
+                <input
+                  type="time"
+                  value={checkoutTime}
+                  onChange={(e) => setCheckoutTime(e.target.value)}
+                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Day-wise stay summary: check-in time + nights + extra stay */}
+        {prefetch && !loadingPre && isDaily && (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Summary</p>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-tile-blue text-brand-blue">Day-wise</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {prefetch.checkin_time && (
+                <Row label="Check-in time" value={prefetch.checkin_time} />
+              )}
+              <Row label="Booked checkout" value={prefetch.booked_checkout_date ? fmtDate(prefetch.booked_checkout_date) : "—"} />
+              <Row label="Checkout time"   value={checkoutTime} />
+              <Row label="Daily rate"      value={`${fmtINR(prefetch.daily_rate ?? 0)} / night`} />
+              {extraNights > 0 && (
+                <>
+                  <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
+                    <Row label={`Extra nights (${extraNights})`} value={`+ ${fmtINR(extraCharge)}`} pink />
+                  </div>
+                  <div className="rounded-tile bg-tile-orange px-3 py-2 text-xs font-medium text-[#7A3300]">
+                    Stayed {extraNights} extra night{extraNights > 1 ? "s" : ""} beyond booked checkout.
+                    ₹{extraCharge.toLocaleString("en-IN")} added to dues.
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -384,8 +448,8 @@ export default function NewCheckoutPage() {
             <div className="flex flex-col gap-1.5 mb-3">
               <Row label="Security deposit"  value={fmtINR(prefetch.security_deposit)} />
               <Row label="Maintenance fee"   value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
-              {prefetch.pending_dues > 0 && (
-                <Row label="Unpaid rent" value={`− ${fmtINR(prefetch.pending_dues)}`} />
+              {totalPendingDues > 0 && (
+                <Row label={extraNights > 0 ? `Unpaid rent + ${extraNights} extra night${extraNights > 1 ? "s" : ""}` : "Unpaid rent"} value={`− ${fmtINR(totalPendingDues)}`} />
               )}
               {!depositForfeited && deductionsNum > 0 && (
                 <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
@@ -529,7 +593,7 @@ export default function NewCheckoutPage() {
             { label: "Tenant",     value: `${tenant.name} · Room ${tenant.room_number}` },
             { label: "Checkout",   value: fmtDate(checkoutDate) },
             { label: "Deposit",    value: fmtINR(prefetch.security_deposit) },
-            ...(prefetch.pending_dues > 0 ? [{ label: "Pending dues", value: `− ${fmtINR(prefetch.pending_dues)}` }] : []),
+            ...(totalPendingDues > 0 ? [{ label: "Pending dues", value: `− ${fmtINR(totalPendingDues)}` }] : []),
             ...(deductionsNum > 0 ? [{ label: "Deductions", value: `− ${fmtINR(deductionsNum)}` }] : []),
             { label: "Refund",     value: refundAmount > 0 ? `${fmtINR(refundAmount)} · ${refundMode}` : "₹0 (no refund)", highlight: refundAmount > 0 },
             { label: "Checklist",  value: [roomKey && "Key", wardrobeKey && "Wardrobe", biometric && "Biometric", conditionOk && "Condition OK"].filter(Boolean).join(" · ") || "—" },

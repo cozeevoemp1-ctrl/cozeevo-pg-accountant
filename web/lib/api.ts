@@ -237,6 +237,7 @@ export interface CheckinCreate {
   amount_collected: number;
   payment_method: string;
   notes?: string;
+  actual_checkin_time?: string;  // HH:MM — day-wise stays only
 }
 
 export function getCheckinPreview(tenancyId: number, actualDate: string): Promise<CheckinPreview> {
@@ -365,6 +366,11 @@ export interface CheckoutPrefetch {
   pending_dues: number;   // outstanding rent only; maintenance_fee deducted separately
   notice_date: string | null;
   expected_checkout: string | null;
+  // day-wise fields
+  stay_type: string;
+  daily_rate: number | null;
+  booked_checkout_date: string | null;
+  checkin_time: string | null;    // HH:MM recorded at physical check-in
 }
 
 export interface CheckoutCreateBody {
@@ -381,6 +387,7 @@ export interface CheckoutCreateBody {
   deduction_reason?: string;
   refund_amount: number;
   refund_mode: string;
+  checkout_time?: string;  // HH:MM — day-wise stays only
 }
 
 export interface CheckoutCreateResponse {

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as dt_time, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -46,16 +46,22 @@ async def checkout_prefetch(
         from src.whatsapp.handlers.account_handler import _calc_outstanding_dues
         o_rent, _o_maint = await _calc_outstanding_dues(tenancy_id, session)
 
+        is_daily = tenancy.stay_type.value == "daily"
         return {
-            "tenancy_id":       tenancy_id,
-            "tenant_name":      tenant.name if tenant else "",
-            "phone":            tenant.phone if tenant else "",
-            "room_number":      room.room_number if room else "",
-            "security_deposit": float(tenancy.security_deposit or 0),
-            "maintenance_fee":  float(tenancy.maintenance_fee or 0),
-            "pending_dues":     float(o_rent),   # outstanding rent only; maintenance_fee deducted separately
-            "notice_date":      tenancy.notice_date.isoformat() if tenancy.notice_date else None,
-            "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
+            "tenancy_id":          tenancy_id,
+            "tenant_name":         tenant.name if tenant else "",
+            "phone":               tenant.phone if tenant else "",
+            "room_number":         room.room_number if room else "",
+            "security_deposit":    float(tenancy.security_deposit or 0),
+            "maintenance_fee":     float(tenancy.maintenance_fee or 0),
+            "pending_dues":        float(o_rent),
+            "notice_date":         tenancy.notice_date.isoformat() if tenancy.notice_date else None,
+            "expected_checkout":   tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
+            # day-wise fields
+            "stay_type":           tenancy.stay_type.value,
+            "daily_rate":          float(tenancy.agreed_rent or 0) if is_daily else None,
+            "booked_checkout_date": tenancy.checkout_date.isoformat() if is_daily and tenancy.checkout_date else None,
+            "checkin_time":        tenancy.checkin_time.strftime("%H:%M") if tenancy.checkin_time else None,
         }
 
 
@@ -75,6 +81,7 @@ class CheckoutCreateBody(BaseModel):
     deduction_reason:      str = ""
     refund_amount:         float
     refund_mode:           str     # cash / upi / bank
+    checkout_time:         str | None = None  # HH:MM — day-wise stays only
 
 
 @router.post("/checkout/create", status_code=201)
@@ -98,6 +105,14 @@ async def create_checkout(
         if not tenant:
             raise HTTPException(404, "Tenant not found")
         room = await session.get(Room, tenancy.room_id)
+
+        # Store checkout time for day-wise stays
+        if body.checkout_time and tenancy.stay_type.value == "daily":
+            try:
+                h, m = body.checkout_time.split(":")
+                tenancy.checkout_time = dt_time(int(h), int(m))
+            except Exception:
+                pass
 
         # Cancel any existing pending session for this tenancy
         existing = await session.scalar(

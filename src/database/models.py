@@ -69,7 +69,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Numeric, Date, DateTime, Enum,
+    Column, Integer, String, Numeric, Date, DateTime, Time, Enum,
     ForeignKey, Text, Boolean, Index, UniqueConstraint
 )
 import os as _os
@@ -392,6 +392,8 @@ class Tenancy(Base):
     checkout_date       = Column(Date)              # NULL if still active
     expected_checkout   = Column(Date)              # planned exit date
     notice_date         = Column(Date)              # date tenant formally gave notice
+    checkin_time        = Column(Time, nullable=True)   # actual time of physical check-in (daywise)
+    checkout_time       = Column(Time, nullable=True)   # actual time of physical check-out (daywise)
     booking_amount      = Column(Numeric(12, 2), default=0)   # advance to reserve
     security_deposit    = Column(Numeric(12, 2), default=0)
     maintenance_fee     = Column(Numeric(10, 2), default=0)   # monthly maintenance

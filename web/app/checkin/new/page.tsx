@@ -29,6 +29,11 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function nowTime(): string {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
+}
+
 function fmtDate(iso: string): string {
   if (!iso) return "—"
   const [y, m, d] = iso.split("-")
@@ -42,6 +47,7 @@ export default function NewCheckinPage() {
   const [tenant,      setTenant]      = useState<TenantSearchResult | null>(null)
   const [preview,     setPreview]     = useState<CheckinPreview | null>(null)
   const [actualDate,  setActualDate]  = useState(todayISO())
+  const [checkinTime, setCheckinTime] = useState(nowTime())
   const [amount,      setAmount]      = useState("")
   const [method,      setMethod]      = useState<Method>("CASH")
   const [notes,       setNotes]       = useState("")
@@ -74,6 +80,7 @@ export default function NewCheckinPage() {
     setTenant(t)
     setPreview(null)
     setAmount("")
+    setCheckinTime(nowTime())
     setError("")
   }
 
@@ -90,11 +97,12 @@ export default function NewCheckinPage() {
     setError("")
     try {
       const res = await recordCheckin({
-        tenancy_id:          tenant.tenancy_id,
-        actual_checkin_date: actualDate,
-        amount_collected:    Number(amount || 0),
-        payment_method:      method,
-        notes:               notes || undefined,
+        tenancy_id:           tenant.tenancy_id,
+        actual_checkin_date:  actualDate,
+        amount_collected:     Number(amount || 0),
+        payment_method:       method,
+        notes:                notes || undefined,
+        actual_checkin_time:  preview?.stay_type === "daily" ? checkinTime : undefined,
       })
       setShowConfirm(false)
       setResult({ balanceRemaining: res.balance_remaining })
@@ -110,7 +118,7 @@ export default function NewCheckinPage() {
   function resetForm() {
     setSuccess(false); setResult(null)
     setTenant(null); setPreview(null)
-    setAmount(""); setNotes(""); setActualDate(todayISO())
+    setAmount(""); setNotes(""); setActualDate(todayISO()); setCheckinTime(nowTime())
   }
 
   // ── Success screen ────────────────────────────────────────────────────────
@@ -179,7 +187,7 @@ export default function NewCheckinPage() {
           />
         </div>
 
-        {/* Actual check-in date */}
+        {/* Actual check-in date (+ time for day-wise) */}
         {tenant && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
@@ -191,6 +199,19 @@ export default function NewCheckinPage() {
               onChange={(e) => setActualDate(e.target.value)}
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
             />
+            {preview?.stay_type === "daily" && (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
+                  Check-in Time
+                </p>
+                <input
+                  type="time"
+                  value={checkinTime}
+                  onChange={(e) => setCheckinTime(e.target.value)}
+                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
+                />
+              </div>
+            )}
             {preview?.date_changed && (
               <div className="mt-3 rounded-tile bg-tile-orange px-3 py-2 text-xs text-ink font-medium">
                 Agreed date was <span className="font-bold">{fmtDate(preview.agreed_checkin_date ?? "")}</span>.
@@ -238,10 +259,10 @@ export default function NewCheckinPage() {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-tile-blue text-brand-blue">Day-wise</span>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Row label="Daily rate"      value={`${fmtINR(preview.daily_rate ?? 0)} / day`} />
-              <Row label="Check-in"        value={fmtDate(actualDate)} />
+              <Row label="Daily rate"      value={`${fmtINR(preview.daily_rate ?? 0)} / night`} />
+              <Row label="Check-in"        value={`${fmtDate(actualDate)}${checkinTime ? `  ${checkinTime}` : ""}`} />
               <Row label="Check-out"       value={preview.checkout_date ? fmtDate(preview.checkout_date) : "—"} />
-              <Row label="Days"            value={`${preview.num_days ?? 0} days`} />
+              <Row label="Nights"          value={`${preview.num_days ?? 0} nights`} />
               <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
                 <Row label="Total stay cost"      value={fmtINR(preview.total_stay_amount ?? 0)} />
                 <Row label="Advance already paid" value={`− ${fmtINR(preview.booking_amount)}`} />
@@ -334,7 +355,7 @@ export default function NewCheckinPage() {
           title="Confirm Check-in"
           fields={[
             { label: "Tenant",     value: `${tenant.name} · Room ${tenant.room_number}` },
-            { label: "Check-in",   value: fmtDate(actualDate) },
+            { label: "Check-in",   value: preview.stay_type === "daily" ? `${fmtDate(actualDate)} ${checkinTime}` : fmtDate(actualDate) },
             ...(preview.date_changed
               ? [{ label: "Date updated from", value: fmtDate(preview.agreed_checkin_date ?? "") }]
               : []),
