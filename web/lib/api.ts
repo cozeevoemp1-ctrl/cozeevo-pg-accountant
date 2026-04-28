@@ -272,7 +272,7 @@ export interface PatchTenantBody {
   security_deposit?: number;
   maintenance_fee?: number;
   lock_in_months?: number;
-  expected_checkout?: string;
+  expected_checkout?: string | null;
   tenancy_notes?: string;
   rent_change_reason?: string;
   notice_date?: string | null;
