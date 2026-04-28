@@ -245,7 +245,7 @@ async def record_physical_checkin(
                 method       = method,
                 for_type     = PaymentFor.rent,
                 period_month = period_month_str,
-                recorded_by  = user.phone or user.user_id,
+                recorded_by  = (user.phone or user.user_id or "")[:30],
                 session      = session,
                 notes        = body.notes or ("Daily stay check-in payment" if is_daily else "Physical check-in payment"),
                 source       = "physical_checkin",
