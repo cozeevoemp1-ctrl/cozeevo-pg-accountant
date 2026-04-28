@@ -221,19 +221,19 @@ export default function NewOnboardingPage() {
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Financials</p>
             <Field label="Monthly rent (₹)" required>
-              <input required type="number" min="0" value={rent} onChange={e => setRent(e.target.value)}
+              <input required type="text" inputMode="numeric" value={rent} onChange={e => setRent(e.target.value)}
                 placeholder="e.g. 12000" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
             <Field label="Security deposit (₹)">
-              <input type="number" min="0" value={deposit} onChange={e => setDeposit(e.target.value)}
+              <input type="text" inputMode="numeric" value={deposit} onChange={e => setDeposit(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
             <Field label="Maintenance fee (₹/mo)">
-              <input type="number" min="0" value={maintenance} onChange={e => setMaintenance(e.target.value)}
+              <input type="text" inputMode="numeric" value={maintenance} onChange={e => setMaintenance(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
             <Field label="Booking advance (₹)">
-              <input type="number" min="0" value={booking} onChange={e => setBooking(e.target.value)}
+              <input type="text" inputMode="numeric" value={booking} onChange={e => setBooking(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
             {Number(booking) > 0 && (
@@ -253,7 +253,7 @@ export default function NewOnboardingPage() {
               </Field>
             )}
             <Field label="Lock-in months">
-              <input type="number" min="0" value={lockIn} onChange={e => setLockIn(e.target.value)}
+              <input type="text" inputMode="numeric" value={lockIn} onChange={e => setLockIn(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
           </div>
@@ -264,7 +264,7 @@ export default function NewOnboardingPage() {
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Financials</p>
             <Field label="Daily rate (₹/day)" required>
-              <input required type="number" min="0" value={dailyRate} onChange={e => setDailyRate(e.target.value)}
+              <input required type="text" inputMode="numeric" value={dailyRate} onChange={e => setDailyRate(e.target.value)}
                 placeholder="e.g. 500" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
             {dailyRate && numDays > 0 && (
@@ -274,7 +274,7 @@ export default function NewOnboardingPage() {
               </div>
             )}
             <Field label="Booking advance (₹)">
-              <input type="number" min="0" value={booking} onChange={e => setBooking(e.target.value)}
+              <input type="text" inputMode="numeric" value={booking} onChange={e => setBooking(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
             {Number(booking) > 0 && (

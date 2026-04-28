@@ -221,7 +221,8 @@ export default function EditTenantPage() {
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Agreed Rent (₹/mo)</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={agreedRent}
               onChange={(e) => setAgreedRent(e.target.value)}
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
@@ -236,7 +237,8 @@ export default function EditTenantPage() {
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Security Deposit (₹)</label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={securityDeposit}
               onChange={(e) => setSecurityDeposit(e.target.value)}
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
