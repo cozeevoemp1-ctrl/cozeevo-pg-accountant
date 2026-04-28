@@ -316,7 +316,7 @@ async def serve_admin_checkout():
     return HTMLResponse(form_path.read_text(encoding="utf-8"))
 
 @app.get("/checkout/{token}", response_class=HTMLResponse)
-async def serve_checkout_confirm(_token: str):
+async def serve_checkout_confirm(token: str):
     """Serve the tenant-facing checkout summary + confirm/dispute page."""
     form_path = Path("static/checkout_confirm.html")
     if not form_path.exists():
