@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.12] — 2026-04-28 — Root cause fix: recurring Cash inflation in Sheet
+
+### Fixed
+- **`src/api/v2/payments.py`** — `gsheets_update()` now only fires for `for_type == "rent"`. Previously fired for all non-booking payments (including deposits, maintenance), causing an immediate ADD-increment to the Cash column on every deposit logged via PWA. Background full sync corrected it seconds later, but if sync was slow or failed, the inflation stuck.
+- **Root cause of "daily 16L" identified:** v1.74.0 backfilled ₹3,18,750 of deposit payments into Sheet Cash cells. Then every `trigger_monthly_sheet_sync` using the old sync script re-added `deposit_credit` to Cash → 16L. Manual fixes brought it to 13L, but the next payment triggered another sync → 16L again.
+- **Both vectors now sealed:** (1) `sync_sheet_from_db.py` no longer adds `deposit_credit` to Cash/Total Paid columns; (2) `gsheets_update()` skips all non-rent payments.
+- **April 2026 confirmed stable:** Cash Rs.13,05,783 / UPI Rs.31,54,345 / Dues Rs.88,766 — resynced and verified.
+
+---
+
 ## [1.74.11] — 2026-04-28 — Day-wise: check-in/out time entry + nights billing
 
 ### Added
