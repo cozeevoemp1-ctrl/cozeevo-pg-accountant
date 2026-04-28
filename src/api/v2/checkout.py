@@ -55,6 +55,7 @@ async def checkout_prefetch(
             "maintenance_fee":  float(tenancy.maintenance_fee or 0),
             "pending_dues":     float(o_rent),   # outstanding rent only; maintenance_fee deducted separately
             "notice_date":      tenancy.notice_date.isoformat() if tenancy.notice_date else None,
+            "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
         }
 
 
