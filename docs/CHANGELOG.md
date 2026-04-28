@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.5] — 2026-04-28 — Edit tenant: maintenance fee + lock-in + pre-filled notes
+
+### Changes
+- **`src/api/v2/tenants.py`** — dues endpoint now returns `maintenance_fee`, `lock_in_months`, `notes`; PATCH endpoint accepts `maintenance_fee` and `lock_in_months`
+- **`web/lib/api.ts`** — `TenantDues` + `PatchTenantBody` updated with new fields
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Maintenance Fee field added to Financials section; Lock-in Months field added to Stay Details; Notes pre-filled from existing value (edit-in-place, not append); change detection: only sends if value differs from original
+
+---
+
 ## [1.74.4] — 2026-04-28 — Planned rent increase — end-to-end
 
 ### Feature: Planned rent increase at onboarding

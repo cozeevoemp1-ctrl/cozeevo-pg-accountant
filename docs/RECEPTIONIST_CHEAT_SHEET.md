@@ -46,6 +46,12 @@ Bot shows dues summary (all months + notes) before asking for amounts.
 | **onboard Priya** | Same, with name |
 | **start registration** | Same |
 
+**PWA Onboarding form** (`app.getkozzy.com → New Onboarding`):
+- Set room, rent, deposit, maintenance, checkin date, lock-in months
+- **Planned Rent Increase** (optional): enter new rent + "after N months" → system auto-schedules the revision at approval, no follow-up needed
+- Formula: current month = month 1 (e.g. checkin Apr, N=2 → new rate from June 1)
+- Tenant sees the increase on their form and agreement before signing
+
 ---
 
 ### CHECKOUT (Immediate)

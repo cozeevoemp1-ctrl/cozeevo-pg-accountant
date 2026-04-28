@@ -383,7 +383,19 @@ delivery | purchase | maintenance | utility | supply | staff | visitor | payment
 
 ---
 
-## 5. Critical Data Rules
+## 5. Key Column Additions (2026-04-28)
+
+**`onboarding_sessions`** — 2 new nullable columns:
+| Column | Type | Description |
+|--------|------|-------------|
+| `future_rent` | NUMERIC(12,2) | Planned future rent after N months |
+| `future_rent_after_months` | INTEGER | N months at intro rate before increase |
+
+Formula: `effective_date = 1st of (checkin_month + N)`. At approval, if set, pre-inserts a `rent_revisions` row so rollover applies it automatically.
+
+---
+
+## 6. Critical Data Rules
 
 1. **NEVER hard-delete** payments, expenses, refunds -- use `is_void = True`
 2. **period_month** is ALWAYS 1st of month: `2026-03-01` not `2026-03-15`
