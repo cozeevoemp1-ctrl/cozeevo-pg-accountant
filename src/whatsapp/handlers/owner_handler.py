@@ -92,6 +92,7 @@ async def handle_owner(
         "CHECKIN_ARRIVAL":    _checkin_arrival,
         "UPDATE_CHECKOUT_DATE": _update_checkout_date,
         "NOTICE_GIVEN":       _notice_given,
+        "NOTICE_WITHDRAWN":   _withdraw_notice,
         "ADD_PARTNER":        _add_partner,
         "REMINDER_SET":       _reminder_prompt,
         "ROOM_LAYOUT":        _room_layout,
@@ -2732,7 +2733,7 @@ async def resolve_pending_action(
 
     if is_negative(reply_text) and pending.intent in (
         "CHECKOUT", "SCHEDULE_CHECKOUT", "PAYMENT_LOG", "QUERY_TENANT",
-        "GET_TENANT_NOTES", "NOTICE_GIVEN", "RENT_CHANGE_WHO", "RENT_CHANGE",
+        "GET_TENANT_NOTES", "NOTICE_GIVEN", "NOTICE_WITHDRAWN", "RENT_CHANGE_WHO", "RENT_CHANGE",
         "VOID_PAYMENT", "VOID_EXPENSE", "DUPLICATE_CONFIRM", "OVERPAYMENT_RESOLVE",
         "OVERPAYMENT_ADD_NOTE", "UNDERPAYMENT_NOTE",
         "DEPOSIT_CHANGE", "DEPOSIT_CHANGE_AMT", "DEPOSIT_CHANGE_WHO",
@@ -3012,6 +3013,52 @@ async def resolve_pending_action(
                 f"{deposit_note}{gsheets_note}"
             )
         return "Tenancy not found."
+
+    if chosen is not None and pending.intent == "NOTICE_WITHDRAWN":
+        # Multi-match disambiguation: chosen has tenancy_id from _make_choices
+        if "search_term" in action_data and "tenancy_id" not in action_data:
+            tenancy_id = chosen.get("tenancy_id")
+            tenancy = await session.get(Tenancy, tenancy_id) if tenancy_id else None
+            room_obj = await session.get(Room, tenancy.room_id) if tenancy else None
+            tenant = await session.get(Tenant, tenancy.tenant_id) if tenancy else None
+            if not tenancy or not tenancy.notice_date:
+                return "No notice on record for that tenant."
+            notice_str = tenancy.notice_date.strftime("%d %b %Y")
+            exit_str = tenancy.expected_checkout.strftime("%d %b %Y") if tenancy.expected_checkout else "—"
+            new_data = {
+                "tenancy_id": tenancy_id,
+                "tenant_name": tenant.name if tenant else "",
+                "room_number": room_obj.room_number if room_obj else "",
+            }
+            new_choices = [{"seq": 1, "label": "Yes"}, {"seq": 2, "label": "No"}]
+            await _save_pending(pending.phone, "NOTICE_WITHDRAWN", new_data, new_choices, session, state="awaiting_choice")
+            return (
+                f"Withdraw notice for *{tenant.name}* (Room {room_obj.room_number if room_obj else '?'})?\n"
+                f"Notice given: {notice_str} · Expected out: {exit_str}\n\n"
+                f"1. Yes, withdraw  2. No, keep"
+            )
+
+        # Yes/No confirmation
+        if chosen.get("seq") == 2 or chosen.get("label") == "No":
+            return "OK, notice kept."
+
+        tenancy_id = action_data.get("tenancy_id")
+        tenant_name = action_data.get("tenant_name", "")
+        room_number = action_data.get("room_number", "")
+
+        tenancy = await session.get(Tenancy, tenancy_id) if tenancy_id else None
+        if not tenancy:
+            return "Tenancy not found."
+
+        tenancy.notice_date = None
+        tenancy.expected_checkout = None
+        session.add(tenancy)
+        await session.commit()
+
+        from src.integrations.gsheets import record_notice
+        await record_notice(room_number, tenant_name, "", "")
+
+        return f"Notice withdrawn for *{tenant_name}* (Room {room_number}). They remain active."
 
     if chosen is not None and pending.intent == "RENT_CHANGE_WHO":
         # After picking the right tenant, ask one-time vs permanent
@@ -4644,6 +4691,52 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
     await _save_pending(ctx.phone, "NOTICE_GIVEN", action_data, choices, session, state="awaiting_choice")
     return _format_choices_message(search_term, choices, f"record notice (vacate: {last_day.strftime('%d %b %Y')})")
 
+
+# ── Withdraw notice ───────────────────────────────────────────────────────────
+
+async def _withdraw_notice(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Cancel/withdraw a notice — clears notice_date + expected_checkout from DB + Sheet."""
+    name = entities.get("name", "").strip()
+    room = entities.get("room", "").strip()
+
+    if not name and not room:
+        return "Who should I withdraw notice for? E.g. *withdraw notice Raj Kumar* or *cancel notice room 205*"
+
+    rows = []
+    search_term = name
+    if name:
+        rows = await _find_active_tenants_by_name(name, session)
+    if not rows and room:
+        rows = await _find_active_tenants_by_room(room, session)
+        search_term = f"Room {room}"
+
+    # Only tenants who actually have a notice on record
+    rows = [(tenant, tenancy, rm) for tenant, tenancy, rm in rows if tenancy.notice_date]
+
+    if not rows:
+        return f"No active tenant on notice matching *{name or room}*."
+
+    tenant, tenancy, rm = rows[0]
+    notice_str = tenancy.notice_date.strftime("%d %b %Y")
+    exit_str = tenancy.expected_checkout.strftime("%d %b %Y") if tenancy.expected_checkout else "—"
+
+    if len(rows) == 1:
+        action_data = {
+            "tenancy_id": tenancy.id,
+            "tenant_name": tenant.name,
+            "room_number": rm.room_number,
+        }
+        choices = [{"seq": 1, "label": "Yes"}, {"seq": 2, "label": "No"}]
+        await _save_pending(ctx.phone, "NOTICE_WITHDRAWN", action_data, choices, session, state="awaiting_choice")
+        return (
+            f"Withdraw notice for *{tenant.name}* (Room {rm.room_number})?\n"
+            f"Notice given: {notice_str} · Expected out: {exit_str}\n\n"
+            f"1. Yes, withdraw  2. No, keep"
+        )
+
+    choices = _make_choices(rows)
+    await _save_pending(ctx.phone, "NOTICE_WITHDRAWN", {"search_term": search_term}, choices, session, state="awaiting_choice")
+    return _format_choices_message(search_term, choices, "withdraw notice")
 
 
 # ── Update check-in date ──────────────────────────────────────────────────────

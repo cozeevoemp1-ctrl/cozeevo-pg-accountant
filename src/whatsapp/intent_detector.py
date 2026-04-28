@@ -186,6 +186,13 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # Distinct from QUERY_VACANT_ROOMS (long-term) because this includes beds
     # reserved by future no-shows that are still free tonight.
     (re.compile(r"(?:(?:beds?|rooms?)\s+free\s+(?:tonight|today|now|on\s+[\w\s\d/-]+)|(?:how\s+many|any)\s+(?:beds?|rooms?)\s+free\s+(?:tonight|today|on\s+[\w\s\d/-]+)|day[-\s]*stay\s+availab|free\s+(?:beds?|rooms?)\s+for\s+day[-\s]*stay|day[-\s]*stay\s+(?:beds?|rooms?)\s+(?:free|available))", re.I), "DAYSTAY_AVAILABILITY", 0.94),
+    # Notice withdrawal — MUST come before NOTICE_GIVEN so "cancel notice" doesn't hit bare "notice" match
+    (re.compile(
+        r"cancel\s+notice|withdraw\s+notice|remove\s+notice|revoke\s+notice|"
+        r"not\s+leaving|changed\s+mind\s+(?:about\s+)?leaving|won[''']?t\s+(?:be\s+)?leaving|"
+        r"will\s+not\s+leave|take\s+back\s+notice|notice\s+cancel(?:led)?|cancel(?:led)?\s+notice",
+        re.I,
+    ), "NOTICE_WITHDRAWN", 0.93),
     # Explicit notice given — BEFORE all query rules so "giving notice, last day X" routes here
     (re.compile(r"gave\s+notice|giving\s+notice|serving\s+notice|on\s+notice\b", re.I), "NOTICE_GIVEN", 0.95),
     # Expense query (before ADD_EXPENSE so "what did we spend" goes here)
@@ -298,6 +305,13 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
         r"|(?:leaving|vacating|moving\s*out|checkout)\s+(?:tomorrow|today|tonight|next\s+week|this\s+week|day\s+after)",
         re.I
     ), "SCHEDULE_CHECKOUT", 0.93),
+    # Notice withdrawal — fallback (catches "cancel notice" before bare "\bnotice\b" below)
+    (re.compile(
+        r"cancel\s+notice|withdraw\s+notice|remove\s+notice|revoke\s+notice|"
+        r"not\s+leaving|changed\s+mind\s+(?:about\s+)?leaving|won[''']?t\s+(?:be\s+)?leaving|"
+        r"will\s+not\s+leave|take\s+back\s+notice|notice\s+cancel(?:led)?|cancel(?:led)?\s+notice",
+        re.I,
+    ), "NOTICE_WITHDRAWN", 0.93),
     # Notice period — "gave notice", "serving notice", "wants to leave", bare "notice"
     (re.compile(r"gave notice|giving notice|serving notice|\bnotice\b|notice period|plans? to (?:leave|vacate)|wants? to (?:leave|move)", re.I), "NOTICE_GIVEN", 0.92),
     # Assign room to unassigned/future booking tenant
