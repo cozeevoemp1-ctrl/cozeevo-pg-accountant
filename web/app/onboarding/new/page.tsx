@@ -54,7 +54,7 @@ export default function NewOnboardingPage() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState("")
-  const [success, setSuccess]       = useState<{ token: string; phone: string } | null>(null)
+  const [success, setSuccess]       = useState<{ token: string; phone: string; waSent: boolean } | null>(null)
 
   const numDays   = stayType === "daily" ? daysBetween(checkinDate, checkoutDate) : 0
   const totalCost = stayType === "daily" && dailyRate ? numDays * Number(dailyRate) : 0
@@ -97,7 +97,7 @@ export default function NewOnboardingPage() {
         throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`)
       }
       const data = await res.json()
-      setSuccess({ token: data.token, phone: tenantPhone.trim() })
+      setSuccess({ token: data.token, phone: tenantPhone.trim(), waSent: !!data.whatsapp_sent })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed")
     } finally {
@@ -113,10 +113,13 @@ export default function NewOnboardingPage() {
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
         <div className="text-center">
           <h1 className="text-xl font-extrabold text-ink">Session Created!</h1>
-          <p className="text-sm text-ink-muted mt-1">WhatsApp link sent to {success.phone}</p>
+          {success.waSent
+            ? <p className="text-sm text-status-ok font-medium mt-1">WhatsApp link sent to {success.phone}</p>
+            : <p className="text-sm text-status-warn font-medium mt-1">WhatsApp failed — share the link below manually</p>
+          }
         </div>
         <div className="w-full max-w-sm bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
-          <p className="text-xs text-ink-muted font-medium">Tenant form link (also sent via WhatsApp):</p>
+          <p className="text-xs text-ink-muted font-medium">{success.waSent ? "Tenant form link (also sent via WhatsApp):" : "Share this link with the tenant:"}</p>
           <p className="text-xs font-mono text-brand-pink break-all bg-[#F6F5F0] rounded-tile px-3 py-2">{formLink}</p>
           <p className="text-xs text-ink-muted">After tenant fills the form, approve in the admin panel:</p>
           <a
