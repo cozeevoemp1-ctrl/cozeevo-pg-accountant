@@ -2,6 +2,49 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.4] — 2026-04-28 — Planned rent increase — end-to-end
+
+### Feature: Planned rent increase at onboarding
+
+Set an intro rent + a future rent in one onboarding session. No manual follow-up needed.
+
+**Data model**
+- `onboarding_sessions.future_rent NUMERIC(12,2)` — nullable
+- `onboarding_sessions.future_rent_after_months INTEGER` — nullable
+- Migration: `run_add_planned_rent_increase_2026_04_28` (append-only)
+
+**Formula** — `effective_date = 1st of (checkin_month + N)`
+- Current month always counts as month 1 (never skipped)
+- Example: checkin Apr 28, N=2 → intro months April & May → new rate from June 1
+
+**Backend** (`src/api/onboarding_router.py`)
+- `POST /api/onboarding/create` — accepts `future_rent`, `future_rent_after_months`
+- `GET /api/onboarding/{token}` — returns both fields to tenant form
+- `POST /api/onboarding/{token}/approve` — monthly path: if `future_rent` set, pre-inserts `rent_revision` row (old_rent=agreed_rent, new_rent=future_rent, effective_date, reason="planned_rent_increase"). Monthly rollover will apply it automatically.
+- WhatsApp at create-time: fallback message appended with `→ Rs.X/mo from [Month]`
+- WhatsApp at approval: fallback confirmation note added if rent increase scheduled
+
+**Tenant form** (`static/onboarding.html`)
+- Room summary card: "Monthly Rent: ₹11,500 → ₹13,000/mo from June"
+- Agreement booking summary: same note
+
+**PWA** (`web/app/onboarding/new/page.tsx`)
+- "Planned Rent Increase" section: solid border (no Preview badge), wired to API
+- Preview shows actual month names: "April & May, then ₹13,000/mo from June"
+- `future_rent=0` skips the field entirely (no revision inserted)
+
+---
+
+## [1.74.3] — 2026-04-28 — PWA onboarding sessions page + quick actions
+
+### New: Onboarding sessions page (`/onboarding/sessions`)
+- Lists all sessions with status filter tabs (All, Pending Review, Awaiting Tenant, Approved, Cancelled, Expired)
+- Expandable session cards with room, financials, tenant info, approve/cancel/copy-link/resend actions
+- Uses PIN auth (same `NEXT_PUBLIC_ONBOARDING_PIN`)
+- Quick Action tile "Onboarding Sessions" added to `/tenants` page
+
+---
+
 ## [1.74.2] — 2026-04-28 — PWA nav on all pages + sticky CTA fix
 
 ### Changes

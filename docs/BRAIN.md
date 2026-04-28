@@ -480,6 +480,13 @@ Dashboard (reads DB)            Kiran views (read-only)
 - Rent changes also tracked in rent_revisions with effective dates
 - Source: whatsapp / dashboard / system / import
 
+**Planned rent increase at onboarding (2026-04-28):**
+- Two nullable columns on `onboarding_sessions`: `future_rent`, `future_rent_after_months`
+- Formula: `effective_date = 1st of (checkin_month + N)` — current month counts as month 1
+- At approval: backend pre-inserts a `rent_revision` row; monthly rollover applies it automatically — no manual step
+- Surfaces end-to-end: PWA form preview (month names), tenant HTML form (room card + agreement), WhatsApp messages (create + approval fallback)
+- `future_rent=0` skips — revision is NOT inserted
+
 **Premium bed rule (CRITICAL — do not change):**
 - Premium sharing = 1 person books BOTH beds in a double room
 - Premium tenant = 2 beds occupied, second bed CANNOT be sold
