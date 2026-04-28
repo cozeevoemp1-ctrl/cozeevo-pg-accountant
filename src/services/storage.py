@@ -28,6 +28,7 @@ SUPABASE_SERVICE_KEY: str = (
 
 BUCKET_KYC = "kyc-documents"
 BUCKET_AGREEMENTS = "agreements"
+BUCKET_RECEIPTS = "receipts"
 
 _BUCKETS_CREATED: set[str] = set()
 

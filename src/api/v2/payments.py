@@ -5,15 +5,17 @@ import asyncio
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import Room, StayType, Tenancy, TenancyStatus, Tenant
+from src.database.models import Payment, Room, StayType, Tenancy, TenancyStatus, Tenant
 from src.integrations.gsheets import update_payment as gsheets_update
 from src.schemas.payments import PaymentCreate, PaymentResponse
 from src.services.payments import _resolve_payment_mode, log_payment
+from src.services.storage import BUCKET_RECEIPTS
+from src.services.storage import upload as storage_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -94,3 +96,38 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
             new_balance=float(result.new_balance),
             receipt_sent=False,
         )
+
+
+_ALLOWED_RECEIPT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
+_MAX_RECEIPT_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+@router.post("/payments/{payment_id}/receipt")
+async def upload_receipt(
+    payment_id: int,
+    file: UploadFile = File(...),
+    user: AppUser = Depends(get_current_user),
+):
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="admin or staff only")
+
+    if file.content_type not in _ALLOWED_RECEIPT_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}. Allowed: jpeg, png, webp, heic")
+
+    data = await file.read()
+    if len(data) > _MAX_RECEIPT_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 8 MB")
+
+    async with get_session() as session:
+        payment = await session.get(Payment, payment_id)
+        if payment is None:
+            raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
+
+        path = f"{payment.payment_date.strftime('%Y-%m')}/{payment_id}.jpg"
+        url = await storage_upload(BUCKET_RECEIPTS, path, data, file.content_type)
+
+        payment.receipt_url = url
+        await session.commit()
+
+    logger.info("[PWA] receipt uploaded: payment=%s url=%s by=%s", payment_id, url, user.phone)
+    return {"payment_id": payment_id, "receipt_url": url}

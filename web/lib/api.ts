@@ -315,3 +315,19 @@ export function getOverdueTenants(): Promise<OverdueTenant[]> {
 export function sendReminder(body: { tenancy_id?: number; send_all?: boolean }): Promise<{ sent: number[]; failed: number[] }> {
   return _post<{ sent: number[]; failed: number[] }>("/api/v2/app/reminders/send", body);
 }
+
+export async function uploadReceipt(paymentId: number, file: File): Promise<{ payment_id: number; receipt_url: string }> {
+  const headers = await _authHeaders();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE_URL}/api/v2/app/payments/${paymentId}/receipt`, {
+    method: "POST",
+    headers,  // no Content-Type — browser sets multipart boundary automatically
+    body: form,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `Upload failed ${res.status}`);
+  }
+  return res.json();
+}

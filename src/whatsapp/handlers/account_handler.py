@@ -1049,10 +1049,28 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
     )
 
     # ── Monthly tenant dues ────────────────────────────────────────────────────
+    # Subquery: rent payments already made this period per tenancy
+    _rent_paid_sq = (
+        select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
+        .where(
+            Payment.period_month == query_month,
+            Payment.for_type == PaymentFor.rent,
+            Payment.is_void == False,
+        )
+        .group_by(Payment.tenancy_id)
+        .subquery()
+    )
     result = await session.execute(
-        select(Tenant.name, RentSchedule.rent_due, RentSchedule.status)
+        select(
+            Tenant.name,
+            RentSchedule.rent_due,
+            func.coalesce(RentSchedule.adjustment, 0).label("adjustment"),
+            func.coalesce(_rent_paid_sq.c.paid, 0).label("paid"),
+            RentSchedule.status,
+        )
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
+        .outerjoin(_rent_paid_sq, _rent_paid_sq.c.tenancy_id == Tenancy.id)
         .where(
             Tenancy.status == TenancyStatus.active,
             Tenancy.checkin_date <= query_month_last,
@@ -1099,27 +1117,31 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
         if balance > 0:
             dw_dues.append((dw_name, balance))
 
-    if not rows and not dw_dues:
-        return f"All tenants are paid up for {query_month.strftime('%B %Y')}!"
-
     lines = [f"*Pending dues — {query_month.strftime('%B %Y')}*\n"]
     total = Decimal("0")
     seen = set()
-    for name, rent_due, status in rows:
+    for name, rent_due, adjustment, paid, status in rows:
         if name in seen:
             continue
         seen.add(name)
+        effective_due = (rent_due or Decimal("0")) + Decimal(str(adjustment or 0))
+        remaining = max(Decimal("0"), effective_due - Decimal(str(paid or 0)))
+        if remaining <= 0:
+            continue
         status_str = "Partial" if status == RentStatus.partial else "Pending"
-        lines.append(f"• {name}: Rs.{int(rent_due or 0):,} ({status_str})")
-        total += rent_due or Decimal("0")
+        lines.append(f"• {name}: Rs.{int(remaining):,} ({status_str})")
+        total += remaining
 
     if dw_dues:
-        if rows:
+        if total > 0:
             lines.append("")
         lines.append("*Day-stays:*")
         for dw_name, balance in dw_dues:
             lines.append(f"• {dw_name} (day-stay): Rs.{int(balance):,}")
             total += balance
+
+    if total <= 0 and not dw_dues:
+        return f"All tenants are paid up for {query_month.strftime('%B %Y')}!"
 
     lines.append(f"\n*Total outstanding: Rs.{int(total):,}*")
     return "\n".join(lines)

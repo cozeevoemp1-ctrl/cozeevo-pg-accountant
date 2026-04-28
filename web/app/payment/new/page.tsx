@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
@@ -9,6 +9,7 @@ import { VoiceSheet } from "@/components/voice/voice-sheet"
 import {
   createPayment,
   getTenantDues,
+  uploadReceipt,
   TenantSearchResult,
   TenantDues,
   PaymentIntent,
@@ -55,6 +56,13 @@ export default function NewPaymentPage() {
   const [success, setSuccess] = useState(false)
   const [voiceHint, setVoiceHint] = useState("")
 
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const [uploadingReceipt, setUploadingReceipt] = useState(false)
+  const [receiptError, setReceiptError] = useState("")
+  const [lastPaymentId, setLastPaymentId] = useState<number | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   async function handleTenantSelect(t: TenantSearchResult) {
     setTenant(t)
     setDues(null)
@@ -92,7 +100,7 @@ export default function NewPaymentPage() {
     setSubmitting(true)
     setError("")
     try {
-      await createPayment({
+      const result = await createPayment({
         tenant_id: tenant.tenant_id,
         amount: Number(amount),
         method,
@@ -100,6 +108,7 @@ export default function NewPaymentPage() {
         period_month: periodMonth,
         notes: notes || undefined,
       })
+      setLastPaymentId(result.payment_id)
       setShowConfirm(false)
       setSuccess(true)
     } catch (err) {
@@ -107,6 +116,22 @@ export default function NewPaymentPage() {
       setError(err instanceof Error ? err.message : "Payment failed. Try again.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleReceiptChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || lastPaymentId === null) return
+    setReceiptFile(file)
+    setReceiptError("")
+    setUploadingReceipt(true)
+    try {
+      const result = await uploadReceipt(lastPaymentId, file)
+      setReceiptUrl(result.receipt_url)
+    } catch (err) {
+      setReceiptError(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setUploadingReceipt(false)
     }
   }
 
@@ -134,9 +159,36 @@ export default function NewPaymentPage() {
             )}
           </div>
         )}
+        {/* Receipt upload */}
+        {receiptUrl ? (
+          <div className="w-full max-w-sm flex items-center gap-2 px-4 py-2 rounded-pill bg-tile-green border border-[#C5E8D0]">
+            <span className="text-status-paid text-sm font-semibold">Receipt saved ✓</span>
+          </div>
+        ) : (
+          <div className="w-full max-w-sm flex flex-col gap-1">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleReceiptChange}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingReceipt}
+              className="w-full flex items-center justify-center gap-2 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm active:opacity-70 disabled:opacity-50"
+            >
+              <span>📷</span>
+              <span>{uploadingReceipt ? "Uploading…" : "Take Photo / Upload"}</span>
+            </button>
+            {receiptError && <p className="text-xs text-status-warn font-medium text-center">{receiptError}</p>}
+          </div>
+        )}
+
         <div className="flex gap-3 w-full max-w-sm">
           <button
-            onClick={() => { setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes("") }}
+            onClick={() => { setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes(""); setReceiptUrl(null); setReceiptFile(null); setLastPaymentId(null) }}
             className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm"
           >
             + New
