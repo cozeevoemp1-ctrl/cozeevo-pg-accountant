@@ -2,6 +2,35 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.2] — 2026-04-28 — PWA nav on all pages + sticky CTA fix
+
+### Changes
+- **`web/components/home/nav-wrapper.tsx`** — nav bar now shows on ALL pages (removed path exclusions for onboarding, payment, checkin, checkout, reminders, tenants detail). Only `/login` still hides it.
+- **`web/app/checkin/new/page.tsx`**, **`checkout/new/page.tsx`**, **`onboarding/new/page.tsx`**, **`payment/new/page.tsx`** — sticky CTA padding raised from `pb-8` (32px) to `pb-28` (112px) so "Review & Confirm" buttons always appear above the ~84px floating nav pill.
+- **`web/components/home/home-tab-bar.tsx`** — `/checkout` path now highlights the Manage tab.
+
+---
+
+## [1.74.1] — 2026-04-28 — PWA checkout form + checkin/onboarding UX fixes
+
+### New: Physical check-out form (`/checkout/new`)
+- **`src/api/v2/checkout.py`** — JWT-protected checkout endpoints: `GET /checkout/tenant/{id}` (prefetch with maintenance_fee separate), `POST /checkout/create`, `GET /checkout/status/{token}`
+- **`src/api/v2/app_router.py`** — registered checkout router
+- **`web/app/checkout/new/page.tsx`** — full checkout form: tenant search, date picker, 4-item handover checklist, deductions numpad, refund calc (`deposit − maintenance_fee − pending_dues − deductions`), refund mode selector, ConfirmationCard, success screen with 5s status polling
+- **`web/app/tenants/page.tsx`** — added "New Check-out" Quick Action tile (orange)
+- **`web/components/home/nav-wrapper.tsx`** — `/checkout/` added to nav-hide list
+
+### Fix: Checkout refund formula
+- `maintenance_fee` is always deducted at checkout (even when all dues paid). API returns it separately from `pending_dues`.
+
+### Fix: Check-in payment method selector
+- Method selector now only shows when `amount > 0` (was always visible, pushing under sticky CTA on mobile).
+
+### Fix: Onboarding form — advance payment method
+- Added `advanceMode` state + Cash/UPI/Bank toggle shown when `booking > 0`. Sends `advance_mode` field to API (was causing HTTP 400 on submissions with booking amount).
+
+---
+
 ## [1.74.0] — 2026-04-28 — April dues fixed (Rs.4L → Rs.88,766) — three-layer bug
 
 ### Root cause
