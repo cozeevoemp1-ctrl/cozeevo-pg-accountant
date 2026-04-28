@@ -116,6 +116,8 @@ Kiran's Excel (offline)
 | `src/services/storage.py` | Supabase Storage wrapper (kyc-documents, agreements buckets) |
 | `src/database/models.py` | ORM models |
 | `src/database/migrate_all.py` | Master migration (append only, never remove) |
+| `src/api/v2/notices.py` | GET /notices/active — tenants on notice (deposit eligible vs forfeited) |
+| `web/app/notices/page.tsx` | PWA Notices page — list tenants on notice with expected checkout + refund status |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations
