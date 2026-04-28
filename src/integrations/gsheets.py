@@ -1624,16 +1624,17 @@ async def record_checkout(
 async def record_notice(
     room_number: str,
     tenant_name: str,
-    notice_date: str,
-    expected_exit: str = "",
+    notice_date: str | None,
+    expected_exit: str | None = "",
 ) -> dict:
     """
     Async entry point — update Notice Date + Expected Exit in monthly tab + TENANTS tab.
+    Pass None or "" for notice_date to clear the cells (withdraw notice).
 
     Returns dict: success, row, tab, error
     """
     return await asyncio.to_thread(
-        _record_notice_sync, room_number, tenant_name, notice_date, expected_exit,
+        _record_notice_sync, room_number, tenant_name, notice_date or "", expected_exit or "",
     )
 
 
