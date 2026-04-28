@@ -195,6 +195,8 @@ export interface CheckinPreview {
   actual_date: string;
   agreed_checkin_date: string | null;
   stay_type: "monthly" | "daily";
+  tenancy_status: string;
+  already_checked_in: boolean;
   // monthly
   agreed_rent: number;
   security_deposit: number;

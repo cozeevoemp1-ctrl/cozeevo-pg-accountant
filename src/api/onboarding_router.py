@@ -110,7 +110,7 @@ class TenantSubmitRequest(BaseModel):
 async def room_lookup(room_number: str, request: Request):
     _check_admin_pin(request)
     _rate_check(f"lookup:{request.client.host}", 30, 60)  # 30/min
-    """Look up room info for the create form."""
+    """Look up room info + live occupancy for the create form."""
     async with get_session() as session:
         room = await session.scalar(select(Room).where(Room.room_number.ilike(room_number)))
         if not room:
@@ -121,7 +121,22 @@ async def room_lookup(room_number: str, request: Request):
             building = prop.name if prop else ""
         rt = room.room_type
         sharing = rt.value if hasattr(rt, 'value') else str(rt or "")
-        return {"room_number": room.room_number, "building": building, "floor": str(room.floor or ""), "sharing": sharing}
+
+        from src.services.room_occupancy import get_room_occupants
+        occ = await get_room_occupants(session, room)
+        occupant_names = [t.name for t, _ in occ.tenancies] + [tc.tenant.name for tc in occ.daywise if tc.tenant]
+        max_occ = room.max_occupancy or 1
+
+        return {
+            "room_number": room.room_number,
+            "building": building,
+            "floor": str(room.floor or ""),
+            "sharing": sharing,
+            "max_occupancy": max_occ,
+            "occupied": occ.total_occupied,
+            "is_full": occ.total_occupied >= max_occ,
+            "occupants": occupant_names,
+        }
 
 
 @router.post("/create")

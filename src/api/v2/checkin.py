@@ -130,15 +130,26 @@ async def checkin_preview(
 
     tenancy, tenant, room, prop = result
 
+    # already_checked_in: monthly active tenants whose check-in was 3+ days ago
+    # are settled residents — the check-in form is not the right tool; use payment form
+    already_checked_in = (
+        tenancy.status == TenancyStatus.active
+        and tenancy.stay_type != StayType.daily
+        and tenancy.checkin_date is not None
+        and (parsed_date - tenancy.checkin_date).days >= 3
+    )
+
     preview = _calc_preview(tenancy, parsed_date)
     return {
-        "tenancy_id":    tenancy.id,
-        "tenant_id":     tenant.id,
-        "name":          tenant.name,
-        "phone":         tenant.phone,
-        "room_number":   room.room_number,
-        "building_code": prop.name.split()[-1] if prop.name else "",
-        "actual_date":   parsed_date.isoformat(),
+        "tenancy_id":         tenancy.id,
+        "tenant_id":          tenant.id,
+        "name":               tenant.name,
+        "phone":              tenant.phone,
+        "room_number":        room.room_number,
+        "building_code":      prop.name.split()[-1] if prop.name else "",
+        "actual_date":        parsed_date.isoformat(),
+        "tenancy_status":     tenancy.status.value if tenancy.status else "",
+        "already_checked_in": already_checked_in,
         **preview,
     }
 
@@ -180,20 +191,36 @@ async def record_physical_checkin(
         raise HTTPException(status_code=400, detail=f"Unknown payment method: {body.payment_method!r} — use CASH, UPI, BANK, or CHEQUE")
 
     async with get_session() as session:
-        # Load tenancy + related
+        # Accept both active (same-day or returning) and no_show (pending physical arrival)
         row = await session.execute(
             select(Tenancy, Tenant, Room)
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room,   Tenancy.room_id   == Room.id)
             .where(
                 Tenancy.id     == body.tenancy_id,
-                Tenancy.status == TenancyStatus.active,
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
             )
         )
         result = row.first()
 
     if result is None:
-        raise HTTPException(status_code=404, detail=f"No active tenancy {body.tenancy_id}")
+        raise HTTPException(status_code=404, detail=f"No active or no-show tenancy {body.tenancy_id}")
+
+    tenancy_check, _, _ = result
+    # Block re-check-in of already-settled monthly tenants (3+ days since check-in)
+    if (
+        tenancy_check.status == TenancyStatus.active
+        and tenancy_check.stay_type != StayType.daily
+        and tenancy_check.checkin_date is not None
+        and (actual_date - tenancy_check.checkin_date).days >= 3
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Tenant already checked in since {tenancy_check.checkin_date.strftime('%d %b %Y')}. "
+                "Use the payment form to collect dues."
+            ),
+        )
 
     tenancy, tenant, room = result
 
@@ -206,6 +233,10 @@ async def record_physical_checkin(
         tenancy = await session.get(Tenancy, body.tenancy_id)
         tenant  = await session.get(Tenant, tenancy.tenant_id)
         room    = await session.get(Room,   tenancy.room_id)
+
+        # Activate no-show tenants on physical arrival
+        if tenancy.status == TenancyStatus.no_show:
+            tenancy.status = TenancyStatus.active
 
         # Update check-in date if it changed
         if date_changed:

@@ -60,6 +60,29 @@ export default function NewOnboardingPage() {
   const [error, setError]           = useState("")
   const [success, setSuccess]       = useState<{ token: string; phone: string; waSent: boolean } | null>(null)
 
+  // Room occupancy check
+  const [roomInfo, setRoomInfo] = useState<{
+    occupied: number; max_occupancy: number; is_full: boolean; occupants: string[]
+  } | null>(null)
+  const [roomInfoLoading, setRoomInfoLoading] = useState(false)
+
+  async function checkRoomOccupancy(room: string) {
+    if (!room.trim()) { setRoomInfo(null); return }
+    setRoomInfoLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/api/onboarding/room-lookup/${encodeURIComponent(room.trim())}`, {
+        headers: { "X-Admin-Pin": ADMIN_PIN }
+      })
+      if (!res.ok) { setRoomInfo(null); return }
+      const d = await res.json()
+      setRoomInfo(d)
+    } catch {
+      setRoomInfo(null)
+    } finally {
+      setRoomInfoLoading(false)
+    }
+  }
+
   const numDays   = stayType === "daily" ? daysBetween(checkinDate, checkoutDate) : 0
   const totalCost = stayType === "daily" && dailyRate ? numDays * Number(dailyRate) : 0
 
@@ -184,9 +207,27 @@ export default function NewOnboardingPage() {
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Room Details</p>
           <Field label="Room number" required>
-            <input required value={roomNumber} onChange={e => setRoomNumber(e.target.value)}
+            <input required value={roomNumber}
+              onChange={e => { setRoomNumber(e.target.value); setRoomInfo(null) }}
+              onBlur={e => checkRoomOccupancy(e.target.value)}
               placeholder="e.g. 101"
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
+              className={`w-full rounded-pill border bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink ${roomInfo?.is_full ? "border-status-warn" : "border-[#E2DEDD]"}`} />
+            {roomInfoLoading && <p className="text-[10px] text-ink-muted mt-1">Checking occupancy…</p>}
+            {roomInfo && !roomInfoLoading && (
+              roomInfo.is_full ? (
+                <div className="mt-2 rounded-tile bg-[#FFF0F0] border border-status-warn px-3 py-2">
+                  <p className="text-xs font-bold text-status-warn">Room {roomNumber} is full ({roomInfo.occupied}/{roomInfo.max_occupancy} beds)</p>
+                  {roomInfo.occupants.length > 0 && (
+                    <p className="text-[10px] text-ink-muted mt-0.5">Current occupants: {roomInfo.occupants.join(", ")}</p>
+                  )}
+                  <p className="text-[10px] text-ink-muted mt-0.5">Existing tenants must check out before a new onboarding can be approved.</p>
+                </div>
+              ) : (
+                <p className="text-[10px] text-status-ok mt-1 font-semibold">
+                  Room {roomNumber}: {roomInfo.occupied}/{roomInfo.max_occupancy} beds occupied
+                </p>
+              )
+            )}
           </Field>
           <Field label="Sharing type">
             <select value={sharingType} onChange={e => setSharingType(e.target.value)} className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink">

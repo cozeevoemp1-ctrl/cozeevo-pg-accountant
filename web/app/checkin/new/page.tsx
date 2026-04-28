@@ -267,6 +267,17 @@ export default function NewCheckinPage() {
           </div>
         )}
 
+        {/* Already checked-in warning */}
+        {preview?.already_checked_in && (
+          <div className="bg-[#FFF0F0] border border-status-warn rounded-card px-4 py-3">
+            <p className="text-xs font-bold text-status-warn">Already checked in</p>
+            <p className="text-xs text-ink-muted mt-0.5">
+              {preview.name} has been in Room {preview.room_number} since {fmtDate(preview.agreed_checkin_date ?? "")}.
+              This is a settled tenant — use the <strong>Payment</strong> form to collect dues instead.
+            </p>
+          </div>
+        )}
+
         {/* Amount — only show if there's something to collect (or override) */}
         {preview && (
           <Numpad
@@ -310,10 +321,10 @@ export default function NewCheckinPage() {
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-[#F0EDE9]">
         <button
           onClick={handleReview}
-          disabled={!tenant || !preview || loadingPrev}
+          disabled={!tenant || !preview || loadingPrev || !!preview?.already_checked_in}
           className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80 disabled:opacity-40"
         >
-          Review &amp; Confirm →
+          {preview?.already_checked_in ? "Already Checked In — Use Payment Form" : "Review & Confirm →"}
         </button>
       </div>
 
