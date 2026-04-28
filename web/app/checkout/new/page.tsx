@@ -14,6 +14,8 @@ import {
   CheckoutCreateResponse,
 } from "@/lib/api"
 
+const NOTICE_BY_DAY = 5
+
 type RefundMode = "CASH" | "UPI" | "BANK"
 
 const REFUND_MODES: { value: RefundMode; label: string; icon: string }[] = [
@@ -85,11 +87,33 @@ export default function NewCheckoutPage() {
   const [result,       setResult]       = useState<CheckoutCreateResponse | null>(null)
   const [pollStatus,   setPollStatus]   = useState<string>("")
 
+  // Manual refund override (for anomalies when deposit is forfeited)
+  const [refundOverride,     setRefundOverride]     = useState<number | null>(null)
+  const [showRefundOverride, setShowRefundOverride] = useState(false)
+  const [refundOverrideVal,  setRefundOverrideVal]  = useState("0")
+
+  // Notice / deposit forfeiture
+  const depositForfeited = prefetch
+    ? !prefetch.notice_date || new Date(prefetch.notice_date + "T00:00:00").getDate() > NOTICE_BY_DAY
+    : false
+
+  function calcLastDay(noticeDateISO: string): string {
+    const d = new Date(noticeDateISO + "T00:00:00")
+    const eligible = d.getDate() <= NOTICE_BY_DAY
+    const y = d.getFullYear()
+    const m = eligible ? d.getMonth() : d.getMonth() + 1
+    return new Date(y, m + 1, 0).toISOString().slice(0, 10)
+  }
+
+  const expectedLastDay = prefetch?.notice_date ? calcLastDay(prefetch.notice_date) : null
+
   // Derived: refund = max(deposit - maintenance_fee - unpaid_rent - deductions, 0)
+  // Forfeited deposits → auto refund = 0 (override available)
   const deductionsNum  = Number(deductions) || 0
-  const refundAmount   = prefetch
+  const autoRefund = prefetch && !depositForfeited
     ? Math.max(prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues - deductionsNum, 0)
     : 0
+  const refundAmount = refundOverride !== null ? refundOverride : autoRefund
 
   // Load prefetch when tenant selected
   useEffect(() => {
@@ -113,6 +137,9 @@ export default function NewCheckoutPage() {
     setBiometric(false)
     setConditionOk(true)
     setDamageNotes("")
+    setRefundOverride(null)
+    setShowRefundOverride(false)
+    setRefundOverrideVal("0")
   }
 
   function handleReview() {
@@ -175,6 +202,7 @@ export default function NewCheckoutPage() {
     setDeductions("0"); setDeductionReason("")
     setRoomKey(false); setWardrobeKey(false)
     setBiometric(false); setConditionOk(true); setDamageNotes("")
+    setRefundOverride(null); setShowRefundOverride(false); setRefundOverrideVal("0")
     setResult(null); setPollStatus(""); setError("")
   }
 
@@ -297,6 +325,48 @@ export default function NewCheckoutPage() {
           </div>
         )}
 
+        {/* Notice status banner */}
+        {prefetch && !loadingPre && (
+          <div className={`rounded-card p-3 border ${
+            depositForfeited
+              ? "bg-tile-orange border-[#FFDCC0] text-[#7A3300]"
+              : "bg-tile-green border-[#C4EDD4] text-[#146B2E]"
+          }`}>
+            <div className="flex items-start gap-2">
+              <span className="text-base flex-shrink-0 mt-0.5">
+                {depositForfeited ? "⚠" : "✓"}
+              </span>
+              <div className="flex-1 min-w-0">
+                {!prefetch.notice_date ? (
+                  <p className="text-xs font-bold">No notice on record — deposit forfeited</p>
+                ) : depositForfeited ? (
+                  <>
+                    <p className="text-xs font-bold">
+                      Notice on {fmtDate(prefetch.notice_date)} (after {NOTICE_BY_DAY}th) — deposit forfeited
+                    </p>
+                    {expectedLastDay && (
+                      <p className="text-[10px] mt-0.5 opacity-80">
+                        Last day: {fmtDate(expectedLastDay)} · Extra month charged
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold">
+                      Notice on {fmtDate(prefetch.notice_date)} (on time) — deposit eligible for refund
+                    </p>
+                    {expectedLastDay && (
+                      <p className="text-[10px] mt-0.5 opacity-80">
+                        Last day: {fmtDate(expectedLastDay)}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Financial summary */}
         {prefetch && !loadingPre && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
@@ -309,22 +379,83 @@ export default function NewCheckoutPage() {
               {prefetch.pending_dues > 0 && (
                 <Row label="Unpaid rent" value={`− ${fmtINR(prefetch.pending_dues)}`} />
               )}
-              {deductionsNum > 0 && (
+              {!depositForfeited && deductionsNum > 0 && (
                 <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
               )}
+              {depositForfeited && (
+                <Row label="Deposit forfeiture" value={`− ${fmtINR(prefetch.security_deposit)}`} muted />
+              )}
               <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
-                <Row
-                  label="Refund to tenant"
-                  value={refundAmount > 0 ? fmtINR(refundAmount) : "₹0"}
-                  pink={refundAmount > 0}
-                />
+                {depositForfeited && refundOverride === null ? (
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-xs text-ink-muted">Refund to tenant</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-ink">₹0</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowRefundOverride(true)}
+                        className="text-[10px] font-bold text-brand-pink border border-brand-pink rounded-full px-2 py-0.5 active:opacity-70"
+                      >
+                        Override
+                      </button>
+                    </div>
+                  </div>
+                ) : depositForfeited && refundOverride !== null ? (
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-xs text-ink-muted">Refund to tenant</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold text-brand-pink">{fmtINR(refundOverride)}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setRefundOverride(null); setShowRefundOverride(false); setRefundOverrideVal("0") }}
+                        className="text-[10px] font-bold text-ink-muted border border-[#E2DEDD] rounded-full px-2 py-0.5 active:opacity-70"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <Row
+                    label="Refund to tenant"
+                    value={refundAmount > 0 ? fmtINR(refundAmount) : "₹0"}
+                    pink={refundAmount > 0}
+                  />
+                )}
               </div>
             </div>
+
+            {/* Override numpad — shown when forfeited and user taps Override */}
+            {depositForfeited && showRefundOverride && refundOverride === null && (
+              <div className="border-t border-[#F0EDE9] pt-3 mt-1">
+                <p className="text-xs font-semibold text-ink-muted mb-2">Override refund amount</p>
+                <Numpad
+                  value={refundOverrideVal === "0" ? "" : refundOverrideVal}
+                  onChange={(v) => setRefundOverrideVal(v || "0")}
+                  suggestAmounts={[]}
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setRefundOverride(Number(refundOverrideVal) || 0); setShowRefundOverride(false) }}
+                    className="flex-1 rounded-pill bg-brand-pink py-2 text-white font-bold text-xs active:opacity-80"
+                  >
+                    Set ₹{(Number(refundOverrideVal) || 0).toLocaleString("en-IN")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRefundOverride(false)}
+                    className="flex-1 rounded-pill border border-[#E2DEDD] py-2 text-ink font-semibold text-xs active:opacity-70"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Deductions numpad */}
-        {prefetch && !loadingPre && (
+        {/* Deductions numpad — hidden when deposit is forfeited (override handles refund there) */}
+        {prefetch && !loadingPre && !depositForfeited && (
           <>
             <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
@@ -344,7 +475,7 @@ export default function NewCheckoutPage() {
               />
             </div>
 
-            {/* Refund mode — only when there's a refund */}
+            {/* Refund mode — only when there's an actual refund amount */}
             {refundAmount > 0 && (
               <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
                 <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">

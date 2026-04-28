@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.6] — 2026-04-28 — Notices page + checkout forfeiture logic
+
+### Added
+- **`src/api/v2/notices.py`** — new `GET /api/v2/app/notices/active` endpoint: returns all active tenants with `notice_date IS NOT NULL`, sorted by expected checkout date. Applies `NOTICE_BY_DAY = 5` rule from `services/property_logic.py` (`calc_notice_last_day`, `is_deposit_eligible`). Returns `deposit_eligible`, `expected_checkout`, `days_remaining` per tenant.
+- **`web/app/notices/page.tsx`** — new Notices page at `/notices`. Lists tenants in two sections: Deposit Eligible (green badge, notice on/before 5th) and Deposit Forfeited (orange badge, after 5th). Each card shows notice date, expected last day, est. refund, "Process Checkout →" CTA. Count badge + refresh button in header.
+- **`web/lib/api.ts`** — `NoticeItem` interface + `getActiveNotices()` function.
+
+### Changed
+- **`src/api/v2/app_router.py`** — registered `notices_router`
+- **`web/app/tenants/page.tsx`** — added "Notices" quick action tile (orange, warning triangle icon) in the grid at `/tenants`
+- **`web/app/checkout/new/page.tsx`** — notice status banner shown after tenant selected:
+  - Green: "Notice on DD Mon YYYY (on time) — deposit eligible" + expected last day
+  - Orange: "Notice on DD Mon YYYY (after 5th) — deposit forfeited" + last day + extra month charged
+  - Orange: "No notice on record — deposit forfeited"
+  - When forfeited: refund auto-sets to ₹0, deductions numpad hidden, "Override" button opens numpad for anomaly refunds (zero refund or more than standard)
+  - Refund mode selector shown only when refund amount > 0
+
+---
+
 ## [1.74.5] — 2026-04-28 — Edit tenant: maintenance fee + lock-in + pre-filled notes
 
 ### Changes
