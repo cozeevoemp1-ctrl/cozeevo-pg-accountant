@@ -121,7 +121,12 @@ export default function NewCheckoutPage() {
     let cancelled = false
     setLoadingPre(true)
     getCheckoutPrefetch(tenant.tenancy_id)
-      .then((p) => { if (!cancelled) setPrefetch(p) })
+      .then((p) => {
+        if (!cancelled) {
+          setPrefetch(p)
+          if (p.expected_checkout) setCheckoutDate(p.expected_checkout)
+        }
+      })
       .catch(() => { if (!cancelled) setError("Could not load tenant details") })
       .finally(() => { if (!cancelled) setLoadingPre(false) })
     return () => { cancelled = true }
@@ -353,7 +358,10 @@ export default function NewCheckoutPage() {
                 ) : (
                   <>
                     <p className="text-xs font-bold">
-                      Notice on {fmtDate(prefetch.notice_date)} (on time) — deposit eligible for refund
+                      Notice on {fmtDate(prefetch.notice_date)} — Deposit Refundable
+                    </p>
+                    <p className="text-xs font-semibold mt-0.5">
+                      {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.pending_dues))} to return
                     </p>
                     {expectedLastDay && (
                       <p className="text-[10px] mt-0.5 opacity-80">
