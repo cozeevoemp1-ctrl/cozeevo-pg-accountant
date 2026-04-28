@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from src.api.v2.auth import AppUser, get_current_user
 from src.api.v2.auth_hooks import router as auth_hooks_router
 from src.api.v2.checkin import router as checkin_router
+from src.api.v2.checkout import router as checkout_router
 from src.api.v2.kpi import activity_router, router as kpi_router
 from src.api.v2.payments import router as payments_router
 from src.api.v2.reminders import router as reminders_router
@@ -22,6 +23,7 @@ router.include_router(auth_hooks_router)
 router.include_router(kpi_router)
 router.include_router(activity_router)
 router.include_router(checkin_router)
+router.include_router(checkout_router)
 router.include_router(payments_router)
 router.include_router(reporting_router)
 router.include_router(tenants_router)

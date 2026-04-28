@@ -7,7 +7,7 @@ import { HomeTabBar } from "./home-tab-bar";
 // /tenants (hub list) keeps nav; /tenants/[id]/edit does not.
 function hideNav(pathname: string): boolean {
   if (pathname === "/login") return true;
-  if (["/onboarding", "/payment/", "/checkin/", "/reminders/"].some((p) => pathname.startsWith(p))) return true;
+  if (["/onboarding", "/payment/", "/checkin/", "/checkout/", "/reminders/"].some((p) => pathname.startsWith(p))) return true;
   if (/^\/tenants\/\d+/.test(pathname)) return true;
   return false;
 }

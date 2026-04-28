@@ -49,6 +49,20 @@ const QUICK_ACTIONS = [
     bg: "bg-tile-yellow",
   },
   {
+    label: "New Check-out",
+    href: "/checkout/new",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+    ),
+    color: "tile-orange",
+    textColor: "text-[#C25000]",
+    bg: "bg-tile-orange",
+  },
+  {
     label: "Collection Report",
     href: "/collection/breakdown",
     icon: (

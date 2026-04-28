@@ -316,6 +316,61 @@ export function sendReminder(body: { tenancy_id?: number; send_all?: boolean }):
   return _post<{ sent: number[]; failed: number[] }>("/api/v2/app/reminders/send", body);
 }
 
+// ── Checkout ─────────────────────────────────────────────────────────────────
+
+export interface CheckoutPrefetch {
+  tenancy_id: number;
+  tenant_name: string;
+  phone: string;
+  room_number: string;
+  security_deposit: number;
+  pending_dues: number;
+  notice_date: string | null;
+}
+
+export interface CheckoutCreateBody {
+  tenancy_id: number;
+  checkout_date: string;
+  room_key_returned: boolean;
+  wardrobe_key_returned: boolean;
+  biometric_removed: boolean;
+  room_condition_ok: boolean;
+  damage_notes?: string;
+  security_deposit: number;
+  pending_dues: number;
+  deductions: number;
+  deduction_reason?: string;
+  refund_amount: number;
+  refund_mode: string;
+}
+
+export interface CheckoutCreateResponse {
+  status: string;
+  token: string;
+  confirm_link: string;
+  expires_at: string;
+}
+
+export interface CheckoutStatusResponse {
+  token: string;
+  status: "pending" | "confirmed" | "rejected" | "cancelled" | "expired";
+  confirmed_at: string | null;
+  rejection_reason: string | null;
+  expires_at: string;
+}
+
+export function getCheckoutPrefetch(tenancyId: number): Promise<CheckoutPrefetch> {
+  return _get<CheckoutPrefetch>(`/api/v2/app/checkout/tenant/${tenancyId}`);
+}
+
+export function createCheckout(body: CheckoutCreateBody): Promise<CheckoutCreateResponse> {
+  return _post<CheckoutCreateResponse>("/api/v2/app/checkout/create", body);
+}
+
+export function getCheckoutStatus(token: string): Promise<CheckoutStatusResponse> {
+  return _get<CheckoutStatusResponse>(`/api/v2/app/checkout/status/${token}`);
+}
+
 export async function uploadReceipt(paymentId: number, file: File): Promise<{ payment_id: number; receipt_url: string }> {
   const headers = await _authHeaders();
   const form = new FormData();
