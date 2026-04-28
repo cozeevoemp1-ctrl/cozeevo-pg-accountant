@@ -24,12 +24,16 @@ type: project
 13. **WhatsApp template approval** — `cozeevo_checkin_form` still PENDING from Meta.
 
 ### Infra
-14. **Merge `feature/pwa-forms-rent-collection` → master** — PWA is stable on VPS; needs merge so VPS tracks master.
+14. ~~**Merge `feature/pwa-forms-rent-collection` → master**~~ — Done; all work on master.
 15. **Task 6 (Supabase Phone Auth)** — Kiran must configure Phone provider in Supabase dashboard.
 
 ## Paused
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
+
+## Recently Completed (v1.74.7 — 2026-04-28)
+
+- **Notice management — full feature** — KPI tile (On Notice · N, col-span-2, orange) with deposit badge per tenant; tenant edit Notice card (date input, deposit flag, expected checkout, withdraw button); checkout page auto-fills checkout date from expected_checkout + shows refund amount in notice banner; bot NOTICE_WITHDRAWN intent (cancel/withdraw/revoke notice → yes/no confirm → clears DB fields + sheet sync); API types updated throughout.
 
 ## Recently Completed (v1.74.0 — 2026-04-28)
 

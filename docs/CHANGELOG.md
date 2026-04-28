@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.7] — 2026-04-28 — Notice management: KPI tile + tenant edit + bot withdrawal
+
+### Added
+- **`src/schemas/kpi.py`** — `notices_count: int` field in `KpiResponse`
+- **`src/api/v2/kpi.py`** — notices_count query (active tenants with notice_date); `kpi-detail?type=notices` branch returning `deposit_eligible` per tenant
+- **`src/api/v2/tenants.py`** — dues GET now returns `notice_date` + `expected_checkout`; PATCH now accepts both fields and triggers `record_notice` sheet sync
+- **`src/api/v2/checkout.py`** — prefetch response now includes `expected_checkout`
+- **`src/integrations/gsheets.py`** — `record_notice` accepts `None` for notice_date/expected_exit (passes empty string to sync, clears cells)
+- **`src/whatsapp/intent_detector.py`** — `NOTICE_WITHDRAWN` pattern (cancel/withdraw/revoke/take-back notice; "not leaving", "changed mind leaving") at 0.93 confidence, placed before `NOTICE_GIVEN` in both strict and fallback sections
+- **`src/whatsapp/handlers/owner_handler.py`** — `_withdraw_notice` handler + inline resolver; searches active tenants with notice_date, shows notice + exit date, yes → clears DB fields + calls `record_notice("", "")`; added to handler map + cancel-with-no list
+- **`web/lib/api.ts`** — `notices_count` in `KpiResponse`; `deposit_eligible` in `KpiDetailItem`; `notice_date` + `expected_checkout` in `TenantDues`; `notice_date?` + `expected_checkout?` in `PatchTenantBody`; `expected_checkout` in `CheckoutPrefetch`
+- **`web/components/home/kpi-grid.tsx`** — "On notice" KPI tile (col-span-2, orange, only when notices_count > 0); name filter bar; deposit eligibility badge (Refundable green / Forfeited red) per row; `"notices"` added to `TileKey`
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Notice card: notice date input, deposit badge (computed from day ≤ 5), expected checkout input, "Withdraw notice" button (clears both fields); change detection compares against originals
+- **`web/app/checkout/new/page.tsx`** — auto-fills `checkoutDate` from `expected_checkout` on prefetch load; notice banner shows refund amount when deposit eligible
+
+### Fixed
+- `PatchTenantBody.expected_checkout` typed as `string | null` (was `string`) — fixed TypeScript build error
+
+---
+
 ## [1.74.6] — 2026-04-28 — Notices page + checkout forfeiture logic
 
 ### Added
