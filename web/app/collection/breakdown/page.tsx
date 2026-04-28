@@ -114,19 +114,36 @@ export default async function CollectionBreakdownPage({
         )}
       </Card>
 
-      {/* Pure rent */}
+      {/* Rent this month — expected vs collected */}
       <Section
-        title="Rent collected this month"
+        title="Rent this month"
         accent="text-status-paid"
         items={[
-          { label: "Pure rent", value: data.rent_collected },
-          { label: "Maintenance", value: data.maintenance_collected },
+          { label: "Expected (agreed rent)", value: data.pure_rent_expected },
+          { label: "Collected", value: data.rent_collected },
+          ...(data.maintenance_expected > 0 ? [
+            { label: "Maintenance expected", value: data.maintenance_expected },
+            { label: "Maintenance collected", value: data.maintenance_collected },
+          ] : []),
         ]}
         total={data.collected}
         totalLabel="Total collected"
         totalColor="text-status-paid"
-        note="Deposits and booking advances excluded."
+        note="Period-scoped: what was owed vs what was paid for this billing month. Deposits excluded."
       />
+
+      {/* Prior dues collected this month */}
+      {data.prior_dues_collected > 0 && (
+        <Section
+          title="Previous dues collected this month"
+          accent="text-brand-blue"
+          items={[{ label: "Cash received for prior periods", value: data.prior_dues_collected }]}
+          total={data.prior_dues_collected}
+          totalLabel="Total"
+          totalColor="text-brand-blue"
+          note="Rent received in this calendar month that was owed from earlier billing periods."
+        />
+      )}
 
       {/* How it was paid */}
       {methods.length > 0 && (

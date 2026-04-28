@@ -4,12 +4,15 @@ from pydantic import BaseModel
 
 class CollectionSummaryResponse(BaseModel):
     period_month: str
-    expected: int
-    collected: int
+    expected: int               # pure_rent_expected + maintenance_expected
+    collected: int              # rent_collected + maintenance_collected (period-scoped)
     pending: int
     collection_pct: int
-    rent_collected: int
+    pure_rent_expected: int     # SUM(agreed_rent + adjustment) for active tenants
+    maintenance_expected: int
+    rent_collected: int         # period-scoped: payments tagged for this billing period
     maintenance_collected: int
+    prior_dues_collected: int   # cash received this month for prior billing periods
     deposits_received: int
     booking_advances: int
     overdue_count: int

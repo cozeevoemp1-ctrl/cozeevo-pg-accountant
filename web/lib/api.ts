@@ -36,12 +36,15 @@ async function _post<T>(path: string, body: unknown): Promise<T> {
 
 export interface CollectionSummary {
   period_month: string;
-  expected: number;
-  collected: number;
+  expected: number;               // pure_rent_expected + maintenance_expected
+  collected: number;              // period-scoped rent + maintenance
   pending: number;
   collection_pct: number;
-  rent_collected: number;
+  pure_rent_expected: number;     // agreed rent total for active tenants (no deposits)
+  maintenance_expected: number;
+  rent_collected: number;         // period-scoped
   maintenance_collected: number;
+  prior_dues_collected: number;   // prior-period catch-up cash received this month
   deposits_received: number;
   booking_advances: number;
   overdue_count: number;

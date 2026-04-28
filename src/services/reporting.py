@@ -7,19 +7,24 @@ Total Collection = rent_collected + maintenance_collected only.
 Deposits and booking advances are tracked but NOT counted in Total Collection.
 
 Key design decisions:
-- rent_collected / method_breakdown use payment_date range: captures ALL rent
-  received in the month, including payments for previous months' dues.
+- rent_collected / maintenance_collected / method_breakdown are PERIOD-SCOPED:
+  they use period_month = this month, not payment_date range. This gives the
+  accrual view — how much of this month's obligation was collected — regardless
+  of when the cash arrived. Aligns with ops sheet logic.
+- prior_dues_collected is DATE-SCOPED: rent/maintenance cash received this
+  month for previous billing periods (catch-up payments). Shown separately.
 - pending / overdue_count use the canonical remaining formula (same as kpi.py):
   effective_due - paid, where paid includes deposit/booking in the calendar month.
   This avoids the broken max(expected-collected, 0) that zeroes out when any
   overpayment exists.
+- pure_rent_expected uses Tenancy.agreed_rent (not RentSchedule.rent_due) so
+  first-month deposit is never baked into the expected figure.
 """
 from __future__ import annotations
 
 import calendar as _cal
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +33,6 @@ from src.database.models import (
     Payment,
     PaymentFor,
     RentSchedule,
-    RentStatus,
     Tenancy,
     TenancyStatus,
 )
@@ -37,12 +41,15 @@ from src.database.models import (
 @dataclass
 class CollectionSummary:
     period_month: str
-    expected: int
-    collected: int
-    pending: int
+    expected: int            # pure_rent_expected + maintenance_expected (no deposits)
+    collected: int           # rent_collected + maintenance_collected (period-scoped)
+    pending: int             # canonical formula — effective_due minus paid
     collection_pct: int
-    rent_collected: int
+    pure_rent_expected: int  # SUM(agreed_rent + adjustment) for active tenants
+    maintenance_expected: int
+    rent_collected: int      # period-scoped: payments tagged for this billing period
     maintenance_collected: int
+    prior_dues_collected: int  # cash received this month for prior billing periods
     deposits_received: int
     booking_advances: int
     overdue_count: int
@@ -72,26 +79,29 @@ async def collection_summary(
         1,
     )
 
-    # ── Expected = April rent_schedule obligations for active tenants ──────────
-    expected_raw = await session.scalar(
+    # ── Expected = agreed rent (no deposits) + maintenance for active tenants ────
+    # Uses Tenancy.agreed_rent so first-month deposit is never baked into expected.
+    _exp_row = (await session.execute(
         select(
-            func.sum(
-                RentSchedule.rent_due
-                + RentSchedule.maintenance_due
-                + RentSchedule.adjustment
-            )
+            func.coalesce(
+                func.sum(Tenancy.agreed_rent + func.coalesce(RentSchedule.adjustment, 0)), 0
+            ).label("rent_exp"),
+            func.coalesce(func.sum(RentSchedule.maintenance_due), 0).label("maint_exp"),
         )
-        .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+        .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
         .where(
             RentSchedule.period_month == from_date,
             Tenancy.status == TenancyStatus.active,
         )
-    )
-    expected = int(expected_raw or 0)
+    )).one()
+    pure_rent_expected = int(_exp_row.rent_exp or 0)
+    maintenance_expected = int(_exp_row.maint_exp or 0)
+    expected = pure_rent_expected + maintenance_expected
 
-    # ── Rent / maintenance collected — ALL payments received this calendar month ─
-    # Use payment_date so we capture previous-month dues paid now, not just
-    # payments tagged for this billing period.
+    # ── Rent / maintenance collected — PERIOD-SCOPED ─────────────────────────
+    # Use period_month filter (not payment_date) so we count what was paid for
+    # THIS billing period, regardless of when the cash arrived. Pre-payments
+    # (paid in advance) are included; prior-month catch-ups are excluded.
     rent_rows = (
         await session.execute(
             select(
@@ -99,8 +109,7 @@ async def collection_summary(
                 func.sum(Payment.amount).label("total"),
             )
             .where(
-                Payment.payment_date >= from_date,
-                Payment.payment_date <= to_date,
+                Payment.period_month == from_date,
                 Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
                 Payment.is_void == False,
             )
@@ -113,7 +122,27 @@ async def collection_summary(
         key = row.for_type.value if hasattr(row.for_type, "value") else str(row.for_type)
         breakdown[key] = int(row.total or 0)
 
-    # Deposits/booking: period_month is NULL on these — always use payment_date range.
+    rent_collected = breakdown.get("rent", 0)
+    maintenance_collected = breakdown.get("maintenance", 0)
+    collected = rent_collected + maintenance_collected
+    collection_pct = round(collected / expected * 100) if expected > 0 else 0
+
+    # ── Prior dues collected this month — DATE-SCOPED ────────────────────────
+    # Cash received in this calendar month for previous billing periods.
+    # These are real cash in-flows but belong to older periods.
+    prior_dues_raw = await session.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(
+            Payment.payment_date >= from_date,
+            Payment.payment_date <= to_date,
+            Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
+            Payment.period_month < from_date,
+            Payment.is_void == False,
+        )
+    )
+    prior_dues_collected = int(prior_dues_raw or 0)
+
+    # ── Deposits / bookings — DATE-SCOPED (period_month is NULL for these) ───
     non_rent_rows = (
         await session.execute(
             select(
@@ -133,24 +162,8 @@ async def collection_summary(
         key = row.for_type.value if hasattr(row.for_type, "value") else str(row.for_type)
         breakdown[key] = int(row.total or 0)
 
-    rent_collected = breakdown.get("rent", 0)
-    maintenance_collected = breakdown.get("maintenance", 0)
     deposits_received = breakdown.get("deposit", 0)
     booking_advances = breakdown.get("booking", 0)
-    collected = rent_collected + maintenance_collected
-
-    # collection_pct: use period-specific rent (period_month = this month) vs expected
-    # so the % reflects "how much of this month's obligation was collected", not
-    # inflated by previous-dues cash flow.
-    period_rent = int(await session.scalar(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(
-            Payment.period_month == from_date,
-            Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
-            Payment.is_void == False,
-        )
-    ) or 0)
-    collection_pct = round(period_rent / expected * 100) if expected > 0 else 0
 
     # ── Pending — canonical formula (matches kpi.py), NOT max(expected-collected,0) ─
     # paid = rent payments for this period_month
@@ -185,7 +198,7 @@ async def collection_summary(
         )
     ) or 0)
 
-    # ── Payment method breakdown — same payment_date range as rent_collected ────
+    # ── Payment method breakdown — PERIOD-SCOPED to match rent_collected ────────
     method_rows = (
         await session.execute(
             select(
@@ -193,8 +206,7 @@ async def collection_summary(
                 func.sum(Payment.amount).label("total"),
             )
             .where(
-                Payment.payment_date >= from_date,
-                Payment.payment_date <= to_date,
+                Payment.period_month == from_date,
                 Payment.is_void == False,
                 Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
             )
@@ -227,8 +239,11 @@ async def collection_summary(
         collected=collected,
         pending=pending,
         collection_pct=collection_pct,
+        pure_rent_expected=pure_rent_expected,
+        maintenance_expected=maintenance_expected,
         rent_collected=rent_collected,
         maintenance_collected=maintenance_collected,
+        prior_dues_collected=prior_dues_collected,
         deposits_received=deposits_received,
         booking_advances=booking_advances,
         overdue_count=overdue_count,
