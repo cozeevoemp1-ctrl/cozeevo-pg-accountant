@@ -9,9 +9,10 @@ class PaymentCreate(BaseModel):
     amount: int = Field(gt=0, description="Amount in rupees (no paise)")
     method: Literal["UPI", "CASH", "BANK", "CARD", "OTHER"] = "CASH"
     for_type: Literal["rent", "deposit", "maintenance", "booking", "adjustment"] = "rent"
-    period_month: str = Field(
+    period_month: Optional[str] = Field(
+        default=None,
         pattern=r"^\d{4}-\d{2}$",
-        description="Month as YYYY-MM",
+        description="Month as YYYY-MM. Required for rent/maintenance; omit for deposit/booking.",
         examples=["2026-04"],
     )
     notes: str = ""
