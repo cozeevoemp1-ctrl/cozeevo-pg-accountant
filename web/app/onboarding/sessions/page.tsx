@@ -323,7 +323,7 @@ export default function OnboardingSessionsPage() {
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                           <DetailField label="Room" value={`${detail.room.number}${detail.room.building ? ` · ${detail.room.building}` : ""}`} />
                           <DetailField label="Floor" value={detail.room.floor || "—"} />
-                          <DetailField label="Sharing type" value={detail.sharing_type || detail.room.sharing || "—"} />
+                          <DetailField label="Sharing type" value={detail.room.sharing || "—"} />
                           <DetailField label="Check-in" value={fmtDate(detail.checkin_date)} />
                           <DetailField label="Stay type" value={detail.stay_type === "daily" ? "Day-wise" : "Monthly"} />
                           <DetailField label="Agreed rent" value={fmtINR(detail.agreed_rent)} />
