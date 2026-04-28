@@ -264,7 +264,15 @@ async def create_session(req: CreateSessionRequest, request: Request):
                     summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
                     if room:
                         summary_lines.append(f"Room *{room.room_number}* ({building}) — {sharing}")
-                    summary_lines.append(f"Rent: {rent_str}/month")
+                    rent_line = f"Rent: {rent_str}/month"
+                    if req.future_rent and req.future_rent_after_months:
+                        future_str = f"Rs.{int(req.future_rent):,}"
+                        _ci = date.fromisoformat(req.checkin_date)
+                        _N = req.future_rent_after_months
+                        _MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+                        _eff = _MONTHS[(_ci.month - 1 + _N) % 12]
+                        rent_line += f" → {future_str}/month from {_eff}"
+                    summary_lines.append(rent_line)
                     summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
                     summary_lines.append(f"\nThis link is valid for 2 hours.")
                     await _send_whatsapp(phone_wa, "\n".join(summary_lines))
@@ -870,6 +878,8 @@ async def get_session_data(token: str, request: Request):
             "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
             "lock_in_months": obs.lock_in_months or 0,
             "special_terms": obs.special_terms or "",
+            "future_rent": float(obs.future_rent) if obs.future_rent else None,
+            "future_rent_after_months": obs.future_rent_after_months or None,
             "tenant_data": json.loads(obs.tenant_data) if obs.tenant_data else None,
             "signature_image": obs.signature_image or "",
             "rules": _substitute_house_rules(obs),
@@ -1515,13 +1525,19 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 # Fallback: if template not approved yet, send free text
                 # (works only if tenant messaged us in the last 24h).
                 if tpl_sent is False or tpl_sent is None:
+                    _rent_increase_note = ""
+                    if obs.future_rent and obs.future_rent_after_months:
+                        _MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+                        _N = obs.future_rent_after_months
+                        _eff = _MONTHS[(checkin.month - 1 + _N) % 12]
+                        _rent_increase_note = f"\nNote: Rent increases to Rs.{int(obs.future_rent):,}/month from {_eff}."
                     await _send_whatsapp(
                         phone_wa,
                         f"Welcome to Cozeevo, {tenant_name}!\n\n"
                         f"Your booking is confirmed.\n"
                         f"Room: {room_for_msg}\n"
                         f"Check-in: {checkin_str}\n"
-                        f"Monthly rent: {rent_str}\n"
+                        f"Monthly rent: {rent_str}{_rent_increase_note}\n"
                         f"Deposit: {deposit_str}\n\n"
                         f"If any amount shown differs from what was agreed in the form, please contact the receptionist or call 8548884455.",
                         intent="BOOKING_CONFIRMATION",

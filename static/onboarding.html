@@ -1012,6 +1012,8 @@
         deposit: data.security_deposit || 0,
         lockin_months: data.lock_in_months || 0,
         maintenance: data.maintenance_fee || 0,
+        future_rent: data.future_rent || null,
+        future_rent_after_months: data.future_rent_after_months || null,
         rules: data.rules || [],
       });
       document.getElementById('main-content').style.display = 'block';
@@ -1036,6 +1038,19 @@
     document.getElementById('card-deposit').textContent = fmtMoney(data.deposit);
     document.getElementById('card-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : '—';
 
+    // Planned rent increase note
+    const _rentIncreaseNote = (fr, frm, checkinISO) => {
+      if (!fr || !frm) return '';
+      const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const d = checkinISO ? new Date(checkinISO) : new Date();
+      const effName = MONTHS[(d.getMonth() + frm) % 12];
+      return ` → ₹${Number(fr).toLocaleString('en-IN')}/mo from ${effName}`;
+    };
+    const rentNote = _rentIncreaseNote(data.future_rent, data.future_rent_after_months, data.checkin_date);
+    if (rentNote) {
+      document.getElementById('card-rent').textContent += rentNote;
+    }
+
     // Show card if we have any data
     if (data.room_number || data.monthly_rent) {
       document.getElementById('room-summary-card').style.display = 'flex';
@@ -1044,7 +1059,7 @@
     // Agreement step values
     document.getElementById('agree-room').textContent = fmt(data.room_number) + (data.bed_label ? ' / ' + data.bed_label : '');
     document.getElementById('agree-checkin').textContent = fmt(data.checkin_date);
-    document.getElementById('agree-rent').textContent = fmtMoney(data.monthly_rent);
+    document.getElementById('agree-rent').textContent = fmtMoney(data.monthly_rent) + rentNote;
     document.getElementById('agree-deposit').textContent = fmtMoney(data.deposit);
     document.getElementById('agree-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : '—';
 
