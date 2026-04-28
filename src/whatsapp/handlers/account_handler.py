@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import or_, select, func, desc
+from sqlalchemy import and_, or_, select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1049,13 +1049,22 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
     )
 
     # ── Monthly tenant dues ────────────────────────────────────────────────────
-    # Subquery: rent payments already made this period per tenancy
-    _rent_paid_sq = (
+    # Paid = rent payments for this period_month  OR  deposit/booking payments
+    # received in this calendar month (period_month IS NULL for those).
+    # Matches kpi.py logic exactly — first-month tenants have deposit baked into
+    # rent_due, so deposit payments must be subtracted too.
+    _paid_sq = (
         select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
         .where(
-            Payment.period_month == query_month,
-            Payment.for_type == PaymentFor.rent,
             Payment.is_void == False,
+            or_(
+                and_(Payment.for_type == PaymentFor.rent,
+                     Payment.period_month == query_month),
+                and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                     Payment.period_month.is_(None),
+                     Payment.payment_date >= query_month,
+                     Payment.payment_date < query_month_last + timedelta(days=1)),
+            ),
         )
         .group_by(Payment.tenancy_id)
         .subquery()
@@ -1065,12 +1074,12 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
             Tenant.name,
             RentSchedule.rent_due,
             func.coalesce(RentSchedule.adjustment, 0).label("adjustment"),
-            func.coalesce(_rent_paid_sq.c.paid, 0).label("paid"),
+            func.coalesce(_paid_sq.c.paid, 0).label("paid"),
             RentSchedule.status,
         )
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
-        .outerjoin(_rent_paid_sq, _rent_paid_sq.c.tenancy_id == Tenancy.id)
+        .outerjoin(_paid_sq, _paid_sq.c.tenancy_id == Tenancy.id)
         .where(
             Tenancy.status == TenancyStatus.active,
             Tenancy.checkin_date <= query_month_last,
