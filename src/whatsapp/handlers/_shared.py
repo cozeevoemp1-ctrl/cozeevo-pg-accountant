@@ -17,7 +17,7 @@ from typing import Optional
 
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import PendingAction, Room, Tenant, Tenancy, TenancyStatus, WhatsappLog, RentSchedule, RentStatus, Payment, PaymentFor
@@ -436,12 +436,26 @@ async def build_dues_snapshot(
     total_outstanding = Decimal("0")
 
     for rs in rs_result.scalars().all():
+        # Match PWA logic: rent payments for this period_month + deposit/booking
+        # payments received in this calendar month (deposit is baked into first-month rent_due)
+        period_start = rs.period_month
+        period_end = date(
+            period_start.year + (1 if period_start.month == 12 else 0),
+            period_start.month % 12 + 1,
+            1,
+        )
         paid = await session.scalar(
             select(func.sum(Payment.amount)).where(
                 Payment.tenancy_id == tenancy_id,
-                Payment.period_month == rs.period_month,
-                Payment.for_type == PaymentFor.rent,
                 Payment.is_void == False,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent,
+                         Payment.period_month == rs.period_month),
+                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                         Payment.period_month.is_(None),
+                         Payment.payment_date >= period_start,
+                         Payment.payment_date < period_end),
+                ),
             )
         ) or Decimal("0")
         effective_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
