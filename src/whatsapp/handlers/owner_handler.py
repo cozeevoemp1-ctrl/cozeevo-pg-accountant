@@ -272,12 +272,14 @@ async def _do_confirm_checkout(
     # Google Sheet sync
     try:
         from src.integrations.gsheets import record_checkout as _gs_checkout
+        from src.integrations import gsheets as _gs
         await _gs_checkout(
             room_number,
             tenant_name,
             notice_str,
             cs.checkout_date.strftime("%d/%m/%Y"),
         )
+        _gs.trigger_monthly_sheet_sync(cs.checkout_date.month, cs.checkout_date.year)
     except Exception as _e:
         logger.warning("Sheet sync failed on checkout confirm: %s", _e)
 

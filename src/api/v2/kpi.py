@@ -62,6 +62,28 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             select(func.coalesce(func.sum(per_room_occ.c.capped_occ), 0))
         )
         occupied_beds = int(occupied_raw or 0)
+
+        # No-shows whose checkin_date <= today are holding a bed (same as Sheet logic).
+        # Future no-shows (checkin_date > today) do NOT occupy a bed tonight.
+        noshow_beds = int(
+            await session.scalar(
+                select(func.coalesce(func.sum(
+                    case(
+                        (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                        else_=literal_column("1"),
+                    )
+                ), 0))
+                .select_from(Tenancy)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
+                    Tenancy.status == TenancyStatus.no_show,
+                    Tenancy.checkin_date <= today,
+                )
+            ) or 0
+        )
+        occupied_beds += noshow_beds
         vacant_beds = max(total_beds - occupied_beds, 0)
         occ_pct = round(occupied_beds / total_beds * 100, 1) if total_beds > 0 else 0.0
 

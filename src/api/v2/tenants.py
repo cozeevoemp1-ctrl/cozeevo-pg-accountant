@@ -306,6 +306,10 @@ async def update_tenant(
         await session.refresh(tenancy)
         await session.refresh(tenant)
 
+    today = date.today()
+    from src.integrations.gsheets import trigger_monthly_sheet_sync
+    trigger_monthly_sheet_sync(today.month, today.year)
+
     return {
         "tenancy_id": tenancy.id,
         "tenant_id": tenant.id,
