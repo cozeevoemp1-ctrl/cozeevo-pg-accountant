@@ -168,6 +168,8 @@ export interface TenantDues {
   checkin_date: string | null;
   security_deposit: number;
   maintenance_fee: number;
+  lock_in_months: number;
+  notes: string;
   last_payment_date: string | null;
   last_payment_amount: number | null;
   period_month: string;
@@ -260,6 +262,8 @@ export interface PatchTenantBody {
   tenant_notes?: string;
   agreed_rent?: number;
   security_deposit?: number;
+  maintenance_fee?: number;
+  lock_in_months?: number;
   expected_checkout?: string;
   tenancy_notes?: string;
   rent_change_reason?: string;
@@ -318,6 +322,26 @@ export function getOverdueTenants(): Promise<OverdueTenant[]> {
 
 export function sendReminder(body: { tenancy_id?: number; send_all?: boolean }): Promise<{ sent: number[]; failed: number[] }> {
   return _post<{ sent: number[]; failed: number[] }>("/api/v2/app/reminders/send", body);
+}
+
+// ── Notices ──────────────────────────────────────────────────────────────────
+
+export interface NoticeItem {
+  tenancy_id: number;
+  tenant_name: string;
+  phone: string;
+  room_number: string;
+  notice_date: string;           // YYYY-MM-DD
+  expected_checkout: string;     // YYYY-MM-DD (last allowed day)
+  deposit_eligible: boolean;     // notice on/before 5th
+  security_deposit: number;
+  maintenance_fee: number;
+  agreed_rent: number;
+  days_remaining: number;        // negative = already past due date
+}
+
+export function getActiveNotices(): Promise<NoticeItem[]> {
+  return _get<NoticeItem[]>("/api/v2/app/notices/active");
 }
 
 // ── Checkout ─────────────────────────────────────────────────────────────────

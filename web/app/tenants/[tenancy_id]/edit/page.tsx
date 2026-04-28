@@ -25,6 +25,8 @@ export default function EditTenantPage() {
   const [email, setEmail] = useState("")
   const [agreedRent, setAgreedRent] = useState("")
   const [securityDeposit, setSecurityDeposit] = useState("")
+  const [maintenanceFee, setMaintenanceFee] = useState("")
+  const [lockIn, setLockIn] = useState("")
   const [expectedCheckout, setExpectedCheckout] = useState("")
   const [notes, setNotes] = useState("")
 
@@ -42,7 +44,10 @@ export default function EditTenantPage() {
         setPhone(d.phone)
         setAgreedRent(String(d.rent))
         setSecurityDeposit(String(d.security_deposit))
-        setExpectedCheckout(formatDate(null)) // not in TenantDues yet
+        setMaintenanceFee(String(d.maintenance_fee))
+        setLockIn(String(d.lock_in_months))
+        setNotes(d.notes || "")
+        setExpectedCheckout(formatDate(null))
       })
       .catch(() => setFetchError("Could not load tenant details"))
       .finally(() => setLoading(false))
@@ -54,14 +59,17 @@ export default function EditTenantPage() {
     if (name.trim() && name.trim() !== original.name) changes.name = name.trim()
     if (phone.trim() && phone.trim() !== original.phone) changes.phone = phone.trim()
     if (email.trim()) changes.email = email.trim()
-    if (agreedRent && Number(agreedRent) !== original.rent) {
+    if (agreedRent && Number(agreedRent) !== original.rent)
       changes.agreed_rent = Number(agreedRent)
-    }
-    if (securityDeposit && Number(securityDeposit) !== original.security_deposit) {
+    if (securityDeposit && Number(securityDeposit) !== original.security_deposit)
       changes.security_deposit = Number(securityDeposit)
-    }
+    if (maintenanceFee && Number(maintenanceFee) !== original.maintenance_fee)
+      changes.maintenance_fee = Number(maintenanceFee)
+    if (lockIn && Number(lockIn) !== original.lock_in_months)
+      changes.lock_in_months = Number(lockIn)
     if (expectedCheckout) changes.expected_checkout = expectedCheckout
-    if (notes.trim()) changes.tenancy_notes = notes.trim()
+    // Notes: send if changed from original (overwrites — user sees current value pre-filled)
+    if (notes !== (original.notes || "")) changes.tenancy_notes = notes
     return changes
   }
 
@@ -75,8 +83,12 @@ export default function EditTenantPage() {
       fields.push({ label: "Agreed Rent", value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
     if (changes.security_deposit !== undefined)
       fields.push({ label: "Security Deposit", value: `₹${Number(changes.security_deposit).toLocaleString("en-IN")}` })
+    if (changes.maintenance_fee !== undefined)
+      fields.push({ label: "Maintenance Fee", value: `₹${Number(changes.maintenance_fee).toLocaleString("en-IN")}` })
+    if (changes.lock_in_months !== undefined)
+      fields.push({ label: "Lock-in Months", value: String(changes.lock_in_months) })
     if (changes.expected_checkout) fields.push({ label: "Expected Checkout", value: changes.expected_checkout })
-    if (changes.tenancy_notes) fields.push({ label: "Notes", value: changes.tenancy_notes })
+    if (changes.tenancy_notes !== undefined) fields.push({ label: "Notes", value: changes.tenancy_notes || "(cleared)" })
     return fields
   }
 
@@ -244,11 +256,33 @@ export default function EditTenantPage() {
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Maintenance Fee (₹)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={maintenanceFee}
+              onChange={(e) => setMaintenanceFee(e.target.value)}
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+          </div>
         </div>
 
         {/* Stay details */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Details</p>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Lock-in Months</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={lockIn}
+              onChange={(e) => setLockIn(e.target.value)}
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Expected Checkout</label>

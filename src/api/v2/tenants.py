@@ -230,6 +230,8 @@ async def get_tenant_dues(
         "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
         "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
         "maintenance_fee": float(tenancy.maintenance_fee) if tenancy.maintenance_fee is not None else 0.0,
+        "lock_in_months": tenancy.lock_in_months or 0,
+        "notes": tenancy.notes or "",
         "last_payment_date": last_payment.payment_date.isoformat() if last_payment else None,
         "last_payment_amount": float(last_payment.amount) if last_payment else None,
         "period_month": period_month.strftime("%Y-%m"),
@@ -299,6 +301,10 @@ async def update_tenant(
             tenancy.expected_checkout = body["expected_checkout"]
         if "tenancy_notes" in body:
             tenancy.notes = body["tenancy_notes"]
+        if "maintenance_fee" in body:
+            tenancy.maintenance_fee = body["maintenance_fee"]
+        if "lock_in_months" in body:
+            tenancy.lock_in_months = body["lock_in_months"]
 
         session.add(tenancy)
         session.add(tenant)
