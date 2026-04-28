@@ -2,6 +2,45 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.0] — 2026-04-28 — April dues fixed (Rs.4L → Rs.88,766) — three-layer bug
+
+### Root cause
+Three compounding bugs caused April Total Dues to show Rs.4,04,266 instead of the correct Rs.88,766:
+
+1. **gsheets write-back crashed for deposit/booking payments** — `period_month=None` caused `datetime.strptime` to raise `TypeError`. Deposit Cash was never written to Sheet.
+2. **`sync_sheet_from_db.py` April balance excluded `deposit_credit`** — First-month rent_due already bundles the deposit (`prorated + deposit - booking`). Without subtracting `deposit_credit` from balance, tenants who paid deposit showed as fully unpaid.
+3. **`_refresh_summary_sync` overwrote COLLECTION row after every payment** — Computed Total Dues as per-row clamped `sum(max(0, balance))` which overstates (Rs.1,45,016) because overpaying tenants don't cancel underpaying ones in per-row view.
+
+### Fixes
+
+- **`src/api/v2/payments.py`**
+  - Skip gsheets write-back when `for_type == "booking"` (booking amount already pre-subtracted from Rent Due via `first_month_rent_due`; writing it to Cash would double-count)
+  - Use `payment_date.month/year` when `period_month is None` (deposits/bookings have no billing period)
+  - Added `trigger_monthly_sheet_sync(period.month, period.year)` after every PWA payment to refresh COLLECTION row
+
+- **`src/integrations/gsheets.py`** — `_refresh_summary_sync`
+  - Removed ALL summary row writes (r2_occ, r3_bld, r4_col, r5_sts, r6_notice, ws.update block)
+  - `_refresh_summary_sync` now ONLY updates per-row Balance/Status/TotalPaid cells
+  - COLLECTION row (Total Dues, Cash, UPI, Collected) is EXCLUSIVELY owned by `sync_sheet_from_db`
+
+- **`scripts/sync_sheet_from_db.py`**
+  - April balance formula now subtracts `deposit_credit`
+  - Cash/TotalPaid columns include `deposit_credit` for first-month tenants
+  - Total Dues now computed from `collection_summary().pending` (same DB aggregate as PWA/bot), NOT from per-row clamped sum
+
+- **`scripts/backfill_april_deposits_to_sheet.py`** (one-time, already run)
+  - Backfilled 23 April deposit payments (Rs.3,18,750) to Sheet Cash column that were never written due to the crash
+
+### Rules established (see REPORTING.md §7)
+
+- `_refresh_summary_sync` = per-row cells only. NEVER writes summary/COLLECTION rows.
+- `sync_sheet_from_db` = sole owner of COLLECTION row.
+- Total Dues = `collection_summary().pending` — aggregate DB formula. Never per-row sum.
+- Booking payments: NEVER write to Sheet Cash/UPI.
+- gsheets write-back: use `payment_date` when `period_month` is None.
+
+---
+
 ## [1.73.10] — 2026-04-28 — Monthly tab Notes column uses original Excel comment
 
 ### Fix — Notes column no longer shows auto-generated cash/UPI/balance text

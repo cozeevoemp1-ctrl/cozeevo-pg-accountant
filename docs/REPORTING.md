@@ -403,6 +403,79 @@ Column G: Balance
 
 ---
 
+## 10. GOOGLE SHEET COLLECTION ROW — OWNERSHIP RULES (CRITICAL)
+
+These rules were established 2026-04-28 after a three-layer bug caused Total Dues to show Rs.4,04,266 instead of Rs.88,766. Violating any of these rules will corrupt the sheet.
+
+### 10.1 Who owns what
+
+| Surface | Owns | Must NOT write |
+|---------|------|----------------|
+| `sync_sheet_from_db.py` | COLLECTION row (rows 2-6: occupancy, building, collection, status, notice) | Per-row Balance/Status cells |
+| `_refresh_summary_sync` in `gsheets.py` | Per-row Balance/Status/TotalPaid cells only | COLLECTION row — NEVER |
+| `update_payment` in `gsheets.py` | Cash/UPI cell for one tenant row | COLLECTION row |
+
+**The COLLECTION row must only be written by `sync_sheet_from_db.py`.** Any function that writes per-row data must not touch rows 2-6.
+
+### 10.2 Total Dues — canonical formula
+
+```python
+# CORRECT — DB aggregate (used by PWA, bot, and sync script)
+from src.services.reporting import collection_summary
+result = await collection_summary(period_month="2026-04", session=session)
+total_dues = result.pending
+
+# WRONG — per-row clamped sum
+total_dues = sum(max(0, row.balance) for row in rows)
+# This overstates dues because overpaying tenants show balance=0, not negative.
+# Their overpayment does NOT cancel underpaying tenants in per-row view.
+```
+
+### 10.3 April first-month balance formula
+
+For April 2026 first-month tenants, `rent_due` already bundles deposit:
+```
+rent_due = prorated_rent + security_deposit - booking_amount  (via first_month_rent_due())
+```
+
+Therefore the balance formula MUST include `deposit_credit`:
+```python
+balance = max(0, rent_due - total_paid - prepaid_credit - deposit_credit)
+```
+
+Without `- deposit_credit`, tenants who paid their deposit show as fully unpaid — dues inflated.
+
+### 10.4 Booking payments — NEVER write to Sheet Cash/UPI
+
+Booking amount is already pre-subtracted from `rent_due` via `first_month_rent_due()`. Writing the booking payment to the Cash column would subtract it a second time.
+
+Rule: skip gsheets write-back when `for_type == "booking"`.
+
+### 10.5 gsheets write-back — period fallback for deposit payments
+
+Deposit/booking payments have `period_month = None` (no billing period). Use `payment_date` as the period:
+
+```python
+if body.period_month:
+    period = datetime.strptime(body.period_month, "%Y-%m")
+else:
+    period = date.today()  # or payment.payment_date for historical backfills
+```
+
+Never pass `period_month=None` to `datetime.strptime` — raises `TypeError`.
+
+### 10.6 trigger_monthly_sheet_sync — call after every payment
+
+Every PWA payment must fire a background sync so the COLLECTION row stays current:
+
+```python
+trigger_monthly_sheet_sync(period.month, period.year)
+```
+
+This spawns `sync_sheet_from_db.py` as a subprocess. It is the only way the COLLECTION row gets updated after individual payments.
+
+---
+
 ## 10. DEPOSIT MATCHING (Bank vs Supabase)
 
 ### 10.1 Algorithm

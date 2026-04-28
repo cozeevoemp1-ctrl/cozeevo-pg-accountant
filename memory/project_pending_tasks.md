@@ -31,6 +31,18 @@ type: project
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
 
+## Recently Completed (v1.74.0 — 2026-04-28)
+
+- **April dues fixed (Rs.4L → Rs.88,766)** — three compounding bugs found and patched:
+  1. gsheets write-back crashed for deposit payments (period_month=None → TypeError in strptime)
+  2. sync_sheet_from_db.py April balance excluded deposit_credit → first-month tenants showed as unpaid
+  3. _refresh_summary_sync was overwriting COLLECTION row with wrong per-row clamped sum after every bot/PWA payment
+- **Booking payments excluded from Sheet Cash** — booking already pre-subtracted from rent_due; writing it to Cash was double-counting
+- **trigger_monthly_sheet_sync added to payments.py** — COLLECTION row now refreshes after every PWA payment
+- **Backfill script run** — 23 April deposit payments (Rs.3,18,750) written to Sheet Cash that were missing since crash
+- **REPORTING.md §10 added** — canonical sheet ownership rules documented to prevent recurrence
+- **CHANGELOG v1.74.0** — full fix log documented
+
 ## Recently Completed (v1.73.8 — 2026-04-27)
 
 - **First-month dues inflation fixed** — deposit/booking payments (period_month=NULL) now counted in dues calc. Was affecting 28 April tenants / ₹3.9L invisible to old query. Arumugam 513: ₹32k → ₹5k.
