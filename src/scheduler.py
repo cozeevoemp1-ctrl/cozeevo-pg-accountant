@@ -127,13 +127,25 @@ def start_scheduler() -> AsyncIOScheduler:
 
     # ── Register jobs ──────────────────────────────────────────────────────────
 
-    # ❌ DISABLED: Rent reminders disabled per Kiran's instruction (causing spam to Mayur + others)
-    # Tier 1 — ADVANCE reminder, 2 days before the next month begins.
-    # scheduler.add_job(_rent_reminder, trigger=CronTrigger(hour=9, minute=0), id="rent_reminder_advance", kwargs={"mode": "advance"})
-    # Tier 2 — DAY 1 reminder
-    # scheduler.add_job(_rent_reminder, trigger=CronTrigger(day=1, hour=9, minute=0), id="rent_reminder_early", kwargs={"mode": "day1"})
-    # Tier 3 — DAILY OVERDUE chaser
-    # scheduler.add_job(_rent_reminder, trigger=CronTrigger(hour=9, minute=0), id="rent_reminder_late", kwargs={"mode": "overdue_daily"})
+    # Rent reminder tiers — all active tenants via approved Meta templates.
+    # Day -1: last day of month (advance notice for next month's rent)
+    scheduler.add_job(
+        _rent_reminder,
+        trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
+        id="rent_reminder_advance",
+        name="Rent Reminder — Day -1 (last day of month)",
+        replace_existing=True,
+        kwargs={"mode": "advance"},
+    )
+    # Day +2: 2nd of month (overdue nudge with amount + late-fee warning)
+    scheduler.add_job(
+        _rent_reminder,
+        trigger=CronTrigger(day=2, hour=9, minute=0, timezone="Asia/Kolkata"),
+        id="rent_reminder_day2",
+        name="Rent Reminder — Day +2 (2nd of month, overdue tenants)",
+        replace_existing=True,
+        kwargs={"mode": "overdue_daily"},
+    )
 
     scheduler.add_job(
         _daily_reconciliation,
@@ -417,7 +429,7 @@ async def _rent_reminder(mode: str = "day1") -> None:
 
     if mode == "advance":
         last_day = calendar.monthrange(today.year, today.month)[1]
-        if today.day != last_day - 1:
+        if today.day != last_day:
             return
         target_year  = today.year + (1 if today.month == 12 else 0)
         target_month = 1 if today.month == 12 else today.month + 1
@@ -433,7 +445,7 @@ async def _rent_reminder(mode: str = "day1") -> None:
         template_name = "rent_reminder"
         log_tag       = "day1 (all active)"
     elif mode == "overdue_daily":
-        if today.day < 2:
+        if today.day != 2:
             return
         period        = date(today.year, today.month, 1)
         all_active    = False
@@ -516,7 +528,7 @@ async def _rent_reminder(mode: str = "day1") -> None:
             else:
                 ok = await send_template(
                     phone, "rent_reminder",
-                    body_params=[name, f"{int(balance):,}", month_label],
+                    body_params=[name],
                 )
             if ok:
                 sent += 1
