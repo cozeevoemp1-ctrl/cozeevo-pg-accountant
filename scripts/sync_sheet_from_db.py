@@ -446,14 +446,12 @@ async def main(args):
             deposit_credit = int(deposit_pay_map.get(tenancy.id, 0)) if is_first_month else 0
             effective_paid = total_paid + booking_credit + prepaid_credit + deposit_credit
 
-            # April 2026: balance is fully encoded in rent_schedule adjustment
-            # (set by fix_april_balances.py: adjustment = src_bal + paid - rent_due).
-            # Only subtract rent payments — booking/deposit credits are already
-            # factored into the adjustment, so don't subtract them again.
+            # Balance — same formula for all months: rent_due + prev_due - effective_paid.
+            # deposit_credit is included in effective_paid for first-month tenants so
+            # PWA deposit payments reduce the outstanding balance correctly.
             if period == date(2026, 4, 1):
-                # No rent_schedule = future check-in; booking advance is a credit toward
-                # their first month, not an April due — show 0, not negative.
-                balance = (rent_due - total_paid - prepaid_credit) if rs else 0
+                # No rent_schedule = future check-in; show 0 not negative.
+                balance = max(0, rent_due - total_paid - prepaid_credit - deposit_credit) if rs else 0
             else:
                 balance = rent_due + int(prev_due_num) - effective_paid
 
@@ -500,9 +498,9 @@ async def main(args):
                 "rent": agreed_rent_amt if agreed_rent_amt else "",
                 "deposit": deposit_amt if deposit_amt else "",
                 "rent due": rent_due,
-                "cash": cash,
+                "cash": cash + deposit_credit,
                 "upi": upi,
-                "total paid": total_paid,
+                "total paid": total_paid + deposit_credit,
                 "balance": balance,
                 "status": status,
                 "check-in": checkin_str,
