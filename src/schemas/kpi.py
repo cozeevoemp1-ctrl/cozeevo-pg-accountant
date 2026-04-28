@@ -9,6 +9,7 @@ class KpiResponse(BaseModel):
     vacant_beds: int
     occupancy_pct: float
     active_tenants: int
+    no_show_count: int
     checkins_today: int
     checkouts_today: int
     overdue_tenants: int

@@ -78,6 +78,19 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
+        # No-show tenants (booked but not yet checked in)
+        no_show_count = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
+                    Tenancy.status == TenancyStatus.no_show,
+                )
+            ) or 0
+        )
+
         # Check-ins today
         checkins_today = int(
             await session.scalar(
@@ -145,6 +158,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         vacant_beds=vacant_beds,
         occupancy_pct=occ_pct,
         active_tenants=active_tenants,
+        no_show_count=no_show_count,
         checkins_today=checkins_today,
         checkouts_today=checkouts_today,
         overdue_tenants=overdue_tenants,
@@ -335,6 +349,28 @@ async def get_kpi_detail(
                     "building": (r.property_name or "").split()[-1] if r.property_name else "",
                     "detail": f"₹{int(r.effective_due - r.paid):,}",
                     "dues": int(r.effective_due - r.paid),
+                }
+                for r in rows
+            ]}
+
+        elif type == "no_show":
+            rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
+                    Tenancy.status == TenancyStatus.no_show,
+                )
+                .order_by(Tenancy.checkin_date)
+            )).all()
+            return {"type": type, "items": [
+                {
+                    "tenancy_id": r.id,
+                    "name": r.name,
+                    "room": r.room_number,
+                    "detail": f"Check-in: {r.checkin_date.strftime('%-d %b') if r.checkin_date else '—'}",
                 }
                 for r in rows
             ]}

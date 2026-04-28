@@ -69,6 +69,7 @@ export interface KpiResponse {
   vacant_beds: number;
   occupancy_pct: number;
   active_tenants: number;
+  no_show_count: number;
   checkins_today: number;
   checkouts_today: number;
   overdue_tenants: number;

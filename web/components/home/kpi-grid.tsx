@@ -10,7 +10,7 @@ interface KpiGridProps {
   data: KpiResponse;
 }
 
-type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | null;
+type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | "no_show" | null;
 type RentRange = "all" | "lt12" | "12to15" | "15to20" | "gt20";
 type GenderFilter = "all" | "male" | "female" | "empty";
 type StayFilter = "all" | "monthly" | "daily";
@@ -185,6 +185,13 @@ export function KpiGrid({ data }: KpiGridProps) {
       const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
       return matchName && matchStay;
     }
+    if (open === "no_show") {
+      return (
+        !nameSearch.trim() ||
+        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+        it.room.toLowerCase().includes(nameSearch.toLowerCase())
+      );
+    }
     if (open === "vacant") {
       const matchRoom =
         !roomSearch.trim() ||
@@ -237,6 +244,16 @@ export function KpiGrid({ data }: KpiGridProps) {
               onClick={() => toggle("checkouts_today")}
             />
           </>
+        )}
+        {data.no_show_count > 0 && (
+          <div className="col-span-2">
+            <IconTile
+              icon="⏳" label="Awaiting check-in"
+              value={data.no_show_count}
+              color="orange" active={open === "no_show"}
+              onClick={() => toggle("no_show")}
+            />
+          </div>
         )}
       </div>
 
@@ -318,6 +335,19 @@ export function KpiGrid({ data }: KpiGridProps) {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Filter bar — no_show: name search */}
+          {open === "no_show" && (
+            <div className="px-3 pt-3 pb-2">
+              <input
+                type="text"
+                placeholder="Name or room…"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+                className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              />
             </div>
           )}
 
