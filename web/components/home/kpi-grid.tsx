@@ -10,7 +10,7 @@ interface KpiGridProps {
   data: KpiResponse;
 }
 
-type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | "no_show" | null;
+type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | "no_show" | "notices" | null;
 type RentRange = "all" | "lt12" | "12to15" | "15to20" | "gt20";
 type GenderFilter = "all" | "male" | "female" | "empty";
 type StayFilter = "all" | "monthly" | "daily";
@@ -185,7 +185,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
       return matchName && matchStay;
     }
-    if (open === "no_show") {
+    if (open === "no_show" || open === "notices") {
       return (
         !nameSearch.trim() ||
         it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
@@ -252,6 +252,16 @@ export function KpiGrid({ data }: KpiGridProps) {
               value={data.no_show_count}
               color="orange" active={open === "no_show"}
               onClick={() => toggle("no_show")}
+            />
+          </div>
+        )}
+        {data.notices_count > 0 && (
+          <div className="col-span-2">
+            <IconTile
+              icon="📋" label={`On notice · ${data.notices_count}`}
+              value={`${data.notices_count} leaving`}
+              color="orange" active={open === "notices"}
+              onClick={() => toggle("notices")}
             />
           </div>
         )}
@@ -351,6 +361,19 @@ export function KpiGrid({ data }: KpiGridProps) {
             </div>
           )}
 
+          {/* Filter bar — notices: name search */}
+          {open === "notices" && (
+            <div className="px-3 pt-3 pb-2">
+              <input
+                type="text"
+                placeholder="Name or room…"
+                value={nameSearch}
+                onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+                className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              />
+            </div>
+          )}
+
           {/* Filter bar — vacant: room search + gender filter pills */}
           {open === "vacant" && (
             <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
@@ -403,6 +426,15 @@ export function KpiGrid({ data }: KpiGridProps) {
                       <p className="text-[10px] text-ink-muted">Room {item.room}</p>
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {open === "notices" && item.deposit_eligible !== undefined && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${
+                          item.deposit_eligible
+                            ? "bg-[#D1FAE5] text-[#065F46]"
+                            : "bg-[#FEE2E2] text-[#991B1B]"
+                        }`}>
+                          {item.deposit_eligible ? "Refundable" : "Forfeited"}
+                        </span>
+                      )}
                       <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
                       {item.tenancy_id && (
                         <span className="text-xs text-brand-pink font-bold">
