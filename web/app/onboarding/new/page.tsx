@@ -48,6 +48,10 @@ export default function NewOnboardingPage() {
   const [advanceMode, setAdvanceMode]   = useState<"cash" | "upi" | "bank">("cash")
   const [lockIn, setLockIn]             = useState("0")
 
+  // Rent escalation (demo — not yet wired to backend)
+  const [futureRent, setFutureRent]             = useState("")
+  const [futureRentMonths, setFutureRentMonths] = useState("2")
+
   // Daily fields
   const [checkoutDate, setCheckoutDate] = useState(addDays(todayISO(), 1))
   const [dailyRate, setDailyRate]       = useState("")
@@ -256,6 +260,34 @@ export default function NewOnboardingPage() {
               <input type="text" inputMode="numeric" value={lockIn} onChange={e => setLockIn(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
+
+            {/* ── Planned rent increase (DEMO — not yet saved) ── */}
+            <div className="rounded-tile border border-dashed border-[#E2DEDD] bg-[#FAFAF8] p-3 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide flex-1">Planned Rent Increase</p>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#FFF3CD] text-[#856404] uppercase tracking-wide">Preview</span>
+              </div>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <p className="text-[10px] text-ink-muted mb-1">New rent (₹)</p>
+                  <input type="text" inputMode="numeric" value={futureRent} onChange={e => setFutureRent(e.target.value)}
+                    placeholder="e.g. 12000"
+                    className="w-full rounded-pill border border-[#E2DEDD] bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-pink" />
+                </div>
+                <div className="w-24">
+                  <p className="text-[10px] text-ink-muted mb-1">After (months)</p>
+                  <input type="text" inputMode="numeric" value={futureRentMonths} onChange={e => setFutureRentMonths(e.target.value)}
+                    placeholder="2"
+                    className="w-full rounded-pill border border-[#E2DEDD] bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-pink" />
+                </div>
+              </div>
+              {futureRent && Number(futureRent) > 0 && rent && (
+                <div className="rounded-tile bg-tile-blue px-3 py-2 text-xs text-ink-muted">
+                  ₹{Number(rent).toLocaleString("en-IN")} for first {futureRentMonths} month{Number(futureRentMonths) !== 1 ? "s" : ""},
+                  then <span className="font-bold text-brand-blue">₹{Number(futureRent).toLocaleString("en-IN")}/mo</span> from month {Number(futureRentMonths) + 1}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
