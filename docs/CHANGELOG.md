@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.8] — 2026-04-28 — Reminder fixes + automated rent reminder schedule
+
+### Fixed
+- **`src/api/v2/reminders.py`** — `rent_reminder` template only has `{{name}}` (1 param); was sending 3 params → Meta returned 400 → Reminder never saved → count reset to 0 on refresh. Fixed `body_params=[r.name]`.
+- **`web/app/reminders/page.tsx`** — frontend was optimistically incrementing `reminder_count` on any HTTP 200, regardless of whether the send succeeded. Now checks `res.sent.includes(tenancyId)` before incrementing.
+- **`src/whatsapp/reminder_sender.py`** — updated template catalog comment to match actual approved template body (1 param, no amount/month).
+
+### Added
+- **`src/scheduler.py`** — enabled 2-tier automated rent reminders:
+  - **Day -1** (last day of month, 9am IST): `rent_reminder` template to all active tenants
+  - **Day +2** (2nd of month, 9am IST): `general_notice` to unpaid tenants with overdue amount + ₹200/day late-fee warning from 6th
+  - Fixed 3-params bug in scheduler's `_rent_reminder` too (same as PWA fix)
+  - Removed day+1 reminder per Kiran's instruction
+
+---
+
 ## [1.74.7] — 2026-04-28 — Notice management: KPI tile + tenant edit + bot withdrawal
 
 ### Added
