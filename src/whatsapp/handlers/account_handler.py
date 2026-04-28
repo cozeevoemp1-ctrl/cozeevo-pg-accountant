@@ -495,14 +495,13 @@ async def _do_log_payment_by_ids(
 
     # ── Google Sheets write-back ──────────────────────────────────────────────
     import asyncio as _aio
+    from src.integrations import gsheets as _gs
     if is_daily_stay:
         # Day-wise: regenerate full DAY WISE tab from DB (correct columns/totals)
-        from src.integrations import gsheets as _gs
         _gs.trigger_daywise_sheet_sync()
     elif room_obj:
         try:
-            from src.integrations.gsheets import update_payment as gsheets_update
-            await _aio.wait_for(gsheets_update(
+            await _aio.wait_for(_gs.update_payment(
                 room_number=room_obj.room_number,
                 tenant_name=tenant.name,
                 amount=float(amount_dec),
@@ -518,6 +517,7 @@ async def _do_log_payment_by_ids(
         except Exception as e:
             import logging as _logging
             _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
+        _gs.trigger_monthly_sheet_sync(period_month.month, period_month.year)
 
     # ── Payment-received WhatsApp template (fire-and-forget) ──
     # Template: cozeevo_payment_received — 4 vars (no payment mode)
