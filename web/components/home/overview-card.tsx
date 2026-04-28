@@ -16,7 +16,7 @@ export function OverviewCard({ data, month }: OverviewCardProps) {
       </p>
 
       <div className="mt-3">
-        <p className="text-xs text-ink-muted">Collected this month</p>
+        <p className="text-xs text-ink-muted">Rent settled this month</p>
         <div className="flex items-baseline gap-1.5 mt-0.5">
           <span className="text-3xl font-extrabold text-ink leading-none">
             {rupee(data.collected)}

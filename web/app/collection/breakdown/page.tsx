@@ -69,9 +69,11 @@ export default async function CollectionBreakdownPage({
     );
   }
 
+  const monthLabel = _monthLabel(period);
   const methods = Object.entries(data.method_breakdown ?? {})
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
+  const totalCashReceived = methods.reduce((s, [, v]) => s + v, 0);
 
   return (
     <main className="flex flex-col gap-4 px-4 pt-6 pb-24 max-w-lg mx-auto">
@@ -87,16 +89,17 @@ export default async function CollectionBreakdownPage({
       {/* Month navigation */}
       <div className="flex items-center justify-between bg-surface rounded-tile px-4 py-2.5 border border-[#E0DDD8]">
         <Link href={`/collection/breakdown?month=${prevPeriod}`} className="text-brand-pink font-bold text-xl px-1 leading-none">‹</Link>
-        <span className="text-sm font-semibold text-ink">{_monthLabel(period)}</span>
+        <span className="text-sm font-semibold text-ink">{monthLabel}</span>
         <Link
           href={isCurrentMonth ? "#" : `/collection/breakdown?month=${nextPeriod}`}
           className={`font-bold text-xl px-1 leading-none ${isCurrentMonth ? "text-ink-muted opacity-30 pointer-events-none" : "text-brand-pink"}`}
         >›</Link>
       </div>
 
-      {/* Summary */}
+      {/* ── 1. Summary — rent obligation settled ── */}
       <Card className="p-5">
-        <div className="flex items-baseline gap-1.5">
+        <p className="text-xs text-ink-muted">Rent settled this month</p>
+        <div className="flex items-baseline gap-1.5 mt-0.5">
           <span className="text-3xl font-extrabold text-ink leading-none">{rupee(data.collected)}</span>
           <span className="text-sm text-ink-muted font-medium">of {rupee(data.expected)}</span>
         </div>
@@ -109,67 +112,83 @@ export default async function CollectionBreakdownPage({
         </div>
         {data.overdue_count > 0 && (
           <p className="mt-3 text-xs text-status-warn font-medium">
-            {data.overdue_count} tenant{data.overdue_count !== 1 ? "s" : ""} overdue
+            {data.overdue_count} tenant{data.overdue_count !== 1 ? "s" : ""} not fully paid
           </p>
         )}
       </Card>
 
-      {/* Rent this month — expected vs collected */}
+      {/* ── 2. Rent this month — expected vs settled ── */}
       <Section
         title="Rent this month"
         accent="text-status-paid"
         items={[
           { label: "Expected (agreed rent)", value: data.pure_rent_expected },
-          { label: "Collected", value: data.rent_collected },
-          ...(data.maintenance_expected > 0 ? [
-            { label: "Maintenance expected", value: data.maintenance_expected },
-            { label: "Maintenance collected", value: data.maintenance_collected },
-          ] : []),
+          { label: "Settled", value: data.collected },
+          { label: "Pending", value: data.pending, highlight: "due" },
         ]}
-        total={data.collected}
-        totalLabel="Total collected"
-        totalColor="text-status-paid"
-        note="Period-scoped: what was owed vs what was paid for this billing month. Deposits excluded."
+        total={data.pure_rent_expected}
+        totalLabel="Total expected"
+        totalColor="text-ink"
+        note="Settled = expected minus pending. Deposits excluded."
       />
 
-      {/* Prior dues collected this month */}
-      {data.prior_dues_collected > 0 && (
-        <Section
-          title="Previous dues collected this month"
-          accent="text-brand-blue"
-          items={[{ label: "Cash received for prior periods", value: data.prior_dues_collected }]}
-          total={data.prior_dues_collected}
-          totalLabel="Total"
-          totalColor="text-brand-blue"
-          note="Rent received in this calendar month that was owed from earlier billing periods."
-        />
-      )}
+      {/* ── 3. All cash received in this month ── */}
+      <Section
+        title={`All cash received in ${monthLabel}`}
+        accent="text-brand-blue"
+        items={[
+          { label: "Rent (this month's billing)", value: data.cash_received_for_current_period },
+          ...(data.prior_dues_collected > 0
+            ? [{ label: "Previous dues collected", value: data.prior_dues_collected }]
+            : []),
+          ...(data.future_advances_collected > 0
+            ? [{ label: "Advance rent (future months)", value: data.future_advances_collected }]
+            : []),
+          ...(data.deposits_received > 0
+            ? [{ label: "Security deposits", value: data.deposits_received }]
+            : []),
+          ...(data.booking_advances > 0
+            ? [{ label: "Booking advances", value: data.booking_advances }]
+            : []),
+        ]}
+        total={
+          data.cash_received_for_current_period +
+          data.prior_dues_collected +
+          data.future_advances_collected +
+          data.deposits_received +
+          data.booking_advances
+        }
+        totalLabel="Total cash in"
+        totalColor="text-brand-blue"
+        note="All money received this calendar month — rent for any period, deposits, advances."
+      />
 
-      {/* How it was paid */}
+      {/* ── 4. Cash vs UPI breakdown ── */}
       {methods.length > 0 && (
         <Section
           title="How it was paid"
           accent="text-brand-blue"
           items={methods.map(([k, v]) => ({ label: METHOD_LABELS[k] ?? k, value: v }))}
-          total={data.collected}
-          totalLabel="Total"
+          total={totalCashReceived}
+          totalLabel="Total rent cash"
           totalColor="text-brand-blue"
+          note="Rent and maintenance only — deposits excluded."
         />
       )}
 
-      {/* Pending */}
+      {/* ── 5. Pending ── */}
       {data.pending > 0 && (
         <Section
-          title="Pending"
+          title="Pending this month"
           accent="text-status-due"
-          items={[{ label: "Outstanding rent + maintenance", value: data.pending }]}
+          items={[{ label: "Outstanding rent", value: data.pending, highlight: "due" }]}
           total={data.pending}
           totalLabel="Total pending"
           totalColor="text-status-due"
         />
       )}
 
-      {/* Deposits held — from active tenancy agreements */}
+      {/* ── 6. Security deposits held ── */}
       <Section
         title="Security deposits held"
         accent="text-brand-pink"
@@ -182,22 +201,6 @@ export default async function CollectionBreakdownPage({
         totalColor="text-brand-pink"
         note="From active tenancy agreements. Net refundable = held minus maintenance."
       />
-
-      {/* Deposits this month */}
-      {(data.deposits_received > 0 || data.booking_advances > 0) && (
-        <Section
-          title={`Received in ${_monthLabel(period)} (not in collection)`}
-          accent="text-brand-blue"
-          items={[
-            ...(data.deposits_received > 0 ? [{ label: "Security deposits", value: data.deposits_received }] : []),
-            ...(data.booking_advances > 0 ? [{ label: "Booking advances", value: data.booking_advances }] : []),
-          ]}
-          total={data.deposits_received + data.booking_advances}
-          totalLabel="Total"
-          totalColor="text-brand-blue"
-          note="Tracked separately — not counted in rent collection."
-        />
-      )}
     </main>
   );
 }
@@ -212,7 +215,7 @@ function BackButton() {
 
 function Section({ title, accent, items, total, totalLabel, totalColor = "text-ink", note }: {
   title: string; accent: string;
-  items: { label: string; value: number }[];
+  items: { label: string; value: number; highlight?: "due" | "paid" }[];
   total: number; totalLabel: string; totalColor?: string; note?: string;
 }) {
   return (
@@ -222,7 +225,9 @@ function Section({ title, accent, items, total, totalLabel, totalColor = "text-i
         {items.map((item) => (
           <div key={item.label} className="flex justify-between py-2 border-b border-[#F0EDE9]">
             <span className="text-sm text-ink-muted">{item.label}</span>
-            <span className="text-sm font-semibold text-ink">{rupee(item.value)}</span>
+            <span className={`text-sm font-semibold ${item.highlight === "due" ? "text-status-due" : item.highlight === "paid" ? "text-status-paid" : "text-ink"}`}>
+              {rupee(item.value)}
+            </span>
           </div>
         ))}
         <div className="flex justify-between pt-2">

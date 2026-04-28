@@ -42,9 +42,11 @@ export interface CollectionSummary {
   collection_pct: number;
   pure_rent_expected: number;     // agreed rent total for active tenants (no deposits)
   maintenance_expected: number;
-  rent_collected: number;         // period-scoped
+  rent_collected: number;                    // period-scoped
   maintenance_collected: number;
-  prior_dues_collected: number;   // prior-period catch-up cash received this month
+  prior_dues_collected: number;              // cash received this month for prior periods
+  cash_received_for_current_period: number;  // cash received this month for this period
+  future_advances_collected: number;         // cash received this month for future periods
   deposits_received: number;
   booking_advances: number;
   overdue_count: number;
