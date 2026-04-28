@@ -152,7 +152,7 @@ export default function NewOnboardingPage() {
         <h1 className="text-lg font-extrabold text-ink">New Tenant Onboarding</h1>
       </div>
 
-      <form onSubmit={handleSubmit} className="px-4 pt-4 pb-32 flex flex-col gap-4 max-w-lg mx-auto">
+      <form onSubmit={handleSubmit} className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
 
         {/* Stay type toggle */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">

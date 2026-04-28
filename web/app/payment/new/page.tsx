@@ -225,7 +225,7 @@ export default function NewPaymentPage() {
         </button>
       </div>
 
-      <div className="px-4 pt-4 pb-32 flex flex-col gap-4 max-w-lg mx-auto">
+      <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
         {/* Tenant search */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <TenantSearch
