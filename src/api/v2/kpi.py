@@ -36,7 +36,6 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
 
         # Occupied beds — per-room sum capped at max_occupancy so overcrowded
         # rooms don't pull vacant_beds below the true available count.
-        from sqlalchemy import least as sql_least
         per_room_occ = (
             select(
                 func.least(

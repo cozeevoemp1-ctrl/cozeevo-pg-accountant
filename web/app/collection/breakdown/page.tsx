@@ -124,6 +124,7 @@ export default async function CollectionBreakdownPage({
         ]}
         total={data.collected}
         totalLabel="Total collected"
+        totalColor="text-status-paid"
         note="Deposits and booking advances excluded."
       />
 
@@ -135,6 +136,7 @@ export default async function CollectionBreakdownPage({
           items={methods.map(([k, v]) => ({ label: METHOD_LABELS[k] ?? k, value: v }))}
           total={data.collected}
           totalLabel="Total"
+          totalColor="text-brand-blue"
         />
       )}
 
