@@ -38,9 +38,13 @@ from src.database.models import (
     PaymentMode,
     RentSchedule,
     RentStatus,
+    Staff,
     Tenancy,
 )
+import re as _re
+
 from src.services.audit import write_audit_entry
+from src.services.rent_schedule import first_month_rent_due
 
 
 # ── Public result type ─────────────────────────────────────────────────────────
@@ -202,7 +206,6 @@ async def log_payment(
             )
             carry_notes = prev_rs.notes if prev_rs else None
 
-            from src.services.rent_schedule import first_month_rent_due
             rs = RentSchedule(
                 tenancy_id=tenancy.id,
                 period_month=period,
@@ -234,13 +237,11 @@ async def log_payment(
     # this being populated.
     received_by_staff_id: Optional[int] = None
     if recorded_by:
-        import re as _re
-        from src.database.models import Staff as _Staff
         _digits = _re.sub(r"[^0-9]", "", recorded_by)
         if len(_digits) >= 10:
             _phone10 = _digits[-10:]
             _staff = await session.scalar(
-                select(_Staff).where(_Staff.phone.like(f"%{_phone10}"))
+                select(Staff).where(Staff.phone.like(f"%{_phone10}"))
             )
             if _staff:
                 received_by_staff_id = _staff.id

@@ -11,8 +11,9 @@ from sqlalchemy import select
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import Room, StayType, Tenancy, TenancyStatus, Tenant
+from src.integrations.gsheets import update_payment as gsheets_update
 from src.schemas.payments import PaymentCreate, PaymentResponse
-from src.services.payments import log_payment
+from src.services.payments import _resolve_payment_mode, log_payment
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -68,9 +69,7 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         room = await session.get(Room, tenancy.room_id)
         if room and tenant:
             try:
-                from src.integrations.gsheets import update_payment as gsheets_update
                 period = datetime.strptime(body.period_month, "%Y-%m")
-                from src.services.payments import _resolve_payment_mode
                 resolved_method = _resolve_payment_mode(body.method).value
                 await asyncio.wait_for(
                     gsheets_update(
