@@ -235,6 +235,8 @@ async def get_tenant_dues(
         "last_payment_date": last_payment.payment_date.isoformat() if last_payment else None,
         "last_payment_amount": float(last_payment.amount) if last_payment else None,
         "period_month": period_month.strftime("%Y-%m"),
+        "notice_date": tenancy.notice_date.isoformat() if tenancy.notice_date else None,
+        "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
     }
 
 
@@ -260,11 +262,12 @@ async def update_tenant(
     async with get_session() as session:
         # Re-fetch within the write session so SQLAlchemy tracks changes
         row2 = await session.execute(
-            select(Tenancy, Tenant)
+            select(Tenancy, Tenant, Room)
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Tenancy.room_id == Room.id)
             .where(Tenancy.id == tenancy_id)
         )
-        tenancy, tenant = row2.first()
+        tenancy, tenant, room = row2.first()
 
         # RentRevision if agreed_rent changes
         if "agreed_rent" in body:
@@ -305,7 +308,14 @@ async def update_tenant(
             tenancy.maintenance_fee = body["maintenance_fee"]
         if "lock_in_months" in body:
             tenancy.lock_in_months = body["lock_in_months"]
+        if "notice_date" in body:
+            val = body["notice_date"]
+            tenancy.notice_date = date.fromisoformat(val) if val else None
+        if "expected_checkout" in body:
+            val = body["expected_checkout"]
+            tenancy.expected_checkout = date.fromisoformat(val) if val else None
 
+        room_number = room.room_number
         session.add(tenancy)
         session.add(tenant)
         await session.commit()
@@ -313,7 +323,16 @@ async def update_tenant(
         await session.refresh(tenant)
 
     today = date.today()
-    from src.integrations.gsheets import trigger_monthly_sheet_sync
+    from src.integrations.gsheets import trigger_monthly_sheet_sync, record_notice
+    import asyncio
+
+    if "notice_date" in body:
+        notice_val = body["notice_date"] or ""
+        checkout_val = body.get("expected_checkout") or ""
+        asyncio.create_task(
+            record_notice(room_number, tenant.name, notice_val, checkout_val)
+        )
+
     trigger_monthly_sheet_sync(today.month, today.year)
 
     return {
