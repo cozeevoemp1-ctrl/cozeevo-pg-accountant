@@ -28,6 +28,7 @@ export default function EditTenantPage() {
   const [maintenanceFee, setMaintenanceFee] = useState("")
   const [lockIn, setLockIn] = useState("")
   const [expectedCheckout, setExpectedCheckout] = useState("")
+  const [noticeDate, setNoticeDate] = useState("")
   const [notes, setNotes] = useState("")
 
   const [showConfirm, setShowConfirm] = useState(false)
@@ -47,7 +48,8 @@ export default function EditTenantPage() {
         setMaintenanceFee(String(d.maintenance_fee))
         setLockIn(String(d.lock_in_months))
         setNotes(d.notes || "")
-        setExpectedCheckout(formatDate(null))
+        setExpectedCheckout(formatDate(d.expected_checkout))
+        setNoticeDate(formatDate(d.notice_date))
       })
       .catch(() => setFetchError("Could not load tenant details"))
       .finally(() => setLoading(false))
@@ -67,7 +69,11 @@ export default function EditTenantPage() {
       changes.maintenance_fee = Number(maintenanceFee)
     if (lockIn && Number(lockIn) !== original.lock_in_months)
       changes.lock_in_months = Number(lockIn)
-    if (expectedCheckout) changes.expected_checkout = expectedCheckout
+    // Notice fields — include if changed or being cleared
+    const origNotice = formatDate(original.notice_date)
+    const origCheckout = formatDate(original.expected_checkout)
+    if (noticeDate !== origNotice) changes.notice_date = noticeDate || null
+    if (expectedCheckout !== origCheckout) changes.expected_checkout = expectedCheckout || null
     // Notes: send if changed from original (overwrites — user sees current value pre-filled)
     if (notes !== (original.notes || "")) changes.tenancy_notes = notes
     return changes
@@ -87,7 +93,10 @@ export default function EditTenantPage() {
       fields.push({ label: "Maintenance Fee", value: `₹${Number(changes.maintenance_fee).toLocaleString("en-IN")}` })
     if (changes.lock_in_months !== undefined)
       fields.push({ label: "Lock-in Months", value: String(changes.lock_in_months) })
-    if (changes.expected_checkout) fields.push({ label: "Expected Checkout", value: changes.expected_checkout })
+    if (changes.notice_date !== undefined)
+      fields.push({ label: "Notice date", value: changes.notice_date ?? "Cleared" })
+    if (changes.expected_checkout !== undefined)
+      fields.push({ label: "Expected checkout", value: changes.expected_checkout ?? "Cleared" })
     if (changes.tenancy_notes !== undefined) fields.push({ label: "Notes", value: changes.tenancy_notes || "(cleared)" })
     return fields
   }
@@ -119,6 +128,7 @@ export default function EditTenantPage() {
     }
   }
 
+  const depositEligible = noticeDate ? new Date(noticeDate).getDate() <= 5 : null
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
 
   if (loading) {
@@ -285,16 +295,6 @@ export default function EditTenantPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-ink-muted mb-1">Expected Checkout</label>
-            <input
-              type="date"
-              value={expectedCheckout}
-              onChange={(e) => setExpectedCheckout(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
-            />
-          </div>
-
-          <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Notes</label>
             <textarea
               value={notes}
@@ -304,6 +304,59 @@ export default function EditTenantPage() {
               className="w-full rounded-[16px] border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors resize-none"
             />
           </div>
+        </div>
+
+        {/* Notice */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notice</p>
+            {noticeDate && (
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-pill ${
+                depositEligible
+                  ? "bg-[#D1FAE5] text-[#065F46]"
+                  : "bg-[#FEE2E2] text-[#991B1B]"
+              }`}>
+                {depositEligible ? "Deposit Refundable" : "Deposit Forfeited"}
+              </span>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Notice date</label>
+            <input
+              type="date"
+              value={noticeDate}
+              onChange={(e) => setNoticeDate(e.target.value)}
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+            {noticeDate && (
+              <p className="text-[10px] text-ink-muted mt-1 px-1">
+                {depositEligible
+                  ? "Given on day ≤ 5 — deposit refundable, exits end of this month"
+                  : "Given after day 5 — deposit forfeited, exits end of next month"}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Expected checkout</label>
+            <input
+              type="date"
+              value={expectedCheckout}
+              onChange={(e) => setExpectedCheckout(e.target.value)}
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+          </div>
+
+          {noticeDate && (
+            <button
+              type="button"
+              onClick={() => { setNoticeDate(""); setExpectedCheckout("") }}
+              className="rounded-pill border border-[#E2DEDD] py-2.5 text-sm font-semibold text-status-warn w-full"
+            >
+              Withdraw notice
+            </button>
+          )}
         </div>
 
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
