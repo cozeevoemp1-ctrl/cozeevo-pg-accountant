@@ -2,6 +2,13 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.73.10] — 2026-04-28 — Monthly tab Notes column uses original Excel comment
+
+### Fix — Notes column no longer shows auto-generated cash/UPI/balance text
+- **`scripts/clean_and_load.py`** — monthly tab Notes column now writes `t.get('comment', '')` (original Excel col 15 note) instead of `" | ".join(notes_parts)` which was concatenating text extracted from cash/UPI/balance cells. Chandra/Lakshmi tracking logic is unchanged.
+
+---
+
 ## [1.73.9] — 2026-04-27 — KPI dues card + monthly rollover carry-forward
 
 ### Bug fix — dues card now shows 18 tenants / ₹88,766 (matching ops sheet)

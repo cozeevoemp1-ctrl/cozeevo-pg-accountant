@@ -317,7 +317,7 @@ def main():
                 continue
 
             total_paid = cash + upi
-            notes = " | ".join(notes_parts)
+            notes = t.get('comment', '')
 
             # Event
             event = ""
