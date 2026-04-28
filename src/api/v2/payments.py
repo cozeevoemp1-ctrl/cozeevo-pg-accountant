@@ -11,7 +11,7 @@ from sqlalchemy import select
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import Payment, Room, StayType, Tenancy, TenancyStatus, Tenant
-from src.integrations.gsheets import update_payment as gsheets_update
+from src.integrations.gsheets import trigger_monthly_sheet_sync, update_payment as gsheets_update
 from src.schemas.payments import PaymentCreate, PaymentResponse
 from src.services.payments import _resolve_payment_mode, log_payment
 from src.services.storage import BUCKET_RECEIPTS
@@ -95,6 +95,9 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
                 logger.warning("[PWA] GSheets write-back timed out (10s)")
             except Exception as exc:
                 logger.warning("[PWA] GSheets write-back failed: %s", exc)
+
+        # Trigger full sync so COLLECTION summary row (Total Dues) stays correct
+        trigger_monthly_sheet_sync(period.month, period.year)
 
         return PaymentResponse(
             payment_id=result.payment_id,

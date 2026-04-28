@@ -690,32 +690,15 @@ def _refresh_summary_sync(tab_name: str) -> None:
             num_cols = 15
             last_col = "O"
 
-        # 5-row labeled summary (matches sync_sheet_from_db.py layout).
-        # Each cell is independent so users can click/copy values.
-        r2_occ = ["OCCUPANCY", f"Active: {regular + premium}",
-                  f"Beds: {beds} ({regular}+{premium}P)",
-                  f"No-show: {noshow}", f"Vacant: {vacant}/{TOTAL_BEDS}",
-                  f"Occupancy: {occ_pct}%"]
-        r3_bld = ["BUILDINGS", f"THOR: {thor_beds} beds ({thor_tenants}t)",
-                  f"HULK: {hulk_beds} beds ({hulk_tenants}t)",
-                  f"Exits: {exits}"]
-        r4_col = ["COLLECTION", f"Cash: {_lk(cash_total)}",
-                  f"UPI: {_lk(upi_total)}", f"Collected: {_lk(collected)}",
-                  f"Pending: {_lk(pending)}"]
-        r5_sts = ["STATUS", f"PAID: {paid}", f"PARTIAL: {partial}",
-                  f"UNPAID: {unpaid}", f"New: {new_checkins}"]
-        r6_notice = ["NOTICE", "On notice: see full sync",
-                     "Vacating next month: see full sync"]
-
-        def _pad(row):
-            return (row + [""] * num_cols)[:num_cols]
-
-        summary_rows = [_pad(r2_occ), _pad(r3_bld), _pad(r4_col), _pad(r5_sts), _pad(r6_notice)]
-        ws.update(values=summary_rows, range_name=f"A2:{last_col}6",
-                  value_input_option="USER_ENTERED")
-
+        # Do NOT write COLLECTION/Total Dues from here — this function computes
+        # balance from per-row Cash/UPI which overstates dues when some tenants
+        # overpay. The authoritative Total Dues comes from sync_sheet_from_db
+        # (which calls collection_summary). Writing it here would overwrite the
+        # correct value every time a payment is logged.
+        # Per-row Balance/Status cells above are always correct; summary is handled
+        # by the background sync triggered via trigger_monthly_sheet_sync.
         logger.info(
-            "GSheets: refreshed summary for %s — %d beds, %d paid, %d partial, %d unpaid, collected=%d",
+            "GSheets: refreshed per-row for %s — %d beds, %d paid, %d partial, %d unpaid, collected=%d",
             tab_name, beds, paid, partial, unpaid, int(collected),
         )
     except Exception as e:
