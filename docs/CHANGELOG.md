@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.9] — 2026-04-28 — Collection dashboard redesign: clean obligation view
+
+### Changed
+- **`src/services/reporting.py`** — `collection_summary()` fully redesigned:
+  - `collected = max(0, expected - pending)` — now shows how much of the rent obligation is settled; never exceeds `expected`
+  - `pure_rent_expected` uses `Tenancy.agreed_rent + RentSchedule.adjustment` (not `rent_due`) — deposits never baked into expected
+  - `method_breakdown` reverted to **period-scoped** — shows Cash vs UPI for this billing period's rent only; matches `rent_collected`; excludes prior-due catch-ups and future advances
+  - Added `prior_dues_collected`, `cash_received_for_current_period`, `future_advances_collected`, `deposits_received`, `booking_advances` fields
+- **`src/schemas/reporting.py`** — `CollectionSummaryResponse` extended with all new fields
+- **`web/lib/api.ts`** — `CollectionSummary` interface updated to match backend schema
+- **`web/components/home/overview-card.tsx`** — label changed to "Rent settled this month"; uses `collected = expected − pending`
+- **`web/app/collection/breakdown/page.tsx`** — full redesign:
+  - Removed confusing "All cash received" section (rent row exceeded expected, was misleading)
+  - Sections: Summary → Rent this month → How it was paid (Cash/UPI, period-scoped) → Pending → Security deposits held
+- **`scripts/sync_sheet_from_db.py`** — removed `deposit_credit` from `cash` and `total_paid` sheet columns (deposit credits are period-scoped; adding to date-scoped cash inflated the cash column)
+
+### Fixed
+- `maintenance_due` in `RentSchedule` rows zeroed (was copying `maintenance_fee` from tenancy; maintenance is a one-time deposit component, not a monthly obligation)
+- 5 code sites (`payments.py`, `checkin.py`, `onboarding_router.py`, `owner_handler.py`, `reminder_router.py`) that were setting `maintenance_due = maintenance_fee` — all fixed to `Decimal("0")`
+
+---
+
 ## [1.74.8] — 2026-04-28 — Reminder fixes + automated rent reminder schedule
 
 ### Fixed

@@ -227,9 +227,9 @@ async def collection_summary(
     collected = max(0, expected - pending)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
-    # ── Payment method breakdown — DATE-SCOPED ────────────────────────────────
-    # All rent/maintenance cash received this calendar month by payment method.
-    # Totals match the "All cash received" section (prior + current + future advances).
+    # ── Payment method breakdown — PERIOD-SCOPED ─────────────────────────────
+    # How this month's rent obligation was paid (Cash vs UPI).
+    # Matches rent_collected; excludes prior dues and future advances.
     method_rows = (
         await session.execute(
             select(
@@ -237,8 +237,7 @@ async def collection_summary(
                 func.sum(Payment.amount).label("total"),
             )
             .where(
-                Payment.payment_date >= from_date,
-                Payment.payment_date <= to_date,
+                Payment.period_month == from_date,
                 Payment.is_void == False,
                 Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
             )

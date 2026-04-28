@@ -132,51 +132,20 @@ export default async function CollectionBreakdownPage({
         note="Settled = expected minus pending. Deposits excluded."
       />
 
-      {/* ── 3. All cash received in this month ── */}
-      <Section
-        title={`All cash received in ${monthLabel}`}
-        accent="text-brand-blue"
-        items={[
-          { label: "Rent (this month's billing)", value: data.cash_received_for_current_period },
-          ...(data.prior_dues_collected > 0
-            ? [{ label: "Previous dues collected", value: data.prior_dues_collected }]
-            : []),
-          ...(data.future_advances_collected > 0
-            ? [{ label: "Advance rent (future months)", value: data.future_advances_collected }]
-            : []),
-          ...(data.deposits_received > 0
-            ? [{ label: "Security deposits", value: data.deposits_received }]
-            : []),
-          ...(data.booking_advances > 0
-            ? [{ label: "Booking advances", value: data.booking_advances }]
-            : []),
-        ]}
-        total={
-          data.cash_received_for_current_period +
-          data.prior_dues_collected +
-          data.future_advances_collected +
-          data.deposits_received +
-          data.booking_advances
-        }
-        totalLabel="Total cash in"
-        totalColor="text-brand-blue"
-        note="All money received this calendar month — rent for any period, deposits, advances."
-      />
-
-      {/* ── 4. Cash vs UPI breakdown ── */}
+      {/* ── 3. Cash vs UPI breakdown ── */}
       {methods.length > 0 && (
         <Section
           title="How it was paid"
           accent="text-brand-blue"
           items={methods.map(([k, v]) => ({ label: METHOD_LABELS[k] ?? k, value: v }))}
           total={totalCashReceived}
-          totalLabel="Total rent cash"
+          totalLabel="Total rent settled"
           totalColor="text-brand-blue"
-          note="Rent and maintenance only — deposits excluded."
+          note="This month's rent obligation by payment method."
         />
       )}
 
-      {/* ── 5. Pending ── */}
+      {/* ── 4. Pending ── */}
       {data.pending > 0 && (
         <Section
           title="Pending this month"
@@ -188,7 +157,7 @@ export default async function CollectionBreakdownPage({
         />
       )}
 
-      {/* ── 6. Security deposits held ── */}
+      {/* ── 5. Security deposits held ── */}
       <Section
         title="Security deposits held"
         accent="text-brand-pink"
