@@ -75,6 +75,7 @@ export interface KpiResponse {
   occupancy_pct: number;
   active_tenants: number;
   no_show_count: number;
+  notices_count: number;
   checkins_today: number;
   checkouts_today: number;
   overdue_tenants: number;
@@ -132,6 +133,7 @@ export interface KpiDetailItem {
   stay_type?: string;  // checkins/checkouts: "monthly" | "daily"
   dues?: number;       // dues items only
   building?: string;   // dues items: "THOR" | "HULK"
+  deposit_eligible?: boolean;  // notices tile only
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
@@ -175,6 +177,8 @@ export interface TenantDues {
   last_payment_date: string | null;
   last_payment_amount: number | null;
   period_month: string;
+  notice_date: string | null;
+  expected_checkout: string | null;
 }
 
 export function searchTenants(q: string): Promise<TenantSearchResult[]> {
@@ -271,6 +275,7 @@ export interface PatchTenantBody {
   expected_checkout?: string;
   tenancy_notes?: string;
   rent_change_reason?: string;
+  notice_date?: string | null;
 }
 
 export interface PatchTenantResponse {
@@ -359,6 +364,7 @@ export interface CheckoutPrefetch {
   maintenance_fee: number;
   pending_dues: number;   // outstanding rent only; maintenance_fee deducted separately
   notice_date: string | null;
+  expected_checkout: string | null;
 }
 
 export interface CheckoutCreateBody {
