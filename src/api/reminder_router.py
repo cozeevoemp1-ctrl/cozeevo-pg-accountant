@@ -65,7 +65,7 @@ async def preview_rent_reminders():
                 SELECT
                     t.name,
                     t.phone,
-                    (rs.rent_due + rs.maintenance_due + COALESCE(rs.adjustment, 0)) AS due_total,
+                    (rs.rent_due + COALESCE(rs.adjustment, 0)) AS due_total,
                     COALESCE(
                         (SELECT SUM(p.amount) FROM payments p
                          WHERE p.tenancy_id = rs.tenancy_id

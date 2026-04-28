@@ -210,7 +210,7 @@ async def log_payment(
                 tenancy_id=tenancy.id,
                 period_month=period,
                 rent_due=first_month_rent_due(tenancy, period),
-                maintenance_due=tenancy.maintenance_fee or Decimal("0"),
+                maintenance_due=Decimal("0"),
                 status=RentStatus.pending,
                 due_date=period,
                 notes=carry_notes,

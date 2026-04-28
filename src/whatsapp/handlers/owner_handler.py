@@ -5990,7 +5990,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             tenancy_id      = tenancy.id,
             period_month    = period,
             rent_due        = first_month_rent_due(tenancy, period),
-            maintenance_due = maintenance,
+            maintenance_due = Decimal("0"),
             adjustment      = adjustment if adjustment != Decimal("0") else None,
             adjustment_note = adj_note,
             status          = RentStatus.pending,

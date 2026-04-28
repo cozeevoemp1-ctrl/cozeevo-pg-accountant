@@ -1354,7 +1354,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 session.add(RentSchedule(
                     tenancy_id=tenancy.id, period_month=period,
                     rent_due=first_month_rent_due(tenancy, period),
-                    maintenance_due=obs.maintenance_fee or 0,
+                    maintenance_due=0,
                     status=RentStatus.pending, due_date=period,
                 ))
                 if period.month == 12:
