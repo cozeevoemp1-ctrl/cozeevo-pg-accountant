@@ -551,7 +551,11 @@ async def main(args):
         total_upi = sum(pn(r[i_upi]) for r in collected_rows)
         total_collected = total_cash + total_upi
 
-        total_dues = sum(max(0, int(pn(r[i_balance]))) for r in active_rows)
+        # Use the same formula as PWA/bot (collection_summary): max(0, expected − collected).
+        # Per-row clamped sum inflates dues when some tenants overpay; DB aggregate is correct.
+        from src.services.reporting import collection_summary as _col_summary
+        _col = await _col_summary(period_month=period.strftime("%Y-%m"), session=session)
+        total_dues = _col.pending
 
         paid_count = sum(1 for r in active_rows if r[i_status] == "PAID")
         partial_count = sum(1 for r in active_rows if r[i_status] == "PARTIAL")
