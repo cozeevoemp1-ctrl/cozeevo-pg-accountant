@@ -31,6 +31,10 @@ type: project
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
 
+## Recently Completed (v1.74.11 — 2026-04-28)
+
+- **Day-wise time entry** — `checkin_time` + `checkout_time` on `Tenancy`; check-in form: time input for day-wise (defaults to now), "Days" → "Nights"; checkout form: time input, Stay Summary card, extra nights auto-detected + extra charge added to dues. Deployed.
+
 ## Recently Completed (v1.74.10 — 2026-04-28)
 
 - **Sessions page editable UX** — `pending_review` sessions now have editable fields (name, phone, gender, all financials, checkout_date/num_days/daily_rate for day-wise); blue hint banner; `handleApprove` sends `overrides` to backend

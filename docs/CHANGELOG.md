@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.11] — 2026-04-28 — Day-wise: check-in/out time entry + nights billing
+
+### Added
+- **`src/database/models.py`** — `checkin_time` (Time, nullable) + `checkout_time` (Time, nullable) on `Tenancy`
+- **`src/database/migrate_all.py`** — `run_add_daywise_time_fields_2026_04_28` migration
+- **`src/api/v2/checkin.py`** — `actual_checkin_time` (HH:MM) in `CheckinRequest`; stored in `tenancy.checkin_time` for daily stays
+- **`src/api/v2/checkout.py`** — prefetch returns `stay_type`, `daily_rate`, `booked_checkout_date`, `checkin_time`; `CheckoutCreateBody` accepts `checkout_time`; stored in `tenancy.checkout_time` for daily stays
+- **`web/lib/api.ts`** — `actual_checkin_time` in `CheckinCreate`; `stay_type`, `daily_rate`, `booked_checkout_date`, `checkin_time` in `CheckoutPrefetch`; `checkout_time` in `CheckoutCreateBody`
+- **`web/app/checkin/new/page.tsx`** — time input for day-wise stays (defaults to current time); "Days" → "Nights" label throughout
+- **`web/app/checkout/new/page.tsx`** — checkout time input for day-wise stays; Stay Summary card (check-in time, booked checkout, checkout time, daily rate); extra nights auto-detected when actual checkout > booked date — extra charge added to dues + orange warning banner
+
+---
+
 ## [1.74.10] — 2026-04-28 — Guardrails, sessions UX, sheet sync corrections
 
 ### Added
