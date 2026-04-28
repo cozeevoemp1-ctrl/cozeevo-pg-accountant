@@ -188,15 +188,15 @@ async def send_reminder_text(to_number: str, message: str) -> bool:
 # Template: rent_reminder
 # Category: UTILITY
 # Language: en
-# Body:     "Hi {{1}}, good day!
-#            Quick reminder — your rent of Rs.{{2}} for {{3}} must be paid on or
-#            before the 5th of every month without fail. Please try to make the
-#            payment earlier and avoid waiting until the last moment.
+# Body:     "Hi {{name}}, Good Day!
+#            Quick reminder — rent must be paid on or before the 5th of every
+#            month without fail. Please try to make the payment earlier and avoid
+#            waiting until the last moment.
 #            Ensure your dues are cleared on time. Once you've made the payment,
-#            share the transaction receipt immediately.
+#            share the transaction receipt to +91 85488 84455.
 #            If already paid, please ignore this message.
 #            Thanks for your cooperation. - Cozeevo Co-living"
-# Params:   {{1}}=name, {{2}}=amount, {{3}}=month
+# Params:   {{name}}=name  (1 param — send body_params=[name] only)
 #
 # Template: rent_overdue
 # Category: UTILITY

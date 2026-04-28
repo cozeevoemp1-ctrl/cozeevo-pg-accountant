@@ -33,16 +33,19 @@ export default function RemindersPage() {
   async function handleSendSingle(tenancyId: number) {
     setRowStatus((s) => ({ ...s, [tenancyId]: "sending" }))
     try {
-      await sendReminder({ tenancy_id: tenancyId })
-      setRowStatus((s) => ({ ...s, [tenancyId]: "sent" }))
-      // update reminder_count locally
-      setTenants((prev) =>
-        prev.map((t) =>
-          t.tenancy_id === tenancyId
-            ? { ...t, reminder_count: t.reminder_count + 1, last_reminded_at: new Date().toISOString() }
-            : t
+      const res = await sendReminder({ tenancy_id: tenancyId })
+      if (res.sent.includes(tenancyId)) {
+        setRowStatus((s) => ({ ...s, [tenancyId]: "sent" }))
+        setTenants((prev) =>
+          prev.map((t) =>
+            t.tenancy_id === tenancyId
+              ? { ...t, reminder_count: t.reminder_count + 1, last_reminded_at: new Date().toISOString() }
+              : t
+          )
         )
-      )
+      } else {
+        setRowStatus((s) => ({ ...s, [tenancyId]: "error" }))
+      }
     } catch {
       setRowStatus((s) => ({ ...s, [tenancyId]: "error" }))
     }

@@ -143,8 +143,6 @@ async def send_reminders(
     if not send_all and tenancy_id is None:
         raise HTTPException(status_code=400, detail="Provide tenancy_id or send_all=true")
 
-    today = date.today()
-    month_label = _month_label(today)
     now = datetime.utcnow()
 
     async with get_session() as session:
@@ -160,11 +158,10 @@ async def send_reminders(
         sent = []
         failed = []
         for r in targets:
-            dues = int(r.effective_due - r.paid)
             ok = await send_template(
                 r.phone,
                 "rent_reminder",
-                body_params=[r.name, str(dues), month_label],
+                body_params=[r.name],
             )
             if ok:
                 reminder = Reminder(
