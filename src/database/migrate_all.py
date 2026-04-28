@@ -1152,6 +1152,18 @@ async def run_add_cancellation_reason_2026_04_25b(conn) -> None:
     print("  [ok] cancellation_reason added")
 
 
+async def run_add_planned_rent_increase_2026_04_28(conn) -> None:
+    """Add future_rent + future_rent_after_months to onboarding_sessions for pre-scheduled rent escalations."""
+    print("\n-- Add planned rent increase columns (2026-04-28) --")
+    await conn.execute(text(
+        "ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS future_rent NUMERIC(12,2)"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS future_rent_after_months INTEGER"
+    ))
+    print("  [ok] future_rent, future_rent_after_months added")
+
+
 async def run_add_staff_kyc_fields_2026_04_26(conn) -> None:
     """Add salary, date_of_birth, aadhar_number, kyc_document_url, kyc_verified to staff."""
     print("\n-- Add staff KYC fields (2026-04-26) --")
@@ -1391,6 +1403,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_approved_by_phone_2026_04_25(conn)
             await run_add_cancellation_reason_2026_04_25b(conn)
             await _migrate_checkout_sessions(conn)
+            await run_add_planned_rent_increase_2026_04_28(conn)
             await run_rent_schedule_cascade_2026_04_25(conn)
             await run_payment_unique_hash_2026_04_25(conn)
             await run_payments_freeze_trigger_2026_04_27(conn)

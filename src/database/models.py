@@ -848,10 +848,12 @@ class OnboardingSession(Base):
     completed         = Column(Boolean, default=False)
     expires_at        = Column(DateTime)
     completed_at      = Column(DateTime)
-    approved_at           = Column(DateTime)
-    approved_by_phone     = Column(String(20))
-    cancellation_reason   = Column(String(30))   # "superseded" when replaced by new session for same phone
-    created_at            = Column(DateTime, default=datetime.utcnow)
+    approved_at               = Column(DateTime)
+    approved_by_phone         = Column(String(20))
+    cancellation_reason       = Column(String(30))   # "superseded" when replaced by new session for same phone
+    future_rent               = Column(Numeric(12, 2), nullable=True)
+    future_rent_after_months  = Column(Integer, nullable=True)
+    created_at                = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
         Index("ix_onboarding_token", "token"),

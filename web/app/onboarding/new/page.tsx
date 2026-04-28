@@ -48,7 +48,7 @@ export default function NewOnboardingPage() {
   const [advanceMode, setAdvanceMode]   = useState<"cash" | "upi" | "bank">("cash")
   const [lockIn, setLockIn]             = useState("0")
 
-  // Rent escalation (demo — not yet wired to backend)
+  // Planned rent increase
   const [futureRent, setFutureRent]             = useState("")
   const [futureRentMonths, setFutureRentMonths] = useState("2")
 
@@ -83,6 +83,8 @@ export default function NewOnboardingPage() {
       booking_amount:   Number(booking || 0),
       advance_mode:     Number(booking || 0) > 0 ? advanceMode : "",
       lock_in_months:   Number(lockIn || 0),
+      future_rent:             stayType === "monthly" && futureRent ? Number(futureRent) : 0,
+      future_rent_after_months: stayType === "monthly" && futureRent ? Number(futureRentMonths || 2) : 0,
       // daily
       checkout_date:    stayType === "daily" ? checkoutDate : "",
       num_days:         stayType === "daily" ? numDays : 0,
@@ -261,15 +263,12 @@ export default function NewOnboardingPage() {
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
 
-            {/* ── Planned rent increase (DEMO — not yet saved) ── */}
-            <div className="rounded-tile border border-dashed border-[#E2DEDD] bg-[#FAFAF8] p-3 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide flex-1">Planned Rent Increase</p>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#FFF3CD] text-[#856404] uppercase tracking-wide">Preview</span>
-              </div>
+            {/* ── Planned rent increase ── */}
+            <div className="rounded-tile border border-[#E2DEDD] bg-[#FAFAF8] p-3 flex flex-col gap-3">
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Planned Rent Increase</p>
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <p className="text-[10px] text-ink-muted mb-1">New rent (₹)</p>
+                  <p className="text-[10px] text-ink-muted mb-1">New rent (₹) — optional</p>
                   <input type="text" inputMode="numeric" value={futureRent} onChange={e => setFutureRent(e.target.value)}
                     placeholder="e.g. 12000"
                     className="w-full rounded-pill border border-[#E2DEDD] bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-pink" />
@@ -281,12 +280,25 @@ export default function NewOnboardingPage() {
                     className="w-full rounded-pill border border-[#E2DEDD] bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-pink" />
                 </div>
               </div>
-              {futureRent && Number(futureRent) > 0 && rent && (
-                <div className="rounded-tile bg-tile-blue px-3 py-2 text-xs text-ink-muted">
-                  ₹{Number(rent).toLocaleString("en-IN")} for first {futureRentMonths} month{Number(futureRentMonths) !== 1 ? "s" : ""},
-                  then <span className="font-bold text-brand-blue">₹{Number(futureRent).toLocaleString("en-IN")}/mo</span> from month {Number(futureRentMonths) + 1}
-                </div>
-              )}
+              {futureRent && Number(futureRent) > 0 && rent && (() => {
+                const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+                const d = new Date(checkinDate)
+                const N = Math.max(1, Number(futureRentMonths) || 2)
+                const startM = d.getMonth()
+                const lastIntroName = MONTHS[(startM + N - 1) % 12]
+                const effName = MONTHS[(startM + N) % 12]
+                const introLabel = N === 1
+                  ? MONTHS[startM]
+                  : N === 2
+                    ? `${MONTHS[startM]} & ${lastIntroName}`
+                    : `${MONTHS[startM]}–${lastIntroName}`
+                return (
+                  <div className="rounded-tile bg-tile-blue px-3 py-2 text-xs text-ink-muted">
+                    ₹{Number(rent).toLocaleString("en-IN")} for {introLabel},
+                    then <span className="font-bold text-brand-blue">₹{Number(futureRent).toLocaleString("en-IN")}/mo</span> from {effName}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         )}

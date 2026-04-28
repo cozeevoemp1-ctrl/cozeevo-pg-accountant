@@ -22,6 +22,7 @@ from src.database.db_manager import get_session
 from src.database.models import (
     OnboardingSession, Room, Property, Tenant, Tenancy, TenancyStatus, StayType,
     RentSchedule, RentStatus, Payment, PaymentMode, PaymentFor, AuthorizedUser,
+    RentRevision,
 )
 from src.services.pdf_generator import HOUSE_RULES
 
@@ -74,6 +75,8 @@ class CreateSessionRequest(BaseModel):
     special_terms: str = ""
     tenant_phone: str
     created_by_phone: str = ""
+    future_rent: float = 0
+    future_rent_after_months: int = 0
 
 
 class TenantSubmitRequest(BaseModel):
@@ -209,6 +212,8 @@ async def create_session(req: CreateSessionRequest, request: Request):
             daily_rate=Decimal(str(req.daily_rate)) if req.daily_rate else 0,
             special_terms=req.special_terms,
             expires_at=datetime.utcnow() + timedelta(hours=48),
+            future_rent=Decimal(str(req.future_rent)) if req.future_rent else None,
+            future_rent_after_months=req.future_rent_after_months if req.future_rent_after_months else None,
         )
         session.add(obs)
         await session.flush()
@@ -1357,6 +1362,25 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             obs.approved_by_phone = (req.approved_by_phone or "").strip() if req else ""
             obs.tenant_id = tenant.id
             obs.tenancy_id = tenancy.id
+
+            # Pre-schedule rent increase: insert rent_revision so monthly rollover
+            # applies new rate automatically on effective_date.
+            # Formula: effective_date = 1st of (checkin_month + N)
+            # current month counts as month 1, so N=2 on April → June 1.
+            if obs.future_rent and obs.future_rent_after_months:
+                N = obs.future_rent_after_months
+                eff_month_idx = checkin.month - 1 + N   # 0-based from Jan
+                eff_year  = checkin.year + eff_month_idx // 12
+                eff_month = eff_month_idx % 12 + 1
+                session.add(RentRevision(
+                    tenancy_id=tenancy.id,
+                    old_rent=obs.agreed_rent,
+                    new_rent=obs.future_rent,
+                    effective_date=date(eff_year, eff_month, 1),
+                    changed_by=(req.approved_by_phone or "onboarding") if req else "onboarding",
+                    reason="planned_rent_increase",
+                    org_id=1,
+                ))
 
             # GSheets TENANTS + monthly tab (retry 3x)
             gsheet_kwargs = dict(
