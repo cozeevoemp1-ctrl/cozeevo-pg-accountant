@@ -43,8 +43,8 @@ async def checkout_prefetch(
         tenant = await session.get(Tenant, tenancy.tenant_id)
         room   = await session.get(Room,   tenancy.room_id)
 
-        from src.api.checkout_router import _get_pending_dues
-        dues = await _get_pending_dues(tenancy_id, session)
+        from src.whatsapp.handlers.account_handler import _calc_outstanding_dues
+        o_rent, _o_maint = await _calc_outstanding_dues(tenancy_id, session)
 
         return {
             "tenancy_id":       tenancy_id,
@@ -52,7 +52,8 @@ async def checkout_prefetch(
             "phone":            tenant.phone if tenant else "",
             "room_number":      room.room_number if room else "",
             "security_deposit": float(tenancy.security_deposit or 0),
-            "pending_dues":     float(dues),
+            "maintenance_fee":  float(tenancy.maintenance_fee or 0),
+            "pending_dues":     float(o_rent),   # outstanding rent only; maintenance_fee deducted separately
             "notice_date":      tenancy.notice_date.isoformat() if tenancy.notice_date else None,
         }
 

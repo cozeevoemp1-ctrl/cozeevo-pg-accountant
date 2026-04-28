@@ -324,7 +324,8 @@ export interface CheckoutPrefetch {
   phone: string;
   room_number: string;
   security_deposit: number;
-  pending_dues: number;
+  maintenance_fee: number;
+  pending_dues: number;   // outstanding rent only; maintenance_fee deducted separately
   notice_date: string | null;
 }
 

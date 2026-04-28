@@ -85,10 +85,10 @@ export default function NewCheckoutPage() {
   const [result,       setResult]       = useState<CheckoutCreateResponse | null>(null)
   const [pollStatus,   setPollStatus]   = useState<string>("")
 
-  // Derived: refund = max(deposit - dues - deductions, 0)
+  // Derived: refund = max(deposit - maintenance_fee - unpaid_rent - deductions, 0)
   const deductionsNum  = Number(deductions) || 0
   const refundAmount   = prefetch
-    ? Math.max(prefetch.security_deposit - prefetch.pending_dues - deductionsNum, 0)
+    ? Math.max(prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues - deductionsNum, 0)
     : 0
 
   // Load prefetch when tenant selected
@@ -201,7 +201,10 @@ export default function NewCheckoutPage() {
           <Row label="Room"             value={tenant.room_number} />
           <Row label="Checkout date"    value={fmtDate(checkoutDate)} />
           <Row label="Security deposit" value={fmtINR(prefetch.security_deposit)} />
-          <Row label="Pending dues"     value={fmtINR(prefetch.pending_dues)} muted={prefetch.pending_dues === 0} />
+          <Row label="Maintenance fee"  value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
+          {prefetch.pending_dues > 0 && (
+            <Row label="Unpaid rent" value={`− ${fmtINR(prefetch.pending_dues)}`} />
+          )}
           {deductionsNum > 0 && (
             <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
           )}
@@ -301,8 +304,11 @@ export default function NewCheckoutPage() {
               Refund Calculation
             </p>
             <div className="flex flex-col gap-1.5 mb-3">
-              <Row label="Security deposit" value={fmtINR(prefetch.security_deposit)} />
-              <Row label="Pending dues"     value={`− ${fmtINR(prefetch.pending_dues)}`} />
+              <Row label="Security deposit"  value={fmtINR(prefetch.security_deposit)} />
+              <Row label="Maintenance fee"   value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
+              {prefetch.pending_dues > 0 && (
+                <Row label="Unpaid rent" value={`− ${fmtINR(prefetch.pending_dues)}`} />
+              )}
               {deductionsNum > 0 && (
                 <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
               )}

@@ -276,8 +276,8 @@ export default function NewCheckinPage() {
           />
         )}
 
-        {/* Method */}
-        {preview && (
+        {/* Method — only when collecting something */}
+        {preview && Number(amount) > 0 && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
             <div className="grid grid-cols-4 gap-2">
