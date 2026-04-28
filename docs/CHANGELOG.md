@@ -2,6 +2,32 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.10] — 2026-04-28 — Guardrails, sessions UX, sheet sync corrections
+
+### Added
+- **`web/app/onboarding/sessions/page.tsx`** — Full rewrite for `pending_review` sessions:
+  - `EditableField` component: renders `<input>` for editable fields, `DetailField` for read-only
+  - Day-wise sessions: shows `checkout_date`, `num_days` (auto-computed), `daily_rate`
+  - `pending_review` state: all financial fields (rent, deposit, maintenance, prorated, daily_rate, num_days, checkout_date) + name/phone/gender editable
+  - Gender: `<select>` dropdown (Male/Female/Other); blue hint banner "Fields are editable — changes apply on Approve"
+  - `handleApprove` passes changed fields in `overrides` dict to backend
+- **`web/app/onboarding/new/page.tsx`** — Room occupancy check on room-number blur:
+  - Fetches `/api/onboarding/room-lookup/{room}` (extended to return occupancy)
+  - Red warning box if `is_full` (shows occupant names); green "X/Y beds occupied" when space available
+- **`web/app/checkin/new/page.tsx`** — Already-checked-in guard:
+  - Red warning banner when `preview.already_checked_in`
+  - CTA disabled + label "Already Checked In — Use Payment Form"
+- **`web/lib/api.ts`** — `CheckinPreview` extended: `tenancy_status`, `already_checked_in`
+
+### Fixed
+- **`src/api/v2/checkin.py`** — Checkin POST now accepts `no_show` tenants (was 404 for all monthly tenants with future check-in date); adds `no_show → active` status transition on physical check-in. Preview endpoint returns `already_checked_in` flag (monthly, active, checkin_date ≥ 3 days ago).
+- **`src/api/onboarding_router.py`** — `room_lookup` endpoint extended to return `occupied`, `max_occupancy`, `is_full`, `occupants[]`; `admin/{token}/detail` returns `checkout_date`, `num_days`, `daily_rate`, `future_rent`, `future_rent_after_months`
+- **`scripts/sync_sheet_from_db.py`** — Removed `deposit_credit` from `cash` and `total_paid` sheet display columns (was inflating cash by ₹3,14,350 in April)
+- **Voided payment ID 14636** — Ronak Samriya ₹18,000 UPI 2026-04-27 (test/mistake payment; he had already paid ₹15,000 via source sync)
+- **April 2026 sheet resynced** — 283 rows written with corrected numbers: Cash Rs.13,05,783, UPI Rs.31,54,345, Collected Rs.44,60,128, Dues Rs.88,766
+
+---
+
 ## [1.74.9] — 2026-04-28 — Collection dashboard redesign: clean obligation view
 
 ### Changed

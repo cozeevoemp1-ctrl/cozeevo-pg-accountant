@@ -31,6 +31,17 @@ type: project
 
 - **Cozeevo website (getkozzy.com)** — landing page paused, waiting for Canva assets.
 
+## Recently Completed (v1.74.10 — 2026-04-28)
+
+- **Sessions page editable UX** — `pending_review` sessions now have editable fields (name, phone, gender, all financials, checkout_date/num_days/daily_rate for day-wise); blue hint banner; `handleApprove` sends `overrides` to backend
+- **Onboarding room occupancy guardrail** — room-number blur triggers occupancy check; red warning + occupant names if full, green count if space
+- **Checkin idempotency guard** — checkin preview returns `already_checked_in` flag; PWA shows red warning + disables CTA for already-checked-in monthly tenants
+- **no_show → active checkin fix** — POST `/api/v2/app/checkin` now accepts `no_show` tenants and transitions status to `active` on check-in (was 404 for all monthly tenants before physical check-in)
+- **Sheet cash inflation fixed** — `deposit_credit` removed from `cash`/`total paid` display columns in `sync_sheet_from_db.py` (was inflating by ~₹3.1L)
+- **Ronak Samriya ₹18,000 voided** — payment ID 14636, test/mistake; real April rent already captured from source sync
+- **April 2026 sheet resynced** — 283 rows, corrected: Cash ₹13,05,783 / UPI ₹31,54,345 / Dues ₹88,766
+- **Navdaap Gupta ₹4,400 gap** — accepted as May carry-forward (overpaid April, no DB action needed)
+
 ## Recently Completed (v1.74.7 — 2026-04-28)
 
 - **Notice management — full feature** — KPI tile (On Notice · N, col-span-2, orange) with deposit badge per tenant; tenant edit Notice card (date input, deposit flag, expected checkout, withdraw button); checkout page auto-fills checkout date from expected_checkout + shows refund amount in notice banner; bot NOTICE_WITHDRAWN intent (cancel/withdraw/revoke notice → yes/no confirm → clears DB fields + sheet sync); API types updated throughout.
