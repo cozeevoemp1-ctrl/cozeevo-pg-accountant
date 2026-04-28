@@ -1538,12 +1538,21 @@ async def _do_query_tenant_by_id(tenant_id: int, tenancy_id: int, session: Async
             rent_due = (sched.rent_due or Decimal("0")) + (sched.adjustment or Decimal("0"))
             m_label = month_names.get(sched.period_month.month, "?")
 
-            # Get payments for this month grouped by mode
+            # Rent payments for this period + deposit/booking received in same calendar month
+            ps = sched.period_month
+            pe = date(ps.year + (1 if ps.month == 12 else 0), ps.month % 12 + 1, 1)
             payments_result = await session.execute(
                 select(Payment).where(
                     Payment.tenancy_id == tenancy.id,
-                    Payment.period_month == sched.period_month,
                     Payment.is_void == False,
+                    or_(
+                        and_(Payment.for_type == PaymentFor.rent,
+                             Payment.period_month == sched.period_month),
+                        and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                             Payment.period_month.is_(None),
+                             Payment.payment_date >= ps,
+                             Payment.payment_date < pe),
+                    ),
                 )
             )
             payments = payments_result.scalars().all()
@@ -2223,25 +2232,50 @@ async def _yearly_report(entities: dict, session: AsyncSession) -> str:
             )
         ) or 0)
 
+        # Deposits received: use payment_date range (deposit payments have period_month=NULL)
+        last_day = date(year, m, calendar.monthrange(year, m)[1])
+        next_period = last_day + timedelta(days=1)
         dep_recv = int(await session.scalar(
             select(func.sum(Payment.amount)).where(
-                Payment.period_month == period,
                 Payment.for_type == PaymentFor.deposit,
                 Payment.is_void == False,
+                Payment.payment_date >= period,
+                Payment.payment_date < next_period,
             )
         ) or 0)
 
         collected = cash + upi + maint
 
-        last_day = date(year, m, calendar.monthrange(year, m)[1])
+        # Pending = effective_due - paid (canonical formula, matches PWA KPI)
+        _pend_paid_sq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
+            .where(
+                Payment.is_void == False,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent,
+                         Payment.period_month == period),
+                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                         Payment.period_month.is_(None),
+                         Payment.payment_date >= period,
+                         Payment.payment_date < next_period),
+                ),
+            )
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
+        eff_due = RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)
         pend = int(await session.scalar(
-            select(func.sum(RentSchedule.rent_due))
+            select(func.coalesce(func.sum(
+                eff_due - func.coalesce(_pend_paid_sq.c.paid, 0)
+            ), 0))
             .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+            .outerjoin(_pend_paid_sq, _pend_paid_sq.c.tenancy_id == RentSchedule.tenancy_id)
             .where(
                 RentSchedule.period_month == period,
                 RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.checkin_date <= last_day,
+                eff_due > func.coalesce(_pend_paid_sq.c.paid, 0),
             )
         ) or 0)
 

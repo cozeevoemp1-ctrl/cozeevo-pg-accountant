@@ -9,12 +9,12 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
     Complaint, ComplaintCategory, ComplaintStatus,
-    OnboardingSession, Payment, PaymentMode, PendingAction, Property, RentSchedule, RentStatus,
+    OnboardingSession, Payment, PaymentFor, PaymentMode, PendingAction, Property, RentSchedule, RentStatus,
     Room, Tenancy, TenancyStatus, Vacation,
 )
 import json
@@ -93,17 +93,29 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
                 f"No rent record found for {asked_month.strftime('%B %Y')}.\n"
                 "Please contact the PG office if you have questions."
             )
-        result = await session.execute(
+        # Canonical payment query: rent payments for this period + deposit/booking
+        # received in this calendar month (deposit is baked into first-month rent_due)
+        _am_end = date(
+            asked_month.year + (1 if asked_month.month == 12 else 0),
+            asked_month.month % 12 + 1,
+            1,
+        )
+        paid = await session.scalar(
             select(func.sum(Payment.amount)).where(
                 Payment.tenancy_id == tenancy.id,
-                Payment.period_month == asked_month,
                 Payment.is_void == False,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent,
+                         Payment.period_month == asked_month),
+                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                         Payment.period_month.is_(None),
+                         Payment.payment_date >= asked_month,
+                         Payment.payment_date < _am_end),
+                ),
             )
-        )
-        paid = result.scalar() or Decimal("0")
+        ) or Decimal("0")
 
-        # Carry-forward any unpaid dues from months BEFORE asked_month so the
-        # tenant sees their true outstanding, not just one month's slice.
+        # Carry-forward: unpaid dues from months BEFORE asked_month
         prev_due_row = (await session.execute(
             select(
                 func.coalesce(func.sum(RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)), 0),
@@ -123,8 +135,8 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
         prev_total_paid = Decimal(str(prev_due_row[1] or 0))
         prev_due = max(Decimal("0"), prev_total_due - prev_total_paid)
 
-        current_due = rs.rent_due or Decimal("0")
-        balance = current_due + prev_due - paid
+        current_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
+        balance = max(Decimal("0"), current_due + prev_due - paid)
         status_msg = {
             RentStatus.paid:    "Fully paid ✓",
             RentStatus.partial: f"Partial — Rs.{int(balance):,} still due",
@@ -175,19 +187,34 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
     lines = ["*Your Outstanding Dues*\n"]
     total_due = Decimal("0")
     for rs in pending_rows:
-        result = await session.execute(
+        period_start = rs.period_month
+        period_end = date(
+            period_start.year + (1 if period_start.month == 12 else 0),
+            period_start.month % 12 + 1,
+            1,
+        )
+        paid = await session.scalar(
             select(func.sum(Payment.amount)).where(
                 Payment.tenancy_id == tenancy.id,
-                Payment.period_month == rs.period_month,
                 Payment.is_void == False,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent,
+                         Payment.period_month == rs.period_month),
+                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                         Payment.period_month.is_(None),
+                         Payment.payment_date >= period_start,
+                         Payment.payment_date < period_end),
+                ),
             )
-        )
-        paid = result.scalar() or Decimal("0")
-        balance = (rs.rent_due or Decimal("0")) - paid
+        ) or Decimal("0")
+        effective_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
+        balance = max(Decimal("0"), effective_due - paid)
+        if balance <= 0:
+            continue
         total_due += balance
         lines.append(
-            f"• {rs.period_month.strftime('%b %Y')}: Rs.{int(rs.rent_due or 0):,}"
-            + (f" (paid Rs.{int(paid):,}, due Rs.{int(balance):,})" if paid > 0 else "")
+            f"• {rs.period_month.strftime('%b %Y')}: Rs.{int(effective_due):,}"
+            + (f" (paid Rs.{int(paid):,}, due Rs.{int(balance):,})" if paid > 0 else f" (due Rs.{int(balance):,})")
         )
 
     lines.append(f"\n*Total due: Rs.{int(total_due):,}*")
