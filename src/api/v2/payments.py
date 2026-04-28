@@ -68,10 +68,12 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         )
 
         # Mirror to Google Sheet (same pattern as WhatsApp handler — 10s timeout)
-        # Booking payments are already subtracted from Rent Due via first_month_rent_due,
-        # so writing them to Cash/UPI would double-count. Skip bookings.
+        # Only rent payments go to Cash/UPI column. Deposit/booking/maintenance are
+        # tracked via deposit_credit / booking_credit in sync_sheet_from_db's balance
+        # formula — adding them here inflates the Cash column then gets corrected by
+        # the background full sync, causing visible temporary inflation on every payment.
         room = await session.get(Room, tenancy.room_id)
-        if room and tenant and body.for_type != "booking":
+        if room and tenant and body.for_type == "rent":
             try:
                 if body.period_month:
                     period = datetime.strptime(body.period_month, "%Y-%m")
