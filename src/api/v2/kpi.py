@@ -113,6 +113,20 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
+        # Tenants on notice (active, notice_date set)
+        notices_count = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
+                    Tenancy.status == TenancyStatus.active,
+                    Tenancy.notice_date != None,
+                )
+            ) or 0
+        )
+
         # Check-ins today
         checkins_today = int(
             await session.scalar(
@@ -181,6 +195,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         occupancy_pct=occ_pct,
         active_tenants=active_tenants,
         no_show_count=no_show_count,
+        notices_count=notices_count,
         checkins_today=checkins_today,
         checkouts_today=checkouts_today,
         overdue_tenants=overdue_tenants,
@@ -393,6 +408,33 @@ async def get_kpi_detail(
                     "name": r.name,
                     "room": r.room_number,
                     "detail": f"Check-in: {r.checkin_date.strftime('%-d %b') if r.checkin_date else '—'}",
+                }
+                for r in rows
+            ]}
+
+        elif type == "notices":
+            rows = (await session.execute(
+                select(
+                    Tenancy.id, Tenant.name, Room.room_number,
+                    Tenancy.notice_date, Tenancy.expected_checkout,
+                )
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "UNASSIGNED",
+                    Tenancy.status == TenancyStatus.active,
+                    Tenancy.notice_date != None,
+                )
+                .order_by(Tenancy.expected_checkout.asc().nulls_last())
+            )).all()
+            return {"type": type, "items": [
+                {
+                    "tenancy_id": r.id,
+                    "name": r.name,
+                    "room": r.room_number,
+                    "detail": r.expected_checkout.strftime("%-d %b") if r.expected_checkout else "—",
+                    "deposit_eligible": (r.notice_date.day <= 5) if r.notice_date else None,
                 }
                 for r in rows
             ]}
