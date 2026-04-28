@@ -45,6 +45,7 @@ export default function NewOnboardingPage() {
   const [deposit, setDeposit]           = useState("")
   const [maintenance, setMaintenance]   = useState("")
   const [booking, setBooking]           = useState("")
+  const [advanceMode, setAdvanceMode]   = useState<"cash" | "upi" | "bank">("cash")
   const [lockIn, setLockIn]             = useState("0")
 
   // Daily fields
@@ -76,6 +77,7 @@ export default function NewOnboardingPage() {
       security_deposit: Number(deposit || 0),
       maintenance_fee:  Number(maintenance || 0),
       booking_amount:   Number(booking || 0),
+      advance_mode:     Number(booking || 0) > 0 ? advanceMode : "",
       lock_in_months:   Number(lockIn || 0),
       // daily
       checkout_date:    stayType === "daily" ? checkoutDate : "",
@@ -231,6 +233,22 @@ export default function NewOnboardingPage() {
               <input type="number" min="0" value={booking} onChange={e => setBooking(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
+            {Number(booking) > 0 && (
+              <Field label="Advance payment method">
+                <div className="flex gap-2">
+                  {(["cash", "upi", "bank"] as const).map((m) => (
+                    <button key={m} type="button" onClick={() => setAdvanceMode(m)}
+                      className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${
+                        advanceMode === m
+                          ? "bg-brand-pink text-white border-brand-pink"
+                          : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                      }`}>
+                      {m === "cash" ? "💵 Cash" : m === "upi" ? "📱 UPI" : "🏦 Bank"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
             <Field label="Lock-in months">
               <input type="number" min="0" value={lockIn} onChange={e => setLockIn(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
@@ -256,6 +274,22 @@ export default function NewOnboardingPage() {
               <input type="number" min="0" value={booking} onChange={e => setBooking(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
             </Field>
+            {Number(booking) > 0 && (
+              <Field label="Advance payment method">
+                <div className="flex gap-2">
+                  {(["cash", "upi", "bank"] as const).map((m) => (
+                    <button key={m} type="button" onClick={() => setAdvanceMode(m)}
+                      className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${
+                        advanceMode === m
+                          ? "bg-brand-pink text-white border-brand-pink"
+                          : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                      }`}>
+                      {m === "cash" ? "💵 Cash" : m === "upi" ? "📱 UPI" : "🏦 Bank"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
           </div>
         )}
 
