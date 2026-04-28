@@ -254,6 +254,20 @@ async def record_physical_checkin(
             )
             payment_id = result.payment_id
 
+        # Clear any negative pre-checkin adjustment (set during import to suppress
+        # dues for no_show tenants). Positive carry-forwards are left untouched.
+        if not is_daily:
+            period = date(actual_date.year, actual_date.month, 1)
+            rs_row = await session.scalar(
+                select(RentSchedule).where(
+                    RentSchedule.tenancy_id   == tenancy.id,
+                    RentSchedule.period_month == period,
+                )
+            )
+            if rs_row is not None and rs_row.adjustment < 0:
+                rs_row.adjustment      = Decimal("0")
+                rs_row.adjustment_note = None
+
         await session.commit()
 
         logger.info(
