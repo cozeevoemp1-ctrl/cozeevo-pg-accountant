@@ -372,7 +372,7 @@ export default function NewCheckoutPage() {
       </div>
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 pb-8 pt-3 bg-bg border-t border-[#F0EDE9]">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-[#F0EDE9]">
         <button
           onClick={handleReview}
           disabled={!tenant || !prefetch || loadingPre}

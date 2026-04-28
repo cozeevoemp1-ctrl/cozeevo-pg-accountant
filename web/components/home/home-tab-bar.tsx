@@ -34,7 +34,7 @@ export function HomeTabBar() {
     pathname === "/"                     ? "home"       :
     pathname.startsWith("/payment")      ? "payments"   :
     pathname.startsWith("/collection")   ? "collection" :
-    pathname.startsWith("/tenants") || pathname.startsWith("/onboarding") || pathname.startsWith("/checkin") ? "manage" :
+    pathname.startsWith("/tenants") || pathname.startsWith("/onboarding") || pathname.startsWith("/checkin") || pathname.startsWith("/checkout") ? "manage" :
     pathname.startsWith("/reminders")    ? "reminders"  :
     "home";
 
