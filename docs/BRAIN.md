@@ -11,8 +11,8 @@
 
 ## 1. System Overview
 
-**Product:** Cozeevo PG Accountant — AI-powered bookkeeping + WhatsApp bot for a PG business.
-**Stack:** Python 3.11 · FastAPI · Supabase (PostgreSQL) · Groq llama-3.3-70b-versatile · APScheduler · Meta WhatsApp Cloud API
+**Product:** Cozeevo PG Accountant — AI-powered bookkeeping + WhatsApp bot + Owner PWA for a PG business.
+**Stack:** Python 3.11 · FastAPI · Next.js 15 · Supabase (PostgreSQL + Auth) · Groq llama-3.3-70b-versatile · APScheduler · Meta WhatsApp Cloud API
 
 > **Note on LangGraph:** `src/agents/langgraph_router.py` exists (v1.0 artifact) but is NOT wired into the WhatsApp flow.
 > The Gatekeeper+Worker architecture + PendingAction state machine replaces it. LangGraph is not needed here —
@@ -20,40 +20,42 @@
 
 **Future goal:** Multi-tenant SaaS — same codebase, each PG gets its own Supabase project + WhatsApp number.
 
-**Current phase:** **LIVE on VPS** — Hostinger KVM 1 (187.127.130.194), domain api.getkozzy.com, SSL active, Meta webhook configured.
+**Current phase:** **LIVE on VPS** — Hostinger KVM 1 (187.127.130.194).
+- **api.getkozzy.com** — FastAPI (port 8000), WhatsApp bot + REST API
+- **app.getkozzy.com** — Next.js PWA (port 3001, `kozzy-pwa.service`), Owner + staff mobile app
 
 ---
 
 ## 2. Architecture & Component Diagram
 
 ```
-  WhatsApp User
-       |
-       | Meta Cloud API
-       v
-  +----------------------+
-  | nginx (SSL)          |  api.getkozzy.com:443
-  | Let's Encrypt        |
-  +----------+-----------+
-             | proxy_pass :8000
-             v
-  +--------------------------------------------------------+
-  |  FastAPI (port 8000, systemd)                          |
-  |                                                        |
-  |  webhook_handler.py                                    |
-  |  +- GET /webhook/whatsapp  (Meta verification)         |
-  |  +- POST /webhook/whatsapp (receive messages)          |
-  |  +- Voice -> Groq Whisper transcription                |
-  |  +- Bank PDF -> parse + classify                       |
-  |       |                                                |
-  |       v                                                |
-  |  chat_api.py (main brain)                              |
-  |  +- 1. Rate limit + role_service.py                    |
-  |  +- 2. Load chat history (last 5 msgs)                 |
-  |  +- 3. Check pending actions                           |
-  |  +- 4. intent_detector.py (regex, 97% accuracy)        |
-  |  +- 5. Follow-up detection (pronouns)                  |
-  |  +- 6. AI fallback (Groq) if UNKNOWN                   |
+  WhatsApp User                Owner / Staff (browser)
+       |                              |
+       | Meta Cloud API               | HTTPS app.getkozzy.com
+       v                              v
+  +----------------------+    +-------------------------+
+  | nginx (SSL)          |    | nginx (SSL)             |
+  | api.getkozzy.com     |    | app.getkozzy.com        |
+  +----------+-----------+    +-----------+-------------+
+             | proxy_pass :8000           | proxy_pass :3001
+             v                            v
+  +--------------------------------------------------------+    +----------------------------+
+  |  FastAPI (port 8000, pg-accountant.service)            |    | Next.js PWA (port 3001,    |
+  |                                                        |    | kozzy-pwa.service)         |
+  |  webhook_handler.py                                    |    |                            |
+  |  +- GET /webhook/whatsapp  (Meta verification)         |    | Pages:                     |
+  |  +- POST /webhook/whatsapp (receive messages)          |    | / Home (KPI tiles)         |
+  |  +- Voice -> Groq Whisper transcription                |    | /payment/new               |
+  |  +- Bank PDF -> parse + classify                       |    | /checkin/new               |
+  |       |                                                |    | /checkout/new              |
+  |       v                                                |    | /onboarding/new            |
+  |  chat_api.py (main brain)                              |    | /tenants                   |
+  |  +- 1. Rate limit + role_service.py                    |    | /reminders                 |
+  |  +- 2. Load chat history (last 5 msgs)                 |    | /collection/breakdown      |
+  |  +- 3. Check pending actions                           |    |                            |
+  |  +- 4. intent_detector.py (regex, 97% accuracy)        |    | Auth: Supabase email+pwd   |
+  |  +- 5. Follow-up detection (pronouns)                  |    | API:  /api/v2/app/* (JWT)  |
+  |  +- 6. AI fallback (Groq) if UNKNOWN                   |    +----------------------------+
   |  +- 7. gatekeeper.py -> route to handler               |
   |       |                                                |
   |       +-- account_handler.py  (financial)               |
@@ -63,6 +65,7 @@
   |       +-- _shared.py          (fuzzy search, pending)   |
   |                                                        |
   |  Also:                                                 |
+  |  +- /api/v2/app/* (JWT endpoints for PWA)              |
   |  +- gsheets.py           -> Google Sheets read/write    |
   |  +- finance_handler.py   -> bank statement processing   |
   |                                                        |
@@ -74,6 +77,9 @@
   | tenants, tenancies, payments,          |
   | rent_schedule, rooms, complaints,      |
   | chat_messages, activity_log, ...       |
+  +----------------------------------------+
+  | Supabase Auth                          |
+  | user_metadata.role: admin/staff/tenant |
   +----------------------------------------+
 ```
 

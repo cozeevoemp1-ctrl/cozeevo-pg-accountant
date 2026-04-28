@@ -2,7 +2,7 @@
 
 > Cloud deployment on Hostinger VPS (Ubuntu 22.04).
 > Target: ~$5/month for a single PG instance.
-> Last updated: 2026-03-14
+> Last updated: 2026-04-28
 
 ---
 
@@ -14,12 +14,20 @@ Internet
     ▼ HTTPS (443)
 nginx (reverse proxy + SSL)
     │
-    ├──► /webhook/*    → FastAPI (port 8000, systemd service)
-    └──► /api/*        → FastAPI (port 8000, systemd service)
+    ├──► api.getkozzy.com  →  FastAPI (port 8000, pg-accountant.service)
+    │       /webhook/*          WhatsApp bot
+    │       /api/*              REST API (v1 + v2)
+    │
+    └──► app.getkozzy.com  →  Next.js PWA (port 3001, kozzy-pwa.service)
+                                Owner + staff mobile app
 
-FastAPI
+FastAPI (port 8000)
     └──► Supabase (cloud PostgreSQL — no local DB needed)
-    └──► Ollama (port 11434 — local LLM on same server)
+    └──► Groq API (llama-3.3-70b-versatile)
+
+Next.js PWA (port 3001)
+    └──► FastAPI /api/v2/app/* (JWT-authenticated)
+    └──► Supabase Auth (email + password login)
 ```
 
 ---
@@ -113,7 +121,72 @@ systemctl start ollama
 
 ---
 
-## Step 5 — FastAPI as systemd Service
+## Step 5 — Node.js for PWA
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+node --version   # should be 20.x
+```
+
+---
+
+## Step 5a — PWA environment variables
+
+```bash
+nano /opt/pg-accountant/web/.env.production
+```
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://oxiqomoilqwfxjauxhzp.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+NEXT_PUBLIC_API_URL=https://api.getkozzy.com
+```
+
+Build the PWA:
+
+```bash
+cd /opt/pg-accountant/web
+npm install
+npm run build
+```
+
+---
+
+## Step 5b — PWA as systemd Service
+
+```bash
+nano /etc/systemd/system/kozzy-pwa.service
+```
+
+```ini
+[Unit]
+Description=Kozzy Owner PWA (Next.js)
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/pg-accountant/web
+ExecStart=/usr/bin/node node_modules/.bin/next start -p 3001
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl daemon-reload
+systemctl enable kozzy-pwa
+systemctl start kozzy-pwa
+```
+
+Test: `curl http://localhost:3001` → HTML response.
+
+---
+
+## Step 6 — FastAPI as systemd Service
 
 Create the service file:
 
@@ -158,11 +231,14 @@ Create nginx config:
 nano /etc/nginx/sites-available/pg-accountant
 ```
 
+**Two nginx server blocks — one per domain.**
+
+Backend API (`api.getkozzy.com`):
+
 ```nginx
 server {
-    server_name api.yourpg.com;
+    server_name api.getkozzy.com;
 
-    # WhatsApp webhook — Meta Cloud API sends messages here
     location /webhook/ {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
@@ -170,7 +246,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    # Internal API (healthz, docs etc.)
     location /api/ {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
@@ -181,19 +256,34 @@ server {
     location /healthz {
         proxy_pass http://localhost:8000;
     }
+}
+```
 
+Owner PWA (`app.getkozzy.com`):
+
+```nginx
+server {
+    server_name app.getkozzy.com;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+    }
 }
 ```
 
 Enable and get SSL:
 
 ```bash
-# Remove default site to avoid port 80 conflict
 rm -f /etc/nginx/sites-enabled/default
 ln -s /etc/nginx/sites-available/pg-accountant /etc/nginx/sites-enabled/
 nginx -t
 systemctl reload nginx
-certbot --nginx -d api.yourpg.com
+certbot --nginx -d api.getkozzy.com -d app.getkozzy.com
 ```
 
 ---
@@ -254,12 +344,36 @@ tail -f /var/log/nginx/access.log
 
 ### Update the code
 
+Backend only:
 ```bash
-cd /opt/pg-accountant
-git pull origin master
-source venv/bin/activate
-pip install -r requirements.txt
-systemctl restart pg-accountant
+cd /opt/pg-accountant && git pull && systemctl restart pg-accountant
+```
+
+PWA only (after any `web/` change):
+```bash
+cd /opt/pg-accountant && git pull && cd web && npm run build && systemctl restart kozzy-pwa
+```
+
+Both (most common):
+```bash
+ssh root@187.127.130.194 "cd /opt/pg-accountant && git pull && systemctl restart pg-accountant && cd web && npm run build && systemctl restart kozzy-pwa"
+```
+
+### Check service status
+
+```bash
+systemctl status pg-accountant
+systemctl status kozzy-pwa
+```
+
+### View logs
+
+```bash
+# FastAPI
+tail -f /tmp/pg_app.log
+
+# PWA (Next.js)
+journalctl -u kozzy-pwa -f
 ```
 
 ### Database migrations (after code updates)
