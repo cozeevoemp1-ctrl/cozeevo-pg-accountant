@@ -1958,70 +1958,22 @@ async def _report(entities: dict, ctx: CallerContext, session: AsyncSession) -> 
 async def _single_month_report(current_month: date, session: AsyncSession) -> str:
     """Generate detailed report for a single month."""
     from src.database.models import BankTransaction, Refund, RefundStatus
+    from src.services.reporting import collection_summary as _cs
 
-    # Rent collection
-    rent_collected = await session.scalar(
-        select(func.sum(Payment.amount)).where(
-            Payment.period_month == current_month,
-            Payment.for_type == PaymentFor.rent,
-            Payment.is_void == False,
-        )
-    ) or Decimal("0")
-
-    cash_collected = await session.scalar(
-        select(func.sum(Payment.amount)).where(
-            Payment.period_month == current_month,
-            Payment.for_type == PaymentFor.rent,
-            Payment.is_void == False,
-            Payment.payment_mode == PaymentMode.cash,
-        )
-    ) or Decimal("0")
-
-    upi_collected = await session.scalar(
-        select(func.sum(Payment.amount)).where(
-            Payment.period_month == current_month,
-            Payment.for_type == PaymentFor.rent,
-            Payment.is_void == False,
-            Payment.payment_mode == PaymentMode.upi,
-        )
-    ) or Decimal("0")
-
-    # Maintenance fees
-    maintenance_collected = await session.scalar(
-        select(func.sum(Payment.amount)).where(
-            Payment.period_month == current_month,
-            Payment.for_type == PaymentFor.maintenance,
-            Payment.is_void == False,
-        )
-    ) or Decimal("0")
-
-    # Security deposits received
-    deposits_received = await session.scalar(
-        select(func.sum(Payment.amount)).where(
-            Payment.period_month == current_month,
-            Payment.for_type == PaymentFor.deposit,
-            Payment.is_void == False,
-        )
-    ) or Decimal("0")
-
-    # Total Collection = Rent + Maintenance (per REPORTING.md)
-    collected = rent_collected + maintenance_collected
+    # Financial figures from shared service — identical source as PWA collection page.
+    _col = await _cs(period_month=current_month.strftime("%Y-%m"), session=session)
+    rent_collected        = Decimal(str(_col.rent_collected))
+    maintenance_collected = Decimal(str(_col.maintenance_collected))
+    deposits_received     = Decimal(str(_col.deposits_received))
+    collected             = Decimal(str(_col.collected))
+    pending               = Decimal(str(_col.pending))
+    cash_collected        = Decimal(str(_col.method_breakdown.get("cash", 0)))
+    upi_collected         = Decimal(str(_col.method_breakdown.get("upi", 0)))
 
     last_day = date(
         current_month.year, current_month.month,
         calendar.monthrange(current_month.year, current_month.month)[1],
     )
-
-    pending = await session.scalar(
-        select(func.sum(RentSchedule.rent_due))
-        .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
-        .where(
-            RentSchedule.period_month == current_month,
-            RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-            Tenancy.status == TenancyStatus.active,
-            Tenancy.checkin_date <= last_day,
-        )
-    ) or Decimal("0")
 
     active_tenants = await session.scalar(
         select(func.count(Tenancy.id)).where(

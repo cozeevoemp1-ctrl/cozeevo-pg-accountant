@@ -8,6 +8,7 @@ Deposits and booking advances are tracked but NOT counted in Total Collection.
 """
 from __future__ import annotations
 
+import calendar as _cal
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -74,7 +75,8 @@ async def collection_summary(
     expected = int(expected_raw or 0)
 
     # ── Collected amounts by for_type ──────────────────────────────────────────
-    collected_rows = (
+    # Rent/maintenance: keyed by period_month (the billing period).
+    rent_rows = (
         await session.execute(
             select(
                 Payment.for_type,
@@ -83,6 +85,7 @@ async def collection_summary(
             .join(Tenancy, Tenancy.id == Payment.tenancy_id)
             .where(
                 Payment.period_month == from_date,
+                Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
                 Payment.is_void == False,
             )
             .group_by(Payment.for_type)
@@ -90,7 +93,29 @@ async def collection_summary(
     ).all()
 
     breakdown: dict[str, int] = {}
-    for row in collected_rows:
+    for row in rent_rows:
+        key = row.for_type.value if hasattr(row.for_type, "value") else str(row.for_type)
+        breakdown[key] = int(row.total or 0)
+
+    # Deposits/booking: period_month is NULL on these rows — use payment_date range.
+    last_day_num = _cal.monthrange(from_date.year, from_date.month)[1]
+    to_date = date(from_date.year, from_date.month, last_day_num)
+    non_rent_rows = (
+        await session.execute(
+            select(
+                Payment.for_type,
+                func.sum(Payment.amount).label("total"),
+            )
+            .where(
+                Payment.payment_date >= from_date,
+                Payment.payment_date <= to_date,
+                Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                Payment.is_void == False,
+            )
+            .group_by(Payment.for_type)
+        )
+    ).all()
+    for row in non_rent_rows:
         key = row.for_type.value if hasattr(row.for_type, "value") else str(row.for_type)
         breakdown[key] = int(row.total or 0)
 
