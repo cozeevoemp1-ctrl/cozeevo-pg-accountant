@@ -52,7 +52,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
         for tenancy, tenant, room in notice_rows:
             nd = tenancy.notice_date
             deposit_eligible = nd.day <= NOTICE_BY_DAY
-            expected_checkout = calc_notice_last_day(nd)
+            expected_checkout = tenancy.expected_checkout or calc_notice_last_day(nd)
             days_remaining = (expected_checkout - today).days
             results.append({
                 "tenancy_id":        tenancy.id,
