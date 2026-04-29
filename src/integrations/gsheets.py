@@ -1143,6 +1143,61 @@ def _add_tenant_sync(
     return result
 
 
+def _record_daywise_checkout_sync(
+    room_number: str,
+    tenant_name: str,
+    exit_date: Optional[str] = None,
+) -> dict:
+    """Mark a day-wise tenant as EXITED in the DAY WISE tab."""
+    result: dict[str, Any] = {"success": False, "row": None, "tab": "DAY WISE", "error": None}
+    try:
+        ws = _get_worksheet_sync("DAY WISE")
+        all_vals = ws.get_all_values()
+        if not all_vals:
+            result["error"] = "DAY WISE tab is empty"
+            return result
+
+        # Build header map from row 1
+        hdr = [h.strip() for h in all_vals[0]]
+        hmap = {h.lower(): i for i, h in enumerate(hdr) if h}
+        status_col  = hmap.get("status",   15)
+        checkout_col = hmap.get("checkout", 17)
+        room_col    = hmap.get("room",      0)
+        name_col    = hmap.get("name",      1)
+
+        room_clean = room_number.strip().upper()
+        name_lower = tenant_name.strip().lower()
+
+        for i, row in enumerate(all_vals):
+            if i == 0:
+                continue
+            cell_room = (row[room_col].strip().upper() if room_col < len(row) else "")
+            cell_name = (row[name_col].strip().lower() if name_col < len(row) else "")
+            if cell_room != room_clean:
+                continue
+            if name_lower not in cell_name and cell_name not in name_lower:
+                continue
+
+            sheet_row = i + 1  # 1-based
+            batch = [
+                {"range": gspread.utils.rowcol_to_a1(sheet_row, status_col + 1),   "values": [["EXITED"]]},
+            ]
+            if exit_date:
+                batch.append({"range": gspread.utils.rowcol_to_a1(sheet_row, checkout_col + 1), "values": [[exit_date]]})
+            ws.batch_update(batch, value_input_option="USER_ENTERED")
+            logger.info("GSheets: daywise checkout Room %s / %s at row %d", room_number, tenant_name, sheet_row)
+            result["success"] = True
+            result["row"] = sheet_row
+            return result
+
+        result["error"] = f"Row not found in DAY WISE for Room {room_number} / {tenant_name}"
+        logger.warning("GSheets: %s", result["error"])
+    except Exception as e:
+        result["error"] = str(e)
+        logger.error("GSheets _record_daywise_checkout_sync: %s", e)
+    return result
+
+
 def _record_checkout_sync(
     room_number: str,
     tenant_name: str,
@@ -1154,6 +1209,7 @@ def _record_checkout_sync(
     Updates Event col to 'EXIT', Status col to 'EXIT'.
     Optionally sets Notice Date.
     Also updates TENANTS tab Status to 'EXIT'.
+    Falls back to DAY WISE tab if not found in monthly tabs.
     """
     result: dict[str, Any] = {
         "success": False,
@@ -1166,9 +1222,12 @@ def _record_checkout_sync(
         # -- Monthly tab (search current + adjacent months) --
         tenant_tab = _find_tenant_tab(room_number, tenant_name)
         if tenant_tab is None:
-            result["error"] = f"Row not found for Room {room_number} / {tenant_name}"
-            logger.warning("GSheets: %s", result["error"])
-            return result
+            # Fallback: day-wise tenants live in DAY WISE tab, not monthly tabs
+            dw = _record_daywise_checkout_sync(room_number, tenant_name, exit_date)
+            if not dw["success"]:
+                result["error"] = f"Row not found for Room {room_number} / {tenant_name} (monthly + DAY WISE)"
+                logger.warning("GSheets: %s", result["error"])
+            return dw
 
         ws, tab_name, row, row_data = tenant_tab
         result["tab"] = tab_name

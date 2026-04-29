@@ -280,7 +280,11 @@ async def _do_confirm_checkout(
             notice_str,
             cs.checkout_date.strftime("%d/%m/%Y"),
         )
-        _gs.trigger_monthly_sheet_sync(cs.checkout_date.month, cs.checkout_date.year)
+        is_daily = tenancy and tenancy.stay_type.value == "daily"
+        if is_daily:
+            _gs.trigger_daywise_sheet_sync()
+        else:
+            _gs.trigger_monthly_sheet_sync(cs.checkout_date.month, cs.checkout_date.year)
     except Exception as _e:
         logger.warning("Sheet sync failed on checkout confirm: %s", _e)
 
