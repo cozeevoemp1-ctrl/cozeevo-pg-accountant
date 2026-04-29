@@ -1,17 +1,10 @@
-const TTS_URL = "https://api.openai.com/v1/audio/speech"
+const TTS_URL = "/api/voice/speak"
 
 export async function speakText(text: string): Promise<void> {
-  const key = process.env.NEXT_PUBLIC_OPENAI_API_KEY
-  if (!key) {
-    browserSpeak(text)
-    return
-  }
-
   try {
     const res = await fetch(TTS_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ model: "tts-1", voice: "nova", input: text }),

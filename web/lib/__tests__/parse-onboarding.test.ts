@@ -13,7 +13,6 @@ function mockGroqResponse(result: object) {
 describe("parseOnboardingFields", () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
-    process.env.NEXT_PUBLIC_GROQ_API_KEY = "test-key"
   })
 
   it("returns extracted fields and confirmation", async () => {
@@ -57,13 +56,6 @@ describe("parseOnboardingFields", () => {
     expect(result.fields.room_number).toBe("101")
     expect(result.fields.monthly_rent).toBe(10000)
     expect(result.fields.security_deposit).toBe(15000)
-  })
-
-  it("throws when NEXT_PUBLIC_GROQ_API_KEY is missing", async () => {
-    delete process.env.NEXT_PUBLIC_GROQ_API_KEY
-    await expect(
-      parseOnboardingFields("room 101", emptyOnboardingFields())
-    ).rejects.toThrow("NEXT_PUBLIC_GROQ_API_KEY is not set")
   })
 
   it("throws on non-ok Groq response", async () => {

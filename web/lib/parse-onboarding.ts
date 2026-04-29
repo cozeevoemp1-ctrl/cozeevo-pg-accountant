@@ -1,4 +1,4 @@
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+const GROQ_URL = "/api/voice/extract"
 
 export interface OnboardingFields {
   room_number: string | null
@@ -67,13 +67,9 @@ export async function parseOnboardingFields(
   transcript: string,
   existing: OnboardingFields
 ): Promise<OnboardingParseResult> {
-  const key = process.env.NEXT_PUBLIC_GROQ_API_KEY
-  if (!key) throw new Error("NEXT_PUBLIC_GROQ_API_KEY is not set")
-
   const res = await fetch(GROQ_URL, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${key}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

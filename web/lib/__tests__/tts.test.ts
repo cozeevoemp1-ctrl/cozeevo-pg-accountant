@@ -4,7 +4,6 @@ import { speakText } from "../tts"
 describe("speakText", () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
-    process.env.NEXT_PUBLIC_OPENAI_API_KEY = "test-key"
   })
 
   it("calls OpenAI TTS and plays audio on success", async () => {
@@ -22,7 +21,7 @@ describe("speakText", () => {
     await speakText("Got it, room 201.")
 
     expect(fetch).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/audio/speech",
+      "/api/voice/speak",
       expect.objectContaining({ method: "POST" })
     )
     expect(mockPlay).toHaveBeenCalled()
@@ -49,23 +48,4 @@ describe("speakText", () => {
     expect(mockSpeak).toHaveBeenCalled()
   })
 
-  it("uses browser fallback when NEXT_PUBLIC_OPENAI_API_KEY is missing", async () => {
-    delete process.env.NEXT_PUBLIC_OPENAI_API_KEY
-
-    const fetchMock = vi.fn()
-    vi.stubGlobal("fetch", fetchMock)
-
-    const mockSpeak = vi.fn()
-    Object.defineProperty(window, "speechSynthesis", {
-      value: { speak: mockSpeak, cancel: vi.fn() },
-      writable: true,
-      configurable: true,
-    })
-    vi.stubGlobal("SpeechSynthesisUtterance", vi.fn().mockReturnValue({}))
-
-    await speakText("No key test.")
-
-    expect(mockSpeak).toHaveBeenCalled()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
 })
