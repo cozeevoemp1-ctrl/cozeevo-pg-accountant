@@ -7,7 +7,7 @@ import { TenantSearch } from "@/components/forms/tenant-search"
 
 const NOTICE_BY_DAY = 5
 
-function fmtDate(iso: string): string {
+function fmtDate(iso: string | null): string {
   if (!iso) return "—"
   const [y, m, d] = iso.split("-")
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -63,12 +63,13 @@ export default function NoticesPage() {
     )
   }, [items, searchQuery])
 
-  const eligible  = filtered.filter(i =>  i.deposit_eligible)
-  const forfeited = filtered.filter(i => !i.deposit_eligible)
+  const eligible    = filtered.filter(i =>  i.has_notice &&  i.deposit_eligible)
+  const forfeited   = filtered.filter(i =>  i.has_notice && !i.deposit_eligible)
+  const noNotice    = filtered.filter(i => !i.has_notice)
 
   function openEdit(item: NoticeItem) {
     setEditItem(item)
-    setEditDate(item.notice_date)
+    setEditDate(item.notice_date ?? "")
     setEditError("")
   }
 
@@ -204,6 +205,25 @@ export default function NoticesPage() {
           </section>
         )}
 
+        {/* Expected checkout — no formal notice given */}
+        {!loading && noNotice.length > 0 && (
+          <section>
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
+              Expected Checkout — No Notice ({noNotice.length})
+            </p>
+            <div className="flex flex-col gap-3">
+              {noNotice.map(item => (
+                <NoticeCard
+                  key={item.tenancy_id}
+                  item={item}
+                  onCheckout={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)}
+                  onEdit={() => openEdit(item)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Legend */}
         {!loading && items.length > 0 && (
           <div className="bg-surface rounded-card border border-[#F0EDE9] p-3 text-xs text-ink-muted">
@@ -308,7 +328,7 @@ function NoticeCard({
   onEdit: () => void
 }) {
   const days = daysLabel(item.days_remaining)
-  const noticeDay = new Date(item.notice_date + "T00:00:00").getDate()
+  const noticeDay = item.notice_date ? new Date(item.notice_date + "T00:00:00").getDate() : null
   const eligibleRefund = item.deposit_eligible
     ? Math.max(item.security_deposit - item.maintenance_fee, 0)
     : 0
@@ -335,7 +355,7 @@ function NoticeCard({
 
       {/* Details grid */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-        <Detail label="Notice given" value={`${fmtDate(item.notice_date)} (${noticeDay <= NOTICE_BY_DAY ? "on time" : "late"})`} />
+        <Detail label="Notice given" value={item.notice_date ? `${fmtDate(item.notice_date)} (${noticeDay! <= NOTICE_BY_DAY ? "on time" : "late"})` : "No notice given"} />
         <Detail label="Last day" value={fmtDate(item.expected_checkout)} />
         <Detail label="Security deposit" value={fmtINR(item.security_deposit)} />
         <Detail label="Agreed rent" value={`${fmtINR(item.agreed_rent)}/mo`} />

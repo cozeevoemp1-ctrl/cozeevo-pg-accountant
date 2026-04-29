@@ -113,7 +113,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Tenants on notice (active, notice_date set)
+        # Tenants leaving: formal notice OR expected_checkout set
+        _today = date.today()
         notices_count = int(
             await session.scalar(
                 select(func.count(Tenancy.id))
@@ -122,7 +123,13 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                     Room.is_staff_room == False,
                     Room.room_number != "UNASSIGNED",
                     Tenancy.status == TenancyStatus.active,
-                    Tenancy.notice_date != None,
+                    or_(
+                        Tenancy.notice_date != None,
+                        and_(
+                            Tenancy.expected_checkout != None,
+                            Tenancy.expected_checkout >= _today,
+                        ),
+                    ),
                 )
             ) or 0
         )

@@ -377,7 +377,8 @@ export interface NoticeItem {
   tenant_name: string;
   phone: string;
   room_number: string;
-  notice_date: string;           // YYYY-MM-DD
+  notice_date: string | null;    // YYYY-MM-DD; null if no formal notice
+  has_notice: boolean;
   expected_checkout: string;     // YYYY-MM-DD (last allowed day)
   deposit_eligible: boolean;     // notice on/before 5th
   security_deposit: number;
