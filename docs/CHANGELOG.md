@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.18] — 2026-04-29 — Feat: prorate this-month rent_due on mid-month room transfers
+
+### Fixed / Added
+- **`src/api/v2/tenants.py`** — `PATCH /tenants/{id}`: when `room_number` changes, recalculates current-month `RentSchedule.rent_due` with proration. First-month tenants (checkin in current month) prorate from checkin day; all others prorate remaining days from today.
+- **`src/whatsapp/handlers/owner_handler.py`** — Bot `ROOM_TRANSFER` flow: `current_rent` now reads `tenancy.agreed_rent` (not `rs.rent_due`, which was inflated by the first-month deposit bundle). `checkin_date` stored in `action_data`. Confirmation message shows read-only prorated line: `Apr prorated (this month): Rs.X,XXX (Y/30 days × Rs.rent)`. `final_confirm` always writes prorated amount to RS.
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Read-only green tile shows prorated amount when room changes; same value echoed in ConfirmationCard. Non-editable.
+
+### Data fix
+- **Prasanth.P (tenancy 920, room G15)** — `RentSchedule.rent_due` corrected `26,000 → 15,600` (2,600 prorated for 6 days Apr 25–30 + 13,000 deposit). April sheet resynced (283 rows).
+
+---
+
+## [1.74.17] — 2026-04-29 — Fix: bot RECORD_CHECKOUT missing DAY WISE sheet sync for daily stays
+
+### Fixed
+- **`src/whatsapp/handlers/owner_handler.py`** — Bot `RECORD_CHECKOUT` confirm step called `gsheets_checkout` but never called `trigger_daywise_sheet_sync()` for daily tenants — only the PWA path (`_do_confirm_checkout`) had this. Root cause of Chandrasekhar Rathod staying as ACTIVE in DAY WISE sheet after bot checkout.
+
+### Data fix
+- Ran `sync_daywise_from_db.py --write` manually to push correct EXITED status for Chandrasekhar Rathod (tenancy 1056, room G15, checkout 2026-04-29).
+
+---
+
 ## [1.74.16] — 2026-04-29 — Fix: DAY WISE tab not synced on any day-wise tenant mutation
 
 ### Fixed
