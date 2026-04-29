@@ -421,6 +421,7 @@ async def get_kpi_detail(
             ]}
 
         elif type == "notices":
+            _today = date.today()
             rows = (await session.execute(
                 select(
                     Tenancy.id, Tenant.name, Room.room_number,
@@ -432,7 +433,13 @@ async def get_kpi_detail(
                     Room.is_staff_room == False,
                     Room.room_number != "UNASSIGNED",
                     Tenancy.status == TenancyStatus.active,
-                    Tenancy.notice_date != None,
+                    or_(
+                        Tenancy.notice_date != None,
+                        and_(
+                            Tenancy.expected_checkout != None,
+                            Tenancy.expected_checkout >= _today,
+                        ),
+                    ),
                 )
                 .order_by(Tenancy.expected_checkout.asc().nulls_last())
             )).all()
