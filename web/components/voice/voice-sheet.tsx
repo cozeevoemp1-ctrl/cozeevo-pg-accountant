@@ -56,7 +56,7 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 flex items-end">
+    <div className="fixed inset-0 bg-black/60 flex items-end" style={{ zIndex: 9999 }}>
       <div className="w-full bg-surface rounded-t-3xl px-5 pt-5 pb-10 min-h-[60vh] flex flex-col">
         {/* Handle bar */}
         <div className="w-12 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5" />
