@@ -6,12 +6,13 @@ type: project
 
 ## Active / Next Up
 
-### PWA — next features (Track A, agreed by Kiran)
-1. **Checkout PWA page** — `/checkout/new` form: tenant search → preview outstanding + deposit → collect/refund → confirmation. Backend endpoint needed (`POST /api/v2/app/checkout`).
-2. **Tenant list page** — dedicated `/tenants` page listing all active tenants with room, rent, dues badge. Tap row → dues detail card + quick pay button.
-3. **Onboarding form in PWA** — move static HTML at `api.getkozzy.com/admin/onboarding` into `app.getkozzy.com/onboarding/new`. Reuse existing backend (`/api/v2/onboarding/*`). OCR photo pre-fill (backlog).
-4. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
-5. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
+### PWA — uncommitted in-progress work
+1. **Proration choice toggle** — `web/app/tenants/[tenancy_id]/edit/page.tsx` + `web/lib/api.ts` have uncommitted changes adding a Full/Prorated toggle when rent or room changes. Sends `prorate_this_month: bool` in PATCH body. **Backend gap:** `tenants.py` PATCH doesn't handle this flag yet (auto-prorates on room change only). Needs backend wiring before commit.
+
+### PWA — next features
+2. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
+3. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
+4. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row.
 
 ### Bot / backend
 6. **DASHBOARD_SUMMARY "dues" line fix** — COLLECTION shows "Mar 2026 dues: Rs.15,500" but should show CURRENT MONTH (April) outstanding. Change `prev_dues` query in `_dashboard_summary`. Kiran expects ~Rs.3L.
