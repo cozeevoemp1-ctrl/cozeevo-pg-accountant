@@ -1369,7 +1369,7 @@ class AuditLog(Base):
 
     id          = Column(Integer, primary_key=True)
     created_at  = Column(DateTime(timezone=True), default=datetime.utcnow)
-    changed_by  = Column(String(30), nullable=False)      # phone number of person who made change
+    changed_by  = Column(String(100), nullable=False)     # phone or UUID of person who made change
     entity_type = Column(String(30), nullable=False)       # "tenant", "tenancy", "room", "payment"
     entity_id   = Column(Integer, nullable=False)           # PK of changed record
     entity_name = Column(String(120), nullable=True)        # human-readable (tenant name, room number)
@@ -1402,7 +1402,7 @@ class RentRevision(Base):
     old_rent       = Column(Numeric(12, 2), nullable=False)
     new_rent       = Column(Numeric(12, 2), nullable=False)
     effective_date = Column(Date, nullable=False)            # rent applies from this date
-    changed_by     = Column(String(30), nullable=False)      # phone number
+    changed_by     = Column(String(100), nullable=False)     # phone or UUID
     reason         = Column(String(200), nullable=True)      # "sharing type change", "annual revision"
     created_at     = Column(DateTime(timezone=True), default=datetime.utcnow)
 
