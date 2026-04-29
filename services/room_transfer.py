@@ -18,6 +18,7 @@ from src.database.models import (
     Tenancy,
     Tenant,
 )
+from src.services.room_occupancy import get_room_occupants
 
 
 async def execute_room_transfer(
@@ -67,7 +68,6 @@ async def execute_room_transfer(
 
     # 3. Occupancy check using canonical helper
     today = date.today()
-    from src.services.room_occupancy import get_room_occupants
     occupants = await get_room_occupants(session, new_room)
     max_occ = int(new_room.max_occupancy or 1)
     if occupants.total_occupied >= max_occ:
