@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.16] — 2026-04-29 — Fix: DAY WISE tab not synced on any day-wise tenant mutation
+
+### Fixed
+- **`src/integrations/gsheets.py`** — Added `_record_daywise_checkout_sync(room, name, exit_date)`: finds tenant row in DAY WISE tab by room+name fuzzy match, sets Status=EXITED and Checkout date using dynamic header map. `_record_checkout_sync` now falls back to this function when monthly tab lookup fails (day-wise tenants have no monthly row).
+- **`src/whatsapp/handlers/owner_handler.py`** — `_do_confirm_checkout` now calls `trigger_daywise_sheet_sync()` for `stay_type=daily` instead of `trigger_monthly_sheet_sync`. 
+- **`src/api/v2/checkin.py`** — `record_physical_checkin` calls `trigger_daywise_sheet_sync()` for daily stays instead of monthly sync.
+- **`src/api/v2/payments.py`** — `POST /payments` calls `trigger_daywise_sheet_sync()` for daily stays instead of monthly sync.
+- **`src/api/v2/tenants.py`** — `PATCH /tenants/{id}` (rent change, room change, deposit, notes) calls `trigger_daywise_sheet_sync()` for daily stays; skips `record_notice` for day-wise (no Notice Date column in DAY WISE tab).
+
+### Data fix
+- Chandrashekar Rathod (Room G15) — DAY WISE tab row manually updated to Status=EXITED, Checkout=29/04/2026 after force-confirm via script.
+
+### Root cause
+Day-wise tenants live exclusively in the DAY WISE sheet tab. All previous sheet write operations used `_find_tenant_tab()` which searches only monthly tabs (April 2026, March 2026, etc.) — returning "Row not found" for every day-wise mutation. Now all mutations dispatch to the correct tab based on `stay_type`.
+
+---
+
 ## [1.74.15] — 2026-04-29 — Fix: DAY WISE tab column shift from onboarding form
 
 ### Fixed

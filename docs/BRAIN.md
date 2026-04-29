@@ -419,7 +419,7 @@ ledger_handler.py (thin adapter) --> finance/ package
 | LLM | Groq llama-3.3-70b-versatile | cloud |
 | Reverse Proxy | nginx + Let's Encrypt SSL | 443 |
 | WhatsApp | Meta Cloud API (free) | -- |
-| Scheduler | APScheduler (5 jobs) | in-process |
+| Scheduler | APScheduler (4 jobs) | in-process |
 
 ---
 
@@ -492,6 +492,17 @@ Dashboard (reads DB)            Kiran views (read-only)
 - Premium tenant = 2 beds occupied, second bed CANNOT be sold
 - Vacant beds = total_beds - regular_count - (premium_count * 2) - noshow_count - daywise_count
 - Room-by-room: premium room = 0 free beds
+
+**Day-wise tenants and the DAY WISE tab (CRITICAL — read before touching day-wise logic):**
+
+Day-wise (short-stay) tenants use `stay_type=daily` and live in the **DAY WISE** sheet tab — NOT in any monthly tab (April 2026 etc.). This is a separate tab with its own column structure (`scripts/sync_daywise_from_db.py` defines `HEADERS`; `DAY_WISE_HEADERS` in `gsheets.py` is a subset used for new-row appends).
+
+Key rules:
+- `_find_tenant_tab()` searches ONLY monthly tabs — will always miss day-wise tenants
+- Every mutation function that calls `_find_tenant_tab()` must fall back to DAY WISE (pattern: `_record_daywise_checkout_sync`)
+- All API endpoints (checkin, payments, tenants PATCH) check `tenancy.stay_type == daily` and call `trigger_daywise_sheet_sync()` instead of `trigger_monthly_sheet_sync()`
+- `trigger_daywise_sheet_sync()` fires `scripts/sync_daywise_from_db.py --write` in background — rebuilds entire DAY WISE tab from DB
+- **Bot handlers** (owner_handler.py) still have this gap for void_payment, notes, rent change via WhatsApp — use `trigger_daywise_sheet_sync()` manually after any bot-initiated day-wise mutation
 
 **Sheet protection (completely non-editable):**
 - Sheet is view-only + filters. Nobody edits it — not even Kiran.
