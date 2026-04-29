@@ -95,7 +95,10 @@ export default function NewOnboardingPage() {
     if (fields.security_deposit != null)       setDeposit(String(fields.security_deposit))
     if (fields.maintenance_fee != null)        setMaintenance(String(fields.maintenance_fee))
     if (fields.booking_amount != null)         setBooking(String(fields.booking_amount))
-    if (fields.advance_mode)                   setAdvanceMode(fields.advance_mode as "cash" | "upi" | "bank")
+    const VALID_MODES = new Set<"cash" | "upi" | "bank">(["cash", "upi", "bank"])
+    if (fields.advance_mode && VALID_MODES.has(fields.advance_mode as "cash" | "upi" | "bank")) {
+      setAdvanceMode(fields.advance_mode as "cash" | "upi" | "bank")
+    }
     if (fields.lock_in_months != null)         setLockIn(String(fields.lock_in_months))
     if (fields.future_rent != null)            setFutureRent(String(fields.future_rent))
     if (fields.future_rent_after_months != null) setFutureRentMonths(String(fields.future_rent_after_months))
