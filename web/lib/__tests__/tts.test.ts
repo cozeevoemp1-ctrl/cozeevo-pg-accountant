@@ -26,6 +26,11 @@ describe("speakText", () => {
       expect.objectContaining({ method: "POST" })
     )
     expect(mockPlay).toHaveBeenCalled()
+
+    const callBody = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string)
+    expect(callBody.model).toBe("tts-1")
+    expect(callBody.voice).toBe("nova")
+    expect(callBody.input).toBe("Got it, room 201.")
   })
 
   it("falls back to browser speechSynthesis when OpenAI fails", async () => {
@@ -47,6 +52,9 @@ describe("speakText", () => {
   it("uses browser fallback when NEXT_PUBLIC_OPENAI_API_KEY is missing", async () => {
     delete process.env.NEXT_PUBLIC_OPENAI_API_KEY
 
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
     const mockSpeak = vi.fn()
     Object.defineProperty(window, "speechSynthesis", {
       value: { speak: mockSpeak, cancel: vi.fn() },
@@ -58,5 +66,6 @@ describe("speakText", () => {
     await speakText("No key test.")
 
     expect(mockSpeak).toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
