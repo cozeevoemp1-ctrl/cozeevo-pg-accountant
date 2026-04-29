@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.12] — 2026-04-29 — Back-nav header on all PWA success screens
+
+### Added
+- **`web/app/checkin/new/page.tsx`** — Fixed top header ("Check-in Recorded" + ← Home) on success screen
+- **`web/app/checkout/new/page.tsx`** — Fixed top header ("Checkout Initiated" + ← Home) on success screen
+- **`web/app/payment/new/page.tsx`** — Fixed top header ("Payment Saved" + ← Home) on success screen
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Fixed top header ("Changes Saved" + ← Back to Manage) on success screen
+- **`web/app/onboarding/new/page.tsx`** — Fixed top header ("Session Created" + ← Home) on success screen
+
+All success screens were previously missing back-navigation. The fixed bottom nav bar was also hiding action buttons (← Home / + New) when content was vertically centred. Fixed by removing `justify-center` and adding `pt-16 pb-32` for scrollable top-aligned layout.
+
+---
+
 ## [1.74.12] — 2026-04-28 — Root cause fix: recurring Cash inflation in Sheet
 
 ### Fixed
