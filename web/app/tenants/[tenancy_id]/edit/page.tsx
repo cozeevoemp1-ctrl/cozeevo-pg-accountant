@@ -144,7 +144,6 @@ export default function EditTenantPage() {
       setShowConfirm(false)
       setSuccess(true)
     } catch (err) {
-      setShowConfirm(false)
       setError(err instanceof Error ? err.message : "Update failed. Try again.")
     } finally {
       setSubmitting(false)
@@ -432,7 +431,8 @@ export default function EditTenantPage() {
           title="Save Changes"
           fields={buildConfirmFields()}
           onConfirm={handleConfirm}
-          onEdit={() => setShowConfirm(false)}
+          error={error}
+          onEdit={() => { setShowConfirm(false); setError("") }}
           loading={submitting}
         />
       )}

@@ -128,7 +128,6 @@ function NewCheckinPage() {
       setResult({ balanceRemaining: res.balance_remaining })
       setSuccess(true)
     } catch (err) {
-      setShowConfirm(false)
       setError(err instanceof Error ? err.message : "Check-in failed. Try again.")
     } finally {
       setSubmitting(false)
@@ -392,7 +391,8 @@ function NewCheckinPage() {
             ...(notes ? [{ label: "Note", value: notes }] : []),
           ]}
           onConfirm={handleConfirm}
-          onEdit={() => setShowConfirm(false)}
+          error={error}
+          onEdit={() => { setShowConfirm(false); setError("") }}
           loading={submitting}
         />
       )}

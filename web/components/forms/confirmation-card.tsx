@@ -12,9 +12,10 @@ interface ConfirmationCardProps {
   onConfirm: () => void
   onEdit: () => void
   loading?: boolean
+  error?: string
 }
 
-export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = false }: ConfirmationCardProps) {
+export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = false, error }: ConfirmationCardProps) {
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40">
       <div className="w-full max-w-md bg-surface rounded-t-[28px] px-6 pt-5 pb-10 shadow-2xl">
@@ -31,6 +32,12 @@ export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = f
             </div>
           ))}
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-tile bg-[#FFF0F0] border border-status-warn px-4 py-3">
+            <p className="text-sm font-semibold text-status-warn">{error}</p>
+          </div>
+        )}
 
         <button
           onClick={onConfirm}

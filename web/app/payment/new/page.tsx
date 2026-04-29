@@ -112,7 +112,6 @@ export default function NewPaymentPage() {
       setShowConfirm(false)
       setSuccess(true)
     } catch (err) {
-      setShowConfirm(false)
       setError(err instanceof Error ? err.message : "Payment failed. Try again.")
     } finally {
       setSubmitting(false)
@@ -353,7 +352,8 @@ export default function NewPaymentPage() {
             }] : []),
           ]}
           onConfirm={handleConfirm}
-          onEdit={() => setShowConfirm(false)}
+          error={error}
+          onEdit={() => { setShowConfirm(false); setError("") }}
           loading={submitting}
         />
       )}

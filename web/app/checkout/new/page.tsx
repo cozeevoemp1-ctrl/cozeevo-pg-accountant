@@ -220,7 +220,6 @@ function NewCheckoutPage() {
       setResult(res)
       setPollStatus("pending")
     } catch (err) {
-      setShowConfirm(false)
       setError(err instanceof Error ? err.message : "Checkout failed. Try again.")
     } finally {
       setSubmitting(false)
@@ -625,7 +624,8 @@ function NewCheckoutPage() {
             { label: "Checklist",  value: [roomKey && "Key", wardrobeKey && "Wardrobe", biometric && "Biometric", conditionOk && "Condition OK"].filter(Boolean).join(" · ") || "—" },
           ]}
           onConfirm={handleConfirm}
-          onEdit={() => setShowConfirm(false)}
+          error={error}
+          onEdit={() => { setShowConfirm(false); setError("") }}
           loading={submitting}
         />
       )}
