@@ -29,6 +29,8 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
             .where(
+                Room.is_staff_room == False,
+                Room.room_number != "UNASSIGNED",
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.stay_type == StayType.monthly,
                 Tenancy.notice_date.isnot(None),
