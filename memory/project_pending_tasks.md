@@ -6,13 +6,18 @@ type: project
 
 ## Active / Next Up
 
-### PWA — uncommitted in-progress work
-1. **Proration choice toggle** — `web/app/tenants/[tenancy_id]/edit/page.tsx` + `web/lib/api.ts` have uncommitted changes adding a Full/Prorated toggle when rent or room changes. Sends `prorate_this_month: bool` in PATCH body. **Backend gap:** `tenants.py` PATCH doesn't handle this flag yet (auto-prorates on room change only). Needs backend wiring before commit.
-
 ### PWA — next features
-2. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
-3. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
-4. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row.
+1. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
+2. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
+3. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row.
+
+### Completed this session (2026-04-29, session 5)
+- ✅ **Proration choice toggle** — Full/Prorated toggle on edit form when rent or room changes; backend honours `prorate_this_month` flag for both room-change and rent-only cases.
+- ✅ **Edit Notice modal** — now edits `expected_checkout` (Last Day), not notice_date. Notice-given date shown as read-only hint.
+- ✅ **Notices page** — removed "Expected Checkout — No Notice" section; daily-stay tenants excluded from notices API.
+- ✅ **Maharajan (room 219)** — DB status set to exited; DAY WISE sheet resynced.
+- ✅ **Checkouts list page** — `/checkouts`: month picker, search, All/Regular/Day-wise tabs, per-tenant cards with refund amounts.
+- ✅ **Home quick links** — Checkouts · Notices · Sessions shortcuts always visible below KPI grid.
 
 ### Bot / backend
 6. **DASHBOARD_SUMMARY "dues" line fix** — COLLECTION shows "Mar 2026 dues: Rs.15,500" but should show CURRENT MONTH (April) outstanding. Change `prev_dues` query in `_dashboard_summary`. Kiran expects ~Rs.3L.

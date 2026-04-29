@@ -127,8 +127,10 @@ Kiran's Excel (offline)
 | `src/api/v2/notices.py` | GET /notices/active — tenants on notice (deposit eligible vs forfeited) |
 | `src/api/v2/rooms.py` | GET /rooms/check — room availability check (free beds, occupants) |
 | `services/room_transfer.py` | Shared execute_room_transfer() — single source of truth for bot + PWA |
-| `web/app/notices/page.tsx` | PWA Notices page — list tenants on notice with expected checkout + refund status |
-| `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, notice management, Transfer Room panel |
+| `web/app/notices/page.tsx` | PWA Notices page — monthly tenants with formal notice only; Edit modal changes expected_checkout |
+| `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
+| `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
+| `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations
