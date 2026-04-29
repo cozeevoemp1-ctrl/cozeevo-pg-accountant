@@ -2,6 +2,45 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.29] — 2026-04-29 — Investigation: notices count vs vacating count
+
+### No code changes
+- Clarified "on notice (16) vs vacating (24)" discrepancy. **On notice** = `notice_date IS NOT NULL` (formal notice given). **Vacating** = `expected_checkout` set in a given month (broader — includes tenants with scheduled checkout but no formal notice). Both are correct; they measure different things. `/notices/active` and KPI `notices_count` were already in sync (fix was in `fa14523`).
+
+---
+
+## [1.74.28] — 2026-04-29 — Checkouts list page + home quick links + notices cleanup
+
+### Added
+- **`src/api/v2/checkouts.py`** — new `GET /api/v2/app/checkouts?month=YYYY-MM`. Returns all exited tenants (monthly + day-wise) for the given month with refund amounts from checkout_records.
+- **`web/app/checkouts/page.tsx`** — `/checkouts` page: month picker, name/room search, All/Regular/Day-wise filter tabs, summary row (count + total refunded), per-tenant cards.
+- **`web/app/page.tsx`** — quick links row below KPI grid: Checkouts · Notices · Sessions always-visible shortcuts.
+- **`web/components/home/kpi-grid.tsx`** — "View all checkouts this month →" link inside expanded checkouts_today tile.
+
+### Fixed
+- **`src/api/v2/notices.py`** — removed "Expected Checkout — No Notice" query and section entirely. Notices page shows only monthly tenants with formal notice_date. Daily-stay tenants excluded.
+- **`web/app/notices/page.tsx`** — Edit Notice modal now edits `expected_checkout` (Last Day), not `notice_date`. Notice-given date shown as read-only hint.
+- **`src/api/v2/tenants.py`** — PATCH proration honours `prorate_this_month` flag: `false` = full month RS, `true` = prorated RS, absent = legacy behaviour (auto-prorate on room change).
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Full/Prorated toggle shows when rent or room changes; confirm card reflects actual choice.
+
+### Data fix
+- Maharajan (tenancy 1030, room 219) — DB status set to `exited`; DAY WISE sheet resynced (36 exits shown).
+
+---
+
+## [1.74.25] — 2026-04-29 — Notices page: correct dates, consistent counts, May sheet created
+
+### Fixed
+- **`src/api/v2/notices.py`** — `expected_checkout` now uses `tenancy.expected_checkout` from DB (source of truth) instead of recalculating from `notice_date` via `calc_notice_last_day()`. Eliminates mismatch between Notices page dates and home KPI tile dates. Scoped to monthly tenants only.
+- **`src/api/v2/kpi.py`** — `notices_count` and KPI detail list both updated to match: monthly tenants with formal `notice_date` only. Previously count included `expected_checkout`-only tenants while detail list did not — causing badge count vs list count mismatch.
+- **`web/lib/api.ts`** — `NoticeItem.notice_date` typed as `string | null`; added `has_notice: boolean`.
+
+### Ops
+- **May 2026 sheet created** — `create_month.py MAY 2026` + `sync_sheet_from_db.py --write --month 5 --year 2026` run manually. 239 active, 17 no-show, Prev Due Rs.4,07,266 (sheet) / Rs.3,66,566 (DB — gap due to create_month not reading April balances; re-sync on May 1).
+- **April dues breakdown run** — 41 tenants owe Rs.3,66,566. 5 UNASSIGNED-room tenants owe Rs.69,000 — need investigation.
+
+---
+
 ## [1.74.24] — 2026-04-29 — Tenant edit: room change + proration toggle + TENANTS tab sync
 
 ### Added
