@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
@@ -66,8 +66,9 @@ function CheckBox({ label, checked, onChange }: { label: string; checked: boolea
   )
 }
 
-export default function NewCheckoutPage() {
+function NewCheckoutPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [tenant,       setTenant]       = useState<TenantSearchResult | null>(null)
   const [prefetch,     setPrefetch]     = useState<CheckoutPrefetch | null>(null)
@@ -134,6 +135,24 @@ export default function NewCheckoutPage() {
     ? Math.max(prefetch.security_deposit - prefetch.maintenance_fee - totalPendingDues - deductionsNum, 0)
     : 0
   const refundAmount = refundOverride !== null ? refundOverride : autoRefund
+
+  // Pre-fill tenant from URL param (navigated from KPI tile)
+  useEffect(() => {
+    const tid = searchParams.get("tenancy_id")
+    if (!tid) return
+    getTenantDues(Number(tid)).then((d) => {
+      setTenant({
+        tenancy_id: d.tenancy_id,
+        tenant_id: d.tenant_id,
+        name: d.name,
+        phone: d.phone,
+        room_number: d.room_number,
+        building_code: d.building_code,
+        rent: d.rent,
+        status: "active",
+      })
+    }).catch(() => {})
+  }, [searchParams])
 
   // Load prefetch when tenant selected
   useEffect(() => {
@@ -247,6 +266,10 @@ export default function NewCheckoutPage() {
 
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+          <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
+          <span className="text-base font-extrabold text-ink">Checkout Initiated</span>
+        </div>
         <div className="w-20 h-20 rounded-full bg-tile-orange flex items-center justify-center text-4xl">✓</div>
         <div className="text-center">
           <h1 className="text-xl font-extrabold text-ink">Checkout Initiated!</h1>
@@ -303,6 +326,8 @@ export default function NewCheckoutPage() {
         {/* Tenant search */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <TenantSearch
+            key={tenant?.tenancy_id ?? "empty"}
+            defaultTenant={tenant ?? undefined}
             onSelect={handleTenantSelect}
             placeholder="Search tenant by name, room, phone…"
           />
@@ -622,5 +647,13 @@ function Row({
         {value}
       </span>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <NewCheckoutPage />
+    </Suspense>
   )
 }

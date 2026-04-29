@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { Numpad } from "@/components/forms/numpad"
 import {
   getCheckinPreview,
   recordCheckin,
+  getTenantDues,
   TenantSearchResult,
   CheckinPreview,
 } from "@/lib/api"
@@ -41,8 +42,9 @@ function fmtDate(iso: string): string {
   return `${d} ${months[parseInt(m) - 1]} ${y}`
 }
 
-export default function NewCheckinPage() {
+function NewCheckinPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [tenant,      setTenant]      = useState<TenantSearchResult | null>(null)
   const [preview,     setPreview]     = useState<CheckinPreview | null>(null)
@@ -58,6 +60,24 @@ export default function NewCheckinPage() {
   const [error,       setError]       = useState("")
   const [success,     setSuccess]     = useState(false)
   const [result,      setResult]      = useState<{ balanceRemaining: number } | null>(null)
+
+  // Pre-fill tenant from URL param (navigated from KPI tile)
+  useEffect(() => {
+    const tid = searchParams.get("tenancy_id")
+    if (!tid) return
+    getTenantDues(Number(tid)).then((d) => {
+      setTenant({
+        tenancy_id: d.tenancy_id,
+        tenant_id: d.tenant_id,
+        name: d.name,
+        phone: d.phone,
+        room_number: d.room_number,
+        building_code: d.building_code,
+        rent: d.rent,
+        status: "active",
+      })
+    }).catch(() => {})
+  }, [searchParams])
 
   // Reload preview whenever tenant or actual date changes
   useEffect(() => {
@@ -126,6 +146,10 @@ export default function NewCheckinPage() {
     const collected = Number(amount || 0)
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+          <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
+          <span className="text-base font-extrabold text-ink">Check-in Recorded</span>
+        </div>
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
         <div className="text-center">
           <h1 className="text-xl font-extrabold text-ink">Check-in Recorded!</h1>
@@ -182,6 +206,8 @@ export default function NewCheckinPage() {
         {/* Tenant search */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <TenantSearch
+            key={tenant?.tenancy_id ?? "empty"}
+            defaultTenant={tenant ?? undefined}
             onSelect={handleTenantSelect}
             placeholder="Search tenant by name, room, phone…"
           />
@@ -388,5 +414,13 @@ function Row({
         {value}
       </span>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <NewCheckinPage />
+    </Suspense>
   )
 }

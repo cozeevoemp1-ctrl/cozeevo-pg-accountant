@@ -6,14 +6,15 @@ import { searchTenants, TenantSearchResult } from "@/lib/api"
 interface TenantSearchProps {
   onSelect: (tenant: TenantSearchResult) => void
   defaultValue?: string
+  defaultTenant?: TenantSearchResult
   placeholder?: string
 }
 
-export function TenantSearch({ onSelect, defaultValue = "", placeholder = "Search by name or room..." }: TenantSearchProps) {
-  const [query, setQuery] = useState(defaultValue)
+export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, placeholder = "Search by name or room..." }: TenantSearchProps) {
+  const [query, setQuery] = useState(defaultTenant ? `${defaultTenant.name} — Room ${defaultTenant.room_number}` : defaultValue)
   const [results, setResults] = useState<TenantSearchResult[]>([])
   const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState<TenantSearchResult | null>(null)
+  const [selected, setSelected] = useState<TenantSearchResult | null>(defaultTenant ?? null)
   const [open, setOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
