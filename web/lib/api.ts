@@ -349,6 +349,25 @@ export function transferRoom(tenancyId: number, body: TransferRoomBody): Promise
   return _post<TransferRoomResult>(`/api/v2/app/tenants/${tenancyId}/transfer-room`, body)
 }
 
+// ── Checkouts ────────────────────────────────────────────────────────────────
+
+export interface CheckoutListItem {
+  tenancy_id: number;
+  name: string;
+  phone: string;
+  room_number: string;
+  checkout_date: string;
+  stay_type: "monthly" | "daily";
+  security_deposit: number;
+  refund_amount: number;
+  agreed_rent: number;
+}
+
+export function getCheckouts(month?: string): Promise<CheckoutListItem[]> {
+  const q = month ? `?month=${month}` : "";
+  return _get<CheckoutListItem[]>(`/api/v2/app/checkouts${q}`);
+}
+
 // ── Reminders ────────────────────────────────────────────────────────────────
 
 export interface OverdueTenant {

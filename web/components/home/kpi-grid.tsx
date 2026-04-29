@@ -473,6 +473,14 @@ export function KpiGrid({ data }: KpiGridProps) {
                 ))}
               </div>
             )}
+            {/* View full month checkout list */}
+            {open === "checkouts_today" && (
+              <div className="px-3 pb-2 pt-1">
+                <Link href="/checkouts" className="block text-center text-xs font-bold text-brand-pink py-1.5 rounded-xl border border-brand-pink/30 active:opacity-70">
+                  View all checkouts this month →
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Tenant detail card */}

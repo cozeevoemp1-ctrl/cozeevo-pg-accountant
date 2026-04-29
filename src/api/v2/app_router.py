@@ -13,6 +13,7 @@ from src.api.v2.kpi import activity_router, router as kpi_router
 from src.api.v2.payments import router as payments_router
 from src.api.v2.notices import router as notices_router
 from src.api.v2.reminders import router as reminders_router
+from src.api.v2.checkouts import router as checkouts_router
 from src.api.v2.rooms import router as rooms_router
 from src.api.v2.reporting import router as reporting_router
 from src.api.v2.tenants import router as tenants_router
@@ -32,6 +33,7 @@ router.include_router(tenants_router)
 router.include_router(voice_router)
 router.include_router(notices_router)
 router.include_router(reminders_router)
+router.include_router(checkouts_router)
 router.include_router(rooms_router)
 
 
