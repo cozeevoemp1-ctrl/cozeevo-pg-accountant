@@ -69,7 +69,7 @@ export default function NoticesPage() {
 
   function openEdit(item: NoticeItem) {
     setEditItem(item)
-    setEditDate(item.notice_date ?? "")
+    setEditDate(item.expected_checkout ?? "")
     setEditError("")
   }
 
@@ -78,7 +78,7 @@ export default function NoticesPage() {
     setEditSaving(true)
     setEditError("")
     try {
-      await patchTenant(editItem.tenancy_id, { notice_date: editDate })
+      await patchTenant(editItem.tenancy_id, { expected_checkout: editDate })
       setEditItem(null)
       await load()
     } catch (e: unknown) {
@@ -280,7 +280,7 @@ export default function NoticesPage() {
 
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
-                Notice Date
+                Checkout Date (Last Day)
               </label>
               <input
                 type="date"
@@ -289,7 +289,7 @@ export default function NoticesPage() {
                 className="w-full rounded-xl border border-[#E5E1DC] bg-surface px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
               />
               <p className="text-[10px] text-ink-muted mt-0.5">
-                On/before {NOTICE_BY_DAY}th = deposit eligible · After {NOTICE_BY_DAY}th = forfeited
+                Notice given: {editItem?.notice_date ? new Date(editItem.notice_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
               </p>
             </div>
 
