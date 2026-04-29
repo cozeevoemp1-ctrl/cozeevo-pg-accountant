@@ -7,6 +7,7 @@ import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select
 
 from src.api.v2.auth import AppUser, get_current_user
@@ -411,3 +412,33 @@ async def update_tenant(
         "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
         "notes": tenancy.notes,
     }
+
+
+class TransferRoomBody(BaseModel):
+    to_room_number: str
+    new_rent: float | None = None
+    extra_deposit: float = 0.0
+
+
+@router.post("/tenants/{tenancy_id}/transfer-room")
+async def transfer_room(
+    tenancy_id: int,
+    body: TransferRoomBody,
+    user: AppUser = Depends(get_current_user),
+):
+    """Execute room transfer — called after PWA user confirms the 4-step panel."""
+    from services.room_transfer import execute_room_transfer
+
+    async with get_session() as session:
+        result = await execute_room_transfer(
+            tenancy_id=tenancy_id,
+            to_room_number=body.to_room_number,
+            new_rent=body.new_rent,
+            extra_deposit=body.extra_deposit,
+            changed_by=user.user_id or "pwa",
+            source="pwa",
+            session=session,
+        )
+        if result["success"]:
+            await session.commit()
+    return result

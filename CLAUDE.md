@@ -15,6 +15,14 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
 - **Regex handles 97% of intents** — AI (Groq) only for ambiguous/lead/classification
 - **Test locally before any VPS deploy**
 
+## Sheet column rule (CRITICAL — no exceptions)
+**Never reference Google Sheet columns by numeric index anywhere in the project.**
+- Banned: `r[14]`, `row[2]`, `chr(65 + n)` outside the `col_letter()` helper
+- Required: `HEADERS` list + `C = {h: i for i, h in enumerate(HEADERS)}` + `col_letter()` helper
+- Build rows as dicts keyed by column name; convert to list only at write time: `[row_dict[h] for h in HEADERS]`
+- After any `ws.clear()` + bulk write, re-apply NUMBER format to numeric columns — Sheets wipes cell formats on clear
+- This applies to: `gsheets.py`, all `scripts/*.py`, any new file that touches sheets
+
 ## Dependency sync rule (CRITICAL)
 **Every change must check and update ALL dependencies across the project.**
 Before closing any feature, run through this checklist:

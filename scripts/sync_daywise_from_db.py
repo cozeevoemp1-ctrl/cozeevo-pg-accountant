@@ -216,6 +216,13 @@ async def main(args) -> None:
                 "horizontalAlignment": "CENTER",
             })
             ws.freeze(rows=2)
+            # Numeric columns F–O (Rent/Day … Balance): force NUMBER format so values
+            # never display as date serials (Sheets inherits cell format from prior writes).
+            num_start = col_letter(C["Rent/Day"] + 1)
+            num_end   = col_letter(C["Balance"] + 1)
+            last_data = len(data_rows) + 2
+            ws.format(f"{num_start}3:{num_end}{last_data}",
+                      {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.##"}})
         except Exception as e:
             print(f"  [warn] formatting failed: {e}")
 
