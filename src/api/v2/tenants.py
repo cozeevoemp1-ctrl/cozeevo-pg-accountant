@@ -360,17 +360,22 @@ async def update_tenant(
         await session.refresh(tenant)
 
     today = date.today()
-    from src.integrations.gsheets import trigger_monthly_sheet_sync, record_notice
+    from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, record_notice
     import asyncio
 
-    if "notice_date" in body:
+    is_daily = tenancy.stay_type.value == "daily"
+
+    if "notice_date" in body and not is_daily:
         notice_val = body["notice_date"] or ""
         checkout_val = body.get("expected_checkout") or ""
         asyncio.create_task(
             record_notice(room_number, tenant.name, notice_val, checkout_val)
         )
 
-    trigger_monthly_sheet_sync(today.month, today.year)
+    if is_daily:
+        trigger_daywise_sheet_sync()
+    else:
+        trigger_monthly_sheet_sync(today.month, today.year)
 
     return {
         "tenancy_id": tenancy.id,
