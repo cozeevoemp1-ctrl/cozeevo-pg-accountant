@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useSpeechInput } from "@/lib/voice"
 import {
   parseOnboardingFields,
@@ -15,7 +15,7 @@ interface OnboardingVoiceSheetProps {
   onConfirm: (fields: OnboardingFields) => void
 }
 
-type SheetStep = "recording" | "extracting" | "speaking" | "confirm" | "error"
+type SheetStep = "idle" | "recording" | "extracting" | "speaking" | "confirm" | "error"
 
 const REQUIRED: (keyof OnboardingFields)[] = ["room_number", "tenant_phone", "monthly_rent"]
 
@@ -46,19 +46,16 @@ function formatValue(key: string, value: unknown): string {
 
 export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceSheetProps) {
   const speech = useSpeechInput()
-  const [step, setStep] = useState<SheetStep>("recording")
+  const [step, setStep] = useState<SheetStep>("idle")
   const [partialFields, setPartialFields] = useState<OnboardingFields>(emptyOnboardingFields())
   const [parseResult, setParseResult] = useState<OnboardingParseResult | null>(null)
   const [errorMsg, setErrorMsg] = useState("")
-  const startedRef = useRef(false)
 
-  useEffect(() => {
-    if (!startedRef.current) {
-      startedRef.current = true
-      speech.start()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  function handleStartRecording() {
+    speech.reset()
+    setStep("recording")
+    speech.start()
+  }
 
   useEffect(() => {
     if (speech.state === "stopped" && speech.transcript?.trim()) {
@@ -87,9 +84,7 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
   }
 
   function handleRecordAgain() {
-    speech.reset()
-    setStep("recording")
-    speech.start()
+    handleStartRecording()
   }
 
   const requiredMet = REQUIRED.every((k) => partialFields[k] !== null)
@@ -100,6 +95,14 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
     <div className="fixed inset-0 bg-black/60 flex items-end" style={{ zIndex: 9999 }}>
       <div className="w-full bg-surface rounded-t-3xl px-5 pt-5 pb-10 min-h-[65vh] flex flex-col max-h-[90vh] overflow-y-auto">
         <div className="w-12 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5 flex-shrink-0" />
+
+        {step === "idle" && (
+          <IdleView
+            hasPartial={Object.values(partialFields).some((v) => v !== null)}
+            onStart={handleStartRecording}
+            onCancel={onClose}
+          />
+        )}
 
         {step === "recording" && (
           <RecordingView
@@ -140,6 +143,34 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
 }
 
 // ── Sub-views ───────────────────────────────────────────────────────────────
+
+function IdleView({ hasPartial, onStart, onCancel }: { hasPartial: boolean; onStart: () => void; onCancel: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-6 flex-1 pt-4">
+      <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Voice Onboarding</p>
+      <button
+        onClick={onStart}
+        className="w-24 h-24 rounded-full bg-brand-pink flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+      >
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+          <rect x="9" y="2" width="6" height="12" rx="3" fill="white" />
+          <path d="M5 10a7 7 0 0 0 14 0" stroke="white" strokeWidth="2" strokeLinecap="round" />
+          <line x1="12" y1="17" x2="12" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+          <line x1="8" y1="21" x2="16" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      <p className="text-sm text-ink-muted text-center max-w-xs">
+        {hasPartial
+          ? "Tap mic to add more details."
+          : "Tap mic and say: \"Room 201, phone 9876543210, rent 12k, deposit 15k\""}
+      </p>
+      <div className="flex gap-3 w-full mt-auto">
+        <button onClick={onCancel} className="flex-1 py-3 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted">Cancel</button>
+        <button onClick={onStart} className="flex-1 py-3 rounded-pill bg-brand-pink text-white text-sm font-semibold">Tap to Start</button>
+      </div>
+    </div>
+  )
+}
 
 function RecordingView({
   state, hasPartial, onStop, onCancel,
