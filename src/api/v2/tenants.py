@@ -338,7 +338,7 @@ async def update_tenant(
                     raise HTTPException(status_code=404, detail=f"Room {new_rn} not found")
                 # Count active occupants in new room, excluding this tenancy
                 from src.services.room_occupancy import get_room_occupants
-                occ = await get_room_occupants(new_room.id)
+                occ = await get_room_occupants(session, new_room)
                 active_in_new = occ.total_occupied
                 # Check if tenant is already in that room (shouldn't count as extra)
                 if new_room.id != tenancy.room_id and active_in_new >= (new_room.max_occupancy or 1):
