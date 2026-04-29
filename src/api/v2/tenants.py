@@ -315,6 +315,32 @@ async def update_tenant(
             val = body["expected_checkout"]
             tenancy.expected_checkout = date.fromisoformat(val) if val else None
 
+        # Room reassignment
+        if "room_number" in body:
+            new_rn = str(body["room_number"]).strip()
+            if new_rn and new_rn != room.room_number:
+                new_room_row = await session.execute(
+                    select(Room).where(
+                        Room.property_id == tenancy.property_id,
+                        func.lower(Room.room_number) == func.lower(new_rn),
+                    )
+                )
+                new_room = new_room_row.scalars().first()
+                if new_room is None:
+                    raise HTTPException(status_code=404, detail=f"Room {new_rn} not found")
+                # Count active occupants in new room, excluding this tenancy
+                from src.services.room_occupancy import get_room_occupants
+                occ = await get_room_occupants(new_room.id)
+                active_in_new = occ.total_occupied
+                # Check if tenant is already in that room (shouldn't count as extra)
+                if new_room.id != tenancy.room_id and active_in_new >= (new_room.max_occupancy or 1):
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Room {new_rn} is full ({active_in_new}/{new_room.max_occupancy} beds)",
+                    )
+                tenancy.room_id = new_room.id
+                room = new_room
+
         room_number = room.room_number
         session.add(tenancy)
         session.add(tenant)

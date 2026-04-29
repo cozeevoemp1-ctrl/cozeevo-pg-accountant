@@ -277,6 +277,7 @@ export interface PatchTenantBody {
   tenancy_notes?: string;
   rent_change_reason?: string;
   notice_date?: string | null;
+  room_number?: string;
 }
 
 export interface PatchTenantResponse {

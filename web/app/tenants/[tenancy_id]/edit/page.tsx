@@ -23,6 +23,7 @@ export default function EditTenantPage() {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
+  const [roomNumber, setRoomNumber] = useState("")
   const [agreedRent, setAgreedRent] = useState("")
   const [securityDeposit, setSecurityDeposit] = useState("")
   const [maintenanceFee, setMaintenanceFee] = useState("")
@@ -30,6 +31,25 @@ export default function EditTenantPage() {
   const [expectedCheckout, setExpectedCheckout] = useState("")
   const [noticeDate, setNoticeDate] = useState("")
   const [notes, setNotes] = useState("")
+
+  // Room occupancy check
+  const [roomInfo, setRoomInfo] = useState<{ occupied: number; max_occupancy: number; is_full: boolean; occupants: string[] } | null>(null)
+  const [roomInfoLoading, setRoomInfoLoading] = useState(false)
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
+  const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
+
+  async function checkRoomOccupancy(room: string) {
+    if (!room.trim() || room.trim() === original?.room_number) { setRoomInfo(null); return }
+    setRoomInfoLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/api/onboarding/room-lookup/${encodeURIComponent(room.trim())}`, {
+        headers: { "X-Admin-Pin": ADMIN_PIN }
+      })
+      if (!res.ok) { setRoomInfo(null); return }
+      setRoomInfo(await res.json())
+    } catch { setRoomInfo(null) }
+    finally { setRoomInfoLoading(false) }
+  }
 
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -43,6 +63,7 @@ export default function EditTenantPage() {
         setOriginal(d)
         setName(d.name)
         setPhone(d.phone)
+        setRoomNumber(d.room_number)
         setAgreedRent(String(d.rent))
         setSecurityDeposit(String(d.security_deposit))
         setMaintenanceFee(String(d.maintenance_fee))
@@ -60,6 +81,7 @@ export default function EditTenantPage() {
     const changes: PatchTenantBody = {}
     if (name.trim() && name.trim() !== original.name) changes.name = name.trim()
     if (phone.trim() && phone.trim() !== original.phone) changes.phone = phone.trim()
+    if (roomNumber.trim() && roomNumber.trim() !== original.room_number) changes.room_number = roomNumber.trim()
     if (email.trim()) changes.email = email.trim()
     if (agreedRent && Number(agreedRent) !== original.rent)
       changes.agreed_rent = Number(agreedRent)
@@ -85,6 +107,7 @@ export default function EditTenantPage() {
     if (changes.name) fields.push({ label: "Name", value: changes.name })
     if (changes.phone) fields.push({ label: "Phone", value: changes.phone })
     if (changes.email) fields.push({ label: "Email", value: changes.email })
+    if (changes.room_number) fields.push({ label: "New Room", value: changes.room_number, highlight: true })
     if (changes.agreed_rent !== undefined)
       fields.push({ label: "Agreed Rent", value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
     if (changes.security_deposit !== undefined)
@@ -204,6 +227,34 @@ export default function EditTenantPage() {
       </div>
 
       <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
+        {/* Room reassignment */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-2">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Room</p>
+          <input
+            type="text"
+            value={roomNumber}
+            onChange={(e) => { setRoomNumber(e.target.value); setRoomInfo(null) }}
+            onBlur={(e) => checkRoomOccupancy(e.target.value)}
+            placeholder="e.g. 219"
+            className={`w-full rounded-pill border bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors ${roomInfo?.is_full ? "border-status-warn" : "border-[#E2DEDD]"}`}
+          />
+          {roomInfoLoading && <p className="text-[10px] text-ink-muted">Checking occupancy…</p>}
+          {roomInfo && !roomInfoLoading && (
+            roomInfo.is_full ? (
+              <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-3 py-2">
+                <p className="text-xs font-bold text-status-warn">Room {roomNumber} is full ({roomInfo.occupied}/{roomInfo.max_occupancy} beds)</p>
+                {roomInfo.occupants.length > 0 && (
+                  <p className="text-[10px] text-ink-muted mt-0.5">Current: {roomInfo.occupants.join(", ")}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-[10px] text-status-ok font-semibold">
+                Room {roomNumber}: {roomInfo.occupied}/{roomInfo.max_occupancy} beds occupied — space available
+              </p>
+            )
+          )}
+        </div>
+
         {/* Personal details */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Personal Details</p>
