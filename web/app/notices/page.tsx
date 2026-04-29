@@ -65,7 +65,6 @@ export default function NoticesPage() {
 
   const eligible    = filtered.filter(i =>  i.has_notice &&  i.deposit_eligible)
   const forfeited   = filtered.filter(i =>  i.has_notice && !i.deposit_eligible)
-  const noNotice    = filtered.filter(i => !i.has_notice)
 
   function openEdit(item: NoticeItem) {
     setEditItem(item)
@@ -205,24 +204,6 @@ export default function NoticesPage() {
           </section>
         )}
 
-        {/* Expected checkout — no formal notice given */}
-        {!loading && noNotice.length > 0 && (
-          <section>
-            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
-              Expected Checkout — No Notice ({noNotice.length})
-            </p>
-            <div className="flex flex-col gap-3">
-              {noNotice.map(item => (
-                <NoticeCard
-                  key={item.tenancy_id}
-                  item={item}
-                  onCheckout={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)}
-                  onEdit={() => openEdit(item)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Legend */}
         {!loading && items.length > 0 && (

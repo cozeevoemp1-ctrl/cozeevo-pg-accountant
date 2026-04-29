@@ -1,5 +1,5 @@
 """
-GET /api/v2/app/notices/active  — active tenants on notice, sorted by expected checkout
+GET /api/v2/app/notices/active  — active monthly tenants who have given formal notice
 """
 from __future__ import annotations
 
@@ -20,11 +20,10 @@ router = APIRouter()
 
 @router.get("/notices/active")
 async def get_active_notices(user: AppUser = Depends(get_current_user)):
-    """All active tenants on notice or with upcoming expected_checkout, sorted by date."""
+    """Active monthly tenants who have given formal notice, sorted by expected checkout."""
     today = date.today()
 
     async with get_session() as session:
-        # Tenants who gave formal notice (monthly only — daily stays don't use notice flow)
         notice_rows = (await session.execute(
             select(Tenancy, Tenant, Room)
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
@@ -33,20 +32,6 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.stay_type == StayType.monthly,
                 Tenancy.notice_date.isnot(None),
-            )
-        )).all()
-
-        # Tenants with expected_checkout set but no formal notice (monthly only)
-        expected_rows = (await session.execute(
-            select(Tenancy, Tenant, Room)
-            .join(Tenant, Tenancy.tenant_id == Tenant.id)
-            .join(Room, Tenancy.room_id == Room.id)
-            .where(
-                Tenancy.status == TenancyStatus.active,
-                Tenancy.stay_type == StayType.monthly,
-                Tenancy.notice_date.is_(None),
-                Tenancy.expected_checkout.isnot(None),
-                Tenancy.expected_checkout >= today,
             )
         )).all()
 
@@ -65,24 +50,6 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "expected_checkout": expected_checkout.isoformat(),
                 "deposit_eligible":  deposit_eligible,
                 "has_notice":        True,
-                "security_deposit":  float(tenancy.security_deposit or 0),
-                "maintenance_fee":   float(tenancy.maintenance_fee or 0),
-                "agreed_rent":       float(tenancy.agreed_rent or 0),
-                "days_remaining":    days_remaining,
-            })
-
-        for tenancy, tenant, room in expected_rows:
-            ec = tenancy.expected_checkout
-            days_remaining = (ec - today).days
-            results.append({
-                "tenancy_id":        tenancy.id,
-                "tenant_name":       tenant.name,
-                "phone":             tenant.phone,
-                "room_number":       room.room_number,
-                "notice_date":       None,
-                "expected_checkout": ec.isoformat(),
-                "deposit_eligible":  False,
-                "has_notice":        False,
                 "security_deposit":  float(tenancy.security_deposit or 0),
                 "maintenance_fee":   float(tenancy.maintenance_fee or 0),
                 "agreed_rent":       float(tenancy.agreed_rent or 0),
