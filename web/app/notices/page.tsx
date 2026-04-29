@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { getActiveNotices, NoticeItem } from "@/lib/api"
+import { getActiveNotices, patchTenant, NoticeItem } from "@/lib/api"
 import { TenantSearch } from "@/components/forms/tenant-search"
 
 const NOTICE_BY_DAY = 5
@@ -28,10 +28,15 @@ function daysLabel(days: number): { text: string; color: string } {
 
 export default function NoticesPage() {
   const router = useRouter()
-  const [items,      setItems]      = useState<NoticeItem[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState("")
-  const [showSearch, setShowSearch] = useState(false)
+  const [items,        setItems]        = useState<NoticeItem[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState("")
+  const [showSearch,   setShowSearch]   = useState(false)
+  const [searchQuery,  setSearchQuery]  = useState("")
+  const [editItem,     setEditItem]     = useState<NoticeItem | null>(null)
+  const [editDate,     setEditDate]     = useState("")
+  const [editSaving,   setEditSaving]   = useState(false)
+  const [editError,    setEditError]    = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,8 +52,56 @@ export default function NoticesPage() {
 
   useEffect(() => { load() }, [load])
 
-  const eligible   = items.filter(i => i.deposit_eligible)
-  const forfeited  = items.filter(i => !i.deposit_eligible)
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const src = [...items].sort((a, b) => a.days_remaining - b.days_remaining)
+    if (!q) return src
+    return src.filter(i =>
+      i.tenant_name.toLowerCase().includes(q) ||
+      i.room_number.toLowerCase().includes(q) ||
+      i.phone.includes(q)
+    )
+  }, [items, searchQuery])
+
+  const eligible  = filtered.filter(i =>  i.deposit_eligible)
+  const forfeited = filtered.filter(i => !i.deposit_eligible)
+
+  function openEdit(item: NoticeItem) {
+    setEditItem(item)
+    setEditDate(item.notice_date)
+    setEditError("")
+  }
+
+  async function saveEdit() {
+    if (!editItem || !editDate) return
+    setEditSaving(true)
+    setEditError("")
+    try {
+      await patchTenant(editItem.tenancy_id, { notice_date: editDate })
+      setEditItem(null)
+      await load()
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : "Save failed")
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function clearNotice() {
+    if (!editItem) return
+    if (!confirm(`Remove notice for ${editItem.tenant_name}?`)) return
+    setEditSaving(true)
+    setEditError("")
+    try {
+      await patchTenant(editItem.tenancy_id, { notice_date: null })
+      setEditItem(null)
+      await load()
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : "Save failed")
+    } finally {
+      setEditSaving(false)
+    }
+  }
 
   return (
     <main className="min-h-screen bg-bg pb-32">
@@ -82,7 +135,18 @@ export default function NoticesPage() {
         </button>
       </div>
 
-      <div className="px-4 pt-4 flex flex-col gap-4 max-w-lg mx-auto">
+      {/* Search bar */}
+      <div className="px-4 pt-3 pb-1 max-w-lg mx-auto">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search by name, room, phone…"
+          className="w-full rounded-xl border border-[#E5E1DC] bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
+        />
+      </div>
+
+      <div className="px-4 pt-3 flex flex-col gap-4 max-w-lg mx-auto">
 
         {loading && (
           <div className="text-center text-xs text-ink-muted py-12">Loading…</div>
@@ -96,6 +160,11 @@ export default function NoticesPage() {
             <p className="text-xs text-ink-muted mt-1">Tenants who gave notice will appear here</p>
           </div>
         )}
+        {!loading && !error && items.length > 0 && filtered.length === 0 && (
+          <div className="bg-surface rounded-card border border-[#F0EDE9] p-8 text-center">
+            <p className="text-sm font-semibold text-ink-muted">No matches for "{searchQuery}"</p>
+          </div>
+        )}
 
         {/* Deposit eligible — notice on/before 5th */}
         {!loading && eligible.length > 0 && (
@@ -104,7 +173,14 @@ export default function NoticesPage() {
               Deposit Eligible ({eligible.length})
             </p>
             <div className="flex flex-col gap-3">
-              {eligible.map(item => <NoticeCard key={item.tenancy_id} item={item} onCheckout={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)} />)}
+              {eligible.map(item => (
+                <NoticeCard
+                  key={item.tenancy_id}
+                  item={item}
+                  onCheckout={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)}
+                  onEdit={() => openEdit(item)}
+                />
+              ))}
             </div>
           </section>
         )}
@@ -116,7 +192,14 @@ export default function NoticesPage() {
               Deposit Forfeited ({forfeited.length})
             </p>
             <div className="flex flex-col gap-3">
-              {forfeited.map(item => <NoticeCard key={item.tenancy_id} item={item} onCheckout={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)} />)}
+              {forfeited.map(item => (
+                <NoticeCard
+                  key={item.tenancy_id}
+                  item={item}
+                  onCheckout={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)}
+                  onEdit={() => openEdit(item)}
+                />
+              ))}
             </div>
           </section>
         )}
@@ -131,7 +214,7 @@ export default function NoticesPage() {
         )}
       </div>
 
-      {/* Add Notice — centered modal (avoids tab bar overlap) */}
+      {/* Add Notice modal */}
       {showSearch && (
         <div className="fixed inset-0 flex items-center justify-center px-5" style={{ zIndex: 9999 }}>
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
@@ -153,11 +236,77 @@ export default function NoticesPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Notice modal */}
+      {editItem && (
+        <div className="fixed inset-0 flex items-center justify-center px-5" style={{ zIndex: 9999 }}>
+          <div className="absolute inset-0 bg-black/40" onClick={() => !editSaving && setEditItem(null)} />
+          <div className="relative bg-bg rounded-2xl px-4 pt-4 pb-5 flex flex-col gap-4 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-extrabold text-ink">Edit Notice</p>
+              <button
+                onClick={() => setEditItem(null)}
+                disabled={editSaving}
+                className="text-ink-muted font-bold text-lg leading-none disabled:opacity-40"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-ink">{editItem.tenant_name}</p>
+              <p className="text-xs text-ink-muted">Room {editItem.room_number} · {editItem.phone}</p>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
+                Notice Date
+              </label>
+              <input
+                type="date"
+                value={editDate}
+                onChange={e => setEditDate(e.target.value)}
+                className="w-full rounded-xl border border-[#E5E1DC] bg-surface px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
+              />
+              <p className="text-[10px] text-ink-muted mt-0.5">
+                On/before {NOTICE_BY_DAY}th = deposit eligible · After {NOTICE_BY_DAY}th = forfeited
+              </p>
+            </div>
+
+            {editError && (
+              <p className="text-xs text-status-warn">{editError}</p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={clearNotice}
+                disabled={editSaving}
+                className="flex-1 rounded-pill border border-[#E5E1DC] py-2.5 text-xs font-bold text-ink-muted active:opacity-70 disabled:opacity-40"
+              >
+                Remove notice
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving || !editDate}
+                className="flex-1 rounded-pill bg-brand-pink py-2.5 text-white font-bold text-sm active:opacity-80 disabled:opacity-40"
+              >
+                {editSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
 
-function NoticeCard({ item, onCheckout }: { item: NoticeItem; onCheckout: () => void }) {
+function NoticeCard({
+  item, onCheckout, onEdit,
+}: {
+  item: NoticeItem
+  onCheckout: () => void
+  onEdit: () => void
+}) {
   const days = daysLabel(item.days_remaining)
   const noticeDay = new Date(item.notice_date + "T00:00:00").getDate()
   const eligibleRefund = item.deposit_eligible
@@ -197,13 +346,21 @@ function NoticeCard({ item, onCheckout }: { item: NoticeItem; onCheckout: () => 
         )}
       </div>
 
-      {/* CTA */}
-      <button
-        onClick={onCheckout}
-        className="w-full rounded-pill bg-brand-pink py-2.5 text-white font-bold text-sm active:opacity-80 mt-1"
-      >
-        Process Checkout →
-      </button>
+      {/* CTAs */}
+      <div className="flex gap-2 mt-1">
+        <button
+          onClick={onEdit}
+          className="flex-1 rounded-pill border border-[#E5E1DC] py-2.5 text-xs font-bold text-ink-muted active:opacity-70"
+        >
+          Edit notice
+        </button>
+        <button
+          onClick={onCheckout}
+          className="flex-[2] rounded-pill bg-brand-pink py-2.5 text-white font-bold text-sm active:opacity-80"
+        >
+          Process Checkout →
+        </button>
+      </div>
     </div>
   )
 }

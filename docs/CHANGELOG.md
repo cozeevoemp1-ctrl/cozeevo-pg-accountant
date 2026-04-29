@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.21] — 2026-04-29 — Notices page: search filter + edit notice date modal
+
+### Added
+- **`web/app/notices/page.tsx`** — Search bar filters by name, room, or phone in real time; list sorted by days_remaining ascending
+- **`web/app/notices/page.tsx`** — "Edit notice" button on every card opens a modal: change notice date (shifts eligible/forfeited classification) or remove notice entirely; uses existing `PATCH /tenants/{id}` endpoint via `patchTenant`
+
+---
+
+## [1.74.20] — 2026-04-29 — Feat: room transfer in PWA + shared service (bot + PWA unified)
+
+### Added
+- **`services/room_transfer.py`** — new shared `execute_room_transfer()` service. Single source of truth for all room transfers — used by both WhatsApp bot and PWA API. Handles: room lookup, staff room guard, occupancy check via `get_room_occupants()`, DB writes (room_id, agreed_rent, RentRevision, RentSchedule, security_deposit +=, AuditLog), fire-and-forget sheet sync.
+- **`src/api/v2/rooms.py`** — new `GET /api/v2/app/rooms/check?room=XXX`. Returns room availability (free beds, occupants list) for the PWA transfer panel.
+- **`src/api/v2/tenants.py`** — new `POST /api/v2/app/tenants/{id}/transfer-room`. Body: `{to_room_number, new_rent, extra_deposit}`. Delegates to shared service, commits on success.
+- **`web/lib/api.ts`** — `checkRoom()` and `transferRoom()` client functions + `RoomCheckResult`, `TransferRoomBody`, `TransferRoomResult` types.
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — 4-step Transfer Room panel: room check → rent (pre-filled) → extra deposit (incremental) → confirm card → POST. Success refreshes tenant header with new room number.
+
+### Refactored
+- **`src/whatsapp/handlers/owner_handler.py`** — `_do_room_transfer` delegates to `execute_room_transfer()`. Removed 65 lines of inline DB logic. `final_confirm` step simplified (duplicate RentSchedule + deposit code removed — service handles it).
+
+### Architecture
+Bot `ROOM_TRANSFER` multi-step flow unchanged. Only the final DB-write step is shared. Both callers guaranteed identical behavior — no drift.
+
+---
+
 ## [1.74.19] — 2026-04-29 — Rule: no hardcoded sheet columns project-wide + DAY WISE numeric format fix
 
 ### Fixed
@@ -100,6 +125,7 @@ Day-wise tenants live exclusively in the DAY WISE sheet tab. All previous sheet 
 - **`web/components/home/kpi-grid.tsx`** — Already-checked-out tenants show greyed "Checked out" badge instead of active "Check-out →" button.
 - **`web/lib/api.ts`** — `is_checked_out?: boolean` in `KpiDetailItem`.
 - **`src/api/v2/tenants.py`** — Room reassignment syncs `tenancy.sharing_type` to match new room's `room_type`.
+- **`web/app/checkout/new/page.tsx`** — When navigated from KPI tile (`?tenancy_id=`), shows locked tenant banner (name + room + "Change" button) instead of the search box. `pollStatus` state restored (was stripped by linter).
 
 ---
 
