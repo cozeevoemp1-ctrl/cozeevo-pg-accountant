@@ -2,6 +2,13 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.14] — 2026-04-29 — Fix: tenant search — numeric query matches exact room only
+
+### Fixed
+- **`src/api/v2/tenants.py`** — `GET /tenants/search`: when query is all digits (e.g. "420"), now matches `room_number` exactly only. Previously `LIKE '%420%'` on phone/name returned unrelated tenants whose phone numbers contained "420". Non-numeric queries (names, partial phones) still use contains match on all three fields.
+
+---
+
 ## [1.74.13-data] — 2026-04-29 — Data fix: Prasanth.P (G15) sharing_type + April rent_due
 
 ### Fixed (data only, no code deploy)
