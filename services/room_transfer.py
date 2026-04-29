@@ -71,6 +71,7 @@ async def execute_room_transfer(
         .join(Tenancy, Tenancy.tenant_id == Tenant.id)
         .where(
             Tenancy.room_id == new_room.id,
+            Tenancy.stay_type == StayType.monthly,
             Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
         )
     )).all()
@@ -151,7 +152,9 @@ async def execute_room_transfer(
             _aio.create_task(_gs.update_tenants_tab_field(
                 to_room_number, tenant_name, "agreed_rent", int(resolved_rent)
             ))
-        _gs.trigger_monthly_sheet_sync(today.month, today.year)
+        _aio.create_task(_aio.to_thread(
+            _gs.trigger_monthly_sheet_sync, today.month, today.year
+        ))
     except Exception:
         pass
 
