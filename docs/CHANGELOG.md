@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.19] — 2026-04-29 — Rule: no hardcoded sheet columns project-wide + DAY WISE numeric format fix
+
+### Fixed
+- **`scripts/sync_daywise_from_db.py`** — After `ws.clear()` + bulk write, now re-applies `NUMBER` format to all numeric columns (Rent/Day → Balance, F:O). `ws.clear()` wipes cell formats; without this, Sheets displays numeric values as date serials.
+- **DAY WISE tab (live sheet)** — Applied `NUMBER` format to `F3:O200` immediately; clears existing date-bleed in Rent/Day column (rows 21, 36, 38 showed date values like "1899-12-30" instead of numbers).
+- **`CLAUDE.md`** — Added "Sheet column rule (CRITICAL)" section: no `r[14]`, no `chr(65 + magic_number)`, always `HEADERS` + `C` dict + `col_letter()` helper. Required for all new and edited files.
+- **`memory/feedback_sheet_column_references.md`** — Expanded scope to all project files, added format-after-clear requirement, added 2026-04-29 incident as motivation.
+
+### Audit findings
+- `gsheets.py` monthly/TENANTS writes: already semantic via `M_*`/`T_*` constants derived from `_derive_constants()` — clean.
+- `sync_daywise_from_db.py`: already semantic (HEADERS + C dict) — only missing the post-write format call, now fixed.
+- `_add_daywise_stay_sync`: rewritten to semantic dict mapping last session (v1.74.15) — clean.
+- Legacy one-off scripts (`april_balance_29.py`, `mirror_march_source_to_ops.py`): contain hardcoded positional reads but are historical/frozen data scripts — not touched.
+
+---
+
 ## [1.74.18] — 2026-04-29 — Feat: prorate this-month rent_due on mid-month room transfers
 
 ### Fixed / Added
