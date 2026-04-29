@@ -17,7 +17,7 @@ interface ConfirmationCardProps {
 
 export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = false, error }: ConfirmationCardProps) {
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40">
+    <div className="fixed inset-0 flex items-end justify-center bg-black/40" style={{ zIndex: 9999 }}>
       <div className="w-full max-w-md bg-surface rounded-t-[28px] px-6 pt-5 pb-10 shadow-2xl">
         <div className="w-10 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5" />
         <h2 className="text-lg font-extrabold text-ink mb-4">{title}</h2>
