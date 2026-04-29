@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, type KpiDetailItem, type TenantDues } from "@/lib/api";
 import { rupee, rupeeL } from "@/lib/format";
@@ -411,38 +412,58 @@ export function KpiGrid({ data }: KpiGridProps) {
             ) : (
               <div className="flex flex-col divide-y divide-[#F0EDE9]">
                 {filtered.map((item, i) => (
-                  <button
+                  <div
                     key={i}
-                    onClick={() => selectItem(item)}
-                    disabled={!item.tenancy_id}
                     className={`flex justify-between items-center py-2.5 w-full text-left rounded px-1 -mx-1 transition-colors ${
                       item.tenancy_id
-                        ? "hover:bg-[#F6F5F0] active:bg-[#EEDFE8] cursor-pointer"
-                        : "cursor-default"
+                        ? "hover:bg-[#F6F5F0] active:bg-[#EEDFE8]"
+                        : ""
                     } ${selected?.tenancy_id === item.tenancy_id ? "bg-[#FCE2EE]" : ""}`}
                   >
-                    <div>
-                      <p className="text-xs font-semibold text-ink">{item.name}</p>
-                      <p className="text-[10px] text-ink-muted">Room {item.room}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {open === "notices" && item.deposit_eligible !== undefined && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${
-                          item.deposit_eligible
-                            ? "bg-[#D1FAE5] text-[#065F46]"
-                            : "bg-[#FEE2E2] text-[#991B1B]"
-                        }`}>
-                          {item.deposit_eligible ? "Refundable" : "Forfeited"}
-                        </span>
-                      )}
-                      <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
-                      {item.tenancy_id && (
-                        <span className="text-xs text-brand-pink font-bold">
-                          {selected?.tenancy_id === item.tenancy_id ? "▾" : "›"}
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => selectItem(item)}
+                      disabled={!item.tenancy_id}
+                      className={`flex-1 flex justify-between items-center text-left min-w-0 ${item.tenancy_id ? "cursor-pointer" : "cursor-default"}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-ink">{item.name}</p>
+                        <p className="text-[10px] text-ink-muted">Room {item.room}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                        {open === "notices" && item.deposit_eligible !== undefined && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${
+                            item.deposit_eligible
+                              ? "bg-[#D1FAE5] text-[#065F46]"
+                              : "bg-[#FEE2E2] text-[#991B1B]"
+                          }`}>
+                            {item.deposit_eligible ? "Refundable" : "Forfeited"}
+                          </span>
+                        )}
+                        <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
+                        {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && (
+                          <span className="text-xs text-brand-pink font-bold">
+                            {selected?.tenancy_id === item.tenancy_id ? "▾" : "›"}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                    {open === "checkouts_today" && (
+                      <Link
+                        href="/checkout/new"
+                        className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                      >
+                        Check-out →
+                      </Link>
+                    )}
+                    {open === "checkins_today" && (
+                      <Link
+                        href="/checkin/new"
+                        className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                      >
+                        Check-in →
+                      </Link>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
