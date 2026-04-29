@@ -1380,6 +1380,21 @@ async def run_add_daywise_time_fields_2026_04_28(conn) -> None:
     print("  [ok] tenancies.checkin_time + checkout_time added")
 
 
+async def run_widen_checkout_phone_fields_2026_04_29(conn) -> None:
+    """Widen created_by_phone (checkout_sessions) and recorded_by (checkout_records)
+    from VARCHAR(20) to VARCHAR(50) — Supabase user IDs (UUIDs) are 36 chars,
+    which exceeded the old limit and crashed POST /checkout/create."""
+    await conn.execute(text("""
+        ALTER TABLE checkout_sessions
+            ALTER COLUMN created_by_phone TYPE VARCHAR(50)
+    """))
+    await conn.execute(text("""
+        ALTER TABLE checkout_records
+            ALTER COLUMN recorded_by TYPE VARCHAR(50)
+    """))
+    print("  [ok] checkout_sessions.created_by_phone + checkout_records.recorded_by widened to 50")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1418,6 +1433,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_payment_unique_hash_2026_04_25(conn)
             await run_payments_freeze_trigger_2026_04_27(conn)
             await run_add_daywise_time_fields_2026_04_28(conn)
+            await run_widen_checkout_phone_fields_2026_04_29(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

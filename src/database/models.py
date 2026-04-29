@@ -879,7 +879,7 @@ class CheckoutSession(Base):
     id                    = Column(Integer, primary_key=True)
     token                 = Column(String(36), unique=True, nullable=False)
     status                = Column(String(20), default=CheckoutSessionStatus.pending.value, nullable=False)
-    created_by_phone      = Column(String(20), nullable=False)
+    created_by_phone      = Column(String(50), nullable=False)
     tenant_phone          = Column(String(20), nullable=False)
     tenancy_id            = Column(Integer, ForeignKey("tenancies.id"), nullable=False)
     checkout_date         = Column(Date, nullable=False)
@@ -924,7 +924,7 @@ class CheckoutRecord(Base):
     deposit_refunded_amount  = Column(Numeric(12, 2), default=0)
     deposit_refund_date      = Column(Date)           # NULL = not yet refunded
     actual_exit_date         = Column(Date)
-    recorded_by              = Column(String(20))     # phone of staff who recorded it
+    recorded_by              = Column(String(50))     # phone of staff who recorded it
     biometric_removed        = Column(Boolean, default=False)
     room_condition_ok        = Column(Boolean, default=True)
     deductions               = Column(Numeric(12, 2), default=0)
