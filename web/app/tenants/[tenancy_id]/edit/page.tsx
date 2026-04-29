@@ -139,9 +139,11 @@ export default function EditTenantPage() {
     setTransferStep(1)
     setDestRoom("")
     setRoomCheck(null)
+    setRoomCheckLoading(false)
     setRoomCheckError("")
     setTransferNewRent("")
     setTransferExtraDeposit("0")
+    setTransferSubmitting(false)
     setTransferError("")
     setTransferSuccess(false)
   }
