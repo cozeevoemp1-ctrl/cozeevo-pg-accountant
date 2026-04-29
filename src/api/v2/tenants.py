@@ -24,6 +24,7 @@ from src.database.models import (
     TenancyStatus,
     Tenant,
 )
+from services.room_transfer import execute_room_transfer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -427,8 +428,6 @@ async def transfer_room(
     user: AppUser = Depends(get_current_user),
 ):
     """Execute room transfer — called after PWA user confirms the 4-step panel."""
-    from services.room_transfer import execute_room_transfer
-
     async with get_session() as session:
         result = await execute_room_transfer(
             tenancy_id=tenancy_id,
