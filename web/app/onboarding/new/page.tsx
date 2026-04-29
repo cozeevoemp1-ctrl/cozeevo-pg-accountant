@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { OnboardingVoiceSheet } from "@/components/voice/onboarding-voice-sheet"
+import type { OnboardingFields } from "@/lib/parse-onboarding"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
 const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
@@ -59,6 +61,7 @@ export default function NewOnboardingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState("")
   const [success, setSuccess]       = useState<{ token: string; phone: string; waSent: boolean } | null>(null)
+  const [showVoiceSheet, setShowVoiceSheet] = useState(false)
 
   // Room occupancy check
   const [roomInfo, setRoomInfo] = useState<{
@@ -81,6 +84,22 @@ export default function NewOnboardingPage() {
     } finally {
       setRoomInfoLoading(false)
     }
+  }
+
+  function handleVoiceConfirm(fields: OnboardingFields) {
+    if (fields.room_number)                    { setRoomNumber(fields.room_number); checkRoomOccupancy(fields.room_number) }
+    if (fields.sharing_type)                   setSharingType(fields.sharing_type)
+    if (fields.tenant_phone)                   setTenantPhone(fields.tenant_phone)
+    if (fields.checkin_date)                   setCheckinDate(fields.checkin_date)
+    if (fields.monthly_rent != null)           setRent(String(fields.monthly_rent))
+    if (fields.security_deposit != null)       setDeposit(String(fields.security_deposit))
+    if (fields.maintenance_fee != null)        setMaintenance(String(fields.maintenance_fee))
+    if (fields.booking_amount != null)         setBooking(String(fields.booking_amount))
+    if (fields.advance_mode)                   setAdvanceMode(fields.advance_mode as "cash" | "upi" | "bank")
+    if (fields.lock_in_months != null)         setLockIn(String(fields.lock_in_months))
+    if (fields.future_rent != null)            setFutureRent(String(fields.future_rent))
+    if (fields.future_rent_after_months != null) setFutureRentMonths(String(fields.future_rent_after_months))
+    setShowVoiceSheet(false)
   }
 
   const numDays   = stayType === "daily" ? daysBetween(checkinDate, checkoutDate) : 0
@@ -185,7 +204,20 @@ export default function NewOnboardingPage() {
         <button onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
           aria-label="Back">←</button>
-        <h1 className="text-lg font-extrabold text-ink">New Tenant Onboarding</h1>
+        <h1 className="text-lg font-extrabold text-ink flex-1">New Tenant Onboarding</h1>
+        <button
+          type="button"
+          onClick={() => setShowVoiceSheet(true)}
+          className="w-9 h-9 rounded-full bg-brand-pink flex items-center justify-center shadow-sm active:opacity-80"
+          aria-label="Fill by voice"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <rect x="9" y="2" width="6" height="12" rx="3" fill="white" />
+            <path d="M5 10a7 7 0 0 0 14 0" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            <line x1="12" y1="17" x2="12" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            <line x1="8" y1="21" x2="16" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
@@ -398,6 +430,12 @@ export default function NewOnboardingPage() {
           {submitting ? "Creating session…" : "Create & Send WhatsApp Link →"}
         </button>
       </div>
+      {showVoiceSheet && (
+        <OnboardingVoiceSheet
+          onClose={() => setShowVoiceSheet(false)}
+          onConfirm={handleVoiceConfirm}
+        />
+      )}
     </main>
   )
 }
