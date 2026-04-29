@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -17,8 +17,6 @@ from src.database.models import (
     RentSchedule,
     Tenancy,
     Tenant,
-    TenancyStatus,
-    StayType,
 )
 
 
@@ -48,6 +46,9 @@ async def execute_room_transfer(
     if not new_room:
         return {"success": False, "message": f"Room {to_room_number} not found."}
 
+    if new_room.is_staff_room:
+        return {"success": False, "message": f"Room {to_room_number} is a staff room — tenant bookings not allowed."}
+
     # 2. Load tenancy + tenant + current room
     row = (await session.execute(
         select(Tenancy, Tenant, Room)
@@ -64,36 +65,16 @@ async def execute_room_transfer(
     if from_room == to_room_number:
         return {"success": False, "message": f"Tenant is already in room {to_room_number}."}
 
-    # 3. Occupancy check — active monthly tenants in new room
+    # 3. Occupancy check using canonical helper
     today = date.today()
-    occupied_rows = (await session.execute(
-        select(Tenant.name, Tenancy.id)
-        .join(Tenancy, Tenancy.tenant_id == Tenant.id)
-        .where(
-            Tenancy.room_id == new_room.id,
-            Tenancy.stay_type == StayType.monthly,
-            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
-        )
-    )).all()
-
-    # Active daywise guests in new room today
-    daywise_count = (await session.scalar(
-        select(func.count()).where(
-            Tenancy.room_id == new_room.id,
-            Tenancy.stay_type == StayType.daily,
-            Tenancy.checkin_date <= today,
-            Tenancy.checkout_date >= today,
-            Tenancy.status == TenancyStatus.active,
-        )
-    )) or 0
-
+    from src.services.room_occupancy import get_room_occupants
+    occupants = await get_room_occupants(session, new_room)
     max_occ = int(new_room.max_occupancy or 1)
-    total_occ = len(occupied_rows) + daywise_count
-    if total_occ >= max_occ:
-        names = ", ".join(r[0] for r in occupied_rows)
+    if occupants.total_occupied >= max_occ:
+        names = ", ".join(t.name for t, _ in occupants.tenancies)
         return {
             "success": False,
-            "message": f"Room {to_room_number} is full ({total_occ}/{max_occ} beds): {names}",
+            "message": f"Room {to_room_number} is full ({occupants.total_occupied}/{max_occ} beds): {names}",
         }
 
     # 4. Resolve rent — keep current if new_rent not supplied
@@ -152,9 +133,7 @@ async def execute_room_transfer(
             _aio.create_task(_gs.update_tenants_tab_field(
                 to_room_number, tenant_name, "agreed_rent", int(resolved_rent)
             ))
-        _aio.create_task(_aio.to_thread(
-            _gs.trigger_monthly_sheet_sync, today.month, today.year
-        ))
+        _gs.trigger_monthly_sheet_sync(today.month, today.year)
     except Exception:
         pass
 
