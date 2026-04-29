@@ -43,7 +43,7 @@ Extract or update any of these fields:
 - room_number (string, e.g. "101", "G20")
 - sharing_type ("single", "double", "triple", or "premium")
 - tenant_phone (string, 10-digit Indian mobile, no country code)
-- checkin_date (string, ISO date YYYY-MM-DD, default to today if not mentioned)
+- checkin_date (string, ISO date YYYY-MM-DD — only populate if the receptionist explicitly mentions a date, otherwise null)
 - monthly_rent (number in rupees, convert "k" = 1000, "lakh" = 100000)
 - security_deposit (number in rupees)
 - maintenance_fee (number in rupees/month)
@@ -90,6 +90,13 @@ export async function parseOnboardingFields(
   }
 
   const data = await res.json() as { choices: { message: { content: string } }[] }
-  const parsed = JSON.parse(data.choices[0].message.content) as OnboardingParseResult
+  const raw = data.choices?.[0]?.message?.content
+  if (!raw) throw new Error("Groq returned empty content")
+  let parsed: OnboardingParseResult
+  try {
+    parsed = JSON.parse(raw) as OnboardingParseResult
+  } catch {
+    throw new Error(`Groq returned invalid JSON: ${raw.slice(0, 200)}`)
+  }
   return parsed
 }
