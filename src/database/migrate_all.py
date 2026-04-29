@@ -1335,6 +1335,7 @@ async def run_enable_rls_all_tables(conn) -> None:
 async def run_payments_freeze_trigger_2026_04_27(conn) -> None:
     """Freeze trigger: block writes to historical payments (period_month < current month).
     Escape hatch: SET LOCAL app.allow_historical_write = 'true' in the same transaction."""
+    # asyncpg requires each statement in its own execute() call
     await conn.execute(text("""
         CREATE OR REPLACE FUNCTION payments_freeze_check()
         RETURNS trigger AS $$
@@ -1359,13 +1360,13 @@ async def run_payments_freeze_trigger_2026_04_27(conn) -> None:
             IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
             RETURN NEW;
         END;
-        $$ LANGUAGE plpgsql;
-
-        DROP TRIGGER IF EXISTS payments_freeze ON payments;
-
+        $$ LANGUAGE plpgsql
+    """))
+    await conn.execute(text("DROP TRIGGER IF EXISTS payments_freeze ON payments"))
+    await conn.execute(text("""
         CREATE TRIGGER payments_freeze
         BEFORE INSERT OR UPDATE OR DELETE ON payments
-        FOR EACH ROW EXECUTE FUNCTION payments_freeze_check();
+        FOR EACH ROW EXECUTE FUNCTION payments_freeze_check()
     """))
     print("  [ok] payments_freeze trigger installed")
 
