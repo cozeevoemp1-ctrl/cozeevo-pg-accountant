@@ -352,6 +352,29 @@ async def update_tenant(
                 except (ValueError, AttributeError):
                     pass
 
+                # Recalculate current month RS with proration for mid-month room move
+                import calendar as _cal
+                from src.services.rent_schedule import first_month_rent_due as _fmrd
+                from decimal import Decimal as _D
+                _today = date.today()
+                _period = _today.replace(day=1)
+                _rs = await session.scalar(
+                    select(RentSchedule).where(
+                        RentSchedule.tenancy_id == tenancy_id,
+                        RentSchedule.period_month == _period,
+                    )
+                )
+                if _rs:
+                    _checkin = tenancy.checkin_date
+                    _is_first = _checkin and _checkin.replace(day=1) == _period
+                    if _is_first:
+                        _rs.rent_due = _fmrd(tenancy, _period)
+                    else:
+                        _dim = _cal.monthrange(_today.year, _today.month)[1]
+                        _remaining = _dim - _today.day + 1
+                        _prorated = int(float(tenancy.agreed_rent or 0) * _remaining / _dim)
+                        _rs.rent_due = _D(str(_prorated))
+
         room_number = room.room_number
         session.add(tenancy)
         session.add(tenant)

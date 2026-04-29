@@ -107,7 +107,13 @@ export default function EditTenantPage() {
     if (changes.name) fields.push({ label: "Name", value: changes.name })
     if (changes.phone) fields.push({ label: "Phone", value: changes.phone })
     if (changes.email) fields.push({ label: "Email", value: changes.email })
-    if (changes.room_number) fields.push({ label: "New Room", value: changes.room_number, highlight: true })
+    if (changes.room_number) {
+      fields.push({ label: "New Room", value: changes.room_number, highlight: true })
+      if (proratedInfo) {
+        const today = new Date()
+        fields.push({ label: `${today.toLocaleString("en-IN", { month: "short" })} prorated (auto)`, value: `₹${proratedInfo.amount.toLocaleString("en-IN")} (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`, highlight: true })
+      }
+    }
     if (changes.agreed_rent !== undefined)
       fields.push({ label: "Agreed Rent", value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
     if (changes.security_deposit !== undefined)
@@ -152,6 +158,26 @@ export default function EditTenantPage() {
 
   const depositEligible = noticeDate ? new Date(noticeDate).getDate() <= 5 : null
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
+  const roomChanged = original && roomNumber.trim() && roomNumber.trim().toUpperCase() !== original.room_number.toUpperCase()
+
+  // Prorated calc for mid-month room transfer (read-only)
+  const proratedInfo = (() => {
+    if (!roomChanged) return null
+    const rent = Number(agreedRent) || 0
+    if (!rent) return null
+    const today = new Date()
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const checkinIso = original?.checkin_date
+    let pivotDay = today.getDate()
+    if (checkinIso) {
+      const checkin = new Date(checkinIso + "T00:00:00")
+      const sameMonth = checkin.getFullYear() === today.getFullYear() && checkin.getMonth() === today.getMonth()
+      if (sameMonth) pivotDay = checkin.getDate()
+    }
+    const remaining = daysInMonth - pivotDay + 1
+    const amount = Math.floor(rent * remaining / daysInMonth)
+    return { amount, remaining, daysInMonth }
+  })()
 
   if (loading) {
     return (
@@ -251,6 +277,13 @@ export default function EditTenantPage() {
                 Room {roomNumber}: {roomInfo.occupied}/{roomInfo.max_occupancy} beds occupied — space available
               </p>
             )
+          )}
+          {proratedInfo && (
+            <div className="rounded-tile bg-tile-green border border-[#D1FAE5] px-3 py-2.5 mt-1">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">This month prorated (auto)</p>
+              <p className="text-sm font-extrabold text-status-paid">₹{proratedInfo.amount.toLocaleString("en-IN")}</p>
+              <p className="text-[10px] text-ink-muted mt-0.5">{proratedInfo.remaining}/{proratedInfo.daysInMonth} days × ₹{Number(agreedRent).toLocaleString("en-IN")}/mo</p>
+            </div>
           )}
         </div>
 

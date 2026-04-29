@@ -2484,18 +2484,42 @@ async def resolve_pending_action(
             extra_deposit = _parse_amount_field(ans)
             action_data["extra_deposit"] = extra_deposit
             action_data["step"] = "final_confirm"
-            await _save_pending(pending.phone, "ROOM_TRANSFER", action_data, [], session)
 
             new_rent = int(action_data.get("new_rent", action_data["current_rent"]))
             rent_changed = new_rent != action_data["current_rent"]
             deposit_line = f"\nAdditional deposit: Rs.{int(extra_deposit):,}" if extra_deposit > 0 else ""
 
+            # Compute prorated amount for this month (non-editable display)
+            import calendar as _cal
+            _today = date.today()
+            _dim = _cal.monthrange(_today.year, _today.month)[1]
+            _checkin_iso = action_data.get("checkin_date")
+            if _checkin_iso:
+                _checkin = date.fromisoformat(_checkin_iso)
+                _is_first = _checkin.replace(day=1) == _today.replace(day=1)
+                _pivot_day = _checkin.day if _is_first else _today.day
+            else:
+                _is_first = False
+                _pivot_day = _today.day
+            _remaining = _dim - _pivot_day + 1
+            _prorated = int(new_rent * _remaining / _dim)
+            action_data["this_month_prorated"] = _prorated
+
+            await _save_pending(pending.phone, "ROOM_TRANSFER", action_data, [], session)
+
+            _month_name = _today.strftime("%b")
+            _prorated_line = (
+                f"\n_{_month_name} prorated (this month): Rs.{_prorated:,} "
+                f"({_remaining}/{_dim} days × Rs.{new_rent:,})_"
+            )
+
             return (
                 f"*Confirm Room Transfer?*\n\n"
                 f"Tenant: {action_data['tenant_name']}\n"
                 f"Room: {action_data['from_room']} → {action_data['to_room_number']}\n"
-                + (f"Rent: Rs.{int(action_data['current_rent']):,} → Rs.{new_rent:,}\n" if rent_changed else f"Rent: Rs.{new_rent:,} (no change)\n")
+                + (f"Rent: Rs.{int(action_data['current_rent']):,} → Rs.{new_rent:,}/mo\n" if rent_changed else f"Rent: Rs.{new_rent:,}/mo (no change)\n")
                 + deposit_line
+                + _prorated_line
                 + "\n\nReply *yes* to confirm or *no* to cancel."
             )
 
@@ -2506,17 +2530,16 @@ async def resolve_pending_action(
                 action_data["changed_by"] = pending.phone
                 result = await _do_room_transfer(action_data, session)
 
-                if new_rent and new_rent != action_data["current_rent"]:
-                    # Update current month's RentSchedule (agreed_rent already set in _do_room_transfer)
-                    current_period = date.today().replace(day=1)
-                    rs = await session.scalar(
-                        select(RentSchedule).where(
-                            RentSchedule.tenancy_id == action_data["tenancy_id"],
-                            RentSchedule.period_month == current_period,
-                        )
+                # Always update current month RS to prorated amount (stored in action_data)
+                current_period = date.today().replace(day=1)
+                rs = await session.scalar(
+                    select(RentSchedule).where(
+                        RentSchedule.tenancy_id == action_data["tenancy_id"],
+                        RentSchedule.period_month == current_period,
                     )
-                    if rs:
-                        rs.rent_due = Decimal(str(new_rent))
+                )
+                if rs and action_data.get("this_month_prorated") is not None:
+                    rs.rent_due = Decimal(str(action_data["this_month_prorated"]))
 
                 if extra_deposit > 0:
                     tenancy = await session.get(Tenancy, action_data["tenancy_id"])
@@ -6443,13 +6466,7 @@ async def _finalize_room_transfer(
             f"_I can't auto-swap yet — checkout the occupant first, then move {tenant_name}._"
         )
 
-    rs = await session.scalar(
-        select(RentSchedule).where(
-            RentSchedule.tenancy_id == tenancy.id,
-            RentSchedule.period_month >= date.today().replace(day=1),
-        ).order_by(RentSchedule.period_month.asc()).limit(1)
-    )
-    current_rent = int(rs.rent_due) if rs else int(tenancy.booking_amount or 0)
+    current_rent = int(tenancy.agreed_rent or 0)
     current_deposit = int(tenancy.security_deposit or 0)
 
     action_data = {
@@ -6460,6 +6477,7 @@ async def _finalize_room_transfer(
         "to_room_number": new_room.room_number,
         "current_rent": current_rent,
         "current_deposit": current_deposit,
+        "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
         "step": "confirm",
     }
     await _save_pending(phone, "ROOM_TRANSFER", action_data, [], session)
