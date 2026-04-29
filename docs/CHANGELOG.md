@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.13-data] — 2026-04-29 — Data fix: Prasanth.P (G15) sharing_type + April rent_due
+
+### Fixed (data only, no code deploy)
+- **`tenancies` id=920 (Prasanth.P, G15)** — `sharing_type` corrected from `triple` → `double` (room G15 is a double room; room reassignment had not auto-updated the field)
+- **`rent_schedule` id=11630 (Prasanth.P, April 2026)** — `rent_due` updated from ₹13,000 → ₹26,000 (first-month rule: rent ₹13,000 + deposit ₹13,000); `adjustment_note = MANUAL_LOCK` cleared
+- April sheet re-synced; Total Dues updated ₹89,166 → ₹1,02,166 (+₹13,000 deposit now in dues)
+- TENANTS master tab updated via `sync_tenant_all_fields`
+
+---
+
 ## [1.74.13] — 2026-04-29 — Checkout: remove tenant approval, immediate confirm
 
 ### Changed
