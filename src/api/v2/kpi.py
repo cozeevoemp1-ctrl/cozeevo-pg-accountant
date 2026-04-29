@@ -12,7 +12,7 @@ from src.database.models import (
     Payment, PaymentFor,
     Property,
     RentSchedule,
-    Room, Tenancy, TenancyStatus,
+    Room, Tenancy, TenancyStatus, StayType,
     Tenant,
 )
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
@@ -113,8 +113,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Tenants leaving: formal notice OR expected_checkout set
-        _today = date.today()
+        # Monthly tenants with formal notice
         notices_count = int(
             await session.scalar(
                 select(func.count(Tenancy.id))
@@ -123,13 +122,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                     Room.is_staff_room == False,
                     Room.room_number != "UNASSIGNED",
                     Tenancy.status == TenancyStatus.active,
-                    or_(
-                        Tenancy.notice_date != None,
-                        and_(
-                            Tenancy.expected_checkout != None,
-                            Tenancy.expected_checkout >= _today,
-                        ),
-                    ),
+                    Tenancy.stay_type == StayType.monthly,
+                    Tenancy.notice_date != None,
                 )
             ) or 0
         )
@@ -421,7 +415,6 @@ async def get_kpi_detail(
             ]}
 
         elif type == "notices":
-            _today = date.today()
             rows = (await session.execute(
                 select(
                     Tenancy.id, Tenant.name, Room.room_number,
@@ -433,13 +426,8 @@ async def get_kpi_detail(
                     Room.is_staff_room == False,
                     Room.room_number != "UNASSIGNED",
                     Tenancy.status == TenancyStatus.active,
-                    or_(
-                        Tenancy.notice_date != None,
-                        and_(
-                            Tenancy.expected_checkout != None,
-                            Tenancy.expected_checkout >= _today,
-                        ),
-                    ),
+                    Tenancy.stay_type == StayType.monthly,
+                    Tenancy.notice_date != None,
                 )
                 .order_by(Tenancy.expected_checkout.asc().nulls_last())
             )).all()
