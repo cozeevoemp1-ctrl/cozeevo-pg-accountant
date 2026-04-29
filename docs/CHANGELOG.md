@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.15] — 2026-04-29 — Fix: DAY WISE tab column shift from onboarding form
+
+### Fixed
+- **`src/integrations/gsheets.py`** — `_add_daywise_stay_sync` now uses header-based dict mapping (semantic) against new `DAY_WISE_HEADERS` constant instead of a hardcoded positional array. Previous `_build_daywise_row` wrote `booking_amount` to the "Days" column and shifted all subsequent columns.
+- Defined `DAY_WISE_HEADERS = [Room, Name, Phone, Building, Sharing, Rent/Day, Days, Booking Amt, Security Dep, Maintenance, Rent Due, Cash, UPI, Total Paid, Balance, Status, Check-in, Checkout, Entered By]` — matches existing tab structure.
+- Sheet header row 1 corrected from MONTHLY_HEADERS to DAY_WISE_HEADERS.
+- Two bad rows (Yogesh/Rutika room 210, sarathbabu room 407) fixed in-place: cleared stale data and re-written with correct column positions.
+
+---
+
 ## [1.74.14] — 2026-04-29 — Fix: tenant search — numeric query matches exact room only
 
 ### Fixed
