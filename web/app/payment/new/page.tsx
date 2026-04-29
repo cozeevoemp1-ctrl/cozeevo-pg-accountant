@@ -140,6 +140,10 @@ export default function NewPaymentPage() {
   if (success) {
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+          <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
+          <span className="text-base font-extrabold text-ink">Payment Saved</span>
+        </div>
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
         <div className="text-center">
           <h1 className="text-xl font-extrabold text-ink">Payment Saved!</h1>
