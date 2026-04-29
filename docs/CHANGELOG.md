@@ -2,6 +2,52 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.24] — 2026-04-29 — Tenant edit: room change + proration toggle + TENANTS tab sync
+
+### Added
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Room field at top of edit form; live occupancy check on blur. Hard blocks if new room is full.
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`** — Full / Prorated toggle for mid-month rent or room changes. Auto-calculates `floor(rent * remaining_days / days_in_month)`. Passed as `prorate_this_month` to backend. Shows only when rent or room changes.
+- **`web/components/forms/confirmation-card.tsx`** — `error?: string` prop; red banner inside card so API errors are visible without closing it.
+- **`src/integrations/gsheets.py`** — `sync_tenants_tab_field()`: generic TENANTS master tab single-field updater (finds column by header name).
+
+### Fixed
+- **`src/api/v2/tenants.py`** PATCH: room reassignment with occupancy check (409 if full); `prorate_this_month` upserts current month `RentSchedule.rent_due`; mirrors `agreed_rent` / `maintenance_fee` / `security_deposit` / `notes` to TENANTS master tab after commit.
+- **`src/database/models.py` + migrate_all.py** — `audit_log.changed_by` and `rent_revisions.changed_by` widened to `VARCHAR(100)` (Supabase UUIDs are 36 chars). Root cause of "Failed to fetch" on rent saves.
+- **Bot notes** — `UPDATE_TENANT_NOTES` and combined payment+notes flow now call `trigger_monthly_sheet_sync` (full rebuild) instead of a targeted cell write that was failing silently.
+- **Transfer Room panel removed** from edit page — confusing when non-room fields changed. Room field + PATCH endpoint handles it.
+- **Error visibility** — `setShowConfirm(false)` removed from catch blocks; errors stay visible inside ConfirmationCard.
+- **Back-nav headers** on all 5 success screens (checkin, checkout, payment, edit-tenant, onboarding).
+
+---
+
+## [1.74.23] — 2026-04-29 — Fix: voice onboarding service-not-allowed error
+
+### Fixed
+- **`web/components/voice/onboarding-voice-sheet.tsx`** — Chrome throws `service-not-allowed` when `SpeechRecognition.start()` is called from a `useEffect` (not a direct user gesture). Removed auto-start useEffect; added `"idle"` initial state with `IdleView` (tap-to-start mic button). `speech.start()` is now always called from a click handler. Also removed unused `useRef` import.
+
+---
+
+## [1.74.22] — 2026-04-29 — Feat: voice onboarding (speak tenant details → form pre-fills)
+
+### Added
+- **`web/components/voice/onboarding-voice-sheet.tsx`** — New bottom sheet for voice onboarding. Multi-turn: receptionist can speak multiple rounds; bot accumulates fields across rounds. States: idle → recording → extracting → speaking → confirm → error. "Fill Form" button disabled until room, phone, and rent are all captured.
+- **`web/lib/parse-onboarding.ts`** — `parseOnboardingFields(transcript, existing)`: calls `/api/voice/extract` (Groq proxy), merges result over `emptyOnboardingFields()` to prevent undefined keys, safe JSON.parse with try-catch.
+- **`web/lib/tts.ts`** — `speakText(text)`: calls `/api/voice/speak` (OpenAI proxy), falls back to browser `speechSynthesis` on failure.
+- **`web/app/api/voice/extract/route.ts`** — Server-side proxy to Groq `llama-3.3-70b-versatile`. Reads `GROQ_API_KEY` (no NEXT_PUBLIC_).
+- **`web/app/api/voice/speak/route.ts`** — Server-side proxy to OpenAI TTS (`tts-1`, voice `nova`). Returns `audio/mpeg`. Reads `OPENAI_API_KEY` (no NEXT_PUBLIC_).
+
+### Edited
+- **`web/app/onboarding/new/page.tsx`** — Pink mic button in header opens `OnboardingVoiceSheet`. `handleVoiceConfirm(fields)` maps all 12 `OnboardingFields` → form state setters. `advance_mode` validated against `Set(["cash","upi","bank"])` before setting.
+- **`web/.env.local.example`** — Added `GROQ_API_KEY=` and `OPENAI_API_KEY=`.
+
+### Security
+- API keys are server-side only (no `NEXT_PUBLIC_` prefix). OpenAI paid key never reaches the browser bundle.
+
+### Cost
+- Groq `llama-3.3-70b`: free. OpenAI TTS: ~₹25/month at 15 onboardings/month.
+
+---
+
 ## [1.74.21] — 2026-04-29 — Notices page: search filter + edit notice date modal
 
 ### Added
