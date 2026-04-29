@@ -345,7 +345,7 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/database/seed.py` | Seed data (users, properties, food, categories) |
 | `src/database/excel_import.py` | Excel import script |
 | `src/database/migrate_all.py` | Master migration (idempotent, append only) |
-| `src/scheduler.py` | 5 jobs — rent reminders, recon, backup, checkout alerts |
+| `src/scheduler.py` | 9 jobs — rent reminders (day-1, day+2), prep reminders (9am/2pm), nightly sheet audit, checkout deposit alerts |
 | `src/llm_gateway/claude_client.py` | LLM client (Ollama/Groq/Anthropic) |
 | `src/reports/reconciliation.py` | Reconciliation engine |
 | `scripts/` | Diagnostic scripts (occupancy, empty rooms, payment breakdown, deposit check) |
