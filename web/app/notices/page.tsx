@@ -133,7 +133,7 @@ export default function NoticesPage() {
 
       {/* Add Notice — tenant search sheet */}
       {showSearch && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
           <div className="relative bg-bg rounded-t-2xl px-4 pt-4 pb-10 flex flex-col gap-4 max-w-lg mx-auto w-full">
             <div className="flex items-center justify-between mb-1">
