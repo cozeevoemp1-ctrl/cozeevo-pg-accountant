@@ -315,6 +315,39 @@ export function patchTenant(tenancyId: number, body: PatchTenantBody): Promise<P
   return _patch<PatchTenantResponse>(`/api/v2/app/tenants/${tenancyId}`, body);
 }
 
+// ── Room Transfer ─────────────────────────────────────────────────────────────
+
+export interface RoomCheckResult {
+  room_number: string
+  max_occupancy: number
+  free_beds: number
+  is_available: boolean
+  occupants: { name: string; tenancy_id: number }[]
+}
+
+export interface TransferRoomBody {
+  to_room_number: string
+  new_rent: number | null
+  extra_deposit: number
+}
+
+export interface TransferRoomResult {
+  success: boolean
+  message: string
+  from_room?: string
+  to_room?: string
+  new_rent?: number
+  extra_deposit?: number
+}
+
+export function checkRoom(roomNumber: string): Promise<RoomCheckResult> {
+  return _get<RoomCheckResult>(`/api/v2/app/rooms/check?room=${encodeURIComponent(roomNumber)}`)
+}
+
+export function transferRoom(tenancyId: number, body: TransferRoomBody): Promise<TransferRoomResult> {
+  return _post<TransferRoomResult>(`/api/v2/app/tenants/${tenancyId}/transfer-room`, body)
+}
+
 // ── Reminders ────────────────────────────────────────────────────────────────
 
 export interface OverdueTenant {

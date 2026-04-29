@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
-import { getTenantDues, patchTenant, TenantDues, PatchTenantBody } from "@/lib/api"
+import { getTenantDues, patchTenant, checkRoom, transferRoom, TenantDues, PatchTenantBody, RoomCheckResult } from "@/lib/api"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -56,6 +56,19 @@ export default function EditTenantPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
 
+  // Transfer Room panel
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferStep, setTransferStep] = useState<1 | 2 | 3 | 4>(1)
+  const [destRoom, setDestRoom] = useState("")
+  const [roomCheck, setRoomCheck] = useState<RoomCheckResult | null>(null)
+  const [roomCheckLoading, setRoomCheckLoading] = useState(false)
+  const [roomCheckError, setRoomCheckError] = useState("")
+  const [transferNewRent, setTransferNewRent] = useState("")
+  const [transferExtraDeposit, setTransferExtraDeposit] = useState("0")
+  const [transferSubmitting, setTransferSubmitting] = useState(false)
+  const [transferError, setTransferError] = useState("")
+  const [transferSuccess, setTransferSuccess] = useState(false)
+
   useEffect(() => {
     if (!tenancyId) return
     getTenantDues(tenancyId)
@@ -75,6 +88,63 @@ export default function EditTenantPage() {
       .catch(() => setFetchError("Could not load tenant details"))
       .finally(() => setLoading(false))
   }, [tenancyId])
+
+  async function handleCheckRoom() {
+    if (!destRoom.trim()) return
+    setRoomCheckLoading(true)
+    setRoomCheckError("")
+    setRoomCheck(null)
+    try {
+      const result = await checkRoom(destRoom.trim())
+      setRoomCheck(result)
+      if (!result.is_available) setRoomCheckError(`Room ${result.room_number} is full (${result.max_occupancy - result.free_beds}/${result.max_occupancy} beds)`)
+    } catch (err) {
+      setRoomCheckError(err instanceof Error ? err.message : "Room not found")
+    } finally {
+      setRoomCheckLoading(false)
+    }
+  }
+
+  async function handleTransferConfirm() {
+    if (!original) return
+    setTransferSubmitting(true)
+    setTransferError("")
+    try {
+      const result = await transferRoom(tenancyId, {
+        to_room_number: roomCheck!.room_number,
+        new_rent: transferNewRent ? Number(transferNewRent) : null,
+        extra_deposit: Number(transferExtraDeposit) || 0,
+      })
+      if (!result.success) {
+        setTransferError(result.message)
+        setTransferStep(1)
+        setRoomCheck(null)
+        return
+      }
+      setTransferSuccess(true)
+      const updated = await getTenantDues(tenancyId)
+      setOriginal(updated)
+      setRoomNumber(updated.room_number)
+      setAgreedRent(String(updated.rent))
+      setSecurityDeposit(String(updated.security_deposit))
+    } catch (err) {
+      setTransferError(err instanceof Error ? err.message : "Transfer failed")
+    } finally {
+      setTransferSubmitting(false)
+    }
+  }
+
+  function resetTransferPanel() {
+    setShowTransfer(false)
+    setTransferStep(1)
+    setDestRoom("")
+    setRoomCheck(null)
+    setRoomCheckError("")
+    setTransferNewRent("")
+    setTransferExtraDeposit("0")
+    setTransferError("")
+    setTransferSuccess(false)
+  }
 
   function buildChanges(): PatchTenantBody {
     if (!original) return {}
@@ -447,6 +517,149 @@ export default function EditTenantPage() {
         </div>
 
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
+
+        {/* Transfer Room button */}
+        {!showTransfer && !transferSuccess && (
+          <button
+            type="button"
+            onClick={() => {
+              setShowTransfer(true)
+              setTransferNewRent(String(original?.rent ?? ""))
+            }}
+            className="w-full mt-3 py-3 rounded-2xl border-2 border-brand-pink text-brand-pink font-bold text-base"
+          >
+            Transfer Room
+          </button>
+        )}
+
+        {/* Transfer Room panel */}
+        {showTransfer && !transferSuccess && (
+          <div className="mt-4 rounded-2xl border border-[#F0EDE9] bg-surface p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-ink text-base">Transfer Room</h3>
+              <button type="button" onClick={resetTransferPanel} className="text-ink-muted text-sm">Cancel</button>
+            </div>
+
+            {transferStep === 1 && (
+              <div className="space-y-3">
+                <p className="text-sm text-ink-muted">Current room: <strong>{original?.room_number}</strong></p>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 border border-[#E2DEDD] rounded-xl px-4 py-3 text-base"
+                    placeholder="New room number"
+                    value={destRoom}
+                    onChange={e => { setDestRoom(e.target.value.toUpperCase()); setRoomCheck(null); setRoomCheckError("") }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCheckRoom}
+                    disabled={roomCheckLoading || !destRoom.trim()}
+                    className="px-4 py-3 rounded-xl bg-brand-pink text-white font-bold text-sm disabled:opacity-50"
+                  >
+                    {roomCheckLoading ? "..." : "Check"}
+                  </button>
+                </div>
+                {roomCheckError && <p className="text-sm text-red-500">{roomCheckError}</p>}
+                {roomCheck && roomCheck.is_available && (
+                  <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-3">
+                    <p className="text-sm font-semibold text-green-700">
+                      Room {roomCheck.room_number} — {roomCheck.free_beds} bed{roomCheck.free_beds !== 1 ? "s" : ""} free
+                      {roomCheck.occupants.length > 0 && ` (sharing with ${roomCheck.occupants.map(o => o.name).join(", ")})`}
+                    </p>
+                  </div>
+                )}
+                {transferError && <p className="text-sm text-red-500">{transferError}</p>}
+                <button
+                  type="button"
+                  onClick={() => setTransferStep(2)}
+                  disabled={!roomCheck?.is_available}
+                  className="w-full py-3 rounded-2xl bg-brand-pink text-white font-bold disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            {transferStep === 2 && (
+              <div className="space-y-3">
+                <label className="text-sm text-ink-muted">Rent for new room <span className="text-ink">(current: ₹{Number(original?.rent ?? 0).toLocaleString("en-IN")}/mo)</span></label>
+                <input
+                  type="number"
+                  className="w-full border border-[#E2DEDD] rounded-xl px-4 py-3 text-base"
+                  value={transferNewRent}
+                  onChange={e => setTransferNewRent(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setTransferStep(1)} className="flex-1 py-3 rounded-2xl border border-[#E2DEDD] text-ink font-bold">Back</button>
+                  <button type="button" onClick={() => setTransferStep(3)} disabled={!transferNewRent} className="flex-1 py-3 rounded-2xl bg-brand-pink text-white font-bold disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
+
+            {transferStep === 3 && (
+              <div className="space-y-3">
+                <label className="text-sm text-ink-muted">Additional deposit to collect <span className="text-ink">(current: ₹{Number(original?.security_deposit ?? 0).toLocaleString("en-IN")})</span></label>
+                <input
+                  type="number"
+                  className="w-full border border-[#E2DEDD] rounded-xl px-4 py-3 text-base"
+                  value={transferExtraDeposit}
+                  onChange={e => setTransferExtraDeposit(e.target.value)}
+                  placeholder="0 = no change"
+                />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setTransferStep(2)} className="flex-1 py-3 rounded-2xl border border-[#E2DEDD] text-ink font-bold">Back</button>
+                  <button type="button" onClick={() => setTransferStep(4)} className="flex-1 py-3 rounded-2xl bg-brand-pink text-white font-bold">Review</button>
+                </div>
+              </div>
+            )}
+
+            {transferStep === 4 && (
+              <div className="space-y-3">
+                {(() => {
+                  const rentChanged = Number(transferNewRent) !== original?.rent
+                  const depositAmt = Number(transferExtraDeposit) || 0
+                  const fields = [
+                    { label: "Room", value: `${original?.room_number} → ${roomCheck?.room_number}`, highlight: true },
+                    { label: "Rent", value: rentChanged
+                      ? `₹${Number(original?.rent).toLocaleString("en-IN")} → ₹${Number(transferNewRent).toLocaleString("en-IN")}/mo`
+                      : `₹${Number(transferNewRent).toLocaleString("en-IN")}/mo (no change)`,
+                      highlight: rentChanged },
+                    ...(depositAmt > 0 ? [{ label: "Extra deposit", value: `₹${depositAmt.toLocaleString("en-IN")}` }] : []),
+                  ]
+                  return (
+                    <>
+                      {fields.map(f => (
+                        <div key={f.label} className="flex justify-between py-2 border-b border-[#F0EDE9]">
+                          <span className="text-sm text-ink-muted">{f.label}</span>
+                          <span className={`text-sm font-semibold ${f.highlight ? "text-brand-pink font-extrabold" : "text-ink"}`}>{f.value}</span>
+                        </div>
+                      ))}
+                    </>
+                  )
+                })()}
+                {transferError && <p className="text-sm text-red-500">{transferError}</p>}
+                <div className="flex gap-2 pt-2">
+                  <button type="button" onClick={() => setTransferStep(3)} className="flex-1 py-3 rounded-2xl border border-[#E2DEDD] text-ink font-bold">Back</button>
+                  <button
+                    type="button"
+                    onClick={handleTransferConfirm}
+                    disabled={transferSubmitting}
+                    className="flex-1 py-3 rounded-2xl bg-brand-pink text-white font-bold disabled:opacity-50"
+                  >
+                    {transferSubmitting ? "Transferring..." : "Confirm Transfer"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {transferSuccess && (
+          <div className="mt-4 rounded-2xl bg-green-50 border border-green-200 px-5 py-4 text-center">
+            <p className="font-bold text-green-700">Room transferred successfully</p>
+            <button type="button" onClick={resetTransferPanel} className="mt-2 text-sm text-ink-muted underline">Done</button>
+          </div>
+        )}
       </div>
 
       {/* Sticky CTA */}
