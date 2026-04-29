@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import Tenancy, TenancyStatus, Tenant, Room
+from src.database.models import Tenancy, TenancyStatus, StayType, Tenant, Room
 from services.property_logic import NOTICE_BY_DAY, calc_notice_last_day
 
 logger = logging.getLogger(__name__)
@@ -24,24 +24,26 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
     today = date.today()
 
     async with get_session() as session:
-        # Tenants who gave formal notice
+        # Tenants who gave formal notice (monthly only — daily stays don't use notice flow)
         notice_rows = (await session.execute(
             select(Tenancy, Tenant, Room)
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
             .where(
                 Tenancy.status == TenancyStatus.active,
+                Tenancy.stay_type == StayType.monthly,
                 Tenancy.notice_date.isnot(None),
             )
         )).all()
 
-        # Tenants with expected_checkout set but no formal notice
+        # Tenants with expected_checkout set but no formal notice (monthly only)
         expected_rows = (await session.execute(
             select(Tenancy, Tenant, Room)
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
             .where(
                 Tenancy.status == TenancyStatus.active,
+                Tenancy.stay_type == StayType.monthly,
                 Tenancy.notice_date.is_(None),
                 Tenancy.expected_checkout.isnot(None),
                 Tenancy.expected_checkout >= today,
