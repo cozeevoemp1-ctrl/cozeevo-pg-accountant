@@ -98,5 +98,7 @@ export async function parseOnboardingFields(
   } catch {
     throw new Error(`Groq returned invalid JSON: ${raw.slice(0, 200)}`)
   }
+  // Merge over emptyOnboardingFields so any LLM-omitted keys default to null (not undefined)
+  parsed.fields = { ...emptyOnboardingFields(), ...parsed.fields }
   return parsed
 }

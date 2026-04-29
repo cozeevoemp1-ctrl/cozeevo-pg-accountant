@@ -61,7 +61,7 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
   }, [])
 
   useEffect(() => {
-    if (speech.state === "stopped" && speech.transcript) {
+    if (speech.state === "stopped" && speech.transcript?.trim()) {
       handleExtract(speech.transcript)
     }
     if (speech.state === "error" || speech.state === "unsupported") {
@@ -88,15 +88,16 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
 
   function handleRecordAgain() {
     speech.reset()
-    startedRef.current = true
     setStep("recording")
     speech.start()
   }
 
   const requiredMet = REQUIRED.every((k) => partialFields[k] !== null)
+  const missing = (Object.keys(partialFields) as (keyof OnboardingFields)[])
+    .filter((k) => partialFields[k] === null)
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end">
+    <div className="fixed inset-0 bg-black/60 flex items-end" style={{ zIndex: 9999 }}>
       <div className="w-full bg-surface rounded-t-3xl px-5 pt-5 pb-10 min-h-[65vh] flex flex-col max-h-[90vh] overflow-y-auto">
         <div className="w-12 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5 flex-shrink-0" />
 
@@ -113,16 +114,18 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
           <ProcessingView label={step === "extracting" ? "Understanding…" : "Confirming details…"} />
         )}
 
-        {step === "confirm" && parseResult && (
+        {step === "confirm" && (parseResult ? (
           <ConfirmView
             fields={partialFields}
-            missing={parseResult.missing}
+            missing={missing}
             requiredMet={requiredMet}
             onRecordAgain={handleRecordAgain}
             onConfirm={() => onConfirm(partialFields)}
             onCancel={onClose}
           />
-        )}
+        ) : (
+          <ProcessingView label="Processing…" />
+        ))}
 
         {step === "error" && (
           <ErrorView
