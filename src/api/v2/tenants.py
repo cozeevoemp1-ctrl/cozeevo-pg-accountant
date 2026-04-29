@@ -354,7 +354,7 @@ async def update_tenant(
                 except (ValueError, AttributeError):
                     pass
 
-                # Recalculate current month RS with proration for mid-month room move
+                # Update current month RS — honour prorate_this_month choice if sent
                 import calendar as _cal
                 from src.services.rent_schedule import first_month_rent_due as _fmrd
                 from decimal import Decimal as _D
@@ -367,25 +367,35 @@ async def update_tenant(
                     )
                 )
                 if _rs:
-                    _checkin = tenancy.checkin_date
-                    _is_first = _checkin and _checkin.replace(day=1) == _period
-                    if _is_first:
-                        _rs.rent_due = _fmrd(tenancy, _period)
+                    _prorate_flag = body.get("prorate_this_month", None)
+                    if _prorate_flag is False:
+                        # Staff chose "full month"
+                        _rs.rent_due = _D(str(int(float(tenancy.agreed_rent or 0))))
                     else:
-                        _dim = _cal.monthrange(_today.year, _today.month)[1]
-                        _remaining = _dim - _today.day + 1
-                        _prorated = int(float(tenancy.agreed_rent or 0) * _remaining / _dim)
-                        _rs.rent_due = _D(str(_prorated))
+                        # prorate_flag is True or absent (legacy: always prorate on room change)
+                        _checkin = tenancy.checkin_date
+                        _is_first = _checkin and _checkin.replace(day=1) == _period
+                        if _is_first:
+                            _rs.rent_due = _fmrd(tenancy, _period)
+                        else:
+                            _dim = _cal.monthrange(_today.year, _today.month)[1]
+                            _remaining = _dim - _today.day + 1
+                            _prorated = int(float(tenancy.agreed_rent or 0) * _remaining / _dim)
+                            _rs.rent_due = _D(str(_prorated))
 
-        # Rent-only proration: when prorate_this_month=True and no room change
-        if body.get("prorate_this_month") and "agreed_rent" in body and "room_number" not in body:
+        # Rent-only RS update: when prorate_this_month is explicitly set and no room change
+        if body.get("prorate_this_month") is not None and "agreed_rent" in body and "room_number" not in body:
             import calendar as _cal
             from decimal import Decimal as _D
             _today = date.today()
             _period = _today.replace(day=1)
-            _dim = _cal.monthrange(_today.year, _today.month)[1]
-            _remaining = _dim - _today.day + 1
-            _prorated = int(float(body["agreed_rent"]) * _remaining / _dim)
+            _new_rent = float(body["agreed_rent"])
+            if body["prorate_this_month"]:
+                _dim = _cal.monthrange(_today.year, _today.month)[1]
+                _remaining = _dim - _today.day + 1
+                _rs_amount = _D(str(int(_new_rent * _remaining / _dim)))
+            else:
+                _rs_amount = _D(str(int(_new_rent)))
             _rs = await session.scalar(
                 select(RentSchedule).where(
                     RentSchedule.tenancy_id == tenancy_id,
@@ -393,13 +403,13 @@ async def update_tenant(
                 )
             )
             if _rs:
-                _rs.rent_due = _D(str(_prorated))
+                _rs.rent_due = _rs_amount
                 session.add(_rs)
             else:
                 session.add(RentSchedule(
                     tenancy_id=tenancy_id,
                     period_month=_period,
-                    rent_due=_D(str(_prorated)),
+                    rent_due=_rs_amount,
                     org_id=tenancy.org_id,
                 ))
 

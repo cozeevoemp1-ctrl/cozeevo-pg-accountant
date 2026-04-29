@@ -115,9 +115,13 @@ export default function EditTenantPage() {
     if (changes.email) fields.push({ label: "Email", value: changes.email })
     if (changes.room_number) {
       fields.push({ label: "New Room", value: changes.room_number, highlight: true })
-      if (proratedInfo) {
-        const today = new Date()
-        fields.push({ label: `${today.toLocaleString("en-IN", { month: "short" })} prorated (auto)`, value: `₹${proratedInfo.amount.toLocaleString("en-IN")} (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`, highlight: true })
+      if (proratedInfo && changes.agreed_rent === undefined) {
+        // Room-only change: show the chosen this-month amount
+        const monthName = new Date().toLocaleString("en-IN", { month: "short" })
+        const thisMonthAmt = prorateChoice === "prorated"
+          ? `₹${proratedInfo.amount.toLocaleString("en-IN")} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
+          : `₹${Number(agreedRent).toLocaleString("en-IN")} full month`
+        fields.push({ label: `${monthName} this month`, value: thisMonthAmt, highlight: true })
       }
     }
     if (changes.agreed_rent !== undefined) {
