@@ -1878,7 +1878,15 @@ async def resolve_pending_action(
                                 gsheets_note = "\nSheet updated"
                         except Exception:
                             pass
-                        # Update month tab status to EXIT
+                        # Trigger DAY WISE or monthly sheet sync
+                        try:
+                            from src.integrations import gsheets as _gs
+                            if tenancy and tenancy.stay_type.value == "daily":
+                                _gs.trigger_daywise_sheet_sync()
+                            else:
+                                _gs.trigger_monthly_sheet_sync(exit_date.month, exit_date.year)
+                        except Exception:
+                            pass
 
                 name = action_data.get("tenant_name", "Tenant")
                 deposit = action_data.get("auto_deposit", 0)
