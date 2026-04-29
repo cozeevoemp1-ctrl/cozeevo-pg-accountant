@@ -136,7 +136,7 @@ async def main(write: bool):
         # Index rooms
         room_rows = (await s.execute(select(Room))).scalars().all()
         by_room = {r.room_number: r for r in room_rows}
-        unassigned = by_room.get("UNASSIGNED") or room_rows[0]
+        unassigned = by_room.get("000") or room_rows[0]
 
         # Index existing tenants by (phone, name_lower)
         tenant_rows = (await s.execute(select(Tenant))).scalars().all()
@@ -440,7 +440,7 @@ async def main(write: bool):
     for k, v in stats.items():
         print(f"  {k}: {v}")
     if missing_rooms:
-        print(f"\nMissing rooms ({len(missing_rooms)}) — routed to UNASSIGNED:")
+        print(f"\nMissing rooms ({len(missing_rooms)}) — routed to 000:")
         for name, room in missing_rooms:
             print(f"  {name} → '{room}'")
 

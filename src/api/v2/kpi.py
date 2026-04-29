@@ -30,7 +30,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         total_beds = int(
             await session.scalar(
                 select(func.coalesce(func.sum(Room.max_occupancy), 0))
-                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED")
+                .where(Room.is_staff_room == False, Room.room_number != "000")
             ) or 0
         )
 
@@ -52,7 +52,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .join(Room, Room.id == Tenancy.room_id)
             .where(
                 Room.is_staff_room == False,
-                Room.room_number != "UNASSIGNED",
+                Room.room_number != "000",
                 Tenancy.status == TenancyStatus.active,
             )
             .group_by(Room.id, Room.max_occupancy)
@@ -77,7 +77,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
-                    Room.room_number != "UNASSIGNED",
+                    Room.room_number != "000",
                     Tenancy.status == TenancyStatus.no_show,
                     Tenancy.checkin_date <= today,
                 )
@@ -94,7 +94,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
-                    Room.room_number != "UNASSIGNED",
+                    Room.room_number != "000",
                     Tenancy.status == TenancyStatus.active,
                 )
             ) or 0
@@ -107,7 +107,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
-                    Room.room_number != "UNASSIGNED",
+                    Room.room_number != "000",
                     Tenancy.status == TenancyStatus.no_show,
                 )
             ) or 0
@@ -120,7 +120,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
-                    Room.room_number != "UNASSIGNED",
+                    Room.room_number != "000",
                     Tenancy.status == TenancyStatus.active,
                     Tenancy.stay_type == StayType.monthly,
                     Tenancy.notice_date != None,
@@ -274,7 +274,7 @@ async def get_kpi_detail(
                     func.coalesce(occ_subq.c.occ, 0).label("occupied_count"),
                 )
                 .outerjoin(occ_subq, occ_subq.c.room_id == Room.id)
-                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED")
+                .where(Room.is_staff_room == False, Room.room_number != "000")
                 .having(func.coalesce(occ_subq.c.occ, 0) < Room.max_occupancy)
                 .group_by(Room.id, Room.room_number, Room.max_occupancy, occ_subq.c.occ)
                 .order_by(Room.room_number)
@@ -327,7 +327,7 @@ async def get_kpi_detail(
                 select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.agreed_rent)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
-                .where(Room.is_staff_room == False, Room.room_number != "UNASSIGNED", Tenancy.status == TenancyStatus.active)
+                .where(Room.is_staff_room == False, Room.room_number != "000", Tenancy.status == TenancyStatus.active)
                 .order_by(Room.room_number)
             )).all()
             return {"type": type, "items": [
@@ -399,7 +399,7 @@ async def get_kpi_detail(
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
-                    Room.room_number != "UNASSIGNED",
+                    Room.room_number != "000",
                     Tenancy.status == TenancyStatus.no_show,
                 )
                 .order_by(Tenancy.checkin_date)
@@ -424,7 +424,7 @@ async def get_kpi_detail(
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     Room.is_staff_room == False,
-                    Room.room_number != "UNASSIGNED",
+                    Room.room_number != "000",
                     Tenancy.status == TenancyStatus.active,
                     Tenancy.stay_type == StayType.monthly,
                     Tenancy.notice_date != None,

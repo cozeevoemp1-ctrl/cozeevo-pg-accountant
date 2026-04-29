@@ -44,7 +44,7 @@ async def get_checkouts(
                 Tenancy.checkout_date >= month_start,
                 Tenancy.checkout_date <= month_end,
                 Room.is_staff_room == False,
-                Room.room_number != "UNASSIGNED",
+                Room.room_number != "000",
             )
             .order_by(Tenancy.checkout_date.desc(), Room.room_number)
         )).all()

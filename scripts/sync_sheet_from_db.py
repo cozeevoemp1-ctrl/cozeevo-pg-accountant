@@ -572,7 +572,7 @@ async def main(args):
             .join(Room, Room.id == Tenancy.room_id)
             .where(
                 Room.is_staff_room == False,
-                Room.room_number != "UNASSIGNED",
+                Room.room_number != "000",
                 Tenancy.stay_type == StayType.daily,
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.checkin_date <= date.today(),

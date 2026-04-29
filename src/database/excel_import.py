@@ -242,16 +242,16 @@ async def run_import(write: bool) -> None:
                 room_by_num[r.room_number] = r
 
         # Pre-load dummy room for future no-shows (May bookings etc.)
-        dummy_room = room_by_num.get("UNASSIGNED")
+        dummy_room = room_by_num.get("000")
         if not dummy_room:
             dummy_room = Room(
-                property_id=thor.id, room_number="UNASSIGNED", floor=0,
+                property_id=thor.id, room_number="000", floor=0,
                 room_type="single", max_occupancy=1, active=False,
                 notes="Dummy room for future no-shows with no room assigned",
             )
             session.add(dummy_room)
             await session.flush()
-            room_by_num["UNASSIGNED"] = dummy_room
+            room_by_num["000"] = dummy_room
             print("  + Created UNASSIGNED dummy room for future no-shows")
 
         all_staff = (await session.execute(select(Staff))).scalars().all()
@@ -263,12 +263,12 @@ async def run_import(write: bool) -> None:
             # 1. Normalize room number (handle edge cases)
             room_num = rec['room']
             if not room_num:
-                room_num = "UNASSIGNED"
+                room_num = "000"
                 print(f"  WARN: no room for {rec['name']} — assigning UNASSIGNED")
 
             # Edge case: "May" = future no-show, no room assigned
             if room_num.upper() == 'MAY':
-                room_num = "UNASSIGNED"
+                room_num = "000"
 
             # Edge case: "617/416" or "617/621" → use first room number
             if '/' in room_num:
@@ -279,7 +279,7 @@ async def run_import(write: bool) -> None:
             room = room_by_num.get(room_num)
             if not room:
                 print(f"  WARN: room {room_num} not in DB — {rec['name']} → UNASSIGNED")
-                room = room_by_num["UNASSIGNED"]
+                room = room_by_num["000"]
 
             # 3. Resolve or create tenant (dedup by phone+name)
             #    Two people can share a phone (roommates/family) — use both as key
