@@ -125,7 +125,10 @@ Kiran's Excel (offline)
 | `src/database/models.py` | ORM models |
 | `src/database/migrate_all.py` | Master migration (append only, never remove) |
 | `src/api/v2/notices.py` | GET /notices/active — tenants on notice (deposit eligible vs forfeited) |
+| `src/api/v2/rooms.py` | GET /rooms/check — room availability check (free beds, occupants) |
+| `services/room_transfer.py` | Shared execute_room_transfer() — single source of truth for bot + PWA |
 | `web/app/notices/page.tsx` | PWA Notices page — list tenants on notice with expected checkout + refund status |
+| `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, notice management, Transfer Room panel |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations
