@@ -392,15 +392,14 @@ async def update_tenant(
                     RentSchedule.period_month == _period,
                 )
             )
-            from decimal import Decimal as _D2
             if _rs:
-                _rs.rent_due = _D2(str(_prorated))
+                _rs.rent_due = _D(str(_prorated))
                 session.add(_rs)
             else:
                 session.add(RentSchedule(
                     tenancy_id=tenancy_id,
                     period_month=_period,
-                    rent_due=_D2(str(_prorated)),
+                    rent_due=_D(str(_prorated)),
                     org_id=tenancy.org_id,
                 ))
 
