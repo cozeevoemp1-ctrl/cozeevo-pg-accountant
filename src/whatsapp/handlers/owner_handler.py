@@ -2525,36 +2525,8 @@ async def resolve_pending_action(
 
         if step == "final_confirm":
             if is_affirmative(reply_text):
-                new_rent = action_data.get("new_rent")
-                extra_deposit = action_data.get("extra_deposit", 0)
                 action_data["changed_by"] = pending.phone
-                result = await _do_room_transfer(action_data, session)
-
-                # Always update current month RS to prorated amount (stored in action_data)
-                current_period = date.today().replace(day=1)
-                rs = await session.scalar(
-                    select(RentSchedule).where(
-                        RentSchedule.tenancy_id == action_data["tenancy_id"],
-                        RentSchedule.period_month == current_period,
-                    )
-                )
-                if rs and action_data.get("this_month_prorated") is not None:
-                    rs.rent_due = Decimal(str(action_data["this_month_prorated"]))
-
-                if extra_deposit > 0:
-                    tenancy = await session.get(Tenancy, action_data["tenancy_id"])
-                    if tenancy:
-                        tenancy.security_deposit = (tenancy.security_deposit or 0) + Decimal(str(extra_deposit))
-                        result += f"\nDeposit increased by Rs.{int(extra_deposit):,}"
-                        # Systemic rule: any tenancy field change → sheet sync.
-                        try:
-                            import asyncio as _aio
-                            from src.integrations.gsheets import sync_tenant_all_fields as _sta
-                            _aio.create_task(_sta(tenancy.tenant_id))
-                        except Exception:
-                            pass
-
-                return result
+                return await _do_room_transfer(action_data, session)
             return "Room transfer cancelled."
 
         return None
@@ -6499,70 +6471,17 @@ async def _finalize_room_transfer(
 
 
 async def _do_room_transfer(action_data: dict, session: AsyncSession) -> str:
-    tenancy = await session.scalar(
-        select(Tenancy).where(Tenancy.id == action_data["tenancy_id"]).with_for_update()
-    )
-    if not tenancy:
-        return "Tenancy record not found."
-
-    old_room = action_data["from_room"]
-    new_room_number = action_data["to_room_number"]
-    tenant_name = action_data["tenant_name"]
-
-    # Update DB
-    tenancy.room_id = action_data["to_room_id"]
-
-    # Update rent if changed
-    new_rent = action_data.get("new_rent")
-    if new_rent:
-        tenancy.agreed_rent = Decimal(str(new_rent))
-
-    # Audit log
-    from src.database.models import AuditLog
-    session.add(AuditLog(
-        changed_by=action_data.get("changed_by", "system"),
-        entity_type="tenancy",
-        entity_id=tenancy.id,
-        entity_name=tenant_name,
-        field="room_id",
-        old_value=old_room,
-        new_value=new_room_number,
-        room_number=new_room_number,
+    from services.room_transfer import execute_room_transfer
+    result = await execute_room_transfer(
+        tenancy_id=action_data["tenancy_id"],
+        to_room_number=action_data["to_room_number"],
+        new_rent=action_data.get("new_rent"),
+        extra_deposit=action_data.get("extra_deposit", 0),
+        changed_by=action_data.get("changed_by", "whatsapp"),
         source="whatsapp",
-        note=f"Room transfer: {old_room} -> {new_room_number}",
-    ))
-
-    # Google Sheet sync — fire-and-forget but covers BOTH tabs:
-    # 1. TENANTS master tab Room column (uses old name match, sets new room)
-    # 2. Trigger full monthly sheet sync (handles row-key change correctly,
-    #    far easier than patching cell-by-cell when the lookup key itself
-    #    is what's changing). Same approach for rent if changed.
-    gsheets_note = ""
-    import asyncio as _aio
-    from src.integrations import gsheets as _gs
-    try:
-        _aio.create_task(_gs.update_tenants_tab_field(
-            old_room, tenant_name, "room", new_room_number
-        ))
-        if new_rent:
-            _aio.create_task(_gs.update_tenants_tab_field(
-                new_room_number, tenant_name, "agreed_rent", int(new_rent)
-            ))
-        today = date.today()
-        _gs.trigger_monthly_sheet_sync(today.month, today.year)
-        gsheets_note = "\nSheet update queued"
-    except Exception:
-        pass
-
-    rent_note = ""
-    if new_rent:
-        rent_note = f"\nNew rent: Rs.{int(new_rent):,}/mo"
-
-    return (
-        f"Room transferred — *{tenant_name}*\n"
-        f"Room *{old_room}* -> Room *{new_room_number}*"
-        f"{rent_note}{gsheets_note}"
+        session=session,
     )
+    return result["message"]
 
 
 async def _query_beds_by_gender(gender: str, building_filter: str | None, session: AsyncSession) -> str:
