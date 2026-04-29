@@ -160,7 +160,7 @@ export default function EditTenantPage() {
 
   if (success) {
     return (
-      <main className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 gap-5">
+      <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />

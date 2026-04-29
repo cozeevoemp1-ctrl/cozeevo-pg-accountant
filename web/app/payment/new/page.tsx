@@ -139,7 +139,7 @@ export default function NewPaymentPage() {
 
   if (success) {
     return (
-      <main className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 gap-5">
+      <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
         <div className="text-center">
           <h1 className="text-xl font-extrabold text-ink">Payment Saved!</h1>
