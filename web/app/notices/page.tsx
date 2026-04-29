@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getActiveNotices, NoticeItem } from "@/lib/api"
+import { TenantSearch } from "@/components/forms/tenant-search"
 
 const NOTICE_BY_DAY = 5
 
@@ -27,9 +28,10 @@ function daysLabel(days: number): { text: string; color: string } {
 
 export default function NoticesPage() {
   const router = useRouter()
-  const [items,   setItems]   = useState<NoticeItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState("")
+  const [items,      setItems]      = useState<NoticeItem[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState("")
+  const [showSearch, setShowSearch] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -65,6 +67,12 @@ export default function NoticesPage() {
             {items.length}
           </span>
         )}
+        <button
+          onClick={() => setShowSearch(true)}
+          className="rounded-pill bg-brand-pink px-4 py-1.5 text-white text-xs font-bold active:opacity-80"
+        >
+          + Notice
+        </button>
         <button
           onClick={load}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted text-sm font-bold"
@@ -122,6 +130,29 @@ export default function NoticesPage() {
           </div>
         )}
       </div>
+
+      {/* Add Notice — tenant search sheet */}
+      {showSearch && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
+          <div className="relative bg-bg rounded-t-2xl px-4 pt-4 pb-10 flex flex-col gap-4 max-w-lg mx-auto w-full">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-extrabold text-ink">Add Notice — select tenant</p>
+              <button onClick={() => setShowSearch(false)} className="text-ink-muted font-bold text-lg leading-none">✕</button>
+            </div>
+            <TenantSearch
+              placeholder="Search by name, room, phone…"
+              onSelect={(t) => {
+                setShowSearch(false)
+                router.push(`/tenants/${t.tenancy_id}/edit`)
+              }}
+            />
+            <p className="text-[10px] text-ink-muted text-center">
+              You'll be taken to the tenant edit page — scroll to the Notice section to set the date
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
