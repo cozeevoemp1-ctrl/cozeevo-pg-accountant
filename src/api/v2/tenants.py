@@ -104,12 +104,15 @@ async def search_tenants(
         raise HTTPException(status_code=400, detail="q must not be empty")
 
     term = q.strip().lower()
-    # Numeric queries (e.g. "420") match room number exactly; avoids phone hits
-    room_filter = (
-        func.lower(Room.room_number) == term
-        if term.isdigit()
-        else func.lower(Room.room_number).contains(term)
-    )
+    # Numeric query → exact room match only (skip name/phone to avoid phone-number hits)
+    if term.isdigit():
+        match_clause = func.lower(Room.room_number) == term
+    else:
+        match_clause = or_(
+            func.lower(Tenant.name).contains(term),
+            func.lower(Room.room_number).contains(term),
+            func.lower(Tenant.phone).contains(term),
+        )
 
     async with get_session() as session:
         stmt = (
@@ -119,11 +122,7 @@ async def search_tenants(
             .join(Property, Room.property_id == Property.id)
             .where(
                 Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
-                or_(
-                    func.lower(Tenant.name).contains(term),
-                    room_filter,
-                    func.lower(Tenant.phone).contains(term),
-                ),
+                match_clause,
             )
             .order_by(Tenant.name)
             .limit(10)
