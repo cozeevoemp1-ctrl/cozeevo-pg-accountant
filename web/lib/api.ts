@@ -279,6 +279,7 @@ export interface PatchTenantBody {
   rent_change_reason?: string;
   notice_date?: string | null;
   room_number?: string;
+  prorate_this_month?: boolean;
 }
 
 export interface PatchTenantResponse {

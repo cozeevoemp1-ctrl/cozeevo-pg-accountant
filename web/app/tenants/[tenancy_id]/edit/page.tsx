@@ -55,6 +55,7 @@ export default function EditTenantPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [prorateChoice, setProrateChoice] = useState<"full" | "prorated">("full")
 
   useEffect(() => {
     if (!tenancyId) return
@@ -98,6 +99,11 @@ export default function EditTenantPage() {
     if (expectedCheckout !== origCheckout) changes.expected_checkout = expectedCheckout || null
     // Notes: send if changed from original (overwrites — user sees current value pre-filled)
     if (notes !== (original.notes || "")) changes.tenancy_notes = notes
+    // Proration — only send when rent or room is actually changing
+    const rentOrRoomChanged = changes.agreed_rent !== undefined || changes.room_number !== undefined
+    if (rentOrRoomChanged && proratedInfo) {
+      changes.prorate_this_month = prorateChoice === "prorated"
+    }
     return changes
   }
 
@@ -114,8 +120,16 @@ export default function EditTenantPage() {
         fields.push({ label: `${today.toLocaleString("en-IN", { month: "short" })} prorated (auto)`, value: `₹${proratedInfo.amount.toLocaleString("en-IN")} (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`, highlight: true })
       }
     }
-    if (changes.agreed_rent !== undefined)
+    if (changes.agreed_rent !== undefined) {
       fields.push({ label: "Agreed Rent", value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
+      if (proratedInfo) {
+        const monthName = new Date().toLocaleString("en-IN", { month: "short" })
+        const thisMonthAmt = prorateChoice === "prorated"
+          ? `₹${proratedInfo.amount.toLocaleString("en-IN")} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
+          : `₹${Number(changes.agreed_rent).toLocaleString("en-IN")} full month`
+        fields.push({ label: `${monthName} this month`, value: thisMonthAmt })
+      }
+    }
     if (changes.security_deposit !== undefined)
       fields.push({ label: "Security Deposit", value: `₹${Number(changes.security_deposit).toLocaleString("en-IN")}` })
     if (changes.maintenance_fee !== undefined)
@@ -160,21 +174,14 @@ export default function EditTenantPage() {
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
   const roomChanged = original && roomNumber.trim() && roomNumber.trim().toUpperCase() !== original.room_number.toUpperCase()
 
-  // Prorated calc for mid-month room transfer (read-only)
+  // Prorated calc — shown whenever rent or room changes mid-month
   const proratedInfo = (() => {
-    if (!roomChanged) return null
+    if (!rentChanged && !roomChanged) return null
     const rent = Number(agreedRent) || 0
     if (!rent) return null
     const today = new Date()
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-    const checkinIso = original?.checkin_date
-    let pivotDay = today.getDate()
-    if (checkinIso) {
-      const checkin = new Date(checkinIso + "T00:00:00")
-      const sameMonth = checkin.getFullYear() === today.getFullYear() && checkin.getMonth() === today.getMonth()
-      if (sameMonth) pivotDay = checkin.getDate()
-    }
-    const remaining = daysInMonth - pivotDay + 1
+    const remaining = daysInMonth - today.getDate() + 1
     const amount = Math.floor(rent * remaining / daysInMonth)
     return { amount, remaining, daysInMonth }
   })()
@@ -278,13 +285,6 @@ export default function EditTenantPage() {
               </p>
             )
           )}
-          {proratedInfo && (
-            <div className="rounded-tile bg-tile-green border border-[#D1FAE5] px-3 py-2.5 mt-1">
-              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">This month prorated (auto)</p>
-              <p className="text-sm font-extrabold text-status-paid">₹{proratedInfo.amount.toLocaleString("en-IN")}</p>
-              <p className="text-[10px] text-ink-muted mt-0.5">{proratedInfo.remaining}/{proratedInfo.daysInMonth} days × ₹{Number(agreedRent).toLocaleString("en-IN")}/mo</p>
-            </div>
-          )}
         </div>
 
         {/* Personal details */}
@@ -342,6 +342,39 @@ export default function EditTenantPage() {
               </p>
             )}
           </div>
+
+          {/* Proration toggle — shown whenever rent or room changes */}
+          {proratedInfo && (
+            <div className="rounded-tile border border-[#E2DEDD] bg-[#FAFAF8] p-3 flex flex-col gap-2">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
+                This month ({new Date().toLocaleString("en-IN", { month: "long" })}) — {proratedInfo.remaining} of {proratedInfo.daysInMonth} days remaining
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProrateChoice("full")}
+                  className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 transition-colors ${
+                    prorateChoice === "full"
+                      ? "bg-brand-pink text-white border-brand-pink"
+                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                  }`}
+                >
+                  Full ₹{Number(agreedRent).toLocaleString("en-IN")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProrateChoice("prorated")}
+                  className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 transition-colors ${
+                    prorateChoice === "prorated"
+                      ? "bg-brand-pink text-white border-brand-pink"
+                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                  }`}
+                >
+                  Prorated ₹{proratedInfo.amount.toLocaleString("en-IN")}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Security Deposit (₹)</label>

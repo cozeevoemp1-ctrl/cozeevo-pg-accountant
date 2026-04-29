@@ -182,19 +182,17 @@ async def _apply_tenant_notes_from_payment(action_data: dict, session: AsyncSess
         source="whatsapp",
     ))
     try:
-        from src.integrations.gsheets import sync_tenants_tab_notes, update_notes
+        from src.integrations.gsheets import sync_tenants_tab_notes, trigger_monthly_sheet_sync
         import asyncio as _aio
+        from datetime import date as _date
         _nv = new_notes or ""
         _aio.create_task(sync_tenants_tab_notes(
             action_data.get("room_number", ""),
             action_data.get("tenant_name", ""),
             _nv,
         ))
-        _aio.create_task(update_notes(
-            action_data.get("room_number", ""),
-            action_data.get("tenant_name", ""),
-            _nv,
-        ))
+        _t = _date.today()
+        trigger_monthly_sheet_sync(_t.month, _t.year)
     except Exception as _e:
         import logging as _log
         _log.getLogger(__name__).error("Notes sheet sync failed in combined flow: %s", _e)
@@ -3808,14 +3806,15 @@ async def resolve_pending_action(
                 # Sync BOTH sheet tabs: TENANTS (master) + current monthly tab.
                 _notes_value = new_notes if notes_action == "update" else ""
                 try:
-                    from src.integrations.gsheets import sync_tenants_tab_notes, update_notes
+                    from src.integrations.gsheets import sync_tenants_tab_notes, trigger_monthly_sheet_sync
                     import asyncio as _aio
+                    from datetime import date as _date
                     _aio.create_task(sync_tenants_tab_notes(
                         action_data["room_number"], action_data["tenant_name"], _notes_value,
                     ))
-                    _aio.create_task(update_notes(
-                        action_data["room_number"], action_data["tenant_name"], _notes_value,
-                    ))
+                    # Full monthly tab rebuild ensures notes are visible even if direct write fails
+                    _t = _date.today()
+                    trigger_monthly_sheet_sync(_t.month, _t.year)
                 except Exception as e:
                     import logging as _log
                     _log.getLogger(__name__).error("Notes sheet sync failed: %s", e)

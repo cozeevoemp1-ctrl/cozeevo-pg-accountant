@@ -377,6 +377,33 @@ async def update_tenant(
                         _prorated = int(float(tenancy.agreed_rent or 0) * _remaining / _dim)
                         _rs.rent_due = _D(str(_prorated))
 
+        # Rent-only proration: when prorate_this_month=True and no room change
+        if body.get("prorate_this_month") and "agreed_rent" in body and "room_number" not in body:
+            import calendar as _cal
+            from decimal import Decimal as _D
+            _today = date.today()
+            _period = _today.replace(day=1)
+            _dim = _cal.monthrange(_today.year, _today.month)[1]
+            _remaining = _dim - _today.day + 1
+            _prorated = int(float(body["agreed_rent"]) * _remaining / _dim)
+            _rs = await session.scalar(
+                select(RentSchedule).where(
+                    RentSchedule.tenancy_id == tenancy_id,
+                    RentSchedule.period_month == _period,
+                )
+            )
+            from decimal import Decimal as _D2
+            if _rs:
+                _rs.rent_due = _D2(str(_prorated))
+                session.add(_rs)
+            else:
+                session.add(RentSchedule(
+                    tenancy_id=tenancy_id,
+                    period_month=_period,
+                    rent_due=_D2(str(_prorated)),
+                    org_id=tenancy.org_id,
+                ))
+
         room_number = room.room_number
         session.add(tenancy)
         session.add(tenant)
@@ -385,7 +412,10 @@ async def update_tenant(
         await session.refresh(tenant)
 
     today = date.today()
-    from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, record_notice
+    from src.integrations.gsheets import (
+        trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, record_notice,
+        sync_tenants_tab_field, sync_tenants_tab_notes,
+    )
     import asyncio
 
     is_daily = tenancy.stay_type.value == "daily"
@@ -396,6 +426,24 @@ async def update_tenant(
         asyncio.create_task(
             record_notice(room_number, tenant.name, notice_val, checkout_val)
         )
+
+    # Mirror changed fields to TENANTS master tab
+    if "agreed_rent" in body:
+        asyncio.create_task(sync_tenants_tab_field(
+            room_number, tenant.name, "Agreed Rent", str(int(float(body["agreed_rent"]))),
+        ))
+    if "maintenance_fee" in body:
+        asyncio.create_task(sync_tenants_tab_field(
+            room_number, tenant.name, "Maintenance", str(int(float(body["maintenance_fee"]))),
+        ))
+    if "security_deposit" in body:
+        asyncio.create_task(sync_tenants_tab_field(
+            room_number, tenant.name, "Deposit", str(int(float(body["security_deposit"]))),
+        ))
+    if "tenancy_notes" in body:
+        asyncio.create_task(sync_tenants_tab_notes(
+            room_number, tenant.name, body.get("tenancy_notes") or "",
+        ))
 
     if is_daily:
         trigger_daywise_sheet_sync()

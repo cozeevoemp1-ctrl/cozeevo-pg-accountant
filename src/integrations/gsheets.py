@@ -1914,6 +1914,75 @@ async def sync_tenants_tab_notes(
     return result
 
 
+# -- Generic TENANTS tab field updater ----------------------------------------
+
+def _update_tenants_tab_field_sync(
+    room_number: str, tenant_name: str, field_header: str, new_value: str
+) -> dict:
+    """Update any single field in the TENANTS master tab by column header name."""
+    result: dict[str, Any] = {"success": False, "error": None}
+    try:
+        ws = _get_worksheet_sync("TENANTS")
+        all_vals = ws.get_all_values()
+        header = all_vals[0] if all_vals else []
+        col_idx = None
+        for i, h in enumerate(header):
+            if h.strip().lower() == field_header.strip().lower():
+                col_idx = i
+                break
+        if col_idx is None:
+            result["error"] = f"Column '{field_header}' not found in TENANTS tab"
+            return result
+
+        room_clean = room_number.strip().upper()
+        name_lower = tenant_name.strip().lower()
+        for i in range(1, len(all_vals)):
+            r = all_vals[i]
+            if not r or len(r) < 2:
+                continue
+            if (str(r[0]).strip().upper() == room_clean and
+                    name_lower in str(r[1]).strip().lower()):
+                cell = gspread.utils.rowcol_to_a1(i + 1, col_idx + 1)
+                ws.update(values=[[new_value]], range_name=cell, value_input_option="USER_ENTERED")
+                result["success"] = True
+                logger.info("GSheets: updated TENANTS.%s = %r for %s row %d", field_header, new_value, tenant_name, i + 1)
+                return result
+
+        result["error"] = f"Row not found for {room_number}/{tenant_name} in TENANTS"
+    except Exception as e:
+        result["error"] = f"TENANTS field update failed: {e}"
+        logger.error("GSheets: _update_tenants_tab_field_sync failed: %s", e)
+    return result
+
+
+async def sync_tenants_tab_field(
+    room_number: str,
+    tenant_name: str,
+    field_header: str,
+    new_value: str,
+    max_retries: int = 3,
+) -> dict:
+    """Async wrapper — update any single field in the TENANTS master tab with retry."""
+    result: dict = {}
+    for attempt in range(max_retries):
+        result = await asyncio.to_thread(
+            _update_tenants_tab_field_sync, room_number, tenant_name, field_header, new_value
+        )
+        if result.get("success"):
+            return result
+        if attempt < max_retries - 1:
+            await asyncio.sleep(1 * (attempt + 1))
+            logger.warning(
+                "GSheets TENANTS field sync retry %d/%d for %s.%s: %s",
+                attempt + 1, max_retries, tenant_name, field_header, result.get("error"),
+            )
+    logger.error(
+        "GSheets TENANTS field sync FAILED after %d retries for %s.%s: %s",
+        max_retries, tenant_name, field_header, result.get("error"),
+    )
+    return result
+
+
 # -- Update KYC gender on TENANTS tab after onboarding approval ----------------
 
 def _update_tenant_gender_sync(phone: str, gender: str) -> dict:
