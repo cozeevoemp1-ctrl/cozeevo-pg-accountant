@@ -50,16 +50,6 @@ async def route(
     # Stash raw message in entities so handlers can access it without signature change
     entities.setdefault("_raw_message", message)
 
-    # Tenant checkout responses — bypass role checks (tenant replies YES/NO)
-    if intent == "CHECKOUT_AGREE":
-        from src.whatsapp.handlers.owner_handler import _handle_checkout_agree
-        return await _handle_checkout_agree(ctx.phone, session)
-
-    if intent == "CHECKOUT_REJECT":
-        reason = (entities or {}).get("reason", "")
-        from src.whatsapp.handlers.owner_handler import _handle_checkout_reject
-        return await _handle_checkout_reject(ctx.phone, reason, session)
-
     if ctx.role in OWNER_ROLES:
         if intent in FINANCIAL_INTENTS:
             return await handle_account(intent, entities, ctx, session)

@@ -6,7 +6,6 @@ GET  /api/v2/app/checkout/status/{token}       — poll session status (JWT-prot
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from datetime import date, datetime, time as dt_time, timedelta
 from decimal import Decimal
@@ -25,7 +24,7 @@ from src.database.models import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-SESSION_TTL_HOURS = 2
+SESSION_TTL_MINUTES = 5
 
 
 # ── GET prefetch ─────────────────────────────────────────────────────────────
@@ -104,7 +103,6 @@ async def create_checkout(
         tenant = await session.get(Tenant, tenancy.tenant_id)
         if not tenant:
             raise HTTPException(404, "Tenant not found")
-        room = await session.get(Room, tenancy.room_id)
 
         # Store checkout time for day-wise stays
         if body.checkout_time and tenancy.stay_type.value == "daily":
@@ -126,7 +124,7 @@ async def create_checkout(
 
         cs = CheckoutSession(
             token                 = str(uuid.uuid4()),
-            status                = CheckoutSessionStatus.pending.value,
+            status                = CheckoutSessionStatus.confirmed.value,
             created_by_phone      = user.phone or user.user_id or "pwa",
             tenant_phone          = tenant.phone,
             tenancy_id            = body.tenancy_id,
@@ -142,48 +140,18 @@ async def create_checkout(
             deduction_reason      = body.deduction_reason or None,
             refund_amount         = Decimal(str(body.refund_amount)),
             refund_mode           = body.refund_mode or None,
-            expires_at            = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS),
+            expires_at            = datetime.utcnow() + timedelta(minutes=SESSION_TTL_MINUTES),
         )
         session.add(cs)
         await session.flush()
 
-        base_url     = os.getenv("BASE_URL", "https://api.getkozzy.com")
-        confirm_link = f"{base_url}/checkout/{cs.token}"
-
-        room_number = room.room_number if room else "?"
-        refund_line = (
-            f"Rs.{int(cs.refund_amount):,} via {cs.refund_mode.upper()}"
-            if cs.refund_amount > 0 else "Rs.0 (no refund)"
-        )
-        date_str = checkout_date_obj.strftime("%d %b %Y")
-        phone_wa = f"+91{tenant.phone}" if not tenant.phone.startswith("+") else tenant.phone
-
-        try:
-            from src.whatsapp.webhook_handler import _send_whatsapp_template, _send_whatsapp
-            sent = await _send_whatsapp_template(
-                phone_wa, "checkout_review",
-                [tenant.name, room_number, date_str, refund_line],
-                url_button_token=cs.token,
-            )
-            if not sent:
-                msg = (
-                    f"Hi {tenant.name}, your checkout from Room {room_number} "
-                    f"on {date_str} has been recorded.\n\n"
-                    f"Refund: {refund_line}\n\n"
-                    f"Please review and confirm or dispute:\n"
-                    f"{confirm_link}\n\n"
-                    f"If no response in 2 hours, this will be auto-confirmed."
-                )
-                await _send_whatsapp(phone_wa, msg)
-        except Exception as e:
-            logger.warning("WhatsApp notification failed for checkout: %s", e)
+        from src.whatsapp.handlers.owner_handler import _do_confirm_checkout
+        await _do_confirm_checkout(cs, session)
 
         await session.commit()
         return {
-            "status":       "pending",
-            "token":        cs.token,
-            "confirm_link": confirm_link,
-            "expires_at":   cs.expires_at.isoformat(),
+            "status": "confirmed",
+            "token":  cs.token,
         }
 
 

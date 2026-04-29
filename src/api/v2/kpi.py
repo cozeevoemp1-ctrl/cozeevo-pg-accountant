@@ -231,7 +231,7 @@ async def get_kpi_detail(
 
         elif type == "checkouts_today":
             rows = (await session.execute(
-                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.stay_type)
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.stay_type, Tenancy.status)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(Tenancy.checkout_date == today)
@@ -240,8 +240,9 @@ async def get_kpi_detail(
             return {"type": type, "items": [
                 {
                     "tenancy_id": r.id, "name": r.name, "room": r.room_number,
-                    "detail": "Check-out today",
+                    "detail": "Checked out" if (r.status.value if hasattr(r.status, "value") else str(r.status)) == "exited" else "Check-out today",
                     "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
+                    "is_checked_out": (r.status.value if hasattr(r.status, "value") else str(r.status)) == "exited",
                 }
                 for r in rows
             ]}

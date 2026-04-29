@@ -448,16 +448,22 @@ export function KpiGrid({ data }: KpiGridProps) {
                       </div>
                     </button>
                     {open === "checkouts_today" && (
-                      <Link
-                        href="/checkout/new"
-                        className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
-                      >
-                        Check-out →
-                      </Link>
+                      item.is_checked_out ? (
+                        <span className="ml-2 flex-shrink-0 text-[10px] font-bold text-[#A0A0A0] bg-[#E8E8E8] px-2.5 py-1 rounded-full cursor-not-allowed">
+                          Checked out
+                        </span>
+                      ) : (
+                        <Link
+                          href={item.tenancy_id ? `/checkout/new?tenancy_id=${item.tenancy_id}` : "/checkout/new"}
+                          className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                        >
+                          Check-out →
+                        </Link>
+                      )
                     )}
                     {open === "checkins_today" && (
                       <Link
-                        href="/checkin/new"
+                        href={item.tenancy_id ? `/checkin/new?tenancy_id=${item.tenancy_id}` : "/checkin/new"}
                         className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
                       >
                         Check-in →

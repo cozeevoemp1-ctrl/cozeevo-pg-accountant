@@ -134,7 +134,6 @@ async def create_checkout_session(req: CreateCheckoutRequest, request: Request):
         tenant = await session.get(Tenant, tenancy.tenant_id)
         if not tenant:
             raise HTTPException(404, "Tenant not found")
-        room = await session.get(Room, tenancy.room_id)
 
         # Cancel any existing pending session for this tenancy
         from sqlalchemy import select as _sel
@@ -149,7 +148,7 @@ async def create_checkout_session(req: CreateCheckoutRequest, request: Request):
 
         cs = CheckoutSession(
             token                 = str(uuid.uuid4()),
-            status                = CheckoutSessionStatus.pending.value,
+            status                = CheckoutSessionStatus.confirmed.value,
             created_by_phone      = req.created_by_phone or "unknown",
             tenant_phone          = tenant.phone,
             tenancy_id            = req.tenancy_id,
@@ -170,44 +169,13 @@ async def create_checkout_session(req: CreateCheckoutRequest, request: Request):
         session.add(cs)
         await session.flush()
 
-        import os as _os
-        base_url = _os.getenv("BASE_URL", "https://api.getkozzy.com")
-        confirm_link = f"{base_url}/checkout/{cs.token}"
-
-        room_number = room.room_number if room else "?"
-        refund_line = (
-            f"Rs.{int(cs.refund_amount):,} via {cs.refund_mode.upper()}"
-            if cs.refund_amount > 0 else "Rs.0 (no refund)"
-        )
-        date_str = checkout_date.strftime('%d %b %Y')
-
-        phone_wa = f"+91{tenant.phone}" if not tenant.phone.startswith("+") else tenant.phone
-        try:
-            from src.whatsapp.webhook_handler import _send_whatsapp_template, _send_whatsapp
-            sent = await _send_whatsapp_template(
-                phone_wa, "checkout_review",
-                [tenant.name, room_number, date_str, refund_line],
-                url_button_token=cs.token,
-            )
-            if not sent:
-                # Fallback: free-form (works only if tenant messaged bot within 24h)
-                msg = (
-                    f"Hi {tenant.name}, your checkout from Room {room_number} "
-                    f"on {date_str} has been recorded.\n\n"
-                    f"Refund: {refund_line}\n\n"
-                    f"Please review and confirm or dispute:\n"
-                    f"{confirm_link}\n\n"
-                    f"If no response in 2 hours, this will be auto-confirmed."
-                )
-                await _send_whatsapp(phone_wa, msg)
-        except Exception as _e:
-            logger.warning("WhatsApp send failed for checkout request: %s", _e)
+        from src.whatsapp.handlers.owner_handler import _do_confirm_checkout
+        await _do_confirm_checkout(cs, session)
 
         await session.commit()
         return {
-            "status": "pending",
+            "status": "confirmed",
             "token": cs.token,
-            "expires_at": cs.expires_at.isoformat(),
         }
 
 

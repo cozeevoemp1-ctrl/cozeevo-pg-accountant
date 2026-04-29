@@ -216,18 +216,8 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    from apscheduler.triggers.interval import IntervalTrigger
-
-    scheduler.add_job(
-        _auto_confirm_checkout_sessions,
-        trigger=IntervalTrigger(minutes=15),
-        id="checkout_auto_confirm",
-        name="Checkout auto-confirm — expired 2hr sessions",
-        replace_existing=True,
-    )
-
     scheduler.start()
-    logger.info("[Scheduler] Started — 10 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 9 jobs registered (jobs persist in Supabase)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -935,66 +925,6 @@ async def _checkout_deposit_alerts() -> None:
         await engine2.dispose()
 
 
-# ── Job: Checkout Auto-Confirm ────────────────────────────────────────────────
-
-async def _auto_confirm_checkout_sessions() -> None:
-    """
-    Every 15 min: find pending CheckoutSessions whose 2-hr window has expired.
-    Auto-confirm each, write DB, sync Sheet, send WhatsApp to tenant + receptionist.
-    """
-    from sqlalchemy import select
-    from src.database.db_manager import get_session
-    from src.database.models import CheckoutSession, CheckoutSessionStatus, Tenancy, Room
-    from src.whatsapp.handlers.owner_handler import _do_confirm_checkout
-    from src.whatsapp.webhook_handler import _send_whatsapp
-    from datetime import datetime
-
-    async with get_session() as session:
-        expired = (await session.execute(
-            select(CheckoutSession).where(
-                CheckoutSession.status == CheckoutSessionStatus.pending.value,
-                CheckoutSession.expires_at <= datetime.utcnow(),
-            )
-        )).scalars().all()
-
-        for cs in expired:
-            try:
-                cs.status = CheckoutSessionStatus.auto_confirmed.value
-                summary = await _do_confirm_checkout(cs, session)
-
-                tenancy = await session.get(Tenancy, cs.tenancy_id)
-                room    = await session.get(Room, tenancy.room_id) if tenancy else None
-                room_no = room.room_number if room else "?"
-
-                tenant_phone = (
-                    f"+91{cs.tenant_phone}"
-                    if not cs.tenant_phone.startswith("+")
-                    else cs.tenant_phone
-                )
-                refund_line = (
-                    f"Refund of Rs.{int(cs.refund_amount):,} will be processed by receptionist now."
-                    if cs.refund_amount > 0 else ""
-                )
-                confirmed_msg = (
-                    f"Your checkout from Room {room_no} on "
-                    f"{cs.checkout_date.strftime('%d %b %Y')} is confirmed.\n"
-                    + (f"{refund_line}\n" if refund_line else "")
-                    + "Thank you for staying with Cozeevo."
-                )
-                await _send_whatsapp(tenant_phone, confirmed_msg)
-
-                recep_phone = (
-                    f"+91{cs.created_by_phone}"
-                    if not cs.created_by_phone.startswith("+")
-                    else cs.created_by_phone
-                )
-                await _send_whatsapp(recep_phone, f"[Auto-confirmed] {summary}")
-
-                await session.commit()
-                logger.info("Auto-confirmed checkout session %s", cs.token)
-            except Exception as _e:
-                logger.error("Auto-confirm failed for session %s: %s", cs.token, _e)
-                await session.rollback()
 
 
 # ── Job: Nightly Sheet Audit ──────────────────────────────────────────────────

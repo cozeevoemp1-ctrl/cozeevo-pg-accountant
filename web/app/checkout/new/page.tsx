@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, Suspense } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
@@ -8,7 +8,6 @@ import { Numpad } from "@/components/forms/numpad"
 import {
   getCheckoutPrefetch,
   createCheckout,
-  getCheckoutStatus,
   getTenantDues,
   TenantSearchResult,
   CheckoutPrefetch,
@@ -70,17 +69,18 @@ function NewCheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [tenant,       setTenant]       = useState<TenantSearchResult | null>(null)
-  const [prefetch,     setPrefetch]     = useState<CheckoutPrefetch | null>(null)
-  const [checkoutDate, setCheckoutDate] = useState(todayISO())
-  const [loadingPre,   setLoadingPre]   = useState(false)
+  const [tenant,        setTenant]        = useState<TenantSearchResult | null>(null)
+  const [tenantFromUrl, setTenantFromUrl] = useState(false)
+  const [prefetch,      setPrefetch]      = useState<CheckoutPrefetch | null>(null)
+  const [checkoutDate,  setCheckoutDate]  = useState(todayISO())
+  const [loadingPre,    setLoadingPre]    = useState(false)
 
   // Checklist
-  const [roomKey,      setRoomKey]      = useState(false)
-  const [wardrobeKey,  setWardrobeKey]  = useState(false)
-  const [biometric,    setBiometric]    = useState(false)
-  const [conditionOk,  setConditionOk]  = useState(true)
-  const [damageNotes,  setDamageNotes]  = useState("")
+  const [roomKey,     setRoomKey]     = useState(false)
+  const [wardrobeKey, setWardrobeKey] = useState(false)
+  const [biometric,   setBiometric]   = useState(false)
+  const [conditionOk, setConditionOk] = useState(true)
+  const [damageNotes, setDamageNotes] = useState("")
 
   // Financials
   const [deductions,      setDeductions]      = useState("0")
@@ -88,11 +88,11 @@ function NewCheckoutPage() {
   const [refundMode,      setRefundMode]      = useState<RefundMode>("CASH")
 
   // Form flow
-  const [showConfirm,  setShowConfirm]  = useState(false)
-  const [submitting,   setSubmitting]   = useState(false)
-  const [error,        setError]        = useState("")
-  const [result,       setResult]       = useState<CheckoutCreateResponse | null>(null)
-  const [pollStatus,   setPollStatus]   = useState<string>("")
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [submitting,  setSubmitting]  = useState(false)
+  const [error,       setError]       = useState("")
+  const [result,      setResult]      = useState<CheckoutCreateResponse | null>(null)
+  const [pollStatus,  setPollStatus]  = useState("")
 
   // Day-wise checkout time
   const [checkoutTime, setCheckoutTime] = useState(nowTime())
@@ -130,7 +130,7 @@ function NewCheckoutPage() {
 
   // Derived: refund = max(deposit - maintenance_fee - unpaid_rent - deductions, 0)
   // Forfeited deposits → auto refund = 0 (override available)
-  const deductionsNum  = Number(deductions) || 0
+  const deductionsNum = Number(deductions) || 0
   const autoRefund = prefetch && !depositForfeited
     ? Math.max(prefetch.security_deposit - prefetch.maintenance_fee - totalPendingDues - deductionsNum, 0)
     : 0
@@ -142,15 +142,16 @@ function NewCheckoutPage() {
     if (!tid) return
     getTenantDues(Number(tid)).then((d) => {
       setTenant({
-        tenancy_id: d.tenancy_id,
-        tenant_id: d.tenant_id,
-        name: d.name,
-        phone: d.phone,
-        room_number: d.room_number,
+        tenancy_id:    d.tenancy_id,
+        tenant_id:     d.tenant_id,
+        name:          d.name,
+        phone:         d.phone,
+        room_number:   d.room_number,
         building_code: d.building_code,
-        rent: d.rent,
-        status: "active",
+        rent:          d.rent,
+        status:        "active",
       })
+      setTenantFromUrl(true)
     }).catch(() => {})
   }, [searchParams])
 
@@ -173,6 +174,7 @@ function NewCheckoutPage() {
 
   function handleTenantSelect(t: TenantSearchResult) {
     setTenant(t)
+    setTenantFromUrl(false)
     setPrefetch(null)
     setError("")
     setDeductions("0")
@@ -226,23 +228,8 @@ function NewCheckoutPage() {
     }
   }
 
-  // Poll status every 5 seconds after submission
-  const pollFn = useCallback(async () => {
-    if (!result?.token) return
-    try {
-      const s = await getCheckoutStatus(result.token)
-      setPollStatus(s.status)
-    } catch { /* ignore */ }
-  }, [result?.token])
-
-  useEffect(() => {
-    if (!result) return
-    const id = setInterval(pollFn, 5000)
-    return () => clearInterval(id)
-  }, [result, pollFn])
-
   function resetForm() {
-    setTenant(null); setPrefetch(null)
+    setTenant(null); setTenantFromUrl(false); setPrefetch(null)
     setCheckoutDate(todayISO())
     setDeductions("0"); setDeductionReason("")
     setRoomKey(false); setWardrobeKey(false)
@@ -322,15 +309,33 @@ function NewCheckoutPage() {
 
       <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
 
-        {/* Tenant search */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
-          <TenantSearch
-            key={tenant?.tenancy_id ?? "empty"}
-            defaultTenant={tenant ?? undefined}
-            onSelect={handleTenantSelect}
-            placeholder="Search tenant by name, room, phone…"
-          />
-        </div>
+        {/* Tenant — locked banner when navigated from KPI tile, search otherwise */}
+        {tenantFromUrl && tenant ? (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Tenant</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-ink">{tenant.name}</p>
+                <p className="text-xs text-ink-muted">Room {tenant.room_number} · {tenant.building_code}</p>
+              </div>
+              <button
+                onClick={() => { setTenant(null); setTenantFromUrl(false); setPrefetch(null) }}
+                className="text-xs text-brand-pink font-semibold border border-brand-pink rounded-full px-3 py-1 active:opacity-70"
+              >
+                Change
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <TenantSearch
+              key={tenant?.tenancy_id ?? "empty"}
+              defaultTenant={tenant ?? undefined}
+              onSelect={handleTenantSelect}
+              placeholder="Search tenant by name, room, phone…"
+            />
+          </div>
+        )}
 
         {/* Checkout date (+ time for day-wise) */}
         {tenant && (

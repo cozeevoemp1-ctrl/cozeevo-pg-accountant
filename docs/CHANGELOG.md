@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.13] — 2026-04-29 — Checkout: remove tenant approval, immediate confirm
+
+### Changed
+- **`src/api/v2/checkout.py`** — `POST /checkout/create` now confirms immediately (no pending session, no WhatsApp template to tenant). `_do_confirm_checkout` called inline; returns `{"status": "confirmed"}`.
+- **`src/api/checkout_router.py`** — Same change for the old HTML admin form route.
+- **`src/scheduler.py`** — Removed `checkout_auto_confirm` job + `_auto_confirm_checkout_sessions` function (no longer needed).
+- **`src/whatsapp/chat_api.py`** — Removed YES/NO intercept block; removed `CheckoutSession/CheckoutSessionStatus` imports.
+- **`src/whatsapp/gatekeeper.py`** — Removed `CHECKOUT_AGREE` / `CHECKOUT_REJECT` routing.
+- **`src/whatsapp/handlers/owner_handler.py`** — Removed `_handle_checkout_agree` + `_handle_checkout_reject`. `_do_confirm_checkout` now sends a one-way WhatsApp notification to the tenant (not asking for approval).
+- **`web/app/checkout/new/page.tsx`** — Removed polling logic (`getCheckoutStatus`, `pollStatus`, `useCallback`). Success screen updated to "Checkout Done! · Tenant notified via WhatsApp".
+
+### Added
+- **`src/api/v2/kpi.py`** — `checkouts_today` tile now includes `status` + `is_checked_out` flag per item.
+- **`web/components/home/kpi-grid.tsx`** — Already-checked-out tenants show greyed "Checked out" badge instead of active "Check-out →" button.
+- **`web/lib/api.ts`** — `is_checked_out?: boolean` in `KpiDetailItem`.
+- **`src/api/v2/tenants.py`** — Room reassignment syncs `tenancy.sharing_type` to match new room's `room_type`.
+
+---
+
 ## [1.74.12] — 2026-04-29 — Back-nav header on all PWA success screens
 
 ### Added

@@ -18,6 +18,7 @@ from src.database.models import (
     RentRevision,
     RentSchedule,
     Room,
+    SharingType,
     Tenancy,
     TenancyStatus,
     Tenant,
@@ -103,6 +104,12 @@ async def search_tenants(
         raise HTTPException(status_code=400, detail="q must not be empty")
 
     term = q.strip().lower()
+    # Numeric queries (e.g. "420") match room number exactly; avoids phone hits
+    room_filter = (
+        func.lower(Room.room_number) == term
+        if term.isdigit()
+        else func.lower(Room.room_number).contains(term)
+    )
 
     async with get_session() as session:
         stmt = (
@@ -114,7 +121,7 @@ async def search_tenants(
                 Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
                 or_(
                     func.lower(Tenant.name).contains(term),
-                    func.lower(Room.room_number).contains(term),
+                    room_filter,
                     func.lower(Tenant.phone).contains(term),
                 ),
             )
@@ -340,6 +347,11 @@ async def update_tenant(
                     )
                 tenancy.room_id = new_room.id
                 room = new_room
+                # Sync sharing_type to match new room's type
+                try:
+                    tenancy.sharing_type = SharingType(new_room.room_type.value)
+                except (ValueError, AttributeError):
+                    pass
 
         room_number = room.room_number
         session.add(tenancy)
