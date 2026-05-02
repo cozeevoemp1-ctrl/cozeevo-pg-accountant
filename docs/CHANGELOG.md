@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.34] — 2026-05-02 — Full reconciliation: Source = Ops = DB for Nov'25–Apr'26
+
+### Fixed
+- **P&L income numbers corrected** — `scripts/export_pnl_2026_05_02.py` fixed against THOR history source sheet: Nov/Dec=0 (no data), Jan UPI corrected to 530,575 (was 1,335,224)
+- **Dec 2025 extra voided** — voided 1 erroneous payment (12,800) via `_void_extra.py`
+- **Mar 2026 extra voided** — voided 8-entry 12:xx batch (124,500) inserted Apr 27; approved batch (14:xx, 259 rows, 3,983,413) retained
+- **April 2026 reconciled** — voided 10 mismatched payments; un-voided Ashmit; added Navdeep +11,600, Nithin Krishna +2,516, Priyansh +16,000; added Siddharth Linge UPI 2,400; created tenants Delvin Raj (id=994) + Suraj SH (id=995) in room 000 with April payments
+- **Fixed NULL is_void** — 3 inserted records had is_void=NULL; patched via `_fix_null_voids.py`
+- **Ops sheet COLLECTION rows updated** — March and April COLLECTION cells patched to match DB totals (March was +124,500 stale; April was -23,016 stale)
+- **Audit script parse fix** — `_audit_all_months.py` parse() now rejects text notes ("19500/6500", "13000 Received by...") that corrupted March source total
+
+### Result
+All months Nov'25–Apr'26: Source = Ops sheet = DB. Zero diffs across all three sources.
+
+---
+
 ## [1.74.33] — 2026-05-02 — Overdue reminder uses rent_reminder template (not general_notice)
 
 ### Changed
