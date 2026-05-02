@@ -539,14 +539,25 @@ async def _rent_reminder(mode: str = "day1") -> None:
     logger.info("[Scheduler] rent_reminder (%s) — %d/%d sent via %s",
                 log_tag, sent, len(rows), template_name)
 
-    if _ADMIN_PHONE:
-        from src.whatsapp.webhook_handler import _send_whatsapp
-        await _send_whatsapp(
-            _ADMIN_PHONE,
-            f"*Rent Reminder — {log_tag}*\n"
-            f"Month: {month_label}\n"
-            f"Recipients: {sent}/{len(rows)} delivered via `{template_name}` template."
-        )
+    # Notify all admin/owner phones so the team knows reminders went out.
+    from src.whatsapp.webhook_handler import _send_whatsapp
+    engine2 = create_async_engine(_ASYNC_DB_URL, echo=False)
+    try:
+        async with engine2.connect() as conn2:
+            admin_rows = (await conn2.execute(text("""
+                SELECT phone FROM authorized_users
+                WHERE role IN ('admin', 'owner') AND active = TRUE AND phone IS NOT NULL
+            """))).fetchall()
+    finally:
+        await engine2.dispose()
+    summary_msg = (
+        f"*Rent Reminder — {log_tag}*\n"
+        f"Month: {month_label}\n"
+        f"Sent: {sent}/{len(rows)} via `{template_name}` template."
+    )
+    for (ap,) in admin_rows:
+        if ap:
+            await _send_whatsapp(ap, summary_msg)
 
 
 # ── Job: Daily Reconciliation ──────────────────────────────────────────────────
