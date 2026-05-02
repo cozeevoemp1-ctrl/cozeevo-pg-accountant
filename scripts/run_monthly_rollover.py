@@ -39,8 +39,9 @@ def _next_month(today: date) -> tuple[int, int, str]:
 
 
 async def _generate_rs(year: int, month: int) -> dict:
-    from src.database.db_manager import init_engine
-    await init_engine()
+    import os
+    from src.database.db_manager import init_db
+    await init_db(os.environ["DATABASE_URL"])
     from src.services.monthly_rollover import generate_rent_schedule_for_month
     return await generate_rent_schedule_for_month(year, month)
 

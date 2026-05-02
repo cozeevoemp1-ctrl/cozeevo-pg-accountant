@@ -736,7 +736,7 @@ async def _monthly_tab_rollover() -> None:
     try:
         result = await asyncio.to_thread(
             subprocess.run,
-            [py, "scripts/run_monthly_rollover.py", next_month_name, str(next_year)],
+            [py, "scripts/run_monthly_rollover.py", next_month_name, str(next_year), "--skip-source"],
             capture_output=True, text=True, timeout=900,
         )
         if result.returncode != 0:
