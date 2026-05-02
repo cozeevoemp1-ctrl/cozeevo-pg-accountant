@@ -377,6 +377,7 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
         elif status:
             q = q.where(OnboardingSession.status == status)
             q = q.where(not_superseded)
+            q = q.where(OnboardingSession.status != "draft")
             # When filtering "pending_tenant", exclude those that have silently expired
             if status == "pending_tenant":
                 q = q.where(
@@ -385,6 +386,7 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
                 )
         else:
             q = q.where(not_superseded)
+            q = q.where(OnboardingSession.status != "draft")
         if date_from:
             q = q.where(OnboardingSession.created_at >= date.fromisoformat(date_from))
         if date_to:
