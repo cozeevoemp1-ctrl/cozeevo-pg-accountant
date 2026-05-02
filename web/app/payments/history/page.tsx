@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import {
@@ -30,18 +30,24 @@ const METHOD_COLOR: Record<string, string> = {
 }
 
 const FOR_TYPE_LABEL: Record<string, string> = {
-  rent: "Rent", deposit: "Deposit", maintenance: "Maintenance",
-  booking: "Advance", adjustment: "Adjustment",
+  rent: "Rent", deposit: "Deposit", maintenance: "Maint.",
+  booking: "Advance", adjustment: "Adj.",
 }
 
 export default function PaymentHistoryPage() {
   const router = useRouter()
 
-  const [tenant, setTenant] = useState<TenantSearchResult | null>(null)
-  const [payments, setPayments] = useState<PaymentListItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  // All-recent state (loaded on mount)
+  const [allPayments, setAllPayments] = useState<PaymentListItem[]>([])
+  const [loadingAll, setLoadingAll] = useState(true)
+  const [loadError, setLoadError] = useState("")
 
+  // Tenant-scoped state (set when user picks a tenant)
+  const [selectedTenant, setSelectedTenant] = useState<TenantSearchResult | null>(null)
+  const [tenantPayments, setTenantPayments] = useState<PaymentListItem[]>([])
+  const [loadingTenant, setLoadingTenant] = useState(false)
+
+  // Edit sheet state
   const [editing, setEditing] = useState<PaymentListItem | null>(null)
   const [editMethod, setEditMethod] = useState<Method>("UPI")
   const [editAmount, setEditAmount] = useState("")
@@ -50,21 +56,29 @@ export default function PaymentHistoryPage() {
   const [saveError, setSaveError] = useState("")
   const [savedId, setSavedId] = useState<number | null>(null)
 
+  useEffect(() => {
+    getPaymentHistory(undefined, 30)
+      .then(setAllPayments)
+      .catch(() => setLoadError("Failed to load recent payments"))
+      .finally(() => setLoadingAll(false))
+  }, [])
+
   async function handleTenantSelect(t: TenantSearchResult) {
-    setTenant(t)
-    setPayments([])
-    setError("")
-    setEditing(null)
+    setSelectedTenant(t)
+    setTenantPayments([])
     setSavedId(null)
-    setLoading(true)
+    setLoadingTenant(true)
     try {
       const list = await getPaymentHistory(t.tenancy_id, 30)
-      setPayments(list)
-    } catch {
-      setError("Failed to load payment history")
+      setTenantPayments(list)
     } finally {
-      setLoading(false)
+      setLoadingTenant(false)
     }
+  }
+
+  function clearTenant() {
+    setSelectedTenant(null)
+    setTenantPayments([])
   }
 
   function openEdit(p: PaymentListItem) {
@@ -73,7 +87,6 @@ export default function PaymentHistoryPage() {
     setEditAmount(String(Math.round(p.amount)))
     setEditNotes(p.notes ?? "")
     setSaveError("")
-    setSavedId(null)
   }
 
   async function handleSave() {
@@ -85,14 +98,13 @@ export default function PaymentHistoryPage() {
       if (editMethod !== editing.method) body.method = editMethod
       if (Number(editAmount) !== Math.round(editing.amount)) body.amount = Number(editAmount)
       if (editNotes !== (editing.notes ?? "")) body.notes = editNotes
-
-      if (Object.keys(body).length === 0) {
-        setEditing(null)
-        return
-      }
+      if (Object.keys(body).length === 0) { setEditing(null); return }
 
       const updated = await editPayment(editing.payment_id, body)
-      setPayments(prev => prev.map(p => p.payment_id === updated.payment_id ? updated : p))
+      const patch = (list: PaymentListItem[]) =>
+        list.map(p => p.payment_id === updated.payment_id ? { ...updated, tenant_name: p.tenant_name, room_number: p.room_number } : p)
+      setAllPayments(patch)
+      setTenantPayments(patch)
       setSavedId(updated.payment_id)
       setEditing(null)
     } catch (err) {
@@ -102,6 +114,9 @@ export default function PaymentHistoryPage() {
     }
   }
 
+  const displayList = selectedTenant ? tenantPayments : allPayments
+  const isLoading = selectedTenant ? loadingTenant : loadingAll
+
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
@@ -109,54 +124,61 @@ export default function PaymentHistoryPage() {
         <button
           onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold"
-          aria-label="Back"
-        >
-          ←
-        </button>
+        >←</button>
         <span className="text-base font-extrabold text-ink">Payment History</span>
         <button
           onClick={() => router.push("/payment/new")}
           className="ml-auto px-3 py-1.5 rounded-pill bg-brand-pink text-white text-xs font-bold"
-        >
-          + New
-        </button>
+        >+ New</button>
       </div>
 
-      <div className="px-4 pt-20 pb-32 flex flex-col gap-4 max-w-lg mx-auto">
-        {/* Tenant search */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
-          <TenantSearch
-            onSelect={handleTenantSelect}
-            placeholder="Search tenant to view payments…"
-          />
-        </div>
-
-        {loading && (
-          <p className="text-center text-ink-muted text-sm py-6">Loading…</p>
+      <div className="px-4 pt-20 pb-32 flex flex-col gap-3 max-w-lg mx-auto">
+        {/* Tenant filter */}
+        {selectedTenant ? (
+          <div className="flex items-center gap-2 bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-extrabold text-ink">{selectedTenant.name}</p>
+              <p className="text-[11px] text-ink-muted">Room {selectedTenant.room_number} · {tenantPayments.length} payments</p>
+            </div>
+            <button
+              onClick={clearTenant}
+              className="shrink-0 text-xs text-ink-muted border border-[#E2DEDD] rounded-pill px-3 py-1"
+            >Show all</button>
+          </div>
+        ) : (
+          <div className="bg-surface rounded-card border border-[#F0EDE9] p-4">
+            <TenantSearch
+              onSelect={handleTenantSelect}
+              placeholder="Filter by tenant…"
+            />
+          </div>
         )}
 
-        {error && (
-          <p className="text-center text-status-warn text-sm">{error}</p>
+        {/* List */}
+        {isLoading && <p className="text-center text-ink-muted text-sm py-8">Loading…</p>}
+        {loadError && <p className="text-center text-status-warn text-sm">{loadError}</p>}
+
+        {!isLoading && displayList.length === 0 && (
+          <p className="text-center text-ink-muted text-sm py-8">No payments found</p>
         )}
 
-        {tenant && !loading && payments.length === 0 && (
-          <p className="text-center text-ink-muted text-sm py-6">No payments found for {tenant.name}</p>
-        )}
-
-        {payments.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide px-1">
-              {tenant?.name} · Room {tenant?.room_number} · {payments.length} payments
-            </p>
-            {payments.map(p => (
+        {!isLoading && displayList.length > 0 && (
+          <>
+            {!selectedTenant && (
+              <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide px-1">
+                Last {displayList.length} payments — all tenants
+              </p>
+            )}
+            {displayList.map(p => (
               <PaymentRow
                 key={p.payment_id}
                 payment={p}
+                showTenant={!selectedTenant}
                 isJustSaved={p.payment_id === savedId}
                 onEdit={() => openEdit(p)}
               />
             ))}
-          </div>
+          </>
         )}
       </div>
 
@@ -164,23 +186,23 @@ export default function PaymentHistoryPage() {
       {editing && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(null)} />
-          <div className="relative bg-bg rounded-t-2xl px-5 pt-5 pb-10 flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+          <div className="relative bg-bg rounded-t-2xl px-5 pt-5 pb-10 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-extrabold text-ink">Edit Payment</h2>
-              <button onClick={() => setEditing(null)} className="text-ink-muted text-lg">✕</button>
+              <button onClick={() => setEditing(null)} className="text-ink-muted text-lg font-bold">✕</button>
             </div>
 
-            {/* Summary of what's being edited */}
             <div className="bg-surface rounded-card p-3 border border-[#F0EDE9] text-xs text-ink-muted">
-              <span className="font-semibold text-ink">#{editing.payment_id}</span>
+              <span className="font-semibold text-ink">
+                {editing.tenant_name ?? ""}{editing.room_number ? ` · Rm ${editing.room_number}` : ""}
+              </span>
               {" · "}₹{Math.round(editing.amount).toLocaleString("en-IN")}
               {" · "}{editing.payment_date}
               {editing.period_month ? ` · ${editing.period_month}` : ""}
             </div>
 
-            {/* Method */}
             <div>
-              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Payment Method</p>
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Method</p>
               <div className="flex gap-2 flex-wrap">
                 {METHODS.map(m => (
                   <button
@@ -191,14 +213,11 @@ export default function PaymentHistoryPage() {
                         ? "border-brand-pink bg-tile-pink text-brand-pink"
                         : "border-[#E2DEDD] bg-bg text-ink"
                     }`}
-                  >
-                    {m.label}
-                  </button>
+                  >{m.label}</button>
                 ))}
               </div>
             </div>
 
-            {/* Amount */}
             <div>
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Amount (₹)</p>
               <input
@@ -209,14 +228,13 @@ export default function PaymentHistoryPage() {
               />
             </div>
 
-            {/* Notes */}
             <div>
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Notes</p>
               <input
                 type="text"
                 value={editNotes}
                 onChange={e => setEditNotes(e.target.value)}
-                placeholder="Optional note…"
+                placeholder="Optional…"
                 className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
               />
             </div>
@@ -226,10 +244,8 @@ export default function PaymentHistoryPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full rounded-pill bg-brand-pink py-3.5 text-white font-bold text-sm active:opacity-80 disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
+              className="w-full rounded-pill bg-brand-pink py-3.5 text-white font-bold text-sm disabled:opacity-50"
+            >{saving ? "Saving…" : "Save Changes"}</button>
           </div>
         </div>
       )}
@@ -238,11 +254,10 @@ export default function PaymentHistoryPage() {
 }
 
 function PaymentRow({
-  payment,
-  isJustSaved,
-  onEdit,
+  payment, showTenant, isJustSaved, onEdit,
 }: {
   payment: PaymentListItem
+  showTenant: boolean
   isJustSaved: boolean
   onEdit: () => void
 }) {
@@ -250,44 +265,40 @@ function PaymentRow({
   const forLabel = FOR_TYPE_LABEL[payment.for_type] ?? payment.for_type
 
   return (
-    <div className={`bg-surface rounded-card border p-4 flex items-center gap-3 transition-colors ${
+    <div className={`bg-surface rounded-card border p-4 flex items-center gap-3 ${
       isJustSaved ? "border-status-paid bg-tile-green" : "border-[#F0EDE9]"
     }`}>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-base font-extrabold text-ink">
+        {showTenant && (
+          <p className="text-xs font-extrabold text-ink mb-0.5">
+            {payment.tenant_name ?? "—"}
+            {payment.room_number ? <span className="text-ink-muted font-normal"> · Rm {payment.room_number}</span> : null}
+          </p>
+        )}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-sm font-extrabold text-ink">
             ₹{Math.round(payment.amount).toLocaleString("en-IN")}
           </span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${methodColor}`}>
             {payment.method}
           </span>
-          <span className="text-[10px] text-ink-muted font-medium bg-bg border border-[#E2DEDD] px-2 py-0.5 rounded-full">
+          <span className="text-[10px] text-ink-muted border border-[#E2DEDD] px-2 py-0.5 rounded-full">
             {forLabel}
           </span>
         </div>
-        <p className="text-xs text-ink-muted">
-          {payment.payment_date}
-          {payment.period_month ? ` · ${payment.period_month}` : ""}
+        <p className="text-[11px] text-ink-muted mt-0.5">
+          {payment.payment_date}{payment.period_month ? ` · ${payment.period_month}` : ""}
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
         {payment.upi_reference && (
-          <p className="text-[10px] text-blue-600 font-medium mt-0.5">
-            Ref: {payment.upi_reference}
-          </p>
+          <p className="text-[10px] text-blue-600 font-medium mt-0.5">Ref: {payment.upi_reference}</p>
         )}
-        {payment.receipt_url && (
-          <p className="text-[10px] text-status-paid font-medium mt-0.5">Receipt saved ✓</p>
-        )}
-        {isJustSaved && (
-          <p className="text-[10px] text-status-paid font-bold mt-0.5">Updated ✓</p>
-        )}
+        {isJustSaved && <p className="text-[10px] text-status-paid font-bold mt-0.5">Updated ✓</p>}
       </div>
       <button
         onClick={onEdit}
-        className="shrink-0 rounded-pill border border-[#E2DEDD] px-3 py-1.5 text-xs font-semibold text-ink active:bg-surface"
-      >
-        Edit
-      </button>
+        className="shrink-0 rounded-pill border border-[#E2DEDD] px-3 py-1.5 text-xs font-semibold text-ink"
+      >Edit</button>
     </div>
   )
 }

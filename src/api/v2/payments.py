@@ -13,6 +13,7 @@ from sqlalchemy import desc, select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
+from sqlalchemy.orm import aliased
 from src.database.models import Payment, PaymentMode, Room, StayType, Tenancy, TenancyStatus, Tenant
 from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, update_payment as gsheets_update
 from src.schemas.payments import PaymentCreate, PaymentEdit, PaymentListItem, PaymentResponse
@@ -126,15 +127,14 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
 async def list_payments(
     tenancy_id: Optional[int] = Query(None),
     tenant_id: Optional[int] = Query(None),
-    limit: int = Query(default=20, le=100),
+    limit: int = Query(default=30, le=100),
     user: AppUser = Depends(get_current_user),
 ):
     if user.role not in ("admin", "staff"):
         raise HTTPException(status_code=403, detail="admin or staff only")
-    if not tenancy_id and not tenant_id:
-        raise HTTPException(status_code=400, detail="tenancy_id or tenant_id required")
 
     async with get_session() as session:
+        # Resolve tenant_id → tenancy_id
         if tenant_id and not tenancy_id:
             tenancy = await session.scalar(
                 select(Tenancy).where(
@@ -146,17 +146,28 @@ async def list_payments(
                 return []
             tenancy_id = tenancy.id
 
-        rows = await session.execute(
-            select(Payment)
-            .where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
-            .order_by(desc(Payment.payment_date), desc(Payment.id))
-            .limit(limit)
+        # Build query — always join tenant+room for display names
+        q = (
+            select(
+                Payment,
+                Tenant.name.label("tenant_name"),
+                Room.room_number.label("room_number"),
+            )
+            .join(Tenancy, Tenancy.id == Payment.tenancy_id)
+            .join(Tenant, Tenant.id == Tenancy.tenant_id)
+            .outerjoin(Room, Room.id == Tenancy.room_id)
+            .where(Payment.is_void == False)
         )
-        payments = rows.scalars().all()
+        if tenancy_id:
+            q = q.where(Payment.tenancy_id == tenancy_id)
+
+        q = q.order_by(desc(Payment.payment_date), desc(Payment.id)).limit(limit)
+        rows = (await session.execute(q)).all()
 
     result = []
-    for p in payments:
-        pm = str(p.period_month.strftime("%Y-%m")) if p.period_month else None
+    for row in rows:
+        p = row[0]
+        pm = p.period_month.strftime("%Y-%m") if p.period_month else None
         result.append(PaymentListItem(
             payment_id=p.id,
             amount=float(p.amount),
@@ -168,6 +179,8 @@ async def list_payments(
             is_void=p.is_void,
             receipt_url=p.receipt_url,
             upi_reference=p.upi_reference,
+            tenant_name=row[1],
+            room_number=row[2],
         ))
     return result
 

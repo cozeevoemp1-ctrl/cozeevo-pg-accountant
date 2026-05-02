@@ -41,3 +41,5 @@ class PaymentListItem(BaseModel):
     is_void: bool
     receipt_url: Optional[str]
     upi_reference: Optional[str]
+    tenant_name: Optional[str] = None
+    room_number: Optional[str] = None

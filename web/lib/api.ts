@@ -502,6 +502,8 @@ export interface PaymentListItem {
   is_void: boolean;
   receipt_url: string | null;
   upi_reference: string | null;
+  tenant_name: string | null;
+  room_number: string | null;
 }
 
 export interface PaymentEditBody {
@@ -510,8 +512,9 @@ export interface PaymentEditBody {
   notes?: string;
 }
 
-export function getPaymentHistory(tenancyId: number, limit = 20): Promise<PaymentListItem[]> {
-  return _get<PaymentListItem[]>(`/api/v2/app/payments?tenancy_id=${tenancyId}&limit=${limit}`);
+export function getPaymentHistory(tenancyId?: number, limit = 30): Promise<PaymentListItem[]> {
+  const q = tenancyId ? `tenancy_id=${tenancyId}&limit=${limit}` : `limit=${limit}`;
+  return _get<PaymentListItem[]>(`/api/v2/app/payments?${q}`);
 }
 
 export function editPayment(paymentId: number, body: PaymentEditBody): Promise<PaymentListItem> {
