@@ -9,9 +9,11 @@ import {
   getCheckinPreview,
   recordCheckin,
   getTenantDues,
+  uploadReceipt,
   TenantSearchResult,
   CheckinPreview,
 } from "@/lib/api"
+import { ReceiptScanner, ReceiptScanResult } from "@/components/forms/receipt-scanner"
 
 type Method = "CASH" | "UPI" | "BANK" | "OTHER"
 
@@ -59,7 +61,21 @@ function NewCheckinPage() {
   const [submitting,  setSubmitting]  = useState(false)
   const [error,       setError]       = useState("")
   const [success,     setSuccess]     = useState(false)
-  const [result,      setResult]      = useState<{ balanceRemaining: number } | null>(null)
+  const [result,      setResult]      = useState<{ balanceRemaining: number; paymentId: number | null } | null>(null)
+
+  // Receipt / OCR state
+  const [scannedFile,    setScannedFile]    = useState<File | null>(null)
+  const [receiptUrl,     setReceiptUrl]     = useState<string | null>(null)
+  const [transactionId,  setTransactionId]  = useState<string | null>(null)
+
+  function handleScan(scan: ReceiptScanResult) {
+    setScannedFile(scan.file)
+    if (scan.ocr.amount && !amount) setAmount(String(scan.ocr.amount))
+    if (scan.ocr.method === "UPI")  setMethod("UPI")
+    else if (scan.ocr.method === "BANK") setMethod("BANK")
+    else if (scan.ocr.method === "CASH") setMethod("CASH")
+    if (scan.ocr.transaction_id) setTransactionId(scan.ocr.transaction_id)
+  }
 
   // Pre-fill tenant from URL param (navigated from KPI tile)
   useEffect(() => {
@@ -124,8 +140,16 @@ function NewCheckinPage() {
         notes:                notes || undefined,
         actual_checkin_time:  preview?.stay_type === "daily" ? checkinTime : undefined,
       })
+      // Auto-upload scanned receipt if available
+      if (scannedFile && res.payment_id) {
+        try {
+          const up = await uploadReceipt(res.payment_id, scannedFile)
+          setReceiptUrl(up.receipt_url)
+          if (up.transaction_id) setTransactionId(up.transaction_id)
+        } catch { /* non-blocking */ }
+      }
       setShowConfirm(false)
-      setResult({ balanceRemaining: res.balance_remaining })
+      setResult({ balanceRemaining: res.balance_remaining, paymentId: res.payment_id ?? null })
       setSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Check-in failed. Try again.")
@@ -138,6 +162,7 @@ function NewCheckinPage() {
     setSuccess(false); setResult(null)
     setTenant(null); setPreview(null)
     setAmount(""); setNotes(""); setActualDate(todayISO()); setCheckinTime(nowTime())
+    setScannedFile(null); setReceiptUrl(null); setTransactionId(null)
   }
 
   // ── Success screen ────────────────────────────────────────────────────────
@@ -173,6 +198,28 @@ function NewCheckinPage() {
             value={result && result.balanceRemaining <= 0 ? "₹0 (Cleared)" : fmtINR(result?.balanceRemaining ?? 0)}
           />
         </div>
+        {/* Receipt status / late upload */}
+        {receiptUrl ? (
+          <div className="w-full max-w-sm flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-pill bg-tile-green border border-[#C5E8D0]">
+              <span className="text-status-paid text-xs font-semibold">Receipt saved ✓</span>
+            </div>
+            {transactionId && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-pill bg-blue-50 border border-blue-200">
+                <span className="text-blue-500 text-xs font-semibold">Ref</span>
+                <span className="text-blue-700 text-xs font-mono font-semibold">{transactionId}</span>
+              </div>
+            )}
+          </div>
+        ) : result?.paymentId ? (
+          <div className="w-full max-w-sm">
+            <ReceiptScanner
+              paymentId={result.paymentId}
+              onUploaded={(url, txn) => { setReceiptUrl(url); if (txn) setTransactionId(txn) }}
+            />
+          </div>
+        ) : null}
+
         <div className="flex gap-3 w-full max-w-sm">
           <button onClick={resetForm}
             className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
@@ -333,6 +380,14 @@ function NewCheckinPage() {
           />
         )}
 
+        {/* Receipt scanner — only shown when collecting */}
+        {preview && Number(amount) > 0 && (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Receipt / Screenshot</p>
+            <ReceiptScanner onScan={handleScan} compact={false} />
+          </div>
+        )}
+
         {/* Method — only when collecting something */}
         {preview && Number(amount) > 0 && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
@@ -389,6 +444,7 @@ function NewCheckinPage() {
             { label: "Collecting now",    value: `₹${Number(amount || 0).toLocaleString("en-IN")}`, highlight: true },
             { label: "Method",            value: `${METHODS.find(m => m.value === method)?.icon} ${method}` },
             ...(notes ? [{ label: "Note", value: notes }] : []),
+            ...(transactionId ? [{ label: "Ref", value: transactionId }] : []),
           ]}
           onConfirm={handleConfirm}
           error={error}

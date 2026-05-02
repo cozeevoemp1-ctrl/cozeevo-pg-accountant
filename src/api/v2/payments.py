@@ -266,6 +266,78 @@ _ALLOWED_RECEIPT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
 _MAX_RECEIPT_BYTES = 8 * 1024 * 1024  # 8 MB
 
 
+@router.post("/payments/ocr")
+async def ocr_receipt_preview(
+    file: UploadFile = File(...),
+    user: AppUser = Depends(get_current_user),
+):
+    """Scan a payment screenshot before recording — returns extracted amount, txn ID, method hint."""
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="admin or staff only")
+    if file.content_type not in _ALLOWED_RECEIPT_TYPES:
+        raise HTTPException(status_code=400, detail="Image required (jpeg/png/webp/heic)")
+    data = await file.read()
+    if len(data) > _MAX_RECEIPT_BYTES:
+        raise HTTPException(status_code=413, detail="File too large — max 8 MB")
+
+    result = await _ocr_receipt_full(data, file.content_type or "image/jpeg")
+    return result
+
+
+async def _ocr_receipt_full(image_data: bytes, content_type: str) -> dict:
+    """Extract amount, transaction ID, and payment method from a receipt screenshot."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key or api_key.startswith("PASTE_"):
+        return {"amount": None, "transaction_id": None, "method": None}
+    try:
+        import anthropic
+        media_type = content_type if content_type in ("image/jpeg", "image/png", "image/webp", "image/gif") else "image/jpeg"
+        b64 = base64.standard_b64encode(image_data).decode("utf-8")
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        msg = await asyncio.wait_for(
+            client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=256,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                        {"type": "text", "text": (
+                            "This is a UPI or bank payment screenshot/receipt from India. Extract:\n"
+                            "1. amount: the payment amount as a number in rupees (digits only, no symbols)\n"
+                            "2. transaction_id: the UTR / Transaction ID / Ref No (alphanumeric string)\n"
+                            "3. method: one of UPI, NEFT, IMPS, RTGS, CASH — whichever applies\n"
+                            "Return JSON only: {\"amount\": 15000, \"transaction_id\": \"T2026...\", \"method\": \"UPI\"}\n"
+                            "Use null for any field you cannot find."
+                        )},
+                    ],
+                }],
+            ),
+            timeout=15,
+        )
+        import json as _json
+        raw = msg.content[0].text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+        data = _json.loads(raw)
+        txn = data.get("transaction_id")
+        if txn and len(str(txn)) > 60:
+            txn = None
+        method = data.get("method", "").upper()
+        if method not in ("UPI", "NEFT", "IMPS", "RTGS", "CASH", "BANK"):
+            method = None
+        if method in ("NEFT", "IMPS", "RTGS"):
+            method = "BANK"
+        amt = data.get("amount")
+        if amt is not None:
+            try:
+                amt = int(float(str(amt).replace(",", "")))
+            except Exception:
+                amt = None
+        return {"amount": amt, "transaction_id": txn, "method": method}
+    except Exception as exc:
+        logger.warning("[OCR] full receipt extraction failed: %s", exc)
+        return {"amount": None, "transaction_id": None, "method": None}
+
+
 async def _ocr_transaction_id(image_data: bytes, content_type: str) -> Optional[str]:
     """Call Claude Haiku vision to extract transaction/UPI reference ID from receipt image."""
     api_key = os.getenv("ANTHROPIC_API_KEY", "")

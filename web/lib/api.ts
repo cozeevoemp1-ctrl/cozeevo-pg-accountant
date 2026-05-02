@@ -512,6 +512,28 @@ export interface PaymentEditBody {
   notes?: string;
 }
 
+export interface OcrResult {
+  amount: number | null;
+  transaction_id: string | null;
+  method: "UPI" | "CASH" | "BANK" | null;
+}
+
+export async function ocrReceiptPreview(file: File): Promise<OcrResult> {
+  const headers = await _authHeaders();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE_URL}/api/v2/app/payments/ocr`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `OCR failed ${res.status}`);
+  }
+  return res.json();
+}
+
 export function getPaymentHistory(tenancyId?: number, limit = 30): Promise<PaymentListItem[]> {
   const q = tenancyId ? `tenancy_id=${tenancyId}&limit=${limit}` : `limit=${limit}`;
   return _get<PaymentListItem[]>(`/api/v2/app/payments?${q}`);

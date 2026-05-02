@@ -6,6 +6,7 @@ import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { Numpad } from "@/components/forms/numpad"
 import { VoiceSheet } from "@/components/voice/voice-sheet"
+import { ReceiptScanner, ReceiptScanResult } from "@/components/forms/receipt-scanner"
 import {
   createPayment,
   getTenantDues,
@@ -56,13 +57,11 @@ export default function NewPaymentPage() {
   const [success, setSuccess] = useState(false)
   const [voiceHint, setVoiceHint] = useState("")
 
-  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  // Receipt state — scanned on form, uploaded after save
+  const [scannedFile, setScannedFile] = useState<File | null>(null)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [transactionId, setTransactionId] = useState<string | null>(null)
-  const [uploadingReceipt, setUploadingReceipt] = useState(false)
-  const [receiptError, setReceiptError] = useState("")
   const [lastPaymentId, setLastPaymentId] = useState<number | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleTenantSelect(t: TenantSearchResult) {
     setTenant(t)
@@ -72,7 +71,7 @@ export default function NewPaymentPage() {
       setDues(d)
       if (!amount && d.dues > 0) setAmount(String(Math.round(d.dues)))
     } catch {
-      // dues preview is best-effort
+      // best-effort
     }
   }
 
@@ -85,12 +84,24 @@ export default function NewPaymentPage() {
     else if (intent.tenant_name) setVoiceHint(intent.tenant_name)
   }
 
+  function handleScan(result: ReceiptScanResult) {
+    setScannedFile(result.file)
+    // Pre-fill amount if not already entered
+    if (result.ocr.amount && !amount) setAmount(String(result.ocr.amount))
+    // Auto-set method
+    if (result.ocr.method === "UPI") setMethod("UPI")
+    else if (result.ocr.method === "BANK") setMethod("BANK")
+    else if (result.ocr.method === "CASH") setMethod("CASH")
+    // Store transaction ID
+    if (result.ocr.transaction_id) setTransactionId(result.ocr.transaction_id)
+  }
+
   function handleReview() {
     setError("")
     if (!tenant) { setError("Select a tenant first"); return }
     if (!amount || Number(amount) <= 0) { setError("Enter a valid amount"); return }
     if (periodMonth < currentMonth()) {
-      setError(`${periodMonth} is a closed period — payments cannot be recorded for past months. Use the adjustment line to correct discrepancies.`)
+      setError(`${periodMonth} is a closed period — use the adjustment line to correct discrepancies.`)
       return
     }
     setShowConfirm(true)
@@ -110,6 +121,18 @@ export default function NewPaymentPage() {
         notes: notes || undefined,
       })
       setLastPaymentId(result.payment_id)
+
+      // Auto-upload scanned receipt immediately
+      if (scannedFile) {
+        try {
+          const up = await uploadReceipt(result.payment_id, scannedFile)
+          setReceiptUrl(up.receipt_url)
+          if (up.transaction_id) setTransactionId(up.transaction_id)
+        } catch {
+          // receipt upload failure doesn't block the success screen
+        }
+      }
+
       setShowConfirm(false)
       setSuccess(true)
     } catch (err) {
@@ -119,30 +142,18 @@ export default function NewPaymentPage() {
     }
   }
 
-  async function handleReceiptChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || lastPaymentId === null) return
-    setReceiptFile(file)
-    setReceiptError("")
-    setUploadingReceipt(true)
-    try {
-      const result = await uploadReceipt(lastPaymentId, file)
-      setReceiptUrl(result.receipt_url)
-      if (result.transaction_id) setTransactionId(result.transaction_id)
-    } catch (err) {
-      setReceiptError(err instanceof Error ? err.message : "Upload failed")
-    } finally {
-      setUploadingReceipt(false)
-    }
-  }
-
   const balanceAfter = dues ? dues.dues - Number(amount || 0) : null
+
+  function resetForm() {
+    setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes("")
+    setScannedFile(null); setReceiptUrl(null); setTransactionId(null); setLastPaymentId(null)
+  }
 
   if (success) {
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
         <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
-          <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
+          <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold">←</button>
           <span className="text-base font-extrabold text-ink">Payment Saved</span>
         </div>
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
@@ -164,52 +175,35 @@ export default function NewPaymentPage() {
             )}
           </div>
         )}
-        {/* Receipt upload */}
+
+        {/* Receipt status */}
         {receiptUrl ? (
           <div className="w-full max-w-sm flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-pill bg-tile-green border border-[#C5E8D0]">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-pill bg-tile-green border border-[#C5E8D0]">
               <span className="text-status-paid text-sm font-semibold">Receipt saved ✓</span>
             </div>
             {transactionId && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-pill bg-blue-50 border border-blue-200">
-                <span className="text-blue-500 text-xs">Ref</span>
+                <span className="text-blue-500 text-xs font-semibold">Ref</span>
                 <span className="text-blue-700 text-xs font-mono font-semibold">{transactionId}</span>
               </div>
             )}
           </div>
         ) : (
-          <div className="w-full max-w-sm flex flex-col gap-1">
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              ref={fileInputRef}
-              onChange={handleReceiptChange}
+          /* No receipt scanned on form — allow upload now */
+          lastPaymentId !== null && (
+            <ReceiptScanner
+              paymentId={lastPaymentId}
+              onUploaded={(url, txn) => { setReceiptUrl(url); if (txn) setTransactionId(txn) }}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingReceipt}
-              className="w-full flex items-center justify-center gap-2 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm active:opacity-70 disabled:opacity-50"
-            >
-              <span>📷</span>
-              <span>{uploadingReceipt ? "Uploading…" : "Take Photo / Upload"}</span>
-            </button>
-            {receiptError && <p className="text-xs text-status-warn font-medium text-center">{receiptError}</p>}
-          </div>
+          )
         )}
 
         <div className="flex gap-3 w-full max-w-sm">
-          <button
-            onClick={() => { setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes(""); setReceiptUrl(null); setReceiptFile(null); setLastPaymentId(null); setTransactionId(null) }}
-            className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm"
-          >
+          <button onClick={resetForm} className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
             + New
           </button>
-          <button
-            onClick={() => router.push("/")}
-            className="flex-1 rounded-pill bg-brand-pink py-3 text-white font-bold text-sm"
-          >
+          <button onClick={() => router.push("/")} className="flex-1 rounded-pill bg-brand-pink py-3 text-white font-bold text-sm">
             ← Home
           </button>
         </div>
@@ -221,37 +215,22 @@ export default function NewPaymentPage() {
     <main className="min-h-screen bg-bg">
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
-        <button
-          onClick={() => router.back()}
-          className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
-          aria-label="Back"
-        >
-          ←
-        </button>
+        <button onClick={() => router.back()} className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold">←</button>
         <h1 className="text-lg font-extrabold text-ink">Collect Payment</h1>
         <button
           onClick={() => router.push("/payments/history")}
           className="ml-auto mr-2 flex items-center gap-1 px-3 py-1.5 rounded-pill border border-[#E2DEDD] text-xs font-semibold text-ink-muted"
-        >
-          History
-        </button>
+        >History</button>
         <button
           onClick={() => setShowVoice(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink text-white text-xs font-bold shadow"
-          aria-label="Voice input"
-        >
-          🎙 Hey Kozzy
-        </button>
+        >🎙 Hey Kozzy</button>
       </div>
 
       <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
-        {/* Tenant search */}
+        {/* Tenant */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
-          <TenantSearch
-            onSelect={handleTenantSelect}
-            defaultValue={voiceHint}
-            placeholder="Search by name, room, phone…"
-          />
+          <TenantSearch onSelect={handleTenantSelect} defaultValue={voiceHint} placeholder="Search by name, room, phone…" />
         </div>
 
         {/* Dues preview */}
@@ -272,28 +251,22 @@ export default function NewPaymentPage() {
           </div>
         )}
 
-        {/* Numpad */}
-        <Numpad
-          value={amount}
-          onChange={setAmount}
-          suggestAmounts={dues && dues.dues > 0 ? [Math.round(dues.dues)] : []}
-        />
+        {/* Receipt scanner — on form so OCR pre-fills amount + method */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Receipt / Screenshot</p>
+          <ReceiptScanner onScan={handleScan} compact={false} />
+        </div>
 
-        {/* Method pills */}
+        {/* Numpad */}
+        <Numpad value={amount} onChange={setAmount} suggestAmounts={dues && dues.dues > 0 ? [Math.round(dues.dues)] : []} />
+
+        {/* Method */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
           <div className="grid grid-cols-4 gap-2">
             {METHODS.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                onClick={() => setMethod(m.value)}
-                className={`rounded-tile py-2.5 text-center border-2 transition-colors ${
-                  method === m.value
-                    ? "border-brand-pink bg-tile-pink"
-                    : "border-[#E2DEDD] bg-bg"
-                }`}
-              >
+              <button key={m.value} type="button" onClick={() => setMethod(m.value)}
+                className={`rounded-tile py-2.5 text-center border-2 transition-colors ${method === m.value ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"}`}>
                 <div className="text-lg">{m.icon}</div>
                 <div className={`text-[10px] font-bold mt-1 ${method === m.value ? "text-brand-pink" : "text-ink"}`}>{m.label}</div>
               </button>
@@ -306,48 +279,27 @@ export default function NewPaymentPage() {
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment For</p>
           <div className="flex gap-2 flex-wrap">
             {FOR_TYPES.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setForType(f.value)}
-                className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${
-                  forType === f.value
-                    ? "bg-brand-pink text-white border-brand-pink"
-                    : "bg-bg text-ink border-[#E2DEDD]"
-                }`}
-              >
+              <button key={f.value} type="button" onClick={() => setForType(f.value)}
+                className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${forType === f.value ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink border-[#E2DEDD]"}`}>
                 {f.label}
               </button>
             ))}
           </div>
           <div className="mt-3 flex gap-2 items-center">
             <label className="text-xs text-ink-muted font-medium whitespace-nowrap">Period</label>
-            <input
-              type="month"
-              value={periodMonth}
-              min={currentMonth()}
-              onChange={(e) => setPeriodMonth(e.target.value)}
-              className="flex-1 rounded-pill border border-[#E2DEDD] bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-brand-pink"
-            />
+            <input type="month" value={periodMonth} min={currentMonth()} onChange={(e) => setPeriodMonth(e.target.value)}
+              className="flex-1 rounded-pill border border-[#E2DEDD] bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-brand-pink" />
           </div>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Note (optional)…"
-            className="mt-2 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
-          />
+          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Note (optional)…"
+            className="mt-2 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink" />
         </div>
 
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
       </div>
 
-      {/* Sticky CTA */}
+      {/* CTA */}
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-[#F0EDE9]">
-        <button
-          onClick={handleReview}
-          className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80"
-        >
+        <button onClick={handleReview} className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80">
           Review &amp; Confirm →
         </button>
       </div>
@@ -362,10 +314,8 @@ export default function NewPaymentPage() {
             { label: "For", value: FOR_TYPES.find(f => f.value === forType)?.label ?? forType },
             { label: "Period", value: periodMonth },
             ...(notes ? [{ label: "Note", value: notes }] : []),
-            ...(balanceAfter !== null ? [{
-              label: "Balance after",
-              value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${balanceAfter.toLocaleString("en-IN")} remaining`,
-            }] : []),
+            ...(transactionId ? [{ label: "Ref", value: transactionId }] : []),
+            ...(balanceAfter !== null ? [{ label: "Balance after", value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${balanceAfter.toLocaleString("en-IN")} remaining` }] : []),
           ]}
           onConfirm={handleConfirm}
           error={error}
@@ -374,12 +324,7 @@ export default function NewPaymentPage() {
         />
       )}
 
-      {showVoice && (
-        <VoiceSheet
-          onClose={() => setShowVoice(false)}
-          onPaymentIntent={handleVoiceIntent}
-        />
-      )}
+      {showVoice && <VoiceSheet onClose={() => setShowVoice(false)} onPaymentIntent={handleVoiceIntent} />}
     </main>
   )
 }
