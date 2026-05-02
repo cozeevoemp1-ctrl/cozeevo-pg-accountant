@@ -11,6 +11,10 @@ Output: data/reports/income_reconciliation.xlsx
   Tab 3  Working Capital     — deposits + bookings held (liability, not profit)
 """
 import asyncio, os, csv, datetime
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 from collections import defaultdict
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,6 +22,7 @@ load_dotenv()
 import asyncpg, openpyxl
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from utils.inr_format import INR_NUMBER_FORMAT
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 def parse_amt(v):
@@ -176,7 +181,8 @@ def hdr(ws, row, col, val, bg='1F4E79', fg='FFFFFF', bold=True, sz=10):
     c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     return c
 
-def num(ws, row, col, val, fmt='#,##0', bg=None):
+def num(ws, row, col, val, fmt=None, bg=None):
+    if fmt is None: fmt = INR_NUMBER_FORMAT
     c = ws.cell(row=row, column=col, value=val)
     c.number_format = fmt
     c.alignment = Alignment(horizontal='right')
@@ -345,8 +351,8 @@ for item, mode, n, amt, note in wc_data:
     if n == 0 and amt == 0: continue
     lbl(ws2, row2, 1, item)
     lbl(ws2, row2, 2, mode)
-    num(ws2, row2, 3, n, '#,##0')
-    num(ws2, row2, 4, amt, '#,##0', bg=LIGHT_RED)
+    num(ws2, row2, 3, n, INR_NUMBER_FORMAT)
+    num(ws2, row2, 4, amt, INR_NUMBER_FORMAT, bg=LIGHT_RED)
     lbl(ws2, row2, 5, note)
     row2 += 1
 
@@ -354,12 +360,12 @@ for item, mode, n, amt, note in wc_data:
 row2 += 1
 lbl(ws2, row2, 1, 'Less: Deposits already refunded to tenants', bold=True)
 lbl(ws2, row2, 2, 'cash+upi')
-num(ws2, row2, 4, -DEPOSIT_REFUNDS_PAID, '#,##0', bg=LIGHT_GREEN)
+num(ws2, row2, 4, -DEPOSIT_REFUNDS_PAID, INR_NUMBER_FORMAT, bg=LIGHT_GREEN)
 lbl(ws2, row2, 5, 'From expense classification (bank outflows tagged Tenant Deposit Refund)')
 
 row2 += 1
 lbl(ws2, row2, 1, 'NET WORKING CAPITAL OWED TO TENANTS', bold=True)
-num(ws2, row2, 4, total_collected - DEPOSIT_REFUNDS_PAID, '#,##0', bg='FCE4D6')
+num(ws2, row2, 4, total_collected - DEPOSIT_REFUNDS_PAID, INR_NUMBER_FORMAT, bg='FCE4D6')
 lbl(ws2, row2, 5, 'This is a liability on your balance sheet — NOT profit')
 ws2.row_dimensions[row2].height = 20
 
@@ -415,7 +421,7 @@ for ri, (dt, desc, ref, amt, cat, note, mk) in enumerate(
         sorted(credit_rows, key=lambda x: x[0]), 2):
     bg = CAT_COLORS.get(cat, None)
     lbl(ws3, ri, 1, str(dt))
-    num(ws3, ri, 2, amt, '#,##0', bg=bg)
+    num(ws3, ri, 2, amt, INR_NUMBER_FORMAT, bg=bg)
     lbl(ws3, ri, 3, cat)
     lbl(ws3, ri, 4, desc)
     lbl(ws3, ri, 5, ref)
