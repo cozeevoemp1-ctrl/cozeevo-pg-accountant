@@ -570,18 +570,25 @@ async def _daily_reconciliation() -> None:
             # Total dues vs collected for current month
             summary = await conn.execute(text("""
                 SELECT
-                    COUNT(*)                                          AS total_tenants,
-                    SUM(rs.due_amount)                               AS total_due,
-                    SUM(COALESCE(rs.paid_amount, 0))                 AS total_collected,
-                    SUM(rs.due_amount - COALESCE(rs.paid_amount, 0)) AS total_gap,
+                    COUNT(*)                                              AS total_tenants,
+                    SUM(rs.rent_due + COALESCE(rs.adjustment, 0))        AS total_due,
+                    SUM(COALESCE(p_sum.paid, 0))                         AS total_collected,
+                    SUM(rs.rent_due + COALESCE(rs.adjustment, 0)
+                        - COALESCE(p_sum.paid, 0))                       AS total_gap,
                     COUNT(*) FILTER (
-                        WHERE rs.due_amount - COALESCE(rs.paid_amount, 0) <= 0
-                    )                                                AS fully_paid_count
+                        WHERE rs.rent_due + COALESCE(rs.adjustment, 0)
+                              - COALESCE(p_sum.paid, 0) <= 0
+                    )                                                     AS fully_paid_count
                 FROM rent_schedule rs
                 JOIN tenancies tn ON tn.id = rs.tenancy_id
+                LEFT JOIN (
+                    SELECT tenancy_id, SUM(amount) AS paid
+                    FROM payments
+                    WHERE for_type = 'rent' AND period_month = :period AND is_void = FALSE
+                    GROUP BY tenancy_id
+                ) p_sum ON p_sum.tenancy_id = rs.tenancy_id
                 WHERE rs.period_month = :period
                   AND tn.status       = 'active'
-                  AND rs.is_void      = FALSE
             """), {"period": period})
             row = summary.fetchone()
 
@@ -813,11 +820,16 @@ async def _checkout_deposit_alerts() -> None:
                            AND pay.is_void = FALSE), 0
                     ) AS deposit_paid,
                     COALESCE(
-                        (SELECT SUM(rs.due_amount - COALESCE(rs.paid_amount,0))
-                         FROM rent_schedule rs
-                         WHERE rs.tenancy_id = tn.id
-                           AND rs.is_void = FALSE
-                           AND rs.due_amount > COALESCE(rs.paid_amount, 0)), 0
+                        (SELECT SUM(rs2.rent_due + COALESCE(rs2.adjustment, 0)
+                                    - COALESCE(
+                                        (SELECT SUM(p2.amount) FROM payments p2
+                                         WHERE p2.tenancy_id = tn.id
+                                           AND p2.for_type = 'rent'
+                                           AND p2.period_month = rs2.period_month
+                                           AND p2.is_void = FALSE), 0))
+                         FROM rent_schedule rs2
+                         WHERE rs2.tenancy_id = tn.id
+                           AND rs2.status IN ('pending', 'partial')), 0
                     ) AS outstanding_dues
                 FROM tenancies tn
                 JOIN tenants  t  ON t.id  = tn.tenant_id
