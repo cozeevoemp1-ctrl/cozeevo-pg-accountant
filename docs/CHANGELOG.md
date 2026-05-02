@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.36] — 2026-05-02 — P&L layout restructured + CAPEX separated
+
+### Changed
+- **`scripts/export_pnl_2026_05_02.py` — layout overhaul**:
+  - CAPEX (Furniture & Fittings, 8 Ball Pool) moved out of opex → own section below Operating Profit
+  - New profit lines: Operating Profit / Operating Margin % → CAPEX → Net Profit After CAPEX / Net Margin %
+  - Capital Contributions moved to below Income section
+  - Excluded items (deposit refunds, loan repayments) shown inline below opex
+  - Bank credits reconciliation section removed (confusing, no actionable value)
+- **Corrections**: Nov ₹50,000 in Furniture & Fittings was loan repayment — moved to Loan Repayment (excluded)
+- **Property rent shifted to cash basis**: Jan rent paid Feb, Feb in Mar, Mar in Apr (Apr rent paid May is outside window)
+- **Water shifted to cash basis**: Mar = ₹8K tanker only; Apr = ₹84,520 (tanker ₹42,020 + Manoj Mar bill ₹42,500)
+- **8 Ball Pool Equipment**: renamed from "CCTV Installation" — Nov ₹82,000
+- **Flags cleaned up**: all confirmed items resolved; only 2 open (Manoj Apr water TBD, Apr rent outside window)
+
+---
+
 ## [1.74.35] — 2026-05-02 — P&L rebuilt from bank statement as primary income source
 
 ### Changed

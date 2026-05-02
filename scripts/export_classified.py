@@ -82,7 +82,7 @@ sources = []
 
 import glob as _glob
 # CSVs first — newest downloads (covers Statement-*.csv and "YYYY statment.csv")
-csv_files = sorted(set(_glob.glob('Statement-*.csv') + _glob.glob('*statment*.csv') + _glob.glob('*statement*.csv')), reverse=True)
+csv_files = sorted(set(_glob.glob('Statement-*.csv') + _glob.glob('*statment*.csv') + _glob.glob('*statement*.csv') + _glob.glob('april month.csv') + _glob.glob('april*.csv')), reverse=True)
 for f in csv_files:
     t = read_yes_bank_csv(f)
     print('Loaded %d from %s' % (len(t), f))

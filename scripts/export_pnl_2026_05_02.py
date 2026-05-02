@@ -59,16 +59,6 @@ income = {
     "Cash (physical, not deposited to bank)":        [0,      0,        0,  300572,  653300, 1094220, 1343783],
 }
 
-# ── Bank statement — ALL credits (Yes Bank …961) ─────────────────────────────
-# Full picture of what hit the bank account each month.
-# Tenant UPI batch + capital injections + other = total bank inflow.
-# Verified against Dec closing balance ₹13,76,417 = sum(income) + sum(capital) - sum(debits) across Oct-Dec ✓
-# Old classifier was wrong: treated ALL individual UPI as "Capital" because partner number appeared as recipient.
-# Fixed: only flag as capital when partner/Kiran is the SENDER (from: field), not recipient.
-bank_all_credits = {
-    "Income (tenant UPI batch + direct + NEFT)": [      0, 723007, 1350547, 1259224, 2512287, 2740366, 3061538],
-    "Capital (Lakshmi startup + Kiran top-ups)": [500000,      1,       0,   90000,       0,       0,       0],
-}
 
 # Owner capital contribution — balance-sheet / equity
 capital_contributions = {
@@ -92,12 +82,13 @@ working_capital = {
 
 # ── Opex (accrual basis) ────────────────────────────────────────────────────
 opex = {
-    # Overrides: bank UPI (~6L) replaced by full 21.32L accrual each month
-    "Property Rent (accrual Rs.21.32L/mo, Jan onwards)":         [0, 0, 0,      2132000, 2132000, 2132000, 2132000],
+    # Cash basis: Jan rent paid in Feb, Feb rent in Mar, Mar rent in Apr.
+    # Apr rent (paid May) is outside this window — flagged below.
+    "Property Rent (cash — Jan rent paid Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 2132000, 2132000, 2132000],
     "Electricity":                                                [0, 0, 0,       131554,  134538,   96617,  140659],
-    # Mar: Manoj Rs.42.5K + bank tanker Rs.8K = Rs.50,500
-    # Apr: bank tanker Rs.42,020 (Himalaya); Manoj Apr accrual TBD (ask Kiran)
-    "Water (bank tankers + Manoj accrual; Apr Manoj TBD)":        [0, 0, 0,            0,       0,   50500,   42020],
+    # Cash basis: Manoj paid 1 month behind. Mar tanker ₹8K only. Apr = tanker ₹42,020 + Manoj Mar bill ₹42,500.
+    # Manoj Apr bill (paid May) is outside window — flagged below.
+    "Water (bank tankers + Manoj cash; Mar bill paid Apr)":        [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     10620,       0,       0,       0],
     # Pre-Feb: bank; Feb+: amortised Rs.15,514/mo (Airwire + WiFi vendor prepay)
     "Internet & WiFi (bank pre-Feb; Rs.15.5K/mo Feb+)":           [0, 0, 40946,    70952,   15514,   15514,   15514],
@@ -115,14 +106,17 @@ opex = {
     "Marketing":                                                  [0, 0, 39500,     17895,   3620,   27700,       0],
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 75716,     88073,   3000,    3000,    3000],
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    # CAPEX — one-time setup investments. Real cash out, included in full.
-    # Apr breakdown: classifier Rs.2,163 + TV Rs.75,600 + chairs Rs.47,000
-    #   + kitchen vessels Rs.37,500 + atta machines Rs.42,120 + mixer Rs.6,800 = Rs.2,11,183
-    "Furniture & Fittings (CAPEX)":                              [0, 50000, 110191, 203815, 1185397,   331, 211183],
-    "CCTV Installation (CAPEX)":                                 [0, 82000,      0,      0,       0,     0,      0],
     # Apr: Rs.2,77,034 raw; less CAPEX Rs.1,33,420 + Maint Rs.24,599 + Non-Op Rs.10,000 = Rs.1,09,015
     # Remaining unknowns: Rs.49,679 (8951297583) + Rs.9,500 (9099913969) + esob/tanti Rs.13K + others
     "Other Expenses":                                             [0, 10000, 83556,  6564,  23308,   98500,  109015],
+}
+
+# ── CAPEX — one-time setup investments (shown separately, below operating profit) ──
+# Apr breakdown: classifier Rs.2,163 + TV Rs.75,600 + chairs Rs.47,000
+#   + kitchen vessels Rs.37,500 + atta machines Rs.42,120 + mixer Rs.6,800 = Rs.2,11,183
+capex = {
+    "Furniture & Fittings":   [0,     0, 110191, 203815, 1185397,   331, 211183],
+    "8 Ball Pool Equipment":  [0, 82000,      0,      0,       0,     0,      0],
 }
 
 # ── Excluded — genuinely NOT costs (balance sheet items only) ────────────────
@@ -130,7 +124,7 @@ excluded = {
     # Giving back money that was always theirs — not an expense
     "Tenant Deposit Refund (balance sheet)":  [0, 10000,  21500,  53944,  74532,  118671, 128418],
     # Paying back debt principal — not an expense (reduces liability, not profit)
-    "Loan Repayment / Transfers (non-op)":    [0, 450000,     0,      0,  600000, 2090000, 22357],
+    "Loan Repayment / Transfers (non-op)":    [0, 500000,     0,      0,  600000, 2090000, 22357],
 }
 
 
@@ -155,27 +149,40 @@ def main():
         c.font = hdr_font
         c.alignment = ctr
 
-    # Income
+    # ── 1. INCOME ────────────────────────────────────────────────────────────
     ws.append(["INCOME"])
     ws[ws.max_row][0].font = bold
     for label, row in income.items():
         ws.append([label] + row + [sum(row)])
     rev_row = [sum(col) for col in zip(*income.values())]
-    ws.append(["Revenue"] + rev_row + [sum(rev_row)])
+    ws.append(["Total Revenue"] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
 
     ws.append([])
 
-    # Opex
+    # ── 2. CAPITAL CONTRIBUTIONS (not P&L) ───────────────────────────────────
+    ws.append(["CAPITAL CONTRIBUTIONS (not P&L — owner's equity injections)"])
+    ws[ws.max_row][0].font = bold
+    for label, row in capital_contributions.items():
+        ws.append([label] + row + [sum(row)])
+
+    ws.append([])
+
+    # ── 3. OPERATING EXPENSES ─────────────────────────────────────────────────
     ws.append(["OPERATING EXPENSES (accrual)"])
     ws[ws.max_row][0].font = bold
     for label, row in opex.items():
         ws.append([label] + row + [sum(row)])
-        # flag rows with known issues
-        if "TBD" in label or "⚠" in label or "Fuel & Diesel" in label:
+        if "TBD" in label or "⚠" in label:
             for c in ws[ws.max_row]:
                 c.fill = flag_fill
+
+    ws.append(["EXCLUDED FROM OPEX (balance sheet items — not costs)"])
+    ws[ws.max_row][0].font = Font(italic=True)
+    for label, row in excluded.items():
+        ws.append(["  " + label] + row + [sum(row)])
+
     opex_row = [sum(col) for col in zip(*opex.values())]
     ws.append(["Total Opex"] + opex_row + [sum(opex_row)])
     for c in ws[ws.max_row]:
@@ -183,56 +190,45 @@ def main():
 
     ws.append([])
 
-    # Net Profit
-    profit_row = [r - o for r, o in zip(rev_row, opex_row)]
-    ws.append(["NET PROFIT (accrual)"] + profit_row + [sum(profit_row)])
+    # ── 4. OPERATING PROFIT / MARGIN ─────────────────────────────────────────
+    op_profit_row = [r - o for r, o in zip(rev_row, opex_row)]
+    ws.append(["OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
+    for c in ws[ws.max_row]:
+        c.font = bold
+
+    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, rev_row)]
+    ws.append(["Operating Margin %"] + op_margin_row + [f"{(sum(op_profit_row)/sum(rev_row)*100):.1f}%"])
+
+    ws.append([])
+
+    # ── 5. CAPEX ──────────────────────────────────────────────────────────────
+    capex_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    ws.append(["CAPEX — ONE-TIME INVESTMENTS"])
+    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
+    ws[ws.max_row][0].fill = capex_fill
+    for ci in range(2, len(header) + 1):
+        ws.cell(ws.max_row, ci).fill = capex_fill
+    for label, row in capex.items():
+        ws.append([label] + row + [sum(row)])
+    capex_row = [sum(col) for col in zip(*capex.values())]
+    ws.append(["Total CAPEX"] + capex_row + [sum(capex_row)])
+    for c in ws[ws.max_row]:
+        c.font = bold; c.fill = total_fill
+
+    ws.append([])
+
+    # ── 6. NET PROFIT AFTER CAPEX ─────────────────────────────────────────────
+    profit_row = [op - cx for op, cx in zip(op_profit_row, capex_row)]
+    ws.append(["NET PROFIT AFTER CAPEX"] + profit_row + [sum(profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
     margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, rev_row)]
-    ws.append(["Margin %"] + margin_row + [f"{(sum(profit_row)/sum(rev_row)*100):.1f}%"])
+    ws.append(["Net Margin %"] + margin_row + [f"{(sum(profit_row)/sum(rev_row)*100):.1f}%"])
 
     ws.append([])
 
-    # Capital Contributions
-    ws.append(["CAPITAL CONTRIBUTIONS (not P&L — balance-sheet / owner's equity)"])
-    ws[ws.max_row][0].font = bold
-    for label, row in capital_contributions.items():
-        ws.append([label] + row + [sum(row)])
-
-    ws.append([])
-
-    # Bank Reconciliation
-    bank_section_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
-    gap_fill          = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    total_bank_fill   = PatternFill(start_color="A9D18E", end_color="A9D18E", fill_type="solid")
-    ws.append(["BANK STATEMENT CREDITS — ALL INFLOWS (Yes Bank …961)"])
-    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
-    ws[ws.max_row][0].fill = bank_section_fill
-    for ci in range(2, len(header) + 1):
-        ws.cell(ws.max_row, ci).fill = bank_section_fill
-
-    for label, row in bank_all_credits.items():
-        ws.append([label] + row + [sum(row)])
-
-    # Total bank credits row
-    total_bank_row = [sum(col) for col in zip(*bank_all_credits.values())]
-    ws.append(["  Total Bank Credits (all inflows)"] + total_bank_row + [sum(total_bank_row)])
-    for c in ws[ws.max_row]:
-        c.font = bold; c.fill = total_bank_fill
-
-    ws.append([])
-
-    # Reconciliation: Recorded income vs what hit the bank
-    recorded_income_row = [sum(col) for col in zip(*income.values())]
-    gap_row = [b - r for b, r in zip(total_bank_row, recorded_income_row)]
-    ws.append(["  Bank Credits − Recorded Income (gap = capital infusions + deposits not in income)"] + gap_row + [sum(gap_row)])
-    for c in ws[ws.max_row]:
-        c.fill = gap_fill
-
-    ws.append([])
-
-    # Working Capital
+    # ── 5. DEPOSITS HELD ──────────────────────────────────────────────────────
     wc_fill = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
     ws.append(["DEPOSITS HELD — refundable liability + non-refundable maintenance fee retained"])
     ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
@@ -243,20 +239,11 @@ def main():
     for label, row in working_capital.items():
         ws.append([label] + row + [sum(row)])
 
-    # Net working capital owed row
     net_wc = [sum(col) for col in zip(*working_capital.values())]
     ws.append(["  Net working capital owed to tenants (balance sheet liability)"] + net_wc + [sum(net_wc)])
     for c in ws[ws.max_row]:
         c.font = bold
         c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-
-    ws.append([])
-
-    # Excluded
-    ws.append(["EXCLUDED (not in opex)"])
-    ws[ws.max_row][0].font = bold
-    for label, row in excluded.items():
-        ws.append([label] + row + [sum(row)])
 
     ws.append([])
 
@@ -274,13 +261,8 @@ def main():
     ws.append(["⚠ ITEMS NEEDING KIRAN REVIEW"])
     ws[ws.max_row][0].font = Font(bold=True, color="FF0000")
     flags = [
-        "1. Manoj water bill for April (accrual — paid in May). Add to Water line when known.",
-        "2. Fuel & Diesel Apr = Rs.2,800 only (petrol for staff). No DG diesel visible in bank. Was generator not used? Or paid separately?",
-        "3. Apr CAPEX reclassified (removed from opex): TV Rs.75,600 + chairs Rs.47,000 + kitchen vessels Rs.37,500 + atta machines Rs.42,120 + mixer Rs.6,800 = Rs.2,11,023. Confirm these are correct.",
-        "4. EB panel board Rs.24,599 moved to Maintenance & Repairs. Correct?",
-        "5. Unknown: Rs.49,679 to 8951297583-3@ibl on 08-Apr. What is this?",
-        "6. Unknown: Rs.9,500 to 9099913969@ptsbi on 11-Apr. What is this?",
-        "7. Mar income updated in this P&L (DB now shows Rs.41.07L vs Rs.39.83L in Apr-23 P&L — additional payments recorded after Apr 23).",
+        "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
+        "2. Apr rent of Rs.21,32,000 paid in May is outside this P&L window — will appear in May P&L.",
     ]
     for f in flags:
         ws.append([f])
