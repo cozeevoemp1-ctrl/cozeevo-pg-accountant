@@ -114,7 +114,9 @@ export default function OnboardingSessionsPage() {
   const [detail, setDetail] = useState<SessionDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [confirmPending, setConfirmPending] = useState<string | null>(null) // token awaiting confirm
   const [toast, setToast] = useState("")
+  const [search, setSearch] = useState("")
   // Editable overrides for pending_review sessions
   const [ov, setOv] = useState<Record<string, string>>({})
 
@@ -178,13 +180,18 @@ export default function OnboardingSessionsPage() {
     }
   }
 
-  function showToast(msg: string) {
+  function showToast(msg: string, duration = 3000) {
     setToast(msg)
-    setTimeout(() => setToast(""), 2500)
+    setTimeout(() => setToast(""), duration)
   }
 
   async function handleCancel(token: string) {
-    if (!confirm("Cancel this session?")) return
+    if (confirmPending !== `cancel-${token}`) {
+      setConfirmPending(`cancel-${token}`)
+      setTimeout(() => setConfirmPending(null), 4000)
+      return
+    }
+    setConfirmPending(null)
     setActionLoading(`cancel-${token}`)
     try {
       const res = await fetch(`${API_URL}/api/onboarding/admin/${token}/cancel`, {
@@ -195,7 +202,7 @@ export default function OnboardingSessionsPage() {
       loadSessions()
       setExpandedToken(null)
     } catch {
-      showToast("Cancel failed")
+      showToast("Cancel failed — try again", 5000)
     } finally {
       setActionLoading(null)
     }
@@ -217,7 +224,12 @@ export default function OnboardingSessionsPage() {
   }
 
   async function handleApprove(token: string) {
-    if (!confirm("Approve this session and create the tenancy?")) return
+    if (confirmPending !== `approve-${token}`) {
+      setConfirmPending(`approve-${token}`)
+      setTimeout(() => setConfirmPending(null), 4000)
+      return
+    }
+    setConfirmPending(null)
     setActionLoading(`approve-${token}`)
     const overrides: Record<string, string | number> = {}
     if (detail) {
@@ -247,7 +259,7 @@ export default function OnboardingSessionsPage() {
       loadSessions()
       setExpandedToken(null)
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Approve failed")
+      showToast(err instanceof Error ? err.message : "Approve failed — try again", 6000)
     } finally {
       setActionLoading(null)
     }
@@ -267,6 +279,15 @@ export default function OnboardingSessionsPage() {
     return acc
   }, {})
   const pendingCount = (counts["pending_review"] ?? 0) + (counts["pending_tenant"] ?? 0)
+
+  const q = search.trim().toLowerCase()
+  const filteredSessions = q
+    ? sessions.filter(s =>
+        (s.tenant_name || "").toLowerCase().includes(q) ||
+        (s.room || "").toLowerCase().includes(q) ||
+        (s.tenant_phone || "").includes(q)
+      )
+    : sessions
 
   return (
     <main className="min-h-screen bg-bg pb-32">
@@ -302,6 +323,17 @@ export default function OnboardingSessionsPage() {
         ))}
       </div>
 
+      {/* Search bar */}
+      <div className="px-4 pt-3 pb-1 bg-surface border-b border-[#F0EDE9]">
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search name, room, phone…"
+          className="w-full text-xs border border-[#E2DEDD] rounded-full px-4 py-2 bg-bg text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+        />
+      </div>
+
       <div className="px-4 pt-3 flex flex-col gap-2 max-w-lg mx-auto">
 
         {loading && (
@@ -314,7 +346,12 @@ export default function OnboardingSessionsPage() {
           <div className="text-center text-xs text-ink-muted py-8">No sessions found</div>
         )}
 
-        {sessions.map((s) => {
+
+        {!loading && !error && filteredSessions.length === 0 && sessions.length > 0 && (
+          <div className="text-center text-xs text-ink-muted py-8">No matches for "{search}"</div>
+        )}
+
+        {filteredSessions.map((s) => {
           const isExpanded = expandedToken === s.token
           const name = s.tenant_name || "Pending fill"
           const hasPendingFill = !s.tenant_name
@@ -533,15 +570,23 @@ export default function OnboardingSessionsPage() {
                         {s.status === "pending_review" && (
                           <button
                             onClick={() => handleApprove(s.token)}
-                            disabled={actionLoading === `approve-${s.token}`}
-                            className="rounded-pill bg-brand-pink text-white px-4 py-2 text-xs font-bold active:opacity-80 disabled:opacity-40">
-                            {actionLoading === `approve-${s.token}` ? "Approving…" : "Approve"}
+                            disabled={!!actionLoading}
+                            className={`rounded-pill px-4 py-2 text-xs font-bold active:opacity-80 disabled:opacity-40 transition-colors ${
+                              confirmPending === `approve-${s.token}`
+                                ? "bg-green-600 text-white"
+                                : "bg-brand-pink text-white"
+                            }`}>
+                            {actionLoading === `approve-${s.token}`
+                              ? "Approving…"
+                              : confirmPending === `approve-${s.token}`
+                              ? "Tap again to confirm"
+                              : "Approve"}
                           </button>
                         )}
                         {(s.status === "pending_tenant" || s.status === "pending_review") && (
                           <button
                             onClick={() => handleResend(s.token)}
-                            disabled={actionLoading === `resend-${s.token}`}
+                            disabled={!!actionLoading}
                             className="rounded-pill bg-[#25D366] text-white px-4 py-2 text-xs font-bold active:opacity-80 disabled:opacity-40">
                             {actionLoading === `resend-${s.token}` ? "Sending…" : "Resend WhatsApp"}
                           </button>
@@ -554,9 +599,17 @@ export default function OnboardingSessionsPage() {
                         {(s.status === "pending_tenant" || s.status === "pending_review") && (
                           <button
                             onClick={() => handleCancel(s.token)}
-                            disabled={actionLoading === `cancel-${s.token}`}
-                            className="rounded-pill border border-status-warn text-status-warn px-4 py-2 text-xs font-semibold active:opacity-70 disabled:opacity-40">
-                            {actionLoading === `cancel-${s.token}` ? "Cancelling…" : "Cancel"}
+                            disabled={!!actionLoading}
+                            className={`rounded-pill border px-4 py-2 text-xs font-semibold active:opacity-70 disabled:opacity-40 transition-colors ${
+                              confirmPending === `cancel-${s.token}`
+                                ? "border-red-500 bg-red-500 text-white"
+                                : "border-status-warn text-status-warn"
+                            }`}>
+                            {actionLoading === `cancel-${s.token}`
+                              ? "Cancelling…"
+                              : confirmPending === `cancel-${s.token}`
+                              ? "Tap again to confirm"
+                              : "Cancel"}
                           </button>
                         )}
                       </div>
