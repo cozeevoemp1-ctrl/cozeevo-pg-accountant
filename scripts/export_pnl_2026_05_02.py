@@ -40,14 +40,42 @@ MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 # Oct–Mar: FROZEN — exact values from approved P&L (Kiran's Google Sheet).
 # DO NOT update from DB for closed months. Only Apr onwards uses DB.
 income = {
-    "Rent Cash":    [0,      0,       0,        300572,  653300,  1094220, 1403683],
-    "Rent UPI":     [0,      0,       0,         530575, 2324048, 2889193, 3236949],
+    "Rent Cash":    [0,      0,       0,        300572,  653300,  1094220, 1343783],
+    "Rent UPI":     [0,      0,       0,         530575, 2324048, 2889193, 3195365],
+    # Maintenance fee = non-refundable, collected at check-in, recognised as income immediately.
+    # DB has ₹12,89,200 in tenancies.maintenance_fee for all paying tenants — collected in cash
+    # (not in payments table). Shown here as one-time income in Jan when DB was first loaded.
+    # ⚠ Verify with Kiran: was this actually collected? Spread across months if needed.
+    "Maintenance Fee (non-refundable, ⚠ verify)": [0, 0, 0, 1289200, 0, 0, 0],
     "Other Income": [0,      100,     0,          14000,   28048,   28014,       0],
 }
 
 # Owner capital contribution — NOT revenue, balance-sheet / owner's equity
 capital_contributions = {
     "Owner startup advance (Prabhakar, from pocket)": [500000, 0, 0, 0, 0, 0, 0],
+}
+
+# ── Bank statement credits (Yes Bank …961) — income-side classification ──────
+# "Tenant UPI Collection" = Yes Bank daily UPI batch settlements (all tenant UPI bundled)
+# "Capital / Personal"    = transfers from Kiran / partner phones + RTGS inflows
+# Gap = Tenant UPI collected in bank minus DB rent UPI (deposits paid via UPI, unrecorded rent, etc.)
+bank_credits = {
+    "Tenant UPI Collection (bank settlements)": [0,       0,  5052, 175596, 2091597, 2515275, 2834731],
+    "Capital / Personal Transfers":             [0,  723008, 622487, 1173229,  419650,  223500,  209500],
+    "Other Credits (unidentified)":             [0,       0,    308,       0,    1040,    1591,   17307],
+}
+# DB rent UPI (same as income["Rent UPI"] — for reconciliation row)
+# Gap = Tenant UPI Collection - Rent UPI → represents deposits/bookings via UPI + unrecorded payments
+
+# ── Security deposits & booking advances — working capital, NOT income ────────
+# All collected in cash. Refunds paid out are in excluded["Tenant Deposit Refund (liability)"].
+# Net = amount still owed to tenants (balance sheet liability).
+working_capital = {
+    # Security deposit = FULLY refundable. Shown in Apr column as running total.
+    # Maintenance fee (₹12,89,200) is NON-refundable income (above in income section).
+    "Security Deposits held (refundable liability)": [0, 0, 0, 0, 0, 0, 4040000],
+    "Booking Advances held (applied to first rent)": [0, 0, 0, 0, 0, 0, 1908582],
+    "Less: Deposits already refunded":               [0, 0, 0, 0, 0, 0,  -146024],
 }
 
 # ── Opex (accrual basis) ────────────────────────────────────────────────────
@@ -158,6 +186,48 @@ def main():
     ws[ws.max_row][0].font = bold
     for label, row in capital_contributions.items():
         ws.append([label] + row + [sum(row)])
+
+    ws.append([])
+
+    # Bank Reconciliation
+    bank_section_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
+    gap_fill          = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    ws.append(["BANK STATEMENT CREDITS (Yes Bank …961) — NOT additional income"])
+    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
+    ws[ws.max_row][0].fill = bank_section_fill
+    for ci in range(2, len(header) + 1):
+        ws.cell(ws.max_row, ci).fill = bank_section_fill
+
+    for label, row in bank_credits.items():
+        ws.append([label] + row + [sum(row)])
+
+    # Reconciliation gap row
+    rent_upi_row = income["Rent UPI"]
+    tenant_upi_row = bank_credits["Tenant UPI Collection (bank settlements)"]
+    gap_row = [t - r for t, r in zip(tenant_upi_row, rent_upi_row)]
+    ws.append(["  Gap: Tenant UPI collect − DB Rent UPI (deposits/unrecorded via UPI)"] + gap_row + [sum(gap_row)])
+    for c in ws[ws.max_row]:
+        c.fill = gap_fill
+
+    ws.append([])
+
+    # Working Capital
+    wc_fill = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
+    ws.append(["WORKING CAPITAL — DEPOSITS HELD (liability — NOT profit, must be refunded)"])
+    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
+    ws[ws.max_row][0].fill = wc_fill
+    for ci in range(2, len(header) + 1):
+        ws.cell(ws.max_row, ci).fill = wc_fill
+
+    for label, row in working_capital.items():
+        ws.append([label] + row + [sum(row)])
+
+    # Net working capital owed row
+    net_wc = [sum(col) for col in zip(*working_capital.values())]
+    ws.append(["  Net working capital owed to tenants (balance sheet liability)"] + net_wc + [sum(net_wc)])
+    for c in ws[ws.max_row]:
+        c.font = bold
+        c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
 
     ws.append([])
 
