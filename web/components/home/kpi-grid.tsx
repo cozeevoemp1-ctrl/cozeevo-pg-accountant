@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, type KpiDetailItem, type TenantDues } from "@/lib/api";
@@ -372,6 +372,19 @@ export function KpiGrid({ data }: KpiGridProps) {
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  const cache = useRef<Map<string, KpiDetailItem[]>>(new Map());
+  const inflight = useRef<Set<string>>(new Set());
+
+  async function prefetch(key: TileKey) {
+    if (!key || cache.current.has(key) || inflight.current.has(key)) return;
+    inflight.current.add(key);
+    try {
+      const res = await getKpiDetail(key);
+      cache.current.set(key, res.items);
+    } catch { /* ignore */ }
+    inflight.current.delete(key);
+  }
+
   async function toggle(key: TileKey) {
     if (open === key) {
       setOpen(null);
@@ -380,9 +393,14 @@ export function KpiGrid({ data }: KpiGridProps) {
     }
     setOpen(key);
     resetFilters();
+    if (cache.current.has(key!)) {
+      setItems(cache.current.get(key!)!);
+      return;
+    }
     setLoading(true);
     try {
       const res = await getKpiDetail(key!);
+      cache.current.set(key!, res.items);
       setItems(res.items);
     } catch { setItems([]); }
     setLoading(false);
@@ -471,7 +489,7 @@ export function KpiGrid({ data }: KpiGridProps) {
     <div className="grid grid-cols-2 gap-3">
 
       {/* Occupied beds — left col */}
-      <div className="relative">
+      <div className="relative" onPointerDown={() => prefetch("occupied")}>
         <IconTile
           icon="🏠" label="Occupied beds"
           value={`${data.occupied_beds} / ${data.total_beds}`}
@@ -484,7 +502,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       </div>
 
       {/* Vacant beds — right col */}
-      <div className="relative">
+      <div className="relative" onPointerDown={() => prefetch("vacant")}>
         <IconTile
           icon="🪟" label="Vacant beds"
           value={data.vacant_beds}
@@ -504,7 +522,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       />
 
       {/* Dues pending — right col */}
-      <div className="relative">
+      <div className="relative" onPointerDown={() => prefetch("dues")}>
         <IconTile
           icon="💸" label={`Dues pending · ${data.overdue_tenants}`}
           value={rupeeL(data.overdue_amount)}
@@ -520,7 +538,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       {/* Check-ins / Check-outs — conditional */}
       {(data.checkins_today > 0 || data.checkouts_today > 0) && (
         <>
-          <div className="relative">
+          <div className="relative" onPointerDown={() => prefetch("checkins_today")}>
             <IconTile
               icon="↗️" label="Check-ins today"
               value={data.checkins_today}
@@ -531,7 +549,7 @@ export function KpiGrid({ data }: KpiGridProps) {
               <ExpansionPanel {...panelProps} positionStyle={leftStyle} />
             )}
           </div>
-          <div className="relative">
+          <div className="relative" onPointerDown={() => prefetch("checkouts_today")}>
             <IconTile
               icon="↙️" label="Check-outs today"
               value={data.checkouts_today}
@@ -547,7 +565,7 @@ export function KpiGrid({ data }: KpiGridProps) {
 
       {/* Awaiting check-in — full width */}
       {data.no_show_count > 0 && (
-        <div className="col-span-2 relative">
+        <div className="col-span-2 relative" onPointerDown={() => prefetch("no_show")}>
           <IconTile
             icon="⏳" label="Awaiting check-in"
             value={data.no_show_count}
@@ -562,7 +580,7 @@ export function KpiGrid({ data }: KpiGridProps) {
 
       {/* On notice — full width */}
       {data.notices_count > 0 && (
-        <div className="col-span-2 relative">
+        <div className="col-span-2 relative" onPointerDown={() => prefetch("notices")}>
           <IconTile
             icon="📋" label={`On notice · ${data.notices_count}`}
             value={`${data.notices_count} leaving`}
