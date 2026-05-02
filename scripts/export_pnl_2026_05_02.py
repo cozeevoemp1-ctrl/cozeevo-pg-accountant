@@ -42,11 +42,10 @@ MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 income = {
     "Rent Cash":    [0,      0,       0,        300572,  653300,  1094220, 1343783],
     "Rent UPI":     [0,      0,       0,         530575, 2324048, 2889193, 3195365],
-    # Maintenance fee = non-refundable, collected at check-in, recognised as income immediately.
-    # DB has ₹12,89,200 in tenancies.maintenance_fee for all paying tenants — collected in cash
-    # (not in payments table). Shown here as one-time income in Jan when DB was first loaded.
-    # ⚠ Verify with Kiran: was this actually collected? Spread across months if needed.
-    "Maintenance Fee (non-refundable, ⚠ verify)": [0, 0, 0, 1289200, 0, 0, 0],
+    # Maintenance fee = non-refundable portion of deposit. Collected at check-in. Income immediately.
+    # Does NOT need to be returned to tenants — exclude from working capital liability.
+    # Total for all paying tenants (active + exited) over Oct'25–Apr'26.
+    "Maintenance Fee (non-refundable income)": [0, 1289200, 0, 0, 0, 0, 0],
     "Other Income": [0,      100,     0,          14000,   28048,   28014,       0],
 }
 
@@ -71,11 +70,11 @@ bank_credits = {
 # All collected in cash. Refunds paid out are in excluded["Tenant Deposit Refund (liability)"].
 # Net = amount still owed to tenants (balance sheet liability).
 working_capital = {
-    # Security deposit = FULLY refundable. Shown in Apr column as running total.
-    # Maintenance fee (₹12,89,200) is NON-refundable income (above in income section).
-    "Security Deposits held (refundable liability)": [0, 0, 0, 0, 0, 0, 4040000],
-    "Booking Advances held (applied to first rent)": [0, 0, 0, 0, 0, 0, 1908582],
-    "Less: Deposits already refunded":               [0, 0, 0, 0, 0, 0,  -146024],
+    # Source: active tenancies only (matches PWA "Security Deposits Held" screen).
+    # Exited tenants already settled — not owed anything further.
+    # Refundable = security_deposit - maintenance_fee per active tenant.
+    "Security Deposits — refundable (active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
+    "Booking Advances held (applied to first rent)":   [0, 0, 0, 0, 0, 0, 1908582],
 }
 
 # ── Opex (accrual basis) ────────────────────────────────────────────────────
