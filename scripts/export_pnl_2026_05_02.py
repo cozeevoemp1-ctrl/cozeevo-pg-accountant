@@ -103,21 +103,22 @@ opex = {
     "Marketing":                                                  [0, 0, 39500,     17895,   3620,   27700,       0],
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 75716,     88073,   3000,    3000,    3000],
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
+    # CAPEX — one-time setup investments. Real cash out, included in full.
+    # Apr breakdown: classifier Rs.2,163 + TV Rs.75,600 + chairs Rs.47,000
+    #   + kitchen vessels Rs.37,500 + atta machines Rs.42,120 + mixer Rs.6,800 = Rs.2,11,183
+    "Furniture & Fittings (CAPEX)":                              [0, 50000, 110191, 203815, 1185397,   331, 211183],
+    "CCTV Installation (CAPEX)":                                 [0, 82000,      0,      0,       0,     0,      0],
     # Apr: Rs.2,77,034 raw; less CAPEX Rs.1,33,420 + Maint Rs.24,599 + Non-Op Rs.10,000 = Rs.1,09,015
     # Remaining unknowns: Rs.49,679 (8951297583) + Rs.9,500 (9099913969) + esob/tanti Rs.13K + others
     "Other Expenses":                                             [0, 10000, 83556,  6564,  23308,   98500,  109015],
 }
 
-# ── Excluded from opex ──────────────────────────────────────────────────────
-# Apr CAPEX breakdown: classifier Rs.2,163 + TV Rs.75,600 + chairs Rs.47,000
-#   + kitchen vessels Rs.37,500 + atta machines Rs.42,120 + mixer Rs.6,800 = Rs.2,11,183
+# ── Excluded — genuinely NOT costs (balance sheet items only) ────────────────
 excluded = {
-    "Furniture & Fittings (CAPEX)":       [0, 50000, 110191, 203815, 1185397,   331, 211183],
-    "CCTV Installation (CAPEX)":          [0, 82000,      0,      0,       0,     0,      0],
-    "Tenant Deposit Refund (liability)":  [0, 10000,  21500,  53944,  74532,  118671, 128418],
-    # Apr: Amazon Pay Later repayments Rs.2,357 + borrow to Prabhakaran Rs.10,000 +
-    #      borrow from Other Rs.10,000 = Rs.22,357  (TV Rs.75,600 moved to F&F above)
-    "Loan Repayment / Transfers (non-op)":[0, 450000,     0,      0,  600000, 2090000, 22357],
+    # Giving back money that was always theirs — not an expense
+    "Tenant Deposit Refund (balance sheet)":  [0, 10000,  21500,  53944,  74532,  118671, 128418],
+    # Paying back debt principal — not an expense (reduces liability, not profit)
+    "Loan Repayment / Transfers (non-op)":    [0, 450000,     0,      0,  600000, 2090000, 22357],
 }
 
 
