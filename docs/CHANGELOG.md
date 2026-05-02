@@ -2,6 +2,13 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.33] — 2026-05-02 — Overdue reminder uses rent_reminder template (not general_notice)
+
+### Changed
+- **`src/scheduler.py` — `overdue_daily` mode** — days 1, 3, 5 now send `rent_reminder` (`{{name}}` only, no amount or late-fee text). `general_notice` reserved for when Kiran enables it.
+
+---
+
 ## [1.74.32] — 2026-05-02 — Onboarding UX + reminder template sync
 
 ### Added
