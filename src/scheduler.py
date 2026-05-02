@@ -457,13 +457,13 @@ async def _rent_reminder(mode: str = "day1") -> None:
                 # 09:00 IST slot). Fall back to tenancy.agreed_rent.
                 rows = (await conn.execute(text("""
                     SELECT t.name, t.phone,
-                           COALESCE(rs.due_amount, tn.agreed_rent, 0) AS balance
+                           COALESCE(rs.rent_due + COALESCE(rs.adjustment, 0),
+                                    tn.agreed_rent, 0) AS balance
                     FROM tenancies tn
                     JOIN tenants t ON t.id = tn.tenant_id
                     LEFT JOIN rent_schedule rs
                            ON rs.tenancy_id = tn.id
                           AND rs.period_month = :period
-                          AND rs.is_void = FALSE
                     WHERE tn.status = 'active'
                       AND t.phone IS NOT NULL AND t.phone <> ''
                     ORDER BY t.name
@@ -471,15 +471,25 @@ async def _rent_reminder(mode: str = "day1") -> None:
             else:
                 rows = (await conn.execute(text("""
                     SELECT t.name, t.phone,
-                           (rs.due_amount - COALESCE(rs.paid_amount, 0)) AS balance
+                           (rs.rent_due + COALESCE(rs.adjustment, 0)
+                            - COALESCE(p_sum.paid, 0)) AS balance
                     FROM rent_schedule rs
                     JOIN tenancies tn ON tn.id = rs.tenancy_id
                     JOIN tenants   t  ON t.id  = tn.tenant_id
+                    LEFT JOIN (
+                        SELECT tenancy_id, SUM(amount) AS paid
+                        FROM payments
+                        WHERE for_type = 'rent'
+                          AND period_month = :period
+                          AND is_void = FALSE
+                        GROUP BY tenancy_id
+                    ) p_sum ON p_sum.tenancy_id = tn.id
                     WHERE rs.period_month = :period
                       AND tn.status       = 'active'
-                      AND rs.is_void      = FALSE
-                      AND (rs.due_amount - COALESCE(rs.paid_amount, 0)) > 0
+                      AND rs.status       IN ('pending', 'partial')
                       AND t.phone IS NOT NULL AND t.phone <> ''
+                      AND (rs.rent_due + COALESCE(rs.adjustment, 0)
+                           - COALESCE(p_sum.paid, 0)) > 0
                     ORDER BY balance DESC
                 """), {"period": period})).fetchall()
     finally:
