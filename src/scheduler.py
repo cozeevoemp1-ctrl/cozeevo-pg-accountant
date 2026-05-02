@@ -137,15 +137,16 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
         kwargs={"mode": "advance"},
     )
-    # Day +2: 2nd of month (overdue nudge with amount + late-fee warning)
-    scheduler.add_job(
-        _rent_reminder,
-        trigger=CronTrigger(day=2, hour=9, minute=0, timezone="Asia/Kolkata"),
-        id="rent_reminder_day2",
-        name="Rent Reminder — Day +2 (2nd of month, overdue tenants)",
-        replace_existing=True,
-        kwargs={"mode": "overdue_daily"},
-    )
+    # 1st, 3rd, 5th of month — general_notice to unpaid tenants only
+    for _day, _id in [(1, "rent_reminder_day1"), (3, "rent_reminder_day3"), (5, "rent_reminder_day5")]:
+        scheduler.add_job(
+            _rent_reminder,
+            trigger=CronTrigger(day=_day, hour=9, minute=0, timezone="Asia/Kolkata"),
+            id=_id,
+            name=f"Rent Reminder — Day {_day} (overdue tenants)",
+            replace_existing=True,
+            kwargs={"mode": "overdue_daily"},
+        )
 
     scheduler.add_job(
         _daily_reconciliation,
