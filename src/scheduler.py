@@ -438,7 +438,7 @@ async def _rent_reminder(mode: str = "day1") -> None:
     elif mode == "overdue_daily":
         period        = date(today.year, today.month, 1)
         all_active    = False
-        template_name = "general_notice"
+        template_name = "rent_reminder"
         log_tag       = f"overdue_daily (day {today.day}, unpaid)"
     else:
         logger.warning("[Scheduler] _rent_reminder unknown mode: %s", mode)
