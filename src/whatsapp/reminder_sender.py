@@ -41,7 +41,7 @@ _API_VERSION = "v18.0"
 # Map template names to their variable names (must match what's in Meta Business Manager)
 TEMPLATE_PARAM_NAMES = {
     "rent_reminder":         ["name"],
-    "general_notice":        ["name", "message"],
+    "general_notice":        ["month"],
     "checkout_confirmation": ["name", "room", "date", "refund", "link"],
 }
 

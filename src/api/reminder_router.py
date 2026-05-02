@@ -47,7 +47,7 @@ class CustomMessageRequest(BaseModel):
 
 class BulkNoticeRequest(BaseModel):
     template_name: str = "general_notice"
-    message: str       # the notice text (goes into {{2}} of general_notice template)
+    body_params: list[str]  # params to pass to template (e.g. ["May 2026"] for general_notice)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -224,7 +224,7 @@ async def send_bulk_notice(req: BulkNoticeRequest):
     for name, phone in rows:
         ok = await send_template(
             phone, req.template_name,
-            body_params=[name, req.message],
+            body_params=req.body_params,
         )
         if ok:
             sent += 1

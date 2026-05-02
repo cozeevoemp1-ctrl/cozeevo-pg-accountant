@@ -503,32 +503,10 @@ async def _rent_reminder(mode: str = "day1") -> None:
         if not phone or not balance or float(balance) <= 0:
             continue
         try:
-            if template_name == "general_notice":
-                # Custom wording so we can include the Rs.200/day late-fee warning.
-                if today.day < LATE_FEE_FROM_DAY:
-                    fee_line = (
-                        f" A late fee of Rs.{LATE_FEE_PER_DAY}/day will apply "
-                        f"for payments made on or after the {LATE_FEE_FROM_DAY}th."
-                    )
-                else:
-                    days_late = today.day - LATE_FEE_FROM_DAY + 1
-                    fee_line = (
-                        f" Late fee so far: Rs.{LATE_FEE_PER_DAY} × {days_late} day(s) "
-                        f"= Rs.{LATE_FEE_PER_DAY * days_late:,}."
-                    )
-                custom = (
-                    f"your rent of Rs.{int(balance):,} for {month_label} is unpaid."
-                    f"{fee_line} Please clear it today to stop the fee growing."
-                )
-                ok = await send_template(
-                    phone, "general_notice",
-                    body_params=[name, custom[:1000]],
-                )
-            else:
-                ok = await send_template(
-                    phone, "rent_reminder",
-                    body_params=[name],
-                )
+            ok = await send_template(
+                phone, "general_notice",
+                body_params=[month_label],
+            )
             if ok:
                 sent += 1
         except Exception as e:
