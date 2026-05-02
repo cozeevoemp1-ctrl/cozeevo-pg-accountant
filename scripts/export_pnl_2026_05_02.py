@@ -1,16 +1,19 @@
-"""Export accrual-basis P&L for Oct'25 – Apr'26.
+"""P&L for Oct'25 – Apr'26 — BANK STATEMENT as primary source.
 
 Produces: data/reports/PnL_Accrual_2026_05_02.xlsx
 
-Rules (sop_pnl.md):
+INCOME METHODOLOGY:
+  Primary:      Bank statement credits — Yes Bank …961 (UPI batch settlements + other)
+  Supplementary: Cash physically collected but NOT deposited to bank (from DB records)
+  NOT income:   Capital / personal transfers from Kiran + partner + NEFT (owner injections)
+  NOT income:   Maintenance fee (non-refundable portion of security deposit — shown in deposits)
+
+EXPENSE METHODOLOGY (unchanged — already bank-derived):
 - Property Rent accrual Rs.21.32L/mo from Jan onwards
-- Water: bank tanker kept; Manoj B accrual from March (paid 1mo behind)
-  Apr: tanker Rs.42,020 (Himalaya); Manoj Apr invoice TBD (ask Kiran)
-- Internet: pre-Feb bank as-is; Rs.15,514/mo Feb onwards (amortised)
-- Police: Rs.3K/mo accrual Jan onwards
-- Waste: Rs.3.5K/mo (classifier handles)
-- Income: DB payments table (for_type=rent, is_void=false)
-- Apr reclassifications applied (see excluded section notes)
+- Water: bank tanker kept; Manoj B accrual from March
+- Internet: bank pre-Feb; Rs.15,514/mo Feb+ (amortised)
+- Police: Rs.3K/mo accrual Jan+
+- Apr reclassifications applied (see script header comments below)
 
 April reclassifications from bank classifier:
   Non-Op → Food:     Rs.29,946  (Prabhakaran NEFT "ninja cart pooja veg")
@@ -36,46 +39,49 @@ OUT = Path(__file__).parent.parent / "data" / "reports" / "PnL_Accrual_2026_05_0
 
 MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 
-# ── Income ───────────────────────────────────────────────────────────────
-# Oct–Mar: FROZEN — exact values from approved P&L (Kiran's Google Sheet).
-# DO NOT update from DB for closed months. Only Apr onwards uses DB.
+# ── Income — BANK as primary, cash as supplement ─────────────────────────
+# Bank income = all credits EXCEPT Lakshmi SBI→Yes Bank startup (Oct) and Kiran top-ups.
+# Individual UPI includes: tenant rent + deposits + bookings paid directly to partner's personal UPI.
+# For Oct-Dec the personal account (7358341775) was used before a merchant QR was set up.
+# Verified against closing balance: Oct–Dec net ₹13,76,417 matches bank statement exactly.
 income = {
-    "Rent Cash":    [0,      0,       0,        300572,  653300,  1094220, 1343783],
-    "Rent UPI":     [0,      0,       0,         530575, 2324048, 2889193, 3195365],
-    # Maintenance fee = non-refundable portion of deposit. Collected at check-in. Income immediately.
-    # Does NOT need to be returned to tenants — exclude from working capital liability.
-    # Total for all paying tenants (active + exited) over Oct'25–Apr'26.
-    "Maintenance Fee (non-refundable income)": [0, 1289200, 0, 0, 0, 0, 0],
-    "Other Income": [0,      100,     0,          14000,   28048,   28014,       0],
+    # Batch settlements = Yes Bank merchant QR daily aggregate (Jan onwards only)
+    "Bank — UPI batch settlements (merchant QR)":    [0,      0,        0,  175596, 2091597, 2515275, 2834731],
+    # Individual/direct = personal UPI + NEFT income (Oct–Dec all were direct; Jan+ diminishing as QR grew)
+    "Bank — individual direct payments + NEFT":      [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
+    # Cash physically collected — NOT deposited to bank. Source: DB cash payments.
+    # Oct-Dec ₹0 = no DB records for pre-live months.
+    "Cash (physical, not deposited to bank)":        [0,      0,        0,  300572,  653300, 1094220, 1343783],
 }
 
-# Owner capital contribution — NOT revenue, balance-sheet / owner's equity
+# ── Bank statement — ALL credits (Yes Bank …961) ─────────────────────────────
+# Full picture of what hit the bank account each month.
+# Tenant UPI batch + capital injections + other = total bank inflow.
+# Verified against Dec closing balance ₹13,76,417 = sum(income) + sum(capital) - sum(debits) across Oct-Dec ✓
+# Old classifier was wrong: treated ALL individual UPI as "Capital" because partner number appeared as recipient.
+# Fixed: only flag as capital when partner/Kiran is the SENDER (from: field), not recipient.
+bank_all_credits = {
+    "Income (tenant UPI batch + direct + NEFT)": [      0, 723007, 1350547, 1259224, 2512287, 2740366, 3061538],
+    "Capital (Lakshmi startup + Kiran top-ups)": [500000,      1,       0,   90000,       0,       0,       0],
+}
+
+# Owner capital contribution — balance-sheet / equity
 capital_contributions = {
-    "Owner startup advance (Prabhakar, from pocket)": [500000, 0, 0, 0, 0, 0, 0],
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000, 0, 0,     0, 0, 0, 0],
+    "Kiran top-up transfer (Jan 2026)":                   [     0, 0, 0, 90000, 0, 0, 0],
 }
 
-# ── Bank statement credits (Yes Bank …961) — income-side classification ──────
-# "Tenant UPI Collection" = Yes Bank daily UPI batch settlements (all tenant UPI bundled)
-# "Capital / Personal"    = transfers from Kiran / partner phones + RTGS inflows
-# Gap = Tenant UPI collected in bank minus DB rent UPI (deposits paid via UPI, unrecorded rent, etc.)
-bank_credits = {
-    "Tenant UPI Collection (bank settlements)": [0,       0,  5052, 175596, 2091597, 2515275, 2834731],
-    "Capital / Personal Transfers":             [0,  723008, 622487, 1173229,  419650,  223500,  209500],
-    "Other Credits (unidentified)":             [0,       0,    308,       0,    1040,    1591,   17307],
-}
-# DB rent UPI (same as income["Rent UPI"] — for reconciliation row)
-# Gap = Tenant UPI Collection - Rent UPI → represents deposits/bookings via UPI + unrecorded payments
-
-# ── Security deposits & booking advances — working capital, NOT income ────────
-# All collected in cash. Refunds paid out are in excluded["Tenant Deposit Refund (liability)"].
-# Net = amount still owed to tenants (balance sheet liability).
+# ── Deposits held — NOT income, balance sheet only ───────────────────────────
+# Security deposit = what tenant paid upfront.
+# Split into: (a) refundable portion — must return to active tenants on exit
+#             (b) maintenance fee   — non-refundable, PG retains, NOT income
+# Source for refundable: active tenancies only (matches PWA "Security Deposits Held" screen, Apr 30).
+# Maintenance fee spread: by check-in month from DB tenancies (all tenants in window).
 working_capital = {
-    # Source: active tenancies only (matches PWA "Security Deposits Held" screen).
-    # Exited tenants already settled — not owed anything further.
-    # Refundable = security_deposit - maintenance_fee per active tenant.
-    # Booking advances are NOT shown here — they are prepaid rent (applied to first month),
-    # not a liability. They reduce the cash collected at check-in, not a separate refund obligation.
-    "Security Deposits — refundable (active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
+    "Security Deposits — refundable (must return to active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
+    # Non-refundable maintenance fee — PG retains this permanently. NOT a liability. NOT income.
+    # Shown here for transparency: by check-in month (Nov 22 tenants, Dec 40, Jan 59, Feb 53, Mar 72, Apr 23)
+    "  Maintenance Fee retained (non-refundable, by check-in month)": [0, 96000, 196000, 287500, 248000, 319700, 122000],
 }
 
 # ── Opex (accrual basis) ────────────────────────────────────────────────────
@@ -193,20 +199,28 @@ def main():
     # Bank Reconciliation
     bank_section_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
     gap_fill          = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    ws.append(["BANK STATEMENT CREDITS (Yes Bank …961) — NOT additional income"])
+    total_bank_fill   = PatternFill(start_color="A9D18E", end_color="A9D18E", fill_type="solid")
+    ws.append(["BANK STATEMENT CREDITS — ALL INFLOWS (Yes Bank …961)"])
     ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
     ws[ws.max_row][0].fill = bank_section_fill
     for ci in range(2, len(header) + 1):
         ws.cell(ws.max_row, ci).fill = bank_section_fill
 
-    for label, row in bank_credits.items():
+    for label, row in bank_all_credits.items():
         ws.append([label] + row + [sum(row)])
 
-    # Reconciliation gap row
-    rent_upi_row = income["Rent UPI"]
-    tenant_upi_row = bank_credits["Tenant UPI Collection (bank settlements)"]
-    gap_row = [t - r for t, r in zip(tenant_upi_row, rent_upi_row)]
-    ws.append(["  Gap: Tenant UPI collect − DB Rent UPI (deposits/unrecorded via UPI)"] + gap_row + [sum(gap_row)])
+    # Total bank credits row
+    total_bank_row = [sum(col) for col in zip(*bank_all_credits.values())]
+    ws.append(["  Total Bank Credits (all inflows)"] + total_bank_row + [sum(total_bank_row)])
+    for c in ws[ws.max_row]:
+        c.font = bold; c.fill = total_bank_fill
+
+    ws.append([])
+
+    # Reconciliation: Recorded income vs what hit the bank
+    recorded_income_row = [sum(col) for col in zip(*income.values())]
+    gap_row = [b - r for b, r in zip(total_bank_row, recorded_income_row)]
+    ws.append(["  Bank Credits − Recorded Income (gap = capital infusions + deposits not in income)"] + gap_row + [sum(gap_row)])
     for c in ws[ws.max_row]:
         c.fill = gap_fill
 
@@ -214,7 +228,7 @@ def main():
 
     # Working Capital
     wc_fill = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
-    ws.append(["WORKING CAPITAL — DEPOSITS HELD (liability — NOT profit, must be refunded)"])
+    ws.append(["DEPOSITS HELD — refundable liability + non-refundable maintenance fee retained"])
     ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
     ws[ws.max_row][0].fill = wc_fill
     for ci in range(2, len(header) + 1):
@@ -290,6 +304,7 @@ def main():
         ("Police", "Rs.3,000/mo cash accrual Jan onwards."),
         ("Waste Disposal", "Rs.3,500/mo (Pavan 6366411789). Classifier catches it."),
         ("Apr reclassifications", "See script header for full list."),
+        ("Maintenance Fee income", "Spread by check-in month (not collected month). Nov ₹96K, Dec ₹1.96L, Jan ₹2.875L, Feb ₹2.48L, Mar ₹3.197L, Apr ₹1.22L. May check-ins excluded."),
         ("Excluded from opex", "Furniture & Fittings (capex), CCTV (capex), Tenant Deposit Refunds (liability), Loan Repayments (non-operating)."),
         ("Cash leakage", "Max 4% of EBITDA for reality-adjusted profit (Kiran-confirmed). Not applied here — flagged for awareness."),
     ]

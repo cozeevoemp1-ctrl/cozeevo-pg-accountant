@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.35] — 2026-05-02 — P&L rebuilt from bank statement as primary income source
+
+### Changed
+- **`scripts/export_pnl_2026_05_02.py` — income methodology** — completely rebuilt:
+  - Primary source: bank statement credits (batch UPI settlements + individual direct UPI + NEFT)
+  - Supplementary: DB cash payments (physical cash not deposited to bank)
+  - Maintenance fee removed from income — shown in Deposits Held section only
+  - Capital correctly separated (Lakshmi SBI→Yes Bank startup ₹5L Oct; Kiran top-up ₹90K Jan)
+- **Bank classifier fixed** — old classifier put ALL individual UPI as "Capital/Personal" because partner's number appeared as *recipient* in every credit description. Fixed: now checks if admin is the *sender* (from: field), not just mentioned. Oct–Dec income was severely understated before.
+- **Verified against Dec closing balance** — Oct–Dec net credits−debits = ₹13,76,417 = bank statement Dec closing balance ✓
+
+### Corrected figures (Oct–Apr)
+| Month | Old Income (DB) | New Income (Bank+Cash) |
+|-------|----------------|----------------------|
+| Oct | ₹0 | ₹0 (all capital) |
+| Nov | ₹96K maint fee | ₹7,23,007 |
+| Dec | ₹1,96K maint fee | ₹13,50,547 |
+| Jan | ₹11,32,647 | ₹15,59,796 |
+| Feb | ₹32,53,396 | ₹31,65,587 |
+| Mar | ₹43,11,127 | ₹38,34,586 |
+| Apr | ₹46,61,148 | ₹44,05,321 |
+
+---
+
 ## [1.74.34] — 2026-05-02 — Full reconciliation: Source = Ops = DB for Nov'25–Apr'26
 
 ### Fixed
