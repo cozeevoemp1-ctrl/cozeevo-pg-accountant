@@ -49,11 +49,11 @@ income = {
     # Batch settlements = clean rent payments. Nov/Dec had no merchant QR (₹0).
     "Bank — UPI batch settlements (merchant QR)":    [0,      0,        0,  175596, 2091597, 2515275, 2834731],
     # PRIMARY — Individual direct UPI + NEFT income
-    # Nov/Dec: ALL bank individual credits = security deposits collected at check-in (NOT rent).
-    #   Rent collection only started from February (for January's period).
-    # Jan: individual UPI = deposits for new Jan check-ins. Excluded here; shown in Deposits section.
-    # Feb+: mix of rent + small deposit collections for new check-ins.
-    "Bank — individual direct payments + NEFT":      [0,      0,        0,       0,  420690,  225091,  226807],
+    # Oct-Dec: all payments went to partner's personal UPI (no merchant QR yet).
+    # Includes rent + deposits mixed together — bank doesn't separate them.
+    # Jan: individual UPI = mix of Jan rent + new deposits; shown here in full.
+    # Feb+: diminishing as tenants migrated to merchant QR.
+    "Bank — individual direct payments + NEFT":      [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
     # SUPPLEMENTARY — Cash physically collected, NOT deposited to bank (from DB records)
     # Oct-Dec ₹0 = no DB records pre-live. Jan cash ₹3,00,572 = first rent payments (some tenants paid Jan in Jan).
     "Cash (physical, not deposited to bank)":        [0,      0,        0,  300572,  653300, 1094220, 1343783],
@@ -83,15 +83,11 @@ capital_contributions = {
 # Source for refundable: active tenancies only (matches PWA "Security Deposits Held" screen, Apr 30).
 # Maintenance fee spread: by check-in month from DB tenancies (all tenants in window).
 working_capital = {
-    # Deposits collected from bank — NOT income. Nov/Dec/Jan bank credits were primarily these.
-    # Nov: ALL ₹7.23L bank = deposits (no rent in Nov). Dec: ALL ₹13.5L = deposits.
-    # Jan: individual bank ₹10.83L = deposits for new Jan check-ins (rent started from Feb).
-    "Deposits collected (bank — Nov/Dec/Jan individual UPI)":         [0, 723007, 1350547, 1083628,       0,       0,       0],
     # Refundable portion owed back to active tenants (Apr 30 snapshot, from PWA)
-    "Security Deposits — refundable (must return to active tenants)": [0,      0,       0,       0,       0,       0, 2437425],
+    "Security Deposits — refundable (must return to active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
     # Non-refundable maintenance fee — PG retains. NOT income. NOT a liability.
     # By check-in month: Nov ₹96K, Dec ₹1.96L, Jan ₹2.875L, Feb ₹2.48L, Mar ₹3.197L, Apr ₹1.22L
-    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  96000,  196000,  287500,  248000,  319700,  122000],
+    "  Maintenance Fee retained (non-refundable, by check-in month)": [0, 96000, 196000, 287500, 248000, 319700, 122000],
 }
 
 # ── Opex (accrual basis) ────────────────────────────────────────────────────
