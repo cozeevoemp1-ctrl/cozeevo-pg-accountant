@@ -473,7 +473,7 @@ export function getCheckoutStatus(token: string): Promise<CheckoutStatusResponse
   return _get<CheckoutStatusResponse>(`/api/v2/app/checkout/status/${token}`);
 }
 
-export async function uploadReceipt(paymentId: number, file: File): Promise<{ payment_id: number; receipt_url: string }> {
+export async function uploadReceipt(paymentId: number, file: File): Promise<{ payment_id: number; receipt_url: string; transaction_id: string | null }> {
   const headers = await _authHeaders();
   const form = new FormData();
   form.append("file", file);
@@ -487,4 +487,33 @@ export async function uploadReceipt(paymentId: number, file: File): Promise<{ pa
     throw new Error((detail as { detail?: string }).detail ?? `Upload failed ${res.status}`);
   }
   return res.json();
+}
+
+// ── Payment history + edit ───────────────────────────────────────────────────
+
+export interface PaymentListItem {
+  payment_id: number;
+  amount: number;
+  method: string;
+  for_type: string;
+  period_month: string | null;
+  payment_date: string;
+  notes: string | null;
+  is_void: boolean;
+  receipt_url: string | null;
+  upi_reference: string | null;
+}
+
+export interface PaymentEditBody {
+  method?: "UPI" | "CASH" | "BANK" | "CARD" | "OTHER";
+  amount?: number;
+  notes?: string;
+}
+
+export function getPaymentHistory(tenancyId: number, limit = 20): Promise<PaymentListItem[]> {
+  return _get<PaymentListItem[]>(`/api/v2/app/payments?tenancy_id=${tenancyId}&limit=${limit}`);
+}
+
+export function editPayment(paymentId: number, body: PaymentEditBody): Promise<PaymentListItem> {
+  return _patch<PaymentListItem>(`/api/v2/app/payments/${paymentId}`, body);
 }

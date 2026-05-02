@@ -22,3 +22,22 @@ class PaymentResponse(BaseModel):
     payment_id: int
     new_balance: float
     receipt_sent: bool = False
+
+
+class PaymentEdit(BaseModel):
+    method: Optional[Literal["UPI", "CASH", "BANK", "CARD", "OTHER"]] = None
+    amount: Optional[int] = Field(default=None, gt=0)
+    notes: Optional[str] = None
+
+
+class PaymentListItem(BaseModel):
+    payment_id: int
+    amount: float
+    method: str
+    for_type: str
+    period_month: Optional[str]
+    payment_date: str
+    notes: Optional[str]
+    is_void: bool
+    receipt_url: Optional[str]
+    upi_reference: Optional[str]

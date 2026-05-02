@@ -2,23 +2,34 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+import os
 from datetime import date, datetime
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy import desc, select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import Payment, Room, StayType, Tenancy, TenancyStatus, Tenant
+from src.database.models import Payment, PaymentMode, Room, StayType, Tenancy, TenancyStatus, Tenant
 from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, update_payment as gsheets_update
-from src.schemas.payments import PaymentCreate, PaymentResponse
+from src.schemas.payments import PaymentCreate, PaymentEdit, PaymentListItem, PaymentResponse
 from src.services.payments import _resolve_payment_mode, log_payment
 from src.services.storage import BUCKET_RECEIPTS
 from src.services.storage import upload as storage_upload
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_METHOD_MAP = {
+    "UPI": PaymentMode.upi,
+    "CASH": PaymentMode.cash,
+    "BANK": PaymentMode.bank_transfer,
+    "CARD": PaymentMode.cheque,
+    "OTHER": PaymentMode.cheque,
+}
 
 
 @router.post("/payments", response_model=PaymentResponse, status_code=201)
@@ -111,8 +122,182 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         )
 
 
+@router.get("/payments", response_model=List[PaymentListItem])
+async def list_payments(
+    tenancy_id: Optional[int] = Query(None),
+    tenant_id: Optional[int] = Query(None),
+    limit: int = Query(default=20, le=100),
+    user: AppUser = Depends(get_current_user),
+):
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="admin or staff only")
+    if not tenancy_id and not tenant_id:
+        raise HTTPException(status_code=400, detail="tenancy_id or tenant_id required")
+
+    async with get_session() as session:
+        if tenant_id and not tenancy_id:
+            tenancy = await session.scalar(
+                select(Tenancy).where(
+                    Tenancy.tenant_id == tenant_id,
+                    Tenancy.status == TenancyStatus.active,
+                )
+            )
+            if tenancy is None:
+                return []
+            tenancy_id = tenancy.id
+
+        rows = await session.execute(
+            select(Payment)
+            .where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
+            .order_by(desc(Payment.payment_date), desc(Payment.id))
+            .limit(limit)
+        )
+        payments = rows.scalars().all()
+
+    result = []
+    for p in payments:
+        pm = str(p.period_month.strftime("%Y-%m")) if p.period_month else None
+        result.append(PaymentListItem(
+            payment_id=p.id,
+            amount=float(p.amount),
+            method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
+            for_type=p.for_type.value if p.for_type else "rent",
+            period_month=pm,
+            payment_date=p.payment_date.strftime("%Y-%m-%d"),
+            notes=p.notes,
+            is_void=p.is_void,
+            receipt_url=p.receipt_url,
+            upi_reference=p.upi_reference,
+        ))
+    return result
+
+
+@router.patch("/payments/{payment_id}", response_model=PaymentListItem)
+async def edit_payment(
+    payment_id: int,
+    body: PaymentEdit,
+    user: AppUser = Depends(get_current_user),
+):
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="admin or staff only")
+
+    async with get_session() as session:
+        payment = await session.get(Payment, payment_id)
+        if payment is None:
+            raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
+        if payment.is_void:
+            raise HTTPException(status_code=409, detail="Cannot edit a voided payment")
+
+        changed = []
+        if body.method is not None:
+            payment.payment_mode = _METHOD_MAP.get(body.method, PaymentMode.cash)
+            changed.append(f"method→{body.method}")
+        if body.amount is not None:
+            payment.amount = body.amount
+            changed.append(f"amount→{body.amount}")
+        if body.notes is not None:
+            payment.notes = body.notes
+            changed.append("notes updated")
+
+        await session.commit()
+        await session.refresh(payment)
+
+        logger.info("[PWA] payment edited: id=%s changes=%s by=%s", payment_id, changed, user.phone)
+
+    # Re-sync sheet if method changed (affects Cash vs UPI column)
+    if body.method is not None and payment.period_month:
+        try:
+            async with get_session() as session:
+                tenancy = await session.get(Tenancy, payment.tenancy_id)
+                if tenancy:
+                    room = await session.get(Room, tenancy.room_id)
+                    tenant = await session.get(Tenant, tenancy.tenant_id)
+                    if room and tenant and payment.for_type and payment.for_type.value == "rent":
+                        resolved = _resolve_payment_mode(body.method).value
+                        await asyncio.wait_for(
+                            gsheets_update(
+                                room_number=room.room_number,
+                                tenant_name=tenant.name,
+                                amount=float(payment.amount),
+                                method=resolved,
+                                month=payment.period_month.month,
+                                year=payment.period_month.year,
+                                entered_by=user.phone or user.user_id,
+                                is_daily=(tenancy.stay_type == StayType.daily),
+                            ),
+                            timeout=10,
+                        )
+                        if tenancy.stay_type == StayType.daily:
+                            trigger_daywise_sheet_sync()
+                        else:
+                            trigger_monthly_sheet_sync(payment.period_month.month, payment.period_month.year)
+        except Exception as exc:
+            logger.warning("[PWA] sheet re-sync after edit failed: %s", exc)
+
+    pm = str(payment.period_month.strftime("%Y-%m")) if payment.period_month else None
+    return PaymentListItem(
+        payment_id=payment.id,
+        amount=float(payment.amount),
+        method=payment.payment_mode.value.upper() if payment.payment_mode else "CASH",
+        for_type=payment.for_type.value if payment.for_type else "rent",
+        period_month=pm,
+        payment_date=payment.payment_date.strftime("%Y-%m-%d"),
+        notes=payment.notes,
+        is_void=payment.is_void,
+        receipt_url=payment.receipt_url,
+        upi_reference=payment.upi_reference,
+    )
+
+
 _ALLOWED_RECEIPT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic"}
 _MAX_RECEIPT_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+async def _ocr_transaction_id(image_data: bytes, content_type: str) -> Optional[str]:
+    """Call Claude Haiku vision to extract transaction/UPI reference ID from receipt image."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key or api_key.startswith("PASTE_"):
+        return None
+    try:
+        import anthropic
+        media_type = content_type if content_type in ("image/jpeg", "image/png", "image/webp", "image/gif") else "image/jpeg"
+        b64 = base64.standard_b64encode(image_data).decode("utf-8")
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        msg = await asyncio.wait_for(
+            client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=128,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": media_type, "data": b64},
+                        },
+                        {
+                            "type": "text",
+                            "text": (
+                                "Look at this payment receipt or UPI screenshot. "
+                                "Extract ONLY the transaction reference ID. "
+                                "It may be labeled: Transaction ID, UTR, Ref No, UPI Ref, IMPS Ref, Reference Number, or similar. "
+                                "Return ONLY the alphanumeric ID string, nothing else. "
+                                "If you cannot find any transaction ID, return the word null."
+                            ),
+                        },
+                    ],
+                }],
+            ),
+            timeout=15,
+        )
+        raw = msg.content[0].text.strip()
+        if raw.lower() in ("null", "none", "", "not found", "n/a"):
+            return None
+        # Keep only alphanumeric + common separator chars; reject multi-line or long prose
+        clean = raw.split("\n")[0].strip()
+        return clean if len(clean) <= 50 else None
+    except Exception as exc:
+        logger.warning("[OCR] transaction ID extraction failed: %s", exc)
+        return None
 
 
 @router.post("/payments/{payment_id}/receipt")
@@ -139,8 +324,16 @@ async def upload_receipt(
         path = f"{payment.payment_date.strftime('%Y-%m')}/{payment_id}.jpg"
         url = await storage_upload(BUCKET_RECEIPTS, path, data, file.content_type)
 
+        # OCR: extract transaction ID from receipt image (best-effort, 15s cap)
+        txn_id = await _ocr_transaction_id(data, file.content_type or "image/jpeg")
+
         payment.receipt_url = url
+        if txn_id:
+            payment.upi_reference = txn_id
         await session.commit()
 
-    logger.info("[PWA] receipt uploaded: payment=%s url=%s by=%s", payment_id, url, user.phone)
-    return {"payment_id": payment_id, "receipt_url": url}
+    logger.info(
+        "[PWA] receipt uploaded: payment=%s txn_id=%s url=%s by=%s",
+        payment_id, txn_id, url, user.phone,
+    )
+    return {"payment_id": payment_id, "receipt_url": url, "transaction_id": txn_id}

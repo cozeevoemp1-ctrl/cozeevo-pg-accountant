@@ -58,6 +58,7 @@ export default function NewPaymentPage() {
 
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const [transactionId, setTransactionId] = useState<string | null>(null)
   const [uploadingReceipt, setUploadingReceipt] = useState(false)
   const [receiptError, setReceiptError] = useState("")
   const [lastPaymentId, setLastPaymentId] = useState<number | null>(null)
@@ -127,6 +128,7 @@ export default function NewPaymentPage() {
     try {
       const result = await uploadReceipt(lastPaymentId, file)
       setReceiptUrl(result.receipt_url)
+      if (result.transaction_id) setTransactionId(result.transaction_id)
     } catch (err) {
       setReceiptError(err instanceof Error ? err.message : "Upload failed")
     } finally {
@@ -164,8 +166,16 @@ export default function NewPaymentPage() {
         )}
         {/* Receipt upload */}
         {receiptUrl ? (
-          <div className="w-full max-w-sm flex items-center gap-2 px-4 py-2 rounded-pill bg-tile-green border border-[#C5E8D0]">
-            <span className="text-status-paid text-sm font-semibold">Receipt saved ✓</span>
+          <div className="w-full max-w-sm flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-pill bg-tile-green border border-[#C5E8D0]">
+              <span className="text-status-paid text-sm font-semibold">Receipt saved ✓</span>
+            </div>
+            {transactionId && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-pill bg-blue-50 border border-blue-200">
+                <span className="text-blue-500 text-xs">Ref</span>
+                <span className="text-blue-700 text-xs font-mono font-semibold">{transactionId}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-full max-w-sm flex flex-col gap-1">
@@ -191,7 +201,7 @@ export default function NewPaymentPage() {
 
         <div className="flex gap-3 w-full max-w-sm">
           <button
-            onClick={() => { setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes(""); setReceiptUrl(null); setReceiptFile(null); setLastPaymentId(null) }}
+            onClick={() => { setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes(""); setReceiptUrl(null); setReceiptFile(null); setLastPaymentId(null); setTransactionId(null) }}
             className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm"
           >
             + New
@@ -220,8 +230,14 @@ export default function NewPaymentPage() {
         </button>
         <h1 className="text-lg font-extrabold text-ink">Collect Payment</h1>
         <button
+          onClick={() => router.push("/payments/history")}
+          className="ml-auto mr-2 flex items-center gap-1 px-3 py-1.5 rounded-pill border border-[#E2DEDD] text-xs font-semibold text-ink-muted"
+        >
+          History
+        </button>
+        <button
           onClick={() => setShowVoice(true)}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink text-white text-xs font-bold shadow"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink text-white text-xs font-bold shadow"
           aria-label="Voice input"
         >
           🎙 Hey Kozzy
