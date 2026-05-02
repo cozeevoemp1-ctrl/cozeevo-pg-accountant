@@ -73,8 +73,9 @@ working_capital = {
     # Source: active tenancies only (matches PWA "Security Deposits Held" screen).
     # Exited tenants already settled — not owed anything further.
     # Refundable = security_deposit - maintenance_fee per active tenant.
+    # Booking advances are NOT shown here — they are prepaid rent (applied to first month),
+    # not a liability. They reduce the cash collected at check-in, not a separate refund obligation.
     "Security Deposits — refundable (active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
-    "Booking Advances held (applied to first rent)":   [0, 0, 0, 0, 0, 0, 1908582],
 }
 
 # ── Opex (accrual basis) ────────────────────────────────────────────────────

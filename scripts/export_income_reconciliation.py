@@ -329,19 +329,14 @@ wc_data = [
     ('Security Deposits collected',  'cash',
      wc_summary.get(('deposit','cash'), {}).get('n', 0),
      wc_summary.get(('deposit','cash'), {}).get('total', 0),
-     'Held until checkout. Refundable (minus damage). Pure LIABILITY.'),
+     'Held until checkout. Refundable portion (minus maintenance fee) must be returned. LIABILITY.'),
     ('Security Deposits collected',  'upi',
      wc_summary.get(('deposit','upi'), {}).get('n', 0),
      wc_summary.get(('deposit','upi'), {}).get('total', 0),
      ''),
-    ('Booking Advances collected',   'cash',
-     wc_summary.get(('booking','cash'), {}).get('n', 0),
-     wc_summary.get(('booking','cash'), {}).get('total', 0),
-     'Applied to first month rent when tenant moves in. Deferred income.'),
-    ('Booking Advances collected',   'upi',
-     wc_summary.get(('booking','upi'), {}).get('n', 0),
-     wc_summary.get(('booking','upi'), {}).get('total', 0),
-     ''),
+    # Booking advances are NOT a liability — they are prepaid rent.
+    # Applied to first month rent at check-in. Kept as penalty if tenant cancels.
+    # Not shown here.
 ]
 
 total_collected = sum(r[3] for r in wc_data)
@@ -469,9 +464,12 @@ for label, fn in rows_to_print:
     print(f'  {sum(vals):>10,}')
 
 print()
-dep_total   = wc_summary.get(('deposit','cash'),{}).get('total',0) + wc_summary.get(('deposit','upi'),{}).get('total',0)
-book_total  = wc_summary.get(('booking','cash'),{}).get('total',0) + wc_summary.get(('booking','upi'),{}).get('total',0)
-print(f'Security deposits held (liability): {dep_total:>12,}')
-print(f'Booking advances held (deferred):   {book_total:>12,}')
-print(f'Less: deposits refunded:            {-DEPOSIT_REFUNDS_PAID:>12,}')
-print(f'NET working capital owed to tenants:{dep_total + book_total - DEPOSIT_REFUNDS_PAID:>12,}')
+dep_total = wc_summary.get(('deposit','cash'),{}).get('total',0) + wc_summary.get(('deposit','upi'),{}).get('total',0)
+# Maintenance fee (non-refundable) is income; refundable portion = dep_total - maintenance_fees
+# Use active tenancy figures matching PWA screen
+REFUNDABLE = 2437425
+MAINTENANCE_INCOME = 1289200
+print(f'Security deposits collected:        {dep_total:>12,}')
+print(f'  of which maintenance (income):    {MAINTENANCE_INCOME:>12,}')
+print(f'  of which refundable (liability):  {REFUNDABLE:>12,}')
+print(f'Booking advances: prepaid rent — not a liability, not shown here.')
