@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, type KpiDetailItem, type TenantDues } from "@/lib/api";
@@ -374,6 +374,13 @@ export function KpiGrid({ data }: KpiGridProps) {
 
   const cache = useRef<Map<string, KpiDetailItem[]>>(new Map());
   const inflight = useRef<Set<string>>(new Set());
+
+  // Warm the cache for all tiles on mount so taps feel instant
+  useEffect(() => {
+    const all: TileKey[] = ["occupied", "vacant", "dues", "checkins_today", "checkouts_today", "no_show", "notices"];
+    all.forEach((k) => prefetch(k));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function prefetch(key: TileKey) {
     if (!key || cache.current.has(key) || inflight.current.has(key)) return;

@@ -87,12 +87,12 @@ export default async function CollectionBreakdownPage({
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between bg-surface rounded-tile px-4 py-2.5 border border-[#E0DDD8]">
-        <Link href={`/collection/breakdown?month=${prevPeriod}`} className="text-brand-pink font-bold text-xl px-1 leading-none">‹</Link>
+      <div className="flex items-center justify-between bg-surface rounded-tile px-2 py-1 border border-[#E0DDD8]">
+        <Link href={`/collection/breakdown?month=${prevPeriod}`} className="flex items-center justify-center w-11 h-11 text-brand-pink font-bold text-2xl leading-none">‹</Link>
         <span className="text-sm font-semibold text-ink">{monthLabel}</span>
         <Link
           href={isCurrentMonth ? "#" : `/collection/breakdown?month=${nextPeriod}`}
-          className={`font-bold text-xl px-1 leading-none ${isCurrentMonth ? "text-ink-muted opacity-30 pointer-events-none" : "text-brand-pink"}`}
+          className={`flex items-center justify-center w-11 h-11 font-bold text-2xl leading-none ${isCurrentMonth ? "text-ink-muted opacity-30 pointer-events-none" : "text-brand-pink"}`}
         >›</Link>
       </div>
 
