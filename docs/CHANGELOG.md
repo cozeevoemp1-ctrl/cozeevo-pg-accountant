@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.32] — 2026-05-02 — Onboarding UX + reminder template sync
+
+### Added
+- **Onboarding sessions — search bar** — filter by name, room, or phone number (client-side, instant)
+- **Onboarding sessions — two-tap confirm buttons** — replaced `window.confirm()` (silently blocked on mobile PWA) with inline "Tap again to confirm" pattern for Approve and Cancel; error toasts now show 5–6s instead of 2.5s
+
+### Fixed
+- **13 orphan draft sessions cleaned** — cancelled in DB with reason `auto-cleaned: orphan draft`; draft sessions excluded from all admin list views going forward
+- **`general_notice` param mismatch** — template edited in Meta from 2 params `[name, message]` to 1 param `[{{month}}]`; updated `reminder_sender.py` TEMPLATE_PARAM_NAMES, `scheduler.py` send logic, `reminder_router.py` BulkNoticeRequest — would have caused silent 400 from Meta on May 3rd fire
+
+### Changed
+- **Reminder schedule** — `general_notice` (overdue nudge) now fires on 1st, 3rd, 5th of each month (was only 2nd)
+
+---
+
 ## [1.74.31] — 2026-05-02 — Scheduler fixes: reminders, rollover, RS rows, CC
 
 ### Root causes fixed
