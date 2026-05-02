@@ -436,8 +436,6 @@ async def _rent_reminder(mode: str = "day1") -> None:
         template_name = "rent_reminder"
         log_tag       = "day1 (all active)"
     elif mode == "overdue_daily":
-        if today.day != 2:
-            return
         period        = date(today.year, today.month, 1)
         all_active    = False
         template_name = "general_notice"

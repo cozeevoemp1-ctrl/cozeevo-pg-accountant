@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.31] — 2026-05-02 — Scheduler fixes: reminders, rollover, RS rows, CC
+
+### Root causes fixed
+- **May RS rows not created (236 missing)** — two stacked bugs: (1) `_monthly_tab_rollover` in scheduler called `run_monthly_rollover.py` without `--skip-source`, causing step 1 (`sync_from_source_sheet.py --write`) to hit the April payments freeze trigger and abort. (2) `_generate_rs()` called `await init_engine()` — wrong: requires URL + not async. Fixed both. Ran manual rollover on VPS: 236 rows created.
+- **Zero rent reminders sent on May 1** — `_rent_reminder` SQL query referenced `rs.is_void`, `rs.due_amount` — columns that don't exist on `rent_schedule` (actual columns: `status`, `rent_due`). `asyncpg.UndefinedColumnError` at 09:00 IST → 0 tenants notified. Fixed all three affected jobs.
+
+### Fixed
+- **`src/scheduler.py` — `_rent_reminder`** — replaced `rs.due_amount`/`rs.is_void`/`rs.paid_amount` with `rs.rent_due`/`rs.adjustment`/`rs.status` and payments JOIN.
+- **`src/scheduler.py` — `_daily_reconciliation`** — same wrong column names; crashed at 02:00 IST every day since May 1. Fixed.
+- **`src/scheduler.py` — `_checkout_deposit_alerts`** — `outstanding_dues` subquery used same wrong columns. Fixed with correlated payments subquery.
+- **`scripts/run_monthly_rollover.py`** — `_generate_rs()` now calls `await init_db(os.environ["DATABASE_URL"])` correctly.
+- **`src/scheduler.py` — rollover subprocess** — added `"--skip-source"` so scheduler never runs frozen source sync.
+- **`tests/services/test_payments_service.py`** — all 10 tests changed from `period_month="2026-04"` (frozen) to `"2026-05"`.
+
+### Changed
+- **Reminder CC** — post-send summary now goes to all `admin`/`owner` phones from `authorized_users` (was only `_ADMIN_PHONE`). Lakshmi + business number now get notified when reminders go out.
+- **Reminder schedule** — overdue nudges now fire on days 1, 3, 5 of each month (was only day 2). Removed stale `if today.day != 2: return` guard from `overdue_daily` mode.
+
+---
+
 ## [1.74.30] — 2026-04-29 — Placeholder room renamed UNASSIGNED → 000
 
 ### Changed
