@@ -251,12 +251,6 @@ export default function NewPaymentPage() {
           </div>
         )}
 
-        {/* Receipt scanner — on form so OCR pre-fills amount + method */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
-          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Receipt / Screenshot</p>
-          <ReceiptScanner onScan={handleScan} compact={false} />
-        </div>
-
         {/* Numpad */}
         <Numpad value={amount} onChange={setAmount} suggestAmounts={dues && dues.dues > 0 ? [Math.round(dues.dues)] : []} />
 
@@ -292,6 +286,12 @@ export default function NewPaymentPage() {
           </div>
           <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Note (optional)…"
             className="mt-2 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink" />
+        </div>
+
+        {/* Receipt scanner — last step before confirming */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Attach Receipt / Screenshot</p>
+          <ReceiptScanner onScan={handleScan} compact={false} />
         </div>
 
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}

@@ -380,14 +380,6 @@ function NewCheckinPage() {
           />
         )}
 
-        {/* Receipt scanner — only shown when collecting */}
-        {preview && Number(amount) > 0 && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
-            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Receipt / Screenshot</p>
-            <ReceiptScanner onScan={handleScan} compact={false} />
-          </div>
-        )}
-
         {/* Method — only when collecting something */}
         {preview && Number(amount) > 0 && (
           <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
@@ -412,6 +404,14 @@ function NewCheckinPage() {
               placeholder="Note (optional)…"
               className="mt-3 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
             />
+          </div>
+        )}
+
+        {/* Receipt scanner — last step before confirming */}
+        {preview && Number(amount) > 0 && (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Attach Receipt / Screenshot</p>
+            <ReceiptScanner onScan={handleScan} compact={false} />
           </div>
         )}
 
