@@ -83,7 +83,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -111,7 +111,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -125,7 +125,7 @@ class TestLogPayment:
         assert p.payment_mode == PaymentMode.upi
         assert p.for_type == PaymentFor.rent
         assert p.is_void == False
-        assert p.period_month == date(2026, 4, 1)
+        assert p.period_month == date(2026, 5, 1)
 
     @pytest.mark.asyncio
     async def test_audit_log_row_created(self):
@@ -142,7 +142,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -169,7 +169,7 @@ class TestLogPayment:
             amount=8000,
             method="cash",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -190,7 +190,7 @@ class TestLogPayment:
             amount=5000,
             method="cash",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -220,7 +220,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -240,7 +240,7 @@ class TestLogPayment:
             amount=8000,
             method="cash",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -262,7 +262,7 @@ class TestLogPayment:
             amount=5000,
             method="cash",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -307,7 +307,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
             room_number="101",
@@ -335,7 +335,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-04",
+            period_month="2026-05",
             recorded_by="kiran@cozeevo",
             session=session,
         )

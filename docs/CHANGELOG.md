@@ -2,6 +2,14 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.30] — 2026-04-29 — Placeholder room renamed UNASSIGNED → 000
+
+### Changed
+- **DB room id=421** — `room_number` renamed `UNASSIGNED` → `000`; `max_occ` set to 50. Onboard tenants without a confirmed room by assigning room `000`; reassign later via Edit Tenant.
+- **All exclusion filters updated** — `kpi.py` (9 sites), `notices.py`, `checkouts.py`, `excel_import.py`, `sync_sheet_from_db.py`, `sync_from_source_sheet.py`. Room 000 excluded from occupancy, bed counts, and all reports.
+
+---
+
 ## [1.74.29] — 2026-04-29 — Investigation: notices count vs vacating count
 
 ### No code changes
