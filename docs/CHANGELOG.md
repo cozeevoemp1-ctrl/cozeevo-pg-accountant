@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.9] — 2026-05-03 — PWA: Recent Check-ins home section + payment deep-link
+
+### Added
+- **`GET /api/v2/app/activity/recent-checkins`** — new endpoint (`src/api/v2/kpi.py`); returns active tenants checked in within last 45 days with first-month due/paid/balance (reads RentSchedule for due, sums rent payments for period)
+- **`RecentCheckins` component** (`web/components/home/recent-checkins.tsx`) — green avatar + "Paid" badge when cleared; orange avatar + "₹X due" when balance remains; tapping unpaid/partial → `/payment/new?tenancy_id=`; tapping paid → `/tenants/{id}/edit`
+- **Home page "Recent check-ins" section** (`web/app/page.tsx`) — server-prefetched alongside KPI data; appears between quick links and Recent Payments
+
+### Changed
+- **Payment page** (`web/app/payment/new/page.tsx`) — accepts `?tenancy_id=` query param; auto-loads tenant + dues + pre-fills amount on page load (uses `window.location.search` to avoid Next.js Suspense requirement)
+
+### DB fix
+- **Abhinav Rastogi (1073) + Chaitanya Prashant Talokar (1074), Room 407** — `rent_due` corrected from ₹17,379 (prorated from May 3) to ₹18,250 (full month: ₹13,500 + ₹6,750 deposit − ₹2,000 booking). Both checked in today; full month agreed.
+
+---
+
 ## [1.75.8] — 2026-05-03 — Fix: Check-ins today KPI only shows pending arrivals
 
 ### Fixed
