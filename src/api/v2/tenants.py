@@ -347,6 +347,9 @@ async def update_tenant(
         if "expected_checkout" in body:
             val = body["expected_checkout"]
             tenancy.expected_checkout = date.fromisoformat(val) if val else None
+        if "checkin_date" in body:
+            val = body["checkin_date"]
+            tenancy.checkin_date = date.fromisoformat(val) if val else None
 
         # Room reassignment
         if "room_number" in body:

@@ -28,6 +28,7 @@ export default function EditTenantPage() {
   const [securityDeposit, setSecurityDeposit] = useState("")
   const [maintenanceFee, setMaintenanceFee] = useState("")
   const [lockIn, setLockIn] = useState("")
+  const [checkinDate, setCheckinDate] = useState("")
   const [expectedCheckout, setExpectedCheckout] = useState("")
   const [noticeDate, setNoticeDate] = useState("")
   const [notes, setNotes] = useState("")
@@ -77,6 +78,7 @@ export default function EditTenantPage() {
         setMaintenanceFee(String(d.maintenance_fee))
         setLockIn(String(d.lock_in_months))
         setNotes(d.notes || "")
+        setCheckinDate(formatDate(d.checkin_date))
         setExpectedCheckout(formatDate(d.expected_checkout))
         setNoticeDate(formatDate(d.notice_date))
       })
@@ -106,6 +108,8 @@ export default function EditTenantPage() {
     if (expectedCheckout !== origCheckout) changes.expected_checkout = expectedCheckout || null
     // Notes: send if changed from original (overwrites — user sees current value pre-filled)
     if (notes !== (original.notes || "")) changes.tenancy_notes = notes
+    const origCheckin = formatDate(original.checkin_date)
+    if (checkinDate !== origCheckin) changes.checkin_date = checkinDate || null
     // Proration — only send when rent or room is actually changing
     const rentOrRoomChanged = changes.agreed_rent !== undefined || changes.room_number !== undefined
     if (rentOrRoomChanged && proratedInfo) {
@@ -152,6 +156,8 @@ export default function EditTenantPage() {
     if (changes.expected_checkout !== undefined)
       fields.push({ label: "Expected checkout", value: changes.expected_checkout ?? "Cleared" })
     if (changes.tenancy_notes !== undefined) fields.push({ label: "Notes", value: changes.tenancy_notes || "(cleared)" })
+    if (changes.checkin_date !== undefined)
+      fields.push({ label: "Check-in date", value: changes.checkin_date ?? "Cleared", highlight: true })
     return fields
   }
 
@@ -464,6 +470,16 @@ export default function EditTenantPage() {
         {/* Stay details */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Details</p>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Check-in Date</label>
+            <input
+              type="date"
+              value={checkinDate}
+              onChange={(e) => setCheckinDate(e.target.value)}
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Lock-in Months</label>

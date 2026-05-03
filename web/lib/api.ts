@@ -281,6 +281,7 @@ export interface PatchTenantBody {
   notice_date?: string | null;
   room_number?: string;
   prorate_this_month?: boolean;
+  checkin_date?: string | null;
 }
 
 export interface PatchTenantResponse {
