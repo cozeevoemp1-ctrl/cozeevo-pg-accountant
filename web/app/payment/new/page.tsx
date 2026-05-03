@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { Numpad } from "@/components/forms/numpad"
@@ -41,7 +41,6 @@ function currentMonth(): string {
 
 export default function NewPaymentPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [tenant, setTenant] = useState<TenantSearchResult | null>(null)
   const [dues, setDues] = useState<TenantDues | null>(null)
@@ -66,7 +65,7 @@ export default function NewPaymentPage() {
 
   // Pre-fill from ?tenancy_id= (e.g. navigating from Recent Check-ins)
   useEffect(() => {
-    const tid = searchParams.get("tenancy_id")
+    const tid = new URLSearchParams(window.location.search).get("tenancy_id")
     if (!tid) return
     getTenantDues(Number(tid)).then((d) => {
       const t: TenantSearchResult = {
