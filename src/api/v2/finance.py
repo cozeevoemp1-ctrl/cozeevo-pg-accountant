@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import re as _re
 import calendar as _calendar
 from collections import defaultdict
 from datetime import date, datetime
@@ -49,6 +50,11 @@ def _require_admin(user: AppUser):
 def _make_hash(txn_date: date, amount: float, desc: str) -> str:
     key = f"{txn_date}|{round(float(amount), 2):.2f}|{desc.strip().lower()}"
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _validate_month(m: str, param: str = "month"):
+    if not _re.fullmatch(r"\d{4}-\d{2}", m):
+        raise HTTPException(status_code=400, detail=f"{param} must be YYYY-MM")
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
@@ -137,6 +143,8 @@ async def get_pnl(
     user: AppUser = Depends(get_current_user),
 ):
     _require_admin(user)
+    if month:
+        _validate_month(month)
 
     async with get_session() as session:
         month_rows = await session.execute(
@@ -236,6 +244,10 @@ async def download_pnl_excel(
     user: AppUser = Depends(get_current_user),
 ):
     _require_admin(user)
+    if from_month:
+        _validate_month(from_month, "from")
+    if to_month:
+        _validate_month(to_month, "to")
 
     async with get_session() as session:
         q = select(BankTransaction).order_by(BankTransaction.txn_date)
