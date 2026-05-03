@@ -354,7 +354,7 @@ async def update_tenant(
             if new_rn and new_rn != room.room_number:
                 new_room_row = await session.execute(
                     select(Room).where(
-                        Room.property_id == tenancy.property_id,
+                        Room.property_id == room.property_id,
                         func.lower(Room.room_number) == func.lower(new_rn),
                     )
                 )
