@@ -29,6 +29,7 @@ from src.database.models import (
 )
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.rules.pnl_classify import classify_txn
+from src.utils.inr_format import INR_NUMBER_FORMAT
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,8 +42,6 @@ EXPENSE_CATS = [
     "Govt & Regulatory", "Tenant Deposit Refund", "Bank Charges",
     "Capital Investment", "Non-Operating", "Other Expenses",
 ]
-
-INR_NUMBER_FORMAT = '#,##0'
 
 
 def _require_admin(user: AppUser):
@@ -64,28 +63,31 @@ async def _auto_reconcile(session):
     """
     import datetime as _dt
 
-    unmatched = (await session.scalars(
-        select(BankTransaction).where(
-            BankTransaction.category == "Tenant Deposit Refund",
-            BankTransaction.reconciled_checkout_id == None,
-        )
-    )).all()
-
-    for txn in unmatched:
-        window_start = txn.txn_date - _dt.timedelta(days=7)
-        window_end   = txn.txn_date + _dt.timedelta(days=7)
-        match = await session.scalar(
-            select(CheckoutRecord).where(
-                CheckoutRecord.deposit_refunded_amount.between(
-                    float(txn.amount) - 1, float(txn.amount) + 1
-                ),
-                CheckoutRecord.deposit_refund_date.between(window_start, window_end),
+    try:
+        unmatched = (await session.scalars(
+            select(BankTransaction).where(
+                BankTransaction.category == "Tenant Deposit Refund",
+                BankTransaction.reconciled_checkout_id == None,
             )
-        )
-        if match:
-            txn.reconciled_checkout_id = match.id
+        )).all()
 
-    await session.flush()
+        for txn in unmatched:
+            window_start = txn.txn_date - _dt.timedelta(days=7)
+            window_end   = txn.txn_date + _dt.timedelta(days=7)
+            match = await session.scalar(
+                select(CheckoutRecord).where(
+                    CheckoutRecord.deposit_refunded_amount.between(
+                        float(txn.amount) - 1, float(txn.amount) + 1
+                    ),
+                    CheckoutRecord.deposit_refund_date.between(window_start, window_end),
+                )
+            )
+            if match:
+                txn.reconciled_checkout_id = match.id
+
+        await session.flush()
+    except Exception:
+        logger.exception("_auto_reconcile failed — upload committed without reconciliation")
 
 
 def _validate_month(m: str, param: str = "month"):
@@ -212,8 +214,10 @@ async def get_pnl(
                 .group_by(BankTransaction.category)
             )
             bank_income = {row[0]: float(row[1]) for row in inc_rows}
-            upi_batch   = bank_income.get("UPI Batch", 0.0)
-            direct_neft = sum(v for k, v in bank_income.items() if k != "UPI Batch")
+            # "Rent Income" = UPI collection settlements + direct UPI from tenants
+            # "Other Income" + "Advance Deposit" = NEFT/RTGS inward, cashback, deposits
+            upi_batch   = bank_income.get("Rent Income", 0.0)
+            direct_neft = sum(v for k, v in bank_income.items() if k != "Rent Income")
 
             cash_rows = await session.execute(
                 select(func.sum(Payment.amount))
@@ -333,7 +337,7 @@ def _build_excel(classified: list) -> openpyxl.Workbook:
     monthly_inc = defaultdict(lambda: defaultdict(float))
     monthly_sub: dict = defaultdict(float)
 
-    INCOME_CATS = ["Rent Income", "Advance Deposit", "UPI Batch", "Other Income"]
+    INCOME_CATS = ["Rent Income", "Advance Deposit", "Other Income"]
 
     for dt, desc, typ, amt, cat, sub in classified:
         m = dt.strftime("%Y-%m")
