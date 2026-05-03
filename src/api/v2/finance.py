@@ -276,47 +276,309 @@ async def get_pnl(
     return {"months": target_months, "data": result}
 
 
-# ── Excel Download ─────────────────────────────────────────────────────────────
+# ── Excel Download — P&L Summary ──────────────────────────────────────────────
+
+# Categories that belong in operating expenses (reduce operating profit)
+_OPEX_CATS = [
+    "Property Rent", "Electricity", "Water", "IT & Software", "Internet & WiFi",
+    "Food & Groceries", "Fuel & Diesel", "Staff & Labour", "Maintenance & Repairs",
+    "Cleaning Supplies", "Waste Disposal", "Shopping & Supplies",
+    "Operational Expenses", "Marketing", "Govt & Regulatory", "Bank Charges",
+    "Other Expenses",
+]
+# Balance-sheet items — shown for reference but NOT deducted from operating profit
+_EXCLUDED_CATS = ["Tenant Deposit Refund", "Non-Operating"]
+# Capital expenditure — shown below operating profit
+_CAPEX_CATS = ["Furniture & Fittings", "Capital Investment"]
+
 
 @router.get("/finance/pnl/excel")
 async def download_pnl_excel(
-    from_month: Optional[str] = Query(None, alias="from"),
-    to_month:   Optional[str] = Query(None, alias="to"),
     user: AppUser = Depends(get_current_user),
 ):
+    """
+    Download full P&L summary Excel.
+    - Reclassifies every transaction on-the-fly using the current classifier
+      so the download always reflects the latest rules, even for old rows.
+    - Covers all months present in bank_transactions.
+    - Includes cash income from DB payments (not deposited to bank).
+    """
     _require_admin(user)
-    if from_month:
-        _validate_month(from_month, "from")
-    if to_month:
-        _validate_month(to_month, "to")
 
     async with get_session() as session:
-        q = select(BankTransaction).order_by(BankTransaction.txn_date)
-        if from_month:
-            y, mo = int(from_month[:4]), int(from_month[5:7])
-            q = q.where(BankTransaction.txn_date >= date(y, mo, 1))
-        if to_month:
-            y, mo = int(to_month[:4]), int(to_month[5:7])
-            last = _calendar.monthrange(y, mo)[1]
-            q = q.where(BankTransaction.txn_date <= date(y, mo, last))
-        rows = (await session.scalars(q)).all()
+        # All bank transactions — reclassify from description at download time
+        txn_rows = (await session.scalars(
+            select(BankTransaction).order_by(BankTransaction.txn_date)
+        )).all()
 
-    classified = [
-        (r.txn_date, r.description, r.txn_type, float(r.amount), r.category, r.sub_category)
-        for r in rows
-    ]
+        # All available months
+        all_months = sorted({r.txn_date.strftime("%Y-%m") for r in txn_rows})
+        if not all_months:
+            raise HTTPException(status_code=404, detail="No bank transactions in DB")
 
-    wb = _build_excel(classified)
+        # Reclassify on-the-fly (current classifier, not stored category)
+        by_cat_month: dict = defaultdict(lambda: defaultdict(float))
+        by_sub_month: dict = defaultdict(float)
+        bank_upi_batch: dict = defaultdict(float)   # Rent Income
+        bank_direct:    dict = defaultdict(float)   # Other bank income
+
+        for r in txn_rows:
+            m = r.txn_date.strftime("%Y-%m")
+            cat, sub = classify_txn(r.description or "", r.txn_type or "")
+            if r.txn_type == "income":
+                if cat == "Rent Income":
+                    bank_upi_batch[m] += float(r.amount)
+                else:
+                    bank_direct[m] += float(r.amount)
+            else:
+                by_cat_month[cat][m] += float(r.amount)
+                by_sub_month[(cat, sub, m)] += float(r.amount)
+
+        # Cash payments from DB (not deposited to bank) — rent only
+        cash_rows = await session.execute(
+            select(
+                func.to_char(Payment.period_month, "YYYY-MM"),
+                func.sum(Payment.amount),
+            )
+            .where(
+                Payment.payment_mode == PaymentMode.cash,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+            )
+            .group_by(func.to_char(Payment.period_month, "YYYY-MM"))
+        )
+        cash_by_month: dict = {row[0]: float(row[1]) for row in cash_rows}
+
+    wb = _build_pnl_excel(all_months, bank_upi_batch, bank_direct, cash_by_month,
+                          by_cat_month, by_sub_month)
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-
-    filename = f"PnL_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
+    filename = f"PnL_Cozeevo_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _month_label(m: str) -> str:
+    """'2025-10' → \"Oct'25\""""
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    y, mo = int(m[:4]), int(m[5:7])
+    return f"{months[mo-1]}'{str(y)[2:]}"
+
+
+def _build_pnl_excel(
+    all_months: list,
+    bank_upi: dict, bank_direct: dict, cash_db: dict,
+    by_cat: dict, by_sub: dict,
+) -> openpyxl.Workbook:
+    HDR_FILL  = PatternFill("solid", fgColor="1F4E78")
+    HDR_FONT  = Font(bold=True, color="FFFFFF", size=10)
+    SEC_FILL  = PatternFill("solid", fgColor="2E3F5C")
+    SEC_FONT  = Font(bold=True, color="FFFFFF", size=10)
+    ALT_FILL  = PatternFill("solid", fgColor="EEF4FF")
+    WHT_FILL  = PatternFill("solid", fgColor="FFFFFF")
+    GRN_FILL  = PatternFill("solid", fgColor="E2EFDA")
+    RED_FILL  = PatternFill("solid", fgColor="FCE4D6")
+    EXC_FILL  = PatternFill("solid", fgColor="FFF2CC")
+    CAP_FILL  = PatternFill("solid", fgColor="EDEDED")
+    BOLD      = Font(bold=True)
+    BOLD_GRN  = Font(bold=True, color="375623")
+    BOLD_RED  = Font(bold=True, color="9C0006")
+    CTR       = Alignment(horizontal="center", vertical="center")
+    RIGHT     = Alignment(horizontal="right",  vertical="center")
+    LEFT      = Alignment(horizontal="left",   vertical="center")
+    NUM_FMT   = INR_NUMBER_FORMAT
+
+    nc = len(all_months) + 2  # label col + month cols + total col
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "P&L Summary"
+
+    def _hdr(col, val, width=14):
+        c = ws.cell(1, col, val)
+        c.fill = HDR_FILL; c.font = HDR_FONT; c.alignment = CTR
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    # Header row
+    _hdr(1, "Category", width=36)
+    for ci, m in enumerate(all_months, 2):
+        _hdr(ci, _month_label(m))
+    _hdr(nc, "TOTAL")
+    ws.row_dimensions[1].height = 22
+
+    ri = [2]  # mutable row counter
+
+    def _section(label):
+        for col in range(1, nc + 1):
+            c = ws.cell(ri[0], col)
+            c.fill = SEC_FILL
+        ws.cell(ri[0], 1, label).font = SEC_FONT
+        ws.cell(ri[0], 1).alignment = LEFT
+        ws.row_dimensions[ri[0]].height = 18
+        ri[0] += 1
+
+    def _data_row(label, vals_by_month, fill, font=None, indent=False, num_fmt=NUM_FMT):
+        lbl = f"  {label}" if indent else label
+        c = ws.cell(ri[0], 1, lbl)
+        c.fill = fill
+        if font: c.font = font
+        else: c.font = Font(size=9)
+        c.alignment = LEFT
+        total = 0.0
+        for ci, m in enumerate(all_months, 2):
+            v = vals_by_month.get(m, 0.0)
+            total += v
+            cell = ws.cell(ri[0], ci, round(v) if v else None)
+            cell.fill = fill
+            if v: cell.number_format = num_fmt
+            if font: cell.font = font
+            else: cell.font = Font(size=9)
+            cell.alignment = RIGHT
+        tc = ws.cell(ri[0], nc, round(total) if total else None)
+        tc.fill = fill
+        if total: tc.number_format = num_fmt
+        if font: tc.font = font
+        else: tc.font = Font(size=9, bold=True)
+        tc.alignment = RIGHT
+        ri[0] += 1
+        return total
+
+    def _total_row(label, totals_by_month, fill, font):
+        c = ws.cell(ri[0], 1, label)
+        c.fill = fill; c.font = font; c.alignment = LEFT
+        grand = 0.0
+        for ci, m in enumerate(all_months, 2):
+            v = totals_by_month.get(m, 0.0)
+            grand += v
+            cell = ws.cell(ri[0], ci, round(v) if v else None)
+            cell.fill = fill; cell.font = font; cell.alignment = RIGHT
+            if v: cell.number_format = NUM_FMT
+        tc = ws.cell(ri[0], nc, round(grand) if grand else None)
+        tc.fill = fill; tc.font = font; tc.alignment = RIGHT
+        if grand: tc.number_format = NUM_FMT
+        ws.row_dimensions[ri[0]].height = 16
+        ri[0] += 1
+        return grand
+
+    def _blank():
+        ri[0] += 1
+
+    # ── INCOME ────────────────────────────────────────────────────────────────
+    _section("INCOME")
+    inc_month: dict = defaultdict(float)
+    for m in all_months:
+        inc_month[m] = bank_upi.get(m, 0) + bank_direct.get(m, 0) + cash_db.get(m, 0)
+
+    fill = ALT_FILL
+    for label, src in [
+        ("Bank — UPI batch settlements (merchant QR)", bank_upi),
+        ("Bank — direct UPI / NEFT payments",          bank_direct),
+        ("Cash collected (not deposited to bank)",     cash_db),
+    ]:
+        if sum(src.values()):
+            _data_row(label, src, fill, indent=True)
+            fill = WHT_FILL if fill == ALT_FILL else ALT_FILL
+
+    _total_row("Total Revenue", inc_month, GRN_FILL, BOLD_GRN)
+    _blank()
+
+    # ── OPERATING EXPENSES ────────────────────────────────────────────────────
+    _section("OPERATING EXPENSES")
+    opex_month: dict = defaultdict(float)
+    for cat in _OPEX_CATS:
+        cat_data = by_cat.get(cat, {})
+        if not any(cat_data.values()):
+            continue
+        fill = ALT_FILL if ri[0] % 2 == 0 else WHT_FILL
+        _data_row(cat, cat_data, fill, indent=True)
+        for m, v in cat_data.items():
+            opex_month[m] += v
+
+    _total_row("Total Operating Expenses", opex_month, RED_FILL, BOLD_RED)
+    _blank()
+
+    # ── OPERATING PROFIT ──────────────────────────────────────────────────────
+    op_profit_month: dict = {m: inc_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
+    _total_row("Operating Profit", op_profit_month, GRN_FILL, BOLD_GRN)
+    _blank()
+
+    # ── EXCLUDED (balance sheet items — for reference only) ───────────────────
+    has_excluded = any(by_cat.get(c, {}) for c in _EXCLUDED_CATS)
+    if has_excluded:
+        _section("BALANCE SHEET ITEMS (not deducted above)")
+        for cat in _EXCLUDED_CATS:
+            cat_data = by_cat.get(cat, {})
+            if not any(cat_data.values()):
+                continue
+            fill = ALT_FILL if ri[0] % 2 == 0 else WHT_FILL
+            _data_row(cat, cat_data, EXC_FILL, indent=True)
+        _blank()
+
+    # ── CAPEX ─────────────────────────────────────────────────────────────────
+    capex_month: dict = defaultdict(float)
+    has_capex = any(by_cat.get(c, {}) for c in _CAPEX_CATS)
+    if has_capex:
+        _section("CAPITAL EXPENDITURE (one-time investments)")
+        for cat in _CAPEX_CATS:
+            cat_data = by_cat.get(cat, {})
+            if not any(cat_data.values()):
+                continue
+            _data_row(cat, cat_data, CAP_FILL, indent=True)
+            for m, v in cat_data.items():
+                capex_month[m] += v
+        _total_row("Total CAPEX", capex_month, CAP_FILL, BOLD)
+        _blank()
+
+    # ── NET PROFIT ────────────────────────────────────────────────────────────
+    net_month = {m: op_profit_month.get(m, 0) - capex_month.get(m, 0) for m in all_months}
+    _total_row("Net Profit after CAPEX", net_month, GRN_FILL, BOLD_GRN)
+
+    ws.freeze_panes = "B2"
+    ws.row_dimensions[1].height = 22
+
+    # ── Sheet 2: Sub-category Breakdown ──────────────────────────────────────
+    ws2 = wb.create_sheet("Sub-category Detail")
+    sub_hdrs = ["Category", "Sub-category"] + [_month_label(m) for m in all_months] + ["TOTAL"]
+    for col, h in enumerate(sub_hdrs, 1):
+        c = ws2.cell(1, col, h)
+        c.fill = HDR_FILL; c.font = HDR_FONT; c.alignment = CTR
+    ws2.column_dimensions["A"].width = 26
+    ws2.column_dimensions["B"].width = 38
+    for i in range(3, len(all_months) + 4):
+        ws2.column_dimensions[get_column_letter(i)].width = 14
+
+    ri2 = 2
+    all_cats = _OPEX_CATS + _EXCLUDED_CATS + _CAPEX_CATS
+    for cat in all_cats:
+        subs = sorted({s for (c2, s, m), v in by_sub.items() if c2 == cat and v > 0})
+        if not subs:
+            continue
+        c = ws2.cell(ri2, 1, cat)
+        c.fill = SEC_FILL; c.font = SEC_FONT
+        for col in range(2, len(all_months) + 4):
+            ws2.cell(ri2, col).fill = SEC_FILL
+        ri2 += 1
+        for sub in subs:
+            fill = ALT_FILL if ri2 % 2 == 0 else WHT_FILL
+            ws2.cell(ri2, 2, sub).fill = fill
+            sub_total = 0.0
+            for ci, m in enumerate(all_months, 3):
+                v = by_sub.get((cat, sub, m), 0)
+                sub_total += v
+                c2 = ws2.cell(ri2, ci, round(v) if v else None)
+                c2.fill = fill
+                if v: c2.number_format = NUM_FMT
+            tc = ws2.cell(ri2, len(all_months) + 3, round(sub_total) if sub_total else None)
+            tc.fill = fill
+            if sub_total: tc.number_format = NUM_FMT; tc.font = Font(bold=True)
+            ri2 += 1
+    ws2.freeze_panes = "C2"
+
+    return wb
 
 
 def _build_excel(classified: list) -> openpyxl.Workbook:
