@@ -21,7 +21,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  try { await supabase.auth.getUser(); } catch { /* Supabase timeout — still serve the page */ }
+  try {
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]);
+  } catch { /* Supabase slow/down — still serve the page */ }
   return supabaseResponse;
 }
 
