@@ -1,0 +1,458 @@
+"""
+src/api/v2/finance.py
+Finance endpoints — CSV upload, P&L dashboard, Excel download.
+Owner-only (admin role required on every endpoint).
+"""
+from __future__ import annotations
+
+import hashlib
+import io
+import logging
+import calendar as _calendar
+from collections import defaultdict
+from datetime import date, datetime
+from typing import Optional
+
+import openpyxl
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+from sqlalchemy import func, select
+
+from src.api.v2.auth import AppUser, get_current_user
+from src.database.db_manager import get_session
+from src.database.models import BankTransaction, BankUpload, Payment, PaymentFor, PaymentMode
+from src.parsers.yes_bank import read_yes_bank_csv
+from src.rules.pnl_classify import classify_txn
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+EXPENSE_CATS = [
+    "Property Rent", "Electricity", "Water", "IT & Software", "Internet & WiFi",
+    "Food & Groceries", "Fuel & Diesel", "Staff & Labour", "Furniture & Fittings",
+    "Maintenance & Repairs", "Cleaning Supplies", "Waste Disposal",
+    "Shopping & Supplies", "Operational Expenses", "Marketing",
+    "Govt & Regulatory", "Tenant Deposit Refund", "Bank Charges",
+    "Capital Investment", "Non-Operating", "Other Expenses",
+]
+
+INR_NUMBER_FORMAT = '#,##0'
+
+
+def _require_admin(user: AppUser):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def _make_hash(txn_date: date, amount: float, desc: str) -> str:
+    key = f"{txn_date}|{round(float(amount), 2):.2f}|{desc.strip().lower()}"
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+# ── Upload ────────────────────────────────────────────────────────────────────
+
+@router.post("/finance/upload")
+async def upload_bank_csv(
+    files: list[UploadFile] = File(...),
+    account_name: str = Form(...),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    if account_name not in ("THOR", "HULK"):
+        raise HTTPException(status_code=400, detail="account_name must be THOR or HULK")
+
+    total_new = 0
+    total_dup = 0
+    months_affected: set[str] = set()
+
+    async with get_session() as session:
+        for upload_file in files:
+            content = await upload_file.read()
+
+            rows = read_yes_bank_csv(content)
+            if not rows:
+                continue
+
+            from_date = min(r[0] for r in rows)
+            to_date   = max(r[0] for r in rows)
+
+            upload = BankUpload(
+                phone=user.phone,
+                file_path=upload_file.filename or "",
+                row_count=len(rows),
+                new_count=0,
+                from_date=from_date,
+                to_date=to_date,
+                status="processed",
+                account_name=account_name,
+            )
+            session.add(upload)
+            await session.flush()
+
+            new_count = 0
+            for txn_date, desc, txn_type, amount in rows:
+                uhash = _make_hash(txn_date, amount, desc)
+                existing = await session.scalar(
+                    select(BankTransaction.id).where(BankTransaction.unique_hash == uhash)
+                )
+                if existing:
+                    total_dup += 1
+                    continue
+
+                cat, sub = classify_txn(desc, txn_type)
+                txn = BankTransaction(
+                    upload_id=upload.id,
+                    txn_date=txn_date,
+                    description=desc,
+                    amount=amount,
+                    txn_type=txn_type,
+                    category=cat,
+                    sub_category=sub,
+                    unique_hash=uhash,
+                    account_name=account_name,
+                )
+                session.add(txn)
+                months_affected.add(txn_date.strftime("%Y-%m"))
+                new_count += 1
+
+            upload.new_count = new_count
+            total_new += new_count
+
+        await session.commit()
+
+    return {
+        "months_affected": sorted(months_affected),
+        "new_count": total_new,
+        "duplicate_count": total_dup,
+    }
+
+
+# ── P&L ───────────────────────────────────────────────────────────────────────
+
+@router.get("/finance/pnl")
+async def get_pnl(
+    month: Optional[str] = Query(None, description="YYYY-MM, e.g. 2026-05"),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+
+    async with get_session() as session:
+        month_rows = await session.execute(
+            select(func.to_char(BankTransaction.txn_date, "YYYY-MM"))
+            .distinct()
+            .order_by(func.to_char(BankTransaction.txn_date, "YYYY-MM"))
+        )
+        available_months = [r[0] for r in month_rows]
+
+        target_months = [month] if month else available_months
+        if not target_months:
+            return {"months": [], "data": {}}
+
+        result = {}
+        for m in target_months:
+            y, mo = int(m[:4]), int(m[5:7])
+            start = date(y, mo, 1)
+            end = date(y, mo, _calendar.monthrange(y, mo)[1])
+            period_date = date(y, mo, 1)  # Payment.period_month is stored as 1st of month
+
+            inc_rows = await session.execute(
+                select(BankTransaction.category, func.sum(BankTransaction.amount))
+                .where(
+                    BankTransaction.txn_type == "income",
+                    BankTransaction.txn_date.between(start, end),
+                    BankTransaction.category != "Capital Investment",
+                )
+                .group_by(BankTransaction.category)
+            )
+            bank_income = {row[0]: float(row[1]) for row in inc_rows}
+            upi_batch   = bank_income.get("UPI Batch", 0.0)
+            direct_neft = sum(v for k, v in bank_income.items() if k != "UPI Batch")
+
+            cash_rows = await session.execute(
+                select(func.sum(Payment.amount))
+                .where(
+                    Payment.payment_mode == PaymentMode.cash,
+                    Payment.for_type == PaymentFor.rent,
+                    Payment.is_void == False,
+                    Payment.period_month == period_date,
+                )
+            )
+            cash_db = float(cash_rows.scalar() or 0)
+
+            cap_rows = await session.execute(
+                select(func.sum(BankTransaction.amount))
+                .where(
+                    BankTransaction.category == "Capital Investment",
+                    BankTransaction.txn_date.between(start, end),
+                )
+            )
+            capital = float(cap_rows.scalar() or 0)
+
+            exp_rows = await session.execute(
+                select(BankTransaction.category, func.sum(BankTransaction.amount))
+                .where(
+                    BankTransaction.txn_type == "expense",
+                    BankTransaction.txn_date.between(start, end),
+                )
+                .group_by(BankTransaction.category)
+            )
+            expense_by_cat = {row[0]: float(row[1]) for row in exp_rows}
+            expenses = [
+                {"category": cat, "amount": expense_by_cat.get(cat, 0.0)}
+                for cat in EXPENSE_CATS
+                if expense_by_cat.get(cat, 0.0) > 0
+            ]
+            total_expense = sum(e["amount"] for e in expenses)
+            total_income  = upi_batch + direct_neft + cash_db
+            profit        = total_income - total_expense
+            margin        = round(profit / total_income * 100, 1) if total_income else 0.0
+
+            result[m] = {
+                "month": m,
+                "income": {
+                    "upi_batch":   upi_batch,
+                    "direct_neft": direct_neft,
+                    "cash_db":     cash_db,
+                    "total":       total_income,
+                },
+                "capital": capital,
+                "expenses": expenses,
+                "total_expense":    total_expense,
+                "operating_profit": profit,
+                "margin_pct":       margin,
+            }
+
+    return {"months": target_months, "data": result}
+
+
+# ── Excel Download ─────────────────────────────────────────────────────────────
+
+@router.get("/finance/pnl/excel")
+async def download_pnl_excel(
+    from_month: Optional[str] = Query(None, alias="from"),
+    to_month:   Optional[str] = Query(None, alias="to"),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+
+    async with get_session() as session:
+        q = select(BankTransaction).order_by(BankTransaction.txn_date)
+        if from_month:
+            y, mo = int(from_month[:4]), int(from_month[5:7])
+            q = q.where(BankTransaction.txn_date >= date(y, mo, 1))
+        if to_month:
+            y, mo = int(to_month[:4]), int(to_month[5:7])
+            last = _calendar.monthrange(y, mo)[1]
+            q = q.where(BankTransaction.txn_date <= date(y, mo, last))
+        rows = (await session.scalars(q)).all()
+
+    classified = [
+        (r.txn_date, r.description, r.txn_type, float(r.amount), r.category, r.sub_category)
+        for r in rows
+    ]
+
+    wb = _build_excel(classified)
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"PnL_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _build_excel(classified: list) -> openpyxl.Workbook:
+    """Build same 3-sheet Excel as export_classified.py."""
+    HDR_FILL = PatternFill("solid", fgColor="1a1a2e")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    ALT_FILL = PatternFill("solid", fgColor="F8F9FA")
+    WHT_FILL = PatternFill("solid", fgColor="FFFFFF")
+    CTR      = Alignment(horizontal="center", vertical="center")
+    TOT_FONT_G = Font(bold=True, size=11, color="008B00")
+    TOT_FONT_R = Font(bold=True, size=11, color="FF0000")
+    TOT_FONT   = Font(bold=True, size=11)
+    SEC_FILL   = PatternFill("solid", fgColor="2d2d44")
+    SEC_FONT   = Font(bold=True, color="FFFFFF", size=11)
+
+    months = sorted(set(dt.strftime("%Y-%m") for dt, *_ in classified))
+    monthly_exp = defaultdict(lambda: defaultdict(float))
+    monthly_inc = defaultdict(lambda: defaultdict(float))
+    monthly_sub: dict = defaultdict(float)
+
+    INCOME_CATS = ["Rent Income", "Advance Deposit", "UPI Batch", "Other Income"]
+
+    for dt, desc, typ, amt, cat, sub in classified:
+        m = dt.strftime("%Y-%m")
+        if typ == "expense":
+            monthly_exp[m][cat] += amt
+            monthly_sub[(m, cat, sub)] += amt
+        else:
+            monthly_inc[m][cat] += amt
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    # ── Sheet 1: Monthly P&L ──────────────────────────────────────────────────
+    ws = wb.create_sheet("Monthly P&L")
+    hdr_row = [""] + months + ["TOTAL"]
+    for col, h in enumerate(hdr_row, 1):
+        c = ws.cell(row=1, column=col, value=h)
+        c.fill = HDR_FILL; c.font = HDR_FONT; c.alignment = CTR
+    ws.row_dimensions[1].height = 22
+
+    def _write_row(ws, ri, label, vals, font=None, fill=None, indent=False):
+        lbl = ("  " + label) if indent else label
+        c = ws.cell(row=ri, column=1, value=lbl)
+        if font: c.font = font
+        if fill: c.fill = fill
+        for ci, v in enumerate(vals, 2):
+            c = ws.cell(row=ri, column=ci, value=round(v) if v else "")
+            c.number_format = INR_NUMBER_FORMAT
+            if font: c.font = font
+            if fill: c.fill = fill
+
+    ri = 2
+    c = ws.cell(row=ri, column=1, value="INCOME")
+    c.fill = SEC_FILL; c.font = SEC_FONT
+    for col in range(2, len(months) + 3):
+        ws.cell(row=ri, column=col).fill = SEC_FILL
+    ri += 1
+
+    inc_totals = [0.0] * (len(months) + 1)
+    for cat in INCOME_CATS:
+        vals = [monthly_inc[m].get(cat, 0) for m in months]
+        vals.append(sum(vals))
+        if sum(vals) == 0:
+            continue
+        for i, v in enumerate(vals):
+            inc_totals[i] += v
+        fill = ALT_FILL if ri % 2 == 0 else WHT_FILL
+        _write_row(ws, ri, cat, vals, indent=True, fill=fill)
+        ri += 1
+    _write_row(ws, ri, "TOTAL INCOME", inc_totals, font=TOT_FONT_G)
+    ri += 2
+
+    c = ws.cell(row=ri, column=1, value="OPERATING EXPENSES")
+    c.fill = SEC_FILL; c.font = SEC_FONT
+    for col in range(2, len(months) + 3):
+        ws.cell(row=ri, column=col).fill = SEC_FILL
+    ri += 1
+
+    exp_totals = [0.0] * (len(months) + 1)
+    op_cats = [c for c in EXPENSE_CATS if c != "Non-Operating"]
+    for cat in op_cats:
+        vals = [monthly_exp[m].get(cat, 0) for m in months]
+        vals.append(sum(vals))
+        if sum(vals) == 0:
+            continue
+        for i, v in enumerate(vals):
+            exp_totals[i] += v
+        fill = ALT_FILL if ri % 2 == 0 else WHT_FILL
+        _write_row(ws, ri, cat, vals, indent=True, fill=fill)
+        ri += 1
+    _write_row(ws, ri, "TOTAL OPERATING EXPENSES", exp_totals, font=TOT_FONT_R)
+    ri += 2
+
+    op_profit = [inc_totals[i] - exp_totals[i] for i in range(len(inc_totals))]
+    _write_row(ws, ri, "OPERATING PROFIT (EBITDA)", op_profit, font=TOT_FONT)
+    ri += 2
+
+    nonop = [monthly_exp[m].get("Non-Operating", 0) for m in months]
+    nonop.append(sum(nonop))
+    if sum(nonop) > 0:
+        c = ws.cell(row=ri, column=1, value="NON-OPERATING EXPENSES")
+        c.fill = SEC_FILL; c.font = SEC_FONT
+        for col in range(2, len(months) + 3):
+            ws.cell(row=ri, column=col).fill = SEC_FILL
+        ri += 1
+        _write_row(ws, ri, "Loan Repayment / Transfers", nonop, indent=True, fill=ALT_FILL)
+        ri += 2
+
+    net = [op_profit[i] - nonop[i] for i in range(len(op_profit))]
+    _write_row(ws, ri, "NET PROFIT / (LOSS)", net, font=Font(bold=True, size=12))
+    ri += 2
+
+    c = ws.cell(row=ri, column=1, value="OPERATING MARGIN %")
+    c.font = Font(bold=True, italic=True)
+    for ci, m in enumerate(months, 2):
+        inc = inc_totals[ci - 2]
+        margin = (op_profit[ci - 2] / inc * 100) if inc else 0
+        ws.cell(row=ri, column=ci, value=f"{margin:.1f}%").font = Font(italic=True)
+    ws.column_dimensions["A"].width = 32
+    for i in range(2, len(months) + 3):
+        ws.column_dimensions[get_column_letter(i)].width = 15
+    ws.freeze_panes = "B2"
+
+    # ── Sheet 2: Sub-category Breakdown ──────────────────────────────────────
+    ws2 = wb.create_sheet("Sub-category Breakdown")
+    sub_hdrs = ["Category", "Sub-category"] + months + ["TOTAL"]
+    for col, h in enumerate(sub_hdrs, 1):
+        c = ws2.cell(row=1, column=col, value=h)
+        c.fill = HDR_FILL; c.font = HDR_FONT; c.alignment = CTR
+
+    ri = 2
+    for cat in EXPENSE_CATS:
+        all_subs = sorted({s for (m, c2, s), v in monthly_sub.items() if c2 == cat and v > 0})
+        if not all_subs:
+            continue
+        cat_total = sum(monthly_exp[m].get(cat, 0) for m in months)
+        if cat_total == 0:
+            continue
+        c = ws2.cell(row=ri, column=1, value=cat)
+        c.fill = PatternFill("solid", fgColor="2d2d44")
+        c.font = Font(bold=True, color="FFFFFF")
+        for col in range(2, len(months) + 3):
+            ws2.cell(row=ri, column=col).fill = PatternFill("solid", fgColor="2d2d44")
+        ri += 1
+        for sub in all_subs:
+            sub_total = sum(monthly_sub.get((m, cat, sub), 0) for m in months)
+            if sub_total == 0:
+                continue
+            fill = ALT_FILL if ri % 2 == 0 else WHT_FILL
+            ws2.cell(row=ri, column=1, value="").fill = fill
+            ws2.cell(row=ri, column=2, value=sub).fill = fill
+            for ci, m in enumerate(months, 3):
+                v = monthly_sub.get((m, cat, sub), 0)
+                c = ws2.cell(row=ri, column=ci, value=round(v) if v else 0)
+                c.fill = fill; c.number_format = INR_NUMBER_FORMAT
+            c = ws2.cell(row=ri, column=len(months) + 3, value=round(sub_total))
+            c.fill = fill; c.number_format = INR_NUMBER_FORMAT; c.font = Font(bold=True)
+            ri += 1
+    ws2.column_dimensions["A"].width = 26
+    ws2.column_dimensions["B"].width = 38
+    for i in range(3, len(months) + 4):
+        ws2.column_dimensions[get_column_letter(i)].width = 14
+    ws2.freeze_panes = "C2"
+
+    # ── Sheet 3: All Transactions ─────────────────────────────────────────────
+    ws3 = wb.create_sheet("All Transactions")
+    txn_hdrs = ["Date", "Month", "Type", "Category", "Sub-category", "Amount (Rs)", "Description"]
+    for col, h in enumerate(txn_hdrs, 1):
+        c = ws3.cell(row=1, column=col, value=h)
+        c.fill = HDR_FILL; c.font = HDR_FONT; c.alignment = CTR
+    for ri, (dt, desc, typ, amt, cat, sub) in enumerate(sorted(classified, key=lambda x: x[0]), 2):
+        fill = ALT_FILL if ri % 2 == 0 else WHT_FILL
+        ws3.cell(row=ri, column=1, value=dt.strftime("%d %b %Y")).fill = fill
+        ws3.cell(row=ri, column=2, value=dt.strftime("%Y-%m")).fill = fill
+        ws3.cell(row=ri, column=3, value=typ).fill = fill
+        ws3.cell(row=ri, column=4, value=cat).fill = fill
+        ws3.cell(row=ri, column=5, value=sub).fill = fill
+        c = ws3.cell(row=ri, column=6, value=amt)
+        c.fill = fill; c.number_format = INR_NUMBER_FORMAT
+        ws3.cell(row=ri, column=7, value=desc).fill = fill
+    ws3.column_dimensions["A"].width = 14
+    ws3.column_dimensions["B"].width = 10
+    ws3.column_dimensions["C"].width = 10
+    ws3.column_dimensions["D"].width = 26
+    ws3.column_dimensions["E"].width = 38
+    ws3.column_dimensions["F"].width = 14
+    ws3.column_dimensions["G"].width = 80
+    ws3.auto_filter.ref = "A1:G1"
+    ws3.freeze_panes = "A2"
+
+    return wb

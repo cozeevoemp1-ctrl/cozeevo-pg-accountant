@@ -18,6 +18,7 @@ from src.api.v2.rooms import router as rooms_router
 from src.api.v2.reporting import router as reporting_router
 from src.api.v2.tenants import router as tenants_router
 from src.api.v2.voice import router as voice_router
+from src.api.v2.finance import router as finance_router
 from src.database.field_registry import fields_for_pwa
 
 router = APIRouter(prefix="/api/v2/app", tags=["app"])
@@ -35,6 +36,7 @@ router.include_router(notices_router)
 router.include_router(reminders_router)
 router.include_router(checkouts_router)
 router.include_router(rooms_router)
+router.include_router(finance_router)
 
 
 @router.get("/health")
