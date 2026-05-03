@@ -543,12 +543,17 @@ async def transfer_room(
 @router.delete("/tenants/{tenancy_id}")
 async def delete_tenant(
     tenancy_id: int,
-    _user: AppUser = Depends(get_current_user),
+    reason: str = Query(default=""),
+    user: AppUser = Depends(get_current_user),
 ):
     """
     Hard-delete a tenancy + tenant iff they have zero non-voided payments.
+    Writes an AuditLog entry with the reason before deleting.
     Refuse with 409 if any payment records exist — use checkout flow instead.
     """
+    if not reason.strip():
+        raise HTTPException(status_code=422, detail="Deletion reason is required.")
+
     async with get_session() as session:
         row = (await session.execute(
             select(Tenancy, Tenant)
@@ -568,6 +573,22 @@ async def delete_tenant(
                 status_code=409,
                 detail=f"Cannot delete — {payment_count} payment record(s) exist. Use checkout instead.",
             )
+
+        # Write audit trail before deleting so there's a permanent record
+        session.add(AuditLog(
+            changed_by=user.user_id or "pwa",
+            entity_type="tenancy",
+            entity_id=tenancy_id,
+            entity_name=tenant.name,
+            field="deleted",
+            old_value=tenancy.room_id and str(tenancy.room_id),
+            new_value=None,
+            room_number=None,
+            source="pwa",
+            note=f"Tenant deleted — {reason.strip()}",
+            org_id=tenancy.org_id,
+        ))
+        await session.flush()  # write audit log before cascade delete
 
         await session.delete(tenancy)
         # Delete tenant only if they have no other tenancies

@@ -59,6 +59,7 @@ export default function EditTenantPage() {
   const [deleteWarned, setDeleteWarned] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState("")
+  const [deleteReason, setDeleteReason] = useState("")
 
   useEffect(() => {
     if (!tenancyId) return
@@ -180,6 +181,10 @@ export default function EditTenantPage() {
 
   async function handleDelete() {
     setDeleteError("")
+    if (!deleteReason.trim()) {
+      setDeleteError("Select a reason before deleting.")
+      return
+    }
     if (!deleteWarned) {
       setDeleteWarned(true)
       setDeleteError("This will permanently delete the tenant. Tap Delete again to confirm.")
@@ -187,7 +192,7 @@ export default function EditTenantPage() {
     }
     setDeleting(true)
     try {
-      await deleteTenant(tenancyId)
+      await deleteTenant(tenancyId, deleteReason.trim())
       router.push("/tenants")
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Delete failed.")
@@ -196,6 +201,8 @@ export default function EditTenantPage() {
       setDeleting(false)
     }
   }
+
+  const DELETE_REASONS = ["Cancelled booking", "Wrong booking", "Double booking", "Other"]
 
   const depositEligible = noticeDate ? new Date(noticeDate).getDate() <= 5 : null
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
@@ -509,20 +516,45 @@ export default function EditTenantPage() {
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
 
         {/* Delete — admin danger zone */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-2">
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Danger Zone</p>
+          <div className="flex flex-wrap gap-2">
+            {DELETE_REASONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => { setDeleteReason(r === "Other" ? "" : r); setDeleteWarned(false); setDeleteError("") }}
+                className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                  (r !== "Other" && deleteReason === r) || (r === "Other" && !DELETE_REASONS.slice(0, -1).includes(deleteReason))
+                    ? "bg-red-500 border-red-500 text-white"
+                    : "border-red-300 text-red-500"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          {!DELETE_REASONS.slice(0, -1).includes(deleteReason) && (
+            <input
+              type="text"
+              value={deleteReason}
+              onChange={(e) => { setDeleteReason(e.target.value); setDeleteWarned(false) }}
+              placeholder="Describe reason…"
+              className="w-full rounded-pill border border-red-200 bg-bg px-4 py-2 text-xs text-ink outline-none focus:border-red-400"
+            />
+          )}
           {deleteError && (
             <p className="text-xs text-status-warn font-medium">{deleteError}</p>
           )}
           <button
             type="button"
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={deleting || !deleteReason.trim()}
             className={`rounded-pill border py-2.5 text-sm font-bold w-full transition-colors ${
               deleteWarned
                 ? "border-red-500 bg-red-500 text-white"
                 : "border-red-400 text-red-500"
-            } disabled:opacity-40`}
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
           >
             {deleting ? "Deleting…" : deleteWarned ? "Confirm Delete" : "Delete Tenant"}
           </button>
