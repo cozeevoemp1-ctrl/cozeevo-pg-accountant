@@ -317,9 +317,9 @@ export function patchTenant(tenancyId: number, body: PatchTenantBody): Promise<P
   return _patch<PatchTenantResponse>(`/api/v2/app/tenants/${tenancyId}`, body);
 }
 
-export async function deleteTenant(tenancyId: number, reason: string): Promise<void> {
+export async function deleteTenant(tenancyId: number, reason: string, force = false): Promise<void> {
   const headers = await _authHeaders();
-  const url = `${BASE_URL}/api/v2/app/tenants/${tenancyId}?reason=${encodeURIComponent(reason)}`;
+  const url = `${BASE_URL}/api/v2/app/tenants/${tenancyId}?reason=${encodeURIComponent(reason)}${force ? "&force=true" : ""}`;
   const res = await fetch(url, { method: "DELETE", headers });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));

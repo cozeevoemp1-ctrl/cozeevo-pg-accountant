@@ -544,12 +544,14 @@ async def transfer_room(
 async def delete_tenant(
     tenancy_id: int,
     reason: str = Query(default=""),
+    force: bool = Query(default=False),
     user: AppUser = Depends(get_current_user),
 ):
     """
-    Hard-delete a tenancy + tenant iff they have zero non-voided payments.
+    Hard-delete a tenancy + tenant.
     Writes an AuditLog entry with the reason before deleting.
-    Refuse with 409 if any payment records exist — use checkout flow instead.
+    If force=true, voids all payment records first (use for erroneous entries).
+    Without force, refuses with 409 if any non-voided payments exist.
     """
     if not reason.strip():
         raise HTTPException(status_code=422, detail="Deletion reason is required.")
@@ -564,15 +566,19 @@ async def delete_tenant(
             raise HTTPException(status_code=404, detail="Tenancy not found")
         tenancy, tenant = row
 
-        payment_count = await session.scalar(
-            select(func.count()).select_from(Payment)
-            .where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
-        )
-        if payment_count and payment_count > 0:
+        payments = (await session.execute(
+            select(Payment).where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
+        )).scalars().all()
+
+        if payments and not force:
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot delete — {payment_count} payment record(s) exist. Use checkout instead.",
+                detail=f"Cannot delete — {len(payments)} payment record(s) exist. Use force delete to void them first.",
             )
+
+        # Void all payments before deleting (force path)
+        for p in payments:
+            p.is_void = True
 
         # Write audit trail before deleting so there's a permanent record
         session.add(AuditLog(
@@ -585,7 +591,7 @@ async def delete_tenant(
             new_value=None,
             room_number=None,
             source="pwa",
-            note=f"Tenant deleted — {reason.strip()}",
+            note=f"Tenant deleted — {reason.strip()}" + (f" (voided {len(payments)} payment(s))" if payments else ""),
             org_id=tenancy.org_id,
         ))
         await session.flush()  # write audit log before cascade delete
