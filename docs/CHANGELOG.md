@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.2] — 2026-05-03 — PWA: delete tenant from edit page (reason + force delete)
+
+### Added
+- **`DELETE /api/v2/app/tenants/{id}`** — hard-deletes tenancy + tenant; requires `?reason=`; blocked if payments exist unless `?force=true` which voids all payments first; AuditLog entry written before deletion
+- **Edit Tenant page** — Danger Zone section: preset reason chips (Cancelled / Wrong / Double booking / Other), two-tap confirm, force delete button revealed on 409
+
+---
+
+## [1.75.1] — 2026-05-03 — PWA edge case hardening
+
+### Fixed
+- Phone uniqueness check in PATCH (409 vs silent DB crash); AuditLog on room change via edit page; floor validation (rent > 0, deposit/maintenance/lock-in ≥ 0) in PATCH + onboarding; CTA disabled when destination room full; email pre-filled in edit form; checkout deductions warning + unpaid dues two-tap gate; transfer-room RS now prorated by remaining days
+
+---
+
 ## [1.75.0] — 2026-05-03 — Finance / P&L page: CSV upload, P&L dashboard, Excel download, deposit reconciliation
 
 ### Added
