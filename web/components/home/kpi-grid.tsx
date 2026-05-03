@@ -131,7 +131,7 @@ function ExpansionPanel({
   filtered, loading, selected, detailLoading, selectItem, setSelected,
 }: PanelProps) {
   return (
-    <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={positionStyle}>
+    <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
 
       {/* Filter bar — dues */}
       {open === "dues" && (
@@ -375,10 +375,13 @@ export function KpiGrid({ data }: KpiGridProps) {
   const cache = useRef<Map<string, KpiDetailItem[]>>(new Map());
   const inflight = useRef<Set<string>>(new Set());
 
-  // Warm the cache for all tiles on mount so taps feel instant
+  // Warm cache on mount — only for tiles that will actually render
   useEffect(() => {
-    const all: TileKey[] = ["occupied", "vacant", "dues", "checkins_today", "checkouts_today", "no_show", "notices"];
-    all.forEach((k) => prefetch(k));
+    const keys: TileKey[] = ["occupied", "vacant", "dues"];
+    if (data.checkins_today > 0 || data.checkouts_today > 0) keys.push("checkins_today", "checkouts_today");
+    if (data.no_show_count > 0) keys.push("no_show");
+    if (data.notices_count > 0) keys.push("notices");
+    keys.forEach((k) => prefetch(k));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -392,12 +395,13 @@ export function KpiGrid({ data }: KpiGridProps) {
     inflight.current.delete(key);
   }
 
+  function close() {
+    setOpen(null);
+    resetFilters();
+  }
+
   async function toggle(key: TileKey) {
-    if (open === key) {
-      setOpen(null);
-      resetFilters();
-      return;
-    }
+    if (open === key) { close(); return; }
     setOpen(key);
     resetFilters();
     if (cache.current.has(key!)) {
@@ -487,16 +491,17 @@ export function KpiGrid({ data }: KpiGridProps) {
     filtered, loading, selected, detailLoading, selectItem, setSelected,
   };
 
-  // Half-column tiles must span both columns + the gap (gap-3 = 0.75rem = 12px)
   const leftStyle: React.CSSProperties = { left: 0, width: "calc(200% + 0.75rem)" };
   const rightStyle: React.CSSProperties = { right: 0, width: "calc(200% + 0.75rem)" };
   const fullStyle: React.CSSProperties = { left: 0, right: 0 };
 
   return (
     <div className="grid grid-cols-2 gap-3">
+      {/* Backdrop — catches outside taps to close the panel */}
+      {open && <div className="fixed inset-0 z-10" onClick={close} />}
 
       {/* Occupied beds — left col */}
-      <div className="relative" onPointerDown={() => prefetch("occupied")}>
+      <div className="relative">
         <IconTile
           icon="🏠" label="Occupied beds"
           value={`${data.occupied_beds} / ${data.total_beds}`}
@@ -509,7 +514,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       </div>
 
       {/* Vacant beds — right col */}
-      <div className="relative" onPointerDown={() => prefetch("vacant")}>
+      <div className="relative">
         <IconTile
           icon="🪟" label="Vacant beds"
           value={data.vacant_beds}
@@ -529,7 +534,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       />
 
       {/* Dues pending — right col */}
-      <div className="relative" onPointerDown={() => prefetch("dues")}>
+      <div className="relative">
         <IconTile
           icon="💸" label={`Dues pending · ${data.overdue_tenants}`}
           value={rupeeL(data.overdue_amount)}
@@ -545,7 +550,7 @@ export function KpiGrid({ data }: KpiGridProps) {
       {/* Check-ins / Check-outs — conditional */}
       {(data.checkins_today > 0 || data.checkouts_today > 0) && (
         <>
-          <div className="relative" onPointerDown={() => prefetch("checkins_today")}>
+          <div className="relative">
             <IconTile
               icon="↗️" label="Check-ins today"
               value={data.checkins_today}
@@ -556,7 +561,7 @@ export function KpiGrid({ data }: KpiGridProps) {
               <ExpansionPanel {...panelProps} positionStyle={leftStyle} />
             )}
           </div>
-          <div className="relative" onPointerDown={() => prefetch("checkouts_today")}>
+          <div className="relative">
             <IconTile
               icon="↙️" label="Check-outs today"
               value={data.checkouts_today}
@@ -572,7 +577,7 @@ export function KpiGrid({ data }: KpiGridProps) {
 
       {/* Awaiting check-in — full width */}
       {data.no_show_count > 0 && (
-        <div className="col-span-2 relative" onPointerDown={() => prefetch("no_show")}>
+        <div className="col-span-2 relative">
           <IconTile
             icon="⏳" label="Awaiting check-in"
             value={data.no_show_count}
@@ -587,7 +592,7 @@ export function KpiGrid({ data }: KpiGridProps) {
 
       {/* On notice — full width */}
       {data.notices_count > 0 && (
-        <div className="col-span-2 relative" onPointerDown={() => prefetch("notices")}>
+        <div className="col-span-2 relative">
           <IconTile
             icon="📋" label={`On notice · ${data.notices_count}`}
             value={`${data.notices_count} leaving`}
