@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.5] — 2026-05-03 — PWA stability fixes: login, room transfer, KPI totals
+
+### Fixed
+- **PWA login stuck / page not loading** — Supabase auth middleware threw unhandled `AuthRetryableFetchError` (504 timeout); added try/catch + 3s `Promise.race` timeout so pages always load even when Supabase auth is slow
+- **Login form hang** — `signInWithEmail` had no timeout; button stayed on "Signing in…" forever; added 10s timeout with "Connection timed out" error message
+- **Room transfer "Failed to fetch"** — `tenancy.property_id` doesn't exist on `Tenancy` model (only `room_id`); changed to `room.property_id` (current room already joined in query)
+- **Room transfer "Room X not found" for Room 000 tenants** — room lookup was filtering by `property_id` of the current room; placeholder rooms like "000" have NULL `property_id`, so lookup matched nothing; removed `property_id` filter entirely — room numbers are unique system-wide; matches how `execute_room_transfer` (the bot service) works
+- **Confirmed no other `tenancy.property_id` wrong-attr bugs** in codebase (grepped all of `src/` and `services/`)
+- **Backend was down** — `pg-accountant` service had failed; restarted
+
+### Added
+- **KPI expansion panel totals** — right-aligned pink label inline with filter chips: vacant shows actual bed count (summed from "N beds free" detail string, not room count), dues shows ₹ total, occupied shows tenant count, others show item count
+
+### Changed
+- **Confirmation modal centered** — was a bottom sheet (`items-end`); now centered on screen (`items-center`) with `rounded-[28px]`; fields area scrollable; buttons pinned to bottom; max-h 85vh
+
+---
+
 ## [1.75.3] — 2026-05-03 — May 2026 payment import from source sheet (Z/AA columns)
 
 ### Data
