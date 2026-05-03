@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-server";
-import { getCollectionSummary, getKpi, getKpiDetail, getRecentActivity, type KpiDetailItem } from "@/lib/api";
+import { getCollectionSummary, getKpi, getKpiDetail, getRecentActivity, getRecentCheckins, type KpiDetailItem } from "@/lib/api";
 import { Greeting } from "@/components/home/greeting";
 import { OverviewCard } from "@/components/home/overview-card";
 import { KpiGrid } from "@/components/home/kpi-grid";
 import { ActivityFeed } from "@/components/home/activity-feed";
+import { RecentCheckins } from "@/components/home/recent-checkins";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
@@ -25,10 +26,11 @@ export default async function HomePage() {
   const monthLabel = _monthLabel(now);
 
   const token = session.session.access_token;
-  const [collection, kpi, activity] = await Promise.allSettled([
+  const [collection, kpi, activity, recentCheckins] = await Promise.allSettled([
     getCollectionSummary(period, token),
     getKpi(token),
     getRecentActivity(15, token),
+    getRecentCheckins(10, token),
   ]);
 
   // Pre-fetch KPI detail data server-side so tiles open instantly (no client-side API call)
@@ -102,6 +104,19 @@ export default async function HomePage() {
           </span>
         </Link>
       )}
+
+      <section>
+        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
+          Recent check-ins
+        </h2>
+        <Card className="px-4 py-1">
+          {recentCheckins.status === "fulfilled" ? (
+            <RecentCheckins items={recentCheckins.value.items} />
+          ) : (
+            <p className="text-sm text-ink-muted py-4 text-center">Unable to load check-ins</p>
+          )}
+        </Card>
+      </section>
 
       <section>
         <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">

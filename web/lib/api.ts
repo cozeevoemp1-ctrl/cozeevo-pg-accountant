@@ -557,6 +557,25 @@ export function editPayment(paymentId: number, body: PaymentEditBody): Promise<P
   return _patch<PaymentListItem>(`/api/v2/app/payments/${paymentId}`, body);
 }
 
+// ── Recent check-ins ─────────────────────────────────────────────────────────
+
+export interface RecentCheckinItem {
+  tenancy_id: number;
+  name: string;
+  room: string;
+  checkin_date: string;
+  agreed_rent: number;
+  security_deposit: number;
+  first_month_due: number;
+  first_month_paid: number;
+  balance: number;
+  stay_type: "monthly" | "daily";
+}
+
+export function getRecentCheckins(limit = 10, token?: string): Promise<{ items: RecentCheckinItem[] }> {
+  return _get(`/api/v2/app/activity/recent-checkins?limit=${limit}`, token);
+}
+
 // ── Finance ──────────────────────────────────────────────────────────────────
 
 export interface FinanceIncomeBreakdown {

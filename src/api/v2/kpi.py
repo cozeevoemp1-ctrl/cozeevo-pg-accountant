@@ -1,7 +1,8 @@
 """GET /api/v2/app/reporting/kpi and GET /api/v2/app/activity/recent."""
 from __future__ import annotations
 
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import case, func, literal_column, select, desc, or_, and_
@@ -515,3 +516,120 @@ async def get_recent_activity(
         for r in rows
     ]
     return ActivityResponse(items=items)
+
+
+@activity_router.get("/recent-checkins")
+async def get_recent_checkins(
+    limit: int = 10,
+    user: AppUser = Depends(get_current_user),
+):
+    """Return recently checked-in tenants with first-month payment status."""
+    today = date.today()
+    since = today - timedelta(days=45)
+
+    async with get_session() as session:
+        rows = (await session.execute(
+            select(
+                Tenancy.id,
+                Tenant.name,
+                Room.room_number,
+                Tenancy.checkin_date,
+                Tenancy.agreed_rent,
+                Tenancy.security_deposit,
+                Tenancy.booking_amount,
+                Tenancy.stay_type,
+            )
+            .join(Tenant, Tenant.id == Tenancy.tenant_id)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.checkin_date >= since,
+                Room.is_staff_room == False,
+                Room.room_number != "000",
+            )
+            .order_by(desc(Tenancy.checkin_date))
+            .limit(limit)
+        )).all()
+
+        if not rows:
+            return {"items": []}
+
+        tenancy_ids = [r.id for r in rows]
+
+        # First-month rent_due per tenancy (earliest RentSchedule row)
+        first_period_subq = (
+            select(
+                RentSchedule.tenancy_id,
+                func.min(RentSchedule.period_month).label("first_period"),
+            )
+            .where(RentSchedule.tenancy_id.in_(tenancy_ids))
+            .group_by(RentSchedule.tenancy_id)
+            .subquery()
+        )
+        rs_rows = (await session.execute(
+            select(
+                RentSchedule.tenancy_id,
+                (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)).label("due"),
+                RentSchedule.period_month,
+            )
+            .join(first_period_subq, and_(
+                RentSchedule.tenancy_id == first_period_subq.c.tenancy_id,
+                RentSchedule.period_month == first_period_subq.c.first_period,
+            ))
+        )).all()
+        rent_due_map: dict[int, tuple] = {
+            rs.tenancy_id: (float(rs.due), rs.period_month)
+            for rs in rs_rows
+        }
+
+        # Rent payments collected for the first month per tenancy
+        pay_rows = (await session.execute(
+            select(
+                Payment.tenancy_id,
+                Payment.amount,
+                Payment.for_type,
+                Payment.period_month,
+            )
+            .where(
+                Payment.tenancy_id.in_(tenancy_ids),
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.rent,
+            )
+        )).all()
+        pay_by_tenancy: dict[int, list] = defaultdict(list)
+        for p in pay_rows:
+            pay_by_tenancy[p.tenancy_id].append(p)
+
+    items = []
+    for r in rows:
+        tid = r.id
+        checkin = r.checkin_date
+        first_period = date(checkin.year, checkin.month, 1)
+
+        due_info = rent_due_map.get(tid)
+        first_due = due_info[0] if due_info else (
+            float(r.agreed_rent or 0) + float(r.security_deposit or 0)
+            - float(r.booking_amount or 0)
+        )
+
+        first_paid = sum(
+            float(p.amount or 0)
+            for p in pay_by_tenancy.get(tid, [])
+            if p.period_month == first_period
+        )
+        balance = max(first_due - first_paid, 0.0)
+
+        items.append({
+            "tenancy_id": tid,
+            "name": r.name,
+            "room": r.room_number,
+            "checkin_date": checkin.isoformat(),
+            "agreed_rent": int(r.agreed_rent or 0),
+            "security_deposit": int(r.security_deposit or 0),
+            "first_month_due": int(first_due),
+            "first_month_paid": int(first_paid),
+            "balance": int(balance),
+            "stay_type": r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly"),
+        })
+
+    return {"items": items}
