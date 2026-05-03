@@ -136,6 +136,7 @@ Kiran's Excel (offline)
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
 | `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation (admin-only) |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |
+| `src/reports/pnl_builder.py` | Canonical P&L Excel builder — shared by `/finance/pnl/excel` API endpoint and `scripts/export_pnl_2026_05_02.py`; single source of truth |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations
