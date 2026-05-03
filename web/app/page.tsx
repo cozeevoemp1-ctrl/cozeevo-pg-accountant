@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-server";
-import { getCollectionSummary, getKpi, getRecentActivity } from "@/lib/api";
+import { getCollectionSummary, getKpi, getKpiDetail, getRecentActivity, type KpiDetailItem } from "@/lib/api";
 import { Greeting } from "@/components/home/greeting";
 import { OverviewCard } from "@/components/home/overview-card";
 import { KpiGrid } from "@/components/home/kpi-grid";
@@ -31,6 +31,20 @@ export default async function HomePage() {
     getRecentActivity(15, token),
   ]);
 
+  // Pre-fetch KPI detail data server-side so tiles open instantly (no client-side API call)
+  const kpiValue = kpi.status === "fulfilled" ? kpi.value : null;
+  let initialDetails: Record<string, KpiDetailItem[]> = {};
+  if (kpiValue) {
+    const types: string[] = ["occupied", "vacant", "dues"];
+    if (kpiValue.checkins_today > 0 || kpiValue.checkouts_today > 0) types.push("checkins_today", "checkouts_today");
+    if (kpiValue.no_show_count > 0) types.push("no_show");
+    if (kpiValue.notices_count > 0) types.push("notices");
+    const results = await Promise.allSettled(types.map((t) => getKpiDetail(t, token)));
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") initialDetails[types[i]] = r.value.items;
+    });
+  }
+
   return (
     <main className="flex flex-col gap-5 px-4 pt-6 pb-32 max-w-lg mx-auto">
       <Greeting session={session} />
@@ -41,12 +55,12 @@ export default async function HomePage() {
         </Link>
       )}
 
-      {kpi.status === "fulfilled" && (
+      {kpiValue && (
         <section>
           <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
             Today at a glance
           </h2>
-          <KpiGrid data={kpi.value} />
+          <KpiGrid data={kpiValue} initialDetails={initialDetails} />
         </section>
       )}
 

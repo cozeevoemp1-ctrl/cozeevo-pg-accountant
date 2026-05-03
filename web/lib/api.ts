@@ -138,8 +138,8 @@ export interface KpiDetailItem {
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
-export function getKpiDetail(type: string): Promise<KpiDetail> {
-  return _get(`/api/v2/app/reporting/kpi-detail?type=${type}`);
+export function getKpiDetail(type: string, token?: string): Promise<KpiDetail> {
+  return _get(`/api/v2/app/reporting/kpi-detail?type=${type}`, token);
 }
 
 export function createPayment(body: PaymentCreate): Promise<PaymentResponse> {

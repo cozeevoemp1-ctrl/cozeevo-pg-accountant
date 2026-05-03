@@ -9,6 +9,7 @@ import type { KpiResponse } from "@/lib/api";
 
 interface KpiGridProps {
   data: KpiResponse;
+  initialDetails?: Record<string, KpiDetailItem[]>;
 }
 
 type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | "no_show" | "notices" | null;
@@ -357,7 +358,7 @@ function ExpansionPanel({
   );
 }
 
-export function KpiGrid({ data }: KpiGridProps) {
+export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [open, setOpen] = useState<TileKey>(null);
   const [items, setItems] = useState<KpiDetailItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -372,7 +373,9 @@ export function KpiGrid({ data }: KpiGridProps) {
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const cache = useRef<Map<string, KpiDetailItem[]>>(new Map());
+  const cache = useRef<Map<string, KpiDetailItem[]>>(
+    new Map(Object.entries(initialDetails ?? {}))
+  );
   const inflight = useRef<Set<string>>(new Set());
 
   // Warm cache on mount — only for tiles that will actually render
