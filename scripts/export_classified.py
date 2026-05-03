@@ -14,21 +14,9 @@ from openpyxl.utils import get_column_letter
 from src.rules.pnl_classify import classify_txn
 from src.utils.inr_format import INR_NUMBER_FORMAT
 from collections import defaultdict
-from datetime import datetime
 
 # ── helpers ────────────────────────────────────────────────────────────────
-def parse_date(v):
-    if hasattr(v, 'strftime'): return v
-    s = str(v).strip()
-    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
-        try: return datetime.strptime(s[:10], fmt)
-        except: pass
-    return None
-
-def parse_amt(v):
-    if v is None or v == '': return 0.0
-    try: return float(str(v).replace(',', '').strip())
-    except: return 0.0
+from src.parsers.yes_bank import parse_date, parse_amt, read_yes_bank_csv
 
 def read_yes_bank(path):
     wb = openpyxl.load_workbook(path, data_only=True)
@@ -51,27 +39,6 @@ def read_yes_bank(path):
         desc = str(d.get('description') or '')
         if wd  > 0: out.append((dt, desc, 'expense', wd))
         if dep > 0: out.append((dt, desc, 'income',  dep))
-    return out
-
-# ── CSV reader (YES Bank CSV format) ──────────────────────────────────────
-import csv as _csv
-
-def read_yes_bank_csv(path):
-    out = []
-    with open(path, 'r') as f:
-        for line in f:
-            if line.startswith('Transaction Date'):
-                break
-        reader = _csv.reader(f)
-        for row in reader:
-            if len(row) < 7: continue
-            dt_str, _, desc, ref, wd, dep, bal = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
-            dt = parse_date(dt_str)
-            if not dt: continue
-            wd_val = parse_amt(wd)
-            dep_val = parse_amt(dep)
-            if wd_val > 0: out.append((dt, desc.strip(), 'expense', wd_val))
-            if dep_val > 0: out.append((dt, desc.strip(), 'income', dep_val))
     return out
 
 # ── load data ──────────────────────────────────────────────────────────────
