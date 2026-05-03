@@ -139,6 +139,10 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Tenant Deposit Refund","Refund - T Srinivasa",         ["t.srinivasa34"]),
     ("Tenant Deposit Refund","Refund - Swami Venkatesh",     ["swamivenkatesh264"]),
     ("Tenant Deposit Refund","Refund - K S Shyam Reddy",     ["ksshyamreddy"]),
+    ("Tenant Deposit Refund","Refund - Siva Kumar",          ["7842266579"]),
+    ("Tenant Deposit Refund","Refund - Shaurya Shah",        ["9099913969"]),
+    ("Tenant Deposit Refund","Refund - Mohammed Umar",       ["umar1256"]),
+    ("Tenant Deposit Refund","Refund - Vijay Kumar",         ["9390933531"]),
     ("Tenant Deposit Refund","Other Refund / Exit",          ["refund","exit refund","checkout refund","rishwanth refund","hafiz refund","gotham refund","lakshmi priya refund"]),
 
     # ── MARKETING ─────────────────────────────────────────────────────────────

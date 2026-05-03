@@ -57,6 +57,8 @@ function NewCheckinPage() {
   const [notes,       setNotes]       = useState("")
   const [loadingPrev, setLoadingPrev] = useState(false)
 
+  const [prorateChoice, setProrateChoice] = useState<"prorated" | "full">("prorated")
+
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting,  setSubmitting]  = useState(false)
   const [error,       setError]       = useState("")
@@ -100,7 +102,7 @@ function NewCheckinPage() {
     if (!tenant) { setPreview(null); return }
     let cancelled = false
     setLoadingPrev(true)
-    getCheckinPreview(tenant.tenancy_id, actualDate)
+    getCheckinPreview(tenant.tenancy_id, actualDate, prorateChoice === "prorated")
       .then((p) => {
         if (cancelled) return
         setPreview(p)
@@ -110,13 +112,14 @@ function NewCheckinPage() {
       .catch(() => { if (!cancelled) setError("Could not load check-in preview") })
       .finally(() => { if (!cancelled) setLoadingPrev(false) })
     return () => { cancelled = true }
-  }, [tenant, actualDate])
+  }, [tenant, actualDate, prorateChoice])
 
   function handleTenantSelect(t: TenantSearchResult) {
     setTenant(t)
     setPreview(null)
     setAmount("")
     setCheckinTime(nowTime())
+    setProrateChoice("prorated")
     setError("")
   }
 
@@ -139,6 +142,7 @@ function NewCheckinPage() {
         payment_method:       method,
         notes:                notes || undefined,
         actual_checkin_time:  preview?.stay_type === "daily" ? checkinTime : undefined,
+        prorate:              prorateChoice === "prorated",
       })
       // Auto-upload scanned receipt if available
       if (scannedFile && res.payment_id) {
@@ -301,8 +305,33 @@ function NewCheckinPage() {
             </p>
             <div className="flex flex-col gap-1.5">
               <Row label="Monthly rent"     value={fmtINR(preview.agreed_rent)} />
-              <Row label="Days billed"      value={`${fmtDate(actualDate)} → end of month`} muted />
-              <Row label="Prorated rent"    value={fmtINR(preview.prorated_rent)} />
+              {/* Full / Prorated toggle */}
+              <div className="flex gap-2 py-1">
+                <button
+                  type="button"
+                  onClick={() => setProrateChoice("full")}
+                  className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${
+                    prorateChoice === "full"
+                      ? "bg-brand-pink text-white border-brand-pink"
+                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                  }`}
+                >
+                  Full {fmtINR(preview.agreed_rent)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProrateChoice("prorated")}
+                  className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${
+                    prorateChoice === "prorated"
+                      ? "bg-brand-pink text-white border-brand-pink"
+                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                  }`}
+                >
+                  Prorated {fmtINR(preview.prorated_rent)}
+                </button>
+              </div>
+              <Row label="Days billed"      value={prorateChoice === "prorated" ? `${fmtDate(actualDate)} → end of month` : "Full month"} muted />
+              <Row label={prorateChoice === "prorated" ? "Prorated rent" : "Full rent"} value={fmtINR(preview.prorated_rent)} />
               <Row label="Security deposit" value={fmtINR(preview.security_deposit)} />
               <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
                 <Row label="Total due (first month)" value={fmtINR(preview.first_month_total)} />

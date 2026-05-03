@@ -241,11 +241,12 @@ export interface CheckinCreate {
   payment_method: string;
   notes?: string;
   actual_checkin_time?: string;  // HH:MM — day-wise stays only
+  prorate?: boolean;
 }
 
-export function getCheckinPreview(tenancyId: number, actualDate: string): Promise<CheckinPreview> {
+export function getCheckinPreview(tenancyId: number, actualDate: string, prorate = true): Promise<CheckinPreview> {
   return _get<CheckinPreview>(
-    `/api/v2/app/tenants/${tenancyId}/checkin-preview?actual_date=${encodeURIComponent(actualDate)}`
+    `/api/v2/app/tenants/${tenancyId}/checkin-preview?actual_date=${encodeURIComponent(actualDate)}&prorate=${prorate}`
   );
 }
 

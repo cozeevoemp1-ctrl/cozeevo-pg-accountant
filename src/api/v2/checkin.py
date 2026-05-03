@@ -45,25 +45,26 @@ def _parse_date(s: str) -> date:
         raise HTTPException(status_code=400, detail=f"Invalid date: {s!r} — expected YYYY-MM-DD")
 
 
-def _calc_monthly_preview(tenancy: Tenancy, actual_date: date) -> dict:
+def _calc_monthly_preview(tenancy: Tenancy, actual_date: date, prorate: bool = True) -> dict:
     """Return the first-month payment breakdown for a monthly tenant."""
     rent        = Decimal(str(tenancy.agreed_rent or 0))
     deposit     = Decimal(str(tenancy.security_deposit or 0))
     booking_amt = Decimal(str(tenancy.booking_amount or 0))
-    prorated    = prorated_first_month_rent(rent, actual_date)
-    first_month = prorated + deposit
-    balance_due = first_month - booking_amt
+    rent_charged = prorated_first_month_rent(rent, actual_date) if prorate else rent
+    first_month  = rent_charged + deposit
+    balance_due  = first_month - booking_amt
     return {
         "stay_type":      "monthly",
         "agreed_rent":    float(rent),
         "security_deposit": float(deposit),
         "booking_amount": float(booking_amt),
-        "prorated_rent":  float(prorated),
+        "prorated_rent":  float(rent_charged),
         "first_month_total": float(first_month),
         "balance_due":    float(max(balance_due, Decimal("0"))),
         "overpayment":    float(max(-balance_due, Decimal("0"))),
         "date_changed":   actual_date != tenancy.checkin_date,
         "agreed_checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
+        "is_prorated":    prorate,
         # day-wise fields (null for monthly)
         "daily_rate": None,
         "num_days": None,
@@ -99,10 +100,10 @@ def _calc_daily_preview(tenancy: Tenancy, actual_date: date) -> dict:
     }
 
 
-def _calc_preview(tenancy: Tenancy, actual_date: date) -> dict:
+def _calc_preview(tenancy: Tenancy, actual_date: date, prorate: bool = True) -> dict:
     if tenancy.stay_type == StayType.daily:
         return _calc_daily_preview(tenancy, actual_date)
-    return _calc_monthly_preview(tenancy, actual_date)
+    return _calc_monthly_preview(tenancy, actual_date, prorate=prorate)
 
 
 # ── GET preview ──────────────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ def _calc_preview(tenancy: Tenancy, actual_date: date) -> dict:
 async def checkin_preview(
     tenancy_id: int,
     actual_date: str = Query(default=None),
+    prorate: bool = Query(default=True),
     user: AppUser = Depends(get_current_user),
 ):
     parsed_date = _parse_date(actual_date) if actual_date else date.today()
@@ -139,7 +141,7 @@ async def checkin_preview(
         and (parsed_date - tenancy.checkin_date).days >= 3
     )
 
-    preview = _calc_preview(tenancy, parsed_date)
+    preview = _calc_preview(tenancy, parsed_date, prorate=prorate)
     return {
         "tenancy_id":         tenancy.id,
         "tenant_id":          tenant.id,
@@ -163,6 +165,7 @@ class CheckinRequest(BaseModel):
     payment_method:      str         # CASH / UPI / BANK_TRANSFER / CHEQUE
     notes:               str = ""
     actual_checkin_time: str | None = None  # HH:MM — day-wise stays only
+    prorate:             bool = True
 
 
 class CheckinResponse(BaseModel):
@@ -225,7 +228,7 @@ async def record_physical_checkin(
 
     tenancy, tenant, room = result
 
-    preview      = _calc_preview(tenancy, actual_date)
+    preview      = _calc_preview(tenancy, actual_date, prorate=body.prorate)
     date_changed = preview["date_changed"]
     is_daily     = tenancy.stay_type == StayType.daily
 
@@ -261,7 +264,13 @@ async def record_physical_checkin(
                         RentSchedule.period_month == period,
                     )
                 )
-                new_rent_due = first_month_rent_due(tenancy, period)
+                if body.prorate:
+                    new_rent_due = first_month_rent_due(tenancy, period)
+                else:
+                    rent_val = Decimal(str(tenancy.agreed_rent or 0))
+                    deposit  = Decimal(str(tenancy.security_deposit or 0))
+                    booking  = Decimal(str(tenancy.booking_amount or 0))
+                    new_rent_due = max(rent_val + deposit - booking, Decimal("0"))
                 if rs:
                     rs.rent_due = new_rent_due
                 else:
