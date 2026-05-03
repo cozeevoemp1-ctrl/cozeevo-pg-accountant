@@ -1,6 +1,6 @@
 """P&L for Oct'25 – Apr'26 — BANK STATEMENT as primary source.
 
-Produces: data/reports/PnL_Accrual_2026_05_02.xlsx
+Produces: data/reports/PnL_Accrual_2026_05_03.xlsx
 
 INCOME METHODOLOGY:
   Primary:      Bank statement credits — Yes Bank …961 (UPI batch settlements + other)
@@ -35,7 +35,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from utils.inr_format import INR_NUMBER_FORMAT
 
-OUT = Path(__file__).parent.parent / "data" / "reports" / "PnL_Accrual_2026_05_02.xlsx"
+OUT = Path(__file__).parent.parent / "data" / "reports" / "PnL_Accrual_2026_05_03.xlsx"
 
 MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 
@@ -93,37 +93,41 @@ opex = {
     # Cash-basis: show when payments actually left bank. Jan: Airwire UPI Rs.70,730 (KIPINN Rs.10,620 in IT & Software).
     # Feb: 8x Razorpay AIRWIREBROADBAND @ Rs.14,146 each = Rs.1,13,168. Mar-Dec 2026 = Rs.0 (prepaid). Next cycle Jan 2027.
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 40946, 70730, 113168,       0,       0],
-    # Apr: includes Rs.29,946 Prabhakaran NEFT (ninja cart veg) reclassified from Non-Op
-    "Food & Groceries":                                           [0, 1086, 34435, 201558,  94931,  237747,  263625],
+    # Apr: Prabhakaran (9444296681) reclassified to Staff & Labour (2026-05-03)
+    "Food & Groceries":                                           [0, 1086, 34435, 201558,  94931,  237747,  233679],
     # Apr: only Rs.2,800 petrol; no DG diesel visible — flagged ⚠
     "Fuel & Diesel":                                              [0, 0, 0,        9099,  104366,  346308,    2800],
-    "Staff & Labour":                                             [0, 1000, 125935, 112063, 219715,  155481,  156102],
-    # Apr: Rs.4,340 classifier + Rs.24,599 EB panel board (reclassified from Other)
-    "Maintenance & Repairs":                                      [0, 0, 0,            0,     500,   18470,   28939],
+    # Apr: +Rs.43,515 Prabhakaran (9444296681) UPI salary payments reclassified from Other Expenses
+    "Staff & Labour":                                             [0, 1000, 125935, 112063, 219715,  155641,  199617],
+    # Basavaraju (bn.basavaraju) EB panel board + plumbers (chandan865858, kumar.ranjan7828)
+    "Maintenance & Repairs":                                      [0, 0, 0,            0,     550,   18470,   30740],
     "Cleaning Supplies":                                          [0, 0, 4414,       1400,     700,    4566,   14500],
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
     "Shopping & Supplies":                                        [0, 2730, 10530,  12036,   6127,    6184,    7442],
-    "Operational Expenses":                                       [0, 0, 47769,     10315,   2174,    3237,   30756],
+    # Apr: +chairs Rs.47K (q962933392) + kitchen equip Rs.37.5K (9844532900)
+    #      +atta machine Rs.21K (naveenmanly100100) + naukri Rs.1K — reclassified from CAPEX/Other
+    "Operational Expenses":                                       [0, 0, 47769,     10315,   2174,    3237,  137319],
     "Marketing":                                                  [0, 0, 39500,     17895,   3620,   27700,       0],
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 75716,     88073,   3000,    3000,    3000],
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    # Apr: Rs.2,77,034 raw; less CAPEX Rs.1,33,420 + Maint Rs.24,599 + Non-Op Rs.10,000 = Rs.1,09,015
-    # Remaining unknowns: Rs.49,679 (8951297583) + Rs.9,500 (9099913969) + esob/tanti Rs.13K + others
-    "Other Expenses":                                             [0, 10000, 83556,  6564,  23308,   98500,  109015],
+    # Remaining unknowns: Rs.49,679 (8951297583) + volipi.l Rs.30K + tpasha638 Rs.24K + others
+    "Other Expenses":                                             [0, 10000, 83556,  4564,  23258,   78780,   99306],
 }
 
 # ── CAPEX — one-time setup investments (shown separately, below operating profit) ──
 # Apr breakdown: classifier Rs.2,163 + TV Rs.75,600 + chairs Rs.47,000
 #   + kitchen vessels Rs.37,500 + atta machines Rs.42,120 + mixer Rs.6,800 = Rs.2,11,183
 capex = {
-    "Furniture & Fittings":   [0,     0, 110191, 203815, 1185397,   331, 211183],
-    "8 Ball Pool Equipment":  [0, 82000,      0,      0,       0,     0,      0],
+    # Apr: chairs 47K + kitchen 37.5K + atta machine 21K moved to Operational Expenses (2026-05-03)
+    "Furniture & Fittings":   [0, 50000, 110191, 203815, 1185397,   331,   2163],
+    "Capital Investment (CCTV, 8 Ball Pool)": [0, 82000, 0, 0, 0, 0, 0],
 }
 
 # ── Excluded — genuinely NOT costs (balance sheet items only) ────────────────
 excluded = {
     # Giving back money that was always theirs — not an expense
-    "Tenant Deposit Refund (balance sheet)":  [0, 10000,  21500,  53944,  74532,  118671, 128418],
+    # Jan: +Bharath cancelled Rs.2K. Apr: +Shubhi Vishnoi Rs.1.75K + Shashank Rs.1K (2026-05-03)
+    "Tenant Deposit Refund (balance sheet)":  [0, 10000,  21500,  55944,  74532,  138231, 129668],
     # Paying back debt principal — not an expense (reduces liability, not profit)
     "Loan Repayment / Transfers (non-op)":    [0, 500000,     0,      0,  600000, 2090000, 22357],
 }

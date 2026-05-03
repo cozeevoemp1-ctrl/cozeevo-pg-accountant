@@ -118,6 +118,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Urban Company (Cleaning Svc)", ["urbancompany","urban company"]),
     ("Staff & Labour",       "Labour / Helpers",             ["helper","labour","kshitij","vivek"]),
     ("Staff & Labour",       "Staff - 9880401360 (Regular)", ["9880401360"]),
+    ("Staff & Labour",       "Salary - Prabhakaran",         ["9444296681"]),
     ("Staff & Labour",       "Staff - gudadesh (Contractor)",["gudadesh","udadesh"]),
     ("Staff & Labour",       "Staff - sandeepgowda",         ["sandeepgowda"]),
     ("Staff & Labour",       "Staff - Various UPI",          ["akmalakmal","kutubuddinku","vishal521","sanket","biplab"]),
@@ -143,6 +144,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Tenant Deposit Refund","Refund - Shaurya Shah",        ["9099913969"]),
     ("Tenant Deposit Refund","Refund - Mohammed Umar",       ["umar1256"]),
     ("Tenant Deposit Refund","Refund - Vijay Kumar",         ["9390933531"]),
+    ("Tenant Deposit Refund","Refund - Shubhi Vishnoi",     ["6391679333"]),
+    ("Tenant Deposit Refund","Refund - Bharath (cancelled)", ["6379442910"]),
+    ("Tenant Deposit Refund","Refund - Shashank B V",       ["9482874334"]),
     ("Tenant Deposit Refund","Other Refund / Exit",          ["refund","exit refund","checkout refund","rishwanth refund","hafiz refund","gotham refund","lakshmi priya refund"]),
 
     # ── MARKETING ─────────────────────────────────────────────────────────────
@@ -166,6 +170,10 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Furniture & Fittings", "Elgis Fitness — Gym CAPEX",     ["elgis"]),
     # Amazon goes to Operational Expenses per Kiran's rule
     ("Operational Expenses", "Amazon",                       ["amazon"]),
+    ("Operational Expenses", "Job Posting - Naukri",         ["naukri.qr8"]),
+    ("Operational Expenses", "Atta Mixing Machine",          ["naveenmanly100100"]),
+    ("Operational Expenses", "Chairs & Study Tables",        ["q962933392"]),
+    ("Operational Expenses", "Kitchen Equipment",            ["9844532900"]),
     ("Operational Expenses", "Misc - akhilreddy007420",      ["akhilreddy007420"]),
     ("Shopping & Supplies",  "Flipkart",                     ["flipkart"]),
     ("Shopping & Supplies",  "BharatPE (POS Payments)",      ["bharatpe","bharat pe"]),
@@ -176,8 +184,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Shopping & Supplies",  "Printing / Xerox",             ["printout","xerox","print"]),
 
     # ── MAINTENANCE & REPAIRS ─────────────────────────────────────────────────
-    ("Maintenance & Repairs","Plumbing",                     ["plumbing","plumber"]),
+    ("Maintenance & Repairs","Plumbing",                     ["plumbing","plumber","chandan865858","kumar.ranjan7828"]),
     ("Maintenance & Repairs","Electrician / Electrical",     ["electrician","electrical","electric"]),
+    ("Maintenance & Repairs","EB Panel Board - Basavaraju",  ["bn.basavaraju"]),
     ("Maintenance & Repairs","Carpenter",                    ["carpenter","r61865951"]),
     ("Maintenance & Repairs","Repairs / Handyman",           ["repair","handyman"]),
     ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith","seals"]),

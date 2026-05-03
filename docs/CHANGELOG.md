@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.7] — 2026-05-03 — P&L classifier: bulk reclassification + check-in toggle + P&L regenerated
+
+### Changed — `src/rules/pnl_classify.py`
+- **Prabhakaran (9444296681)** → Staff & Labour "Salary - Prabhakaran" (was Other Expenses)
+- **Basavaraju (bn.basavaraju)** → Maintenance & Repairs "EB Panel Board - Basavaraju"
+- **Plumbers** — chandan865858 + kumar.ranjan7828 added to Maintenance & Repairs "Plumbing"
+- **Naukri (naukri.qr8.payu@indus)** → Operational Expenses "Job Posting - Naukri"
+- **Atta mixing machine (naveenmanly100100)** → Operational Expenses
+- **Chairs & study tables (q962933392)** → Operational Expenses
+- **Kitchen equipment (9844532900@okbizaxis)** → Operational Expenses
+- **Deposit refunds** added: Shubhi Vishnoi (6391679333), Bharath cancelled (6379442910), Shashank B V (9482874334) → Tenant Deposit Refund
+
+### Changed — `scripts/export_pnl_2026_05_02.py` + P&L Excel
+- All bank-derived rows updated from fresh classifier run
+- Staff & Labour Apr: 1,56,102 → 1,99,617 (+Prabhakaran salary)
+- Operational Expenses Apr: 30,756 → 1,37,319 (+chairs 47K + kitchen 37.5K + atta 21K + naukri 1K)
+- CAPEX Furniture & Fittings Apr: 2,11,183 → 2,163 (chairs/kitchen/atta moved to Opex)
+- Other Expenses: Jan 6,564→4,564 / Feb 23,308→23,258 / Apr 99,515→99,306
+- Tenant Deposit Refund: Jan +2K (Bharath), Apr +Shubhi+Shashank
+- Output: `data/reports/PnL_Accrual_2026_05_03.xlsx`
+
+### Added — PWA check-in form
+- **Full/Prorated toggle** on check-in form (same as Edit Tenant page)
+- Backend: `GET /checkin-preview?prorate=true/false` + `POST /checkin` accepts `prorate` field
+- Frontend: `prorateChoice` state, pill toggle UI, dynamic rent row label
+
+---
+
 ## [1.75.6] — 2026-05-03 — Finance fixes: dedup hash alignment + INR rupee format
 
 ### Fixed
