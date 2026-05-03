@@ -2,6 +2,14 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.8] — 2026-05-03 — Fix: Check-ins today KPI only shows pending arrivals
+
+### Fixed
+- **`src/api/v2/kpi.py`** — `checkins_today` count + detail queries now filter `status == no_show` only. Previously showed ALL tenancies with `checkin_date == today` regardless of status, so already-checked-in (`active`) tenants kept reappearing in the tile after physical check-in.
+- **DB fix** — Abhinav Rastogi (tenancy 1073) and Chaitanya Prashant Talokar (tenancy 1074), Room 407, were `active` with only booking advance paid (no physical check-in done). Reverted both to `no_show` so they appear correctly in the "Check-ins today" tile pending physical arrival.
+
+---
+
 ## [1.75.7] — 2026-05-03 — P&L classifier: bulk reclassification + check-in toggle + P&L regenerated
 
 ### Changed — `src/rules/pnl_classify.py`
