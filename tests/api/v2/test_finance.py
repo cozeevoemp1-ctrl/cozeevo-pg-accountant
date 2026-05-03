@@ -10,7 +10,7 @@ SAMPLE_CSV = """Transaction Date,Value Date,Description,Ref No,Withdrawals,Depos
 """
 
 def _make_hash(dt, amt, desc) -> str:
-    key = f"{dt}|{round(float(amt), 2):.2f}|{desc.strip().lower()}"
+    key = f"{dt}|{(desc or '').strip().lower()[:80]}|{round(float(amt), 2)}"
     return hashlib.sha256(key.encode()).hexdigest()
 
 def test_parse_and_classify():

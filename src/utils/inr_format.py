@@ -13,9 +13,10 @@ Short form (with unit):
     8500      -> "Rs.8,500"
 """
 
-# openpyxl number_format for Indian grouping. Positive ; negative in parens ; zero as "-"
-INR_NUMBER_FORMAT = '#,##,##,##0;(#,##,##,##0);"-"'
-INR_NUMBER_FORMAT_2DP = '#,##,##,##0.00;(#,##,##,##0.00);"-"'
+# openpyxl number_format — Indian lakh/crore grouping with ₹ symbol.
+# Sections: >99,99,999 (crore) | >99,999 (lakh) | otherwise
+INR_NUMBER_FORMAT = '[>9999999][$₹]##\\,##\\,##\\,##0;[>99999][$₹]##\\,##\\,##0;[$₹]##,##0'
+INR_NUMBER_FORMAT_2DP = '[>9999999][$₹]##\\,##\\,##\\,##0.00;[>99999][$₹]##\\,##\\,##0.00;[$₹]##,##0.00'
 
 
 def inr(n, zero_dash: bool = True) -> str:

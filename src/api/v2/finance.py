@@ -50,7 +50,7 @@ def _require_admin(user: AppUser):
 
 
 def _make_hash(txn_date: date, amount: float, desc: str) -> str:
-    key = f"{txn_date}|{round(float(amount), 2):.2f}|{desc.strip().lower()}"
+    key = f"{txn_date}|{(desc or '').strip().lower()[:80]}|{round(float(amount), 2)}"
     return hashlib.sha256(key.encode()).hexdigest()
 
 
