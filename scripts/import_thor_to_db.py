@@ -93,14 +93,17 @@ async def main():
             continue
 
         cat, sub = classify_txn(desc, txn_type)
-        await conn.execute("""
+        result = await conn.execute("""
             INSERT INTO bank_transactions
               (upload_id, txn_date, description, amount, txn_type,
                category, sub_category, unique_hash, account_name)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ON CONFLICT (unique_hash) DO NOTHING
         """, None, txn_date, desc, float(amount), txn_type, cat, sub, uhash, "THOR")
-        existing_hashes.add(uhash)
-        new_count += 1
+        if result == "INSERT 0 1":
+            new_count += 1
+        else:
+            dup_count += 1
 
     print(f"\nInserted: {new_count} new rows")
     print(f"Skipped:  {dup_count} duplicates")
