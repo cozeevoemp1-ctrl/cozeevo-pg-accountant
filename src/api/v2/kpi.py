@@ -305,6 +305,22 @@ async def get_kpi_detail(
                     return "female"
                 return "mixed"
 
+            # Upcoming no-show bookings for these rooms (checkin_date > today)
+            vacant_room_ids = [r.id for r in room_rows]
+            upcoming_map: dict[int, date] = {}
+            if vacant_room_ids:
+                upcoming_rows = (await session.execute(
+                    select(Tenancy.room_id, func.min(Tenancy.checkin_date).label("next_checkin"))
+                    .where(
+                        Tenancy.room_id.in_(vacant_room_ids),
+                        Tenancy.status == TenancyStatus.no_show,
+                        Tenancy.checkin_date > today,
+                    )
+                    .group_by(Tenancy.room_id)
+                )).all()
+                for row in upcoming_rows:
+                    upcoming_map[row.room_id] = row.next_checkin
+
             items = []
             for r in room_rows:
                 free = r.max_occupancy - r.occupied_count
@@ -313,12 +329,14 @@ async def get_kpi_detail(
                 detail_parts = [f"{free} bed{'s' if free > 1 else ''} free"]
                 if gender_label:
                     detail_parts.append(gender_label)
+                upcoming = upcoming_map.get(r.id)
                 items.append({
                     "name": f"Room {r.room_number}",
                     "room": r.room_number,
                     "detail": " · ".join(detail_parts),
                     "free_beds": free,
                     "gender": gender,
+                    "upcoming_checkin": upcoming.isoformat() if upcoming else None,
                 })
             return {"type": type, "items": items}
 

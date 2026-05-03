@@ -135,6 +135,7 @@ export interface KpiDetailItem {
   dues?: number;       // dues items only
   building?: string;   // dues items: "THOR" | "HULK"
   deposit_eligible?: boolean;  // notices tile only
+  upcoming_checkin?: string | null;  // vacant items: earliest future no-show checkin date (ISO)
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 

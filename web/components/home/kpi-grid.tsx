@@ -328,6 +328,11 @@ function ExpansionPanel({
                         {item.deposit_eligible ? "Refundable" : "Forfeited"}
                       </span>
                     )}
+                    {open === "vacant" && item.upcoming_checkin && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
+                        Booked {new Date(item.upcoming_checkin).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
                     <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
                     {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && (
                       <span className="text-xs text-brand-pink font-bold">
