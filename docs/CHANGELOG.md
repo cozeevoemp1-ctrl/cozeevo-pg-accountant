@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.37] — 2026-05-03 — PWA UX: KPI overlay panels + instant open + recent payments search/sort
+
+### Changed
+- **`web/components/home/kpi-grid.tsx`** — KPI expansion panel completely reworked:
+  - Panel now **floats as absolute overlay** below the clicked tile instead of pushing content down
+  - Left-column tiles: overlay spans both columns anchored left; right-column: anchored right; full-width: left-right
+  - **Transparent backdrop** (`fixed inset-0 z-10`) — tapping anywhere outside closes the panel
+  - **150ms open animation** (`panel-in` keyframe: translateY -6px + scale 0.97 → normal)
+  - **Instant open (server-side prefetch)**: all KPI detail data now fetched server-side in `page.tsx` alongside KPI counts; cache pre-populated before page reaches browser — zero client-side API call on tile tap
+  - Mount-time client prefetch now skips tiles with count=0 (no wasted API calls on quiet days)
+- **`web/app/page.tsx`** — fetches all visible KPI details in parallel during SSR; passes `initialDetails` prop to `KpiGrid`
+- **`web/lib/api.ts`** — `getKpiDetail` accepts optional `token` for server-side use
+- **`web/components/home/activity-feed.tsx`** — converted to client component; added name/room search + newest/oldest sort toggle
+- **`web/components/ui/tab-bar.tsx`** — regular buttons `w-11→w-12`, CTA `w-12→w-14`, pill padding `py-2→py-2.5`
+- **`web/app/collection/breakdown/page.tsx`** — month nav arrows now `w-11 h-11` (44px touch target, was `px-1`)
+- **`web/app/globals.css`** — added `@keyframes panel-in`
+
+---
+
 ## [1.74.36] — 2026-05-02 — P&L layout restructured + CAPEX separated
 
 ### Changed
