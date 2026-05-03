@@ -650,19 +650,30 @@ export async function getDepositReconciliation(month?: string): Promise<{ rows: 
   return _get(`/api/v2/app/finance/reconcile${qs}`);
 }
 
-export async function downloadPnlExcel(fromMonth?: string, toMonth?: string): Promise<void> {
+async function _downloadExcel(path: string, filename: string): Promise<void> {
   const headers = await _authHeaders();
-  const params = new URLSearchParams();
-  if (fromMonth) params.set("from", fromMonth);
-  if (toMonth) params.set("to", toMonth);
-  const qs = params.size ? "?" + params.toString() : "";
-  const url = `${BASE_URL}/api/v2/app/finance/pnl/excel${qs}`;
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`Excel download failed: ${res.status}`);
+  const res = await fetch(`${BASE_URL}${path}`, { headers });
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
   const blob = await res.blob();
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `PnL_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/** Verified canonical P&L — Oct'25–Apr'26, manually verified figures */
+export function downloadPnlExcel(): Promise<void> {
+  return _downloadExcel(
+    "/api/v2/app/finance/pnl/excel",
+    `PnL_Verified_${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
+}
+
+/** Live P&L recomputed from DB — reflects latest uploads (HULK, new months) */
+export function downloadPnlLive(): Promise<void> {
+  return _downloadExcel(
+    "/api/v2/app/finance/pnl/live",
+    `PnL_Live_${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
 }

@@ -28,6 +28,7 @@ from src.database.models import (
     Tenancy, Tenant,
 )
 from src.parsers.yes_bank import read_yes_bank_csv
+from src.reports.pnl_builder import build_pnl_bytes
 from src.rules.pnl_classify import classify_txn
 from src.utils.inr_format import INR_NUMBER_FORMAT
 
@@ -293,34 +294,39 @@ _CAPEX_CATS = ["Furniture & Fittings", "Capital Investment"]
 
 
 @router.get("/finance/pnl/excel")
-async def download_pnl_excel(
-    user: AppUser = Depends(get_current_user),
-):
+async def download_pnl_excel(user: AppUser = Depends(get_current_user)):
+    """Verified canonical P&L (Oct'25–Apr'26) — same as local export script."""
+    _require_admin(user)
+    buf = io.BytesIO(build_pnl_bytes())
+    filename = f"PnL_Cozeevo_Verified_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/finance/pnl/live")
+async def download_pnl_live(user: AppUser = Depends(get_current_user)):
     """
-    Download full P&L summary Excel.
-    - Reclassifies every transaction on-the-fly using the current classifier
-      so the download always reflects the latest rules, even for old rows.
-    - Covers all months present in bank_transactions.
-    - Includes cash income from DB payments (not deposited to bank).
+    Live P&L recomputed from DB — picks up any new CSV uploads (HULK, new months).
+    Reclassifies every transaction with the current classifier rules.
     """
     _require_admin(user)
 
     async with get_session() as session:
-        # All bank transactions — reclassify from description at download time
         txn_rows = (await session.scalars(
             select(BankTransaction).order_by(BankTransaction.txn_date)
         )).all()
 
-        # All available months
         all_months = sorted({r.txn_date.strftime("%Y-%m") for r in txn_rows})
         if not all_months:
             raise HTTPException(status_code=404, detail="No bank transactions in DB")
 
-        # Reclassify on-the-fly (current classifier, not stored category)
         by_cat_month: dict = defaultdict(lambda: defaultdict(float))
         by_sub_month: dict = defaultdict(float)
-        bank_upi_batch: dict = defaultdict(float)   # Rent Income
-        bank_direct:    dict = defaultdict(float)   # Other bank income
+        bank_upi_batch: dict = defaultdict(float)
+        bank_direct:    dict = defaultdict(float)
 
         for r in txn_rows:
             m = r.txn_date.strftime("%Y-%m")
@@ -334,7 +340,6 @@ async def download_pnl_excel(
                 by_cat_month[cat][m] += float(r.amount)
                 by_sub_month[(cat, sub, m)] += float(r.amount)
 
-        # Cash payments from DB (not deposited to bank) — rent only
         cash_rows = await session.execute(
             select(
                 func.to_char(Payment.period_month, "YYYY-MM"),
@@ -354,7 +359,7 @@ async def download_pnl_excel(
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
-    filename = f"PnL_Cozeevo_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
+    filename = f"PnL_Live_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

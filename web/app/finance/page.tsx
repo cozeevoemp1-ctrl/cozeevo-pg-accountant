@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { getFinancePnl, getDepositReconciliation, downloadPnlExcel, FinanceMonthData, FinanceUploadResult, DepositReconcileRow } from "@/lib/api"
+import { getFinancePnl, getDepositReconciliation, downloadPnlExcel, downloadPnlLive, FinanceMonthData, FinanceUploadResult, DepositReconcileRow } from "@/lib/api"
 import { KpiTiles, IncomeCard, ExpenseCard } from "@/components/finance/pnl-cards"
 import { UploadCard } from "@/components/finance/upload-card"
 import { ReconcileCard } from "@/components/finance/reconcile-card"
@@ -37,6 +37,7 @@ export default function FinancePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [downloading, setDownloading] = useState(false)
+  const [downloadingLive, setDownloadingLive] = useState(false)
 
   // Admin gate — client-side check
   useEffect(() => {
@@ -73,6 +74,17 @@ export default function FinancePage() {
       setError(e instanceof Error ? e.message : "Download failed")
     } finally {
       setDownloading(false)
+    }
+  }
+
+  async function handleDownloadLive() {
+    setDownloadingLive(true)
+    try {
+      await downloadPnlLive()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Download failed")
+    } finally {
+      setDownloadingLive(false)
     }
   }
 
@@ -124,15 +136,25 @@ export default function FinancePage() {
       {/* Upload */}
       <UploadCard onUploaded={handleUploaded} />
 
-      {/* Download */}
-      <button
-        type="button"
-        onClick={handleDownload}
-        disabled={downloading}
-        className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70"
-      >
-        {downloading ? "Preparing…" : "↓ Download Excel Report"}
-      </button>
+      {/* Downloads */}
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70"
+        >
+          {downloading ? "Preparing…" : "↓ P&L Report (Oct'25–Apr'26)"}
+        </button>
+        <button
+          type="button"
+          onClick={handleDownloadLive}
+          disabled={downloadingLive}
+          className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70 text-ink-muted"
+        >
+          {downloadingLive ? "Recalculating…" : "↓ Recalculate from Latest Uploads"}
+        </button>
+      </div>
 
       {error && (
         <p className="text-[10px] text-status-warn font-medium text-center">{error}</p>
