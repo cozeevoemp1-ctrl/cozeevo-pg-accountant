@@ -17,8 +17,8 @@ interface ConfirmationCardProps {
 
 export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = false, error }: ConfirmationCardProps) {
   return (
-    <div className="fixed inset-0 flex items-end justify-center bg-black/40" style={{ zIndex: 9999 }}>
-      <div className="w-full max-w-md bg-surface rounded-t-[28px] shadow-2xl flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4" style={{ zIndex: 9999 }}>
+      <div className="w-full max-w-md bg-surface rounded-[28px] shadow-2xl flex flex-col max-h-[85vh]">
         <div className="px-6 pt-5 shrink-0">
           <div className="w-10 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5" />
           <h2 className="text-lg font-extrabold text-ink mb-4">{title}</h2>
@@ -43,7 +43,7 @@ export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = f
           )}
         </div>
 
-        <div className="px-6 pt-3 pb-10 shrink-0">
+        <div className="px-6 pt-3 pb-6 shrink-0">
           <button
             onClick={onConfirm}
             disabled={loading}
