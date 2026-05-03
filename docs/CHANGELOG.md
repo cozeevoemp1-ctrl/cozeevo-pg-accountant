@@ -2,6 +2,33 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.0] — 2026-05-03 — Finance / P&L page: CSV upload, P&L dashboard, Excel download, deposit reconciliation
+
+### Added
+- **`src/parsers/yes_bank.py`** — `read_yes_bank_csv()` parser extracted from `export_classified.py`; accepts str path, bytes, or file-like IO
+- **`src/api/v2/finance.py`** — 4 new endpoints (admin-only):
+  - `POST /finance/upload` — multi-file CSV upload (THOR/HULK account selector), classify + dedup via SHA256 hash, auto-reconcile deposit refunds on upload
+  - `GET /finance/pnl?month=YYYY-MM` — income (bank UPI batch + direct/NEFT + DB cash) + expenses by category + capital + operating profit + margin %
+  - `GET /finance/pnl/excel?from=&to=` — 3-sheet Excel download (Monthly P&L, Sub-category Breakdown, All Transactions) matching existing report format
+  - `GET /finance/reconcile?month=YYYY-MM` — deposit refund rows with matched/unmatched status and tenant name
+- **`web/app/finance/page.tsx`** — Finance dashboard: month picker, KPI tiles, income/expense cards, upload card, reconciliation card, Excel download button
+- **`web/components/finance/pnl-cards.tsx`** — `KpiTiles`, `IncomeCard`, `ExpenseCard`
+- **`web/components/finance/upload-card.tsx`** — THOR/HULK selector + multi-file CSV upload
+- **`web/components/finance/reconcile-card.tsx`** — deposit refund rows with matched(green)/unmatched(orange) badges
+- **`web/app/page.tsx`** — admin-only Finance & P&L quick link on home page
+
+### Changed
+- **`src/database/models.py`** — `BankUpload` + `BankTransaction` get `account_name VARCHAR(20) DEFAULT 'THOR'`; `BankTransaction` gets `reconciled_checkout_id` nullable FK → `checkout_records.id`
+- **`src/database/migrate_all.py`** — 3 new migration entries appended
+- **`scripts/export_classified.py`** — imports `parse_date`, `parse_amt`, `read_yes_bank_csv` from new parser module (no logic change)
+- **`web/lib/api.ts`** — finance API client: `uploadBankCsv`, `getFinancePnl`, `downloadPnlExcel`, `getDepositReconciliation` + 6 TypeScript interfaces
+
+### Deployed
+- All 3 DB migrations applied on VPS (account_name × 2 + reconciled_checkout_id)
+- API + PWA restarted and healthy
+
+---
+
 ## [1.74.38] — 2026-05-03 — PWA edge case fixes: validation, audit log, email pre-fill, checkout guards
 
 ### Fixed
