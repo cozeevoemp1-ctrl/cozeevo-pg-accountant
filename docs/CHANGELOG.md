@@ -21,6 +21,17 @@ All notable changes to PG Accountant will be documented here.
 
 ---
 
+## [1.75.4] — 2026-05-03 — PWA: force delete fix + check-in date edit + upcoming booking badge
+
+### Fixed
+- **Force delete** — payments in frozen months (April etc.) caused "FROZEN" DB trigger error; now sets `SET LOCAL app.allow_historical_write = 'true'` before voiding, so force delete works for any tenant regardless of payment period
+
+### Added
+- **Check-in date field in Edit Tenant** — pre-filled from DB, editable, appears in Stay Details section above Lock-in; saves via PATCH; shows in confirmation card when changed
+- **Upcoming booking badge on Vacant Beds panel** — rooms with future no-show bookings (checkin_date > today) now show amber "Booked DD Mon" badge; bed still counts as vacant until that date
+
+---
+
 ## [1.75.2] — 2026-05-03 — PWA: delete tenant from edit page (reason + force delete)
 
 ### Added
