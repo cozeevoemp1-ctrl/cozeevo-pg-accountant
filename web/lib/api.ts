@@ -542,3 +542,80 @@ export function getPaymentHistory(tenancyId?: number, limit = 30): Promise<Payme
 export function editPayment(paymentId: number, body: PaymentEditBody): Promise<PaymentListItem> {
   return _patch<PaymentListItem>(`/api/v2/app/payments/${paymentId}`, body);
 }
+
+// ── Finance ──────────────────────────────────────────────────────────────────
+
+export interface FinanceIncomeBreakdown {
+  upi_batch: number;
+  direct_neft: number;
+  cash_db: number;
+  total: number;
+}
+
+export interface FinanceExpenseRow {
+  category: string;
+  amount: number;
+}
+
+export interface FinanceMonthData {
+  month: string;
+  income: FinanceIncomeBreakdown;
+  capital: number;
+  expenses: FinanceExpenseRow[];
+  total_expense: number;
+  operating_profit: number;
+  margin_pct: number;
+}
+
+export interface FinancePnlResponse {
+  months: string[];
+  data: Record<string, FinanceMonthData>;
+}
+
+export interface FinanceUploadResult {
+  months_affected: string[];
+  new_count: number;
+  duplicate_count: number;
+}
+
+export async function uploadBankCsv(
+  files: File[],
+  accountName: "THOR" | "HULK",
+): Promise<FinanceUploadResult> {
+  const headers = await _authHeaders();
+  const form = new FormData();
+  files.forEach((f) => form.append("files", f));
+  form.append("account_name", accountName);
+  const res = await fetch(`${BASE_URL}/api/v2/app/finance/upload`, {
+    method: "POST",
+    headers,  // no Content-Type — browser sets multipart boundary automatically
+    body: form,
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `Upload failed: ${res.status}`);
+  }
+  return res.json() as Promise<FinanceUploadResult>;
+}
+
+export async function getFinancePnl(month?: string): Promise<FinancePnlResponse> {
+  const qs = month ? `?month=${month}` : "";
+  return _get<FinancePnlResponse>(`/api/v2/app/finance/pnl${qs}`);
+}
+
+export async function downloadPnlExcel(fromMonth?: string, toMonth?: string): Promise<void> {
+  const headers = await _authHeaders();
+  const params = new URLSearchParams();
+  if (fromMonth) params.set("from", fromMonth);
+  if (toMonth) params.set("to", toMonth);
+  const qs = params.size ? "?" + params.toString() : "";
+  const url = `${BASE_URL}/api/v2/app/finance/pnl/excel${qs}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Excel download failed: ${res.status}`);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `PnL_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
