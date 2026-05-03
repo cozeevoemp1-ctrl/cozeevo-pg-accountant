@@ -128,11 +128,14 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Check-ins today
+        # Check-ins today — only no_show tenants (pending physical arrival)
         checkins_today = int(
             await session.scalar(
                 select(func.count(Tenancy.id))
-                .where(Tenancy.checkin_date == today)
+                .where(
+                    Tenancy.checkin_date == today,
+                    Tenancy.status == TenancyStatus.no_show,
+                )
             ) or 0
         )
 
@@ -217,7 +220,10 @@ async def get_kpi_detail(
                 select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date, Tenancy.agreed_rent, Tenancy.stay_type)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
-                .where(Tenancy.checkin_date == today)
+                .where(
+                    Tenancy.checkin_date == today,
+                    Tenancy.status == TenancyStatus.no_show,
+                )
                 .order_by(Room.room_number)
             )).all()
             return {"type": type, "items": [
