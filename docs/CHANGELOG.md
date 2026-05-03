@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.3] — 2026-05-03 — May 2026 payment import from source sheet (Z/AA columns)
+
+### Data
+- **Source sheet columns Z (MAY UPI) + AA (MAY Cash)** identified as May 2026 collection data added by Kiran to the April source sheet (1Vr_...)
+- **24 missing May rent payments imported** — 10 cash ₹2,14,850 + 14 UPI ₹2,01,000; script skipped 12 already in DB
+- **Ajay Mohan (room 516) ₹37,000 cash** added manually — duplicate tenant record (id=920 vs 921, same phone) caused import script to hit wrong record; duplicate deleted
+- **May 2026 sheet resynced** — Ops Sheet now shows Cash ₹3,67,850 / UPI ₹3,01,000 / Total ₹6,68,850
+- **4 pending onboarding sessions bulk-cancelled** (Delvin Raj, + 3 pending_tenant)
+- **Duplicate Ajay Mohan tenant (id=920) deleted** — no tenancy, safe removal
+
+### Added
+- `scripts/_import_may_payments.py` — reusable script to import monthly cash/UPI payments from source sheet columns by index; dry-run + --write; detects room mismatches + missing tenants
+
+### Outstanding (not imported)
+- Chandraprakash (G20) ₹28,000 cash + ₹5,000 UPI — no tenant in DB; blocked pending G20 room reclassification
+- Delvin Raj — room 520 full (2/2); needs room reassignment before onboarding
+
+---
+
 ## [1.75.2] — 2026-05-03 — PWA: delete tenant from edit page (reason + force delete)
 
 ### Added
