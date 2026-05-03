@@ -1267,6 +1267,7 @@ class BankTransaction(Base):
     unique_hash   = Column(String(64), nullable=True)       # SHA-256 dedup fingerprint
     created_at    = Column(DateTime, default=datetime.utcnow)
     account_name  = Column(String(20), default="THOR")   # copied from upload
+    reconciled_checkout_id = Column(Integer, ForeignKey("checkout_records.id"), nullable=True)
 
     upload = relationship("BankUpload", back_populates="transactions")
 

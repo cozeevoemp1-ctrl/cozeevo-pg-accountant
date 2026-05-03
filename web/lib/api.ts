@@ -166,6 +166,7 @@ export interface TenantDues {
   tenant_id: number;
   name: string;
   phone: string;
+  email: string;
   room_number: string;
   building_code: string;
   rent: number;
@@ -601,6 +602,20 @@ export async function uploadBankCsv(
 export async function getFinancePnl(month?: string): Promise<FinancePnlResponse> {
   const qs = month ? `?month=${month}` : "";
   return _get<FinancePnlResponse>(`/api/v2/app/finance/pnl${qs}`);
+}
+
+export interface DepositReconcileRow {
+  txn_id: number;
+  txn_date: string;
+  amount: number;
+  status: "matched" | "unmatched";
+  tenant: string | null;
+  checkout_id: number | null;
+}
+
+export async function getDepositReconciliation(month?: string): Promise<{ rows: DepositReconcileRow[] }> {
+  const qs = month ? `?month=${month}` : "";
+  return _get(`/api/v2/app/finance/reconcile${qs}`);
 }
 
 export async function downloadPnlExcel(fromMonth?: string, toMonth?: string): Promise<void> {

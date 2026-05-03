@@ -23,7 +23,10 @@ from sqlalchemy import func, select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import BankTransaction, BankUpload, Payment, PaymentFor, PaymentMode
+from src.database.models import (
+    BankTransaction, BankUpload, CheckoutRecord, Payment, PaymentFor, PaymentMode,
+    Tenancy, Tenant,
+)
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.rules.pnl_classify import classify_txn
 
@@ -50,6 +53,39 @@ def _require_admin(user: AppUser):
 def _make_hash(txn_date: date, amount: float, desc: str) -> str:
     key = f"{txn_date}|{round(float(amount), 2):.2f}|{desc.strip().lower()}"
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+async def _auto_reconcile(session):
+    """
+    For every bank_transaction with category='Tenant Deposit Refund' and no
+    reconciled_checkout_id yet, try to match to a checkout_records row by:
+      - amount within ±1 rupee
+      - deposit_refund_date within ±7 days of txn_date
+    """
+    import datetime as _dt
+
+    unmatched = (await session.scalars(
+        select(BankTransaction).where(
+            BankTransaction.category == "Tenant Deposit Refund",
+            BankTransaction.reconciled_checkout_id == None,
+        )
+    )).all()
+
+    for txn in unmatched:
+        window_start = txn.txn_date - _dt.timedelta(days=7)
+        window_end   = txn.txn_date + _dt.timedelta(days=7)
+        match = await session.scalar(
+            select(CheckoutRecord).where(
+                CheckoutRecord.deposit_refunded_amount.between(
+                    float(txn.amount) - 1, float(txn.amount) + 1
+                ),
+                CheckoutRecord.deposit_refund_date.between(window_start, window_end),
+            )
+        )
+        if match:
+            txn.reconciled_checkout_id = match.id
+
+    await session.flush()
 
 
 def _validate_month(m: str, param: str = "month"):
@@ -126,6 +162,7 @@ async def upload_bank_csv(
             upload.new_count = new_count
             total_new += new_count
 
+        await _auto_reconcile(session)
         await session.commit()
 
     return {
@@ -468,3 +505,57 @@ def _build_excel(classified: list) -> openpyxl.Workbook:
     ws3.freeze_panes = "A2"
 
     return wb
+
+
+# ── Deposit Reconciliation ─────────────────────────────────────────────────────
+
+@router.get("/finance/reconcile")
+async def get_deposit_reconciliation(
+    month: Optional[str] = Query(None),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    if month:
+        _validate_month(month)
+
+    async with get_session() as session:
+        q = select(BankTransaction).where(
+            BankTransaction.category == "Tenant Deposit Refund"
+        ).order_by(BankTransaction.txn_date.desc())
+
+        if month:
+            y, mo = int(month[:4]), int(month[5:7])
+            start = date(y, mo, 1)
+            end   = date(y, mo, _calendar.monthrange(y, mo)[1])
+            q = q.where(BankTransaction.txn_date.between(start, end))
+
+        txns = (await session.scalars(q)).all()
+
+        rows = []
+        for t in txns:
+            tenant_name = None
+            if t.reconciled_checkout_id:
+                cr = await session.scalar(
+                    select(CheckoutRecord).where(CheckoutRecord.id == t.reconciled_checkout_id)
+                )
+                if cr:
+                    tenancy = await session.scalar(
+                        select(Tenancy).where(Tenancy.id == cr.tenancy_id)
+                    )
+                    if tenancy:
+                        tenant = await session.scalar(
+                            select(Tenant).where(Tenant.id == tenancy.tenant_id)
+                        )
+                        if tenant:
+                            tenant_name = tenant.name
+
+            rows.append({
+                "txn_id":      t.id,
+                "txn_date":    t.txn_date.isoformat(),
+                "amount":      float(t.amount),
+                "status":      "matched" if t.reconciled_checkout_id else "unmatched",
+                "tenant":      tenant_name,
+                "checkout_id": t.reconciled_checkout_id,
+            })
+
+    return {"rows": rows}

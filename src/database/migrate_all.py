@@ -65,6 +65,8 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
     # Finance — bank account tagging (added 2026-05-02)
     ("bank_uploads",       "account_name",  "VARCHAR(20) DEFAULT 'THOR'"),
     ("bank_transactions",  "account_name",  "VARCHAR(20) DEFAULT 'THOR'"),
+    # Deposit reconciliation (added 2026-05-02)
+    ("bank_transactions", "reconciled_checkout_id", "INTEGER REFERENCES checkout_records(id)"),
 ]
 
 # -- Tables to create if missing -----------------------------------------------

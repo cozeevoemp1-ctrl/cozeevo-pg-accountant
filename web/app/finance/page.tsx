@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { getFinancePnl, downloadPnlExcel, FinanceMonthData, FinanceUploadResult } from "@/lib/api"
+import { getFinancePnl, getDepositReconciliation, downloadPnlExcel, FinanceMonthData, FinanceUploadResult, DepositReconcileRow } from "@/lib/api"
 import { KpiTiles, IncomeCard, ExpenseCard } from "@/components/finance/pnl-cards"
 import { UploadCard } from "@/components/finance/upload-card"
+import { ReconcileCard } from "@/components/finance/reconcile-card"
 import { supabase } from "@/lib/supabase"
 
 function prevMonth(m: string): string {
@@ -32,6 +33,7 @@ export default function FinancePage() {
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   )
   const [data, setData] = useState<FinanceMonthData | null>(null)
+  const [reconcileRows, setReconcileRows] = useState<DepositReconcileRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [downloading, setDownloading] = useState(false)
@@ -48,10 +50,14 @@ export default function FinancePage() {
     setLoading(true)
     setError("")
     try {
-      const res = await getFinancePnl(m)
-      setData(res.data[m] ?? null)
+      const [pnlRes, reconcileRes] = await Promise.all([
+        getFinancePnl(m),
+        getDepositReconciliation(m),
+      ])
+      setData(pnlRes.data[m] ?? null)
+      setReconcileRows(reconcileRes.rows)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load P&L")
+      setError(e instanceof Error ? e.message : "Failed to load")
     } finally {
       setLoading(false)
     }
@@ -111,6 +117,7 @@ export default function FinancePage() {
           <KpiTiles data={data} />
           <IncomeCard data={data} />
           <ExpenseCard data={data} />
+          <ReconcileCard rows={reconcileRows} />
         </>
       )}
 
