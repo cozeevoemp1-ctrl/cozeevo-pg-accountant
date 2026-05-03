@@ -317,6 +317,15 @@ export function patchTenant(tenancyId: number, body: PatchTenantBody): Promise<P
   return _patch<PatchTenantResponse>(`/api/v2/app/tenants/${tenancyId}`, body);
 }
 
+export async function deleteTenant(tenancyId: number): Promise<void> {
+  const headers = await _authHeaders();
+  const res = await fetch(`${BASE_URL}/api/v2/app/tenants/${tenancyId}`, { method: "DELETE", headers });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `DELETE failed: ${res.status}`);
+  }
+}
+
 // ── Room Transfer ─────────────────────────────────────────────────────────────
 
 export interface RoomCheckResult {

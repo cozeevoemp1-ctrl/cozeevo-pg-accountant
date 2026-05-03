@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
-import { getTenantDues, patchTenant, TenantDues, PatchTenantBody } from "@/lib/api"
+import { getTenantDues, patchTenant, deleteTenant, TenantDues, PatchTenantBody } from "@/lib/api"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -56,6 +56,9 @@ export default function EditTenantPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const [prorateChoice, setProrateChoice] = useState<"full" | "prorated">("full")
+  const [deleteWarned, setDeleteWarned] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState("")
 
   useEffect(() => {
     if (!tenancyId) return
@@ -172,6 +175,25 @@ export default function EditTenantPage() {
       setError(err instanceof Error ? err.message : "Update failed. Try again.")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleteError("")
+    if (!deleteWarned) {
+      setDeleteWarned(true)
+      setDeleteError("This will permanently delete the tenant. Tap Delete again to confirm.")
+      return
+    }
+    setDeleting(true)
+    try {
+      await deleteTenant(tenancyId)
+      router.push("/tenants")
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed.")
+      setDeleteWarned(false)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -485,6 +507,26 @@ export default function EditTenantPage() {
         </div>
 
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
+
+        {/* Delete — admin danger zone */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-2">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Danger Zone</p>
+          {deleteError && (
+            <p className="text-xs text-status-warn font-medium">{deleteError}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className={`rounded-pill border py-2.5 text-sm font-bold w-full transition-colors ${
+              deleteWarned
+                ? "border-red-500 bg-red-500 text-white"
+                : "border-red-400 text-red-500"
+            } disabled:opacity-40`}
+          >
+            {deleting ? "Deleting…" : deleteWarned ? "Confirm Delete" : "Delete Tenant"}
+          </button>
+        </div>
       </div>
 
       {/* Sticky CTA */}

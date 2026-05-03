@@ -538,3 +538,46 @@ async def transfer_room(
         if result["success"]:
             await session.commit()
     return result
+
+
+@router.delete("/tenants/{tenancy_id}")
+async def delete_tenant(
+    tenancy_id: int,
+    _user: AppUser = Depends(get_current_user),
+):
+    """
+    Hard-delete a tenancy + tenant iff they have zero non-voided payments.
+    Refuse with 409 if any payment records exist — use checkout flow instead.
+    """
+    async with get_session() as session:
+        row = (await session.execute(
+            select(Tenancy, Tenant)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .where(Tenancy.id == tenancy_id)
+        )).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Tenancy not found")
+        tenancy, tenant = row
+
+        payment_count = await session.scalar(
+            select(func.count()).select_from(Payment)
+            .where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
+        )
+        if payment_count and payment_count > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot delete — {payment_count} payment record(s) exist. Use checkout instead.",
+            )
+
+        await session.delete(tenancy)
+        # Delete tenant only if they have no other tenancies
+        other = await session.scalar(
+            select(func.count()).select_from(Tenancy)
+            .where(Tenancy.tenant_id == tenant.id, Tenancy.id != tenancy_id)
+        )
+        if not other:
+            await session.delete(tenant)
+
+        await session.commit()
+
+    return {"deleted": True, "tenancy_id": tenancy_id}
