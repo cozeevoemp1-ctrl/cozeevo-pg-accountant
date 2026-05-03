@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.74.38] — 2026-05-03 — PWA edge case fixes: validation, audit log, email pre-fill, checkout guards
+
+### Fixed
+- **`src/api/v2/tenants.py`** — PATCH endpoint:
+  - Phone uniqueness: checks for duplicate before writing; returns 409 with clear message instead of silent DB constraint crash
+  - AuditLog entry now written on room change via edit page (was missing — only `/transfer-room` logged it)
+  - Floor validation: `agreed_rent` must be > 0; `security_deposit`, `maintenance_fee`, `lock_in_months` cannot be negative — returns 422
+  - `email` added to `GET /tenants/{id}/dues` response so edit page can pre-fill it
+  - Imported `AuditLog` model (was missing from imports)
+- **`src/api/onboarding_router.py`** — `/create` endpoint: same floor checks for `agreed_rent`, `security_deposit`, `maintenance_fee`, `daily_rate`
+- **`services/room_transfer.py`** — `execute_room_transfer()`: RS update now runs on every room transfer (was only when rent changed); applies prorated `remaining_days / days_in_month` math instead of always writing full rent
+- **`web/app/tenants/[tenancy_id]/edit/page.tsx`**:
+  - "Review Changes" CTA disabled (`opacity-40`, `cursor-not-allowed`) when destination room is full
+  - Email field pre-filled from API response on load
+- **`web/app/checkout/new/page.tsx`**:
+  - Deductions > deposit shows inline warning ("surplus not charged, refund will be ₹0")
+  - Unpaid dues gate: first tap shows warning + blocks; second tap proceeds (two-tap confirm pattern)
+  - Added `duesWarned` state, reset on tenant change
+- **`web/lib/api.ts`** — `TenantDues` interface: added `email: string` field
+
+---
+
 ## [1.74.37] — 2026-05-03 — PWA UX: KPI overlay panels + instant open + recent payments search/sort
 
 ### Changed

@@ -13,6 +13,7 @@ from sqlalchemy import and_, func, or_, select
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
+    AuditLog,
     Payment,
     PaymentFor,
     Property,
@@ -227,6 +228,7 @@ async def get_tenant_dues(
         "tenant_id": tenant.id,
         "name": tenant.name,
         "phone": tenant.phone,
+        "email": tenant.email or "",
         "room_number": room.room_number,
         "building_code": _building_code(prop.name),
         "rent": rent,
@@ -267,6 +269,16 @@ async def update_tenant(
 
     tenancy, tenant = result
 
+    # Floor / ceiling checks — reject bad values before touching DB
+    if "agreed_rent" in body and float(body["agreed_rent"]) <= 0:
+        raise HTTPException(status_code=422, detail="agreed_rent must be > 0")
+    if "security_deposit" in body and float(body["security_deposit"]) < 0:
+        raise HTTPException(status_code=422, detail="security_deposit cannot be negative")
+    if "maintenance_fee" in body and float(body["maintenance_fee"]) < 0:
+        raise HTTPException(status_code=422, detail="maintenance_fee cannot be negative")
+    if "lock_in_months" in body and int(body["lock_in_months"]) < 0:
+        raise HTTPException(status_code=422, detail="lock_in_months cannot be negative")
+
     async with get_session() as session:
         # Re-fetch within the write session so SQLAlchemy tracks changes
         row2 = await session.execute(
@@ -297,7 +309,20 @@ async def update_tenant(
         if "name" in body:
             tenant.name = body["name"]
         if "phone" in body:
-            tenant.phone = body["phone"]
+            new_phone = body["phone"]
+            if new_phone and new_phone != tenant.phone:
+                conflict = await session.scalar(
+                    select(Tenant.id).where(
+                        Tenant.phone == new_phone,
+                        Tenant.id != tenant.id,
+                    )
+                )
+                if conflict:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Phone {new_phone} is already registered to another tenant.",
+                    )
+            tenant.phone = new_phone
         if "email" in body:
             tenant.email = body["email"]
         if "tenant_notes" in body:
@@ -347,12 +372,27 @@ async def update_tenant(
                         detail=f"Room {new_rn} is full ({active_in_new}/{new_room.max_occupancy} beds)",
                     )
                 tenancy.room_id = new_room.id
+                _from_room = room.room_number
                 room = new_room
                 # Sync sharing_type to match new room's type
                 try:
                     tenancy.sharing_type = SharingType(new_room.room_type.value)
                 except (ValueError, AttributeError):
                     pass
+
+                session.add(AuditLog(
+                    changed_by=user.user_id or "pwa",
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="room_id",
+                    old_value=_from_room,
+                    new_value=new_rn,
+                    room_number=new_rn,
+                    source="pwa",
+                    note=f"Room change: {_from_room} → {new_rn}",
+                    org_id=tenancy.org_id,
+                ))
 
                 # Update current month RS — honour prorate_this_month choice if sent
                 import calendar as _cal

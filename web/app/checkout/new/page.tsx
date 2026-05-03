@@ -91,6 +91,7 @@ function NewCheckoutPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitting,  setSubmitting]  = useState(false)
   const [error,       setError]       = useState("")
+  const [duesWarned,  setDuesWarned]  = useState(false)
   const [result,      setResult]      = useState<CheckoutCreateResponse | null>(null)
   const [pollStatus,  setPollStatus]  = useState("")
 
@@ -194,6 +195,11 @@ function NewCheckoutPage() {
     if (!tenant)   { setError("Select a tenant first"); return }
     if (!prefetch) { setError("Loading tenant details…"); return }
     if (refundAmount > 0 && !refundMode) { setError("Select refund mode"); return }
+    if (totalPendingDues > 0 && !duesWarned) {
+      setError(`Tenant has ₹${totalPendingDues.toLocaleString("en-IN")} unpaid dues. Tap again to proceed anyway.`)
+      setDuesWarned(true)
+      return
+    }
     setShowConfirm(true)
   }
 
@@ -235,6 +241,7 @@ function NewCheckoutPage() {
     setRoomKey(false); setWardrobeKey(false)
     setBiometric(false); setConditionOk(true); setDamageNotes("")
     setRefundOverride(null); setShowRefundOverride(false); setRefundOverrideVal("0")
+    setDuesWarned(false)
     setCheckoutTime(nowTime())
     setResult(null); setPollStatus(""); setError("")
   }
@@ -568,6 +575,11 @@ function NewCheckoutPage() {
                 onChange={(v) => setDeductions(v || "0")}
                 suggestAmounts={[]}
               />
+              {deductionsNum > prefetch.security_deposit && (
+                <p className="text-xs text-status-warn font-semibold mt-2 px-1">
+                  Deductions ({fmtINR(deductionsNum)}) exceed deposit ({fmtINR(prefetch.security_deposit)}) — refund will be ₹0 and surplus is not charged
+                </p>
+              )}
               <input
                 type="text"
                 value={deductionReason}

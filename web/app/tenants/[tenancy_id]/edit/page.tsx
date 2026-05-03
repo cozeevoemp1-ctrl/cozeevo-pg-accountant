@@ -64,6 +64,7 @@ export default function EditTenantPage() {
         setOriginal(d)
         setName(d.name)
         setPhone(d.phone)
+        setEmail(d.email || "")
         setRoomNumber(d.room_number)
         setAgreedRent(String(d.rent))
         setSecurityDeposit(String(d.security_deposit))
@@ -490,7 +491,8 @@ export default function EditTenantPage() {
       <div className="fixed bottom-[80px] left-0 right-0 px-4 pb-2 pt-3 bg-bg border-t border-[#F0EDE9]">
         <button
           onClick={handleReview}
-          className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80"
+          disabled={!!roomInfo?.is_full}
+          className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Review Changes →
         </button>

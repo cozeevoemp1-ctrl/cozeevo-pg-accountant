@@ -95,15 +95,25 @@ async def execute_room_transfer(
             changed_by=changed_by,
             reason=f"Room transfer: {from_room} → {to_room_number}",
         ))
-        # Update current month RentSchedule if it exists
-        rs = await session.scalar(
-            select(RentSchedule).where(
-                RentSchedule.tenancy_id == tenancy_id,
-                RentSchedule.period_month == today.replace(day=1),
-            )
+
+    # Always update current month RS on room transfer — prorate by remaining days
+    import calendar as _cal
+    rs = await session.scalar(
+        select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy_id,
+            RentSchedule.period_month == today.replace(day=1),
         )
-        if rs:
-            rs.rent_due = Decimal(str(resolved_rent))
+    )
+    if rs:
+        period = today.replace(day=1)
+        is_first_month = tenancy.checkin_date and tenancy.checkin_date.replace(day=1) == period
+        if is_first_month:
+            # First month: keep whatever proration was set at checkin; just update rent cap
+            rs.rent_due = min(rs.rent_due, Decimal(str(resolved_rent)))
+        else:
+            dim = _cal.monthrange(today.year, today.month)[1]
+            remaining = dim - today.day + 1
+            rs.rent_due = Decimal(str(int(resolved_rent * remaining / dim)))
 
     if extra_deposit and extra_deposit > 0:
         tenancy.security_deposit = (tenancy.security_deposit or Decimal("0")) + Decimal(str(extra_deposit))

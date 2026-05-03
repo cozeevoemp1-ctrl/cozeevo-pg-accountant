@@ -157,6 +157,16 @@ async def create_session(req: CreateSessionRequest, request: Request):
     if req.booking_amount > 0 and not req.advance_mode:
         raise HTTPException(400, "Payment method (cash/upi) required when booking amount > 0")
 
+    # Floor checks
+    if req.agreed_rent <= 0:
+        raise HTTPException(422, "agreed_rent must be > 0")
+    if req.security_deposit < 0:
+        raise HTTPException(422, "security_deposit cannot be negative")
+    if req.maintenance_fee < 0:
+        raise HTTPException(422, "maintenance_fee cannot be negative")
+    if req.daily_rate < 0:
+        raise HTTPException(422, "daily_rate cannot be negative")
+
     async with get_session() as session:
         # Auto-cancel old pending sessions for same tenant phone
         if req.tenant_phone:
