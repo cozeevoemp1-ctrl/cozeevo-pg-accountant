@@ -131,6 +131,10 @@ Kiran's Excel (offline)
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
+| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation (admin-only) |
+| `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
+| `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
+| `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation (admin-only) |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations

@@ -2,6 +2,14 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.6] — 2026-05-03 — Finance fixes: dedup hash alignment + INR rupee format
+
+### Fixed
+- **`src/api/v2/finance.py`** — `_make_hash` formula now matches `finance_handler.py` exactly (`date|desc[:80]|amount`). Old formula had different field order (`date|amount|desc`), causing re-uploads of records already inserted via WhatsApp to create duplicates instead of being skipped.
+- **`src/utils/inr_format.py`** — `INR_NUMBER_FORMAT` updated to conditional format with ₹ symbol: `[>9999999][$₹]##\,##\,##\,##0;[>99999][$₹]##\,##\,##0;[$₹]##,##0`. Propagates automatically to Finance Excel download and `export_classified.py`.
+
+---
+
 ## [1.75.5] — 2026-05-03 — PWA stability fixes: login, room transfer, KPI totals
 
 ### Fixed
