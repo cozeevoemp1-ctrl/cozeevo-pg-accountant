@@ -1166,8 +1166,9 @@ class BankUpload(Base):
     new_count   = Column(Integer, default=0)               # new (non-duplicate) rows saved
     from_date   = Column(Date, nullable=True)              # earliest txn date in file
     to_date     = Column(Date, nullable=True)              # latest txn date in file
-    status      = Column(String(20), default="processed")  # processed | error
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    status        = Column(String(20), default="processed")  # processed | error
+    uploaded_at   = Column(DateTime, default=datetime.utcnow)
+    account_name  = Column(String(20), default="THOR")   # 'THOR' | 'HULK'
 
     transactions = relationship("BankTransaction", back_populates="upload")
 
@@ -1265,6 +1266,7 @@ class BankTransaction(Base):
     source        = Column(String(40), default="bank_statement")
     unique_hash   = Column(String(64), nullable=True)       # SHA-256 dedup fingerprint
     created_at    = Column(DateTime, default=datetime.utcnow)
+    account_name  = Column(String(20), default="THOR")   # copied from upload
 
     upload = relationship("BankUpload", back_populates="transactions")
 

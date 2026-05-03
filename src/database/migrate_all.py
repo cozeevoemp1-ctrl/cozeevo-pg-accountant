@@ -62,6 +62,9 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
     ("tenants", "office_phone",                   "VARCHAR(20)"),
     # Staff→room assignment (added 2026-04-20)
     ("staff",   "room_id",                        "INTEGER REFERENCES rooms(id)"),
+    # Finance — bank account tagging (added 2026-05-02)
+    ("bank_uploads",       "account_name",  "VARCHAR(20) DEFAULT 'THOR'"),
+    ("bank_transactions",  "account_name",  "VARCHAR(20) DEFAULT 'THOR'"),
 ]
 
 # -- Tables to create if missing -----------------------------------------------
