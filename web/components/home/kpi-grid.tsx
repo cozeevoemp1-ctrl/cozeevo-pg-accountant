@@ -266,6 +266,26 @@ function ExpansionPanel({
         </div>
       )}
 
+      {/* Totals bar — shown when there are filtered results */}
+      {!loading && filtered.length > 0 && (() => {
+        let label = "";
+        if (open === "dues") {
+          const total = filtered.reduce((s, it) => s + (it.dues ?? 0), 0);
+          label = `${filtered.length} tenants · ₹${total.toLocaleString("en-IN")} total`;
+        } else if (open === "vacant") {
+          label = `${filtered.length} vacant bed${filtered.length !== 1 ? "s" : ""}`;
+        } else if (open === "occupied") {
+          label = `${filtered.length} tenant${filtered.length !== 1 ? "s" : ""}`;
+        } else {
+          label = `${filtered.length} total`;
+        }
+        return (
+          <div className="px-3 py-1.5 bg-[#F6F5F0] border-b border-[#E8E4E0]">
+            <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">{label}</p>
+          </div>
+        );
+      })()}
+
       {/* Scrollable list */}
       <div className="overflow-y-auto px-3" style={{ maxHeight: "256px" }}>
         {loading ? (
