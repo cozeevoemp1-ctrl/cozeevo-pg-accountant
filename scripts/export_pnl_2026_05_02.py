@@ -90,8 +90,9 @@ opex = {
     # Manoj Apr bill (paid May) is outside window — flagged below.
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":        [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     10620,       0,       0,       0],
-    # Pre-Feb: bank; Feb+: amortised Rs.15,514/mo (Airwire + WiFi vendor prepay)
-    "Internet & WiFi (bank pre-Feb; Rs.15.5K/mo Feb+)":           [0, 0, 40946,    70952,   15514,   15514,   15514],
+    # Cash-basis: show when payments actually left bank. Jan: Airwire UPI Rs.70,730 (KIPINN Rs.10,620 in IT & Software).
+    # Feb: 8x Razorpay AIRWIREBROADBAND @ Rs.14,146 each = Rs.1,13,168. Mar-Dec 2026 = Rs.0 (prepaid). Next cycle Jan 2027.
+    "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 40946, 70730, 113168,       0,       0],
     # Apr: includes Rs.29,946 Prabhakaran NEFT (ninja cart veg) reclassified from Non-Op
     "Food & Groceries":                                           [0, 1086, 34435, 201558,  94931,  237747,  263625],
     # Apr: only Rs.2,800 petrol; no DG diesel visible — flagged ⚠
@@ -287,8 +288,7 @@ def main():
         ("Property Rent", "Rs.21,32,000/mo accrual Jan–Apr. Nov-Dec zero (notice period). Bank UPI portion replaced by full accrual."),
         ("Water — Manoj B (9535665407)", "Variable invoice, accrued in month of consumption, paid 1mo behind. Mar invoice = Rs.42,500. Apr invoice TBD."),
         ("Water — bank tankers", "Kept additive to Manoj accrual (not replacement). Apr: Himalaya Rs.42,000."),
-        ("Internet pre-Feb", "Bank classifier numbers kept as-is."),
-        ("Internet Feb+", "Airwire Rs.1.13L + WiFi Vendor Rs.1.04L = Rs.2.17L prepay / 14mo = Rs.15,514/mo (Feb 2026 – Mar 2027)."),
+        ("Internet & WiFi", "Cash-basis. Jan: Airwire Rs.70,730 (UPI). Feb: 8x Razorpay AIRWIREBROADBAND Rs.14,146 each = Rs.1,13,168. Mar–Dec 2026: Rs.0 (prepaid, next cycle Jan 2027). KIPINN Rs.10,620 (Jan, 6mo THOR) in IT & Software."),
         ("Police", "Rs.3,000/mo cash accrual Jan onwards."),
         ("Waste Disposal", "Rs.3,500/mo (Pavan 6366411789). Classifier catches it."),
         ("Apr reclassifications", "See script header for full list."),
