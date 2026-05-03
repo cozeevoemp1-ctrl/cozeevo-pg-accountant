@@ -8,7 +8,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, text
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -576,7 +576,10 @@ async def delete_tenant(
                 detail=f"Cannot delete — {len(payments)} payment record(s) exist. Use force delete to void them first.",
             )
 
-        # Void all payments before deleting (force path)
+        # Void all payments before deleting (force path).
+        # Payments may be in frozen months — bypass the freeze trigger for this session.
+        if payments:
+            await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
         for p in payments:
             p.is_void = True
 
