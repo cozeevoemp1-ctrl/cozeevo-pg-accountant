@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { Numpad } from "@/components/forms/numpad"
@@ -41,6 +41,7 @@ function currentMonth(): string {
 
 export default function NewPaymentPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [tenant, setTenant] = useState<TenantSearchResult | null>(null)
   const [dues, setDues] = useState<TenantDues | null>(null)
@@ -62,6 +63,27 @@ export default function NewPaymentPage() {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
   const [transactionId, setTransactionId] = useState<string | null>(null)
   const [lastPaymentId, setLastPaymentId] = useState<number | null>(null)
+
+  // Pre-fill from ?tenancy_id= (e.g. navigating from Recent Check-ins)
+  useEffect(() => {
+    const tid = searchParams.get("tenancy_id")
+    if (!tid) return
+    getTenantDues(Number(tid)).then((d) => {
+      const t: TenantSearchResult = {
+        tenancy_id: d.tenancy_id,
+        tenant_id: d.tenant_id,
+        name: d.name,
+        phone: d.phone,
+        room_number: d.room_number,
+        building_code: d.building_code,
+        rent: d.rent,
+        status: "active",
+      }
+      setTenant(t)
+      setDues(d)
+      if (d.dues > 0) setAmount(String(Math.round(d.dues)))
+    }).catch(() => {/* ignore */})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleTenantSelect(t: TenantSearchResult) {
     setTenant(t)

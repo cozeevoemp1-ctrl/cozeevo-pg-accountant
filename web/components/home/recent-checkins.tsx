@@ -37,7 +37,7 @@ export function RecentCheckins({ items }: RecentCheckinsProps) {
         return (
           <Link
             key={item.tenancy_id}
-            href={`/tenants/${item.tenancy_id}/edit`}
+            href={paid ? `/tenants/${item.tenancy_id}/edit` : `/payment/new?tenancy_id=${item.tenancy_id}`}
             className="flex items-center gap-3 py-3 active:opacity-70"
           >
             {/* Avatar */}
