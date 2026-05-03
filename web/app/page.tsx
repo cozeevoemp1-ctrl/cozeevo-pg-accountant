@@ -89,6 +89,20 @@ export default async function HomePage() {
         </Link>
       </div>
 
+      {/* Admin-only: Finance link */}
+      {session.role === "admin" && (
+        <Link href="/finance" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
+          <span className="text-base">📊</span>
+          <div className="flex-1">
+            <p className="text-xs font-bold text-ink">Finance & P&L</p>
+            <p className="text-[10px] text-ink-muted">Upload statements · Download Excel</p>
+          </div>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-tile-pink text-brand-pink uppercase">
+            Owner
+          </span>
+        </Link>
+      )}
+
       <section>
         <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
           Recent payments
