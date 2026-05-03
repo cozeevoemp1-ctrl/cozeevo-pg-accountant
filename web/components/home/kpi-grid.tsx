@@ -144,7 +144,7 @@ function ExpansionPanel({
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 items-center">
             {(["all", "THOR", "HULK"] as const).map((b) => (
               <button
                 key={b}
@@ -158,29 +158,39 @@ function ExpansionPanel({
                 {b === "all" ? "All" : b}
               </button>
             ))}
+            {!loading && filtered.length > 0 && (
+              <span className="ml-auto text-[10px] font-bold text-brand-pink">
+                ₹{filtered.reduce((s, it) => s + (it.dues ?? 0), 0).toLocaleString("en-IN")}
+              </span>
+            )}
           </div>
         </div>
       )}
 
       {/* Filter bar — occupied */}
       {open === "occupied" && (
-        <div className="px-3 pt-3 pb-2 flex gap-2">
-          <input
-            type="text"
-            placeholder="Name or room…"
-            value={nameSearch}
-            onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-            className="flex-1 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
-          />
-          <select
-            value={rentRange}
-            onChange={(e) => setRentRange(e.target.value as RentRange)}
-            className="text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-2 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-          >
-            {RENT_RANGES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+        <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Name or room…"
+              value={nameSearch}
+              onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+              className="flex-1 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            />
+            <select
+              value={rentRange}
+              onChange={(e) => setRentRange(e.target.value as RentRange)}
+              className="text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-2 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+            >
+              {RENT_RANGES.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+          {!loading && filtered.length > 0 && (
+            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} tenants</p>
+          )}
         </div>
       )}
 
@@ -194,7 +204,7 @@ function ExpansionPanel({
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 items-center">
             {STAY_FILTERS.map((sf) => (
               <button
                 key={sf.value}
@@ -208,13 +218,16 @@ function ExpansionPanel({
                 {sf.label}
               </button>
             ))}
+            {!loading && filtered.length > 0 && (
+              <span className="ml-auto text-[10px] font-bold text-brand-pink">{filtered.length} total</span>
+            )}
           </div>
         </div>
       )}
 
       {/* Filter bar — no_show */}
       {open === "no_show" && (
-        <div className="px-3 pt-3 pb-2">
+        <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
           <input
             type="text"
             placeholder="Name or room…"
@@ -222,12 +235,15 @@ function ExpansionPanel({
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
+          {!loading && filtered.length > 0 && (
+            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} total</p>
+          )}
         </div>
       )}
 
       {/* Filter bar — notices */}
       {open === "notices" && (
-        <div className="px-3 pt-3 pb-2">
+        <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
           <input
             type="text"
             placeholder="Name or room…"
@@ -235,6 +251,9 @@ function ExpansionPanel({
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
+          {!loading && filtered.length > 0 && (
+            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} total</p>
+          )}
         </div>
       )}
 
@@ -248,7 +267,7 @@ function ExpansionPanel({
             onChange={(e) => setRoomSearch(e.target.value)}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 items-center">
             {GENDER_FILTERS.map((gf) => (
               <button
                 key={gf.value}
@@ -262,29 +281,16 @@ function ExpansionPanel({
                 {gf.label}
               </button>
             ))}
+            {!loading && filtered.length > 0 && (() => {
+              const beds = filtered.reduce((s, it) => {
+                const m = it.detail.match(/^(\d+)/);
+                return s + (m ? parseInt(m[1]) : 1);
+              }, 0);
+              return <span className="ml-auto text-[10px] font-bold text-brand-pink">{beds} beds free</span>;
+            })()}
           </div>
         </div>
       )}
-
-      {/* Totals bar — shown when there are filtered results */}
-      {!loading && filtered.length > 0 && (() => {
-        let label = "";
-        if (open === "dues") {
-          const total = filtered.reduce((s, it) => s + (it.dues ?? 0), 0);
-          label = `${filtered.length} tenants · ₹${total.toLocaleString("en-IN")} total`;
-        } else if (open === "vacant") {
-          label = `${filtered.length} vacant bed${filtered.length !== 1 ? "s" : ""}`;
-        } else if (open === "occupied") {
-          label = `${filtered.length} tenant${filtered.length !== 1 ? "s" : ""}`;
-        } else {
-          label = `${filtered.length} total`;
-        }
-        return (
-          <div className="px-3 py-1.5 bg-[#F6F5F0] border-b border-[#E8E4E0]">
-            <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">{label}</p>
-          </div>
-        );
-      })()}
 
       {/* Scrollable list */}
       <div className="overflow-y-auto px-3" style={{ maxHeight: "256px" }}>
