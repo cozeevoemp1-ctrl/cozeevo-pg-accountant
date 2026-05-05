@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.10] — 2026-05-03 — Finance: shared P&L builder + two download buttons + DB fully loaded
+
+### Added
+- **`src/reports/pnl_builder.py`** — canonical P&L builder (hardcoded verified Oct'25–Apr'26 figures). Single source of truth shared by the local export script and the PWA API endpoint — both produce identical Excel output.
+- **`GET /finance/pnl/excel`** — now serves the verified canonical P&L from `pnl_builder.py` (not DB-computed). Same file as `data/reports/PnL_Accrual_2026_05_03.xlsx`.
+- **`GET /finance/pnl/live`** — new endpoint: recomputes P&L on-the-fly from DB, reclassifying all transactions with current classifier rules. Picks up any new CSV uploads (HULK, new months).
+- **PWA Finance page — two download buttons:**
+  - `↓ P&L Report (Oct'25–Apr'26)` — verified canonical, fast, no DB query
+  - `↓ Recalculate from Latest Uploads` — live from DB, picks up new statements
+
+### Changed
+- **`scripts/export_pnl_2026_05_02.py`** — now delegates to `pnl_builder.build_pnl_workbook()` (was duplicate code). Running locally produces identical output to downloading from the PWA.
+- **`scripts/import_thor_to_db.py`** — `ON CONFLICT (unique_hash) DO NOTHING` replaces manual hash-set pre-check; idempotent and safe to re-run.
+
+### Verified
+- **DB fully loaded**: THOR Oct'25–Apr'26 (all 7 months) confirmed in `bank_transactions`. Oct: 4 rows, Nov: 83, Dec: 209, Jan: 728, Feb: 488, Mar: 538, Apr: 520.
+
+---
+
 ## [1.75.9] — 2026-05-03 — PWA: Recent Check-ins home section + payment deep-link
 
 ### Added
