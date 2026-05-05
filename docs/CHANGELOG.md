@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.11] — 2026-05-05 — May 2026 payment import (bulk, from April source sheet)
+
+### Data
+- **May 2026 payments imported** — ran `scripts/_import_may_payments.py --write` against April source sheet (1Vr_...) columns Z (MAY UPI) / AA (MAY Cash)
+- **87 new payments committed**: Cash ₹7,85,450 + UPI ₹4,89,750 (54 already existed from prior run on 2026-05-03)
+- **1 RS auto-created** for T.Rakesh Chetan (room 415) — tenancy existed, no May rent_schedule row
+- **May sheet resynced** — `sync_sheet_from_db.py --write --month 5 --year 2026`; 271 rows, Cash ₹12,50,300 / UPI ₹11,00,750 / Collected ₹23,51,050 / Dues ₹18,54,887; 117 paid, 136 partial
+
+### Skipped (no DB match — handle separately)
+- Prakashita room 620 (+917275547390)
+- Chandraprakash room G20 (+919506064442) — blocked on G20 reclassification
+- Mathew Koshy room 304 (+919446655101)
+- Rama Krishnan room G09 (+919842378754)
+- Vijay Kumar (room listed "June" in sheet — data error)
+- Akshitha Jawahar room 214 (+919500006551)
+
+### Room mismatches (payment recorded to DB room)
+- Gayatri Kulkarni NM: sheet 514, DB 519
+- Ganesh Magi: sheet 418, DB 219
+
+---
+
 ## [1.75.10] — 2026-05-03 — Finance: shared P&L builder + two download buttons + DB fully loaded
 
 ### Added
