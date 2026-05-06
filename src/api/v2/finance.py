@@ -410,8 +410,31 @@ async def download_pnl_live(user: AppUser = Depends(get_current_user)):
         )
         cash_by_month: dict = {row[0]: float(row[1]) for row in cash_rows}
 
+        # Deposits received by check-in month (security + maintenance — liability inflows)
+        dep_recv_rows = await session.execute(
+            select(
+                func.to_char(func.date_trunc("month", Tenancy.checkin_date), "YYYY-MM"),
+                func.sum(Tenancy.security_deposit + Tenancy.maintenance_fee),
+            )
+            .where(Tenancy.status != "no_show")
+            .group_by(func.date_trunc("month", Tenancy.checkin_date))
+        )
+        dep_recv_by_month: dict = {row[0]: float(row[1]) for row in dep_recv_rows if row[0]}
+
+        # Deposit refunds paid by refund date
+        dep_ref_rows = await session.execute(
+            select(
+                func.to_char(func.date_trunc("month", CheckoutRecord.deposit_refund_date), "YYYY-MM"),
+                func.sum(CheckoutRecord.deposit_refunded_amount),
+            )
+            .where(CheckoutRecord.deposit_refunded_amount > 0)
+            .group_by(func.date_trunc("month", CheckoutRecord.deposit_refund_date))
+        )
+        dep_ref_by_month: dict = {row[0]: float(row[1]) for row in dep_ref_rows if row[0]}
+
     wb = _build_pnl_excel(all_months, bank_upi_batch, bank_direct, cash_by_month,
-                          by_cat_month, by_sub_month)
+                          by_cat_month, by_sub_month,
+                          dep_recv_by_month, dep_ref_by_month)
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -434,6 +457,8 @@ def _build_pnl_excel(
     all_months: list,
     bank_upi: dict, bank_direct: dict, cash_db: dict,
     by_cat: dict, by_sub: dict,
+    dep_recv: dict | None = None,
+    dep_ref: dict | None = None,
 ) -> openpyxl.Workbook:
     HDR_FILL  = PatternFill("solid", fgColor="1F4E78")
     HDR_FONT  = Font(bold=True, color="FFFFFF", size=10)
@@ -528,11 +553,18 @@ def _build_pnl_excel(
     def _blank():
         ri[0] += 1
 
-    # ── INCOME ────────────────────────────────────────────────────────────────
-    _section("INCOME")
-    inc_month: dict = defaultdict(float)
+    DEP_FILL  = PatternFill("solid", fgColor="FFF2CC")
+    TRUE_FILL = PatternFill("solid", fgColor="E2EFDA")
+    BOLD_DEP  = Font(bold=True, color="7F6000", size=9)
+
+    dep_recv  = dep_recv or {}
+    dep_ref   = dep_ref  or {}
+
+    # ── GROSS INFLOWS ─────────────────────────────────────────────────────────
+    _section("GROSS INFLOWS")
+    gross_month: dict = defaultdict(float)
     for m in all_months:
-        inc_month[m] = bank_upi.get(m, 0) + bank_direct.get(m, 0) + cash_db.get(m, 0)
+        gross_month[m] = bank_upi.get(m, 0) + bank_direct.get(m, 0) + cash_db.get(m, 0)
 
     fill = ALT_FILL
     for label, src in [
@@ -544,7 +576,24 @@ def _build_pnl_excel(
             _data_row(label, src, fill, indent=True)
             fill = WHT_FILL if fill == ALT_FILL else ALT_FILL
 
-    _total_row("Total Revenue", inc_month, GRN_FILL, BOLD_GRN)
+    _total_row("Total Gross Inflows", gross_month, GRN_FILL, BOLD_GRN)
+
+    # ── DEPOSIT ADJUSTMENT ────────────────────────────────────────────────────
+    neg_recv: dict = {m: -dep_recv.get(m, 0) for m in all_months}
+    pos_ref:  dict = {m:  dep_ref.get(m, 0)  for m in all_months}
+    net_dep:  dict = {m: neg_recv[m] + pos_ref[m] for m in all_months}
+
+    if any(v for v in dep_recv.values()) or any(v for v in dep_ref.values()):
+        _data_row("(-) Deposits received (security + maintenance, by check-in month)",
+                  neg_recv, DEP_FILL, font=Font(size=9, color="7F6000"), indent=True)
+        _data_row("(+) Deposit refunds paid to exiting tenants",
+                  pos_ref,  DEP_FILL, font=Font(size=9, color="375623"), indent=True)
+        _total_row("Net Deposit Adjustment", net_dep, DEP_FILL, BOLD_DEP)
+
+    # ── TRUE REVENUE ──────────────────────────────────────────────────────────
+    true_rev_month: dict = {m: gross_month.get(m, 0) + net_dep.get(m, 0) for m in all_months}
+    _total_row("True Revenue (rent only — deposits excluded)", true_rev_month, TRUE_FILL,
+               Font(bold=True, color="375623"))
     _blank()
 
     # ── OPERATING EXPENSES ────────────────────────────────────────────────────
@@ -562,9 +611,9 @@ def _build_pnl_excel(
     _total_row("Total Operating Expenses", opex_month, RED_FILL, BOLD_RED)
     _blank()
 
-    # ── OPERATING PROFIT ──────────────────────────────────────────────────────
-    op_profit_month: dict = {m: inc_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
-    _total_row("Operating Profit", op_profit_month, GRN_FILL, BOLD_GRN)
+    # ── OPERATING PROFIT (on True Revenue) ───────────────────────────────────
+    op_profit_month: dict = {m: true_rev_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
+    _total_row("Operating Profit (on True Revenue)", op_profit_month, GRN_FILL, BOLD_GRN)
     _blank()
 
     # ── EXCLUDED (balance sheet items — for reference only) ───────────────────
