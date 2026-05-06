@@ -599,7 +599,7 @@ export interface FinanceIncomeBreakdown {
   upi_batch: number;
   direct_neft: number;
   cash_db: number;
-  total: number;               // gross inflows (bank + cash)
+  total: number;               // gross rent inflows (bank + cash, deposits excluded)
 }
 
 export interface FinanceExpenseRow {

@@ -116,19 +116,34 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for label, row in INCOME.items():
         ws.append([label] + row + [sum(row)])
     rev_row = [sum(col) for col in zip(*INCOME.values())]
-    ws.append(["Total Gross Inflows"] + rev_row + [sum(rev_row)])
+    ws.append(["Total Gross Inflows (rent only — deposits excluded)"] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 2. CAPITAL CONTRIBUTIONS
+    # 2. DEPOSITS HELD — shown right after income as context (NOT deducted — not in income)
+    ws.append(["DEPOSITS HELD — balance sheet liability (cash held on behalf of tenants)"])
+    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
+    ws[ws.max_row][0].fill = wc_fill
+    for ci in range(2, len(header) + 1):
+        ws.cell(ws.max_row, ci).fill = wc_fill
+    for label, row in DEPOSITS.items():
+        ws.append([label] + row + [sum(row)])
+    net_wc = [sum(col) for col in zip(*DEPOSITS.values())]
+    ws.append(["  Net working capital owed to tenants (must return on exit)"] + net_wc + [sum(net_wc)])
+    for c in ws[ws.max_row]:
+        c.font = bold
+        c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    ws.append([])
+
+    # 3. CAPITAL CONTRIBUTIONS
     ws.append(["CAPITAL CONTRIBUTIONS (not P&L — owner's equity injections)"])
     ws[ws.max_row][0].font = bold
     for label, row in CAPITAL_CONTRIBUTIONS.items():
         ws.append([label] + row + [sum(row)])
     ws.append([])
 
-    # 3. OPERATING EXPENSES
+    # 4. OPERATING EXPENSES
     ws.append(["OPERATING EXPENSES (accrual)"])
     ws[ws.max_row][0].font = bold
     for label, row in OPEX.items():
@@ -148,30 +163,15 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 4. OPERATING PROFIT (on Gross Inflows)
+    # 5. EBITDA / OPERATING PROFIT (gross inflows − opex)
     op_profit_row = [r - o for r, o in zip(rev_row, opex_row)]
-    ws.append(["OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
+    ws.append(["EBITDA / OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
     op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, rev_row)]
     ws.append(["Operating Margin %"] + op_margin_row
               + [f"{(sum(op_profit_row)/sum(rev_row)*100):.1f}%" if sum(rev_row) else "-"])
-    ws.append([])
-
-    # 5. DEPOSITS HELD — balance sheet liability (shown before CAPEX for context)
-    ws.append(["DEPOSITS HELD — refundable liability + non-refundable maintenance fee retained"])
-    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
-    ws[ws.max_row][0].fill = wc_fill
-    for ci in range(2, len(header) + 1):
-        ws.cell(ws.max_row, ci).fill = wc_fill
-    for label, row in DEPOSITS.items():
-        ws.append([label] + row + [sum(row)])
-    net_wc = [sum(col) for col in zip(*DEPOSITS.values())]
-    ws.append(["  Net working capital owed to tenants (balance sheet liability)"] + net_wc + [sum(net_wc)])
-    for c in ws[ws.max_row]:
-        c.font = bold
-        c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
     ws.append([])
 
     # 6. CAPEX

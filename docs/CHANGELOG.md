@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.17] — 2026-05-06 — P&L structure final + bank_transactions dedup
+
+### P&L — correct structure across all surfaces
+- **Deposit deduction reverted** — deposits were never in income (DB confirmed: zero deposit payments in payments table for Oct–Apr; zero "Advance Deposit" bank transactions). Subtracting them gave false negative EBITDA. Structure: Gross Inflows → DEPOSITS HELD (context, not deducted) → OPEX → EBITDA → CAPEX → Net Profit.
+- **DEPOSITS HELD moved to right after income** in both `pnl_builder.py` and `_build_pnl_excel()` — visible context of cash held on behalf of tenants, before OPEX.
+- **EBITDA label** added to Operating Profit row in both Excel surfaces.
+- **"Advance Deposit" bank transactions excluded from income** — `get_pnl()` SQL query now filters out `category = 'Advance Deposit'`; `_build_pnl_excel()` loop skips them. Defensive fix for future deposits paid via bank.
+- **Total label clarified** — "Total Gross Inflows (rent only — deposits excluded)" in Excel header.
+
+### bank_transactions dedup
+- **Deleted 999 duplicate rows** — upload_id=2 (243 rows, Jan 2026 only) and upload_id=4 (756 rows, Jan–Mar 2026) were fully covered by the NULL-upload dataset (comprehensive Oct'25–May'26). January income was 3× inflated in live P&L before this fix.
+- Remaining: 1,603 rows (NULL upload 1343 + upload_id=6 April data 260).
+
+### Rent increase (June 2026)
+- ₹500/bed increase effective June 2026. Noted in memory for next billing cycle.
+
+---
+
 ## [1.75.16] — 2026-05-06 — P&L structure cleanup + non-operating audit
 
 ### P&L — deposit adjustment removed, structure simplified
