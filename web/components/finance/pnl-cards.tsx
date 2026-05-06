@@ -40,22 +40,58 @@ export function KpiTiles({ data }: KpiTilesProps) {
 }
 
 export function IncomeCard({ data }: KpiTilesProps) {
-  const rows = [
-    { label: "Bank — UPI batch settlements", amount: data.income.upi_batch },
-    { label: "Bank — direct + NEFT", amount: data.income.direct_neft },
-    { label: "Cash (PWA recorded)", amount: data.income.cash_db },
-  ]
+  const gross = data.income.total_gross ?? data.income.total
+  const depRecv = data.income.deposits_received ?? 0
+  const depRef  = data.income.deposits_refunded ?? 0
+  const hasDepAdj = depRecv > 0 || depRef > 0
   return (
     <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
-      <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Income</p>
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center justify-between py-2 border-b border-[#F6F5F0] last:border-none">
-          <span className="text-xs text-ink-muted">{row.label}</span>
-          <span className="text-xs font-bold text-status-paid">{rupeeExact(row.amount)}</span>
+      <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Gross Inflows</p>
+      {data.income.upi_batch > 0 && (
+        <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
+          <span className="text-xs text-ink-muted">Bank — UPI batch settlements</span>
+          <span className="text-xs font-bold text-status-paid">{rupeeExact(data.income.upi_batch)}</span>
         </div>
-      ))}
-      <div className="flex items-center justify-between pt-2 mt-1">
-        <span className="text-xs font-bold text-ink">Total Revenue</span>
+      )}
+      {data.income.direct_neft > 0 && (
+        <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
+          <span className="text-xs text-ink-muted">Bank — direct + NEFT</span>
+          <span className="text-xs font-bold text-status-paid">{rupeeExact(data.income.direct_neft)}</span>
+        </div>
+      )}
+      {data.income.cash_db > 0 && (
+        <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
+          <span className="text-xs text-ink-muted">Cash (rent only)</span>
+          <span className="text-xs font-bold text-status-paid">{rupeeExact(data.income.cash_db)}</span>
+        </div>
+      )}
+      <div className="flex items-center justify-between pt-2">
+        <span className="text-xs font-bold text-ink">Total Gross Inflows</span>
+        <span className="text-sm font-extrabold text-ink">{rupeeExact(gross)}</span>
+      </div>
+
+      {hasDepAdj && (
+        <>
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-4 mb-2">
+            Deposit Adjustment (liability flows)
+          </p>
+          {depRecv > 0 && (
+            <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
+              <span className="text-xs text-ink-muted">(-) Deposits received (security + maintenance)</span>
+              <span className="text-xs font-bold text-status-due">−{rupeeExact(depRecv)}</span>
+            </div>
+          )}
+          {depRef > 0 && (
+            <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
+              <span className="text-xs text-ink-muted">(+) Deposit refunds paid</span>
+              <span className="text-xs font-bold text-status-paid">+{rupeeExact(depRef)}</span>
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="flex items-center justify-between pt-2 mt-1 border-t border-[#E8E4E0]">
+        <span className="text-xs font-bold text-ink">True Revenue (rent only)</span>
         <span className="text-sm font-extrabold text-ink">{rupeeExact(data.income.total)}</span>
       </div>
     </div>
@@ -63,20 +99,52 @@ export function IncomeCard({ data }: KpiTilesProps) {
 }
 
 export function ExpenseCard({ data }: KpiTilesProps) {
-  const nonEmpty = data.expenses.filter((e) => e.amount > 0)
+  const opex    = data.expenses.filter((e) => e.amount > 0)
+  const capex   = (data.capex_items   ?? []).filter((e) => e.amount > 0)
+  const excl    = (data.excluded_items ?? []).filter((e) => e.amount > 0)
   return (
     <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
-      <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Expenses</p>
-      {nonEmpty.map((row) => (
+      <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Operating Expenses</p>
+      {opex.map((row) => (
         <div key={row.category} className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0] last:border-none">
           <span className="text-xs text-ink-muted">{row.category}</span>
           <span className="text-xs font-bold text-status-due">−{rupeeExact(row.amount)}</span>
         </div>
       ))}
       <div className="flex items-center justify-between pt-2 mt-1">
-        <span className="text-xs font-bold text-ink">Total Expenses</span>
+        <span className="text-xs font-bold text-ink">Total Operating Expenses</span>
         <span className="text-sm font-extrabold text-status-due">−{rupeeExact(data.total_expense)}</span>
       </div>
+
+      {capex.length > 0 && (
+        <>
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-4 mb-2">One-time CAPEX</p>
+          {capex.map((row) => (
+            <div key={row.category} className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0] last:border-none">
+              <span className="text-xs text-ink-muted">{row.category}</span>
+              <span className="text-xs font-bold text-ink-muted">−{rupeeExact(row.amount)}</span>
+            </div>
+          ))}
+          {data.total_capex > 0 && (
+            <div className="flex items-center justify-between pt-2 mt-1">
+              <span className="text-xs font-bold text-ink">Total CAPEX</span>
+              <span className="text-sm font-extrabold text-ink-muted">−{rupeeExact(data.total_capex)}</span>
+            </div>
+          )}
+        </>
+      )}
+
+      {excl.length > 0 && (
+        <>
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-4 mb-1">Balance Sheet Items (not deducted)</p>
+          {excl.map((row) => (
+            <div key={row.category} className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0] last:border-none">
+              <span className="text-xs text-ink-muted">{row.category}</span>
+              <span className="text-xs text-ink-muted">{rupeeExact(row.amount)}</span>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   )
 }

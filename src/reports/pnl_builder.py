@@ -63,6 +63,12 @@ EXCLUDED = {
     "Loan Repayment / Transfers (non-op)":   [0, 500000,     0,      0,  600000, 2090000, 22357],
 }
 
+# ── Deposit flows — queried from tenancies (security_deposit + maintenance_fee by check-in month)
+# These are LIABILITY inflows — real cash but NOT revenue. Subtracted from gross income for True Revenue.
+DEPOSIT_RECEIVED = [0, 448000, 838000, 1383000, 1074250, 1256450, 1161125]
+# Deposit refunds = same figures as EXCLUDED["Tenant Deposit Refund"] — shown here for net calc
+DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  138231,  129668]
+
 DEPOSITS = {
     "Security Deposits — refundable (must return to active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
     "  Maintenance Fee retained (non-refundable, by check-in month)": [0, 96000, 196000, 287500, 248000, 319700, 122000],
@@ -92,14 +98,42 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.fill = hdr_fill; c.font = hdr_font; c.alignment = ctr
 
     # 1. INCOME
+    dep_fill   = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    true_fill  = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+
     ws.append(["INCOME"])
     ws[ws.max_row][0].font = bold
     for label, row in INCOME.items():
         ws.append([label] + row + [sum(row)])
     rev_row = [sum(col) for col in zip(*INCOME.values())]
-    ws.append(["Total Revenue"] + rev_row + [sum(rev_row)])
+    ws.append(["Total Gross Inflows"] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
+
+    # Deposit adjustment — these are liability flows, not revenue
+    ws.append([])
+    ws.append(["DEPOSIT ADJUSTMENT (liability flows — not income, not expense)"])
+    ws[ws.max_row][0].font = Font(italic=True)
+    neg_dep = [-v for v in DEPOSIT_RECEIVED]
+    ws.append(["  (-) Deposits received from tenants (security + maintenance, by check-in month)"]
+              + neg_dep + [sum(neg_dep)])
+    for c in ws[ws.max_row]:
+        c.fill = dep_fill
+    ws.append(["  (+) Deposit refunds paid to exiting tenants"]
+              + DEPOSIT_REFUNDED + [sum(DEPOSIT_REFUNDED)])
+    for c in ws[ws.max_row]:
+        c.fill = dep_fill
+    net_dep = [d + r for d, r in zip(neg_dep, DEPOSIT_REFUNDED)]
+    ws.append(["  Net deposit adjustment"] + net_dep + [sum(net_dep)])
+    for c in ws[ws.max_row]:
+        c.fill = dep_fill; c.font = Font(italic=True)
+    ws.append([])
+
+    # True Revenue = rent income only (deposits stripped out)
+    true_rev_row = [g + n for g, n in zip(rev_row, net_dep)]
+    ws.append(["TRUE REVENUE (rent only — deposits excluded)"] + true_rev_row + [sum(true_rev_row)])
+    for c in ws[ws.max_row]:
+        c.font = Font(bold=True); c.fill = true_fill
     ws.append([])
 
     # 2. CAPITAL CONTRIBUTIONS
@@ -129,14 +163,15 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 4. OPERATING PROFIT
-    op_profit_row = [r - o for r, o in zip(rev_row, opex_row)]
-    ws.append(["OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
+    # 4. OPERATING PROFIT (based on True Revenue — deposits excluded)
+    op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
+    ws.append(["OPERATING PROFIT (on True Revenue)"] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
-    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, rev_row)]
-    ws.append(["Operating Margin %"] + op_margin_row + [f"{(sum(op_profit_row)/sum(rev_row)*100):.1f}%"])
+    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, true_rev_row)]
+    ws.append(["Operating Margin %"] + op_margin_row
+              + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
     # 5. CAPEX
@@ -159,8 +194,9 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for c in ws[ws.max_row]:
         c.font = bold
 
-    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, rev_row)]
-    ws.append(["Net Margin %"] + margin_row + [f"{(sum(profit_row)/sum(rev_row)*100):.1f}%"])
+    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, true_rev_row)]
+    ws.append(["Net Margin %"] + margin_row
+              + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
     # 7. DEPOSITS HELD

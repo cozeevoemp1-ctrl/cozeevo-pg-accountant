@@ -44,6 +44,19 @@ EXPENSE_CATS = [
     "Capital Investment", "Non-Operating", "Other Expenses",
 ]
 
+# Only these categories reduce operating profit
+_OPEX_CATS_JSON = {
+    "Property Rent", "Electricity", "Water", "IT & Software", "Internet & WiFi",
+    "Food & Groceries", "Fuel & Diesel", "Staff & Labour",
+    "Maintenance & Repairs", "Cleaning Supplies", "Waste Disposal",
+    "Shopping & Supplies", "Operational Expenses", "Marketing",
+    "Govt & Regulatory", "Bank Charges", "Other Expenses",
+}
+# Shown separately below operating profit
+_CAPEX_CATS_JSON = {"Furniture & Fittings", "Capital Investment"}
+# Balance-sheet items — shown for info only, never deducted from any profit line
+_EXCL_CATS_JSON  = {"Tenant Deposit Refund", "Non-Operating"}
+
 
 def _require_admin(user: AppUser):
     if user.role != "admin":
@@ -249,28 +262,71 @@ async def get_pnl(
                 .group_by(BankTransaction.category)
             )
             expense_by_cat = {row[0]: float(row[1]) for row in exp_rows}
+
             expenses = [
                 {"category": cat, "amount": expense_by_cat.get(cat, 0.0)}
                 for cat in EXPENSE_CATS
-                if expense_by_cat.get(cat, 0.0) > 0
+                if expense_by_cat.get(cat, 0.0) > 0 and cat in _OPEX_CATS_JSON
             ]
-            total_expense = sum(e["amount"] for e in expenses)
-            total_income  = upi_batch + direct_neft + cash_db
-            profit        = total_income - total_expense
-            margin        = round(profit / total_income * 100, 1) if total_income else 0.0
+            capex_items = [
+                {"category": cat, "amount": expense_by_cat.get(cat, 0.0)}
+                for cat in EXPENSE_CATS
+                if expense_by_cat.get(cat, 0.0) > 0 and cat in _CAPEX_CATS_JSON
+            ]
+            excluded_items = [
+                {"category": cat, "amount": expense_by_cat.get(cat, 0.0)}
+                for cat in EXPENSE_CATS
+                if expense_by_cat.get(cat, 0.0) > 0 and cat in _EXCL_CATS_JSON
+            ]
+
+            total_expense    = sum(e["amount"] for e in expenses)
+            total_capex      = sum(e["amount"] for e in capex_items)
+            # Deposits received this month (from tenancies by check-in date)
+            dep_recv_rows = await session.execute(
+                select(func.sum(Tenancy.security_deposit + Tenancy.maintenance_fee))
+                .where(
+                    func.date_trunc("month", Tenancy.checkin_date) == start,
+                    Tenancy.status != "no_show",
+                )
+            )
+            deposits_received = float(dep_recv_rows.scalar() or 0)
+
+            # Deposit refunds paid this month (from checkout_records)
+            dep_ref_rows = await session.execute(
+                select(func.sum(CheckoutRecord.deposit_refunded_amount))
+                .where(
+                    CheckoutRecord.deposit_refund_date.between(start, end),
+                    CheckoutRecord.deposit_refunded_amount > 0,
+                )
+            )
+            deposits_refunded = float(dep_ref_rows.scalar() or 0)
+
+            total_gross      = upi_batch + direct_neft + cash_db
+            net_dep_adj      = -deposits_received + deposits_refunded
+            total_income     = total_gross + net_dep_adj  # true rent revenue
+            operating_profit = total_income - total_expense
+            net_profit       = operating_profit - total_capex
+            margin           = round(operating_profit / total_income * 100, 1) if total_income else 0.0
 
             result[m] = {
                 "month": m,
                 "income": {
-                    "upi_batch":   upi_batch,
-                    "direct_neft": direct_neft,
-                    "cash_db":     cash_db,
-                    "total":       total_income,
+                    "upi_batch":          upi_batch,
+                    "direct_neft":        direct_neft,
+                    "cash_db":            cash_db,
+                    "total_gross":        total_gross,
+                    "deposits_received":  deposits_received,
+                    "deposits_refunded":  deposits_refunded,
+                    "total":              total_income,   # true revenue (deposits stripped)
                 },
-                "capital": capital,
-                "expenses": expenses,
+                "capital":          capital,
+                "expenses":         expenses,
+                "capex_items":      capex_items,
+                "excluded_items":   excluded_items,
                 "total_expense":    total_expense,
-                "operating_profit": profit,
+                "total_capex":      total_capex,
+                "operating_profit": operating_profit,
+                "net_profit":       net_profit,
                 "margin_pct":       margin,
             }
 

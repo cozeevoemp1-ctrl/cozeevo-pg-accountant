@@ -599,7 +599,10 @@ export interface FinanceIncomeBreakdown {
   upi_batch: number;
   direct_neft: number;
   cash_db: number;
-  total: number;
+  total_gross: number;         // bank + cash before deposit adjustment
+  deposits_received: number;   // liability inflow — not revenue
+  deposits_refunded: number;   // liability outflow — not expense
+  total: number;               // true rent revenue = gross − deposits + refunds
 }
 
 export interface FinanceExpenseRow {
@@ -611,9 +614,13 @@ export interface FinanceMonthData {
   month: string;
   income: FinanceIncomeBreakdown;
   capital: number;
-  expenses: FinanceExpenseRow[];
-  total_expense: number;
-  operating_profit: number;
+  expenses: FinanceExpenseRow[];          // opex only (reduces operating profit)
+  capex_items: FinanceExpenseRow[];       // one-time CAPEX (shown below op profit)
+  excluded_items: FinanceExpenseRow[];    // balance-sheet items (info only, not deducted)
+  total_expense: number;                  // opex total only
+  total_capex: number;
+  operating_profit: number;              // income − opex
+  net_profit: number;                    // operating_profit − capex
   margin_pct: number;
 }
 
