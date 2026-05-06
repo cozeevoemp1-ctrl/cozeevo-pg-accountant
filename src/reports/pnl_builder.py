@@ -78,9 +78,12 @@ DEPOSIT_RECEIVED = [0, 448000, 838000, 1383000, 1074250, 1256450, 1161125]
 # Deposit refunds = same figures as EXCLUDED["Tenant Deposit Refund"] — shown here for net calc
 DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  138231,  129668]
 
+# Security deposits = active tenants only (what we owe back), split by check-in month
+# Maintenance fees  = all non-no-show tenants (non-refundable, retained), by check-in month
+# Source: DB query 2026-05-06
 DEPOSITS = {
-    "Security Deposits — refundable (must return to active tenants)": [0, 0, 0, 0, 0, 0, 2437425],
-    "  Maintenance Fee retained (non-refundable, by check-in month)": [0, 96000, 196000, 287500, 248000, 319700, 122000],
+    "Security Deposits — refundable (must return to active tenants)": [0, 193000, 386500, 633500, 498000, 812250, 798125],
+    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000],
 }
 
 BANK_CLOSING_BALANCE_THOR = 1373863   # THOR acct ...0961 Apr 30
