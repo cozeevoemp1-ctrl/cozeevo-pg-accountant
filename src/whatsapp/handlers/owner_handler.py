@@ -140,6 +140,9 @@ async def handle_owner(
         "CHANGE_ROOM":        _room_transfer_prompt,  # alias for ROOM_TRANSFER
         "ASSIGN_ROOM":        _assign_room_prompt,
         "QUERY_UNHANDLED":    _query_unhandled,
+        "BLACKLIST_ADD":      _blacklist_add,
+        "SHOW_BLACKLIST":     _show_blacklist,
+        "BLACKLIST_REMOVE":   _blacklist_remove,
         "UNKNOWN":            _unknown,
     }
     fn = handlers.get(intent, _unknown)
@@ -4157,6 +4160,17 @@ async def resolve_pending_action(
                 return "Cancelled."
             return "__KEEP_PENDING__Reply *Yes* to save or *No* to cancel."
 
+    if pending.intent == "BLACKLIST_ADD_REASON":
+        reason = reply_text.strip()
+        if not reason or is_negative(reason):
+            pending.resolved = True
+            return "Blacklist cancelled."
+        name = action_data.get("name", "")
+        from src.services.blacklist import add_to_blacklist
+        await add_to_blacklist(session, name=name, reason=reason, added_by=pending.phone)
+        pending.resolved = True
+        return f"*{name}* has been added to the blacklist.\nReason: {reason}"
+
     return None
 
 
@@ -7884,6 +7898,99 @@ async def _query_unhandled(entities: dict, ctx: CallerContext, session: AsyncSes
         lines.append(f"- _{ts}_ ({r.role or '?'}): {r.message[:80]}")
 
     return "\n".join(lines)
+
+
+# ── Blacklist handlers ─────────────────────────────────────────────────────────
+
+async def _blacklist_add(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Add a person to the blacklist. Syntax: blacklist [name] reason [reason]"""
+    import re as _re
+    raw = (entities.get("raw") or "").strip()
+
+    # Extract reason after "reason" keyword
+    reason_m = _re.search(r"\breason\s+(.+)$", raw, _re.I)
+    reason = reason_m.group(1).strip() if reason_m else ""
+
+    # Extract name — everything before "reason" (or the whole thing if no reason keyword)
+    if reason_m:
+        before_reason = raw[: reason_m.start()].strip()
+    else:
+        before_reason = raw
+
+    # Strip leading command words to isolate the name
+    name = _re.sub(
+        r"^(?:blacklist|block|ban|never\s+give\s+(?:bed|room)\s+to|"
+        r"do\s+not\s+(?:admit|onboard)|add\s+to\s+blacklist)\s+",
+        "", before_reason, flags=_re.I,
+    ).strip()
+
+    if not name:
+        return (
+            "Usage: *blacklist [name] reason [reason]*\n"
+            "Example: blacklist Prem Prasana reason fought with other tenants"
+        )
+
+    if not reason:
+        await _save_pending(
+            ctx.phone, "BLACKLIST_ADD_REASON", {"name": name}, [], session
+        )
+        return (
+            f"Adding *{name}* to blacklist.\n"
+            "What's the reason? (Reply with a short note)"
+        )
+
+    from src.services.blacklist import add_to_blacklist
+    await add_to_blacklist(session, name=name, reason=reason, added_by=ctx.phone)
+    return f"*{name}* has been added to the blacklist.\nReason: {reason}"
+
+
+async def _show_blacklist(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Show all active blacklist entries."""
+    from src.services.blacklist import list_blacklist
+    entries = await list_blacklist(session)
+    if not entries:
+        return "Blacklist is empty — no one is currently blocked."
+    lines = [f"*Blacklist* ({len(entries)} entries):\n"]
+    for e in entries:
+        name_part = e["name"] or "—"
+        phone_part = f"  Ph: {e['phone']}" if e["phone"] else ""
+        lines.append(f"[{e['id']}] {name_part}{phone_part}\n    Reason: {e['reason']}")
+    lines.append("\nTo remove: *unblacklist [id]*")
+    return "\n".join(lines)
+
+
+async def _blacklist_remove(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
+    """Remove an entry from the blacklist by ID or name."""
+    import re as _re
+    raw = (entities.get("raw") or "").strip()
+
+    # Try numeric ID first
+    id_m = _re.search(r"\b(\d+)\b", raw)
+    if id_m:
+        from src.services.blacklist import remove_from_blacklist
+        ok = await remove_from_blacklist(session, int(id_m.group(1)))
+        if ok:
+            return f"Blacklist entry #{id_m.group(1)} removed."
+        return f"No active blacklist entry with ID {id_m.group(1)}."
+
+    # Name-based: strip command words and look up
+    name = _re.sub(
+        r"^(?:remove|unblock|unban|delist|clear|unblacklist)\s+(?:from\s+blacklist\s+)?",
+        "", raw, flags=_re.I,
+    ).strip()
+    if not name or len(name) < 3:
+        return "Usage: *unblacklist [id]* or *unblacklist [name]*"
+
+    from sqlalchemy import text
+    row = (await session.execute(
+        text("SELECT id, name FROM blacklist WHERE is_active=TRUE AND LOWER(name) LIKE :pat LIMIT 1"),
+        {"pat": f"%{name.lower()}%"},
+    )).first()
+    if not row:
+        return f"No active blacklist entry matching *{name}*."
+    from src.services.blacklist import remove_from_blacklist
+    await remove_from_blacklist(session, row.id)
+    return f"*{row.name}* (ID {row.id}) removed from blacklist."
 
 
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:

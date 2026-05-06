@@ -1438,3 +1438,24 @@ class UnhandledRequest(Base):
         Index("ix_unhandled_created", "created_at"),
         Index("ix_unhandled_resolved", "resolved"),
     )
+
+
+class Blacklist(Base):
+    """
+    Persons banned from being onboarded. Checked at onboarding create + approve.
+    Never hard-delete — set is_active=False to remove.
+    """
+    __tablename__ = "blacklist"
+
+    id         = Column(Integer, primary_key=True)
+    name       = Column(String(200), nullable=True)
+    phone      = Column(String(20), nullable=True)
+    reason     = Column(Text, nullable=False)
+    added_by   = Column(String(20), nullable=True)      # phone of admin who added
+    is_active  = Column(Boolean, default=True, nullable=False, server_default="true")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_blacklist_phone", "phone"),
+        Index("ix_blacklist_active", "is_active"),
+    )

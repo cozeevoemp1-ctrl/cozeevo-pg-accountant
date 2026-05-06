@@ -73,6 +73,23 @@ ADD_COLUMNS: list[tuple[str, str, str]] = [
 
 CREATE_TABLES: list[str] = [
     """
+    CREATE TABLE IF NOT EXISTS blacklist (
+        id         SERIAL PRIMARY KEY,
+        name       VARCHAR(200),
+        phone      VARCHAR(20),
+        reason     TEXT NOT NULL,
+        added_by   VARCHAR(20),
+        is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW()
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_blacklist_phone  ON blacklist(phone)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_blacklist_active ON blacklist(is_active)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS onboarding_sessions (
         id           SERIAL PRIMARY KEY,
         tenant_id    INTEGER NOT NULL REFERENCES tenants(id),
@@ -235,7 +252,7 @@ async def run_schema(conn: AsyncConnection) -> None:
     # 1. Create new tables
     for stmt in CREATE_TABLES:
         await conn.execute(text(stmt))
-    print("  [ok] onboarding_sessions, checkout_records, pending_learning, learned_rules, complaints, conversation_history - created or already exist")
+    print("  [ok] blacklist, onboarding_sessions, checkout_records, pending_learning, learned_rules, complaints, conversation_history - created or already exist")
 
     # 2. Add new columns to existing tables
     for (table, col, col_type) in ADD_COLUMNS:
@@ -1243,7 +1260,7 @@ async def run_rent_schedule_cascade_2026_04_25(conn) -> None:
     Safe: we never delete tenancies (policy is is_void/status), so this only
     fires during test-data cleanup. Currently the missing cascade forces
     manual DELETE FROM rent_schedules before deleting a test tenancy."""
-    print("\n-- rent_schedules FK → ON DELETE CASCADE (2026-04-25) --")
+    print("\n-- rent_schedules FK -> ON DELETE CASCADE (2026-04-25) --")
     await conn.execute(text("""
         DO $$
         DECLARE
@@ -1282,7 +1299,7 @@ async def run_rent_schedule_cascade_2026_04_25(conn) -> None:
             RAISE NOTICE 'CASCADE added (was: %)', cname;
         END $$
     """))
-    print("  [ok] rent_schedules.tenancy_id → ON DELETE CASCADE")
+    print("  [ok] rent_schedules.tenancy_id -> ON DELETE CASCADE")
 
 
 async def run_payment_unique_hash_2026_04_25(conn) -> None:

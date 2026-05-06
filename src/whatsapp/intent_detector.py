@@ -324,6 +324,10 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"rent (?:is now|from\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|next)|change|increase|hike|reduce|decrease)|new rent|from \w+ rent|rent to \d|from\s+next\s+month\s+rent|room\s+[\w-]+\s+rent\s+(?:\d|updated?|changed?|revised?)|(?:change|update|revise|set|increase)\s+rent\b|room\s+[\w-]+\s+to\s+\d{4,}|increase\s+rent\s+(?:for\s+)?room|(?:change|update|revise|set|increase)\s+rent\s+(?:for\s+)?(?:room|[A-Z][a-z]+)\b", re.I), "RENT_CHANGE", 0.91),
     # One-time discount / concession / surcharge
     (re.compile(r"(?:concession|discount|waive|deduct|give.*less|less this month|reduce this month|reduce\s+\w+'?s?\s+rent\s+by|extra charge|add.*surcharge|add.*electricity|add.*food charge)", re.I), "RENT_DISCOUNT", 0.90),
+    # Blacklist management — must come before generic ADD_STAFF/ADD_PARTNER
+    (re.compile(r"(?:blacklist|block|ban|never\s+give\s+(?:bed|room)|do\s+not\s+(?:admit|onboard)|add\s+to\s+blacklist)\s+\w", re.I), "BLACKLIST_ADD", 0.97),
+    (re.compile(r"(?:show|list|display)\s+blacklist|blacklist\s+(?:list|all|show)|who\s+(?:is|are)\s+blacklisted", re.I), "SHOW_BLACKLIST", 0.96),
+    (re.compile(r"(?:remove|unblock|unban|delist|clear)\s+(?:from\s+blacklist\s+)?(?:\w+)|(?:remove|unblock)\s+blacklist\s+\d+|unblacklist\s+\w", re.I), "BLACKLIST_REMOVE", 0.96),
     # Add new staff member with details (pipe-separated) — must come before ADD_PARTNER
     (re.compile(r"(?:add|register|new)\s+staff\s+[A-Za-z][^\|]+\|", re.I), "ADD_STAFF", 0.97),
     # Add partner / staff (bot access only)

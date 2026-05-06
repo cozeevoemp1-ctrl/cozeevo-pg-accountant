@@ -180,6 +180,16 @@ async def create_session(req: CreateSessionRequest, request: Request):
                 old_obs.status = "cancelled"
                 old_obs.cancellation_reason = "superseded"
 
+        # Blacklist check (phone only at create time — name comes in at KYC submit)
+        from src.services.blacklist import check_blacklisted as _check_bl
+        _bl = await _check_bl(session, phone=req.tenant_phone)
+        if _bl:
+            raise HTTPException(
+                403,
+                f"This person is on the Cozeevo blacklist: {_bl['reason']}. "
+                "Contact Kiran if this is a mistake."
+            )
+
         # Hard-block if this phone already has an active tenancy anywhere
         if req.tenant_phone:
             from src.services.room_occupancy import get_active_tenancy_by_phone
@@ -1131,6 +1141,16 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 td[k] = overrides[k]
         if not td.get("name") or not td.get("phone"):
             raise HTTPException(400, "Tenant data incomplete")
+
+        # Blacklist check (name + phone from KYC — catches name-only entries)
+        from src.services.blacklist import check_blacklisted as _check_bl
+        _bl = await _check_bl(session, name=td.get("name"), phone=td.get("phone"))
+        if _bl:
+            raise HTTPException(
+                403,
+                f"This person is on the Cozeevo blacklist: {_bl['reason']}. "
+                "Contact Kiran if this is a mistake."
+            )
 
         # If room was not assigned at creation time (future booking), allow override now
         room = None
