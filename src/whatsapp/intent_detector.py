@@ -151,22 +151,33 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # "Ganesh Divekar") — accept up to 4 name tokens. Earlier the group was
     # `(?:\w+\s+)?` which only allowed single-word names, so 2+word-name flows
     # went to UNKNOWN intent ("I didn't understand that").
-    (re.compile(r"(?:change|update|set|modify|switch)\s+(?:\w+\s+){0,4}?(?:sharing\s*(?:type)?|sharing)\s+(?:to\s+)?(?:premium|single|double|triple)|(?:change|update|set|modify|switch)\s+(?:room\s+)?(?:\w+\s+){0,3}?(?:to\s+)?(?:premium|single|double|triple)\s+sharing(?:\s+(?:type|bed|room|configuration))?|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing", re.I), "UPDATE_SHARING_TYPE", 0.94),
+    # Explicit room-number forms come FIRST (higher specificity) so they win
+    # over the generic name-based alternatives below.
+    (re.compile(
+        r"(?:change|update|set)\s+occupancy\b"  # "change occupancy from double to single"
+        r"|(?:change|update|set|modify)\s+(?:room\s+)?[A-Za-z]?\d{1,4}[A-Za-z]?\s+occupancy\b"
+        r"|(?:change|update|set|modify)\s+(?:room\s+)?[A-Za-z]?\d{1,4}[A-Za-z]?\s+(?:to\s+)?(?:premium|single|double|triple)\s+sharing"  # "change G16 to single sharing"
+        r"|(?:change|update|set|modify)\s+(?:room\s+)?[A-Za-z]?\d{1,4}[A-Za-z]?\s+(?:sharing|occupancy|configuration|bed[- ]?type)(?:\s+to\s+(?:premium|single|double|triple))?"  # "change room G16 configuration [to single]"
+        r"|(?:change|update|set|modify|switch)\s+(?:\w+\s+){0,4}?(?:sharing\s*(?:type)?|sharing)\s+(?:to\s+)?(?:premium|single|double|triple)"
+        r"|(?:change|update|set|modify|switch)\s+(?:room\s+)?(?:\w+\s+){0,5}?(?:to\s+)?(?:premium|single|double|triple)\s+sharing(?:\s+(?:type|bed|room|configuration))?"
+        r"|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing",
+        re.I,
+    ), "UPDATE_SHARING_TYPE", 0.94),
     (re.compile(r"(?:change|update|set|modify|revise)\s+(?:\w+\s+){0,4}?rent\s+(?:to\s+)?\d|(?:\w+)\s+rent\s+(?:is|=|should\s+be)\s+\d", re.I), "UPDATE_RENT", 0.93),
     # UPDATE_PHONE moved up (before UPDATE_CONTACT at line ~115) — see note there.
     (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+){0,4}?gender\s+(?:to\s+)?(?:male|female)|(?:\w+)\s+(?:is\s+)?(?:male|female)", re.I), "UPDATE_GENDER", 0.93),
     # UPDATE_DEPOSIT removed — DEPOSIT_CHANGE (line ~88) handles this with full account_handler flow
     (re.compile(r"(?:show|check|view|get|who)\s+(?:changes?|audit|history|log|modified|updated)\s+(?:for|of|on|to)?\s*(?:room|tenant)?|(?:changes?|audit|history)\s+(?:for|of)\s+\w+|what\s+changed|audit\s+log|who\s+changed\s+\w+", re.I), "QUERY_AUDIT", 0.92),
     (re.compile(r"rent\s+(?:history|changes?|revisions?)\s*(?:for\s+)?\w*|(?:show|check)\s+rent\s+(?:changes?|revisions?|history)", re.I), "QUERY_RENT_HISTORY", 0.93),
-    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+(?:add|mark|set|make|is)\s+(?:a\s+)?staff(?:\s+room)?\b|\b[A-Z]?\d{1,4}\b\s+(?:not|no\s+longer)\s+(?:a\s+)?staff(?:\s+room)?\b|\b(?:mark|set|make)\s+[A-Z]?\d{1,4}\b\s+(?:as\s+)?(?:a\s+)?staff(?:\s+room)?\b|\badd\s+staff\s+room\s+[A-Z]?\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+staff\s+room\b)", re.I), "UPDATE_ROOM", 0.93),
+    (re.compile(r"(?:room\s+\w+\s+(?:add|remove|has|no)\s+ac|room\s+\w+\s+(?:under\s+)?maintenance|room\s+\w+\s+type\s+(?:single|double|triple|premium)|(?:mark|set)\s+room\s+\w+|room\s+\w+\s+(?:staff|not\s+staff|mark\s+staff)|\b\d+\s+(?:is\s+)?not\s+staff(?:\s+room)?|(?:not\s+)?staff\s+rooms?\s+[\w\s,&]*?\b\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+(?:add|mark|set|make|is)\s+(?:a\s+)?staff(?:\s+room)?\b|\b[A-Z]?\d{1,4}\b\s+(?:not|no\s+longer)\s+(?:a\s+)?staff(?:\s+room)?\b|\b(?:mark|set|make)\s+[A-Z]?\d{1,4}\b\s+(?:as\s+)?(?:a\s+)?staff(?:\s+room)?\b|\badd\s+staff\s+room\s+[A-Z]?\d{1,4}\b|\b[A-Z]?\d{1,4}\b\s+staff\s+room\b|change\s+room\s+[A-Za-z]?\d{1,4}[A-Za-z]?(?:\s*$|\s+(?!to\b|from\b|rent\b|\d|sharing\b|single\b|double\b|triple\b|premium\b|occupancy\b|configuration\b|type\b)))", re.I), "UPDATE_ROOM", 0.93),
     (re.compile(r"(?<!not\s)(?:list|show|give|which|what|how many)\s+(?:me\s+)?(?:are\s+)?(?:the\s+)?(?:staff|labou?r)\s+rooms?|^\s*(?:staff|labou?r)\s+rooms?\s*(?:list|\?)?\s*$|(?:non[- ]?revenue|no\s+revenue)\s+rooms?", re.I), "QUERY_STAFF_ROOMS", 0.93),
     (re.compile(r"(?:show|print|get|display)\s+master\s+data|master\s+data\s+(?:summary|snapshot|check)|system\s+summary|bed\s+count\s+(?:summary|check)|total\s+(?:bed|room)\s+count", re.I), "SHOW_MASTER_DATA", 0.95),
     # Staff exit — mark a staff member as exited (clears room link; room auto-flips to revenue if empty)
     (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:exit|exited|left|leaving|gone|resigned?)\b|\b[A-Za-z]+\s+staff\s+exit(?:ed)?\b|^\s*exit\s+staff\s+[A-Za-z]", re.I), "EXIT_STAFF", 0.93),
     # Staff assign — link a staff member to a room (many staff per room allowed, no sharing cap)
     (re.compile(r"\bstaff\s+(?!room|rooms\b)[A-Za-z][A-Za-z\s]*?\s+(?:room|in|to)\s+\w+|\bassign\s+staff\s+[A-Za-z]+\s+(?:to\s+)?(?:room\s+)?\w+|\b(?:add|put)\s+staff\s+[A-Za-z]+\s+(?:to|in)\s+(?:room\s+)?\w+", re.I), "ASSIGN_STAFF_ROOM", 0.93),
-    # Occupancy overview
-    (re.compile(r"(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
+    # Occupancy overview — negative lookahead for "change/update/set occupancy" which → UPDATE_SHARING_TYPE
+    (re.compile(r"(?<!change\s)(?<!update\s)(?<!set\s)(?:occu?pa?ncy(?!\s+report)|ocupancy|how full|how many (?:rooms|tenants?)|total rooms|occupied rooms|capacity|fill(?:ed)? (?:rooms?|up)|kitne\s+(?:log|tenants?)\b|rooms?\s+occupied\b)", re.I), "QUERY_OCCUPANCY", 0.91),
     # Early UPDATE_CHECKIN — "Name checkin Month Day" pattern (must be before QUERY_CHECKINS & SCHEDULE_CHECKOUT)
     (re.compile(r"\b[A-Za-z]+\s+check.?in\s+(?:was\s+)?(?:on\s+)?(?:\d|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))", re.I), "UPDATE_CHECKIN", 0.94),
     # Expiring tenancies / upcoming checkouts

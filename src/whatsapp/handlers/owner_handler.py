@@ -1532,10 +1532,18 @@ async def resolve_pending_action(
         from src.whatsapp.handlers.update_handler import _is_confirm_choice
         if _is_confirm_choice(reply_text):
             result = await _resolve_field_update("1", action_data, session, changed_by=pending.phone)
-        else:
+            pending.resolved = True
+            return result
+        if is_negative(reply_text) or reply_text.strip() == "2":
             result = await _resolve_field_update("2", action_data, session, changed_by=pending.phone)
-        pending.resolved = True
-        return result
+            pending.resolved = True
+            return result
+        # Unclear reply — keep pending alive and re-prompt
+        field = action_data.get("field", "field")
+        old_v = action_data.get("old_value", "?")
+        new_v = action_data.get("new_value", "?")
+        name  = action_data.get("tenant_name", "tenant")
+        return f"__KEEP_PENDING__Update *{name}*: {field} *{old_v}* → *{new_v}*\nReply *1* to confirm or *2* to cancel."
 
     if pending.intent in ("ASSIGN_STAFF_WHO", "EXIT_STAFF_WHO"):
         # Disambiguating which staff the user meant
@@ -3532,6 +3540,17 @@ async def resolve_pending_action(
             f"{display_line}\n\n"
             f"Reply *1* to confirm or *2* to cancel."
         )
+
+    # FIELD_UPDATE_WHO — invalid choice (chosen is None): re-prompt with list
+    if chosen is None and pending.intent == "FIELD_UPDATE_WHO":
+        n = len(choices)
+        if n == 0:
+            pending.resolved = True
+            return "No matching tenants found."
+        lines = [f"Which *{action_data.get('field', 'field')}* to update? Reply with a number:"]
+        for c in choices:
+            lines.append(f"  {c['seq']}. {c.get('label', c.get('tenant_name', '?'))}")
+        return "__KEEP_PENDING__" + "\n".join(lines)
 
     # (ROOM_TRANSFER step-by-step handled earlier, before cancel/chosen_idx checks)
 

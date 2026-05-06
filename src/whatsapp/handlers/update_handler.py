@@ -69,17 +69,23 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
     name = entities.get("name", "").strip()
 
     # Extract sharing type from message
+    # "change occupancy from double to single" — the target type is after "to"
     new_sharing = None
-    for st in ("premium", "single", "double", "triple"):
-        if st in desc.lower():
-            new_sharing = st
-            break
+    to_m = re.search(r"\bto\s+(single|double|triple|premium)\b", desc, re.I)
+    if to_m:
+        new_sharing = to_m.group(1).lower()
+    else:
+        for st in ("premium", "single", "double", "triple"):
+            if st in desc.lower():
+                new_sharing = st
+                break
 
     if not new_sharing:
         return (
             "What sharing type? Reply with:\n"
             "*[Name] [sharing type]*\n"
-            "Example: _Anukriti premium_ or _Raj double_"
+            "Example: _Anukriti premium_ or _Raj double_\n"
+            "Or: _room G16 single sharing_"
         )
 
     # Find tenant — try room number first, then name
@@ -87,8 +93,8 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
     room_from_desc = room_m.group(1).upper() if room_m else ""
 
     if not name:
-        clean = re.sub(r"\b(change|update|set|modify|sharing|type|to|for|is|in|premium|single|double|triple|room|bed|configuration)\b", "", desc, flags=re.I).strip()
-        clean = re.sub(r"\b[A-Z]?\d{2,3}[A-Z]?(?:-[A-Z])?\b", "", clean, flags=re.I).strip()
+        clean = re.sub(r"\b(change|update|set|modify|sharing|type|to|from|for|is|in|premium|single|double|triple|room|bed|configuration|occupancy|capacity)\b", "", desc, flags=re.I).strip()
+        clean = re.sub(r"\b[A-Z]?\d{1,4}[A-Za-z]?\b", "", clean, flags=re.I).strip()
         name = clean
 
     rows = []
