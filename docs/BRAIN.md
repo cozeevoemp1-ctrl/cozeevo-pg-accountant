@@ -354,7 +354,8 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/llm_gateway/claude_client.py` | LLM client (Ollama/Groq/Anthropic) |
 | `src/reports/reconciliation.py` | Reconciliation engine |
 | `src/reports/pnl_builder.py` | **Canonical P&L builder** — hardcoded verified Oct'25–Apr'26; shared by `/finance/pnl/excel` endpoint |
-| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L (live + verified Excel), reconciliation |
+| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L (live + verified Excel), reconciliation, unit economics |
+| `src/services/unit_economics.py` | Unit economics service — revenue/bed, cost/bed, avg rent, collection rate, EBITDA/bed (True Revenue only) |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export scripts |
 | `src/services/blacklist.py` | Blacklist service — fuzzy name + phone check, add/list/remove |
 | `src/services/room_transfer.py` | Shared room transfer — single source of truth for bot + PWA |

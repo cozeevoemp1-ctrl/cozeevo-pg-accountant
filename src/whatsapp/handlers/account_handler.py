@@ -75,6 +75,7 @@ FINANCIAL_INTENTS: frozenset[str] = frozenset({
     "BANK_REPORT",
     "BANK_DEPOSIT_MATCH",
     "DASHBOARD_SUMMARY",
+    "QUERY_UNIT_ECONOMICS",
 })
 
 
@@ -110,6 +111,8 @@ async def handle_account(
     if intent == "BANK_DEPOSIT_MATCH":
         from src.whatsapp.handlers.finance_handler import handle_deposit_match
         return await handle_deposit_match(entities, ctx, session)
+    if intent == "QUERY_UNIT_ECONOMICS":
+        return await _query_unit_economics(entities, ctx, session)
 
     fn = handlers.get(intent, _unknown_financial)
     return await fn(entities, ctx, session)
@@ -2853,6 +2856,57 @@ async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncS
         f"  Maintenance : Rs.{int(maint_fee):,}",
         f"  Refundable  : Rs.{int(refundable):,}",
     ]
+
+    return "\n".join(lines)
+
+
+# ── Unit economics ─────────────────────────────────────────────────────────────
+
+async def _query_unit_economics(entities: dict, _ctx: CallerContext, session: AsyncSession) -> str:
+    from src.services.unit_economics import get_unit_economics
+    from src.whatsapp.handlers.finance_handler import _parse_date_range, _MONTH_NAME
+
+    from_date, _ = _parse_date_range(entities)
+    month = from_date.replace(day=1)
+    month_label = f"{_MONTH_NAME[month.month]} {month.year}"
+
+    kpis = await get_unit_economics(month, session)
+
+    lines = [f"*Unit Economics — {month_label}*", ""]
+
+    # Occupancy
+    lines.append(f"*Occupancy*")
+    lines.append(f"  Beds: {kpis['occupied_beds']}/{kpis['total_beds']} ({kpis['occupancy_pct']}%)")
+    lines.append(f"  Active tenants: {kpis['active_tenants']}")
+    lines.append("")
+
+    # Rent & collection
+    lines.append(f"*Rent*")
+    lines.append(f"  Avg agreed rent: Rs.{kpis['avg_agreed_rent']:,.0f}")
+    collected_pct = kpis['collection_rate']
+    lines.append(
+        f"  Collection rate: {collected_pct}%  "
+        f"(Rs.{kpis['total_collected']:,.0f} of Rs.{kpis['total_billed']:,.0f})"
+    )
+    lines.append("")
+
+    # Per-bed unit economics (only if bank data available)
+    if kpis["bank_available"]:
+        lines.append(f"*Per-Bed Unit Economics*")
+        lines.append(f"  True Revenue:  Rs.{kpis['true_revenue']:,.0f}")
+        lines.append(f"  OPEX:          Rs.{kpis['total_opex']:,.0f}")
+        sign = "+" if kpis["ebitda"] >= 0 else "-"
+        lines.append(
+            f"  EBITDA:        {sign}Rs.{abs(kpis['ebitda']):,.0f}  ({kpis['ebitda_margin']}%)"
+        )
+        lines.append("")
+        lines.append(f"  Revenue/bed:  Rs.{kpis['revenue_per_bed']:,.0f}")
+        lines.append(f"  Cost/bed:     Rs.{kpis['opex_per_bed']:,.0f}")
+        lines.append(f"  EBITDA/bed:   Rs.{kpis['ebitda_per_bed']:,.0f}")
+        if kpis["deposits_held"] > 0:
+            lines.append(f"\n_Deposits held deducted: Rs.{kpis['deposits_held']:,.0f}_")
+    else:
+        lines.append("_Upload bank statement to see revenue & cost per bed_")
 
     return "\n".join(lines)
 

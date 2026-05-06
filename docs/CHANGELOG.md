@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.22] — 2026-05-06 — Unit economics KPIs — PWA + WhatsApp bot
+
+### New: Unit Economics reporting (end-to-end)
+- **`src/services/unit_economics.py`** — core service computing all KPIs from DB + bank_transactions:
+  - Occupancy %, active tenants, avg agreed rent (True Rent — no deposits), collection rate
+  - True Revenue, OPEX, EBITDA, revenue/bed, cost/bed, EBITDA/bed, EBITDA margin (only when bank CSV uploaded)
+- **`GET /api/v2/app/finance/unit-economics?month=YYYY-MM`** — new admin-only API endpoint
+- **`web/components/finance/unit-economics-card.tsx`** — new PWA card with two sections: Occupancy/Rent (always) + Per-Bed Unit Economics (when bank data available)
+- **Finance page** (`web/app/finance/page.tsx`) — Unit Economics card added below P&L cards, loads on every month change
+- **Bot intent `QUERY_UNIT_ECONOMICS`** — registered in `intent_detector.py` at confidence 0.95 before REPORT
+  - Phrases: "unit economics", "revenue per bed", "cost per bed", "avg rent", "average bed rent", "collection rate", "unit kpi", "ebitda per bed", "property kpi"
+- **Bot handler** `_query_unit_economics` in `account_handler.py` — formats all KPIs as WhatsApp-friendly text
+- **`RECEPTIONIST_BLOCKED`** — QUERY_UNIT_ECONOMICS blocked from receptionist role (owner-only)
+- **Docs updated**: REPORTING.md (section 11b), BOT_FLOWS.md, BRAIN.md, CLAUDE.md
+
 ## [1.75.21] — 2026-05-06 — Explicit audit standard + CI/CD testing requirement
 
 ### sop_session.md — wrap-up now requires explicit audit table

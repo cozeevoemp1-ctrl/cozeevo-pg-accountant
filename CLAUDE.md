@@ -131,10 +131,12 @@ Kiran's Excel (offline)
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
-| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation (admin-only) |
+| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation, unit economics (admin-only) |
+| `src/services/unit_economics.py` | Unit economics — revenue/bed, cost/bed, EBITDA/bed, avg rent, collection rate (True Revenue only) |
+| `web/components/finance/unit-economics-card.tsx` | PWA Unit Economics card — occupancy, avg rent, collection rate, per-bed KPIs |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
-| `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation (admin-only) |
+| `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation, unit economics (admin-only) |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |
 | `src/reports/pnl_builder.py` | Canonical P&L builder — hardcoded verified Oct'25–Apr'26 figures. Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. Update here when figures change. |
 | `src/services/blacklist.py` | Blacklist service — `check_blacklisted()` (fuzzy name + phone), add/list/remove. Shared by REST API + onboarding guard. |

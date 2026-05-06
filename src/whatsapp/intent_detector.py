@@ -216,6 +216,8 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     (re.compile(r"(?:(?:give|get|show|find|list|who\s+is)\s+(?:me\s+)?(?:the\s+)?(?:our\s+)?(?:plumber|electrician|carpenter|painter|vendor|supplier|contact|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\b|(?:plumber|electrician|carpenter|painter|vendor|supplier|wifi|internet|gas|diesel|cleaner|housekeep|manpower|security|cctv|lift|water\s+tank|furniture|chair|mattress|gym|signage|plant)s?\s+(?:contact|number|phone|details?|vendor|guy)\b|(?:all|list|show)\s+(?:contacts?|vendors?|suppliers?)\b|vendor\s+(?:list|directory|contacts?)|contacts?\s+(?:list|for|of)\b|who\s+(?:do|did)\s+we\s+(?:call|use)\s+for\s+\w+|who\s+is\s+(?:the|our)\s+\w+\s+(?:vendor|supplier|guy|contact)|\w+\s+(?:number|contact|phone)\s*$)", re.I), "QUERY_CONTACTS", 0.93),
     # Log vacation / absence for tenant (any name, not hardcoded)
     (re.compile(r"(?:\w+\s+(?:on vacation|going home|on leave|absent|away|out of station|on holiday|chutti)|log vacation|\w+\s+vacation\s+(?:from|for|\d)|going home for|on leave from|will be away|out of station|vacation\s+(?:for\s+)?\d+\s+days?|chutti\s+(?:pe|par|\d+)|din\s+ke\s+liye\s+(?:bahar|ghar)|ghar\s+(?:gaya|gayi|gaye)\b|\w+\s+\d+\s+din\s+bahar\b|\w+\s+not\s+here\b|chutti\s+pe\s+(?:hai|hain|ho)\b|chutti\s+\w+\s+\d+\s+din\b)", re.I), "LOG_VACATION", 0.89),
+    # Unit economics / per-bed KPIs — MUST come before REPORT catch
+    (re.compile(r"(?:unit\s+(?:economics?|kpi|cost|revenue|profit)|(?:revenue|cost|opex|ebitda|profit)\s+per\s+bed|per.?bed\s+(?:revenue|cost|opex|ebitda|profit)|avg(?:erage)?\s+(?:bed\s+)?rent|average\s+(?:bed\s+)?rent(?:\s+per\s+bed)?|collection\s+rate|rent\s+collection\s+rate|property\s+kpi|performance\s+kpi|unit\s+profitability)", re.I), "QUERY_UNIT_ECONOMICS", 0.95),
     # Bank deposit matching — MUST come before REPORT/P&L catches
     (re.compile(r"(?:match\s+deposits?|deposit\s+match|check\s+deposits?|identify\s+deposits?|which\s+deposits?|tenant\s+deposits?\s+(?:in\s+bank|matched|verify)|deposit\s+identification|bank\s+deposits?\s+match)", re.I), "BANK_DEPOSIT_MATCH", 0.94),
     # Bank statement P&L report — MUST come before generic REPORT catch
@@ -534,7 +536,7 @@ _OWNER_DIRECT: frozenset[str] = frozenset({
     "QUERY_DUES", "QUERY_RECEIPT", "QUERY_TENANT", "QUERY_VACANT_ROOMS", "QUERY_OCCUPANCY",
     "QUERY_EXPIRING", "QUERY_CHECKINS", "QUERY_CHECKOUTS", "QUERY_CHECKOUT_ROOM", "QUERY_CONTACTS",
     "DAYSTAY_AVAILABILITY",
-    "REPORT", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
+    "REPORT", "QUERY_UNIT_ECONOMICS", "GET_WIFI_PASSWORD", "SET_WIFI", "ADD_PARTNER",
     "COMPLAINT_REGISTER", "COMPLAINT_UPDATE", "QUERY_COMPLAINTS",
     "ACTIVITY_LOG", "QUERY_ACTIVITY",
     "RULES", "HELP", "MORE_MENU",

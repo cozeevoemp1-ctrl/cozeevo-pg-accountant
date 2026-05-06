@@ -700,3 +700,30 @@ export function downloadPnlLive(): Promise<void> {
     `PnL_Live_${new Date().toISOString().slice(0, 10)}.xlsx`,
   );
 }
+
+export interface UnitEconomics {
+  month: string;
+  total_beds: number;
+  occupied_beds: number;
+  occupancy_pct: number;
+  active_tenants: number;
+  avg_agreed_rent: number;
+  total_billed: number;
+  total_collected: number;
+  collection_rate: number;
+  bank_available: boolean;
+  gross_income: number;
+  deposits_held: number;
+  true_revenue: number;
+  total_opex: number;
+  ebitda: number;
+  revenue_per_bed: number;
+  opex_per_bed: number;
+  ebitda_per_bed: number;
+  ebitda_margin: number;
+}
+
+export async function getUnitEconomics(month?: string): Promise<UnitEconomics> {
+  const qs = month ? `?month=${month}` : "";
+  return _get(`/api/v2/app/finance/unit-economics${qs}`);
+}

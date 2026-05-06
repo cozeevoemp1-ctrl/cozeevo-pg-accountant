@@ -554,6 +554,36 @@ For month M:
 
 ---
 
+## 11b. UNIT ECONOMICS
+
+### Definition
+Unit economics = per-bed breakdown of revenue, cost, and profit. All figures use **True Revenue** (bank gross income − security deposits held). Never use deposits as income.
+
+### KPIs computed by `src/services/unit_economics.py`
+
+| KPI | Formula | Data Source |
+|-----|---------|-------------|
+| Occupancy % | occupied_beds / total_beds × 100 | DB — tenancies |
+| Avg Agreed Rent | avg(tenancy.agreed_rent) for active monthly tenants | DB — tenancies (True Rent, no deposits) |
+| Collection Rate | rent_collected / rent_billed × 100 | DB — payments vs rent_schedule |
+| True Revenue | gross_bank_income + cash_rent − deposits_held | bank_transactions + payments (cash) |
+| OPEX | sum of OPEX-category bank expenses | bank_transactions |
+| EBITDA | True Revenue − OPEX | derived |
+| Revenue / Bed | True Revenue / occupied_beds | derived |
+| OPEX / Bed | OPEX / total_beds | derived |
+| EBITDA / Bed | EBITDA / occupied_beds | derived |
+| EBITDA Margin | EBITDA / True Revenue × 100 | derived |
+
+### Rules
+- **True Rent only** — agreed_rent excludes security_deposit and booking_amount
+- Bank KPIs (revenue/bed, cost/bed, EBITDA/bed) only shown when bank CSV uploaded for that month
+- Occupancy, avg rent, collection rate always available from DB
+- OPEX excludes: Furniture & Fittings, Capital Investment, Tenant Deposit Refund, Non-Operating
+- API: `GET /api/v2/app/finance/unit-economics?month=YYYY-MM`
+- Bot: `QUERY_UNIT_ECONOMICS` intent — phrases: "unit economics", "revenue per bed", "cost per bed", "avg rent", "collection rate", "unit kpi"
+
+---
+
 ## 12. KEY CONSTANTS
 
 | Constant | Value | Where Used |

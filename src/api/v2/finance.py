@@ -914,3 +914,23 @@ async def get_deposit_reconciliation(
             })
 
     return {"rows": rows}
+
+
+@router.get("/finance/unit-economics")
+async def get_unit_economics_api(
+    month: Optional[str] = Query(None, description="YYYY-MM format"),
+    user: AppUser = Depends(get_current_user),
+):
+    """Unit economics KPIs — revenue per bed, cost per bed, avg rent, collection rate."""
+    _require_admin(user)
+    today = date.today()
+    if month:
+        _validate_month(month)
+        m = date(int(month[:4]), int(month[5:7]), 1)
+    else:
+        m = date(today.year, today.month, 1)
+
+    from src.services.unit_economics import get_unit_economics
+    async with get_session() as session:
+        kpis = await get_unit_economics(m, session)
+    return {"month": m.strftime("%Y-%m"), **kpis}

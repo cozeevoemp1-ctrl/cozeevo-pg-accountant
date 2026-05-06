@@ -37,6 +37,7 @@ RECEPTIONIST_BLOCKED: frozenset[str] = frozenset({
     "VOID_PAYMENT",      # void/reverse payments
     "RENT_CHANGE",       # change permanent rent
     "RENT_DISCOUNT",     # one-time discount/surcharge
+    "QUERY_UNIT_ECONOMICS", # financial KPIs — owner only
 })
 
 

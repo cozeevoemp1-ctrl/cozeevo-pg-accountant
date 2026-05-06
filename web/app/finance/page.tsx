@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { getFinancePnl, getDepositReconciliation, downloadPnlExcel, downloadPnlLive, FinanceMonthData, FinanceUploadResult, DepositReconcileRow } from "@/lib/api"
+import { getFinancePnl, getDepositReconciliation, downloadPnlExcel, downloadPnlLive, getUnitEconomics, FinanceMonthData, FinanceUploadResult, DepositReconcileRow, UnitEconomics } from "@/lib/api"
 import { KpiTiles, IncomeCard, ExpenseCard } from "@/components/finance/pnl-cards"
 import { UploadCard } from "@/components/finance/upload-card"
 import { ReconcileCard } from "@/components/finance/reconcile-card"
+import { UnitEconomicsCard } from "@/components/finance/unit-economics-card"
 import { supabase } from "@/lib/supabase"
 
 function prevMonth(m: string): string {
@@ -34,6 +35,7 @@ export default function FinancePage() {
   )
   const [data, setData] = useState<FinanceMonthData | null>(null)
   const [reconcileRows, setReconcileRows] = useState<DepositReconcileRow[]>([])
+  const [unitEcon, setUnitEcon] = useState<UnitEconomics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [downloading, setDownloading] = useState(false)
@@ -51,12 +53,14 @@ export default function FinancePage() {
     setLoading(true)
     setError("")
     try {
-      const [pnlRes, reconcileRes] = await Promise.all([
+      const [pnlRes, reconcileRes, ueRes] = await Promise.all([
         getFinancePnl(m),
         getDepositReconciliation(m),
+        getUnitEconomics(m),
       ])
       setData(pnlRes.data[m] ?? null)
       setReconcileRows(reconcileRes.rows)
+      setUnitEcon(ueRes)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load")
     } finally {
@@ -130,6 +134,14 @@ export default function FinancePage() {
           <IncomeCard data={data} />
           <ExpenseCard data={data} />
           <ReconcileCard rows={reconcileRows} />
+        </>
+      )}
+
+      {/* Unit Economics — always shown (occupancy/rent from DB; per-bed figures need bank data) */}
+      {!loading && unitEcon && (
+        <>
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide px-1">Unit Economics</p>
+          <UnitEconomicsCard data={unitEcon} />
         </>
       )}
 

@@ -23,6 +23,7 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | QUERY_REFUNDS | "pending refunds" | account_handler | owner | List refunds |
 | BANK_REPORT | "bank report March" | finance_handler | owner | Parse bank statement → P&L |
 | BANK_DEPOSIT_MATCH | "match deposits" | finance_handler | owner | Match bank deposits to payments |
+| QUERY_UNIT_ECONOMICS | "unit economics", "revenue per bed", "cost per bed", "avg rent", "collection rate" | account_handler | owner | Per-bed KPIs: True Revenue, OPEX, EBITDA per bed, avg rent, occupancy, collection rate |
 | DASHBOARD_SUMMARY | "show dashboard", "dashboard summary", "all stats" | account_handler | owner | All 6 dashboard rows: occupancy, buildings, collection, status, notice, deposits |
 | SHOW_MASTER_DATA | "show master data", "bed count summary" | owner_handler | owner | Live DB snapshot: staff rooms + revenue beds per property |
 | ADD_TENANT | "add tenant Raj", "new check-in" | owner_handler | owner | New tenant onboarding |
