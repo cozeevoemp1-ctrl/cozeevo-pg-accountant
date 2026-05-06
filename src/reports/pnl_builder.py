@@ -20,17 +20,24 @@ from openpyxl.utils import get_column_letter
 from src.utils.inr_format import INR_NUMBER_FORMAT
 
 # ── Verified income figures (bank statement primary source) ───────────────────
+# THOR = original building (Yes Bank acct 124563400000961)
+# HULK = second building (Yes Bank acct 124563400000881, live from Mar 2026)
 MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 
 INCOME = {
-    "Bank — UPI batch settlements (merchant QR)":   [0,      0,        0,  175596, 2091597, 2515275, 2834731],
-    "Bank — individual direct payments + NEFT":     [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
-    "Cash (physical, not deposited to bank)":       [0,      0,        0,  300572,  653300, 1094220, 1343783],
+    # THOR building (acct ...0961)
+    "THOR — UPI batch settlements (merchant QR)":   [0,      0,        0,  175596, 2091597, 2515275, 2834731],
+    "THOR — individual direct payments + NEFT":     [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
+    "Cash (physical — both buildings combined)":    [0,      0,        0,  300572,  653300, 1094220, 1343783],
+    # HULK building (acct ...0881) — live from Mar 2026
+    "HULK — UPI batch settlements (merchant QR)":   [0,      0,        0,       0,       0,       0,  247719],
+    "HULK — cheque / other deposits":               [0,      0,        0,       0,       0,   71550,       0],
 }
 
 CAPITAL_CONTRIBUTIONS = {
-    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000, 0, 0,     0, 0, 0, 0],
-    "Kiran top-up transfer (Jan 2026)":                   [     0, 0, 0, 90000, 0, 0, 0],
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)":      [500000, 0, 0,     0, 0,      0, 0],
+    "Kiran top-up transfer (Jan 2026)":                        [     0, 0, 0, 90000, 0,      0, 0],
+    "Bharathi Prabhakaran — HULK startup capital (Mar 2026)":  [     0, 0, 0,     0, 0, 500000, 0],
 }
 
 OPEX = {
@@ -51,6 +58,8 @@ OPEX = {
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 75716,     88073,   3000,    3000,    3000],
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
     "Other Expenses":                                             [0, 10000, 83556,  4564,  23258,   78780,   99306],
+    # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
+    "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
 }
 
 CAPEX = {
@@ -74,7 +83,8 @@ DEPOSITS = {
     "  Maintenance Fee retained (non-refundable, by check-in month)": [0, 96000, 196000, 287500, 248000, 319700, 122000],
 }
 
-BANK_CLOSING_BALANCE = 1373863  # Apr 30
+BANK_CLOSING_BALANCE_THOR = 1373863   # THOR acct ...0961 Apr 30
+BANK_CLOSING_BALANCE_HULK =  814941   # HULK acct ...0881 Apr 30
 
 
 def build_pnl_workbook() -> openpyxl.Workbook:
@@ -217,7 +227,8 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     # 8. CASH POSITION
     ws.append(["CASH POSITION (Apr 30)"])
     ws[ws.max_row][0].font = bold
-    ws.append(["Bank closing balance (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE])
+    ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
+    ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
     ws.append(["Cash in hand", "", "", "", "", "", "", "← Ask Kiran"])
     ws.append(["Refundable Security Deposit liability", "", "", "", "", "", "", "← recompute from Apr Collection sheet"])
     ws.append(["True free cash", "", "", "", "", "", "", "= Bank + Cash − Refundable deposits"])

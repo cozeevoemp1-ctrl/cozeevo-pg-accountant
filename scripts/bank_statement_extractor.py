@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import re
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -164,7 +163,7 @@ def _detect_col_bounds(header_words: list[dict], page_width: float) -> dict[str,
     return bounds
 
 
-def extract_transactions(pdf_path: str | Path) -> pd.DataFrame:
+def extract_transactions(pdf_path: str | Path, password: str | None = None) -> pd.DataFrame:
     """
     Extract all transactions from an Indian bank statement PDF.
     Uses word-position grouping to avoid pdfplumber's merged-cell bug.
@@ -172,7 +171,8 @@ def extract_transactions(pdf_path: str | Path) -> pd.DataFrame:
     pdf_path = Path(pdf_path)
     all_rows: list[dict] = []
 
-    with pdfplumber.open(pdf_path) as pdf:
+    open_kwargs = {"password": password} if password else {}
+    with pdfplumber.open(pdf_path, **open_kwargs) as pdf:
         col_bounds: dict | None = None
         header_y_bottom: float = 0.0  # ignore words above this on each page
 
@@ -347,19 +347,19 @@ def enrich_transactions(df: pd.DataFrame) -> pd.DataFrame:
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
 
-def run_pipeline(pdf_path: str | None = None) -> None:
+def run_pipeline(pdf_path: str | None = None, password: str | None = None) -> None:
     if pdf_path:
         pdf_file = pdf_path
     else:
         pdf_files = [f for f in os.listdir(".") if f.lower().endswith(".pdf")]
         if not pdf_files:
-            print("❌ No PDF found in current folder. Pass path as argument.")
+            print("No PDF found in current folder. Pass path as argument.")
             return
         pdf_file = pdf_files[0]
 
     print(f"Processing: {pdf_file}")
 
-    df = extract_transactions(pdf_file)
+    df = extract_transactions(pdf_file, password=password)
 
     if df is None or df.empty:
         print("❌ Could not extract any transactions")
@@ -371,7 +371,7 @@ def run_pipeline(pdf_path: str | None = None) -> None:
     df.to_excel(output_file, index=False)
 
     print("=" * 50)
-    print("✅ Done")
+    print("OK Done")
     print(f"File  : {output_file}")
     print(f"Rows  : {len(df)}")
     if "Withdrawals" in df.columns:
@@ -383,5 +383,9 @@ def run_pipeline(pdf_path: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    pdf_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    run_pipeline(pdf_arg)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("pdf", nargs="?", help="PDF file path")
+    ap.add_argument("--password", "-p", default=None, help="PDF password")
+    args = ap.parse_args()
+    run_pipeline(args.pdf, password=args.password)
