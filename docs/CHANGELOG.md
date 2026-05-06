@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.15] — 2026-05-06 — P&L HULK integration + deposit structure overhaul
+
+### P&L — all 4 surfaces now consistent
+- **Deposit adjustment** added to income section: Gross Inflows → Deposit Adjustment (recv/refunded) → True Revenue. Operating Profit based on True Revenue, not gross.
+- **CAPEX + excluded items** no longer inflate `total_expense` on Finance page JSON (`get_pnl()`).
+- **All 4 surfaces consistent**: local Excel, `/finance/pnl/excel` (verified), `/finance/pnl/live`, Finance page JSON.
+
+### HULK building incorporated
+- **`AccountSummary Cozeevo hulk.pdf`** extracted (32 rows, Mar–May 2026, acct ...0881). `bank_statement_extractor.py` updated with `--password` flag for encrypted PDFs.
+- **`pnl_builder.py`** — renamed THOR income lines; added HULK UPI settlements (Apr ₹2.47L), HULK cheque (Mar ₹71.5K), HULK opex (Apr ₹4.3K), THOR→HULK inter-account transfer capital (Mar ₹5L). Bank closing balance split into THOR (₹13.7L) + HULK (₹8.1L).
+- **32 HULK transactions inserted** into `bank_transactions` (account_name=HULK). Bharathi RTGS/NEFT transfers reclassified as Non-Operating (inter-account, not income).
+
+### DEPOSITS HELD — fixed and split by check-in month
+- Security deposits now split by check-in month (active tenants only) in both `pnl_builder.py` and live Excel. Was incorrectly lumped in April.
+- Source: DB query 2026-05-06. Security refundable = ₹33.2L; maintenance retained = ₹10.7L.
+- Live Excel (`/finance/pnl/live`) now has full DEPOSITS HELD section — was missing entirely.
+
+---
+
 ## [1.75.14] — 2026-05-06 — May 2026 full data load
 
 ### May data import
