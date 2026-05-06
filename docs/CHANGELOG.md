@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.16] — 2026-05-06 — P&L structure cleanup + non-operating audit
+
+### P&L — deposit adjustment removed, structure simplified
+- **Removed DEPOSIT ADJUSTMENT section** from income — was confusing alongside DEPOSITS HELD. Income now shows gross inflows only. Operating Profit computed on gross.
+- **DEPOSITS HELD moved before CAPEX** — now appears between Operating Profit and CAPEX for better reading flow.
+- **All 4 surfaces updated**: `pnl_builder.py` (verified Excel), `_build_pnl_excel()` (live Excel), `get_pnl()` (JSON), `pnl-cards.tsx` + `api.ts` (PWA Finance page).
+- **Excel saved** to `data/reports/PnL_Cozeevo_v2_clean.xlsx`.
+
+### Investigations completed this session
+- **Deposits confirmed NOT in bank income** — DB query: all ₹40.4L in deposits paid via CASH (273 entries, zero via UPI/bank). ₹35.13L net profit is not inflated by deposits.
+- **₹5L THOR→HULK correctly handled** — Capital Contributions on HULK side, Excluded on THOR side. Does not affect profit either way.
+- **Non-operating transactions audited** — ₹32.12L total across 7 months shown in EXCLUDED section (not deducted from profit). Duplicate rows found in DB for most entries (total appears as ₹65.6L in DB vs ₹32.8L actual).
+- **March ₹20.9L breakdown identified**: ₹5L THOR→HULK (Bharathi), ₹7.5L Vakkalagadda Sravani "money exchange" (unclear), ₹2L Bharathi RTGS, ₹40K UPI to shalu.pravi2125, ₹6L Sri Lakshmi Chandrasekar.
+
+### Pending from this session — carry to next
+- Duplicate bank_transactions rows in DB — almost every non-operating entry appears twice; need dedup before live Excel is reliable
+- Kiran to identify: ₹7.5L "Vakkalagadda Sravani — money exchange" (Mar 10), ₹6L Sri Lakshmi Chandrasekar (Feb + Mar), ₹2L Bharathi Mar RTGS
+- Decide: add Non-Operating Outflows line below Net Profit to show cash impact of ₹32.12L transfers
+
+---
+
 ## [1.75.15] — 2026-05-06 — P&L HULK integration + deposit structure overhaul
 
 ### P&L — all 4 surfaces now consistent
