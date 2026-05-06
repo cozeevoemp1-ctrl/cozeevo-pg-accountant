@@ -139,6 +139,10 @@ Kiran's Excel (offline)
 | `src/reports/pnl_builder.py` | Canonical P&L builder — hardcoded verified Oct'25–Apr'26 figures. Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. Update here when figures change. |
 | `src/services/blacklist.py` | Blacklist service — `check_blacklisted()` (fuzzy name + phone), add/list/remove. Shared by REST API + onboarding guard. |
 | `src/api/v2/blacklist.py` | Blacklist REST API — GET/POST/DELETE `/api/v2/app/blacklist`. Admin-only. |
+| `scripts/_import_may_payments.py` | One-off: imports May rent payments from source sheet cols Z/AA by phone match. Idempotent. |
+| `scripts/_add_missing_may_tenants.py` | One-off: adds long-term tenants missing from DB (Chandraprakash, Mathew Koshy, Rama Krishnan, Akshitha Jawahar). |
+| `scripts/_add_daywise_may.py` | One-off: adds day-wise tenants missing from DB (Rayirth, Lakshmi Pathi, Chinchu David, Avirneni Karthik). |
+| `scripts/resync_missing_tenants_to_sheet.py` | Finds tenants in DB but missing from TENANTS ops sheet tab; appends them. Safe to re-run. |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations

@@ -2,6 +2,33 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.14] — 2026-05-06 — May 2026 full data load
+
+### May data import
+- **`scripts/_import_may_payments.py --write`** — 5 new payments committed (Satvik Suresh cash ₹12,500; Gnanesh UPI ₹13,000; Shivam Nath cash ₹15,000; Abhishek Charan UPI ₹19,066; Prakashita UPI ₹17,750 — phone typo fix, sheet 7275 vs DB 7375). 135 already in DB skipped.
+- **`scripts/_add_missing_may_tenants.py`** — 4 long-term tenants added to DB (missing from system):
+  - Chandraprakash (G20, tenancy 1078) — active May 2, rent ₹22k, cash ₹28k rent + UPI ₹5k booking
+  - Mathew Koshy (304, tenancy 1079) — active May 3, rent ₹28k, UPI ₹44k rent + cash ₹2k booking
+  - Rama Krishnan (G09, tenancy 1080) — no_show, check-in June 1, rent ₹9k, UPI ₹2k booking
+  - Akshitha Jawahar (214, tenancy 1081) — active May 3, rent ₹15k, UPI ₹2k booking (May rent unpaid)
+- **G20 reclassified** — `is_staff_room=false` in DB (Chandraprakash is regular tenant)
+- **`scripts/_add_daywise_may.py`** — 4 day-wise tenants added:
+  - Rayirth (G18, tenancy 1082) — active May 3–15, ₹1k/day, ₹1k cash
+  - Lakshmi Pathi (219, tenancy 1083) — no_show May 4–6, ₹1.2k booking
+  - Chinchu David (G17, tenancy 1084) — no_show May 4–6, ₹3.1k UPI (500 discount)
+  - Avirneni Karthik (510, tenancy 1085) — active May 6–25, ₹700/day, ₹2.6k UPI
+  - Shashank B V (G18) stale active record fixed → exited (Apr 28)
+- **TENANTS master tab** — 5 rows appended via `resync_missing_tenants_to_sheet.py`
+- **Ops sheet resynced** — MAY 2026: Cash ₹13,05,800 · UPI ₹13,27,565 · Collected ₹26,33,365 · Occ 94.6%
+- **DAY WISE tab resynced** — 42 rows, 2 active today
+
+### Pending (next data load)
+- Covai (room 121) — no phone, room full in DB; ask Kiran which room
+- Vijay Kumar — room "June" data error in source sheet; ask Kiran actual room
+- Prem Prasana — blacklisted, moved out May 6, cleared dues (correct)
+
+---
+
 ## [1.75.13] — 2026-05-06 — Blacklist system + reminders paused
 
 ### Blacklist (complete feature)
