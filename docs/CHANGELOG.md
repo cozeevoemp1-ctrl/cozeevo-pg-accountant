@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.12] — 2026-05-06 — Balance Adjustment PWA + UPDATE_SHARING_TYPE bot fix
+
+### PWA
+- **Balance Adjustment section** on Edit Tenant page — toggle Waive/Add Charge, amount, required reason, live preview of new effective due, two-tap confirm. Separate save flow (doesn't affect main tenant edit form).
+- **Credit balance display** — shows "Credit ₹X" badge when tenant has paid more than effective due.
+- **Existing adjustment display** — shows current adjustment and note inline (green for waive, amber for surcharge).
+
+### Backend
+- **`PATCH /api/v2/app/tenants/{id}/adjustment`** — new endpoint sets `RentSchedule.adjustment` and `adjustment_note` for current month. Positive = surcharge, negative = waive. Writes AuditLog. Triggers sheet sync (monthly or day-wise based on stay type).
+- **`GET /api/v2/app/tenants/{id}/dues`** — now returns `credit`, `rent_due`, `adjustment`, `adjustment_note`, `booking_amount` fields. `credit = max(paid - effective_due, 0)`.
+- **`lib/api.ts`** — added `patchAdjustment()`, `AdjustmentResult` type. Extended `TenantDues` interface with all new fields.
+
+### Bot fix (UPDATE_SHARING_TYPE context loss — from screenshot)
+- **`intent_detector.py` line 154** — regex now matches "change [room] to [type] sharing" word order (previously only matched "sharing to [type]" order, causing Groq fallback with no pending state saved → "1" response lost).
+- **`update_handler.py` update_sharing_type()** — now extracts room number from message and tries room-number lookup before name lookup. Added `_find_active_tenants_by_room` to top-level import.
+
+### Test
+- Golden suite: 79/105 passing (up from 76/105) — 0 regressions from this session.
+- Root cause of 93-failure run found: `TEST_MODE=0` on VPS meant `clear-pending` endpoint was never registered, so pending state from one test bled into all subsequent tests. Fixed for this run by temporarily flipping TEST_MODE=1, clearing all pending, then restoring.
+
+---
+
 ## [1.75.11] — 2026-05-05 — May 2026 payment import (bulk, from April source sheet)
 
 ### Data
