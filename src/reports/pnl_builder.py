@@ -207,13 +207,32 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append([])
 
     # 8. CASH POSITION
+    # Security deposits: collected from active tenants (refundable, must return at exit)
+    _sec_collected  = sum(DEPOSITS["Security Deposits — refundable (must return to active tenants)"])
+    _sec_refunded   = sum(EXCLUDED["Tenant Deposit Refund (balance sheet)"])
+    _sec_net_owed   = _sec_collected - _sec_refunded   # what we still owe to tenants
+    _bank_total     = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
+
     ws.append(["CASH POSITION (Apr 30)"])
     ws[ws.max_row][0].font = bold
     ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
     ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
-    ws.append(["Cash in hand", "", "", "", "", "", "", "← Ask Kiran"])
-    ws.append(["Refundable Security Deposit liability", "", "", "", "", "", "", "← recompute from Apr Collection sheet"])
-    ws.append(["True free cash", "", "", "", "", "", "", "= Bank + Cash − Refundable deposits"])
+    ws.append(["Total bank balance", "", "", "", "", "", "", _bank_total])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    ws.append(["Cash in hand (physical)", "", "", "", "", "", "", "← confirm with Kiran"])
+    ws.append([])
+    ws.append(["Security deposits collected (refundable, active tenants)", "", "", "", "", "", "", _sec_collected])
+    ws.append(["Less: deposits already refunded to exited tenants", "", "", "", "", "", "", -_sec_refunded])
+    ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", _sec_net_owed])
+    for c in ws[ws.max_row]:
+        c.font = Font(bold=True, color="9C0006")
+    ws.append([])
+    ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", _bank_total - _sec_net_owed])
+    for c in ws[ws.max_row]:
+        c.font = Font(bold=True)
+    ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)", "", "", "", "", "", "", ""])
+    ws.append(["As revenue grows, bank balance will recover and exceed deposit liability", "", "", "", "", "", "", ""])
     ws.append([])
 
     # 9. FLAGS
