@@ -137,6 +137,8 @@ Kiran's Excel (offline)
 | `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation (admin-only) |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |
 | `src/reports/pnl_builder.py` | Canonical P&L builder — hardcoded verified Oct'25–Apr'26 figures. Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. Update here when figures change. |
+| `src/services/blacklist.py` | Blacklist service — `check_blacklisted()` (fuzzy name + phone), add/list/remove. Shared by REST API + onboarding guard. |
+| `src/api/v2/blacklist.py` | Blacklist REST API — GET/POST/DELETE `/api/v2/app/blacklist`. Admin-only. |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations

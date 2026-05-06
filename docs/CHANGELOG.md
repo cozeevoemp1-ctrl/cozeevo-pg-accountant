@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.13] — 2026-05-06 — Blacklist system + reminders paused
+
+### Blacklist (complete feature)
+- **`blacklist` DB table** — id, name, phone, reason, added_by, is_active, created_at. Soft-delete via `is_active`. Migration added to `migrate_all.py`.
+- **`src/services/blacklist.py`** — shared service: `check_blacklisted()` (fuzzy name + last-10-digit phone), `add_to_blacklist()`, `list_blacklist()`, `remove_from_blacklist()`.
+- **`src/api/v2/blacklist.py`** — REST API: `GET /blacklist` (list), `POST /blacklist` (add), `DELETE /blacklist/{id}` (soft-delete). Registered in `app_router.py`.
+- **Onboarding guard** — check at session CREATE (phone) and session APPROVE (name + phone). Returns HTTP 403 with reason if matched.
+- **Bot commands** (owner/admin only):
+  - `blacklist [name] — [reason]` → adds with reason
+  - `blacklist [name]` → prompts for reason (multi-turn)
+  - `show blacklist` → lists all active entries with ID, name, phone, reason
+  - `remove blacklist [name or ID]` → confirmation flow; multiple matches → numbered pick → confirm → remove
+- **Full E2E tested**: 28/28 tests passing — add, show, remove by ID, remove by name, fuzzy disambiguation, cancel flows, edge cases (not found, already removed, partial name match).
+- **Prem Prasana** added to blacklist: "Do not admit — flagged by owner."
+
+### Reminders paused
+- `REMINDERS_PAUSED=1` in VPS `.env` — all rent reminder jobs check this flag and skip silently. Re-enable: `sed -i '/REMINDERS_PAUSED/d' /opt/pg-accountant/.env && systemctl restart pg-accountant`.
+
+### Fixes (found during blacklist E2E)
+- `migrate_all.py` — two `→` Unicode chars replaced with `->` (crashed Windows console with charmap error)
+- `intent_detector.py` — BLACKLIST_REMOVE listed before BLACKLIST_ADD; `\b` word boundaries on `blacklist`/`block`/`ban` so "unblacklist" no longer triggers ADD
+- `owner_handler.py` — `entities["_raw_message"]` (was `entities["raw"]`); `is_affirmative()` (was `is_positive()`)
+
+---
+
 ## [1.75.12] — 2026-05-06 — Balance Adjustment PWA + UPDATE_SHARING_TYPE bot fix
 
 ### PWA

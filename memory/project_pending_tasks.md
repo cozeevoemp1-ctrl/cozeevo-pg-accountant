@@ -6,10 +6,31 @@ type: project
 
 ## Active / Next Up
 
+### Data fixes (from May payment import — 2026-05-05)
+1. **G20 reclassification** — `UPDATE rooms SET is_staff_room=false WHERE room_number='G20'` + re-sync + import Chandraprakash ₹33k payment. Blocked because G20 is staff room in DB.
+2. **6 skipped tenants in May import** — need manual payment recording:
+   - Prakashita room 620 (+917275547390)
+   - Chandraprakash room G20 (+919506064442) — blocked on G20 fix above
+   - Mathew Koshy room 304 (+919446655101)
+   - Rama Krishnan room G09 (+919842378754)
+   - Vijay Kumar (room listed "June" in sheet — data error, needs clarification)
+   - Akshitha Jawahar room 214 (+919500006551)
+3. **5 UNASSIGNED-room tenants with dues** — Tanya Rishikesh, Nihanth, Kiran Koushik, Ganesh Magi, Aditya Sable
+4. **Room mismatches** — Gayatri Kulkarni NM (sheet:514, DB:519), Ganesh Magi (sheet:418, DB:219)
+
+### Reminders
+5. **REMINDERS_PAUSED=1** — still active on VPS. Re-enable when Kiran says so: `sed -i '/REMINDERS_PAUSED/d' /opt/pg-accountant/.env && systemctl restart pg-accountant`
+
 ### PWA — next features
-1. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
-2. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
-3. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row.
+6. **Smart Query** — AI query bar on dashboard home. Needs `/api/v2/app/query` backend endpoint (NL → DB query → answer). Groq llama-3.3-70b.
+7. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
+8. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row. (Backend done; PWA UI done on edit-tenant page — may already be complete, verify.)
+
+### Completed this session (2026-05-06 — blacklist + reminders pause)
+- ✅ **Blacklist system** — DB table, service layer, REST API, onboarding guard, bot commands (add/show/remove with disambiguation), 28/28 E2E tests passing.
+- ✅ **Prem Prasana blacklisted** — "Do not admit — flagged by owner."
+- ✅ **REMINDERS_PAUSED=1** — all rent reminders silenced on VPS until further notice.
+- ✅ **migrate_all.py Unicode fix** — `→` → `->` (was crashing Windows console)
 
 ### Completed this session (2026-04-29, session 5)
 - ✅ **Proration choice toggle** — Full/Prorated toggle on edit form when rent or room changes; backend honours `prorate_this_month` flag for both room-change and rent-only cases.
