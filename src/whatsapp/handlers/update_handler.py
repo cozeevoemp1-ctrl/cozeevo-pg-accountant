@@ -24,8 +24,8 @@ from src.database.models import (
 )
 from src.whatsapp.role_service import CallerContext
 from src.whatsapp.handlers._shared import (
-    _save_pending, _find_active_tenants_by_name, _find_similar_names,
-    _make_choices, _format_choices_message, _format_no_match_message,
+    _save_pending, _find_active_tenants_by_name, _find_active_tenants_by_room,
+    _find_similar_names, _make_choices, _format_choices_message, _format_no_match_message,
 )
 
 
@@ -82,21 +82,46 @@ async def update_sharing_type(entities: dict, ctx: CallerContext, session: Async
             "Example: _Anukriti premium_ or _Raj double_"
         )
 
-    # Find tenant
+    # Find tenant — try room number first, then name
+    room_m = re.search(r"\b([A-Z]?\d{2,3}[A-Z]?(?:-[A-Z])?)\b", desc, re.I)
+    room_from_desc = room_m.group(1).upper() if room_m else ""
+
     if not name:
-        # Try to extract name from description
-        clean = re.sub(r"\b(change|update|set|modify|sharing|type|to|for|is|in|premium|single|double|triple)\b", "", desc, flags=re.I).strip()
+        clean = re.sub(r"\b(change|update|set|modify|sharing|type|to|for|is|in|premium|single|double|triple|room|bed|configuration)\b", "", desc, flags=re.I).strip()
+        clean = re.sub(r"\b[A-Z]?\d{2,3}[A-Z]?(?:-[A-Z])?\b", "", clean, flags=re.I).strip()
         name = clean
 
-    if not name or len(name) < 2:
-        return "Which tenant? Reply: *[Name] [sharing type]*"
+    rows = []
+    if room_from_desc:
+        rows = await _find_active_tenants_by_room(room_from_desc, session)
 
-    tenant, tenancy, room, early = await _disambiguate_or_pick(
-        name, ctx, session, "sharing_type", new_sharing,
-        f"change sharing to {new_sharing}",
-    )
-    if early:
-        return early
+    if not rows and name and len(name) >= 2:
+        tenant, tenancy, room_obj, early = await _disambiguate_or_pick(
+            name, ctx, session, "sharing_type", new_sharing,
+            f"change sharing to {new_sharing}",
+        )
+        if early:
+            return early
+        if tenant:
+            rows = [(tenant, tenancy, room_obj)]
+
+    if not rows:
+        identifier = room_from_desc or name
+        if not identifier or len(identifier) < 2:
+            return "Which tenant? Reply: *[Name] [sharing type]* or *room [room number] [sharing type]*"
+        suggestions = await _find_similar_names(identifier, session)
+        return _format_no_match_message(identifier, suggestions)
+
+    if len(rows) > 1:
+        choices = _make_choices(rows)
+        await _save_pending(
+            ctx.phone, "FIELD_UPDATE_WHO",
+            {"field": "sharing_type", "new_value": new_sharing},
+            choices, session,
+        )
+        return _format_choices_message(room_from_desc or name, choices, f"change sharing to {new_sharing}")
+
+    tenant, tenancy, room = rows[0]
 
     raw = tenancy.sharing_type
     old_sharing = raw.value if hasattr(raw, "value") else (raw or "not set")

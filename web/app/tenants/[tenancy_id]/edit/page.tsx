@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
-import { getTenantDues, patchTenant, deleteTenant, TenantDues, PatchTenantBody } from "@/lib/api"
+import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, TenantDues, PatchTenantBody } from "@/lib/api"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -63,6 +63,15 @@ export default function EditTenantPage() {
   const [deleteReason, setDeleteReason] = useState("")
   const [forceDeleteNeeded, setForceDeleteNeeded] = useState(false)
   const [forceDeleteWarned, setForceDeleteWarned] = useState(false)
+
+  // Balance adjustment state
+  const [adjAmount, setAdjAmount] = useState("")
+  const [adjNote, setAdjNote] = useState("")
+  const [adjType, setAdjType] = useState<"waive" | "surcharge">("waive")
+  const [adjWarned, setAdjWarned] = useState(false)
+  const [adjSubmitting, setAdjSubmitting] = useState(false)
+  const [adjError, setAdjError] = useState("")
+  const [adjSuccess, setAdjSuccess] = useState("")
 
   useEffect(() => {
     if (!tenancyId) return
@@ -233,6 +242,43 @@ export default function EditTenantPage() {
       setForceDeleteWarned(false)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function handleAdjustment() {
+    setAdjError("")
+    const amt = parseFloat(adjAmount)
+    if (!adjAmount || isNaN(amt) || amt <= 0) {
+      setAdjError("Enter a valid positive amount.")
+      return
+    }
+    if (!adjNote.trim()) {
+      setAdjError("Reason is required.")
+      return
+    }
+    if (!adjWarned) {
+      setAdjWarned(true)
+      return
+    }
+    setAdjSubmitting(true)
+    try {
+      const signedAmt = adjType === "waive" ? -amt : amt
+      const result = await patchAdjustment(tenancyId, signedAmt, adjNote.trim())
+      setAdjSuccess(
+        adjType === "waive"
+          ? `Waived ₹${amt.toLocaleString("en-IN")} — new dues ₹${Math.max(result.effective_due, 0).toLocaleString("en-IN")}`
+          : `Added ₹${amt.toLocaleString("en-IN")} charge — new dues ₹${result.effective_due.toLocaleString("en-IN")}`
+      )
+      setAdjAmount("")
+      setAdjNote("")
+      setAdjWarned(false)
+      // Refresh original to reflect new adjustment
+      getTenantDues(tenancyId).then(setOriginal).catch(() => {})
+    } catch (err) {
+      setAdjError(err instanceof Error ? err.message : "Adjustment failed.")
+      setAdjWarned(false)
+    } finally {
+      setAdjSubmitting(false)
     }
   }
 
@@ -502,6 +548,109 @@ export default function EditTenantPage() {
               className="w-full rounded-[16px] border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors resize-none"
             />
           </div>
+        </div>
+
+        {/* Balance Adjustment */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Balance Adjustment</p>
+            {original && (
+              <span className="text-[10px] text-ink-muted">
+                {original.period_month} · Due ₹{(original.rent_due + original.adjustment).toLocaleString("en-IN")}
+              </span>
+            )}
+          </div>
+
+          {/* Current state row */}
+          {original && (
+            <div className="flex gap-2 text-[11px]">
+              <span className="bg-[#F5F3F0] rounded-pill px-3 py-1 text-ink-muted">
+                Rent ₹{original.rent_due.toLocaleString("en-IN")}
+              </span>
+              {original.adjustment !== 0 && (
+                <span className={`rounded-pill px-3 py-1 font-semibold ${original.adjustment < 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEF3C7] text-[#92400E]"}`}>
+                  {original.adjustment < 0 ? "−" : "+"}₹{Math.abs(original.adjustment).toLocaleString("en-IN")} {original.adjustment_note || ""}
+                </span>
+              )}
+              {original.credit > 0 && (
+                <span className="bg-[#EFF6FF] rounded-pill px-3 py-1 font-semibold text-[#1D4ED8]">
+                  Credit ₹{original.credit.toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Type toggle */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setAdjType("waive"); setAdjWarned(false); setAdjError("") }}
+              className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${adjType === "waive" ? "bg-[#D1FAE5] border-[#6EE7B7] text-[#065F46]" : "bg-bg border-[#E0DDD8] text-ink-muted"}`}
+            >
+              Waive / Write-off
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAdjType("surcharge"); setAdjWarned(false); setAdjError("") }}
+              className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${adjType === "surcharge" ? "bg-[#FEF3C7] border-[#FCD34D] text-[#92400E]" : "bg-bg border-[#E0DDD8] text-ink-muted"}`}
+            >
+              Add Charge
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Amount (₹)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={adjAmount}
+              onChange={(e) => { setAdjAmount(e.target.value); setAdjWarned(false); setAdjError("") }}
+              placeholder="e.g. 5000"
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Reason (required)</label>
+            <input
+              type="text"
+              value={adjNote}
+              onChange={(e) => { setAdjNote(e.target.value); setAdjWarned(false); setAdjError("") }}
+              placeholder="e.g. collected cash offline Apr 15 / water issue"
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+            />
+          </div>
+
+          {/* Preview */}
+          {adjAmount && !isNaN(parseFloat(adjAmount)) && parseFloat(adjAmount) > 0 && original && (
+            <div className="rounded-tile bg-[#F5F3F0] px-3 py-2 text-xs text-ink-muted">
+              {(() => {
+                const amt = parseFloat(adjAmount)
+                const signedAdj = adjType === "waive" ? -amt : amt
+                const newEffective = original.rent_due + signedAdj
+                const newDues = Math.max(newEffective - (original.rent_due + original.adjustment - original.dues), 0)
+                return adjType === "waive"
+                  ? `After waive: effective due ₹${Math.max(newEffective, 0).toLocaleString("en-IN")}`
+                  : `After charge: effective due ₹${newEffective.toLocaleString("en-IN")}`
+              })()}
+            </div>
+          )}
+
+          {adjError && <p className="text-xs text-status-warn font-medium">{adjError}</p>}
+          {adjSuccess && <p className="text-xs text-status-ok font-semibold">{adjSuccess}</p>}
+
+          <button
+            type="button"
+            onClick={handleAdjustment}
+            disabled={adjSubmitting || !adjAmount || !adjNote.trim()}
+            className={`rounded-pill py-2.5 text-sm font-bold w-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              adjWarned
+                ? "bg-brand-pink text-white"
+                : "border border-brand-pink text-brand-pink bg-bg"
+            }`}
+          >
+            {adjSubmitting ? "Saving…" : adjWarned ? "Confirm Adjustment" : adjType === "waive" ? "Waive Dues →" : "Add Charge →"}
+          </button>
         </div>
 
         {/* Notice */}

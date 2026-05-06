@@ -171,7 +171,12 @@ export interface TenantDues {
   room_number: string;
   building_code: string;
   rent: number;
+  rent_due: number;
+  adjustment: number;
+  adjustment_note: string | null;
+  booking_amount: number;
   dues: number;
+  credit: number;
   checkin_date: string | null;
   security_deposit: number;
   maintenance_fee: number;
@@ -190,6 +195,18 @@ export function searchTenants(q: string): Promise<TenantSearchResult[]> {
 
 export function getTenantDues(tenancyId: number): Promise<TenantDues> {
   return _get<TenantDues>(`/api/v2/app/tenants/${tenancyId}/dues`);
+}
+
+export interface AdjustmentResult {
+  tenancy_id: number;
+  period_month: string;
+  adjustment: number;
+  adjustment_note: string;
+  effective_due: number;
+}
+
+export function patchAdjustment(tenancyId: number, amount: number, note: string): Promise<AdjustmentResult> {
+  return _patch<AdjustmentResult>(`/api/v2/app/tenants/${tenancyId}/adjustment`, { amount, note });
 }
 
 // ── Physical check-in ────────────────────────────────────────────────────────

@@ -208,7 +208,9 @@ async def get_tenant_dues(
     rent_due   = float(rs.rent_due)   if rs else rent
     adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
 
-    dues = max(rent_due + adjustment - paid, 0.0)
+    effective_due = rent_due + adjustment
+    dues = max(effective_due - paid, 0.0)
+    credit = max(paid - effective_due, 0.0)
     booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
 
     # Last payment (any type, not voided) for this tenancy
@@ -237,6 +239,7 @@ async def get_tenant_dues(
         "adjustment_note": rs.adjustment_note if rs else None,
         "booking_amount": booking_amount,
         "dues": dues,
+        "credit": credit,
         "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
         "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
         "maintenance_fee": float(tenancy.maintenance_fee) if tenancy.maintenance_fee is not None else 0.0,
@@ -512,6 +515,93 @@ async def update_tenant(
         "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
         "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
         "notes": tenancy.notes,
+    }
+
+
+@router.patch("/tenants/{tenancy_id}/adjustment")
+async def patch_adjustment(
+    tenancy_id: int,
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    """Set adjustment + note on the current month's RentSchedule.
+
+    Positive amount = surcharge (dues go up).
+    Negative amount = waive/concession (dues go down).
+    Pass amount=0 to clear a prior adjustment.
+    """
+    amount = body.get("amount")
+    note = (body.get("note") or "").strip()
+    if amount is None:
+        raise HTTPException(status_code=422, detail="amount is required")
+    if not note:
+        raise HTTPException(status_code=422, detail="note (reason) is required")
+
+    from decimal import Decimal
+    adj = Decimal(str(float(amount)))
+
+    today = date.today()
+    period_month = today.replace(day=1)
+
+    async with get_session() as session:
+        row = (await session.execute(
+            select(Tenancy, Tenant, Room)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Tenancy.room_id == Room.id)
+            .where(Tenancy.id == tenancy_id)
+        )).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Tenancy not found")
+        tenancy, tenant, room = row
+
+        rs = await session.scalar(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy_id,
+                RentSchedule.period_month == period_month,
+            )
+        )
+        if rs:
+            rs.adjustment = adj
+            rs.adjustment_note = note
+        else:
+            session.add(RentSchedule(
+                tenancy_id=tenancy_id,
+                period_month=period_month,
+                rent_due=Decimal(str(float(tenancy.agreed_rent or 0))),
+                adjustment=adj,
+                adjustment_note=note,
+                org_id=tenancy.org_id,
+            ))
+
+        session.add(AuditLog(
+            changed_by=user.user_id or "pwa",
+            entity_type="rent_schedule",
+            entity_id=tenancy_id,
+            entity_name=tenant.name,
+            field="adjustment",
+            old_value=str(float(rs.adjustment)) if rs and rs.adjustment else "0",
+            new_value=str(float(adj)),
+            room_number=room.room_number,
+            source="pwa",
+            note=note,
+            org_id=tenancy.org_id,
+        ))
+        await session.commit()
+
+    from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync
+    if tenancy.stay_type.value == "daily":
+        trigger_daywise_sheet_sync()
+    else:
+        trigger_monthly_sheet_sync(today.month, today.year)
+
+    rent_due = float(tenancy.agreed_rent or 0)
+    effective_due = rent_due + float(adj)
+    return {
+        "tenancy_id": tenancy_id,
+        "period_month": period_month.strftime("%Y-%m"),
+        "adjustment": float(adj),
+        "adjustment_note": note,
+        "effective_due": effective_due,
     }
 
 

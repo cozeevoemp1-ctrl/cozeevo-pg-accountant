@@ -151,7 +151,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # "Ganesh Divekar") — accept up to 4 name tokens. Earlier the group was
     # `(?:\w+\s+)?` which only allowed single-word names, so 2+word-name flows
     # went to UNKNOWN intent ("I didn't understand that").
-    (re.compile(r"(?:change|update|set|modify|switch)\s+(?:\w+\s+){0,4}?(?:sharing\s*(?:type)?|sharing)\s+(?:to\s+)?(?:premium|single|double|triple)|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing", re.I), "UPDATE_SHARING_TYPE", 0.94),
+    (re.compile(r"(?:change|update|set|modify|switch)\s+(?:\w+\s+){0,4}?(?:sharing\s*(?:type)?|sharing)\s+(?:to\s+)?(?:premium|single|double|triple)|(?:change|update|set|modify|switch)\s+(?:room\s+)?(?:\w+\s+){0,3}?(?:to\s+)?(?:premium|single|double|triple)\s+sharing(?:\s+(?:type|bed|room|configuration))?|(?:\w+)\s+(?:is\s+)?(?:in\s+)?premium\s+sharing", re.I), "UPDATE_SHARING_TYPE", 0.94),
     (re.compile(r"(?:change|update|set|modify|revise)\s+(?:\w+\s+){0,4}?rent\s+(?:to\s+)?\d|(?:\w+)\s+rent\s+(?:is|=|should\s+be)\s+\d", re.I), "UPDATE_RENT", 0.93),
     # UPDATE_PHONE moved up (before UPDATE_CONTACT at line ~115) — see note there.
     (re.compile(r"(?:change|update|set|modify)\s+(?:\w+\s+){0,4}?gender\s+(?:to\s+)?(?:male|female)|(?:\w+)\s+(?:is\s+)?(?:male|female)", re.I), "UPDATE_GENDER", 0.93),
