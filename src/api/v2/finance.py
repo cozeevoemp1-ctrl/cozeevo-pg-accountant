@@ -281,43 +281,18 @@ async def get_pnl(
 
             total_expense    = sum(e["amount"] for e in expenses)
             total_capex      = sum(e["amount"] for e in capex_items)
-            # Deposits received this month (from tenancies by check-in date)
-            dep_recv_rows = await session.execute(
-                select(func.sum(Tenancy.security_deposit + Tenancy.maintenance_fee))
-                .where(
-                    func.date_trunc("month", Tenancy.checkin_date) == start,
-                    Tenancy.status != "no_show",
-                )
-            )
-            deposits_received = float(dep_recv_rows.scalar() or 0)
-
-            # Deposit refunds paid this month (from checkout_records)
-            dep_ref_rows = await session.execute(
-                select(func.sum(CheckoutRecord.deposit_refunded_amount))
-                .where(
-                    CheckoutRecord.deposit_refund_date.between(start, end),
-                    CheckoutRecord.deposit_refunded_amount > 0,
-                )
-            )
-            deposits_refunded = float(dep_ref_rows.scalar() or 0)
-
             total_gross      = upi_batch + direct_neft + cash_db
-            net_dep_adj      = -deposits_received + deposits_refunded
-            total_income     = total_gross + net_dep_adj  # true rent revenue
-            operating_profit = total_income - total_expense
+            operating_profit = total_gross - total_expense
             net_profit       = operating_profit - total_capex
-            margin           = round(operating_profit / total_income * 100, 1) if total_income else 0.0
+            margin           = round(operating_profit / total_gross * 100, 1) if total_gross else 0.0
 
             result[m] = {
                 "month": m,
                 "income": {
-                    "upi_batch":          upi_batch,
-                    "direct_neft":        direct_neft,
-                    "cash_db":            cash_db,
-                    "total_gross":        total_gross,
-                    "deposits_received":  deposits_received,
-                    "deposits_refunded":  deposits_refunded,
-                    "total":              total_income,   # true revenue (deposits stripped)
+                    "upi_batch":   upi_batch,
+                    "direct_neft": direct_neft,
+                    "cash_db":     cash_db,
+                    "total":       total_gross,
                 },
                 "capital":          capital,
                 "expenses":         expenses,
@@ -577,9 +552,6 @@ def _build_pnl_excel(
     TRUE_FILL = PatternFill("solid", fgColor="E2EFDA")
     BOLD_DEP  = Font(bold=True, color="7F6000", size=9)
 
-    dep_recv  = dep_recv or {}
-    dep_ref   = dep_ref  or {}
-
     # ── GROSS INFLOWS ─────────────────────────────────────────────────────────
     _section("GROSS INFLOWS")
     gross_month: dict = defaultdict(float)
@@ -597,23 +569,6 @@ def _build_pnl_excel(
             fill = WHT_FILL if fill == ALT_FILL else ALT_FILL
 
     _total_row("Total Gross Inflows", gross_month, GRN_FILL, BOLD_GRN)
-
-    # ── DEPOSIT ADJUSTMENT ────────────────────────────────────────────────────
-    neg_recv: dict = {m: -dep_recv.get(m, 0) for m in all_months}
-    pos_ref:  dict = {m:  dep_ref.get(m, 0)  for m in all_months}
-    net_dep:  dict = {m: neg_recv[m] + pos_ref[m] for m in all_months}
-
-    if any(v for v in dep_recv.values()) or any(v for v in dep_ref.values()):
-        _data_row("(-) Deposits received (security + maintenance, by check-in month)",
-                  neg_recv, DEP_FILL, font=Font(size=9, color="7F6000"), indent=True)
-        _data_row("(+) Deposit refunds paid to exiting tenants",
-                  pos_ref,  DEP_FILL, font=Font(size=9, color="375623"), indent=True)
-        _total_row("Net Deposit Adjustment", net_dep, DEP_FILL, BOLD_DEP)
-
-    # ── TRUE REVENUE ──────────────────────────────────────────────────────────
-    true_rev_month: dict = {m: gross_month.get(m, 0) + net_dep.get(m, 0) for m in all_months}
-    _total_row("True Revenue (rent only — deposits excluded)", true_rev_month, TRUE_FILL,
-               Font(bold=True, color="375623"))
     _blank()
 
     # ── OPERATING EXPENSES ────────────────────────────────────────────────────
@@ -631,9 +586,9 @@ def _build_pnl_excel(
     _total_row("Total Operating Expenses", opex_month, RED_FILL, BOLD_RED)
     _blank()
 
-    # ── OPERATING PROFIT (on True Revenue) ───────────────────────────────────
-    op_profit_month: dict = {m: true_rev_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
-    _total_row("Operating Profit (on True Revenue)", op_profit_month, GRN_FILL, BOLD_GRN)
+    # ── OPERATING PROFIT (on Gross Inflows) ──────────────────────────────────
+    op_profit_month: dict = {m: gross_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
+    _total_row("Operating Profit", op_profit_month, GRN_FILL, BOLD_GRN)
     _blank()
 
     # ── EXCLUDED (balance sheet items — for reference only) ───────────────────
@@ -648,27 +603,7 @@ def _build_pnl_excel(
             _data_row(cat, cat_data, EXC_FILL, indent=True)
         _blank()
 
-    # ── CAPEX ─────────────────────────────────────────────────────────────────
-    capex_month: dict = defaultdict(float)
-    has_capex = any(by_cat.get(c, {}) for c in _CAPEX_CATS)
-    if has_capex:
-        _section("CAPITAL EXPENDITURE (one-time investments)")
-        for cat in _CAPEX_CATS:
-            cat_data = by_cat.get(cat, {})
-            if not any(cat_data.values()):
-                continue
-            _data_row(cat, cat_data, CAP_FILL, indent=True)
-            for m, v in cat_data.items():
-                capex_month[m] += v
-        _total_row("Total CAPEX", capex_month, CAP_FILL, BOLD)
-        _blank()
-
-    # ── NET PROFIT ────────────────────────────────────────────────────────────
-    net_month = {m: op_profit_month.get(m, 0) - capex_month.get(m, 0) for m in all_months}
-    _total_row("Net Profit after CAPEX", net_month, GRN_FILL, BOLD_GRN)
-    _blank()
-
-    # ── DEPOSITS HELD (balance sheet liability) ───────────────────────────────
+    # ── DEPOSITS HELD (balance sheet liability — shown before CAPEX for context)
     dep_held_sec   = dep_held_sec   or {}
     dep_held_maint = dep_held_maint or {}
     if dep_held_sec or dep_held_maint:
@@ -691,6 +626,27 @@ def _build_pnl_excel(
         net_held = {m: dep_held_sec.get(m, 0) + dep_held_maint.get(m, 0) for m in all_months}
         _total_row("Net working capital owed to tenants (balance sheet liability)",
                    net_held, LIA_FILL, LIA_FONT)
+        _blank()
+
+    # ── CAPEX ─────────────────────────────────────────────────────────────────
+    capex_month: dict = defaultdict(float)
+    has_capex = any(by_cat.get(c, {}) for c in _CAPEX_CATS)
+    if has_capex:
+        _section("CAPITAL EXPENDITURE (one-time investments)")
+        for cat in _CAPEX_CATS:
+            cat_data = by_cat.get(cat, {})
+            if not any(cat_data.values()):
+                continue
+            _data_row(cat, cat_data, CAP_FILL, indent=True)
+            for m, v in cat_data.items():
+                capex_month[m] += v
+        _total_row("Total CAPEX", capex_month, CAP_FILL, BOLD)
+        _blank()
+
+    # ── NET PROFIT ────────────────────────────────────────────────────────────
+    net_month = {m: op_profit_month.get(m, 0) - capex_month.get(m, 0) for m in all_months}
+    _total_row("Net Profit after CAPEX", net_month, GRN_FILL, BOLD_GRN)
+    _blank()
 
     ws.freeze_panes = "B2"
     ws.row_dimensions[1].height = 22

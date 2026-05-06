@@ -40,10 +40,6 @@ export function KpiTiles({ data }: KpiTilesProps) {
 }
 
 export function IncomeCard({ data }: KpiTilesProps) {
-  const gross = data.income.total_gross ?? data.income.total
-  const depRecv = data.income.deposits_received ?? 0
-  const depRef  = data.income.deposits_refunded ?? 0
-  const hasDepAdj = depRecv > 0 || depRef > 0
   return (
     <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
       <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Gross Inflows</p>
@@ -65,33 +61,8 @@ export function IncomeCard({ data }: KpiTilesProps) {
           <span className="text-xs font-bold text-status-paid">{rupeeExact(data.income.cash_db)}</span>
         </div>
       )}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-2 border-t border-[#E8E4E0]">
         <span className="text-xs font-bold text-ink">Total Gross Inflows</span>
-        <span className="text-sm font-extrabold text-ink">{rupeeExact(gross)}</span>
-      </div>
-
-      {hasDepAdj && (
-        <>
-          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-4 mb-2">
-            Deposit Adjustment (liability flows)
-          </p>
-          {depRecv > 0 && (
-            <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
-              <span className="text-xs text-ink-muted">(-) Deposits received (security + maintenance)</span>
-              <span className="text-xs font-bold text-status-due">−{rupeeExact(depRecv)}</span>
-            </div>
-          )}
-          {depRef > 0 && (
-            <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0]">
-              <span className="text-xs text-ink-muted">(+) Deposit refunds paid</span>
-              <span className="text-xs font-bold text-status-paid">+{rupeeExact(depRef)}</span>
-            </div>
-          )}
-        </>
-      )}
-
-      <div className="flex items-center justify-between pt-2 mt-1 border-t border-[#E8E4E0]">
-        <span className="text-xs font-bold text-ink">True Revenue (rent only)</span>
         <span className="text-sm font-extrabold text-ink">{rupeeExact(data.income.total)}</span>
       </div>
     </div>

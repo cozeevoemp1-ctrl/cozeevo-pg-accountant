@@ -599,10 +599,7 @@ export interface FinanceIncomeBreakdown {
   upi_batch: number;
   direct_neft: number;
   cash_db: number;
-  total_gross: number;         // bank + cash before deposit adjustment
-  deposits_received: number;   // liability inflow — not revenue
-  deposits_refunded: number;   // liability outflow — not expense
-  total: number;               // true rent revenue = gross − deposits + refunds
+  total: number;               // gross inflows (bank + cash)
 }
 
 export interface FinanceExpenseRow {

@@ -111,9 +111,6 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.fill = hdr_fill; c.font = hdr_font; c.alignment = ctr
 
     # 1. INCOME
-    dep_fill   = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    true_fill  = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-
     ws.append(["INCOME"])
     ws[ws.max_row][0].font = bold
     for label, row in INCOME.items():
@@ -122,31 +119,6 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append(["Total Gross Inflows"] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
-
-    # Deposit adjustment — these are liability flows, not revenue
-    ws.append([])
-    ws.append(["DEPOSIT ADJUSTMENT (liability flows — not income, not expense)"])
-    ws[ws.max_row][0].font = Font(italic=True)
-    neg_dep = [-v for v in DEPOSIT_RECEIVED]
-    ws.append(["  (-) Deposits received from tenants (security + maintenance, by check-in month)"]
-              + neg_dep + [sum(neg_dep)])
-    for c in ws[ws.max_row]:
-        c.fill = dep_fill
-    ws.append(["  (+) Deposit refunds paid to exiting tenants"]
-              + DEPOSIT_REFUNDED + [sum(DEPOSIT_REFUNDED)])
-    for c in ws[ws.max_row]:
-        c.fill = dep_fill
-    net_dep = [d + r for d, r in zip(neg_dep, DEPOSIT_REFUNDED)]
-    ws.append(["  Net deposit adjustment"] + net_dep + [sum(net_dep)])
-    for c in ws[ws.max_row]:
-        c.fill = dep_fill; c.font = Font(italic=True)
-    ws.append([])
-
-    # True Revenue = rent income only (deposits stripped out)
-    true_rev_row = [g + n for g, n in zip(rev_row, net_dep)]
-    ws.append(["TRUE REVENUE (rent only — deposits excluded)"] + true_rev_row + [sum(true_rev_row)])
-    for c in ws[ws.max_row]:
-        c.font = Font(bold=True); c.fill = true_fill
     ws.append([])
 
     # 2. CAPITAL CONTRIBUTIONS
@@ -176,18 +148,33 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 4. OPERATING PROFIT (based on True Revenue — deposits excluded)
-    op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
-    ws.append(["OPERATING PROFIT (on True Revenue)"] + op_profit_row + [sum(op_profit_row)])
+    # 4. OPERATING PROFIT (on Gross Inflows)
+    op_profit_row = [r - o for r, o in zip(rev_row, opex_row)]
+    ws.append(["OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
-    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, true_rev_row)]
+    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, rev_row)]
     ws.append(["Operating Margin %"] + op_margin_row
-              + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
+              + [f"{(sum(op_profit_row)/sum(rev_row)*100):.1f}%" if sum(rev_row) else "-"])
     ws.append([])
 
-    # 5. CAPEX
+    # 5. DEPOSITS HELD — balance sheet liability (shown before CAPEX for context)
+    ws.append(["DEPOSITS HELD — refundable liability + non-refundable maintenance fee retained"])
+    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
+    ws[ws.max_row][0].fill = wc_fill
+    for ci in range(2, len(header) + 1):
+        ws.cell(ws.max_row, ci).fill = wc_fill
+    for label, row in DEPOSITS.items():
+        ws.append([label] + row + [sum(row)])
+    net_wc = [sum(col) for col in zip(*DEPOSITS.values())]
+    ws.append(["  Net working capital owed to tenants (balance sheet liability)"] + net_wc + [sum(net_wc)])
+    for c in ws[ws.max_row]:
+        c.font = bold
+        c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    ws.append([])
+
+    # 6. CAPEX
     ws.append(["CAPEX — ONE-TIME INVESTMENTS"])
     ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
     ws[ws.max_row][0].fill = capex_fill
@@ -201,30 +188,15 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 6. NET PROFIT AFTER CAPEX
+    # 7. NET PROFIT AFTER CAPEX
     profit_row = [op - cx for op, cx in zip(op_profit_row, capex_row)]
     ws.append(["NET PROFIT AFTER CAPEX"] + profit_row + [sum(profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
-    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, true_rev_row)]
+    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, rev_row)]
     ws.append(["Net Margin %"] + margin_row
-              + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
-    ws.append([])
-
-    # 7. DEPOSITS HELD
-    ws.append(["DEPOSITS HELD — refundable liability + non-refundable maintenance fee retained"])
-    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
-    ws[ws.max_row][0].fill = wc_fill
-    for ci in range(2, len(header) + 1):
-        ws.cell(ws.max_row, ci).fill = wc_fill
-    for label, row in DEPOSITS.items():
-        ws.append([label] + row + [sum(row)])
-    net_wc = [sum(col) for col in zip(*DEPOSITS.values())]
-    ws.append(["  Net working capital owed to tenants (balance sheet liability)"] + net_wc + [sum(net_wc)])
-    for c in ws[ws.max_row]:
-        c.font = bold
-        c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+              + [f"{(sum(profit_row)/sum(rev_row)*100):.1f}%" if sum(rev_row) else "-"])
     ws.append([])
 
     # 8. CASH POSITION
