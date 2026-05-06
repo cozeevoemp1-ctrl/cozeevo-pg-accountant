@@ -5,7 +5,7 @@
 > Consolidated from ARCHITECTURE.md + SYSTEM_ARCHITECTURE.md on 2026-03-30.
 > For detailed DB schema, see DATA_MODEL.md.
 > For detailed floor-by-floor room layouts, see MASTER_DATA.md.
-> Last updated: 2026-03-30
+> Last updated: 2026-05-06
 
 ---
 
@@ -49,10 +49,13 @@
   |  +- Bank PDF -> parse + classify                       |    | /checkin/new               |
   |       |                                                |    | /checkout/new              |
   |       v                                                |    | /onboarding/new            |
-  |  chat_api.py (main brain)                              |    | /tenants                   |
-  |  +- 1. Rate limit + role_service.py                    |    | /reminders                 |
-  |  +- 2. Load chat history (last 5 msgs)                 |    | /collection/breakdown      |
-  |  +- 3. Check pending actions                           |    |                            |
+  |  chat_api.py (main brain)                              |    | /onboarding/sessions       |
+  |  +- 1. Rate limit + role_service.py                    |    | /tenants/[id]/edit         |
+  |  +- 2. Load chat history (last 5 msgs)                 |    | /notices                   |
+  |  +- 3. Check pending actions                           |    | /checkouts                 |
+  |                                                        |    | /collection/breakdown      |
+  |                                                        |    | /finance (admin-only)      |
+  |                                                        |    |                            |
   |  +- 4. intent_detector.py (regex, 97% accuracy)        |    | Auth: Supabase email+pwd   |
   |  +- 5. Follow-up detection (pronouns)                  |    | API:  /api/v2/app/* (JWT)  |
   |  +- 6. AI fallback (Groq) if UNKNOWN                   |    +----------------------------+
@@ -66,8 +69,10 @@
   |                                                        |
   |  Also:                                                 |
   |  +- /api/v2/app/* (JWT endpoints for PWA)              |
+  |  +- /api/v2/finance/* (bank upload, P&L, reconcile)    |
   |  +- gsheets.py           -> Google Sheets read/write    |
-  |  +- finance_handler.py   -> bank statement processing   |
+  |  +- src/reports/pnl_builder.py -> canonical P&L Excel  |
+  |  +- src/parsers/yes_bank.py    -> Yes Bank CSV parser   |
   |                                                        |
   +---------------+----------------------------------------+
                   |
@@ -348,7 +353,17 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/scheduler.py` | 9 jobs — rent reminders (day-1, day+2), prep reminders (9am/2pm), nightly sheet audit, checkout deposit alerts |
 | `src/llm_gateway/claude_client.py` | LLM client (Ollama/Groq/Anthropic) |
 | `src/reports/reconciliation.py` | Reconciliation engine |
-| `scripts/` | Diagnostic scripts (occupancy, empty rooms, payment breakdown, deposit check) |
+| `src/reports/pnl_builder.py` | **Canonical P&L builder** — hardcoded verified Oct'25–Apr'26; shared by `/finance/pnl/excel` endpoint |
+| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L (live + verified Excel), reconciliation |
+| `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export scripts |
+| `src/services/blacklist.py` | Blacklist service — fuzzy name + phone check, add/list/remove |
+| `src/services/room_transfer.py` | Shared room transfer — single source of truth for bot + PWA |
+| `src/utils/inr_format.py` | INR number format helpers — inr() / inr_short() |
+| `web/app/finance/page.tsx` | Finance page (PWA) — month picker, P&L dashboard, upload, reconciliation (admin-only) |
+| `web/app/notices/page.tsx` | Notices page (PWA) — monthly tenants with formal notice |
+| `web/app/checkouts/page.tsx` | Checkouts page (PWA) — monthly checkout history, All/Regular/Day-wise filter |
+| `web/app/tenants/[tenancy_id]/edit/page.tsx` | Edit Tenant (PWA) — all fields, balance adjustment, room transfer, notice |
+| `scripts/` | Diagnostic + one-off scripts (occupancy, payments, import, P&L export) |
 
 ### Worker Architecture
 

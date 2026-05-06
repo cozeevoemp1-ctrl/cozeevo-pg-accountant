@@ -44,68 +44,93 @@ Months as columns, categories as rows. All amounts in INR.
 **Note:** Items 1-7 (Milk through Vegetables) are sub-items of "Food & Groceries" in bank statements.
 Bank data cannot split these — they will be grouped as "Food & Kitchen" until Kiran provides item-level data from a separate source (Excel/notebook).
 
-### 1.2 Income Categories
+### 1.2 Income Categories (updated 2026-05-06 — bank-primary)
 
-| # | Account / Category | Source | In Total Collection? |
+**HARD RULE:** Bank statement credits = primary income source. DB payments = supplementary (cash only).
+
+| # | Account / Category | Source | Notes |
 |---|---|---|---|
-| 1 | Rent Collection (THOR) | Supabase payments (for_type=rent, property_id) | YES |
-| 2 | Rent Collection (HULK) | Supabase payments (for_type=rent, property_id) | YES |
-| 3 | Maintenance Fees | Supabase tenancies (maintenance_fee, checkin month) | YES |
-| 4 | Security Deposits Received | Supabase payments (for_type=deposit) | NO — separate line |
-| 5 | Booking Advances | Supabase payments (for_type=booking) | NO — separate line |
-| 6 | Other Income | Bank statement (unclassified income) | NO |
-| | **Total Collection** | Rent + Maintenance | |
+| 1 | Bank — UPI batch settlements (THOR) | `bank_transactions` WHERE category='UPI Batch' AND account_name='THOR' | Merchant QR batch settlements |
+| 2 | Bank — individual direct payments + NEFT (THOR) | `bank_transactions` WHERE category IN ('UPI Direct','NEFT') AND account_name='THOR' | Individual UPI + NEFT |
+| 3 | HULK — UPI settlements | `bank_transactions` WHERE account_name='HULK' | HULK building bank account |
+| 4 | THOR → HULK reclassification | Explicit −₹5L row in THOR column | Internal transfer — shown for transparency, net zero |
+| 5 | HULK ← THOR reclassification | Explicit +₹5L row in HULK column | Mirrors row 4 |
+| 6 | Cash (physical, not deposited) | `payments` WHERE payment_mode='cash' AND for_type='rent' AND is_void=false | Supplement only — cash NOT in bank |
+| | **Total Gross Inflows** | Sum of rows 1–6 | |
+| | **Less: Security Deposits (refundable)** | `tenancies.security_deposit` WHERE status='active' AND check-in month = target month | Must return at exit — excluded from revenue |
+| | **True Rent Revenue** | Gross Inflows − Security Deposits | Operating income base |
 
-### 1.3 Report Layout
+Maintenance fees (non-refundable) are retained income and stay in Gross Inflows. Do NOT deduct them.
+
+Capital contributions (owner equity injections) are shown separately — NOT in income.
+
+### 1.3 Report Layout (updated 2026-05-06)
 
 ```
-                        Oct-25    Nov-25    Dec-25    Jan-26    Feb-26    Mar-26    TOTAL
-═══════════════════════════════════════════════════════════════════════════════════════════
-INCOME
-  Rent Collection       XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Maintenance Fees      XXX       XXX       XXX       XXX       XXX       XXX       XXX
-───────────────────────────────────────────────────────────────────────────────────────────
-  TOTAL COLLECTION      XXX       XXX       XXX       XXX       XXX       XXX       XXX
+HEADER:  [blank] | Oct'25 | Nov'25 | Dec'25 | Jan'26 | Feb'26 | Mar'26 | Apr'26 | TOTAL
 
-  Security Deposits     XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Booking Advances      XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Other Income          XXX       XXX       XXX       XXX       XXX       XXX       XXX
-───────────────────────────────────────────────────────────────────────────────────────────
-  TOTAL INCOME (ALL)    XXX       XXX       XXX       XXX       XXX       XXX       XXX
+1. INCOME
+   Bank — UPI batch settlements (THOR)
+   Bank — individual direct + NEFT (THOR)
+   HULK — UPI settlements
+   THOR — transferred to HULK acct (reclassification)     [-5L on THOR col]
+   HULK — received from THOR acct (reclassification)      [+5L on HULK col]
+   Cash (physical, not deposited to bank)
+   ─────────────────────────────────────
+   Total Gross Inflows
+   Less: Security Deposits Received (refundable)           [italic, negative]
+   ─────────────────────────────────────
+   True Rent Revenue (excl. refundable deposits)           [bold green]
 
-EXPENSES
-  Food & Kitchen        XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Salaries              XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Current Bill          XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Water Bill            XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Property Rent         XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Gas Bill              XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Internet Bill         XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Maintenance Cost      XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  House Keeping Items   XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Furniture & Fittings  XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Police/Waste/Govt     XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Marketing             XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Shopping & Supplies   XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Deposit Refunds       XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Non-Operating         XXX       XXX       XXX       XXX       XXX       XXX       XXX
-  Other / Miscellaneous XXX       XXX       XXX       XXX       XXX       XXX       XXX
-───────────────────────────────────────────────────────────────────────────────────────────
-  TOTAL EXPENSES        XXX       XXX       XXX       XXX       XXX       XXX       XXX
+2. CAPITAL CONTRIBUTIONS (not P&L — owner equity injections)
+   Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)
+   Kiran top-up transfer (Jan 2026)
 
-═══════════════════════════════════════════════════════════════════════════════════════════
-  NET P&L (Income - Expenses)  XXX  XXX   XXX       XXX       XXX       XXX       XXX
-═══════════════════════════════════════════════════════════════════════════════════════════
+3. OPERATING EXPENSES
+   [all opex lines]
+   EXCLUDED FROM OPEX (balance sheet items — not costs):   [italic section]
+     Tenant Deposit Refund
+     Loan Repayment / Transfers (non-op)
+   ─────────────────────────────────────
+   Total Operating Expenses
+
+4. OPERATING PROFIT (EBITDA) = True Rent Revenue − Opex   [bold]
+   Operating Margin % (on True Revenue)
+
+5. CAPEX — ONE-TIME INVESTMENTS
+   Furniture & Fittings
+   8 Ball Pool Equipment
+   ─────────────────────────────────────
+   Total CAPEX
+
+6. NET PROFIT AFTER CAPEX                                  [bold]
+   Net Margin % (on True Revenue)
+
+7. DEPOSITS HELD
+   Security Deposits — refundable (must return at exit)
+   Maintenance Fee retained (non-refundable)
+   Net working capital owed to tenants
+
+8. CASH POSITION (month-end)
+   Bank closing balance THOR + HULK
+   Net deposits owed (sec collected − sec refunded)
+   True free cash = Bank − Net deposits owed
+
+9. ⚠ ITEMS NEEDING REVIEW
 ```
 
-### 1.4 Data Sources
+### 1.4 Data Sources (updated 2026-05-06)
 
-| Data | Primary Source | Fallback |
+| Data | Primary Source | Notes |
 |---|---|---|
-| Income (rent) | Bank statement Excel (deposit column) | Supabase `payments` table |
-| Expenses | Bank statement Excel (withdrawal column) | Supabase `expenses` table |
-| Expense classification | `src/rules/pnl_classify.py` (auto) | Manual via `unclassified_review.xlsx` |
-| Bank statements | `2025 statement.xlsx`, `2026 statment.xlsx` (Yes Bank) | WhatsApp PDF upload → Supabase `bank_transactions` |
+| Bank income (THOR) | `bank_transactions` WHERE account_name='THOR' | Uploaded via Finance page CSV upload |
+| Bank income (HULK) | `bank_transactions` WHERE account_name='HULK' | Uploaded via Finance page CSV upload |
+| Cash income | `payments` WHERE payment_mode='cash' AND for_type='rent' | Physical cash not in bank |
+| Security deposits | `tenancies.security_deposit` WHERE status='active' | Active tenants only, by check-in month |
+| Expense classification | `src/rules/pnl_classify.py` | Auto-classify bank debits |
+| Verified canonical P&L | `src/reports/pnl_builder.py` | Hardcoded Oct'25–Apr'26; served by `/finance/pnl/excel` |
+| Live P&L (recomputed) | `src/api/v2/finance.py:_build_pnl_excel()` | Picks up new uploads; served by `/finance/pnl/live` |
+| JSON API (PWA) | `src/api/v2/finance.py:get_pnl()` | Powers Finance page dashboard cards |
 
 ---
 
@@ -145,13 +170,17 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 ### 3.1 Capacity (Canonical — verified from DB 2026-04-08)
 
 ```
-TOTAL_REVENUE_BEDS = 294  (295 from May 2026 when G20 returns to revenue)
-  THOR: 145 beds (78 revenue rooms)
-  HULK: 149 beds (80 revenue rooms)
+⚠ DISCREPANCY: REPORTING.md/BUSINESS_LOGIC.md say 294 total; reference_master_data.md says 291.
+  Verify with DB: SELECT SUM(max_occupancy) FROM rooms WHERE is_staff_room=false;
+  G20 reclassified to revenue from May 2026 — total may now be 295.
+
+THOR: 145 beds (78 revenue rooms)
+HULK: 149 beds (80 revenue rooms)   ← REPORTING.md section 12 says 146 (needs DB verify)
+Total: 294 beds
 
 Staff rooms EXCLUDED (8 rooms, updated 2026-04-26):
   THOR: G05(3), G06(2), 107(2), 108(2), 701(1), 702(1)
-  HULK: G12(3), G20(1)[temp until Apr end]
+  HULK: G12(3), G20(1)[temp until Apr end → revenue from May 2026]
   — 114 and 618 moved to revenue 2026-04-26
 ```
 
@@ -529,9 +558,9 @@ For month M:
 
 | Constant | Value | Where Used |
 |---|---|---|
-| TOTAL_REVENUE_BEDS | 294 | Occupancy KPI (295 from May 2026) |
+| TOTAL_REVENUE_BEDS | 294–295 (verify DB) | Occupancy KPI — G20 revenue from May 2026 |
 | THOR_BEDS | 145 | Property occupancy |
-| HULK_BEDS | 146 | Property occupancy |
+| HULK_BEDS | 149 (⚠ section 12 says 146 — verify DB) | Property occupancy |
 | NOTICE_BY_DAY | 5 | Deposit eligibility |
 | OVERPAYMENT_NOISE_RS | 10 | Payment processing |
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection |
