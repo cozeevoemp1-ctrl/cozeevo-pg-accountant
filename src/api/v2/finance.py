@@ -539,33 +539,26 @@ def _build_pnl_excel(
             _data_row(label, src, fill, indent=True)
             fill = WHT_FILL if fill == ALT_FILL else ALT_FILL
 
-    _total_row("Total Gross Inflows (rent only — deposits excluded)", gross_month, GRN_FILL, BOLD_GRN)
-    _blank()
+    _total_row("Total Gross Inflows", gross_month, GRN_FILL, BOLD_GRN)
 
-    # ── DEPOSITS HELD — shown right after income as context (NOT deducted) ────
+    # ── Security deposit deduction (refundable — must return at exit) ─────────
     dep_held_sec   = dep_held_sec   or {}
     dep_held_maint = dep_held_maint or {}
-    if dep_held_sec or dep_held_maint:
-        WC_FILL  = PatternFill("solid", fgColor="C00000")
-        WC_FONT  = Font(bold=True, color="FFFFFF")
-        LIA_FILL = PatternFill("solid", fgColor="FCE4D6")
-        LIA_FONT = Font(bold=True, color="9C0006")
+    LIA_FILL = PatternFill("solid", fgColor="FCE4D6")
+    ITLC     = Font(size=9, italic=True)
 
-        _section("DEPOSITS HELD — balance sheet liability (cash held on behalf of tenants)")
-        ws.cell(ri[0] - 1, 1).fill = WC_FILL
-        ws.cell(ri[0] - 1, 1).font = WC_FONT
-        for col in range(2, nc + 1):
-            ws.cell(ri[0] - 1, col).fill = WC_FILL
-
-        _data_row("Security Deposits — refundable (must return to active tenants)",
-                  dep_held_sec, LIA_FILL, font=Font(size=9), indent=True)
-        _data_row("  Maintenance Fee retained (non-refundable, by check-in month)",
-                  dep_held_maint, LIA_FILL, font=Font(size=9, italic=True), indent=False)
-
-        net_held = {m: dep_held_sec.get(m, 0) + dep_held_maint.get(m, 0) for m in all_months}
-        _total_row("Net working capital owed to tenants (must return on exit)",
-                   net_held, LIA_FILL, LIA_FONT)
-        _blank()
+    sec_dep_neg = {m: -dep_held_sec.get(m, 0) for m in all_months}
+    if any(dep_held_sec.values()):
+        _data_row("  Less: Security Deposits Received (refundable — must return at exit)",
+                  sec_dep_neg, LIA_FILL, font=ITLC)
+        true_rev_month: dict = {m: gross_month[m] + sec_dep_neg.get(m, 0) for m in all_months}
+        _total_row("True Rent Revenue (excl. refundable deposits)", true_rev_month, GRN_FILL, BOLD_GRN)
+        if any(dep_held_maint.values()):
+            _data_row("  Note: Maintenance Fee retained (non-refundable, included above)",
+                      dep_held_maint, LIA_FILL, font=ITLC)
+    else:
+        true_rev_month = gross_month
+    _blank()
 
     # ── OPERATING EXPENSES ────────────────────────────────────────────────────
     _section("OPERATING EXPENSES")
@@ -582,8 +575,8 @@ def _build_pnl_excel(
     _total_row("Total Operating Expenses", opex_month, RED_FILL, BOLD_RED)
     _blank()
 
-    # ── EBITDA / OPERATING PROFIT (gross inflows − opex) ─────────────────────
-    op_profit_month: dict = {m: gross_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
+    # ── EBITDA / OPERATING PROFIT (true rent revenue − opex) ─────────────────
+    op_profit_month: dict = {m: true_rev_month.get(m, 0) - opex_month.get(m, 0) for m in all_months}
     _total_row("EBITDA / Operating Profit", op_profit_month, GRN_FILL, BOLD_GRN)
     _blank()
 
@@ -618,31 +611,6 @@ def _build_pnl_excel(
     net_month = {m: op_profit_month.get(m, 0) - capex_month.get(m, 0) for m in all_months}
     _total_row("Net Profit after CAPEX", net_month, GRN_FILL, BOLD_GRN)
     _blank()
-
-    # ── DEPOSITS HELD (balance sheet liability — info only, after net profit) ─
-    dep_held_sec   = dep_held_sec   or {}
-    dep_held_maint = dep_held_maint or {}
-    if dep_held_sec or dep_held_maint:
-        WC_FILL  = PatternFill("solid", fgColor="C00000")
-        WC_FONT  = Font(bold=True, color="FFFFFF")
-        LIA_FILL = PatternFill("solid", fgColor="FCE4D6")
-        LIA_FONT = Font(bold=True, color="9C0006")
-
-        _section("DEPOSITS HELD — refundable liability + maintenance fee retained (info only)")
-        ws.cell(ri[0] - 1, 1).fill = WC_FILL
-        ws.cell(ri[0] - 1, 1).font = WC_FONT
-        for col in range(2, nc + 1):
-            ws.cell(ri[0] - 1, col).fill = WC_FILL
-
-        _data_row("Security Deposits — refundable (must return to active tenants)",
-                  dep_held_sec, LIA_FILL, font=Font(size=9), indent=True)
-        _data_row("  Maintenance Fee retained (non-refundable, by check-in month)",
-                  dep_held_maint, LIA_FILL, font=Font(size=9, italic=True), indent=False)
-
-        net_held = {m: dep_held_sec.get(m, 0) + dep_held_maint.get(m, 0) for m in all_months}
-        _total_row("Net working capital owed to tenants (balance sheet liability)",
-                   net_held, LIA_FILL, LIA_FONT)
-        _blank()
 
     ws.freeze_panes = "B2"
     ws.row_dimensions[1].height = 22

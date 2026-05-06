@@ -26,18 +26,20 @@ MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 
 INCOME = {
     # THOR building (acct ...0961)
-    "THOR — UPI batch settlements (merchant QR)":   [0,      0,        0,  175596, 2091597, 2515275, 2834731],
-    "THOR — individual direct payments + NEFT":     [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
-    "Cash (physical — both buildings combined)":    [0,      0,        0,  300572,  653300, 1094220, 1343783],
+    "THOR — UPI batch settlements (merchant QR)":          [0,      0,        0,  175596, 2091597, 2515275, 2834731],
+    "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
+    "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1343783],
     # HULK building (acct ...0881) — live from Mar 2026
-    "HULK — UPI batch settlements (merchant QR)":   [0,      0,        0,       0,       0,       0,  247719],
-    "HULK — cheque / other deposits":               [0,      0,        0,       0,       0,   71550,       0],
+    "HULK — UPI batch settlements (merchant QR)":          [0,      0,        0,       0,       0,       0,  247719],
+    "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
+    "HULK — cheque / other deposits":                      [0,      0,        0,       0,       0,   71550,       0],
 }
 
 CAPITAL_CONTRIBUTIONS = {
-    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)":      [500000, 0, 0,     0, 0,      0, 0],
-    "Kiran top-up transfer (Jan 2026)":                        [     0, 0, 0, 90000, 0,      0, 0],
-    "THOR→HULK inter-account transfer via Bharathi (Mar 2026)": [     0, 0, 0,     0, 0, 500000, 0],
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000, 0, 0,     0, 0, 0, 0],
+    "Kiran top-up transfer (Jan 2026)":                   [     0, 0, 0, 90000, 0, 0, 0],
+    # THOR→HULK ₹5L transfer (Apr 2026) is already in THOR income — internal bank move, not new capital
 }
 
 OPEX = {
@@ -99,7 +101,6 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     flag_fill  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
     ctr        = Alignment(horizontal="center")
     capex_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    wc_fill    = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -116,24 +117,30 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for label, row in INCOME.items():
         ws.append([label] + row + [sum(row)])
     rev_row = [sum(col) for col in zip(*INCOME.values())]
-    ws.append(["Total Gross Inflows (rent only — deposits excluded)"] + rev_row + [sum(rev_row)])
+    ws.append(["Total Gross Inflows"] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
-    ws.append([])
 
-    # 2. DEPOSITS HELD — shown right after income as context (NOT deducted — not in income)
-    ws.append(["DEPOSITS HELD — balance sheet liability (cash held on behalf of tenants)"])
-    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
-    ws[ws.max_row][0].fill = wc_fill
-    for ci in range(2, len(header) + 1):
-        ws.cell(ws.max_row, ci).fill = wc_fill
-    for label, row in DEPOSITS.items():
-        ws.append([label] + row + [sum(row)])
-    net_wc = [sum(col) for col in zip(*DEPOSITS.values())]
-    ws.append(["  Net working capital owed to tenants (must return on exit)"] + net_wc + [sum(net_wc)])
+    # Less: refundable security deposits (must return at exit — not revenue)
+    sec_dep = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
+    ws.append(["  Less: Security Deposits Received (refundable — must return at exit)"]
+              + [-x for x in sec_dep] + [-sum(sec_dep)])
+    for c in ws[ws.max_row]:
+        c.font = Font(italic=True)
+
+    # True Rent Revenue = gross − security deposits held
+    true_rev_row = [r - s for r, s in zip(rev_row, sec_dep)]
+    ws.append(["True Rent Revenue (excl. refundable deposits)"] + true_rev_row + [sum(true_rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold
-        c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+        c.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+
+    # Maintenance fee retained (non-refundable context)
+    maint = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
+    ws.append(["  Note: Maintenance Fee retained (non-refundable, included above)"]
+              + maint + [sum(maint)])
+    for c in ws[ws.max_row]:
+        c.font = Font(italic=True)
     ws.append([])
 
     # 3. CAPITAL CONTRIBUTIONS
@@ -163,15 +170,15 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 5. EBITDA / OPERATING PROFIT (gross inflows − opex)
-    op_profit_row = [r - o for r, o in zip(rev_row, opex_row)]
+    # 5. EBITDA / OPERATING PROFIT (true rent revenue − opex)
+    op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
     ws.append(["EBITDA / OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
-    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, rev_row)]
+    op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, true_rev_row)]
     ws.append(["Operating Margin %"] + op_margin_row
-              + [f"{(sum(op_profit_row)/sum(rev_row)*100):.1f}%" if sum(rev_row) else "-"])
+              + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
     # 6. CAPEX
@@ -194,9 +201,9 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for c in ws[ws.max_row]:
         c.font = bold
 
-    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, rev_row)]
+    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, true_rev_row)]
     ws.append(["Net Margin %"] + margin_row
-              + [f"{(sum(profit_row)/sum(rev_row)*100):.1f}%" if sum(rev_row) else "-"])
+              + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
     # 8. CASH POSITION
@@ -235,7 +242,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     rules = [
         ("Basis", "Accrual — expense in month of service, not payment"),
         ("Income source", "Bank statement credits (verified). Cash from DB payments table."),
-        ("Property Rent", "Rs.21,32,000/mo accrual Jan–Apr. Nov-Dec zero (notice period)."),
+        ("Property Rent", "Rs.22,14,000/mo accrual (164 beds × Rs.13,500). Feb–Apr. Nov-Jan zero (notice period)."),
         ("Water — Manoj B (9535665407)", "Cash basis. Apr = tanker Rs.42,020 + Mar bill Rs.42,500."),
         ("Internet & WiFi", "Cash-basis. Jan: Airwire Rs.70,730. Feb: 8x Razorpay Rs.1,13,168. Mar-Dec: Rs.0 (prepaid)."),
         ("Police", "Rs.3,000/mo cash accrual Jan onwards."),
