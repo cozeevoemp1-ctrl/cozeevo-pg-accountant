@@ -279,20 +279,34 @@ async def get_pnl(
                 if expense_by_cat.get(cat, 0.0) > 0 and cat in _EXCL_CATS_JSON
             ]
 
+            # Security deposits collected this month (active tenants, by check-in month)
+            sec_dep_row = await session.execute(
+                select(func.sum(Tenancy.security_deposit))
+                .where(
+                    func.extract("year",  Tenancy.checkin_date) == y,
+                    func.extract("month", Tenancy.checkin_date) == mo,
+                    Tenancy.status == "active",
+                )
+            )
+            security_deposits = float(sec_dep_row.scalar() or 0)
+
             total_expense    = sum(e["amount"] for e in expenses)
             total_capex      = sum(e["amount"] for e in capex_items)
             total_gross      = upi_batch + direct_neft + cash_db
-            operating_profit = total_gross - total_expense
+            true_revenue     = total_gross - security_deposits
+            operating_profit = true_revenue - total_expense
             net_profit       = operating_profit - total_capex
-            margin           = round(operating_profit / total_gross * 100, 1) if total_gross else 0.0
+            margin           = round(operating_profit / true_revenue * 100, 1) if true_revenue else 0.0
 
             result[m] = {
                 "month": m,
                 "income": {
-                    "upi_batch":   upi_batch,
-                    "direct_neft": direct_neft,
-                    "cash_db":     cash_db,
-                    "total":       total_gross,
+                    "upi_batch":         upi_batch,
+                    "direct_neft":       direct_neft,
+                    "cash_db":           cash_db,
+                    "total":             total_gross,
+                    "security_deposits": security_deposits,
+                    "true_revenue":      true_revenue,
                 },
                 "capital":          capital,
                 "expenses":         expenses,

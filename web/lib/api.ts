@@ -599,7 +599,9 @@ export interface FinanceIncomeBreakdown {
   upi_batch: number;
   direct_neft: number;
   cash_db: number;
-  total: number;               // gross rent inflows (bank + cash, deposits excluded)
+  total: number;               // gross rent inflows (bank + cash)
+  security_deposits: number;  // refundable deposits collected this month (deducted below)
+  true_revenue: number;        // total − security_deposits
 }
 
 export interface FinanceExpenseRow {

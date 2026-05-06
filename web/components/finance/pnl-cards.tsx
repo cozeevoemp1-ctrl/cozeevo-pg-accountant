@@ -20,8 +20,8 @@ export function KpiTiles({ data }: KpiTilesProps) {
   return (
     <div className="grid grid-cols-3 gap-2">
       <div className="bg-tile-green rounded-tile p-3">
-        <p className="text-[11px] font-extrabold text-status-paid">{rupee(data.income.total)}</p>
-        <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Income</p>
+        <p className="text-[11px] font-extrabold text-status-paid">{rupee(data.income.true_revenue)}</p>
+        <p className="text-[9px] text-ink-muted font-semibold mt-0.5">True Revenue</p>
       </div>
       <div className="bg-tile-orange rounded-tile p-3">
         <p className="text-[11px] font-extrabold text-status-due">{rupee(data.total_expense)}</p>
@@ -61,9 +61,19 @@ export function IncomeCard({ data }: KpiTilesProps) {
           <span className="text-xs font-bold text-status-paid">{rupeeExact(data.income.cash_db)}</span>
         </div>
       )}
-      <div className="flex items-center justify-between pt-2 border-t border-[#E8E4E0]">
-        <span className="text-xs font-bold text-ink">Total Gross Inflows</span>
-        <span className="text-sm font-extrabold text-ink">{rupeeExact(data.income.total)}</span>
+      <div className="flex items-center justify-between pt-1.5 border-t border-[#E8E4E0]">
+        <span className="text-xs text-ink-muted">Total Gross Inflows</span>
+        <span className="text-xs font-bold text-ink">{rupeeExact(data.income.total)}</span>
+      </div>
+      {data.income.security_deposits > 0 && (
+        <div className="flex items-center justify-between py-1">
+          <span className="text-xs text-ink-muted italic">Less: Security Deposits (refundable)</span>
+          <span className="text-xs text-status-due italic">−{rupeeExact(data.income.security_deposits)}</span>
+        </div>
+      )}
+      <div className="flex items-center justify-between pt-1.5 border-t border-[#E8E4E0]">
+        <span className="text-xs font-bold text-ink">True Rent Revenue</span>
+        <span className="text-sm font-extrabold text-ink">{rupeeExact(data.income.true_revenue)}</span>
       </div>
     </div>
   )
