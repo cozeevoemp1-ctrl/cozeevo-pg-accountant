@@ -37,7 +37,7 @@ INCOME = {
 CAPITAL_CONTRIBUTIONS = {
     "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)":      [500000, 0, 0,     0, 0,      0, 0],
     "Kiran top-up transfer (Jan 2026)":                        [     0, 0, 0, 90000, 0,      0, 0],
-    "Bharathi Prabhakaran — HULK startup capital (Mar 2026)":  [     0, 0, 0,     0, 0, 500000, 0],
+    "THOR→HULK inter-account transfer via Bharathi (Mar 2026)": [     0, 0, 0,     0, 0, 500000, 0],
 }
 
 OPEX = {
