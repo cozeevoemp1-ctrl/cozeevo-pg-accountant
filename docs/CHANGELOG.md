@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.21] — 2026-05-06 — Explicit audit standard + CI/CD testing requirement
+
+### sop_session.md — wrap-up now requires explicit audit table
+- Step 6 rewritten: every doc must be opened and verdict stated out loud — "Updated: [what]" or "No change needed: [reason]". Silent skips are a failed audit.
+- Step 7 added: tests must be stated (golden suite pass count, smoke test, surface-specific checks). Failed tests block wrap-up until fixed or explicitly flagged in pending.
+- "Wrap up done" definition updated: requires audit table to appear in the response.
+
+### rules_impact_map.md — "Test with" column added
+- Every change type now has a specific test: golden suite, curl endpoint, open Finance page, check Sheet, etc.
+- Testing is part of the task, not deferred — same as CI blocking a merge on a failing test.
+
+---
+
 ## [1.75.20] — 2026-05-06 — Memory system reorganised + docs audited + AI workflow guide
 
 ### Memory system — 70 files → ~35 files (halved)
