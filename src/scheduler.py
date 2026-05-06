@@ -392,6 +392,9 @@ LATE_FEE_FROM_DAY = 6     # Fee starts accruing on this day of the month
 
 
 async def _rent_reminder(mode: str = "day1") -> None:
+    if os.getenv("REMINDERS_PAUSED", "0") == "1":
+        logger.info("[Scheduler] _rent_reminder skipped — REMINDERS_PAUSED=1")
+        return
     """Three-tier rent reminder — all delivered via approved Meta templates so
     no 24-hour customer-service window is required.
 
