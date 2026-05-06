@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.19] — 2026-05-06 — P&L wrap-up: SOP update + doubtful tenants documented
+
+### sop_pnl.md — fully updated to reflect new P&L logic
+- **4-surface sync rule** — any P&L logic change must be applied to all four: `pnl_builder.py`, `_build_pnl_excel()`, `get_pnl()`, `pnl-cards.tsx + api.ts`. Rule now explicit in SOP header.
+- **True Revenue formula** — `Total Gross Inflows − Security Deposits (refundable, active tenants, by check-in month)`. Maintenance fees NOT deducted. EBITDA = True Revenue − OPEX.
+- **THOR→HULK reclassification** — pattern documented: show as explicit −₹5L THOR / +₹5L HULK rows in INCOME. Net zero. Not capital, not new income.
+- **Cash position formula** — `Bank THOR+HULK − Net deposits owed (sec collected − refunded)`. Apr 30: Bank ₹21.88L − Deposits owed ₹28.91L = −₹7.02L true free cash.
+- **Step 6 layout** updated with new income structure (Gross → Less: Security Deposits → True Revenue).
+- **Step 10 checklist** updated with all new rules.
+
+### May payments — additional import run
+- Re-ran `scripts/_import_may_payments.py` against April collection sheet: 8 cash + 3 UPI new payments added (~₹88K). Idempotent — previously imported entries skipped.
+
+### Doubtful tenants — 6 cases saved to memory/project_pending_tasks.md
+- Prakashita (room 620), Vijay Kumar (room "June" = data error), Gayatri Kulkarni NM (514 vs 519), Ganesh Magi (418 vs 219), Covai (room 121 — no DB match), Abhishek Vishwakarma (room 121 — April dues unpaid).
+
+---
+
 ## [1.75.18] — 2026-05-06 — P&L deposit deduction corrected + cash position
 
 ### Deposit deduction — correct amount (refundable security only ~₹33L not ₹61L)
