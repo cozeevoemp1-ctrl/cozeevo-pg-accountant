@@ -432,9 +432,27 @@ async def download_pnl_live(user: AppUser = Depends(get_current_user)):
         )
         dep_ref_by_month: dict = {row[0]: float(row[1]) for row in dep_ref_rows if row[0]}
 
+        # Deposits HELD — active tenants only, split by check-in month
+        held_sec_rows = await session.execute(
+            select(
+                func.to_char(func.date_trunc("month", Tenancy.checkin_date), "YYYY-MM"),
+                func.sum(Tenancy.security_deposit),
+                func.sum(Tenancy.maintenance_fee),
+            )
+            .where(Tenancy.status == "active")
+            .group_by(func.date_trunc("month", Tenancy.checkin_date))
+        )
+        dep_held_sec:   dict = {}
+        dep_held_maint: dict = {}
+        for row in held_sec_rows:
+            if row[0]:
+                dep_held_sec[row[0]]   = float(row[1] or 0)
+                dep_held_maint[row[0]] = float(row[2] or 0)
+
     wb = _build_pnl_excel(all_months, bank_upi_batch, bank_direct, cash_by_month,
                           by_cat_month, by_sub_month,
-                          dep_recv_by_month, dep_ref_by_month)
+                          dep_recv_by_month, dep_ref_by_month,
+                          dep_held_sec, dep_held_maint)
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -459,6 +477,8 @@ def _build_pnl_excel(
     by_cat: dict, by_sub: dict,
     dep_recv: dict | None = None,
     dep_ref: dict | None = None,
+    dep_held_sec: dict | None = None,
+    dep_held_maint: dict | None = None,
 ) -> openpyxl.Workbook:
     HDR_FILL  = PatternFill("solid", fgColor="1F4E78")
     HDR_FONT  = Font(bold=True, color="FFFFFF", size=10)
@@ -646,6 +666,31 @@ def _build_pnl_excel(
     # ── NET PROFIT ────────────────────────────────────────────────────────────
     net_month = {m: op_profit_month.get(m, 0) - capex_month.get(m, 0) for m in all_months}
     _total_row("Net Profit after CAPEX", net_month, GRN_FILL, BOLD_GRN)
+    _blank()
+
+    # ── DEPOSITS HELD (balance sheet liability) ───────────────────────────────
+    dep_held_sec   = dep_held_sec   or {}
+    dep_held_maint = dep_held_maint or {}
+    if dep_held_sec or dep_held_maint:
+        WC_FILL  = PatternFill("solid", fgColor="C00000")
+        WC_FONT  = Font(bold=True, color="FFFFFF")
+        LIA_FILL = PatternFill("solid", fgColor="FCE4D6")
+        LIA_FONT = Font(bold=True, color="9C0006")
+
+        _section("DEPOSITS HELD — refundable liability + maintenance fee retained")
+        ws.cell(ri[0] - 1, 1).fill = WC_FILL
+        ws.cell(ri[0] - 1, 1).font = WC_FONT
+        for col in range(2, nc + 1):
+            ws.cell(ri[0] - 1, col).fill = WC_FILL
+
+        _data_row("Security Deposits — refundable (must return to active tenants)",
+                  dep_held_sec, LIA_FILL, font=Font(size=9), indent=True)
+        _data_row("  Maintenance Fee retained (non-refundable, by check-in month)",
+                  dep_held_maint, LIA_FILL, font=Font(size=9, italic=True), indent=False)
+
+        net_held = {m: dep_held_sec.get(m, 0) + dep_held_maint.get(m, 0) for m in all_months}
+        _total_row("Net working capital owed to tenants (balance sheet liability)",
+                   net_held, LIA_FILL, LIA_FONT)
 
     ws.freeze_panes = "B2"
     ws.row_dimensions[1].height = 22
