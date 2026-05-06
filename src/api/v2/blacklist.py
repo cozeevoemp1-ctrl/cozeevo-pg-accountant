@@ -7,7 +7,7 @@ DELETE /api/v2/app/blacklist/{id}   — soft-delete (is_active=False)
 """
 from fastapi import APIRouter, Depends, HTTPException
 from src.api.v2.auth import AppUser, get_current_user
-from src.database.connection import get_session
+from src.database.db_manager import get_session
 from src.services.blacklist import (
     add_to_blacklist,
     list_blacklist,

@@ -4171,6 +4171,42 @@ async def resolve_pending_action(
         pending.resolved = True
         return f"*{name}* has been added to the blacklist.\nReason: {reason}"
 
+    if pending.intent == "BLACKLIST_REMOVE_CONFIRM":
+        if is_negative(reply_text):
+            pending.resolved = True
+            return "Cancelled — no changes made."
+        if is_affirmative(reply_text):
+            bl_id = action_data.get("id")
+            bl_name = action_data.get("name", "")
+            from src.services.blacklist import remove_from_blacklist
+            await remove_from_blacklist(session, bl_id)
+            pending.resolved = True
+            return f"*{bl_name}* has been removed from the blacklist."
+        return "__KEEP_PENDING__Reply *yes* to remove or *no* to cancel."
+
+    if pending.intent == "BLACKLIST_REMOVE_PICK":
+        if is_negative(reply_text.strip()):
+            pending.resolved = True
+            return "Cancelled."
+        import re as _re2
+        choice_m = _re2.search(r"\b(\d+)\b", reply_text)
+        choices = action_data.get("choices", [])
+        if choice_m:
+            idx = int(choice_m.group(1)) - 1
+            if 0 <= idx < len(choices):
+                chosen = choices[idx]
+                # Show the chosen entry and ask final confirmation
+                await _save_pending(
+                    pending.phone, "BLACKLIST_REMOVE_CONFIRM",
+                    {"id": chosen["id"], "name": chosen["name"]}, [], session,
+                )
+                return (
+                    f"Remove *{chosen['name']}* from blacklist?\n"
+                    "Reply *yes* to confirm or *no* to cancel."
+                )
+            return f"__KEEP_PENDING__Reply with a number between 1 and {len(choices)}, or *cancel*."
+        return f"__KEEP_PENDING__Reply with a number between 1 and {len(choices)}, or *cancel*."
+
     return None
 
 
@@ -7905,7 +7941,7 @@ async def _query_unhandled(entities: dict, ctx: CallerContext, session: AsyncSes
 async def _blacklist_add(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     """Add a person to the blacklist. Syntax: blacklist [name] reason [reason]"""
     import re as _re
-    raw = (entities.get("raw") or "").strip()
+    raw = (entities.get("_raw_message") or entities.get("description") or "").strip()
 
     # Extract reason after "reason" keyword
     reason_m = _re.search(r"\breason\s+(.+)$", raw, _re.I)
@@ -7960,20 +7996,32 @@ async def _show_blacklist(entities: dict, ctx: CallerContext, session: AsyncSess
 
 
 async def _blacklist_remove(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
-    """Remove an entry from the blacklist by ID or name."""
+    """Remove an entry from the blacklist by ID or name (with confirmation)."""
     import re as _re
-    raw = (entities.get("raw") or "").strip()
+    from sqlalchemy import text as _text
+    raw = (entities.get("_raw_message") or entities.get("description") or "").strip()
 
-    # Try numeric ID first
+    # Numeric ID → look up, confirm, then remove
     id_m = _re.search(r"\b(\d+)\b", raw)
     if id_m:
-        from src.services.blacklist import remove_from_blacklist
-        ok = await remove_from_blacklist(session, int(id_m.group(1)))
-        if ok:
-            return f"Blacklist entry #{id_m.group(1)} removed."
-        return f"No active blacklist entry with ID {id_m.group(1)}."
+        bl_id = int(id_m.group(1))
+        row = (await session.execute(
+            _text("SELECT id, name, reason FROM blacklist WHERE id=:id AND is_active=TRUE"),
+            {"id": bl_id},
+        )).first()
+        if not row:
+            return f"No active blacklist entry with ID {bl_id}."
+        await _save_pending(
+            ctx.phone, "BLACKLIST_REMOVE_CONFIRM",
+            {"id": row.id, "name": row.name}, [], session,
+        )
+        return (
+            f"Remove *{row.name}* from blacklist?\n"
+            f"Reason on file: {row.reason}\n\n"
+            "Reply *yes* to remove or *no* to cancel."
+        )
 
-    # Name-based: strip command words and look up
+    # Name-based: strip command words
     name = _re.sub(
         r"^(?:remove|unblock|unban|delist|clear|unblacklist)\s+(?:from\s+blacklist\s+)?",
         "", raw, flags=_re.I,
@@ -7981,16 +8029,40 @@ async def _blacklist_remove(entities: dict, ctx: CallerContext, session: AsyncSe
     if not name or len(name) < 3:
         return "Usage: *unblacklist [id]* or *unblacklist [name]*"
 
-    from sqlalchemy import text
-    row = (await session.execute(
-        text("SELECT id, name FROM blacklist WHERE is_active=TRUE AND LOWER(name) LIKE :pat LIMIT 1"),
+    rows = (await session.execute(
+        _text(
+            "SELECT id, name, reason FROM blacklist "
+            "WHERE is_active=TRUE AND LOWER(name) LIKE :pat ORDER BY name LIMIT 5"
+        ),
         {"pat": f"%{name.lower()}%"},
-    )).first()
-    if not row:
-        return f"No active blacklist entry matching *{name}*."
-    from src.services.blacklist import remove_from_blacklist
-    await remove_from_blacklist(session, row.id)
-    return f"*{row.name}* (ID {row.id}) removed from blacklist."
+    )).all()
+
+    if not rows:
+        return f"No active blacklist entry matching *{name}*. Use *show blacklist* to see all entries."
+
+    if len(rows) == 1:
+        row = rows[0]
+        await _save_pending(
+            ctx.phone, "BLACKLIST_REMOVE_CONFIRM",
+            {"id": row.id, "name": row.name}, [], session,
+        )
+        return (
+            f"Remove *{row.name}* from blacklist?\n"
+            f"Reason on file: {row.reason}\n\n"
+            "Reply *yes* to remove or *no* to cancel."
+        )
+
+    # Multiple matches — let admin pick
+    choices = [{"id": r.id, "name": r.name} for r in rows]
+    lines = [f"Found {len(rows)} entries matching *{name}*:\n"]
+    for i, r in enumerate(rows, 1):
+        lines.append(f"{i}. {r.name}")
+    lines.append("\nReply with the number to remove, or *cancel*.")
+    await _save_pending(
+        ctx.phone, "BLACKLIST_REMOVE_PICK",
+        {"choices": choices, "query": name}, [], session,
+    )
+    return "\n".join(lines)
 
 
 async def _unknown(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
