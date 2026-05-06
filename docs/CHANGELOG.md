@@ -2,6 +2,33 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.20] — 2026-05-06 — Memory system reorganised + docs audited + AI workflow guide
+
+### Memory system — 70 files → ~35 files (halved)
+- **27 individual feedback_*.md files deleted** — merged into 4 themed rule files:
+  - `rules_financial.md` — dues formula, proration, billing, checkout, premium beds, rollover, exits, maintenance, late fee
+  - `rules_data_sync.md` — sheet column refs, cash column integrity, DB-first, auto-refresh, daywise sync, import, all-outputs
+  - `rules_bot_integrity.md` — no double-booking, handler completeness, side-effect audit, cross-layer consistency
+  - `rules_workflow.md` — permissions, env, VPS deploy, model selection, testing, no-eraser, autocompact, staff room docs, PWA zindex
+- **3 stale project files deleted**: project_pnl_session_2026_04_23.md (STALE), project_deprecate_add_tenant.md (shipped), project_checkout_form.md (shipped)
+- **2 project files merged**: project_billing_rules.md → rules_financial.md; project_gsheet_sync.md → rules_data_sync.md
+- **MEMORY.md rewritten** — clean table format with status column; purpose-per-type table at top
+- **sop_session.md** — added "check before create" rule; BRAIN.md file-based trigger (not judgment-based); hardened wrap-up definition
+
+### Process fixes — structural, not just rules
+- **BRAIN.md trigger**: before every commit, run `git diff HEAD~1 --name-only`; if any file in BRAIN.md Key Files changed → update BRAIN.md same session. Eliminates 5-week staleness gap.
+- **Wrap-up definition hardened**: "done" = CHANGELOG + all relevant docs updated + memory updated + committed + pushed + deployed. Every relevant doc on every change — no exceptions.
+
+### New memory files
+- `user_growth.md` — Kiran's working patterns, Claude's recurring mistakes log, friction points, improvement suggestions
+- `user_ai_workflow.md` — how to prompt Claude effectively, session structure, correction patterns, anti-patterns, commands
+
+### Docs audited and updated
+- `docs/REPORTING.md` — Section 1 (P&L format) rewritten: bank-primary income, True Revenue = Gross − Security Deposits, CAPEX separate, cash position. Section 3/12: HULK beds discrepancy flagged.
+- `docs/BRAIN.md` — last updated 2026-05-06; PWA pages list completed (Finance, Notices, Checkouts, Onboarding sessions, Edit Tenant added); Key Files expanded with pnl_builder.py, finance.py, yes_bank.py, PWA pages
+
+---
+
 ## [1.75.19] — 2026-05-06 — P&L wrap-up: SOP update + doubtful tenants documented
 
 ### sop_pnl.md — fully updated to reflect new P&L logic
