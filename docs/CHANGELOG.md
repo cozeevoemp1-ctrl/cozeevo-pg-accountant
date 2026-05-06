@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.18] — 2026-05-06 — P&L deposit deduction corrected + cash position
+
+### Deposit deduction — correct amount (refundable security only ~₹33L not ₹61L)
+- **Root cause of double**: was using `DEPOSIT_RECEIVED` (security + maintenance = ₹61.6L). Correct: only refundable security deposits = ₹33.21L.
+- `pnl_builder.py`: deduct `DEPOSITS["Security Deposits — refundable"]` per month. True Rent Revenue = ₹1,20,36,738. EBITDA = ₹18.26L (15.2%). Net = ₹1.92L.
+- `finance.py _build_pnl_excel()`: same logic — deducts `dep_held_sec` from gross, EBITDA on true revenue. Removed duplicate DEPOSITS HELD section.
+- Maintenance fee (non-refundable, ₹10.7L) kept in income — shown as informational note only.
+
+### THOR→HULK ₹5L inter-account transfer — explicit reclassification
+- Removed from Capital Contributions (it's not new equity — already in THOR income).
+- INCOME section now shows: `THOR — transferred to HULK (reclassification): −₹5L` and `HULK — received from THOR (reclassification): +₹5L`. Net = zero on combined total. Per-building attribution correct for tax.
+
+### Property rent — corrected back to ₹13,000 × 164 = ₹21,32,000
+- Was incorrectly changed to ₹13,500 × 164 mid-session. Reverted.
+
+### Cash position — filled with actual numbers
+- Bank THOR + HULK = ₹21,88,804. Net deposits owed to active tenants = ₹28,91,500.
+- True free cash = −₹7,02,696 (bank < deposits owed — gap funded by early CAPEX/OPEX).
+- Note added: gap recovers as revenue grows (Apr EBITDA ₹14.78L/month).
+
+---
+
 ## [1.75.17] — 2026-05-06 — P&L structure final + bank_transactions dedup
 
 ### P&L — correct structure across all surfaces
