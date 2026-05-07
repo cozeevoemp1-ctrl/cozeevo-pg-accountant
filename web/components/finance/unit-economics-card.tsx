@@ -3,36 +3,13 @@
 import type { UnitEconomics } from "@/lib/api"
 
 function rupee(n: number): string {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`
-  if (n >= 1000) return `₹${Math.round(n / 1000)}K`
+  if (Math.abs(n) >= 100000) return `₹${(n / 100000).toFixed(1)}L`
+  if (Math.abs(n) >= 1000) return `₹${Math.round(n / 1000)}K`
   return `₹${Math.round(n).toLocaleString("en-IN")}`
 }
 
-function pct(n: number): string {
-  return `${n.toFixed(1)}%`
-}
-
-interface RowProps {
-  label: string
-  value: string
-  sub?: string
-  highlight?: "green" | "red" | "neutral"
-}
-
-function Row({ label, value, sub, highlight }: RowProps) {
-  const valueColor =
-    highlight === "green" ? "text-status-paid" :
-    highlight === "red"   ? "text-status-warn" :
-    "text-ink"
-  return (
-    <div className="flex items-center justify-between py-1.5 border-b border-[#F6F5F0] last:border-0">
-      <div>
-        <span className="text-xs text-ink-muted">{label}</span>
-        {sub && <span className="text-[10px] text-ink-muted ml-1 opacity-60">{sub}</span>}
-      </div>
-      <span className={`text-xs font-bold ${valueColor}`}>{value}</span>
-    </div>
-  )
+function pct(n: number, decimals = 1): string {
+  return `${n.toFixed(decimals)}%`
 }
 
 interface Props {
@@ -40,76 +17,145 @@ interface Props {
 }
 
 export function UnitEconomicsCard({ data }: Props) {
-  const collectionColor = data.collection_rate >= 90 ? "green" : data.collection_rate >= 70 ? "neutral" : "red"
-  const ebitdaColor = data.ebitda >= 0 ? "green" : "red"
+  const ebitdaPositive = data.ebitda >= 0
+  const collectionGood = data.collection_rate >= 90
+  const collectionOk = data.collection_rate >= 70
+  const vacantBeds = data.total_beds - data.occupied_beds
+  const occupancyBar = Math.round(data.occupancy_pct)
 
   return (
-    <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3 flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
 
-      {/* Section 1 — Occupancy & Rent (always available) */}
-      <div>
-        <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Occupancy &amp; Rent</p>
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="bg-tile-green rounded-tile p-2.5 text-center">
-            <p className="text-sm font-extrabold text-status-paid">{pct(data.occupancy_pct)}</p>
-            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Occupancy</p>
+      {/* ── HERO: EBITDA margin ── */}
+      {data.bank_available && (
+        <div className={`rounded-card px-5 py-4 flex items-center justify-between ${ebitdaPositive ? "bg-[#0F0E0D]" : "bg-[#2D1010]"}`}>
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[#6F655D] mb-1">EBITDA / Bed · Month</p>
+            <p className={`text-3xl font-extrabold ${ebitdaPositive ? "text-white" : "text-status-warn"}`}>
+              {rupee(data.ebitda_per_bed)}
+            </p>
           </div>
-          <div className="bg-[#F6F5F0] rounded-tile p-2.5 text-center">
-            <p className="text-sm font-extrabold text-ink">{data.occupied_beds}</p>
-            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Beds Occ.</p>
+          <div className="text-right">
+            <p className={`text-2xl font-extrabold ${ebitdaPositive ? "text-status-paid" : "text-status-warn"}`}>
+              {pct(data.ebitda_margin)}
+            </p>
+            <p className="text-[9px] font-semibold text-[#6F655D] mt-0.5">margin</p>
           </div>
-          <div className="bg-[#F6F5F0] rounded-tile p-2.5 text-center">
-            <p className="text-sm font-extrabold text-ink">{data.total_beds - data.occupied_beds}</p>
-            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Vacant</p>
-          </div>
-        </div>
-        <Row label="Avg Agreed Rent" value={rupee(data.avg_agreed_rent)} sub="(monthly, excl. deposits)" />
-        <Row
-          label="Collection Rate"
-          value={pct(data.collection_rate)}
-          sub={`${rupee(data.total_collected)} of ${rupee(data.total_billed)}`}
-          highlight={collectionColor}
-        />
-      </div>
-
-      {/* Section 2 — Per-Bed Unit Economics (bank data required) */}
-      {data.bank_available ? (
-        <div>
-          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-2">Unit Economics</p>
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="bg-tile-green rounded-tile p-2.5 text-center">
-              <p className="text-sm font-extrabold text-status-paid">{rupee(data.revenue_per_bed)}</p>
-              <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Rev / Bed</p>
-            </div>
-            <div className="bg-tile-orange rounded-tile p-2.5 text-center">
-              <p className="text-sm font-extrabold text-status-due">{rupee(data.opex_per_bed)}</p>
-              <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Cost / Bed</p>
-            </div>
-            <div className={`${data.ebitda_per_bed >= 0 ? "bg-tile-pink" : "bg-tile-orange"} rounded-tile p-2.5 text-center`}>
-              <p className={`text-sm font-extrabold ${data.ebitda_per_bed >= 0 ? "text-brand-pink" : "text-status-warn"}`}>
-                {rupee(Math.abs(data.ebitda_per_bed))}
-              </p>
-              <p className="text-[9px] text-ink-muted font-semibold mt-0.5">EBITDA / Bed</p>
-            </div>
-          </div>
-          <Row label="True Revenue" value={rupee(data.true_revenue)} highlight="green" />
-          <Row label="Less: OPEX" value={rupee(data.total_opex)} />
-          <Row
-            label="EBITDA"
-            value={`${rupee(Math.abs(data.ebitda))} (${pct(data.ebitda_margin)})`}
-            highlight={ebitdaColor}
-          />
-          {data.deposits_held > 0 && (
-            <Row label="Security Deposits deducted" value={rupee(data.deposits_held)} />
-          )}
-        </div>
-      ) : (
-        <div className="py-2">
-          <p className="text-[11px] text-ink-muted text-center">
-            Upload bank statement to see revenue &amp; cost per bed
-          </p>
         </div>
       )}
+
+      {/* ── P&L WATERFALL ── */}
+      {data.bank_available ? (
+        <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-3">P&amp;L Waterfall</p>
+
+          {/* Gross Revenue */}
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-ink-muted">Gross Bank Income</span>
+            <span className="text-xs font-bold text-ink">{rupee(data.gross_income)}</span>
+          </div>
+
+          {/* Deposits deducted */}
+          {data.deposits_held > 0 && (
+            <div className="flex items-center justify-between py-1.5">
+              <span className="text-xs text-ink-muted pl-3">− Security Deposits</span>
+              <span className="text-xs font-semibold text-status-warn">−{rupee(data.deposits_held)}</span>
+            </div>
+          )}
+
+          {/* True Revenue — highlighted */}
+          <div className="flex items-center justify-between py-1.5 bg-[#F6F5F0] rounded-lg px-2 -mx-2 my-1">
+            <span className="text-xs font-bold text-ink">True Revenue</span>
+            <span className="text-xs font-extrabold text-status-paid">{rupee(data.true_revenue)}</span>
+          </div>
+
+          {/* OPEX */}
+          <div className="flex items-center justify-between py-1.5">
+            <span className="text-xs text-ink-muted pl-3">− Operations (OPEX)</span>
+            <span className="text-xs font-semibold text-ink-muted">−{rupee(data.total_opex)}</span>
+          </div>
+
+          {/* EBITDA — highlighted */}
+          <div className={`flex items-center justify-between py-2 rounded-lg px-2 -mx-2 mt-1 ${ebitdaPositive ? "bg-tile-green" : "bg-tile-orange"}`}>
+            <div>
+              <span className="text-xs font-extrabold text-ink">EBITDA</span>
+              <span className="text-[9px] text-ink-muted ml-2">{pct(data.ebitda_margin)} margin</span>
+            </div>
+            <span className={`text-sm font-extrabold ${ebitdaPositive ? "text-status-paid" : "text-status-warn"}`}>
+              {ebitdaPositive ? "" : "−"}{rupee(Math.abs(data.ebitda))}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-4 text-center">
+          <p className="text-[11px] text-ink-muted">Upload bank statement to unlock revenue &amp; EBITDA</p>
+        </div>
+      )}
+
+      {/* ── PER-BED KPIs ── */}
+      {data.bank_available && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-tile-green rounded-tile p-2.5 text-center">
+            <p className="text-sm font-extrabold text-status-paid">{rupee(data.revenue_per_bed)}</p>
+            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Rev / Bed</p>
+          </div>
+          <div className="bg-tile-orange rounded-tile p-2.5 text-center">
+            <p className="text-sm font-extrabold text-status-due">{rupee(data.opex_per_bed)}</p>
+            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Cost / Bed</p>
+          </div>
+          <div className="bg-[#F6F5F0] rounded-tile p-2.5 text-center">
+            <p className="text-xs font-extrabold text-ink">{pct(data.ebitda_margin, 0)}</p>
+            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">EBITDA %</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── OCCUPANCY + RENT ── */}
+      <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
+        <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mb-3">Occupancy &amp; Rent</p>
+
+        {/* Occupancy bar */}
+        <div className="mb-3">
+          <div className="flex justify-between text-[10px] font-semibold mb-1">
+            <span className="text-ink">{data.occupied_beds} of {data.total_beds} beds occupied</span>
+            <span className={data.occupancy_pct >= 90 ? "text-status-paid" : data.occupancy_pct >= 70 ? "text-ink" : "text-status-warn"}>
+              {pct(data.occupancy_pct, 0)}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-[#F0EDE9] rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full ${data.occupancy_pct >= 90 ? "bg-status-paid" : data.occupancy_pct >= 70 ? "bg-brand-blue" : "bg-status-warn"}`}
+              style={{ width: `${occupancyBar}%` }}
+            />
+          </div>
+          {vacantBeds > 0 && (
+            <p className="text-[10px] text-status-warn font-semibold mt-1">{vacantBeds} vacant bed{vacantBeds > 1 ? "s" : ""}</p>
+          )}
+        </div>
+
+        {/* Rent + Collection row */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-[#F6F5F0] rounded-tile p-2.5">
+            <p className="text-sm font-extrabold text-ink">{rupee(data.avg_agreed_rent)}</p>
+            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Avg Rent / Bed</p>
+          </div>
+          <div className={`${collectionGood ? "bg-tile-green" : collectionOk ? "bg-[#F6F5F0]" : "bg-tile-orange"} rounded-tile p-2.5`}>
+            <p className={`text-sm font-extrabold ${collectionGood ? "text-status-paid" : collectionOk ? "text-ink" : "text-status-warn"}`}>
+              {pct(data.collection_rate, 0)}
+            </p>
+            <p className="text-[9px] text-ink-muted font-semibold mt-0.5">Collection Rate</p>
+          </div>
+        </div>
+
+        {/* Collected vs billed */}
+        <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-[#F0EDE9]">
+          <span className="text-[10px] text-ink-muted">Collected</span>
+          <span className="text-[10px] font-bold text-ink">
+            {rupee(data.total_collected)} <span className="font-normal text-ink-muted">of {rupee(data.total_billed)}</span>
+          </span>
+        </div>
+      </div>
+
     </div>
   )
 }

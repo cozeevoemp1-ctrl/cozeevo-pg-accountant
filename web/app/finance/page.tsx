@@ -140,7 +140,7 @@ export default function FinancePage() {
       {/* Unit Economics — always shown (occupancy/rent from DB; per-bed figures need bank data) */}
       {!loading && unitEcon && (
         <>
-          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide px-1">Unit Economics</p>
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide px-1 mt-2">Unit Economics</p>
           <UnitEconomicsCard data={unitEcon} />
         </>
       )}
