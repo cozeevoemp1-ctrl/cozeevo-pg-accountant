@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.23] — 2026-05-07 — May payment audit via bot logs
+
+### Analysis (no code changes)
+- Grepped VPS webhook log for all payment-related messages in last 10 days
+- Matched 38 tenant phones to active tenancies in DB
+- Cross-checked against May 2026 `payments` table: 14 already in DB (12 full, 2 partial), 23 missing
+- Inserted 19 confirmed payers → voided all 19 after discovering Gemini vision has been failing (429 rate limit) and screenshots are unverified
+- 4 tenants flagged as ambiguous (307 Sonali, 409 Amisha, 412 Jatin, 512 Krish Kumar) — do not enter without manual verification
+
+### Key findings
+- Gemini vision (`receipt_handler._gemini_read_image`) has been hitting 429 rate limits all of May — zero payment screenshots read or saved to disk
+- Bot receives images but they are processed in-memory only; on Gemini failure images are lost
+- **Fix needed:** Replace Gemini with Claude vision in `receipt_handler.py`
+- **Verification path for 19 tenants:** Upload May Yes Bank CSV → parser matches UPI credits to tenant phones → verified amounts
+
 ## [1.75.22] — 2026-05-06 — Unit economics KPIs — PWA + WhatsApp bot
 
 ### New: Unit Economics reporting (end-to-end)
