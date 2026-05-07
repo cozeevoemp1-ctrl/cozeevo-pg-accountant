@@ -52,20 +52,20 @@ export default function FinancePage() {
   const loadPnl = useCallback(async (m: string) => {
     setLoading(true)
     setError("")
-    try {
-      const [pnlRes, reconcileRes, ueRes] = await Promise.all([
-        getFinancePnl(m),
-        getDepositReconciliation(m),
-        getUnitEconomics(m),
-      ])
-      setData(pnlRes.data[m] ?? null)
-      setReconcileRows(reconcileRes.rows)
-      setUnitEcon(ueRes)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load")
-    } finally {
-      setLoading(false)
+    const [pnlResult, reconcileResult, ueResult] = await Promise.allSettled([
+      getFinancePnl(m),
+      getDepositReconciliation(m),
+      getUnitEconomics(m),
+    ])
+    if (pnlResult.status === "fulfilled") {
+      setData(pnlResult.value.data[m] ?? null)
+    } else {
+      setData(null)
+      setError(pnlResult.reason instanceof Error ? pnlResult.reason.message : "Failed to load")
     }
+    if (reconcileResult.status === "fulfilled") setReconcileRows(reconcileResult.value.rows)
+    if (ueResult.status === "fulfilled") setUnitEcon(ueResult.value)
+    setLoading(false)
   }, [])
 
   useEffect(() => { loadPnl(month) }, [month, loadPnl])
