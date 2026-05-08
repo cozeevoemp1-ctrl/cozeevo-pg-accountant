@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.25] — 2026-05-08 — Unit economics card redesign (investor-grade)
+
+### Changed: `web/components/finance/unit-economics-card.tsx`
+- **Hero tile** — dark bg, EBITDA/bed (large left) + EBITDA% margin (large right); impossible to miss
+- **P&L Waterfall** — Gross Income → −Security Deposits → True Revenue (highlighted row) → −OPEX → EBITDA (green/red row with margin %)
+- **Per-bed KPI tiles** — Rev/Bed · Cost/Bed · EBITDA% (only when bank CSV uploaded)
+- **Occupancy progress bar** — color-coded (green ≥90%, amber ≥70%, red below) + vacant count
+- **2-tile row** — Avg Rent/Bed + Collection Rate + collected-of-billed line
+- Previous flat-list layout replaced; all data fields unchanged, presentation only
+
+### Research: PG/co-living unit economics KPI concepts (presented, pending Kiran decision)
+- Groups: RevPAB/RevPOB (per-bed revenue), Vacancy Cost/Economic Occupancy, OPEX Ratio, Payback Period/Annual Yield on Investment, Avg Stay Duration/Renewal Rate
+- Kiran to select which groups to build next session
+
 ## [1.75.24] — 2026-05-08 — VPS security hardening
 
 ### Security fixes (no code changes — server config only)
