@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.24] — 2026-05-08 — VPS security hardening
+
+### Security fixes (no code changes — server config only)
+- **UFW firewall enabled** — ports 8000 (FastAPI) and 3001 (Next.js) blocked from internet; only 22/80/443 open
+- **SSH password auth disabled** — key-only login; brute force now impossible
+- **PermitRootLogin → prohibit-password** — root SSH only via key
+- **MaxAuthTries 3** — SSH limited to 3 attempts before disconnect
+- **fail2ban installed** — 3 failed SSH attempts → 24h IP ban; nginx-botsearch + nginx-http-auth jails also active
+- **`.env` permissions fixed** — was world-readable (644), now root-only (600)
+- **Nginx security headers** — X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, server_tokens off
+
+### Planned (pending Yes Bank API approval)
+- Payment screenshot verification system (Claude vision → amount extraction → dues comparison → auto-log)
+- Yes Bank transaction API integration for UTR verification (Kiran to apply at apiportal.yes.bank.in)
+
 ## [1.75.23] — 2026-05-07 — May payment audit via bot logs
 
 ### Analysis (no code changes)
