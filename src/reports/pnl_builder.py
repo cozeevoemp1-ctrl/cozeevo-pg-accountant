@@ -48,25 +48,26 @@ OPEX = {
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     10620,       0,       0,       0],
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 40946, 70730, 113168, 0, 0],
-    "Food & Groceries":                                           [0, 1086, 34435, 201558,  94931,  237747,  233679],
-    "Fuel & Diesel":                                              [0, 0, 0,        9099,  104366,  346308,    2800],
+    "Food & Groceries":                                           [0, 33632, 88250, 201558,  94931,  237747,  233679],
+    "Fuel & Diesel":                                              [0, 0, 200,       9099,  104366,  346308,    2800],
     "Staff & Labour":                                             [0, 1000, 125935, 112063, 219715,  155641,  199617],
     "Maintenance & Repairs":                                      [0, 0, 0,            0,     550,   18470,   30740],
     "Cleaning Supplies":                                          [0, 0, 4414,       1400,     700,    4566,   14500],
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
     "Shopping & Supplies":                                        [0, 2730, 10530,  12036,   6127,    6184,    7442],
     "Operational Expenses":                                       [0, 0, 47769,     10315,   2174,    3237,  137319],
-    "Marketing":                                                  [0, 0, 39500,     17895,   3620,   27700,       0],
+    "Marketing":                                                  [0, 0, 48500,     17895,   3620,   27700,       0],
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 75716,     88073,   3000,    3000,    3000],
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 10000, 83556,  4564,  23258,   78780,   99306],
+    "Other Expenses":                                             [0, 10318, 156337,  4564,  23258,   78780,   99306],
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
 }
 
 CAPEX = {
-    "Furniture & Fittings":                    [0, 50000, 110191, 203815, 1185397,   331,   2163],
-    "Capital Investment (CCTV, 8 Ball Pool)":  [0, 82000,      0,      0,       0,     0,      0],
+    # THOR/HULK Yes Bank + Lakshmi SBI direct vendor payments combined
+    "Furniture & Fittings":                    [0, 370071, 419304, 203815, 1185397,   331,   2163],
+    "Capital Investment (CCTV, 8 Ball Pool)":  [0,  82000,      0,      0,       0,     0,      0],
 }
 
 EXCLUDED = {

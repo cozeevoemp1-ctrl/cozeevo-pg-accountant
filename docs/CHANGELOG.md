@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.32] — 2026-05-09 — Import Lakshmi SBI investment spend into P&L
+
+### Data — Investment.xlsx (Lakshmi SBI direct vendor payments, Oct–Dec 2025)
+- 32 transactions inserted into `bank_transactions` (account_name=LAKSHMI_SBI, upload_id=7)
+- Direct SBI→vendor payments never captured in THOR/HULK Yes Bank CSV
+- Skipped: Oct capital transfers to Cozeevo (already in Capital Contributions), test txns, Chandra credits
+
+### CAPEX added
+- Nov +₹3,20,071 (Griham Decor, Naveen Kumar gym, Lavanya, Kumar UC, carpets, nursery)
+- Dec +₹3,09,113 (architect ₹43K, Griham Decor ₹2.28L, Decor Studio plants, fire extinguishers, wardrobe)
+- Total CAPEX: ₹16,33,897 → ₹22,63,081 (+₹6.29L)
+
+### OPEX added
+- Food & Groceries: Nov +₹32,546, Dec +₹53,815
+- Other Expenses: Dec +₹72,781 (Chandra PG ₹70K + misc)
+- Marketing: Dec +₹9,000 | Fuel: Dec +₹200
+
+### P&L impact
+- EBITDA: ₹18,25,678 → ₹16,57,018 (15.2% → 13.8%)
+- Net Profit: +₹1,91,781 → −₹6,06,063 (₹7.97L hidden spend now visible)
+
+### Classifier additions (`src/rules/pnl_classify.py`)
+- Griham Decor, Naveen Kumar, Lavanya Ravishankar, Decor Studio, Kaizen, carpets, nursery, architect → Furniture & Fittings
+- Signs & Signages → Marketing
+
 ## [1.75.31] — 2026-05-09 — Payment audit: 26 unrecorded claimers + 3 test voids
 
 ### Investigation — bot messages last 5 days

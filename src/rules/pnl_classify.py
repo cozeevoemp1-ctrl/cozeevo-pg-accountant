@@ -62,6 +62,17 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
 
     # ── FURNITURE & FITTINGS ──────────────────────────────────────────────────
     ("Furniture & Fittings", "Wakefit - Mattresses",         ["wakefit"]),
+    # Lakshmi SBI direct vendor payments (initial setup — never through THOR/HULK)
+    ("Furniture & Fittings", "Griham Decor (Furniture)",         ["griham decor","griham"]),
+    ("Furniture & Fittings", "Naveen Kumar (Gym Setup)",         ["naveen kumar"]),
+    ("Furniture & Fittings", "Lavanya Ravishankar (Fittings)",   ["lavanya ravishankar","lavanya"]),
+    ("Furniture & Fittings", "Kumar UC (Fittings)",              ["kumar.u.c","kumar uc"]),
+    ("Furniture & Fittings", "Carpets / Flooring",               ["floors and carpet","carpet"]),
+    ("Furniture & Fittings", "Decor Studio (Plants/Decor)",      ["decor studio"]),
+    ("Furniture & Fittings", "Plants / Nursery (SBI)",           ["madeena nursery","amartradingco","amar trading"]),
+    ("Furniture & Fittings", "Kaizen (Fire Extinguishers)",      ["kaizen"]),
+    ("Furniture & Fittings", "Architect Fee",                    ["architect"]),
+    ("Marketing",            "Signs & Signages",                 ["signs and signages","signage"]),
     ("Furniture & Fittings", "Bedsheets / Linen",            ["bedsheet","bed sheet"]),
     ("Furniture & Fittings", "Shoe Rack / Rack",             ["shoe rack","rack balance","9108617776"]),
     ("Furniture & Fittings", "Curtains",                     ["curtain"]),
