@@ -61,8 +61,6 @@ export default function EditTenantPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState("")
   const [deleteReason, setDeleteReason] = useState("")
-  const [forceDeleteNeeded, setForceDeleteNeeded] = useState(false)
-  const [forceDeleteWarned, setForceDeleteWarned] = useState(false)
 
   // Balance adjustment state
   const [adjAmount, setAdjAmount] = useState("")
@@ -204,33 +202,6 @@ export default function EditTenantPage() {
     }
     if (!deleteWarned) {
       setDeleteWarned(true)
-      setDeleteError("This will permanently delete the tenant. Tap Delete again to confirm.")
-      return
-    }
-    setDeleting(true)
-    try {
-      await deleteTenant(tenancyId, deleteReason.trim())
-      router.push("/tenants")
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Delete failed."
-      if (msg.includes("payment record(s) exist")) {
-        setForceDeleteNeeded(true)
-        setDeleteWarned(false)
-        setDeleteError(msg)
-      } else {
-        setDeleteError(msg)
-        setDeleteWarned(false)
-      }
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  async function handleForceDelete() {
-    setDeleteError("")
-    if (!forceDeleteWarned) {
-      setForceDeleteWarned(true)
-      setDeleteError("This will VOID all payments and permanently delete the tenant. Tap again to confirm.")
       return
     }
     setDeleting(true)
@@ -238,8 +209,8 @@ export default function EditTenantPage() {
       await deleteTenant(tenancyId, deleteReason.trim(), true)
       router.push("/tenants")
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Force delete failed.")
-      setForceDeleteWarned(false)
+      setDeleteError(err instanceof Error ? err.message : "Delete failed.")
+      setDeleteWarned(false)
     } finally {
       setDeleting(false)
     }
@@ -739,34 +710,18 @@ export default function EditTenantPage() {
           {deleteError && (
             <p className="text-xs text-status-warn font-medium">{deleteError}</p>
           )}
-          {!forceDeleteNeeded && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting || !deleteReason.trim()}
-              className={`rounded-pill border py-2.5 text-sm font-bold w-full transition-colors ${
-                deleteWarned
-                  ? "border-red-500 bg-red-500 text-white"
-                  : "border-red-400 text-red-500"
-              } disabled:opacity-40 disabled:cursor-not-allowed`}
-            >
-              {deleting ? "Deleting…" : deleteWarned ? "Confirm Delete" : "Delete Tenant"}
-            </button>
-          )}
-          {forceDeleteNeeded && (
-            <button
-              type="button"
-              onClick={handleForceDelete}
-              disabled={deleting}
-              className={`rounded-pill border py-2.5 text-sm font-bold w-full transition-colors ${
-                forceDeleteWarned
-                  ? "border-red-600 bg-red-600 text-white"
-                  : "border-red-500 bg-red-50 text-red-600"
-              } disabled:opacity-40`}
-            >
-              {deleting ? "Deleting…" : forceDeleteWarned ? "Confirm — void payments + delete" : "Force Delete (void payments + delete)"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting || !deleteReason.trim()}
+            className={`rounded-pill border py-2.5 text-sm font-bold w-full transition-colors ${
+              deleteWarned
+                ? "border-red-500 bg-red-500 text-white"
+                : "border-red-400 text-red-500"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {deleting ? "Deleting…" : deleteWarned ? "Confirm Delete" : "Delete Tenant"}
+          </button>
         </div>
       </div>
 

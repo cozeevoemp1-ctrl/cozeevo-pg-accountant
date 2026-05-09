@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.27] — 2026-05-09 — Delete tenant UX simplified + login autofill fix
+
+### Changed: `web/app/tenants/[tenancy_id]/edit/page.tsx`
+- **Delete flow collapsed to 1 confirmation** — removed `forceDeleteNeeded` / `forceDeleteWarned` states and `handleForceDelete` function; now always calls `deleteTenant(..., force=true)`; one "Delete Tenant" → "Confirm Delete" tap, done
+- Previous flow had 4 taps for tenants with payments; now 2 taps regardless of payment state
+- "Failed to fetch" on force delete was caused by server error in force path (under investigation — check VPS logs when next needed)
+
+### Fixed: `web/app/login/page.tsx`
+- **Browser autofill no longer fails** — changed from React controlled inputs (`value=` + `onChange`) to uncontrolled refs; `emailRef` + `passwordRef` read DOM values at submit time
+- Root cause: browser fills password field visually but never fires React `onChange`, so `password` state stayed `""`; submit sent empty password; clearing email and retyping was accidentally unblocking it via re-render cycle
+- Email keeps `defaultValue="cozeevoemp1@gmail.com"`; no UX change, autofill now works immediately
+
 ## [1.75.26] — 2026-05-09 — Project reorganisation + LinkedIn brand project created
 
 ### Project move

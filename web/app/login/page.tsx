@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmail } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("cozeevoemp1@gmail.com");
-  const [password, setPassword] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const email = emailRef.current?.value ?? "";
+    const password = passwordRef.current?.value ?? "";
     setLoading(true);
     setError(null);
     const { error: err } = await signInWithEmail(email, password);
@@ -41,25 +43,22 @@ export default function LoginPage() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Email</label>
             <input
+              ref={emailRef}
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              defaultValue="cozeevoemp1@gmail.com"
               required
               autoComplete="email"
               className="rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
-              suppressHydrationWarning
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Password</label>
             <input
+              ref={passwordRef}
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
               className="rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
-              suppressHydrationWarning
             />
           </div>
           {error && <p className="text-xs text-status-warn font-medium">{error}</p>}
