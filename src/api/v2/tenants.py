@@ -669,13 +669,6 @@ async def delete_tenant(
                 detail=f"Cannot delete — {len(payments)} payment record(s) exist. Use force delete to void them first.",
             )
 
-        # Void all payments before deleting (force path).
-        # Payments may be in frozen months — bypass the freeze trigger for this session.
-        if payments:
-            await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
-        for p in payments:
-            p.is_void = True
-
         # Write audit trail before deleting so there's a permanent record
         session.add(AuditLog(
             changed_by=user.user_id or "pwa",
@@ -692,14 +685,51 @@ async def delete_tenant(
         ))
         await session.flush()  # write audit log before cascade delete
 
-        await session.delete(tenancy)
-        # Delete tenant only if they have no other tenancies
+        # Bypass frozen-month trigger for this transaction (erroneous-entry cleanup)
+        await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
+
+        # Use raw SQL to delete child records. The ORM relationship on Tenancy
+        # (no passive_deletes) would issue UPDATE SET tenancy_id=NULL before the
+        # parent delete — but tenancy_id is NOT NULL on all these tables → 500.
+        # Raw SQL bypasses ORM cascade entirely.
+        for tbl in [
+            "checkout_sessions",   # must come before checkout_records (no FK dep)
+            "checkout_records",
+            "rent_revisions",
+            "rent_schedule",
+            "payments",
+            "refunds",
+            "vacations",
+            "complaints",
+        ]:
+            await session.execute(
+                text(f"DELETE FROM {tbl} WHERE tenancy_id = :tid"),
+                {"tid": tenancy_id},
+            )
+        # Nullable FK tables: just NULL them out
+        for tbl in ["reminders", "agreements", "onboarding_sessions", "documents"]:
+            await session.execute(
+                text(f"UPDATE {tbl} SET tenancy_id = NULL WHERE tenancy_id = :tid"),
+                {"tid": tenancy_id},
+            )
+
+        # Check before deleting tenancy (avoid FK issue from expunged ORM object)
         other = await session.scalar(
             select(func.count()).select_from(Tenancy)
             .where(Tenancy.tenant_id == tenant.id, Tenancy.id != tenancy_id)
         )
+
+        # Expunge ORM objects so raw SQL delete doesn't conflict with identity map
+        session.expunge(tenancy)
+        for p in payments:
+            try:
+                session.expunge(p)
+            except Exception:
+                pass
+
+        await session.execute(text("DELETE FROM tenancies WHERE id = :id"), {"id": tenancy_id})
         if not other:
-            await session.delete(tenant)
+            await session.execute(text("DELETE FROM tenants WHERE id = :id"), {"id": tenant.id})
 
         await session.commit()
 
