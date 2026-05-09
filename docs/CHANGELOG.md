@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.31] — 2026-05-09 — Payment audit: 26 unrecorded claimers + 3 test voids
+
+### Investigation — bot messages last 5 days
+- Audited VPS webhook + pending logs + DB for all payment activity May 4–9
+- Found **26 active tenants** who messaged bot claiming payment (text or image) with ₹0 in DB and Sheet
+- 3 sent receipt images (rooms 218, 303, 314) — bot couldn't read them (Gemini 429 all month)
+- 3 sent UPI screenshots (rooms 208, 302, 508) — not logged
+- 4 flagged as non-May: 307 Sonali (April join), 409 Amisha (April payment), 412 Jatin (QR only), 512 Krish (UPI ID only)
+- 9 tenants correctly recorded in DB and Sheet — no action needed
+- Sheet confirmed = DB for all 26 (no discrepancy; Sheet is a live mirror)
+
+### Data fix — voided 3 test payments (from May 6 golden suite run)
+- Room 618 Priyanshi Rs.99,999 UPI (payment id=15131) — voided
+- Room 203 Ronak Samriya Rs.15,000 UPI (payment id=15132) — voided
+- Room 203 Ronak Samriya Rs.18,000 UPI (payment id=15133) — voided
+
+### Pending action for Kiran
+- Upload May Yes Bank CSV → Finance page → auto-match UPI credits → log confirmed payments via bot
+
 ## [1.75.30] — 2026-05-09 — Unit economics: Investment Return + Revenue Quality (Shark Tank-grade)
 
 ### New KPIs — Concept A: Investment Return (bank-gated)
