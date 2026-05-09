@@ -2,6 +2,13 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.29] — 2026-05-09 — Fix delete tenant 500 (ORM cascade bug)
+
+### Bug fix — delete tenant "Failed to fetch"
+- **Root cause:** SQLAlchemy without `passive_deletes` issues `UPDATE payments SET tenancy_id=NULL` before deleting tenancy. `tenancy_id` is NOT NULL → IntegrityError → 500 with no CORS headers → browser reports "Failed to fetch"
+- **Fix:** `delete_tenant` now uses raw SQL to delete child records in FK-safe order (checkout_sessions → checkout_records → rent_revisions → rent_schedule → payments → refunds → vacations → complaints), nullifies nullable FK tables (reminders, agreements, onboarding_sessions, documents), then deletes tenancy+tenant via raw SQL. ORM objects expunged to avoid identity map conflicts.
+- **Deployed to VPS** — service restarted, verified 401 response with CORS headers on test DELETE
+
 ## [1.75.28] — 2026-05-09 — May room resolution + staff room flips (107 + G20)
 
 ### Data — room 107 + G20 flipped staff -> revenue
