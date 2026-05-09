@@ -132,8 +132,8 @@ Kiran's Excel (offline)
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
 | `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation, unit economics (admin-only) |
-| `src/services/unit_economics.py` | Unit economics — revenue/bed, cost/bed, EBITDA/bed, avg rent, collection rate (True Revenue only) |
-| `web/components/finance/unit-economics-card.tsx` | PWA Unit Economics card — occupancy, avg rent, collection rate, per-bed KPIs |
+| `src/services/unit_economics.py` | Unit economics — revenue/bed, cost/bed, EBITDA/bed, avg rent, collection rate, investment yield, payback months, break-even occ, economic occ, revenue leakage (True Revenue only) |
+| `web/components/finance/unit-economics-card.tsx` | PWA Unit Economics card — occupancy, avg rent, collection rate, per-bed KPIs, Investment Return section (dark navy, bank-gated), Revenue Quality section |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
 | `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation, unit economics (admin-only) |
@@ -142,6 +142,7 @@ Kiran's Excel (offline)
 | `src/services/blacklist.py` | Blacklist service — `check_blacklisted()` (fuzzy name + phone), add/list/remove. Shared by REST API + onboarding guard. |
 | `src/api/v2/blacklist.py` | Blacklist REST API — GET/POST/DELETE `/api/v2/app/blacklist`. Admin-only. |
 | `scripts/_import_may_payments.py` | One-off: imports May rent payments from source sheet cols Z/AA by phone match. Idempotent. |
+| `scripts/_import_investment_sbi.py` | One-off: imports Investment.xlsx (Lakshmi SBI direct vendor payments Oct–Dec 2025) into bank_transactions as account_name=LAKSHMI_SBI. Skip logic for Cozeevo capital transfers, test txns, Chandra credits. |
 | `scripts/_add_missing_may_tenants.py` | One-off: adds long-term tenants missing from DB (Chandraprakash, Mathew Koshy, Rama Krishnan, Akshitha Jawahar). |
 | `scripts/_add_daywise_may.py` | One-off: adds day-wise tenants missing from DB (Rayirth, Lakshmi Pathi, Chinchu David, Avirneni Karthik). |
 | `scripts/resync_missing_tenants_to_sheet.py` | Finds tenants in DB but missing from TENANTS ops sheet tab; appends them. Safe to re-run. |

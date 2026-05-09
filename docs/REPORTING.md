@@ -570,12 +570,19 @@ Unit economics = per-bed breakdown of revenue, cost, and profit. All figures use
 | OPEX / Bed | OPEX / total_beds | derived |
 | EBITDA / Bed | EBITDA / occupied_beds | derived |
 | EBITDA Margin | EBITDA / True Revenue × 100 | derived |
+| Investment Yield % | (EBITDA × 12) / ₹2.59Cr × 100 | derived (bank-gated) |
+| Payback Months | ₹2.59Cr / EBITDA | derived (bank-gated) |
+| Break-even Occupancy | (OPEX / rev_per_bed) / total_beds × 100 | derived (bank-gated) |
+| Economic Occupancy % | total_collected / (total_beds × avg_agreed_rent) × 100 | DB (always available) |
+| Revenue Leakage | total_billed − total_collected | DB (always available) |
 
 ### Rules
 - **True Rent only** — agreed_rent excludes security_deposit and booking_amount
-- Bank KPIs (revenue/bed, cost/bed, EBITDA/bed) only shown when bank CSV uploaded for that month
-- Occupancy, avg rent, collection rate always available from DB
+- Bank KPIs (revenue/bed, cost/bed, EBITDA/bed, investment yield, payback, break-even) only shown when bank CSV uploaded for that month
+- Occupancy, avg rent, collection rate, economic occ, revenue leakage always available from DB
 - OPEX excludes: Furniture & Fittings, Capital Investment, Tenant Deposit Refund, Non-Operating
+- Total investment constant: ₹2.59Cr (Ashokan 11.21% + Jitendra 13.17% + Chandra&Team 75.62%)
+- Investment yield benchmarks: FD = 7%, Equity = 12%
 - API: `GET /api/v2/app/finance/unit-economics?month=YYYY-MM`
 - Bot: `QUERY_UNIT_ECONOMICS` intent — phrases: "unit economics", "revenue per bed", "cost per bed", "avg rent", "collection rate", "unit kpi"
 

@@ -5,7 +5,7 @@
 > Consolidated from ARCHITECTURE.md + SYSTEM_ARCHITECTURE.md on 2026-03-30.
 > For detailed DB schema, see DATA_MODEL.md.
 > For detailed floor-by-floor room layouts, see MASTER_DATA.md.
-> Last updated: 2026-05-06
+> Last updated: 2026-05-09
 
 ---
 
@@ -355,7 +355,7 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/reports/reconciliation.py` | Reconciliation engine |
 | `src/reports/pnl_builder.py` | **Canonical P&L builder** — hardcoded verified Oct'25–Apr'26; shared by `/finance/pnl/excel` endpoint |
 | `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L (live + verified Excel), reconciliation, unit economics |
-| `src/services/unit_economics.py` | Unit economics service — revenue/bed, cost/bed, avg rent, collection rate, EBITDA/bed (True Revenue only) |
+| `src/services/unit_economics.py` | Unit economics service — revenue/bed, cost/bed, avg rent, collection rate, EBITDA/bed, investment yield %, payback months, break-even occupancy, economic occupancy %, revenue leakage (True Revenue only) |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export scripts |
 | `src/services/blacklist.py` | Blacklist service — fuzzy name + phone check, add/list/remove |
 | `src/services/room_transfer.py` | Shared room transfer — single source of truth for bot + PWA |
