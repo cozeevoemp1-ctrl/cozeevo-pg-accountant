@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.28] — 2026-05-09 — May room resolution + staff room flips (107 + G20)
+
+### Data — room 107 + G20 flipped staff -> revenue
+- Room 107 (THOR, 2-bed double): flipped `is_staff_room=false`; Samruddhi Thanwar (tenancy 1086) added, checkin 2026-05-07, rent 17,500, booking 52,000 cash
+- G20 (HULK, 1-bed single): was already flipped in DB (Chandraprakash added May 2); docs and code had never been updated — fixed in this session
+- **TOTAL_BEDS 294 → 297** (+1 G20, +2 room 107): updated in `gsheets.py`, `clean_and_load.py`, `gsheet_apps_script.js`, `gsheet_dashboard_webapp.js`
+- Docs updated: `MASTER_DATA.md`, `BRAIN.md`, `BUSINESS_LOGIC.md`, `REPORTING.md`, `SHEET_LOGIC.md`, `memory/reference_master_data.md`
+- Staff rooms: 8 → 6 (THOR: G05, G06, 108, 701, 702 | HULK: G12)
+
+### Data — April/May gap investigation + resolutions
+- Arjun Sumanth (tenancy 800, room 523) — marked exited checkout 2026-04-30 (was active in DB)
+- 12 day-wise stays added via `_update_april_missing.py` (April day-wise tab)
+- Lakshmi Pathi (tenancy 1083, room 219) — marked exited checkout 2026-05-07 (daily stay, status was stale active)
+- Ganesh Magi (tenancy 869) — corrected room 219 -> 418 (data entry error)
+- Arka (tenant 1011, tenancy 1088) — added to room 219, premium, checkin 2026-05-09, rent 25,000, May prorated 18,548, booking 5,000 UPI
+- Nikhil Mistry (tenant 1012, tenancy 1089) — added then hard-deleted for clean onboarding link
+
+### Scripts added
+- `scripts/_find_april_missing_from_db.py` — investigation: compares April source sheet vs DB
+- `scripts/_update_april_missing.py` — action: adds missing exits + day-wise stays
+- `scripts/_resolve_may_rooms.py` — action: Lakshmi exit, Ganesh room move, Arka + Nikhil add
+
+### Sheet sync
+- May 2026 sheet re-synced: 277 rows, 282 beds (232 reg + 25 premium), 94.9% occ, 13 vacant
+
 ## [1.75.27] — 2026-05-09 — Delete tenant UX simplified + login autofill fix
 
 ### Changed: `web/app/tenants/[tenancy_id]/edit/page.tsx`

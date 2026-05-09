@@ -560,31 +560,28 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 |------|----------|------|-------|
 | G05  | THOR | 3 | Staff quarters (permanent) |
 | G06  | THOR | 2 | Staff quarters (permanent) |
-| 107  | THOR | 2 | Staff quarters (permanent) |
 | 108  | THOR | 2 | Staff quarters (permanent) |
 | 701  | THOR | 1 | Staff quarters (permanent) |
 | 702  | THOR | 1 | Staff quarters (permanent) |
 | G12  | HULK | 3 | Staff quarters (permanent) |
-| G20  | HULK | 1 | Staff quarters (temporary — until April 2026 end, returns to revenue May 2026) |
 
+> Changed 2026-05-09: G20 → revenue (Chandraprakash). Room 107 → revenue (Samruddhi Thanwar).
 > Changed 2026-04-26: 114 + 618 moved staff→revenue (paying tenants). G20 temp staff until Apr end.
 
 ### Revenue Summary
 
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
-| THOR | 78 | 14 | 61 | 3 | **145** |
-| HULK | 80 | 13 | 65 | 2 | **149** |
-| **Total** | **158** | **27** | **126** | **5** | **294** |
-
-> 295 from May 2026 when G20 returns to revenue.
+| THOR | 79 | 14 | 62 | 3 | **147** |
+| HULK | 81 | 14 | 65 | 2 | **150** |
+| **Total** | **160** | **28** | **127** | **5** | **297** |
 
 ### Bed Count Formula
 ```
 Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
                    = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
-                   = 27 + 252 + 15
-                   = 294  (295 from May 2026)
+                   = 28 + 254 + 15
+                   = 297
 ```
 
 ---

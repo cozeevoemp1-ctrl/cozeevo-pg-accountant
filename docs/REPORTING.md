@@ -170,18 +170,15 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 ### 3.1 Capacity (Canonical — verified from DB 2026-04-08)
 
 ```
-⚠ DISCREPANCY: REPORTING.md/BUSINESS_LOGIC.md say 294 total; reference_master_data.md says 291.
-  Verify with DB: SELECT SUM(max_occupancy) FROM rooms WHERE is_staff_room=false;
-  G20 reclassified to revenue from May 2026 — total may now be 295.
+THOR: 147 beds (79 revenue rooms)
+HULK: 150 beds (81 revenue rooms)
+Total: 297 beds  ← updated 2026-05-09; DB verified
 
-THOR: 145 beds (78 revenue rooms)
-HULK: 149 beds (80 revenue rooms)   ← REPORTING.md section 12 says 146 (needs DB verify)
-Total: 294 beds
-
-Staff rooms EXCLUDED (8 rooms, updated 2026-04-26):
-  THOR: G05(3), G06(2), 107(2), 108(2), 701(1), 702(1)
-  HULK: G12(3), G20(1)[temp until Apr end → revenue from May 2026]
+Staff rooms EXCLUDED (6 rooms, updated 2026-05-09):
+  THOR: G05(3), G06(2), 108(2), 701(1), 702(1)
+  HULK: G12(3)
   — 114 and 618 moved to revenue 2026-04-26
+  — G20 → revenue 2026-05-09 (Chandraprakash); 107 → revenue 2026-05-09 (Samruddhi Thanwar)
 ```
 
 ### 3.2 Formula
