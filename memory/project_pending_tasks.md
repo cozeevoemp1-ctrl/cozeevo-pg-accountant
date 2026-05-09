@@ -6,6 +6,12 @@ type: project
 
 ## Active / Next Up
 
+### Housekeeping (from 2026-05-09 session)
+0. **Open PG Accountant from D drive** — `D:\Work\Claude Projects\AI Watsapp PG Accountant` → `git pull` → delete `C:\Users\kiran\Desktop\AI Watsapp PG Accountant`
+0b. **LinkedIn Brand** — open `D:\Work\Claude Projects\LinkedIn Brand` in Claude Code → run writing-plans to create implementation plan → build PROFILE.md, hooks.md, topics.md, pipeline.md
+
+## Active / Next Up
+
 ### Data fixes (from May payment import — 2026-05-05)
 1. **G20 reclassification** — `UPDATE rooms SET is_staff_room=false WHERE room_number='G20'` + re-sync + import Chandraprakash ₹33k payment. Blocked because G20 is staff room in DB.
 2. **6 skipped tenants in May import** — need manual payment recording:

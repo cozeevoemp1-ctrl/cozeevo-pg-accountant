@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.26] — 2026-05-09 — Project reorganisation + LinkedIn brand project created
+
+### Project move
+- Copied PG Accountant from `C:\Users\kiran\Desktop\AI Watsapp PG Accountant` → `D:\Work\Claude Projects\AI Watsapp PG Accountant`
+- Memory files copied to new Claude Code path (`d--Work-Claude-Projects-AI-Watsapp-PG-Accountant`)
+- **Action needed:** Open from D drive next session → `git pull` → delete Desktop folder
+
+### New project: LinkedIn Brand
+- Created `D:\Work\Claude Projects\LinkedIn Brand\` as standalone project (own git repo)
+- Full pipeline design spec written: `docs/superpowers/specs/2026-05-09-linkedin-brand-pipeline-design.md`
+- Stack: Claude Code pipeline → LinkedIn native scheduler (no Playwright bot risk)
+- Audience: SAC consultants + decision-makers, Germany/DACH market, English with DACH context
+- Cadence: 2 posts/week (Tue + Thu, 8 AM CET), one pipeline session/week
+- Visual strategy: animated HTML diagrams (MP4) + Canva carousels + text-only, matched to content type
+- Next: open LinkedIn Brand folder in Claude Code, run writing-plans to build implementation plan
+
 ## [1.75.25] — 2026-05-08 — Unit economics card redesign (investor-grade)
 
 ### Changed: `web/components/finance/unit-economics-card.tsx`
