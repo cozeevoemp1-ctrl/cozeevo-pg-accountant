@@ -3,6 +3,7 @@ src/services/unit_economics.py
 Unit economics KPIs — revenue per bed, cost per bed, avg rent, collection rate.
 All monetary figures use True Revenue (gross income − security deposits held).
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -16,6 +17,8 @@ from src.database.models import (
     Room, RentSchedule, Tenancy, TenancyStatus, StayType,
 )
 from src.rules.pnl_classify import classify_txn
+
+_TOTAL_INVESTMENT = 25_900_000  # ₹2.59Cr — Ashokan + Jitendra + Chandra&Team
 
 _OPEX_CATS = {
     "Property Rent", "Electricity", "Water", "IT & Software", "Internet & WiFi",
@@ -169,6 +172,25 @@ async def get_unit_economics(month: date, session: AsyncSession) -> dict:
     ebitda_per_bed = round(ebitda / occupied_beds) if occupied_beds > 0 else 0
     ebitda_margin = round(ebitda / true_revenue * 100, 1) if true_revenue > 0 else 0.0
 
+    # ── 7. Investment return (Concept A) ─────────────────────────────────────
+    investment_yield_pct: Optional[float] = None
+    payback_months: Optional[int] = None
+    breakeven_occupancy_pct: Optional[float] = None
+    if bank_available:
+        annual_ebitda = ebitda * 12
+        investment_yield_pct = round(annual_ebitda / _TOTAL_INVESTMENT * 100, 1)
+        if ebitda > 0:
+            payback_months = round(_TOTAL_INVESTMENT / ebitda)
+        if true_revenue > 0 and occupied_beds > 0:
+            rev_per_bed = true_revenue / occupied_beds
+            breakeven_beds = total_opex / rev_per_bed
+            breakeven_occupancy_pct = round(breakeven_beds / total_beds * 100, 1) if total_beds > 0 else None
+
+    # ── 8. Revenue quality (Concept B) ───────────────────────────────────────
+    potential_revenue = total_beds * avg_agreed_rent
+    economic_occupancy_pct = round(total_collected / potential_revenue * 100, 1) if potential_revenue > 0 else 0.0
+    revenue_leakage = round(total_billed - total_collected)
+
     return {
         "total_beds": total_beds,
         "occupied_beds": occupied_beds,
@@ -188,4 +210,9 @@ async def get_unit_economics(month: date, session: AsyncSession) -> dict:
         "opex_per_bed": opex_per_bed,
         "ebitda_per_bed": ebitda_per_bed,
         "ebitda_margin": ebitda_margin,
+        "investment_yield_pct": investment_yield_pct,
+        "payback_months": payback_months,
+        "breakeven_occupancy_pct": breakeven_occupancy_pct,
+        "economic_occupancy_pct": economic_occupancy_pct,
+        "revenue_leakage": revenue_leakage,
     }

@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.30] — 2026-05-09 — Unit economics: Investment Return + Revenue Quality (Shark Tank-grade)
+
+### New KPIs — Concept A: Investment Return (bank-gated)
+- **Investment Yield %** — annualised EBITDA ÷ ₹2.59Cr; benchmarked vs FD (7%) and equity (12%) with ▲/▼ badges
+- **Payback Period** — months (+ years) to recover full investment at current EBITDA run rate
+- **Break-even Occupancy** — minimum occupancy % to cover OPEX; shows buffer above current occupancy
+
+### New KPIs — Concept B: Revenue Quality (always visible)
+- **Economic Occupancy %** — collected ÷ (total beds × avg rent); captures both vacancy and collection failure in one number
+- **Revenue Leakage ₹** — billed but uncollected this month; color-coded by severity (green ≤10%, orange >20%)
+- **RevPOB vs ADR gap** — bank revenue per occupied bed vs agreed rent; flags discounting if gap > 5%
+
+### Files changed
+- `src/services/unit_economics.py` — 5 new fields + `_TOTAL_INVESTMENT = 25_900_000` constant
+- `web/lib/api.ts` — `UnitEconomics` interface extended with 5 new fields
+- `web/components/finance/unit-economics-card.tsx` — 2 new card sections (Investment Return dark navy + Revenue Quality)
+
 ## [1.75.29] — 2026-05-09 — Fix delete tenant 500 (ORM cascade bug)
 
 ### Bug fix — delete tenant "Failed to fetch"

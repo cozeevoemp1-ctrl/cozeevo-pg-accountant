@@ -721,6 +721,13 @@ export interface UnitEconomics {
   opex_per_bed: number;
   ebitda_per_bed: number;
   ebitda_margin: number;
+  // Concept A — Investment Return
+  investment_yield_pct: number | null;
+  payback_months: number | null;
+  breakeven_occupancy_pct: number | null;
+  // Concept B — Revenue Quality
+  economic_occupancy_pct: number;
+  revenue_leakage: number;
 }
 
 export async function getUnitEconomics(month?: string): Promise<UnitEconomics> {
