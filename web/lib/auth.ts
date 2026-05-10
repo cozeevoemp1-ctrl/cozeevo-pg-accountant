@@ -30,3 +30,9 @@ export async function signInWithEmail(
 export async function signOut(): Promise<void> {
   await supabase().auth.signOut();
 }
+
+export async function resetPasswordForEmail(email: string): Promise<{ error: string | null }> {
+  const redirectTo = `${window.location.origin}/auth/callback?next=/auth/update-password`;
+  const { error } = await supabase().auth.resetPasswordForEmail(email, { redirectTo });
+  return { error: error?.message ?? null };
+}

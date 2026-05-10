@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmail } from "@/lib/auth";
+import { signInWithEmail, resetPasswordForEmail } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +10,7 @@ export default function LoginPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,6 +22,17 @@ export default function LoginPage() {
     setLoading(false);
     if (err) { setError(err); return; }
     router.replace("/");
+  }
+
+  async function handleForgotPassword() {
+    const email = emailRef.current?.value ?? "";
+    if (!email) { setError("Enter your email first."); return; }
+    setLoading(true);
+    setError(null);
+    const { error: err } = await resetPasswordForEmail(email);
+    setLoading(false);
+    if (err) { setError(err); return; }
+    setResetSent(true);
   }
 
   return (
@@ -45,7 +57,6 @@ export default function LoginPage() {
             <input
               ref={emailRef}
               type="email"
-              defaultValue="cozeevoemp1@gmail.com"
               required
               autoComplete="email"
               className="rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
@@ -62,12 +73,21 @@ export default function LoginPage() {
             />
           </div>
           {error && <p className="text-xs text-status-warn font-medium">{error}</p>}
+          {resetSent && <p className="text-xs text-green-600 font-medium">Check your email for a password reset link.</p>}
           <button
             type="submit"
             disabled={loading}
             className="rounded-pill bg-brand-pink py-3 text-white font-bold text-sm active:opacity-80 disabled:opacity-40"
           >
             {loading ? "Signing in…" : "Sign in"}
+          </button>
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={loading}
+            className="text-xs text-ink-muted underline text-center disabled:opacity-40"
+          >
+            Forgot password?
           </button>
         </form>
       </div>

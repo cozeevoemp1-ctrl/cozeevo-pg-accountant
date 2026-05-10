@@ -4,8 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow the login page through
-  if (pathname.startsWith("/login")) {
+  // Always allow login and auth callback through
+  if (pathname.startsWith("/login") || pathname.startsWith("/auth")) {
     return NextResponse.next({ request });
   }
 
