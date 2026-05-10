@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.37] — 2026-05-10 — P&L audit: deposit fix, Lavanya 50%, orphan dedup, SBI spend report
+
+### Fixes — pnl_builder.py
+- **Deposit double-deduction removed** — Cash Position `_sec_collected` is active-tenants-only from DB; refunds to exited tenants already reflected in bank closing balance. Removed the `-Rs.4,61,845` deduction. Net deposits owed: ₹28,59,530 → ₹33,21,375. True free cash: −₹6,70,726 → −₹11,32,571.
+- **Lavanya Ravishankar Nov F&F** — paid ₹49,600, she refunded 50% back. Net expense = ₹24,800. Updated DB id=2607 amount + pnl_builder Nov F&F: ₹1,49,821 → ₹1,25,021.
+
+### DB cleanup — orphan duplicate deletions
+- Deleted id=1273 (Naveen Kumar Apr 28, ₹21,060, upload_id=NULL) — duplicate of id=1013
+
+### Naveen Kumar confirmed
+- Naveen Kumar M ₹50,000 (gym, Nov 13) — in CAPEX Furniture & Fittings ✓
+- Naveen Kumar B S ₹43,426 (architect, Dec 2) — Partner Capital (Whitefield), excluded from P&L ✓
+
+### Analysis — All SBI spend (LAKSHMI_SBI + PERSONAL_SBI_0167), Oct 2025–Apr 2026
+| Month | OPEX | CAPEX | Deposit Refunds | Partner Capital | Total |
+|---|---|---|---|---|---|
+| Nov 2025 | ₹32,864 | ₹75,021 | — | ₹2,20,250 | ₹3,28,135 |
+| Dec 2025 | ₹1,36,611 | ₹52,550 | — | ₹2,56,563 | ₹4,45,724 |
+| Jan 2026 | ₹41,899 | — | — | — | ₹41,899 |
+| Feb 2026 | ₹18,264 | — | — | — | ₹18,264 |
+| Mar 2026 | ₹750 | — | ₹22,000 | — | ₹22,750 |
+| Apr 2026 | ₹6,928 | — | ₹9,970 | — | ₹16,898 |
+| **Total** | **₹2,37,316** | **₹1,27,571** | **₹31,970** | **₹4,76,813** | **₹8,73,670** |
+- LAKSHMI_SBI (main) only has Nov–Dec 2025 data; Jan–Apr 2026 LAKSHMI_SBI bank statements not yet imported
+- Griham Decor ₹49,200 (Dec 27) still in F&F — confirm if this belongs in Whitefield tracker
+
+### VPS deployed ✓
+
 ## [1.75.36] — 2026-05-10 — Auth: login gate, roles, forgot password, logout
 
 ### Auth — 5 Supabase users created
