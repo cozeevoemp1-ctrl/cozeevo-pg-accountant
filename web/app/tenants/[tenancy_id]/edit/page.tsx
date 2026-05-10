@@ -67,6 +67,7 @@ export default function EditTenantPage() {
   const [adjNote, setAdjNote] = useState("")
   const [adjType, setAdjType] = useState<"waive" | "surcharge">("waive")
   const [adjWarned, setAdjWarned] = useState(false)
+  const [clearWarned, setClearWarned] = useState(false)
   const [adjSubmitting, setAdjSubmitting] = useState(false)
   const [adjError, setAdjError] = useState("")
   const [adjSuccess, setAdjSuccess] = useState("")
@@ -253,14 +254,17 @@ export default function EditTenantPage() {
   }
 
   async function handleClearAdjustment() {
+    if (!clearWarned) { setClearWarned(true); return }
     setAdjSubmitting(true)
     setAdjError("")
     try {
       await patchAdjustment(tenancyId, 0, "Adjustment cleared")
       setAdjSuccess("Adjustment cleared.")
+      setClearWarned(false)
       getTenantDues(tenancyId).then(setOriginal).catch(() => {})
     } catch (err) {
       setAdjError(err instanceof Error ? err.message : "Failed to clear.")
+      setClearWarned(false)
     } finally {
       setAdjSubmitting(false)
     }
@@ -640,9 +644,9 @@ export default function EditTenantPage() {
               type="button"
               onClick={handleClearAdjustment}
               disabled={adjSubmitting}
-              className="rounded-pill py-2.5 text-sm font-bold w-full border border-[#E2DEDD] text-ink-muted bg-bg transition-colors disabled:opacity-40"
+              className={`rounded-pill py-2.5 text-sm font-bold w-full transition-colors disabled:opacity-40 ${clearWarned ? "bg-red-500 text-white" : "border border-[#E2DEDD] text-ink-muted bg-bg"}`}
             >
-              Clear existing adjustment (₹{Math.abs(original.adjustment).toLocaleString("en-IN")})
+              {adjSubmitting ? "Clearing…" : clearWarned ? "Confirm — clear adjustment?" : `Clear existing adjustment (₹${Math.abs(original.adjustment).toLocaleString("en-IN")})`}
             </button>
           )}
         </div>
