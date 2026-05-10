@@ -2,6 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Always allow the login page through
+  if (pathname.startsWith("/login")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -18,15 +25,40 @@ export async function middleware(request: NextRequest) {
           );
         },
       },
-    }
+    },
   );
 
+  let user: { user_metadata?: Record<string, unknown> } | null = null;
   try {
-    await Promise.race([
+    const result = await Promise.race([
       supabase.auth.getUser(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 3000),
+      ),
     ]);
-  } catch { /* Supabase slow/down — still serve the page */ }
+    user = result.data?.user ?? null;
+  } catch {
+    // Supabase slow/down — fail open, don't lock everyone out
+    return supabaseResponse;
+  }
+
+  // No session → login
+  if (!user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Finance routes → admin only
+  if (pathname.startsWith("/finance")) {
+    const role = user.user_metadata?.role as string | undefined;
+    if (role !== "admin") {
+      const homeUrl = request.nextUrl.clone();
+      homeUrl.pathname = "/";
+      return NextResponse.redirect(homeUrl);
+    }
+  }
+
   return supabaseResponse;
 }
 
