@@ -95,6 +95,11 @@ DEPOSITS = {
 BANK_CLOSING_BALANCE_THOR = 1373863   # THOR acct ...0961 Apr 30
 BANK_CLOSING_BALANCE_HULK =  814941   # HULK acct ...0881 Apr 30
 
+CASH_IN_HAND = {
+    "Lakshmi cash":             1063500,  # Apr 30 confirmed
+    "Prabhakaran cash holding":  823350,  # Apr 30 confirmed
+}
+
 
 def build_pnl_workbook() -> openpyxl.Workbook:
     """Return the canonical P&L workbook (Oct'25 – Apr'26)."""
@@ -217,6 +222,8 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     _sec_collected  = sum(DEPOSITS["Security Deposits — refundable (must return to active tenants)"])
     _bank_total     = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
 
+    _cash_total = sum(CASH_IN_HAND.values())
+
     ws.append(["CASH POSITION (Apr 30)"])
     ws[ws.max_row][0].font = bold
     ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
@@ -224,13 +231,23 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append(["Total bank balance", "", "", "", "", "", "", _bank_total])
     for c in ws[ws.max_row]:
         c.font = bold
-    ws.append(["Cash in hand (physical)", "", "", "", "", "", "", "← confirm with Kiran"])
+    ws.append([])
+    ws.append(["Cash in hand (physical)"])
+    ws[ws.max_row][0].font = bold
+    for name, amt in CASH_IN_HAND.items():
+        ws.append(["  " + name, "", "", "", "", "", "", amt])
+    ws.append(["Total cash in hand", "", "", "", "", "", "", _cash_total])
+    for c in ws[ws.max_row]:
+        c.font = bold
     ws.append([])
     ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="9C0006")
     ws.append([])
     ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", _bank_total - _sec_collected])
+    for c in ws[ws.max_row]:
+        c.font = Font(bold=True)
+    ws.append(["True free cash incl. cash in hand", "", "", "", "", "", "", _bank_total + _cash_total - _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
     ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)", "", "", "", "", "", "", ""])
