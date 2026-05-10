@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.39] — 2026-05-10 — P&L cash in hand confirmed + REPORTING formula fix
+
+### pnl_builder.py
+- Added `CASH_IN_HAND`: Lakshmi ₹10,63,500 + Prabhakaran ₹8,23,350 = ₹18,86,850 (Apr 30 confirmed)
+- Cash Position: per-person breakdown + two free-cash lines
+  - True free cash (bank − deposits): −₹11,32,571
+  - True free cash incl. cash in hand: **+₹7,54,279**
+- Deployed to VPS ✓
+
+### Docs
+- REPORTING.md + sop_pnl.md: cash position formula corrected (active-tenants-only, no double-deduction)
+
 ## [1.75.38] — 2026-05-10 — Personal session: SAC career framework (no project changes)
 
 ### No project code changed
