@@ -2,6 +2,27 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.36] — 2026-05-10 — Auth: login gate, roles, forgot password, logout
+
+### Auth — 5 Supabase users created
+- Created 5 auth accounts directly via SQL (pgcrypto bcrypt) — email confirmed, login-ready immediately
+  - `Sai1522kl@gmail.com` → staff (Lokesh); `Cozeevo@gmail.com` → admin; `krish484@gmail.com` → admin (Kiran); `lakshmigorjala6@gmail.com` → admin (Lakshmi); `devarajuluprabhakaran1@gmail.com` → admin (Prabhakaran)
+- `scripts/create_auth_users.py` — idempotent script for future use (needs `SUPABASE_SERVICE_KEY`)
+
+### Auth — middleware login gate + finance role gate
+- `web/middleware.ts` — unauthenticated → `/login`; staff on `/finance/**` → `/`; 3s timeout fail-open; `/auth/**` always allowed
+
+### Auth — forgot password + set password flow
+- `web/app/auth/callback/route.ts` — PKCE code exchange → `/auth/update-password`
+- `web/app/auth/update-password/page.tsx` — any logged-in user can set new password (no email flow required; navigate directly after login with temp password)
+- `web/app/login/page.tsx` — "Forgot password?" button added; removed hardcoded email default
+
+### Auth — logout
+- Tap the pink avatar circle (top-right of home) → signs out → login screen
+
+### Fix — delete tenant "Failed to fetch"
+- `src/api/v2/tenants.py` — removed `"agreements"` from nullable FK cleanup loop; table does not exist in schema → was causing 500 UndefinedTableError → browser saw "Failed to fetch"
+
 ## [1.75.34] — 2026-05-10 — Import partner personal SBI (0167) expenses — PhonePe + Paytm
 
 ### Data — Partner personal account reimbursable expenses (Jan–Apr 2026)
