@@ -68,8 +68,10 @@ RECLASSIFY: dict[str, tuple[str, str]] = {
     "anumola yoga anil kumar":           ("Tenant Deposit Refund", "Deposit Refund — Anumola Yoga Anil Kumar"),
     "aahil rafiq":                       ("Tenant Deposit Refund", "Deposit Refund — Aahil Rafiq"),
     "p deepa":                           ("Tenant Deposit Refund", "Deposit Refund — P Deepa"),
-    "notion online solutions":           ("IT & Software",        "Recruitment Software (Notion)"),
+    "notion online solutions":           ("Food & Groceries",    "Notion Online Solutions (PG Food)"),
     "shubh chikan":                      ("Food & Groceries",     "Shubh Chikan (PG Food)"),
+    "spar hypermarkets":                 ("Food & Groceries",     "Spar Hypermarkets (PG Groceries)"),
+    "subramani":                         ("Staff & Labour",       "Subramani (Worker)"),
     "tuniki lavanya":                    ("Other Expenses",       "Worker Payment"),
 }
 
