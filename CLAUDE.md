@@ -136,6 +136,12 @@ Kiran's Excel (offline)
 | `web/components/finance/unit-economics-card.tsx` | PWA Unit Economics card — occupancy, avg rent, collection rate, per-bed KPIs, Investment Return section (dark navy, bank-gated), Revenue Quality section |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
+| `web/middleware.ts` | Next.js auth gate — unauthenticated → /login; staff on /finance/** → /; 3s timeout fail-open; /auth/** always allowed |
+| `web/app/login/page.tsx` | PWA login — email+password sign-in + "Forgot password?" reset flow |
+| `web/app/auth/callback/route.ts` | PKCE code exchange — Supabase reset email → exchanges code → redirects to /auth/update-password |
+| `web/app/auth/update-password/page.tsx` | Set new password — works for any logged-in user; navigate directly after login with temp password |
+| `web/components/home/logout-avatar.tsx` | Avatar button (top-right home) — tap to sign out |
+| `scripts/create_auth_users.py` | One-shot: create Supabase auth users via Admin API with role metadata. Needs SUPABASE_SERVICE_KEY. |
 | `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation, unit economics (admin-only) |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |
 | `src/reports/pnl_builder.py` | Canonical P&L builder — hardcoded verified Oct'25–Apr'26 figures. Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. Update here when figures change. |
