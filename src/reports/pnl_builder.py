@@ -5,7 +5,7 @@ Canonical P&L builder — single source of truth shared by:
   - scripts/export_pnl_2026_05_02.py  (local regeneration)
   - src/api/v2/finance.py  GET /finance/pnl/excel  (PWA download)
 
-Both produce identical output. Verified figures as of 2026-05-03.
+Both produce identical output. Verified figures as of 2026-05-10.
 See memory/sop_pnl.md for full methodology.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ INCOME = {
     "THOR — UPI batch settlements (merchant QR)":          [0,      0,        0,  175596, 2091597, 2515275, 2834731],
     "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
     "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1343783],
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1254220, 1343783],  # Mar +160000 (Chandra collected from 10 HULK tenants)
     # HULK building (acct ...0881) — live from Mar 2026
     "HULK — UPI batch settlements (merchant QR)":          [0,      0,        0,       0,       0,       0,  247719],
     "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
@@ -48,7 +48,7 @@ OPEX = {
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     10620,       0,       0,       0],
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 40946, 70730, 113168, 0, 0],
-    "Food & Groceries":                                           [0, 33632, 88250, 201558,  94931,  237747,  233679],
+    "Food & Groceries":                                           [0, 33632, 89065, 201558,  94931,  237747,  233679],  # Dec +815 (Zepto tomatoes Dec 31 — Lakshmi SBI)
     "Fuel & Diesel":                                              [0, 0, 200,       9099,  104366,  346308,    2800],
     "Staff & Labour":                                             [0, 1000, 125935, 112063, 219715,  155641,  199617],
     "Maintenance & Repairs":                                      [0, 0, 0,            0,     550,   18470,   30740],
