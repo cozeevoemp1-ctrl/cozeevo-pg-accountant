@@ -27,6 +27,38 @@ All notable changes to PG Accountant will be documented here.
 - Deposit refunds added to EXCLUDED Tenant Deposit Refund: Mar +₹22,000 → 160,231; Apr +₹9,970 → 139,638
 - Total reimbursable from company: **₹99,811** (OPEX ₹67,841 + deposits ₹31,970)
 
+## [1.75.35] — 2026-05-10 — P&L CAPEX reconciliation: remove partner capital, fix DB duplicates
+
+### Investigation
+- April electricity discrepancy: DB showed ₹2,81,318 vs pnl_builder ₹1,40,659
+  - Root cause: duplicate BESCOM import (id=1452, upload_id=NULL orphan). Deleted.
+  - pnl_builder ₹1,40,659 = correct (March bill paid April). April bill (₹1,96,367) appears in May.
+- Cross-checked Investment.xlsx (29 LAKSHMI_SBI records) vs Whitefield PG Expense Tracker
+  - 12 of 18 CAPEX items confirmed in Whitefield tracker = partner capital, not company P&L CAPEX
+  - 2 uncertain items (Lavanya ₹49,600 architect, Naveen Kumar M ₹50,000 gym) confirmed NOT in tracker → kept
+  - Lavanya paid from LAKSHMI_SBI (not THOR). Prabhakaran paid Naveen Kumar advance; Lakshmi paid balance.
+
+### P&L correction — pnl_builder.py
+- Nov Furniture & Fittings: ₹3,70,071 → ₹1,49,821 (−₹2,20,250 partner capital removed)
+- Dec Furniture & Fittings: ₹4,19,304 → ₹1,62,741 (−₹2,56,563 partner capital removed)
+- Dec Food & Groceries: ₹88,250 → ₹89,065 (+₹815 Zepto Dec 31 from LAKSHMI_SBI, inserted to DB)
+- Total CAPEX: ₹22,63,081 → ₹17,86,268 (−₹4,76,813)
+
+### DB cleanup — bank_transactions
+- Reclassified 12 LAKSHMI_SBI records from "Furniture & Fittings" → "Partner Capital (Whitefield)"
+  - ₹4,76,813 removed from CAPEX in live DB (PWA on-screen now matches pnl_builder)
+- Deleted 4 orphan April CAPEX duplicate rows (id=1374, 1352, 1339, 1269, upload_id=NULL)
+  - April F&F: ₹4,326 → ₹2,163 (matches pnl_builder)
+- Deleted 2 orphan April duplicates (BESCOM id=1452, Virani id=1514) — from earlier session
+
+### Partner Investment Report
+- Generated `data/reports/Partner_Investment_Report.xlsx` — 2 sheets (Summary + 228 transaction rows)
+- Whitefield tracker totals by investor: Lakshmi, Kiran, Prabhakaran, Ashokan, Jitendra, Narendra
+- PWA Finance page investment section planned (owner-only, shows tracker data with full detail)
+
+### DB verification
+- All CAPEX months (Oct–Apr) in bank_transactions now match pnl_builder exactly ✓
+
 ## [1.75.32] — 2026-05-09 — Import Lakshmi SBI investment spend into P&L
 
 ### Data — Investment.xlsx (Lakshmi SBI direct vendor payments, Oct–Dec 2025)
