@@ -69,7 +69,7 @@ OPEX = {
 
 CAPEX = {
     # THOR/HULK Yes Bank + Lakshmi SBI direct vendor payments combined
-    "Furniture & Fittings":                    [0, 149821, 162741, 203815, 1185397,   331,   2163],  # Nov/Dec: removed Lakshmi SBI items already in Whitefield partner tracker (Nov -220250, Dec -256563)
+    "Furniture & Fittings":                    [0, 125021, 162741, 203815, 1185397,   331,   2163],  # Nov: -24800 Lavanya (net 50%; she refunded Rs.24800 back). Nov/Dec: removed Lakshmi SBI partner tracker items.
     "Capital Investment (CCTV, 8 Ball Pool)":  [0,  82000,      0,      0,       0,     0,      0],
 }
 
