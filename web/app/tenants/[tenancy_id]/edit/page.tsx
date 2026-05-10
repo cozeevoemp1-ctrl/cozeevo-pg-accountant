@@ -243,11 +243,24 @@ export default function EditTenantPage() {
       setAdjAmount("")
       setAdjNote("")
       setAdjWarned(false)
-      // Refresh original to reflect new adjustment
       getTenantDues(tenancyId).then(setOriginal).catch(() => {})
     } catch (err) {
       setAdjError(err instanceof Error ? err.message : "Adjustment failed.")
       setAdjWarned(false)
+    } finally {
+      setAdjSubmitting(false)
+    }
+  }
+
+  async function handleClearAdjustment() {
+    setAdjSubmitting(true)
+    setAdjError("")
+    try {
+      await patchAdjustment(tenancyId, 0, "Adjustment cleared")
+      setAdjSuccess("Adjustment cleared.")
+      getTenantDues(tenancyId).then(setOriginal).catch(() => {})
+    } catch (err) {
+      setAdjError(err instanceof Error ? err.message : "Failed to clear.")
     } finally {
       setAdjSubmitting(false)
     }
@@ -622,6 +635,16 @@ export default function EditTenantPage() {
           >
             {adjSubmitting ? "Saving…" : adjWarned ? "Confirm Adjustment" : adjType === "waive" ? "Waive Dues →" : "Add Charge →"}
           </button>
+          {original && original.adjustment !== 0 && (
+            <button
+              type="button"
+              onClick={handleClearAdjustment}
+              disabled={adjSubmitting}
+              className="rounded-pill py-2.5 text-sm font-bold w-full border border-[#E2DEDD] text-ink-muted bg-bg transition-colors disabled:opacity-40"
+            >
+              Clear existing adjustment (₹{Math.abs(original.adjustment).toLocaleString("en-IN")})
+            </button>
+          )}
         </div>
 
         {/* Notice */}
