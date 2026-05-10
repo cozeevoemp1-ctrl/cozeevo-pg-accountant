@@ -113,7 +113,8 @@ HEADER:  [blank] | Oct'25 | Nov'25 | Dec'25 | Jan'26 | Feb'26 | Mar'26 | Apr'26 
 
 8. CASH POSITION (month-end)
    Bank closing balance THOR + HULK
-   Net deposits owed (sec collected − sec refunded)
+   Net deposits owed = SUM(security_deposit) WHERE tenancy status='active'
+     — active-tenants-only from DB; refunds to exited tenants already in bank closing balance
    True free cash = Bank − Net deposits owed
 
 9. ⚠ ITEMS NEEDING REVIEW
