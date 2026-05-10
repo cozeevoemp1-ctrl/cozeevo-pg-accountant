@@ -28,17 +28,13 @@ export async function middleware(request: NextRequest) {
     },
   );
 
+  // Use getSession() (cookie-only, no network call) so middleware is instant.
+  // Actual data APIs verify the JWT on every request — this gate is just for UI routing.
   let user: { user_metadata?: Record<string, unknown> } | null = null;
   try {
-    const result = await Promise.race([
-      supabase.auth.getUser(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 3000),
-      ),
-    ]);
-    user = result.data?.user ?? null;
+    const { data: { session } } = await supabase.auth.getSession();
+    user = session?.user ?? null;
   } catch {
-    // Supabase slow/down — fail open, don't lock everyone out
     return supabaseResponse;
   }
 
