@@ -23,10 +23,12 @@ from decimal import Decimal
 
 NOTICE_BY_DAY: int = 5
 """
-Tenant must give notice on or before this day-of-month for deposit to be eligible.
+Cutoff day-of-month for the notice period calculation.
 
-  notice_date.day <= NOTICE_BY_DAY  → deposit refundable, last day = end of THIS month
-  notice_date.day >  NOTICE_BY_DAY  → deposit forfeited,  last day = end of NEXT month
+  notice_date.day <= NOTICE_BY_DAY  → can vacate end of THIS month; deposit refundable
+  notice_date.day >  NOTICE_BY_DAY  → must stay till end of NEXT month; deposit still refundable
+
+Deposit is only forfeited if NO notice is given at all (tenant walks out without notice).
 """
 
 OVERPAYMENT_NOISE_RS: int = 10
@@ -115,12 +117,13 @@ def calc_payment_status(
 
 # ── Notice / checkout ─────────────────────────────────────────────────────────
 
-def is_deposit_eligible(notice_date: date, notice_by_day: int = NOTICE_BY_DAY) -> bool:
+def is_deposit_eligible(_notice_date: date, _notice_by_day: int = NOTICE_BY_DAY) -> bool:
     """
-    True if notice was given early enough for the deposit to be refundable.
-    Uses NOTICE_BY_DAY rule: given on/before that day → eligible.
+    True if deposit is refundable. Deposit is always refundable when notice is given.
+    Only forfeited when NO notice is given at all.
+    The notice_by_day cutoff only affects the last day (this month vs next month).
     """
-    return notice_date.day <= notice_by_day
+    return True  # notice was given → always eligible
 
 
 def calc_notice_last_day(notice_date: date, notice_by_day: int = NOTICE_BY_DAY) -> date:

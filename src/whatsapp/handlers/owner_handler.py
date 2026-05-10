@@ -350,17 +350,11 @@ async def _build_checkout_summary(action_data: dict, phone: str, session: "Async
         deposit_forfeited = True
         notice_line = "\nNo notice on record — *deposit forfeited*"
     elif tenancy and tenancy.notice_date:
-        if tenancy.notice_date.day > _NOTICE_BY_DAY:
-            deposit_forfeited = True
-            notice_line = (
-                f"\nNotice: {tenancy.notice_date.strftime('%d %b %Y')} "
-                f"(after {_NOTICE_BY_DAY}th) — *deposit forfeited*"
-            )
-        else:
-            notice_line = (
-                f"\nNotice: {tenancy.notice_date.strftime('%d %b %Y')} "
-                f"(on/before {_NOTICE_BY_DAY}th) — eligible for refund"
-            )
+        timing = "on time" if tenancy.notice_date.day <= _NOTICE_BY_DAY else f"after {_NOTICE_BY_DAY}th — must stay till end of next month"
+        notice_line = (
+            f"\nNotice: {tenancy.notice_date.strftime('%d %b %Y')} "
+            f"({timing}) — eligible for refund"
+        )
 
     if deposit_forfeited:
         refund = 0
@@ -2800,16 +2794,11 @@ async def resolve_pending_action(
         if not (tenancy and tenancy.notice_date):
             notice_line = "No notice given — *deposit forfeited*"
             deposit_forfeited = True
-        elif tenancy.notice_date.day > _NOTICE_BY_DAY:
-            notice_line = (
-                f"Notice: {tenancy.notice_date.strftime('%d %b %Y')} "
-                f"(after {_NOTICE_BY_DAY}th) — *deposit forfeited*"
-            )
-            deposit_forfeited = True
         else:
+            timing = "on time ✓" if tenancy.notice_date.day <= _NOTICE_BY_DAY else f"after {_NOTICE_BY_DAY}th — must stay till end of next month"
             notice_line = (
                 f"Notice: {tenancy.notice_date.strftime('%d %b %Y')} "
-                f"(on time ✓) — deposit refundable"
+                f"({timing}) — deposit refundable"
             )
 
         if deposit_forfeited:
@@ -4372,29 +4361,26 @@ async def _do_checkout(
     # Notice period check
     notice_warn = ""
     if not tenancy.notice_date:
-        notice_warn = "\n⚠️ No notice on record — deposit forfeited, extra month may be charged."
+        notice_warn = "\n⚠️ No notice on record — deposit forfeited."
     elif tenancy.notice_date.day > _NOTICE_BY_DAY:
         notice_warn = (
             f"\n⚠️ Notice given on {tenancy.notice_date.strftime('%d %b')} "
-            f"(after {_NOTICE_BY_DAY}th) — deposit forfeited + extra month charged."
+            f"(after {_NOTICE_BY_DAY}th) — must stay till end of next month. Deposit refundable."
         )
     else:
         notice_warn = (
             f"\n✅ Notice was on time ({tenancy.notice_date.strftime('%d %b')}) — deposit eligible for refund."
         )
 
-    # No proration at checkout — full month rent charged regardless of exit date
-    # Proration only applies at checkin (first month)
     prorate_note = ""
 
     # ── Settlement summary ─────────────────────────────────────────────────────
     deposit = tenancy.security_deposit or Decimal("0")
     o_rent, o_maintenance = await _calc_outstanding_dues(tenancy.id, session)
-    damages = Decimal("0")   # 0 unless owner specifies later
+    damages = Decimal("0")
 
-    # Late / no notice → deposit forfeited (owner keeps it) + extra month charged
-    late_notice = not tenancy.notice_date or tenancy.notice_date.day > _NOTICE_BY_DAY
-    if late_notice:
+    no_notice = not tenancy.notice_date
+    if no_notice:
         extra_month = tenancy.agreed_rent or Decimal("0")
         net = Decimal("0") - o_rent - o_maintenance - extra_month
     else:
@@ -4403,15 +4389,15 @@ async def _do_checkout(
 
     settlement_lines = ["\n*Settlement Summary*"]
     settlement_lines.append(f"Security deposit held : Rs.{int(deposit):,}")
-    if late_notice:
-        settlement_lines.append(f"Deposit forfeited     : -Rs.{int(deposit):,} (late notice)")
+    if no_notice:
+        settlement_lines.append(f"Deposit forfeited     : -Rs.{int(deposit):,} (no notice given)")
     if extra_month > 0:
         settlement_lines.append(f"Extra month (penalty) : -Rs.{int(extra_month):,}")
     if o_rent > 0:
         settlement_lines.append(f"Outstanding rent      : -Rs.{int(o_rent):,}")
     if o_maintenance > 0:
         settlement_lines.append(f"Outstanding maintenance: -Rs.{int(o_maintenance):,}")
-    if not late_notice:
+    if not no_notice:
         settlement_lines.append(f"Damages               : Rs.0")
     settlement_lines.append("─" * 28)
     if net >= 0:
@@ -4612,11 +4598,9 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         return _format_no_match_message(name or room, suggestions)
 
     # Vacate date: use explicit value if provided, else auto-calculate from notice date
-    custom_vacate = False
     if vacate_str:
         try:
             last_day = date.fromisoformat(vacate_str)
-            custom_vacate = True
         except ValueError:
             last_day = _calc_notice_last_day(notice_date_val)
     else:
@@ -4627,9 +4611,8 @@ async def _notice_given(entities: dict, ctx: CallerContext, session: AsyncSessio
         deposit_note = f"On time — deposit eligible for refund on vacate.\nVacate date: *{last_day.strftime('%d %b %Y')}*"
     else:
         deposit_note = (
-            f"Late notice (after {_NOTICE_BY_DAY}th) — *deposit forfeited*.\n"
-            f"Vacate date: *{last_day.strftime('%d %b %Y')}*" +
-            ("" if custom_vacate else " (extra month charged).")
+            f"After {_NOTICE_BY_DAY}th — must stay till end of next month.\n"
+            f"Vacate date: *{last_day.strftime('%d %b %Y')}*. Deposit refundable on exit."
         )
 
     assumed_note = ""
@@ -6989,14 +6972,11 @@ async def _query_expiring(entities: dict, ctx: CallerContext, session: AsyncSess
         exit_str = tenancy.expected_checkout.strftime("%d %b") if tenancy.expected_checkout else "TBD"
         notice_str = tenancy.notice_date.strftime("%d %b") if tenancy.notice_date else "No notice"
         deposit = int(tenancy.security_deposit or 0)
-        # Check forfeiture
-        if tenancy.notice_date and tenancy.notice_date.day > _NOTICE_BY_DAY:
-            deposit_note = f"Deposit Rs.{deposit:,} *forfeited*"
-        elif tenancy.notice_date:
+        if tenancy.notice_date:
             refund = max(0, deposit - int(tenancy.maintenance_fee or 0))
             deposit_note = f"Refund ~Rs.{refund:,}"
         else:
-            deposit_note = f"Deposit Rs.{deposit:,}"
+            deposit_note = f"Deposit Rs.{deposit:,} *forfeited* (no notice)"
         lines.append(f"• {name} (Room {room.room_number})\n  Notice: {notice_str} | Exit: {exit_str} | {deposit_note}")
     return "\n".join(lines)
 

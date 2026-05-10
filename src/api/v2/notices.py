@@ -12,7 +12,7 @@ from sqlalchemy import select
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import Tenancy, TenancyStatus, StayType, Tenant, Room
-from services.property_logic import NOTICE_BY_DAY, calc_notice_last_day
+from services.property_logic import calc_notice_last_day
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -40,7 +40,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
         results = []
         for tenancy, tenant, room in notice_rows:
             nd = tenancy.notice_date
-            deposit_eligible = nd.day <= NOTICE_BY_DAY
+            deposit_eligible = True  # notice given → always eligible; only forfeited with no notice
             expected_checkout = tenancy.expected_checkout or calc_notice_last_day(nd)
             days_remaining = (expected_checkout - today).days
             results.append({
