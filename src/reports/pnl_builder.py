@@ -62,6 +62,9 @@ OPEX = {
     "Other Expenses":                                             [0, 10318, 156337,  4564,  23258,   78780,   99306],
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
+    # Partner personal SBI (0167) payments for PG business — reimbursable from company account
+    # Detail: data/reports/SBI_0167_Reimbursement.xlsx
+    "Partner Reimbursable (Personal Acct SBI 0167)":            [0,     0,     0, 41899,  18264,     750,    6928],
 }
 
 CAPEX = {
@@ -71,7 +74,7 @@ CAPEX = {
 }
 
 EXCLUDED = {
-    "Tenant Deposit Refund (balance sheet)": [0, 10000,  21500,  55944,  74532,  138231, 129668],
+    "Tenant Deposit Refund (balance sheet)": [0, 10000,  21500,  55944,  74532,  160231, 139638],  # Mar +22000, Apr +9970 (personal SBI refunds: Anumola, Aahil, P Deepa)
     "Loan Repayment / Transfers (non-op)":   [0, 500000,     0,      0,  600000, 2090000, 22357],
 }
 
@@ -79,7 +82,7 @@ EXCLUDED = {
 # These are LIABILITY inflows — real cash but NOT revenue. Subtracted from gross income for True Revenue.
 DEPOSIT_RECEIVED = [0, 448000, 838000, 1383000, 1074250, 1256450, 1161125]
 # Deposit refunds = same figures as EXCLUDED["Tenant Deposit Refund"] — shown here for net calc
-DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  138231,  129668]
+DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638]  # Mar +22000, Apr +9970 (personal SBI)
 
 # Security deposits = active tenants only (what we owe back), split by check-in month
 # Maintenance fees  = all non-no-show tenants (non-refundable, retained), by check-in month

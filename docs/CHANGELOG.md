@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.34] — 2026-05-10 — Import partner personal SBI (0167) expenses — PhonePe + Paytm
+
+### Data — Partner personal account reimbursable expenses (Jan–Apr 2026)
+- Sources: PhonePe_Transaction_Statement.pdf (59 debits) + Paytm XLSX (27 debits), SBI account XX0167
+- 86 raw rows → 30 personal excluded → **56 business transactions inserted** into `bank_transactions` (account_name=PERSONAL_SBI_0167, upload_id=8)
+- Reimbursement Excel: `data/reports/SBI_0167_Reimbursement.xlsx`
+
+### Excluded (personal — confirmed by Kiran)
+- Hospital (Motherhood, SPS) + pharmacy (Apollo) + baby stores (Born Babies, Zippycubs) = personal medical
+- Restaurants (KFC, California Burrito, GoPizza, Coffee Day, HMS Host) = personal food
+- Clothing (H&M, Myntra, Trends, Sharif Foot Wear) = personal shopping
+- Parlour (Velidi Venkata Chaithanya), personal transfer to Kiran
+
+### Reclassified (per Kiran instructions)
+- HOUSE HUNT ₹17,700 → Marketing / Influencer Channel Marketing Fee
+- Anumola Yoga Anil Kumar ₹11,000 + Aahil Rafiq ₹11,000 → Tenant Deposit Refund
+- P Deepa ₹9,970 → Tenant Deposit Refund
+- Notion Online Solutions ₹1,852×2 + ₹1,454 → IT & Software / Recruitment Software
+- Shubh Chikan ₹3,000 → Food & Groceries (PG food)
+
+### P&L impact (pnl_builder.py)
+- New OPEX line "Partner Reimbursable (Personal Acct SBI 0167)": Jan ₹41,899 + Feb ₹18,264 + Mar ₹750 + Apr ₹6,928 = **₹67,841**
+- Deposit refunds added to EXCLUDED Tenant Deposit Refund: Mar +₹22,000 → 160,231; Apr +₹9,970 → 139,638
+- Total reimbursable from company: **₹99,811** (OPEX ₹67,841 + deposits ₹31,970)
+
 ## [1.75.32] — 2026-05-09 — Import Lakshmi SBI investment spend into P&L
 
 ### Data — Investment.xlsx (Lakshmi SBI direct vendor payments, Oct–Dec 2025)
