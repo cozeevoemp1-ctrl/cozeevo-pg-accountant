@@ -211,10 +211,10 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append([])
 
     # 8. CASH POSITION
-    # Security deposits: collected from active tenants (refundable, must return at exit)
+    # _sec_collected = DB sum of active tenants only — exited tenants are already excluded.
+    # Refunds to exited tenants are already reflected in the bank closing balance (cash left the account).
+    # Do NOT subtract refunds here — that would double-deduct from an already-active-only total.
     _sec_collected  = sum(DEPOSITS["Security Deposits — refundable (must return to active tenants)"])
-    _sec_refunded   = sum(EXCLUDED["Tenant Deposit Refund (balance sheet)"])
-    _sec_net_owed   = _sec_collected - _sec_refunded   # what we still owe to tenants
     _bank_total     = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
 
     ws.append(["CASH POSITION (Apr 30)"])
@@ -226,13 +226,11 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold
     ws.append(["Cash in hand (physical)", "", "", "", "", "", "", "← confirm with Kiran"])
     ws.append([])
-    ws.append(["Security deposits collected (refundable, active tenants)", "", "", "", "", "", "", _sec_collected])
-    ws.append(["Less: deposits already refunded to exited tenants", "", "", "", "", "", "", -_sec_refunded])
-    ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", _sec_net_owed])
+    ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="9C0006")
     ws.append([])
-    ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", _bank_total - _sec_net_owed])
+    ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", _bank_total - _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
     ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)", "", "", "", "", "", "", ""])
