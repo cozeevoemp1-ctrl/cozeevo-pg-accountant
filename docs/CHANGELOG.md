@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.41] — 2026-05-10 — Deposit forfeiture fix: only on no-notice, not late notice
+
+### Business logic fix — notices
+- **Root cause:** `NOTICE_BY_DAY = 5` was incorrectly forfeiting deposits for anyone who gave notice after the 5th, even if they gave 30–45 days advance notice for a future month.
+- **Correct rule:** notice after 5th → must stay till end of next month (last day unchanged). Deposit always refundable if notice was given. Only forfeited with zero notice.
+- `services/property_logic.py` — `is_deposit_eligible()` now always returns True; docstring updated
+- `src/api/v2/notices.py` — `deposit_eligible = True` for all tenants with a notice date
+- `src/whatsapp/handlers/owner_handler.py` — 4 forfeiture checks fixed; late-notice text now says "must stay till end of next month, deposit refundable"; extra_month penalty removed for late-notice settlement (they're already paying that rent)
+- Deployed to VPS ✓
+
+## [1.75.40] — 2026-05-10 — PWA page-switch lag eliminated
+
+### Performance
+- **Middleware:** switched `supabase.auth.getUser()` → `getSession()` — eliminates Supabase network round-trip (~150–300ms) on every page navigation; data APIs still verify JWT server-side
+- **Loading skeletons:** added `web/app/loading.tsx` (home `/`) and `web/app/collection/breakdown/loading.tsx` — skeleton appears in same frame as tap while server fetches data; previously blank screen until all API calls completed
+- Deployed to VPS ✓
+
 ## [1.75.39] — 2026-05-10 — P&L cash in hand confirmed + REPORTING formula fix
 
 ### pnl_builder.py
