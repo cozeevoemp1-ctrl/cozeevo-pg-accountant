@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.38] — 2026-05-10 — Personal session: SAC career framework (no project changes)
+
+### No project code changed
+- Created 3 personal career reference documents (saved to desktop, not in repo):
+  - `SAC_Career_Roadmap.md` — career advice: Senior Consultant → Senior Manager
+  - `SAC_Master_Framework.md` — 8-framework operating system (technical, delivery, docs, client, growth, promotion, communication)
+  - `SAC_Model_Configuration_Guide.md` — complete SAC model config reference: dimension fields, hierarchy types, aggregation logic, irreversible actions
+
+---
+
 ## [1.75.37] — 2026-05-10 — P&L audit: deposit fix, Lavanya 50%, orphan dedup, SBI spend report
 
 ### Fixes — pnl_builder.py

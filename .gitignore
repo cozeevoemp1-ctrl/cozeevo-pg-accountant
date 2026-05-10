@@ -86,3 +86,9 @@ web/tsconfig.tsbuildinfo
 
 # Media / screenshots (local test artifacts)
 media/
+
+# Sensitive files in root
+*.pdf
+*API Key*.txt
+*backup*.pdf
+*back up*.pdf
