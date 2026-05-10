@@ -107,7 +107,7 @@ def main():
         print(f"    Email:    {email}")
         print(f"    Password: {pw}")
         print(f"    URL:      https://app.getkozzy.com")
-        print(f"    Step:     Check email → click verification link → then login")
+        print(f"    Step:     Check email -> click verification link -> then login")
         print()
 
     if not args.write:
