@@ -19,13 +19,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import StreamingResponse
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
-from sqlalchemy import func, select
+from sqlalchemy import extract, func, select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
-    BankTransaction, BankUpload, CheckoutRecord, Payment, PaymentFor, PaymentMode,
-    Tenancy, Tenant,
+    BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
+    Payment, PaymentFor, PaymentMode, Tenancy, Tenant,
 )
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.reports.pnl_builder import build_pnl_bytes
@@ -107,6 +107,103 @@ async def _auto_reconcile(session):
 def _validate_month(m: str, param: str = "month"):
     if not _re.fullmatch(r"\d{4}-\d{2}", m):
         raise HTTPException(status_code=400, detail=f"{param} must be YYYY-MM")
+
+
+# ── Cash position ─────────────────────────────────────────────────────────────
+
+@router.get("/finance/cash")
+async def get_cash_position(
+    month: str = Query(..., description="YYYY-MM"),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    _validate_month(month)
+    year, month_num = int(month[:4]), int(month[5:7])
+
+    async with get_session() as session:
+        collected = float(await session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.payment_mode == PaymentMode.cash,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+                extract("year", Payment.payment_date) == year,
+                extract("month", Payment.payment_date) == month_num,
+            )
+        ) or 0)
+
+        expense_rows = (await session.scalars(
+            select(CashExpense).where(
+                extract("year", CashExpense.date) == year,
+                extract("month", CashExpense.date) == month_num,
+                CashExpense.is_void == False,
+            ).order_by(CashExpense.date.desc(), CashExpense.id.desc())
+        )).all()
+
+        expenses_total = sum(float(e.amount) for e in expense_rows)
+        balance = collected - expenses_total
+
+        last_count_row = await session.scalar(
+            select(CashCount).where(
+                extract("year", CashCount.date) == year,
+                extract("month", CashCount.date) == month_num,
+            ).order_by(CashCount.created_at.desc())
+        )
+
+        history = []
+        for i in range(6):
+            hm = month_num - i
+            hy = year
+            while hm <= 0:
+                hm += 12
+                hy -= 1
+            h_col = float(await session.scalar(
+                select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                    Payment.payment_mode == PaymentMode.cash,
+                    Payment.for_type == PaymentFor.rent,
+                    Payment.is_void == False,
+                    extract("year", Payment.payment_date) == hy,
+                    extract("month", Payment.payment_date) == hm,
+                )
+            ) or 0)
+            h_exp = float(await session.scalar(
+                select(func.coalesce(func.sum(CashExpense.amount), 0)).where(
+                    extract("year", CashExpense.date) == hy,
+                    extract("month", CashExpense.date) == hm,
+                    CashExpense.is_void == False,
+                )
+            ) or 0)
+            history.append({
+                "month": f"{hy}-{hm:02d}",
+                "collected": h_col,
+                "expenses": h_exp,
+                "balance": h_col - h_exp,
+            })
+
+        return {
+            "month": month,
+            "collected": collected,
+            "expenses_total": expenses_total,
+            "balance": balance,
+            "last_count": {
+                "id": last_count_row.id,
+                "date": str(last_count_row.date),
+                "amount": float(last_count_row.amount),
+                "counted_by": last_count_row.counted_by,
+                "variance": balance - float(last_count_row.amount),
+            } if last_count_row else None,
+            "expenses": [
+                {
+                    "id": e.id,
+                    "date": str(e.date),
+                    "description": e.description,
+                    "amount": float(e.amount),
+                    "paid_by": e.paid_by,
+                    "is_void": e.is_void,
+                }
+                for e in expense_rows
+            ],
+            "history": history,
+        }
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
