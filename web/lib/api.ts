@@ -734,3 +734,76 @@ export async function getUnitEconomics(month?: string): Promise<UnitEconomics> {
   const qs = month ? `?month=${month}` : "";
   return _get(`/api/v2/app/finance/unit-economics${qs}`);
 }
+
+// ── Cash position ─────────────────────────────────────────────────────────────
+
+export interface CashExpense {
+  id: number
+  date: string           // YYYY-MM-DD
+  description: string
+  amount: number
+  paid_by: string
+  is_void: boolean
+}
+
+export interface CashCountEntry {
+  id: number
+  date: string           // YYYY-MM-DD
+  amount: number
+  counted_by: string
+  variance: number       // balance − counted (positive = short, negative = over)
+}
+
+export interface CashHistoryRow {
+  month: string          // YYYY-MM
+  collected: number
+  expenses: number
+  balance: number
+}
+
+export interface CashPosition {
+  month: string
+  collected: number
+  expenses_total: number
+  balance: number
+  last_count: CashCountEntry | null
+  expenses: CashExpense[]
+  history: CashHistoryRow[]
+}
+
+export interface AddExpenseBody {
+  date: string
+  description: string
+  amount: number
+  paid_by: "Prabhakaran" | "Lakshmi" | "Other"
+}
+
+export interface LogCountBody {
+  date: string
+  amount: number
+  counted_by: "Prabhakaran" | "Lakshmi"
+  notes?: string
+}
+
+export async function getCashPosition(month: string): Promise<CashPosition> {
+  return _get<CashPosition>(`/api/v2/app/finance/cash?month=${encodeURIComponent(month)}`)
+}
+
+export async function addCashExpense(body: AddExpenseBody): Promise<CashExpense> {
+  return _post<CashExpense>("/api/v2/app/finance/cash/expenses", body)
+}
+
+export async function voidCashExpense(id: number): Promise<{ ok: boolean; id: number }> {
+  const headers = await _authHeaders()
+  const res = await fetch(`${BASE_URL}/api/v2/app/finance/cash/expenses/${id}`, {
+    method: "DELETE",
+    headers,
+    cache: "no-store",
+  })
+  if (!res.ok) throw new Error(`DELETE /finance/cash/expenses/${id} → ${res.status}`)
+  return res.json()
+}
+
+export async function logCashCount(body: LogCountBody): Promise<{ id: number; date: string; amount: number; counted_by: string; notes: string | null }> {
+  return _post("/api/v2/app/finance/cash/counts", body)
+}
