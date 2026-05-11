@@ -142,7 +142,9 @@ Kiran's Excel (offline)
 | `web/app/auth/update-password/page.tsx` | Set new password — works for any logged-in user; navigate directly after login with temp password |
 | `web/components/home/logout-avatar.tsx` | Avatar button (top-right home) — tap to sign out |
 | `scripts/create_auth_users.py` | One-shot: create Supabase auth users via Admin API with role metadata. Needs SUPABASE_SERVICE_KEY. |
-| `web/app/finance/page.tsx` | PWA Finance page — month picker, P&L dashboard, upload, reconciliation, unit economics (admin-only) |
+| `web/app/finance/page.tsx` | PWA Finance page — P&L tab + Cash tab; month picker, upload, reconciliation, unit economics (admin-only) |
+| `web/components/finance/cash-tab.tsx` | PWA Cash tab — monthly cash position: collected (auto), expenses (manual), count check card, 6-month history, add expense + log count sheets |
+| `tests/test_cash_logic.py` | Unit tests for cash balance and variance calculation logic |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |
 | `src/reports/pnl_builder.py` | Canonical P&L builder — hardcoded verified Oct'25–Apr'26 figures. Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. Update here when figures change. |
 | `src/services/blacklist.py` | Blacklist service — `check_blacklisted()` (fuzzy name + phone), add/list/remove. Shared by REST API + onboarding guard. |

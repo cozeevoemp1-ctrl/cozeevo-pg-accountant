@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.42] — 2026-05-11 — Cash tracking: Cash tab on Finance page
+
+### New feature — Cash tab
+- **`cash_expenses` table** — manually logged cash outflows (date, description, amount, paid_by, soft-delete via is_void)
+- **`cash_counts` table** — append-only physical cash count log (date, amount, counted_by, notes); used for spot-check variance
+- **4 new API endpoints** on `GET /api/v2/app/finance/cash?month=`:
+  - `GET /finance/cash` — monthly cash position: collected (auto from payments), expenses_total, balance, last_count + variance, expense list, 6-month history
+  - `POST /finance/cash/expenses` — log cash expense (admin-only)
+  - `DELETE /finance/cash/expenses/{id}` — void expense (soft-delete)
+  - `POST /finance/cash/counts` — log physical count; variance = balance − counted
+- **`web/components/finance/cash-tab.tsx`** — full Cash tab UI: month picker, dark balance card, 2 stat cards (collected green / expenses red), count check card with variance (short/over/matches), expense list with two-tap void, 6-month history table, Add Expense sheet, Log Count sheet
+- **`web/app/finance/page.tsx`** — added Cash tab to tab bar (P&L | Cash); independent month state per tab
+- **`web/lib/api.ts`** — CashPosition types + getCashPosition/addCashExpense/voidCashExpense/logCashCount helpers
+- **`tests/test_cash_logic.py`** — 5 unit tests for balance and variance calculation
+- DB tables applied via Supabase MCP (migration script has pre-existing deadlock in earlier step)
+- Not yet deployed to VPS
+
 ## [1.75.41] — 2026-05-10 — Deposit forfeiture fix: only on no-notice, not late notice
 
 ### Business logic fix — notices
