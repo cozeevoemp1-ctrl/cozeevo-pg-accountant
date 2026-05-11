@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.44] — 2026-05-11 — Outstanding dues analysis: April + May, THOR deep-check
+
+### Analysis scripts (one-off, not deployed)
+- **`scripts/_export_outstanding_v2.py`** — April + May outstanding using Google Sheet as source (cash + UPI); May cross-checked vs bank. Output: `data/reports/April_Outstanding_2026.xlsx` (33 tenants, Rs.1,97,400) + `data/reports/May_Outstanding_2026.xlsx` (70 tenants, Rs.7,57,045)
+- **`scripts/_thor_outstanding.py`** — THOR-only May outstanding; checks THOR May bank + HULK May bank for cross-building payments. Output: `data/reports/THOR_Outstanding_May2026.xlsx` (24 tenants, Rs.2,25,434)
+- **`scripts/_may_full_analysis.py`** — Full May analysis both buildings (76 tenants, Rs.8,36,336)
+
+### Key findings
+- 8 THOR tenants paying to HULK bank (cross-building): Ganesh Divekar 603, Nithin 202, Shirin 210, P.N.Charan 510, Shilpa 212, Didla Lochan G07, Suraj Prasana 106
+- April HULK bank = batch settlements only — no per-tenant match possible; THOR April individual UPI available via `thor bank statement april til now.xlsx`
+- G.D.Abhishek (612) — single-char initials break fuzzy match; HULK bank shows Rs.22K from "G D ABHISHEK" — not auto-matched, needs manual review
+- Navdeep/Navdaap (rooms 000 + 506) — same person, same phone 9953195499, two tenancy records — double-counted in reports
+
 ## [1.75.43] — 2026-05-11 — May data load: payments, exit notices, new tenants
 
 ### Data operations

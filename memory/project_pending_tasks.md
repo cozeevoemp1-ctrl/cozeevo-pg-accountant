@@ -6,6 +6,11 @@ type: project
 
 ## Active / Next Up
 
+### Outstanding dues analysis — resume tomorrow
+0a. **Upload HULK April+May bank statement** — Kiran will upload `hulk bank statement april til now` → re-run `scripts/_thor_outstanding.py` to catch remaining THOR cross-building payments (currently 24 tenants Rs.2,25,434 outstanding but some may be cleared via HULK April bank)
+0b. **G.D.Abhishek (612) manual review** — name has initials only; fuzzy match fails. HULK May bank shows "G D ABHISHEK" Rs.20K + Rs.2K = Rs.22K unmatched. His Sheet cash = Rs.13,250. Clarify actual balance with Kiran.
+0c. **Navdeep/Navdaap duplicate** — rooms 000 + 506, phone 9953195499, same person. Two tenancy records double-count Rs.16K + Rs.14K. Determine which is active tenancy and remove duplicate from reports.
+
 ### Housekeeping (from 2026-05-09 session)
 0. **Open PG Accountant from D drive** — `D:\Work\Claude Projects\AI Watsapp PG Accountant` → `git pull` → delete `C:\Users\kiran\Desktop\AI Watsapp PG Accountant`
 0b. **LinkedIn Brand** — open `D:\Work\Claude Projects\LinkedIn Brand` in Claude Code → run writing-plans to create implementation plan → build PROFILE.md, hooks.md, topics.md, pipeline.md
