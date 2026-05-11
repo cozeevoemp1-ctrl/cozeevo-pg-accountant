@@ -235,7 +235,7 @@ async def add_cash_expense(
             description=str(body["description"]).strip(),
             amount=amount,
             paid_by=body["paid_by"],
-            created_by=user.email,
+            created_by=user.phone,
         )
         session.add(expense)
         await session.flush()
@@ -249,6 +249,53 @@ async def add_cash_expense(
         }
         await session.commit()
     return result
+
+
+@router.patch("/finance/cash/expenses/{expense_id}")
+async def edit_cash_expense(
+    expense_id: int,
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    async with get_session() as session:
+        expense = await session.get(CashExpense, expense_id)
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense not found")
+        if expense.is_void:
+            raise HTTPException(status_code=400, detail="Cannot edit a voided expense")
+        if "date" in body:
+            try:
+                from datetime import date as _date_type
+                expense.date = _date_type.fromisoformat(body["date"])
+            except ValueError:
+                raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+        if "description" in body:
+            desc = str(body["description"]).strip()
+            if not desc:
+                raise HTTPException(status_code=400, detail="description cannot be empty")
+            expense.description = desc
+        if "amount" in body:
+            try:
+                amount = float(body["amount"])
+                if amount <= 0:
+                    raise ValueError
+                expense.amount = amount
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="amount must be a positive number")
+        if "paid_by" in body:
+            if body["paid_by"] not in ("Prabhakaran", "Lakshmi", "Other"):
+                raise HTTPException(status_code=400, detail="paid_by must be Prabhakaran, Lakshmi, or Other")
+            expense.paid_by = body["paid_by"]
+        await session.commit()
+    return {
+        "id": expense.id,
+        "date": str(expense.date),
+        "description": expense.description,
+        "amount": float(expense.amount),
+        "paid_by": expense.paid_by,
+        "is_void": expense.is_void,
+    }
 
 
 @router.delete("/finance/cash/expenses/{expense_id}")
