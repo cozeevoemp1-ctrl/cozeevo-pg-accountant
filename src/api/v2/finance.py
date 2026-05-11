@@ -270,6 +270,49 @@ async def void_cash_expense(
     return {"ok": True, "id": expense_id}
 
 
+@router.post("/finance/cash/counts")
+async def log_cash_count(
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    missing = {"date", "amount", "counted_by"} - set(body.keys())
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing fields: {missing}")
+    try:
+        from datetime import date as _date_type
+        count_date = _date_type.fromisoformat(body["date"])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    try:
+        amount = float(body["amount"])
+        if amount < 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="amount must be a non-negative number")
+    if body["counted_by"] not in ("Prabhakaran", "Lakshmi"):
+        raise HTTPException(status_code=400, detail="counted_by must be Prabhakaran or Lakshmi")
+
+    async with get_session() as session:
+        count = CashCount(
+            date=count_date,
+            amount=amount,
+            counted_by=body["counted_by"],
+            notes=body.get("notes"),
+        )
+        session.add(count)
+        await session.flush()
+        result = {
+            "id": count.id,
+            "date": str(count.date),
+            "amount": amount,
+            "counted_by": count.counted_by,
+            "notes": count.notes,
+        }
+        await session.commit()
+    return result
+
+
 # ── Upload ────────────────────────────────────────────────────────────────────
 
 @router.post("/finance/upload")
