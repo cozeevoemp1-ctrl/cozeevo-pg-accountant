@@ -117,7 +117,7 @@ export default function FinancePage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${
+            className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
               tab === key
                 ? "text-[#EF1F9C] border-[#EF1F9C]"
                 : "text-[#999] border-transparent"
