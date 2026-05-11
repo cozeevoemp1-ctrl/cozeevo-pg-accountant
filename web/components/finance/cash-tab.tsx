@@ -78,7 +78,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   )
 }
 
-function AddExpenseSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AddExpenseSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (month: string) => void }) {
   const [date, setDate] = useState(todayStr())
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
@@ -95,7 +95,7 @@ function AddExpenseSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (
     setError("")
     try {
       await addCashExpense({ date, description: desc.trim(), amount: amt, paid_by: paidBy })
-      onSaved()
+      onSaved(date.slice(0, 7))
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save")
@@ -380,7 +380,7 @@ export function CashTab() {
       )}
 
       {showExpenseSheet && (
-        <AddExpenseSheet onClose={() => setShowExpenseSheet(false)} onSaved={() => load(month)} />
+        <AddExpenseSheet onClose={() => setShowExpenseSheet(false)} onSaved={(m) => { setMonth(m) }} />
       )}
       {showCountSheet && (
         <LogCountSheet onClose={() => setShowCountSheet(false)} onSaved={() => load(month)} />
