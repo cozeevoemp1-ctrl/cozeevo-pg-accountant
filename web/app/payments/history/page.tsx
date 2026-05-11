@@ -182,11 +182,10 @@ export default function PaymentHistoryPage() {
         )}
       </div>
 
-      {/* Edit bottom sheet */}
+      {/* Edit payment modal */}
       {editing && (
-        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setEditing(null)} />
-          <div className="relative bg-bg rounded-t-2xl px-5 pt-5 pb-10 flex flex-col gap-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/40" onClick={() => setEditing(null)}>
+          <div className="relative bg-bg rounded-2xl px-5 pt-5 pb-6 flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-extrabold text-ink">Edit Payment</h2>
               <button onClick={() => setEditing(null)} className="text-ink-muted text-lg font-bold">✕</button>

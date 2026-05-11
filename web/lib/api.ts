@@ -793,6 +793,18 @@ export async function addCashExpense(body: AddExpenseBody): Promise<CashExpense>
   return _post<CashExpense>("/api/v2/app/finance/cash/expenses", body)
 }
 
+export async function patchCashExpense(id: number, body: Partial<AddExpenseBody>): Promise<CashExpense> {
+  const headers = { ...(await _authHeaders()), "Content-Type": "application/json" }
+  const res = await fetch(`${BASE_URL}/api/v2/app/finance/cash/expenses/${id}`, {
+    method: "PATCH", headers, body: JSON.stringify(body), cache: "no-store",
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error((detail as { detail?: string }).detail ?? `PATCH failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function voidCashExpense(id: number): Promise<{ ok: boolean; id: number }> {
   const headers = await _authHeaders()
   const res = await fetch(`${BASE_URL}/api/v2/app/finance/cash/expenses/${id}`, {

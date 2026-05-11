@@ -206,9 +206,8 @@ export default function RemindersPage() {
 
       {/* Send All confirmation modal */}
       {showSendAllConfirm && (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40">
-          <div className="w-full max-w-md bg-surface rounded-t-[28px] px-6 pt-5 pb-10 shadow-2xl">
-            <div className="w-10 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5" />
+        <div className="fixed inset-0 z-30 flex items-center justify-center px-4 bg-black/40" onClick={() => setShowSendAllConfirm(false)}>
+          <div className="w-full max-w-md bg-surface rounded-2xl px-6 pt-5 pb-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-extrabold text-ink mb-2">Send All Reminders?</h2>
             <p className="text-sm text-ink-muted mb-6">
               This will send a WhatsApp reminder to all {tenants.length} overdue tenant{tenants.length !== 1 ? "s" : ""}.

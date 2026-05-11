@@ -1,8 +1,8 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import {
-  getCashPosition, addCashExpense, voidCashExpense, logCashCount,
-  CashPosition, AddExpenseBody, LogCountBody,
+  getCashPosition, addCashExpense, patchCashExpense, voidCashExpense, logCashCount,
+  CashPosition, CashExpense, AddExpenseBody, LogCountBody,
 } from "@/lib/api"
 
 function fmt(n: number): string {
@@ -63,9 +63,9 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
 
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="bg-white rounded-t-[24px] p-6 flex flex-col gap-4 max-w-lg mx-auto w-full"
+        className="bg-white rounded-2xl p-6 flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -138,6 +138,63 @@ function AddExpenseSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (
           className="bg-[#EF1F9C] text-white rounded-xl py-3 text-sm font-extrabold mt-1 disabled:opacity-50 active:opacity-70"
         >
           {saving ? "Saving…" : "Save expense"}
+        </button>
+      </form>
+    </Sheet>
+  )
+}
+
+function EditExpenseSheet({ expense, onClose, onSaved }: { expense: CashExpense; onClose: () => void; onSaved: (month: string) => void }) {
+  const [date, setDate] = useState(expense.date)
+  const [desc, setDesc] = useState(expense.description)
+  const [amount, setAmount] = useState(String(Math.round(expense.amount)))
+  const [paidBy, setPaidBy] = useState<AddExpenseBody["paid_by"]>(expense.paid_by as AddExpenseBody["paid_by"])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const amt = parseFloat(amount)
+    if (!desc.trim()) return setError("Description required")
+    if (!amt || amt <= 0) return setError("Enter a valid amount")
+    setSaving(true)
+    setError("")
+    try {
+      await patchCashExpense(expense.id, { date, description: desc.trim(), amount: amt, paid_by: paidBy })
+      onSaved(date.slice(0, 7))
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save")
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Sheet title="Edit expense" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Date</label>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Description</label>
+          <input type="text" value={desc} onChange={e => setDesc(e.target.value)} className={inputCls} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Amount ₹</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} inputMode="numeric" className={inputCls} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Paid by</label>
+          <div className="flex gap-2 flex-wrap">
+            {(["Prabhakaran", "Lakshmi", "Other"] as const).map(p => (
+              <Pill key={p} label={p} active={paidBy === p} onClick={() => setPaidBy(p)} />
+            ))}
+          </div>
+        </div>
+        {error && <p className="text-xs text-[#EF4444] font-medium">{error}</p>}
+        <button type="submit" disabled={saving} className="bg-[#EF1F9C] text-white rounded-xl py-3 text-sm font-extrabold active:opacity-70 disabled:opacity-50">
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </form>
     </Sheet>
@@ -221,8 +278,10 @@ export function CashTab() {
   const [error, setError] = useState("")
   const [showExpenseSheet, setShowExpenseSheet] = useState(false)
   const [showCountSheet, setShowCountSheet] = useState(false)
-  const [voidTarget, setVoidTarget] = useState<number | null>(null)
+  const [activeRow, setActiveRow] = useState<number | null>(null)
+  const [voidConfirm, setVoidConfirm] = useState<number | null>(null)
   const [voiding, setVoiding] = useState(false)
+  const [editExpense, setEditExpense] = useState<CashExpense | null>(null)
 
   const load = useCallback(async (m: string) => {
     setLoading(true)
@@ -238,15 +297,12 @@ export function CashTab() {
 
   useEffect(() => { load(month) }, [month, load])
 
-  async function handleVoid(id: number) {
-    if (voidTarget !== id) {
-      setVoidTarget(id)
-      return
-    }
+  async function handleVoidConfirm(id: number) {
     setVoiding(true)
     try {
       await voidCashExpense(id)
-      setVoidTarget(null)
+      setVoidConfirm(null)
+      setActiveRow(null)
       await load(month)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to void")
@@ -341,23 +397,45 @@ export function CashTab() {
               <div className="py-6 text-center text-xs text-[#bbb]">No expenses logged</div>
             )}
             {data.expenses.map(exp => (
-              <div
-                key={exp.id}
-                className="flex items-center justify-between px-4 py-3 border-b border-[#F8F5F3] last:border-0 active:bg-[#FFF5FB] cursor-pointer"
-                onClick={() => !voiding && handleVoid(exp.id)}
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[13px] font-semibold text-[#1A1614]">{exp.description}</span>
-                  <span className="text-[11px] text-[#aaa]">{fmtDate(exp.date)} · {exp.paid_by}</span>
-                  {voidTarget === exp.id && (
-                    <span className="text-[11px] font-bold text-[#EF4444] mt-0.5">
-                      {voiding ? "Voiding…" : "Tap again to void"}
-                    </span>
-                  )}
+              <div key={exp.id} className="border-b border-[#F8F5F3] last:border-0">
+                <div
+                  className="flex items-center justify-between px-4 py-3 active:bg-[#FFF5FB] cursor-pointer"
+                  onClick={() => { setActiveRow(activeRow === exp.id ? null : exp.id); setVoidConfirm(null) }}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[13px] font-semibold text-[#1A1614]">{exp.description}</span>
+                    <span className="text-[11px] text-[#aaa]">{fmtDate(exp.date)} · {exp.paid_by}</span>
+                  </div>
+                  <span className="text-[14px] font-extrabold text-[#EF4444] shrink-0 ml-2">−{fmt(exp.amount)}</span>
                 </div>
-                <span className="text-[14px] font-extrabold text-[#EF4444] shrink-0 ml-2">
-                  −{fmt(exp.amount)}
-                </span>
+                {activeRow === exp.id && (
+                  <div className="px-4 pb-3 pt-1 bg-[#FFF5FB] flex items-center gap-2">
+                    {voidConfirm === exp.id ? (
+                      <>
+                        <span className="text-xs text-[#EF4444] font-semibold flex-1">Void this entry?</span>
+                        <button onClick={() => handleVoidConfirm(exp.id)} disabled={voiding}
+                          className="text-xs font-bold text-white bg-[#EF4444] rounded-lg px-3 py-1.5 active:opacity-70">
+                          {voiding ? "Voiding…" : "Confirm"}
+                        </button>
+                        <button onClick={() => setVoidConfirm(null)}
+                          className="text-xs font-bold text-[#999] bg-white rounded-lg px-3 py-1.5 border border-[#E2DEDD]">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => { setEditExpense(exp); setActiveRow(null) }}
+                          className="text-xs font-bold text-[#1A1614] bg-white rounded-lg px-3 py-1.5 border border-[#E2DEDD] active:opacity-70">
+                          Edit
+                        </button>
+                        <button onClick={() => setVoidConfirm(exp.id)}
+                          className="text-xs font-bold text-[#EF4444] bg-white rounded-lg px-3 py-1.5 border border-[#FECDD3] active:opacity-70">
+                          Void
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -372,15 +450,35 @@ export function CashTab() {
                 <span className="text-[#1A1614] font-medium">{monthLabel(h.month).split(" ")[0]}</span>
                 <span className="font-bold text-[#16A34A]">{fmtShort(h.collected)}</span>
                 <span className="font-bold text-[#EF4444]">{fmtShort(h.expenses)}</span>
-                <span className="font-extrabold text-[#1A1614]">{fmtShort(h.balance)}</span>
+                <span className={`font-extrabold ${h.balance < 0 ? "text-[#EF4444]" : "text-[#1A1614]"}`}>
+                  {h.balance < 0 ? `−${fmtShort(Math.abs(h.balance))}` : fmtShort(h.balance)}
+                </span>
               </div>
             ))}
+            {data.history.length > 0 && (() => {
+              const totC = data.history.reduce((s, h) => s + h.collected, 0)
+              const totE = data.history.reduce((s, h) => s + h.expenses, 0)
+              const totB = totC - totE
+              return (
+                <div className="grid grid-cols-4 px-3.5 py-2.5 border-t-2 border-[#E2DEDD] bg-[#F8F5F3] text-[12px] items-center">
+                  <span className="text-[#1A1614] font-extrabold">Total</span>
+                  <span className="font-extrabold text-[#16A34A]">{fmtShort(totC)}</span>
+                  <span className="font-extrabold text-[#EF4444]">{fmtShort(totE)}</span>
+                  <span className={`font-extrabold ${totB < 0 ? "text-[#EF4444]" : "text-[#1A1614]"}`}>
+                    {totB < 0 ? `−${fmtShort(Math.abs(totB))}` : fmtShort(totB)}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
         </>
       )}
 
       {showExpenseSheet && (
         <AddExpenseSheet onClose={() => setShowExpenseSheet(false)} onSaved={(m) => { setMonth(m) }} />
+      )}
+      {editExpense && (
+        <EditExpenseSheet expense={editExpense} onClose={() => setEditExpense(null)} onSaved={(m) => { setEditExpense(null); setMonth(m) }} />
       )}
       {showCountSheet && (
         <LogCountSheet onClose={() => setShowCountSheet(false)} onSaved={() => load(month)} />
