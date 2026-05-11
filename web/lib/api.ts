@@ -819,3 +819,74 @@ export async function voidCashExpense(id: number): Promise<{ ok: boolean; id: nu
 export async function logCashCount(body: LogCountBody): Promise<{ id: number; date: string; amount: number; counted_by: string; notes: string | null }> {
   return _post("/api/v2/app/finance/cash/counts", body)
 }
+
+// ── UPI Reconciliation ────────────────────────────────────────────────────────
+
+export interface UpiMatchedEntry {
+  rrn:        string
+  amount:     number
+  payer:      string
+  tenant:     string
+  room:       string
+  matched_by: string
+}
+
+export interface UpiUnmatchedEntry {
+  rrn:    string
+  amount: number
+  payer:  string
+  vpa:    string | null
+}
+
+export interface UpiReconcileResult {
+  account_name:      string
+  matched_count:     number
+  matched_amount:    number
+  unmatched_count:   number
+  unmatched_amount:  number
+  skipped_duplicate: number
+  matched:           UpiMatchedEntry[]
+  unmatched:         UpiUnmatchedEntry[]
+}
+
+export async function uploadUpiFile(
+  file: File,
+  accountName: "THOR" | "HULK",
+  periodMonth: string,   // YYYY-MM
+): Promise<UpiReconcileResult> {
+  const headers = await _authHeaders()
+  const form = new FormData()
+  form.append("files", file)
+  form.append("account_name", accountName)
+  form.append("period_month", periodMonth)
+  const res = await fetch(`${BASE_URL}/api/v2/app/finance/upi-reconcile`, {
+    method: "POST", headers, body: form,
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error((detail as { detail?: string }).detail ?? `Upload failed: ${res.status}`)
+  }
+  return res.json() as Promise<UpiReconcileResult>
+}
+
+export async function getUnmatchedUpi(month?: string): Promise<{ unmatched: Array<{ rrn: string; account: string; date: string; amount: number; payer: string; vpa: string | null }> }> {
+  const qs = month ? `?month=${month}` : ""
+  return _get(`/api/v2/app/finance/upi-reconcile/unmatched${qs}`)
+}
+
+export async function assignUpiEntry(rrn: string, tenancyId: number, periodMonth: string): Promise<{ payment_id: number }> {
+  const headers = await _authHeaders()
+  const form = new FormData()
+  form.append("rrn", rrn)
+  form.append("tenancy_id", String(tenancyId))
+  form.append("period_month", periodMonth)
+  const res = await fetch(`${BASE_URL}/api/v2/app/finance/upi-reconcile/assign`, {
+    method: "POST", headers, body: form,
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error((detail as { detail?: string }).detail ?? `Assign failed: ${res.status}`)
+  }
+  return res.json()
+}
+

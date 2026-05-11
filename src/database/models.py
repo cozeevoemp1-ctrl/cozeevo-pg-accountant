@@ -1492,3 +1492,38 @@ class CashCount(Base):
     counted_by  = Column(String(100), nullable=False)
     notes       = Column(Text, nullable=True)
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class UpiCollectionEntry(Base):
+    """
+    L2 — One row per UPI transaction from Lakshmi merchant collection app exports.
+    RRN is the unique key — re-uploading the same file is always safe.
+    When matched to a tenant, a Payment record is auto-created (payment_id FK).
+    Unmatched entries (tenancy_id=NULL) appear in the daily review queue.
+    """
+    __tablename__ = "upi_collection_entries"
+
+    id            = Column(Integer, primary_key=True)
+    rrn           = Column(String(30), nullable=False)           # UPI Reference Number — unique per txn
+    account_name  = Column(String(10), nullable=False)           # HULK | THOR
+    txn_date      = Column(Date, nullable=False)
+    amount        = Column(Numeric(12, 2), nullable=False)
+    payer_vpa     = Column(String(200), nullable=True)
+    payer_phone   = Column(String(15), nullable=True)            # extracted from VPA
+    payer_name    = Column(String(200), nullable=True)
+    tenancy_id    = Column(Integer, ForeignKey("tenancies.id"), nullable=True)
+    payment_id    = Column(Integer, ForeignKey("payments.id"), nullable=True)
+    matched_by    = Column(String(20), nullable=True)            # phone | name | fuzzy | manual | unmatched
+    period_month  = Column(Date, nullable=True)                  # first day of the month this pays for
+    processed_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    source_file   = Column(String(300), nullable=True)
+
+    tenancy = relationship("Tenancy")
+    payment = relationship("Payment")
+
+    __table_args__ = (
+        UniqueConstraint("rrn", name="uq_upi_collection_rrn"),
+        Index("ix_upi_col_date",    "txn_date"),
+        Index("ix_upi_col_account", "account_name"),
+        Index("ix_upi_col_tenant",  "tenancy_id"),
+    )

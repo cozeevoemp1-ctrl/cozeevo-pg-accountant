@@ -8,6 +8,7 @@ import { UploadCard } from "@/components/finance/upload-card"
 import { ReconcileCard } from "@/components/finance/reconcile-card"
 import { UnitEconomicsCard } from "@/components/finance/unit-economics-card"
 import { CashTab } from "@/components/finance/cash-tab"
+import { UpiReconcileTab } from "@/components/finance/upi-reconcile-tab"
 import { supabase } from "@/lib/supabase"
 
 function prevMonth(m: string): string {
@@ -41,7 +42,7 @@ export default function FinancePage() {
   const [error, setError] = useState("")
   const [downloading, setDownloading] = useState(false)
   const [downloadingLive, setDownloadingLive] = useState(false)
-  const [tab, setTab] = useState<"pnl" | "cash">("pnl")
+  const [tab, setTab] = useState<"pnl" | "cash" | "reconcile">("pnl")
 
   // Admin gate — client-side check
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function FinancePage() {
 
       {/* Tab bar */}
       <div className="flex border-b border-[#F0EDE9]">
-        {(["pnl", "cash"] as const).map(key => (
+        {(["pnl", "cash", "reconcile"] as const).map(key => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -123,7 +124,7 @@ export default function FinancePage() {
                 : "text-[#999] border-transparent"
             }`}
           >
-            {key === "pnl" ? "P&L" : "Cash"}
+            {key === "pnl" ? "P&L" : key === "cash" ? "Cash" : "UPI"}
           </button>
         ))}
       </div>
@@ -196,6 +197,7 @@ export default function FinancePage() {
       )}
 
       {tab === "cash" && <CashTab />}
+      {tab === "reconcile" && <UpiReconcileTab />}
     </main>
   )
 }

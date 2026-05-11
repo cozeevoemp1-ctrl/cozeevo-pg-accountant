@@ -1458,6 +1458,32 @@ async def run_cash_tables_2026_05_11(conn) -> None:
     print("  [ok] cash_expenses + cash_counts created")
 
 
+async def run_upi_collection_table_2026_05_11(conn: AsyncConnection) -> None:
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS upi_collection_entries (
+            id            SERIAL PRIMARY KEY,
+            rrn           VARCHAR(30)    NOT NULL,
+            account_name  VARCHAR(10)    NOT NULL,
+            txn_date      DATE           NOT NULL,
+            amount        NUMERIC(12,2)  NOT NULL,
+            payer_vpa     VARCHAR(200),
+            payer_phone   VARCHAR(15),
+            payer_name    VARCHAR(200),
+            tenancy_id    INTEGER        REFERENCES tenancies(id),
+            payment_id    INTEGER        REFERENCES payments(id),
+            matched_by    VARCHAR(20),
+            period_month  DATE,
+            processed_at  TIMESTAMPTZ    NOT NULL DEFAULT now(),
+            source_file   VARCHAR(300),
+            CONSTRAINT uq_upi_collection_rrn UNIQUE (rrn)
+        )
+    """))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_upi_col_date    ON upi_collection_entries (txn_date)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_upi_col_account ON upi_collection_entries (account_name)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_upi_col_tenant  ON upi_collection_entries (tenancy_id)"))
+    print("  [ok] upi_collection_entries created")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1499,6 +1525,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_widen_checkout_phone_fields_2026_04_29(conn)
             await run_widen_changed_by_2026_04_29(conn)
             await run_cash_tables_2026_05_11(conn)
+            await run_upi_collection_table_2026_05_11(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

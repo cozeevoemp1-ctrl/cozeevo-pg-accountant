@@ -25,7 +25,7 @@ from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
     BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
-    Payment, PaymentFor, PaymentMode, Tenancy, Tenant,
+    Payment, PaymentFor, PaymentMode, Tenancy, Tenant, UpiCollectionEntry,
 )
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.reports.pnl_builder import build_pnl_bytes
@@ -1185,3 +1185,104 @@ async def get_unit_economics_api(
     async with get_session() as session:
         kpis = await get_unit_economics(m, session)
     return {"month": m.strftime("%Y-%m"), **kpis}
+
+
+# ── UPI Auto-Reconcile ────────────────────────────────────────────────────────
+
+@router.post("/finance/upi-reconcile")
+async def upi_reconcile(
+    files: list[UploadFile] = File(...),
+    account_name: str = Form(...),
+    period_month: Optional[str] = Form(None, description="YYYY-MM — defaults to each txn's own month"),
+    user: AppUser = Depends(get_current_user),
+):
+    """
+    Upload HULK or THOR Lakshmi UPI export (XLSX or CSV).
+    Auto-matches transactions to tenants, creates Payment records.
+    Re-uploading the same file is safe — RRN dedup skips existing rows.
+    """
+    _require_admin(user)
+    if account_name not in ("THOR", "HULK"):
+        raise HTTPException(status_code=400, detail="account_name must be THOR or HULK")
+
+    mon: Optional[date] = None
+    if period_month:
+        _validate_month(period_month)
+        mon = date(int(period_month[:4]), int(period_month[5:7]), 1)
+
+    from src.services.upi_reconciliation import reconcile_upi_file
+
+    all_matched, all_unmatched, total_skipped = [], [], 0
+
+    async with get_session() as session:
+        for upload_file in files:
+            content  = await upload_file.read()
+            filename = upload_file.filename or "upload.xlsx"
+            result   = await reconcile_upi_file(session, content, filename, account_name, mon)
+            all_matched.extend([
+                {"rrn": e.rrn, "amount": e.amount, "payer": e.payer_name,
+                 "tenant": e.tenant_name, "room": e.room, "matched_by": e.matched_by}
+                for e in result.matched
+            ])
+            all_unmatched.extend([
+                {"rrn": e.rrn, "amount": e.amount, "payer": e.payer_name, "vpa": e.payer_vpa}
+                for e in result.unmatched
+            ])
+            total_skipped += result.skipped_dup
+
+    return {
+        "account_name":     account_name,
+        "matched_count":    len(all_matched),
+        "matched_amount":   sum(e["amount"] for e in all_matched),
+        "unmatched_count":  len(all_unmatched),
+        "unmatched_amount": sum(e["amount"] for e in all_unmatched),
+        "skipped_duplicate":total_skipped,
+        "matched":          all_matched,
+        "unmatched":        all_unmatched,
+    }
+
+
+@router.post("/finance/upi-reconcile/assign")
+async def assign_upi_entry(
+    rrn:          str  = Form(...),
+    tenancy_id:   int  = Form(...),
+    period_month: str  = Form(..., description="YYYY-MM"),
+    user: AppUser = Depends(get_current_user),
+):
+    """Manually link an unmatched UPI bank entry to a tenant."""
+    _require_admin(user)
+    _validate_month(period_month)
+    mon = date(int(period_month[:4]), int(period_month[5:7]), 1)
+
+    from src.services.upi_reconciliation import assign_upi_entry as _assign
+    async with get_session() as session:
+        payment_id = await _assign(session, rrn, tenancy_id, mon)
+    return {"payment_id": payment_id, "rrn": rrn, "tenancy_id": tenancy_id}
+
+
+@router.get("/finance/upi-reconcile/unmatched")
+async def get_unmatched_upi(
+    month: Optional[str] = Query(None, description="YYYY-MM"),
+    user: AppUser = Depends(get_current_user),
+):
+    """Return unmatched UPI entries — the daily review queue."""
+    _require_admin(user)
+    from sqlalchemy import select as sa_select
+
+    async with get_session() as session:
+        q = sa_select(UpiCollectionEntry).where(UpiCollectionEntry.tenancy_id.is_(None))
+        if month:
+            _validate_month(month)
+            mon = date(int(month[:4]), int(month[5:7]), 1)
+            next_mon = date(mon.year + (mon.month // 12), (mon.month % 12) + 1, 1)
+            q = q.where(UpiCollectionEntry.txn_date >= mon)
+            q = q.where(UpiCollectionEntry.txn_date < next_mon)
+        q = q.order_by(UpiCollectionEntry.txn_date.desc())
+        rows = await session.execute(q)
+        entries = rows.scalars().all()
+
+    return {"unmatched": [
+        {"rrn": e.rrn, "account": e.account_name, "date": str(e.txn_date),
+         "amount": round(float(str(e.amount)), 2), "payer": e.payer_name, "vpa": e.payer_vpa}
+        for e in entries
+    ]}
