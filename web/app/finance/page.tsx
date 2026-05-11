@@ -7,6 +7,7 @@ import { KpiTiles, IncomeCard, ExpenseCard } from "@/components/finance/pnl-card
 import { UploadCard } from "@/components/finance/upload-card"
 import { ReconcileCard } from "@/components/finance/reconcile-card"
 import { UnitEconomicsCard } from "@/components/finance/unit-economics-card"
+import { CashTab } from "@/components/finance/cash-tab"
 import { supabase } from "@/lib/supabase"
 
 function prevMonth(m: string): string {
@@ -40,6 +41,7 @@ export default function FinancePage() {
   const [error, setError] = useState("")
   const [downloading, setDownloading] = useState(false)
   const [downloadingLive, setDownloadingLive] = useState(false)
+  const [tab, setTab] = useState<"pnl" | "cash">("pnl")
 
   // Admin gate — client-side check
   useEffect(() => {
@@ -109,68 +111,91 @@ export default function FinancePage() {
         </span>
       </div>
 
-      {/* Month picker */}
-      <div className="flex items-center justify-between bg-[#0F0E0D] rounded-pill px-5 py-3">
-        <button onClick={() => setMonth(prevMonth(month))} className="text-[#6F655D] text-sm font-bold">←</button>
-        <span className="text-white text-sm font-bold">{monthLabel(month)}</span>
-        <button onClick={() => setMonth(nextMonth(month))} className="text-[#6F655D] text-sm font-bold">→</button>
+      {/* Tab bar */}
+      <div className="flex border-b border-[#F0EDE9]">
+        {(["pnl", "cash"] as const).map(key => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-colors ${
+              tab === key
+                ? "text-[#EF1F9C] border-[#EF1F9C]"
+                : "text-[#999] border-transparent"
+            }`}
+          >
+            {key === "pnl" ? "P&L" : "Cash"}
+          </button>
+        ))}
       </div>
 
-      {/* P&L content */}
-      {loading && (
-        <div className="py-12 text-center text-xs text-ink-muted">Loading…</div>
-      )}
-
-      {!loading && !data && (
-        <div className="py-12 text-center">
-          <p className="text-sm text-ink-muted font-medium">No data for {monthLabel(month)}</p>
-          <p className="text-xs text-ink-muted mt-1">Upload a bank statement below to generate P&L</p>
-        </div>
-      )}
-
-      {!loading && data && (
+      {tab === "pnl" && (
         <>
-          <KpiTiles data={data} />
-          <IncomeCard data={data} />
-          <ExpenseCard data={data} />
-          <ReconcileCard rows={reconcileRows} />
+          {/* Month picker */}
+          <div className="flex items-center justify-between bg-[#0F0E0D] rounded-pill px-5 py-3">
+            <button onClick={() => setMonth(prevMonth(month))} className="text-[#6F655D] text-sm font-bold">←</button>
+            <span className="text-white text-sm font-bold">{monthLabel(month)}</span>
+            <button onClick={() => setMonth(nextMonth(month))} className="text-[#6F655D] text-sm font-bold">→</button>
+          </div>
+
+          {/* P&L content */}
+          {loading && (
+            <div className="py-12 text-center text-xs text-ink-muted">Loading…</div>
+          )}
+
+          {!loading && !data && (
+            <div className="py-12 text-center">
+              <p className="text-sm text-ink-muted font-medium">No data for {monthLabel(month)}</p>
+              <p className="text-xs text-ink-muted mt-1">Upload a bank statement below to generate P&L</p>
+            </div>
+          )}
+
+          {!loading && data && (
+            <>
+              <KpiTiles data={data} />
+              <IncomeCard data={data} />
+              <ExpenseCard data={data} />
+              <ReconcileCard rows={reconcileRows} />
+            </>
+          )}
+
+          {/* Unit Economics — always shown (occupancy/rent from DB; per-bed figures need bank data) */}
+          {!loading && unitEcon && (
+            <>
+              <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide px-1 mt-2">Unit Economics</p>
+              <UnitEconomicsCard data={unitEcon} />
+            </>
+          )}
+
+          {/* Upload */}
+          <UploadCard onUploaded={handleUploaded} />
+
+          {/* Downloads */}
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70"
+            >
+              {downloading ? "Preparing…" : "↓ P&L Report (Oct'25–Apr'26)"}
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadLive}
+              disabled={downloadingLive}
+              className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70 text-ink-muted"
+            >
+              {downloadingLive ? "Recalculating…" : "↓ Recalculate from Latest Uploads"}
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-[10px] text-status-warn font-medium text-center">{error}</p>
+          )}
         </>
       )}
 
-      {/* Unit Economics — always shown (occupancy/rent from DB; per-bed figures need bank data) */}
-      {!loading && unitEcon && (
-        <>
-          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide px-1 mt-2">Unit Economics</p>
-          <UnitEconomicsCard data={unitEcon} />
-        </>
-      )}
-
-      {/* Upload */}
-      <UploadCard onUploaded={handleUploaded} />
-
-      {/* Downloads */}
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={downloading}
-          className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70"
-        >
-          {downloading ? "Preparing…" : "↓ P&L Report (Oct'25–Apr'26)"}
-        </button>
-        <button
-          type="button"
-          onClick={handleDownloadLive}
-          disabled={downloadingLive}
-          className="w-full rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70 text-ink-muted"
-        >
-          {downloadingLive ? "Recalculating…" : "↓ Recalculate from Latest Uploads"}
-        </button>
-      </div>
-
-      {error && (
-        <p className="text-[10px] text-status-warn font-medium text-center">{error}</p>
-      )}
+      {tab === "cash" && <CashTab />}
     </main>
   )
 }
