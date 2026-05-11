@@ -206,6 +206,70 @@ async def get_cash_position(
         }
 
 
+@router.post("/finance/cash/expenses")
+async def add_cash_expense(
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    missing = {"date", "description", "amount", "paid_by"} - set(body.keys())
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing fields: {missing}")
+    try:
+        from datetime import date as _date_type
+        exp_date = _date_type.fromisoformat(body["date"])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    try:
+        amount = float(body["amount"])
+        if amount <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="amount must be a positive number")
+    if body["paid_by"] not in ("Prabhakaran", "Lakshmi", "Other"):
+        raise HTTPException(status_code=400, detail="paid_by must be Prabhakaran, Lakshmi, or Other")
+
+    async with get_session() as session:
+        expense = CashExpense(
+            date=exp_date,
+            description=str(body["description"]).strip(),
+            amount=amount,
+            paid_by=body["paid_by"],
+            created_by=user.email,
+        )
+        session.add(expense)
+        await session.flush()
+        result = {
+            "id": expense.id,
+            "date": str(expense.date),
+            "description": expense.description,
+            "amount": float(expense.amount),
+            "paid_by": expense.paid_by,
+            "is_void": expense.is_void,
+        }
+        await session.commit()
+    return result
+
+
+@router.delete("/finance/cash/expenses/{expense_id}")
+async def void_cash_expense(
+    expense_id: int,
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    from datetime import datetime, timezone
+    async with get_session() as session:
+        expense = await session.get(CashExpense, expense_id)
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense not found")
+        if expense.is_void:
+            raise HTTPException(status_code=400, detail="Already voided")
+        expense.is_void = True
+        expense.voided_at = datetime.now(timezone.utc)
+        await session.commit()
+    return {"ok": True, "id": expense_id}
+
+
 # ── Upload ────────────────────────────────────────────────────────────────────
 
 @router.post("/finance/upload")
