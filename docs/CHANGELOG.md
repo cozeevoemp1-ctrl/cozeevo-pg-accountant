@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.43] — 2026-05-11 — May data load: payments, exit notices, new tenants
+
+### Data operations
+- **May payment import** — 12 cash (₹1,78,000) + 4 UPI (₹48,000) added from source sheet cols Z/AA; Mathew Koshy ₹52K cash confirmed by Kiran
+- **11 exit notices set** in DB (notice_date=2026-05-11): Sathya Priya + Bhanu Prakash (314), Gnanesh (418), Bijayananda (510), Prithviraj (420 — expected_checkout corrected May 2→May 31), Pratik (517), Adithya Reddy (522), Gaurav (617), Revant Godara (G03), Ashit Jha (621, May 15), Sajith (621, Jun 14)
+- **2 new tenants added** — Akshay Kothari (room 522, no_show, check-in Jun 1, rent ₹14K + ₹2K booking UPI); P.N.Charan (room 510, active May 5, rent ₹12.5K + ₹7K May payments)
+- **Lakshmi Pathi (219) checkout_record created** — exit May 7, no refund (day-wise, zero deposit)
+- **`scripts/_add_may_new_tenants.py`** — one-shot script for above
+- **Ops sheet synced** — May 2026: Collected ₹42,66,970 | Cash ₹21,75,300 | UPI ₹20,91,670 | Dues ₹5,76,850 | 189 PAID / 70 PARTIAL | 13 notices | Occ 95.6%
+
+### Inconsistencies flagged
+- Vijay Kumar (phone +919600288048) — room col says "June" = data error; skip
+- Akshay Kothari not previously in DB (now added as June no_show)
+- P.N.Charan not previously in DB (now added as active May 5)
+- Source sheet col AB used as freetext notes (exit dates, payment promises, balances) — not a structured column
+
 ## [1.75.42] — 2026-05-11 — Cash tracking: Cash tab on Finance page
 
 ### New feature — Cash tab
