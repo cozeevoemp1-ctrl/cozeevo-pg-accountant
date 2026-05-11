@@ -1430,6 +1430,34 @@ async def run_widen_changed_by_2026_04_29(conn) -> None:
     print("  [ok] audit_log.changed_by + rent_revisions.changed_by widened to 100")
 
 
+async def run_cash_tables_2026_05_11(conn) -> None:
+    """Cash tracking: cash_expenses (manual outflows) + cash_counts (physical spot-checks)."""
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS cash_expenses (
+            id          SERIAL PRIMARY KEY,
+            date        DATE NOT NULL,
+            description TEXT NOT NULL,
+            amount      NUMERIC(12,2) NOT NULL,
+            paid_by     VARCHAR(100) NOT NULL,
+            is_void     BOOLEAN NOT NULL DEFAULT false,
+            voided_at   TIMESTAMPTZ,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_by  VARCHAR(100)
+        )
+    """))
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS cash_counts (
+            id          SERIAL PRIMARY KEY,
+            date        DATE NOT NULL,
+            amount      NUMERIC(12,2) NOT NULL,
+            counted_by  VARCHAR(100) NOT NULL,
+            notes       TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """))
+    print("  [ok] cash_expenses + cash_counts created")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1470,6 +1498,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_daywise_time_fields_2026_04_28(conn)
             await run_widen_checkout_phone_fields_2026_04_29(conn)
             await run_widen_changed_by_2026_04_29(conn)
+            await run_cash_tables_2026_05_11(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)
