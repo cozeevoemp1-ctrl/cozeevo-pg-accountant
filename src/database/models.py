@@ -70,7 +70,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column, Integer, String, Numeric, Date, DateTime, Time, Enum,
-    ForeignKey, Text, Boolean, Index, UniqueConstraint
+    ForeignKey, Text, Boolean, Index, UniqueConstraint, func
 )
 import os as _os
 if _os.getenv("DATABASE_URL", "sqlite").startswith("sqlite"):
@@ -1459,3 +1459,36 @@ class Blacklist(Base):
         Index("ix_blacklist_phone", "phone"),
         Index("ix_blacklist_active", "is_active"),
     )
+
+
+class CashExpense(Base):
+    """
+    Cash expense record — operating costs paid in cash.
+    Never hard-delete — set is_void=True to void.
+    """
+    __tablename__ = "cash_expenses"
+
+    id          = Column(Integer, primary_key=True)
+    date        = Column(Date, nullable=False)
+    description = Column(Text, nullable=False)
+    amount      = Column(Numeric(12, 2), nullable=False)
+    paid_by     = Column(String(100), nullable=False)
+    is_void     = Column(Boolean, nullable=False, default=False)
+    voided_at   = Column(DateTime(timezone=True), nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by  = Column(String(100), nullable=True)
+
+
+class CashCount(Base):
+    """
+    Physical cash count record — snapshot of actual cash on hand.
+    Used to reconcile cash flow and detect discrepancies.
+    """
+    __tablename__ = "cash_counts"
+
+    id          = Column(Integer, primary_key=True)
+    date        = Column(Date, nullable=False)
+    amount      = Column(Numeric(12, 2), nullable=False)
+    counted_by  = Column(String(100), nullable=False)
+    notes       = Column(Text, nullable=True)
+    created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
