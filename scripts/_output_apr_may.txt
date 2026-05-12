@@ -1,0 +1,922 @@
+Tenants: 329 | Apr bank txns: 77 | May entries: 236
+
+
+################################################################################
+##  HULK
+################################################################################
+
+============================================================================================================================================
+  HULK — APRIL 2026
+============================================================================================================================================
+Name                              Room     Rent        Due Basis                         UPI       Cash    Total    Balance  Status
+--------------------------------------------------------------------------------------------------------------------------------------------
+Abhinav A                          617   13,500     13,500 full rent                  25,000          0   25,000    -11,500  CLEAR
+Abhiram                            319   14,000     27,533 dep+prorated(29d)          16,050          0   16,050     11,483  BAL 11,483
+Abhishek Sharma                    622   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Abhishek Vishwakarma               121   12,000     21,250 dep+prorated(30d)               0          0        0     21,250  NO PAYMENT
+Adharsh Unni                       216   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Aditaya Sanghi                     322   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Adithya Reddy                      522   12,000     12,000 full rent                   2,000     10,000   12,000          0  CLEAR
+Advait                             220   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Ahmad shafi shaik                  619    1,000      1,000 full rent                       0          0        0      1,000  NO PAYMENT
+Ajay Mohan                         516   26,000     26,000 full rent                   2,000          0    2,000     24,000  BAL 24,000
+Ajay Ramchandra                    G17   12,000     12,000 full rent                       0          0        0     12,000  NO PAYMENT
+Ajay Uppal                         415    1,200        720 dep+prorated(18d)               0          0        0        720  NO PAYMENT
+Akaash                             G13   10,000     10,000 full rent                       0          0        0     10,000  NO PAYMENT
+Akash.M                            221      900        450 dep+prorated(15d)               0          0        0        450  NO PAYMENT
+Akshit                             419   13,500     13,500 full rent                       0     11,500   11,500      2,000  BAL 2,000
+Akshitha Jawahar                   214   15,000     15,000 full rent                       0          0        0     15,000  NO PAYMENT
+Anirudh                            315   13,000     26,000 dep+prorated(30d)          24,000          0   24,000      2,000  BAL 2,000
+Ankit Kumar                        320   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Ankit Kumar                        G13   10,000     10,000 full rent                   9,900          0    9,900        100  BAL 100
+Ankush                             517   12,500     25,000 dep+prorated(30d)          23,000          0   23,000      2,000  BAL 2,000
+Anmol Gupta Nm                     514   12,000     13,600 dep+prorated(19d)           6,000     12,000   18,000     -4,400  CLEAR
+Anshika Gahlot                     615   13,000     26,000 dep+prorated(30d)          22,500          0   22,500      3,500  BAL 3,500
+Anshu Wanjari                      114        0          0 dep+prorated(26d)               0          0        0          0  N/A
+Anshu Wanjari                      124   21,000     21,000 full rent                  38,000          0   38,000    -17,000  CLEAR
+Anudeep Bhist                      G14   10,000     10,000 full rent                   9,900          0    9,900        100  BAL 100
+Anugun                             624   20,000     23,333 dep+prorated(20d)          10,000     20,000   30,000     -6,667  CLEAR
+Anush                              321   12,500     20,833 dep+prorated(20d)          20,820          0   20,820         13  BAL 13
+Arjun Sumanth                      523   13,000     13,000 full rent                     877     13,000   13,877       -877  CLEAR
+Arka                               219   25,000     25,000 full rent                       0          0        0     25,000  NO PAYMENT
+Arnab Roy                          221   13,500     13,500 full rent                   2,000          0    2,000     11,500  BAL 11,500
+Aruf Khan                          419   13,500     13,500 full rent                       0     11,500   11,500      2,000  BAL 2,000
+Arumugam Sathish                   513   22,000     44,000 dep+prorated(30d)          12,000          0   12,000     32,000  BAL 32,000
+Arun Dharshini                     117   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Arun Rl                            114   13,000     11,700 dep+prorated(12d)           2,000     17,500   19,500     -7,800  CLEAR
+Arun Vasavan                       216   13,500     13,500 full rent                   2,000     13,500   15,500     -2,000  CLEAR
+Ashish Das                         121   13,000     13,000 full rent                       0     18,500   18,500     -5,500  CLEAR
+Ashit Jha                          621   13,500     13,500 full rent                  20,250          0   20,250     -6,750  CLEAR
+Avinash Yadav                      218   12,500     12,500 full rent                  12,500          0   12,500          0  CLEAR
+Balaji                             515   13,000     13,000 full rent                       0     12,000   12,000      1,000  BAL 1,000
+Bhavana                            114      900        870 dep+prorated(29d)               0          0        0        870  NO PAYMENT
+Chandraprakash                     G20   22,000     22,000 full rent                       0          0        0     22,000  NO PAYMENT
+Chandrasekhar                      417   13,000     13,000 full rent                  10,100          0   10,100      2,900  BAL 2,900
+Chandrasekhar Rathod               G15    1,000        133 dep+prorated(4d)                0          0        0        133  NO PAYMENT
+Chinchu David                      G17    1,200      1,200 full rent                       0          0        0      1,200  NO PAYMENT
+Chinmay Pagey                      124   22,000     44,000 dep+prorated(30d)               0          0        0     44,000  NO PAYMENT
+Claudin Narsis                     117   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Darshil                            519   23,000     23,000 full rent                       0          0        0     23,000  NO PAYMENT
+Darshit Khakhkhar                  522   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Delvin Raj                         520   13,500     13,500 full rent                   2,000          0    2,000     11,500  BAL 11,500
+Devi priya                         116      600        460 dep+prorated(23d)               0          0        0        460  NO PAYMENT
+Dhamodharan                        G19   22,500     22,500 full rent                  22,500          0   22,500          0  CLEAR
+Dhruv                              414   12,500     12,500 full rent                   6,500          0    6,500      6,000  BAL 6,000
+Dhruv Singh                        414   13,000     11,300 dep+prorated(3d)            1,868     22,000   23,868    -12,568  CLEAR
+Dinesh                             222   13,000     13,000 full rent                  27,000          0   27,000    -14,000  CLEAR
+Divyansh Tripathi                  217   14,500     18,367 dep+prorated(8d)           18,366          0   18,366          1  BAL 1
+Ganesh Magi                        418   13,500     13,500 full rent                   2,000          0    2,000     11,500  BAL 11,500
+Gaurav                             617   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Gayatri Kulkarni Nm                514   12,000     13,600 dep+prorated(19d)           6,000     12,000   18,000     -4,400  CLEAR
+Gnanesh                            418   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Guru Sai Reddy                     319   14,000     27,533 dep+prorated(29d)          16,050          0   16,050     11,483  BAL 11,483
+Hardik Rohilla                     524   23,000     23,000 full rent                  33,000          0   33,000    -10,000  CLEAR
+Jagpreet Singh                     523   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Jahnavi                            214   13,000     13,000 full rent                  17,500          0   17,500     -4,500  CLEAR
+Jerome Babu                        321   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Jitendra Kochale                   316   12,500     25,000 dep+prorated(30d)               0          0        0     25,000  NO PAYMENT
+K.Shakthivel                       622   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Kalyan dagar                       619    1,000      1,000 full rent                       0          0        0      1,000  NO PAYMENT
+Kanchan                            G11   22,000     22,000 full rent                  22,000          0   22,000          0  CLEAR
+Karesse                            119   25,000     25,000 full rent                  25,000          0   25,000          0  CLEAR
+Kishan                             122   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Kona Yashwanth Reddy               123   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Koushik                            515   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Koustav Das Choudary               223   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Kumar Shivam                       318   13,000     13,000 full rent                  18,000          0   18,000     -5,000  CLEAR
+Lakshita Jain                      424   23,000     19,167 dep+prorated(25d)          23,000          0   23,000     -3,833  CLEAR
+Lakshman Goud                      220   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Lakshmi Pathi                      219    1,200      1,200 full rent                       0          0        0      1,200  NO PAYMENT
+Lakshmi Priya                      421   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Lakshmiprasanna                    120   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Lokesh Sanaka                      G17   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Madhav                             114      900        870 dep+prorated(29d)               0          0        0        870  NO PAYMENT
+maharajan                          219    1,000        700 dep+prorated(21d)               0          0        0        700  NO PAYMENT
+Maheep Tulsian                     218   12,500     12,500 full rent                  12,500          0   12,500          0  CLEAR
+Mamta Khandade                     115   12,000     24,000 dep+prorated(30d)          24,000          0   24,000          0  CLEAR
+Manikandan                         315   13,000     13,000 full rent                  17,500          0   17,500     -4,500  CLEAR
+Manya                              116   12,000     13,600 dep+prorated(19d)           2,000     16,000   18,000     -4,400  CLEAR
+Mayur                              122   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Muhesh.M                           423   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Nagarajan                          417   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Naitik Raj                         416   13,000     13,000 full rent                  19,500          0   19,500     -6,500  CLEAR
+Nakul Gupta                        521   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Namit Mehta                        422   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Nandakumar                         120   12,500     12,500 full rent                  12,500          0   12,500          0  CLEAR
+Neha                               615   13,500     13,500 full rent                  26,500          0   26,500    -13,000  CLEAR
+Nikhil Mistry                      121   14,000     14,000 full rent                       0          0        0     14,000  NO PAYMENT
+Omkar Deodher                      616   11,000     20,900 dep+prorated(27d)          11,000          0   11,000      9,900  BAL 9,900
+Omkar Deodher                      616   11,000     20,900 dep+prorated(27d)               0          0        0     20,900  NO PAYMENT
+Piyush Kale                        123   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Piyush Kumar                       619   13,000     26,000 dep+prorated(30d)          26,000          0   26,000          0  CLEAR
+Pooja                              114   13,000     11,700 dep+prorated(12d)           2,000     17,500   19,500     -7,800  CLEAR
+Prajwal Sr                         414   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Prakashita                         620   12,500     23,333 dep+prorated(26d)          17,750          0   17,750      5,583  BAL 5,583
+Pranav Sonawane                    516    1,000        267 dep+prorated(8d)                0          0        0        267  NO PAYMENT
+Prasad Vadlamani                   318   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Prasanth.P                         G15   13,000     13,100 dep+prorated(6d)            2,600     10,000   12,600        500  BAL 500
+Prashanth                          316   13,500     26,100 dep+prorated(28d)          14,200          0   14,200     11,900  BAL 11,900
+Pratik                             517   12,500     12,500 full rent                  12,500     14,000   26,500    -14,000  CLEAR
+Praveen                            122   13,500     15,750 dep+prorated(5d)            2,750     13,000   15,750          0  CLEAR
+Praveen Kumar                      122   13,500     15,750 dep+prorated(5d)                0          0        0     15,750  NO PAYMENT
+Prithviraj                         420   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Priyanshi                          618   24,000     26,000 dep+prorated(20d)          10,000     24,000   34,000     -8,000  CLEAR
+Rafi                               316      900        780 dep+prorated(26d)               0          0        0        780  NO PAYMENT
+Ragolu Sai Balaji                  323   12,000     12,000 full rent                  18,000          0   18,000     -6,000  CLEAR
+Rahul                              118      600        460 dep+prorated(23d)               0          0        0        460  NO PAYMENT
+Rakesh                             418   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Rakesh Sanaka                      G17   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Rakesh Thallapally                 415   26,000     35,533 dep+prorated(11d)               0          0        0     35,533  NO PAYMENT
+Rayirth                            G18    1,000      1,000 full rent                       0          0        0      1,000  NO PAYMENT
+Ritik                              G16   22,000     22,000 full rent                       0     22,000   22,000          0  CLEAR
+Rohit                              521   14,000     20,067 dep+prorated(13d)           6,078     14,000   20,078        -11  CLEAR
+Roshni                             116   12,000     13,600 dep+prorated(19d)           5,000     13,000   18,000     -4,400  CLEAR
+Sachin                             623   12,500     25,000 dep+prorated(30d)           2,000     16,250   18,250      6,750  BAL 6,750
+Sachin Kumar Yadav                 215   12,500     25,000 dep+prorated(30d)               0          0        0     25,000  NO PAYMENT
+Sahithya.V                         620   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Sai Shankar                        420   12,000     12,000 full rent                       0     20,000   20,000     -8,000  CLEAR
+Saiteja                            523   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Sajith                             621   13,500      7,650 dep+prorated(17d)          15,000          0   15,000     -7,350  CLEAR
+Saksham                            422   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Sanjay                             520   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Sanjoy Roy Choudary                613   25,000     25,000 full rent                  25,000          0   25,000          0  CLEAR
+Satvik Suresh                      215   12,500     25,000 dep+prorated(30d)          23,000          0   23,000      2,000  BAL 2,000
+Saurav Mishra                      221   13,500     25,200 dep+prorated(26d)          25,000          0   25,000        200  BAL 200
+Sethuram                           317   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Shashank                           521   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+SHASHANK B V                       G18    1,000        133 dep+prorated(4d)                0          0        0        133  NO PAYMENT
+Shivam Varma                       518   13,000     13,000 full rent                  18,000          0   18,000     -5,000  CLEAR
+Shivang                            324   22,000     22,000 full rent                       0          0        0     22,000  NO PAYMENT
+Shreyakarpe                        313   22,000     22,000 full rent                  20,400      1,600   22,000          0  CLEAR
+Shubham Mishra                     514   20,000     20,000 full rent                  10,000          0   10,000     10,000  BAL 10,000
+Shubham Varma                      G13   10,000     10,000 full rent                   9,900          0    9,900        100  BAL 100
+Siddharth Dewangan                 619   13,500     25,200 dep+prorated(26d)          27,000          0   27,000     -1,800  CLEAR
+Siddharth Linge                    520   13,500     13,500 full rent                   2,400          0    2,400     11,100  BAL 11,100
+Sipan Pal                          217   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Sohan Monies                       118   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Souryadeep Ganguly                 223   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Sparsh Rawat                       413   23,000     23,000 full rent                  23,000          0   23,000          0  CLEAR
+Srikar                             423   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Sujal Jaiswal                      217   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Surajit Chandra                    224   20,000     23,333 dep+prorated(20d)          10,000     20,000   30,000     -6,667  CLEAR
+Swarup Ravindra  Futane            616   11,000     20,900 dep+prorated(27d)          11,000          0   11,000      9,900  BAL 9,900
+T.Rakesh Chetan                    415   26,000     35,533 dep+prorated(11d)               0     35,533   35,533          0  CLEAR
+Tanishka                           113   20,000     20,000 full rent                  20,000          0   20,000          0  CLEAR
+Tanishka                           213   20,000     23,333 dep+prorated(20d)           6,000     20,000   26,000     -2,667  CLEAR
+Taral                              318   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Tarun                              G18   13,000     13,000 full rent                  13,000      6,500   19,500     -6,500  CLEAR
+Tejas                              118   12,000     13,600 dep+prorated(19d)           6,000     12,000   18,000     -4,400  CLEAR
+Thiruloshini                       116      600        460 dep+prorated(23d)               0          0        0        460  NO PAYMENT
+Thulasi Ram                        317   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Tripati Patro                      123   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Ulaganadhan                        G15   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+V Leela Yugandhar                  323   12,000     12,000 full rent                   8,000      4,000   12,000          0  CLEAR
+V. Bhanu Prakash                   314   11,500     11,500 full rent                   5,000     14,250   19,250     -7,750  CLEAR
+V.Sathya Priya                     314   11,500     11,500 full rent                   5,000     14,250   19,250     -7,750  CLEAR
+Vadi Raj Nandlal                   521   13,500     12,150 dep+prorated(12d)           2,050     23,600   25,650    -13,500  CLEAR
+Veena.T                            623   12,500     25,000 dep+prorated(30d)           2,000     16,250   18,250      6,750  BAL 6,750
+Venkatesh                          321    1,000        567 dep+prorated(17d)               0          0        0        567  NO PAYMENT
+Vinod Kumar Reddy                  518   13,000     13,000 full rent                  17,000          0   17,000     -4,000  CLEAR
+Vishnu Reddy.Y                     320   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Yash Shinde                        416   11,500     23,500 dep+prorated(30d)          21,500          0   21,500      2,000  BAL 2,000
+Yatam Ramakanth                    520   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Yelagani Anuhya                    421   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Yogesh Bhist                       G14   10,000     10,000 full rent                   9,900          0    9,900        100  BAL 100
+Yogesh/ Rutika                     519    1,300      1,300 full rent                       0          0        0      1,300  NO PAYMENT
+Yuvaraj                            222   12,500     23,750 dep+prorated(27d)          25,000          0   25,000     -1,250  CLEAR
+
+  Total due: 2,592,268 | UPI: 1,475,209 | Cash: 728,733 | Collected: 2,203,942 | Outstanding: 388,326
+  99 cleared | 33 partial | 41 no payment
+
+============================================================================================================================================
+  HULK — MAY 2026
+============================================================================================================================================
+Name                              Room     Rent        Due Basis                         UPI       Cash    Total    Balance  Status
+--------------------------------------------------------------------------------------------------------------------------------------------
+Abhinav A                          617   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Abhiram                            319   14,000     14,000 full rent                  13,000     10,000   23,000     -9,000  CLEAR
+Abhishek Sharma                    622   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Abhishek Vishwakarma               121   12,000     12,000 full rent                  16,500     16,500   33,000    -21,000  CLEAR
+Adharsh Unni                       216   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Aditaya Sanghi                     322   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Adithya Reddy                      522   12,000     12,000 full rent                       0     10,000   10,000      2,000  BAL 2,000
+Advait                             220   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Ahmad shafi shaik                  619    1,000          0 exited before May               0          0        0          0  N/A
+Ajay Mohan                         516   26,000     52,000 dep+prorated(31d)           2,000     37,000   39,000     13,000  BAL 13,000
+Ajay Ramchandra                    G17   12,000     24,000 dep+prorated(31d)           3,904          0    3,904     20,096  BAL 20,096
+Ajay Uppal                         415    1,200          0 exited before May               0          0        0          0  N/A
+Akaash                             G13   10,000     12,097 dep+prorated(22d)               0     10,000   10,000      2,097  BAL 2,097
+Akash.M                            221      900          0 exited before May               0          0        0          0  N/A
+Akshit                             419   13,500     13,500 full rent                   7,500      6,000   13,500          0  CLEAR
+Akshitha Jawahar                   214   15,000     22,032 dep+prorated(29d)               0          0        0     22,032  NO PAYMENT
+Anirudh                            315   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Ankit Kumar                        320   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Ankit Kumar                        G13   10,000     10,000 full rent                       0     10,000   10,000          0  CLEAR
+Ankush                             517   12,500     12,500 full rent                       0          0        0     12,500  NO PAYMENT
+Anmol Gupta Nm                     514   12,000     12,000 full rent                       0     24,000   24,000    -12,000  CLEAR
+Anshika Gahlot                     615   13,000     13,000 full rent                   6,500          0    6,500      6,500  BAL 6,500
+Anshu Wanjari                      114        0          0 exited before May               0          0        0          0  N/A
+Anshu Wanjari                      124   21,000     21,000 full rent                       0     21,000   21,000          0  CLEAR
+Anudeep Bhist                      G14   10,000     10,000 full rent                       0     10,000   10,000          0  CLEAR
+Anugun                             624   20,000     20,000 full rent                       0     20,000   20,000          0  CLEAR
+Anush                              321   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Arjun Sumanth                      523   13,000          0 exited before May               0          0        0          0  N/A
+Arka                               219   25,000     43,548 dep+prorated(23d)               0     23,550   23,550     19,998  BAL 19,998
+Arnab Roy                          221   13,500     27,000 dep+prorated(31d)           2,000     27,000   29,000     -2,000  CLEAR
+Aruf Khan                          419   13,500     13,500 full rent                   7,500      6,000   13,500          0  CLEAR
+Arumugam Sathish                   513   22,000     22,000 full rent                  21,000          0   21,000      1,000  BAL 1,000
+Arun Dharshini                     117   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Arun Rl                            114   13,000     13,000 full rent                   4,000          0    4,000      9,000  BAL 9,000
+Arun Vasavan                       216   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Ashish Das                         121   13,000          0 exited before May               0          0        0          0  N/A
+Ashit Jha                          621   13,500     13,500 full rent                   6,750          0    6,750      6,750  BAL 6,750
+Avinash Yadav                      218   12,500     12,500 full rent                  12,500          0   12,500          0  CLEAR
+Balaji                             515   13,000     13,000 full rent                       0     12,000   12,000      1,000  BAL 1,000
+Bhavana                            114      900          0 exited before May               0          0        0          0  N/A
+Chandraprakash                     G20   22,000     43,290 dep+prorated(30d)               0     28,000   28,000     15,290  BAL 15,290
+Chandrasekhar                      417   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Chandrasekhar Rathod               G15    1,000          0 exited before May           2,000          0    2,000     -2,000  N/A
+Chinchu David                      G17    1,200      1,084 dep+prorated(28d)             600          0      600        484  BAL 484
+Chinmay Pagey                      124   22,000          0 exited before May          12,500          0   12,500    -12,500  N/A
+Claudin Narsis                     117   13,000     13,000 full rent                  39,000          0   39,000    -26,000  CLEAR
+Darshil                            519   23,000     38,548 dep+prorated(25d)               0          0        0     38,548  NO PAYMENT
+Darshit Khakhkhar                  522   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Delvin Raj                         520   13,500     27,000 dep+prorated(31d)          13,500          0   13,500     13,500  BAL 13,500
+Devi priya                         116      600          0 exited before May               0          0        0          0  N/A
+Dhamodharan                        G19   22,500     22,500 full rent                       0     20,000   20,000      2,500  BAL 2,500
+Dhruv                              414   12,500          0 exited before May               0          0        0          0  N/A
+Dhruv Singh                        414   13,000     13,000 full rent                   1,868          0    1,868     11,132  BAL 11,132
+Dinesh                             222   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Divyansh Tripathi                  217   14,500     14,500 full rent                   2,000          0    2,000     12,500  BAL 12,500
+Ganesh Magi                        418   13,500     27,000 dep+prorated(31d)          11,500     15,500   27,000          0  CLEAR
+Gaurav                             617   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Gayatri Kulkarni Nm                514   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Gnanesh                            418   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Guru Sai Reddy                     319   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Hardik Rohilla                     524   23,000     23,000 full rent                       0     17,750   17,750      5,250  BAL 5,250
+Jagpreet Singh                     523   13,500     23,081 dep+prorated(22d)          13,500          0   13,500      9,581  BAL 9,581
+Jahnavi                            214   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Jerome Babu                        321   13,000     13,000 full rent                  15,000          0   15,000     -2,000  CLEAR
+Jitendra Kochale                   316   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+K.Shakthivel                       622   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Kalyan dagar                       619    1,000          0 exited before May               0          0        0          0  N/A
+Kanchan                            G11   22,000     22,000 full rent                       0     22,000   22,000          0  CLEAR
+Karesse                            119   25,000     25,000 full rent                  25,000          0   25,000          0  CLEAR
+Kishan                             122   13,500          0 exited before May               0          0        0          0  N/A
+Kona Yashwanth Reddy               123   13,500     25,694 dep+prorated(28d)           2,000     23,700   25,700         -6  CLEAR
+Koushik                            515   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Koustav Das Choudary               223   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Kumar Shivam                       318   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Lakshita Jain                      424   23,000     23,000 full rent                       0          0        0     23,000  NO PAYMENT
+Lakshman Goud                      220   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Lakshmi Pathi                      219    1,200      1,084 dep+prorated(28d)           1,200          0    1,200       -116  CLEAR
+Lakshmi Priya                      421   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Lakshmiprasanna                    120   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Lokesh Sanaka                      G17   13,500          0 exited before May               0          0        0          0  N/A
+Madhav                             114      900          0 exited before May               0          0        0          0  N/A
+maharajan                          219    1,000          0 exited before May           7,000          0    7,000     -7,000  N/A
+Maheep Tulsian                     218   12,500     12,500 full rent                  12,500          0   12,500          0  CLEAR
+Mamta Khandade                     115   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Manikandan                         315   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Manya                              116   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Mayur                              122   14,000     14,000 full rent                       0     20,000   20,000     -6,000  CLEAR
+Muhesh.M                           423   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Nagarajan                          417   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Naitik Raj                         416   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Nakul Gupta                        521   13,500          0 exited before May               0          0        0          0  N/A
+Namit Mehta                        422   13,000     13,000 full rent                   6,500          0    6,500      6,500  BAL 6,500
+Nandakumar                         120   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Neha                               615   13,500     13,500 full rent                   7,500      6,000   13,500          0  CLEAR
+Nikhil Mistry                      121   14,000     24,387 dep+prorated(23d)          14,000          0   14,000     10,387  BAL 10,387
+Omkar Deodher                      616   11,000     11,000 full rent                       0          0        0     11,000  NO PAYMENT
+Omkar Deodher                      616   11,000     11,000 full rent                       0     22,000   22,000    -11,000  CLEAR
+Piyush Kale                        123   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Piyush Kumar                       619   13,000     13,000 full rent                   6,500          0    6,500      6,500  BAL 6,500
+Pooja                              114   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Prajwal Sr                         414   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Prakashita                         620   12,500     12,500 full rent                  17,750          0   17,750     -5,250  CLEAR
+Pranav Sonawane                    516    1,000          0 exited before May           3,000          0    3,000     -3,000  N/A
+Prasad Vadlamani                   318   13,500     27,000 dep+prorated(31d)               0          0        0     27,000  NO PAYMENT
+Prasanth.P                         G15   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Prashanth                          316   13,500     13,500 full rent                  32,650          0   32,650    -19,150  CLEAR
+Pratik                             517   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Praveen                            122   13,500     13,500 full rent                   2,750          0    2,750     10,750  BAL 10,750
+Praveen Kumar                      122   13,500     13,500 full rent                   2,750     13,500   16,250     -2,750  CLEAR
+Prithviraj                         420   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Priyanshi                          618   24,000     24,000 full rent                   8,000     48,000   56,000    -32,000  CLEAR
+Rafi                               316      900          0 exited before May               0          0        0          0  N/A
+Ragolu Sai Balaji                  323   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Rahul                              118      600          0 exited before May               0          0        0          0  N/A
+Rakesh                             418   13,500          0 exited before May               0          0        0          0  N/A
+Rakesh Sanaka                      G17   13,500          0 exited before May               0          0        0          0  N/A
+Rakesh Thallapally                 415   26,000          0 exited before May               0     26,000   26,000    -26,000  N/A
+Rayirth                            G18    1,000        935 dep+prorated(29d)               0          0        0        935  NO PAYMENT
+Ritik                              G16   22,000     22,000 full rent                       0     22,000   22,000          0  CLEAR
+Rohit                              521   14,000     14,000 full rent                   6,078     14,000   20,078     -6,078  CLEAR
+Roshni                             116   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Sachin                             623   12,500     12,500 full rent                       0     18,250   18,250     -5,750  CLEAR
+Sachin Kumar Yadav                 215   12,500     12,500 full rent                  17,750          0   17,750     -5,250  CLEAR
+Sahithya.V                         620   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Sai Shankar                        420   12,000     12,000 full rent                       0          0        0     12,000  NO PAYMENT
+Saiteja                            523   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Sajith                             621   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Saksham                            422   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Sanjay                             520   13,500          0 exited before May               0          0        0          0  N/A
+Sanjoy Roy Choudary                613   25,000     25,000 full rent                  25,000          0   25,000          0  CLEAR
+Satvik Suresh                      215   12,500     12,500 full rent                       0     12,500   12,500          0  CLEAR
+Saurav Mishra                      221   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Sethuram                           317   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Shashank                           521   13,500          0 exited before May               0          0        0          0  N/A
+SHASHANK B V                       G18    1,000          0 exited before May           2,000          0    2,000     -2,000  N/A
+Shivam Varma                       518   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Shivang                            324   22,000     22,000 full rent                       0     22,000   22,000          0  CLEAR
+Shreyakarpe                        313   22,000     22,000 full rent                       0     22,000   22,000          0  CLEAR
+Shubham Mishra                     514   20,000          0 exited before May               0          0        0          0  N/A
+Shubham Varma                      G13   10,000     10,000 full rent                       0     10,000   10,000          0  CLEAR
+Siddharth Dewangan                 619   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Siddharth Linge                    520   13,500     27,000 dep+prorated(31d)           2,450     23,000   25,450      1,550  BAL 1,550
+Sipan Pal                          217   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Sohan Monies                       118   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Souryadeep Ganguly                 223   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Sparsh Rawat                       413   23,000     23,000 full rent                  23,000          0   23,000          0  CLEAR
+Srikar                             423   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Sujal Jaiswal                      217   13,000          0 exited before May               0          0        0          0  N/A
+Surajit Chandra                    224   20,000     20,000 full rent                   5,000          0    5,000     15,000  BAL 15,000
+Swarup Ravindra  Futane            616   11,000     11,000 full rent                   5,500     22,000   27,500    -16,500  CLEAR
+T.Rakesh Chetan                    415   26,000     26,000 full rent                       0          0        0     26,000  NO PAYMENT
+Tanishka                           113   20,000     20,000 full rent                       0     20,000   20,000          0  CLEAR
+Tanishka                           213   20,000     20,000 full rent                       0     28,000   28,000     -8,000  CLEAR
+Taral                              318   13,500          0 exited before May               0          0        0          0  N/A
+Tarun                              G18   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Tejas                              118   12,000     12,000 full rent                       0          0        0     12,000  NO PAYMENT
+Thiruloshini                       116      600          0 exited before May               0          0        0          0  N/A
+Thulasi Ram                        317   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Tripati Patro                      123   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Ulaganadhan                        G15   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+V Leela Yugandhar                  323   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+V. Bhanu Prakash                   314   11,500     11,500 full rent                       0          0        0     11,500  NO PAYMENT
+V.Sathya Priya                     314   11,500     11,500 full rent                       0     18,000   18,000     -6,500  CLEAR
+Vadi Raj Nandlal                   521   13,500     13,500 full rent                      50          0       50     13,450  BAL 13,450
+Veena.T                            623   12,500     12,500 full rent                       0     18,250   18,250     -5,750  CLEAR
+Venkatesh                          321    1,000          0 exited before May               0          0        0          0  N/A
+Vinod Kumar Reddy                  518   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Vishnu Reddy.Y                     320   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Yash Shinde                        416   11,500     11,500 full rent                  11,500          0   11,500          0  CLEAR
+Yatam Ramakanth                    520   13,500          0 exited before May               0          0        0          0  N/A
+Yelagani Anuhya                    421   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Yogesh Bhist                       G14   10,000     10,000 full rent                       0     10,000   10,000          0  CLEAR
+Yogesh/ Rutika                     519    1,300          0 exited before May               0          0        0          0  N/A
+Yuvaraj                            222   12,500     12,500 full rent                       0          0        0     12,500  NO PAYMENT
+
+  Total due: 2,190,280 | UPI: 610,050 | Cash: 1,173,500 | Collected: 1,783,550 | Outstanding: 406,730
+  86 cleared | 25 partial | 30 no payment
+
+================================================================================
+  HULK — COMBINED OUTSTANDING (April + May)
+================================================================================
+  Name                              Room    Apr Bal    May Bal      Total
+--------------------------------------------------------------------------------
+  Darshil                            519     23,000     38,548     61,548
+  Arka                               219     25,000     19,998     44,998
+  Prasad Vadlamani                   318     13,500     27,000     40,500
+  Chandraprakash                     G20     22,000     15,290     37,290
+  Akshitha Jawahar                   214     15,000     22,032     37,032
+  Ajay Mohan                         516     24,000     13,000     37,000
+  Arumugam Sathish                   513     32,000      1,000     33,000
+  Ajay Ramchandra                    G17     12,000     20,096     32,096
+  Chinmay Pagey                      124     44,000    -12,500     31,500
+  T.Rakesh Chetan                    415          0     26,000     26,000
+  Delvin Raj                         520     11,500     13,500     25,000
+  Jitendra Kochale                   316     25,000          0     25,000
+  Nikhil Mistry                      121     14,000     10,387     24,387
+  Jagpreet Singh                     523     13,500      9,581     23,081
+  Lakshita Jain                      424     -3,833     23,000     23,000
+  Shivang                            324     22,000          0     22,000
+  Omkar Deodher                      616      9,900     11,000     20,900
+  Sachin Kumar Yadav                 215     25,000     -5,250     19,750
+  Surajit Chandra                    224     -6,667     15,000     15,000
+  Ankush                             517      2,000     12,500     14,500
+  Arun Vasavan                       216     -2,000     13,500     13,500
+  Nakul Gupta                        521     13,500          0     13,500
+  Rakesh                             418     13,500          0     13,500
+  Saiteja                            523          0     13,500     13,500
+  Sajith                             621     -7,350     13,500     13,500
+  Shashank                           521     13,500          0     13,500
+  Siddharth Dewangan                 619     -1,800     13,500     13,500
+  Tripati Patro                      123          0     13,500     13,500
+  Yatam Ramakanth                    520     13,500          0     13,500
+  Kona Yashwanth Reddy               123     13,500         -6     13,494
+  Vadi Raj Nandlal                   521    -13,500     13,450     13,450
+  Advait                             220          0     13,000     13,000
+  Arun Dharshini                     117          0     13,000     13,000
+  Dinesh                             222    -14,000     13,000     13,000
+  Gaurav                             617          0     13,000     13,000
+  Gnanesh                            418          0     13,000     13,000
+  Jahnavi                            214     -4,500     13,000     13,000
+  Koushik                            515          0     13,000     13,000
+  Muhesh.M                           423          0     13,000     13,000
+  Pooja                              114     -7,800     13,000     13,000
+  Praveen Kumar                      122     15,750     -2,750     13,000
+  Sahithya.V                         620          0     13,000     13,000
+  Saksham                            422          0     13,000     13,000
+  Vinod Kumar Reddy                  518     -4,000     13,000     13,000
+  Yelagani Anuhya                    421          0     13,000     13,000
+  Siddharth Linge                    520     11,100      1,550     12,650
+  Divyansh Tripathi                  217          1     12,500     12,501
+  Yuvaraj                            222     -1,250     12,500     12,500
+  Akaash                             G13     10,000      2,097     12,097
+  Sai Shankar                        420     -8,000     12,000     12,000
+  Tejas                              118     -4,400     12,000     12,000
+  Ganesh Magi                        418     11,500          0     11,500
+  V. Bhanu Prakash                   314     -7,750     11,500     11,500
+  Guru Sai Reddy                     319     11,483          0     11,483
+  Dhruv Singh                        414    -12,568     11,132     11,132
+  Praveen                            122          0     10,750     10,750
+  Anshika Gahlot                     615      3,500      6,500     10,000
+  Shubham Mishra                     514     10,000          0     10,000
+  Omkar Deodher                      616     20,900    -11,000      9,900
+  Rakesh Thallapally                 415     35,533    -26,000      9,533
+  Arnab Roy                          221     11,500     -2,000      9,500
+  Arun Rl                            114     -7,800      9,000      9,000
+  Ashit Jha                          621     -6,750      6,750      6,750
+  Namit Mehta                        422          0      6,500      6,500
+  Piyush Kumar                       619          0      6,500      6,500
+  Dhruv                              414      6,000          0      6,000
+  Hardik Rohilla                     524    -10,000      5,250      5,250
+  Chandrasekhar                      417      2,900          0      2,900
+  Dhamodharan                        G19          0      2,500      2,500
+  Abhiram                            319     11,483     -9,000      2,483
+  Adithya Reddy                      522          0      2,000      2,000
+  Akshit                             419      2,000          0      2,000
+  Anirudh                            315      2,000          0      2,000
+  Aruf Khan                          419      2,000          0      2,000
+  Balaji                             515      1,000      1,000      2,000
+  Satvik Suresh                      215      2,000          0      2,000
+  Yash Shinde                        416      2,000          0      2,000
+  Rayirth                            G18      1,000        935      1,935
+  Chinchu David                      G17      1,200        484      1,684
+  Yogesh/ Rutika                     519      1,300          0      1,300
+  Lakshmi Pathi                      219      1,200       -116      1,084
+  Ahmad shafi shaik                  619      1,000          0      1,000
+  Kalyan dagar                       619      1,000          0      1,000
+  Sachin                             623      6,750     -5,750      1,000
+  Veena.T                            623      6,750     -5,750      1,000
+  Bhavana                            114        870          0        870
+  Madhav                             114        870          0        870
+  Rafi                               316        780          0        780
+  Ajay Uppal                         415        720          0        720
+  Venkatesh                          321        567          0        567
+  Prasanth.P                         G15        500          0        500
+  Devi priya                         116        460          0        460
+  Rahul                              118        460          0        460
+  Thiruloshini                       116        460          0        460
+  Akash.M                            221        450          0        450
+  Prakashita                         620      5,583     -5,250        333
+  Abhishek Vishwakarma               121     21,250    -21,000        250
+  Saurav Mishra                      221        200          0        200
+  Ankit Kumar                        G13        100          0        100
+  Anudeep Bhist                      G14        100          0        100
+  Shubham Varma                      G13        100          0        100
+  Yogesh Bhist                       G14        100          0        100
+  Anush                              321         13          0         13
+  Chandrasekhar Rathod               G15        133     -2,000     -1,867
+  SHASHANK B V                       G18        133     -2,000     -1,867
+  Pranav Sonawane                    516        267     -3,000     -2,733
+  maharajan                          219        700     -7,000     -6,300
+  Swarup Ravindra  Futane            616      9,900    -16,500     -6,600
+  Prashanth                          316     11,900    -19,150     -7,250
+--------------------------------------------------------------------------------
+                               GRAND TOTAL                        1,155,674
+
+
+################################################################################
+##  THOR
+################################################################################
+
+============================================================================================================================================
+  THOR — APRIL 2026
+============================================================================================================================================
+Name                              Room     Rent        Due Basis                         UPI       Cash    Total    Balance  Status
+--------------------------------------------------------------------------------------------------------------------------------------------
+Abhinav                            409    1,200      1,200 full rent                       0          0        0      1,200  NO PAYMENT
+Abhinav Rastogi                    407   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Abhishek Anand                     302   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Abhishek Charan                    411   13,000     19,067 dep+prorated(14d)          13,000          0   13,000      6,067  BAL 6,067
+Abhishek S Rao                     111   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Abhishek Shebrao Palkar            501   25,000     25,000 full rent                  50,000          0   50,000    -25,000  CLEAR
+Adarsh Venugopal                   G01   26,000     26,000 full rent                  26,000          0   26,000          0  CLEAR
+Aditya                             609    1,000        867 dep+prorated(26d)               0          0        0        867  NO PAYMENT
+Adnan Doshi                        510   14,500     14,500 full rent                       0     14,500   14,500          0  CLEAR
+Ahana Dutta                        304   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Aishwarya                          601   26,000     26,000 full rent                  26,000          0   26,000          0  CLEAR
+Akarsh Sm                          102   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Akshayarathna A                    610   12,250     16,742 dep+prorated(26d)           6,125     12,250   18,375     -1,633  CLEAR
+Albin Varghese Sajan               609      900        270 dep+prorated(9d)                0          0        0        270  NO PAYMENT
+Aldrin P Thomas                    G07   10,000     20,000 dep+prorated(30d)          13,000          0   13,000      7,000  BAL 7,000
+Alma Siddique                      210   13,500     13,500 full rent                   5,000          0    5,000      8,500  BAL 8,500
+Amisha Mohta                       409   12,000     13,600 dep+prorated(19d)           2,000     13,000   15,000     -1,400  CLEAR
+Anand                              207   26,000     26,000 full rent                  26,000          0   26,000          0  CLEAR
+Anika Merin Thomas                 609      900        270 dep+prorated(9d)                0          0        0        270  NO PAYMENT
+Ankita Benarjee                    110   14,000     14,000 full rent                  14,000          0   14,000          0  CLEAR
+Anshit                             204   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Anshsinha                          301   26,000     26,000 full rent                       0          0        0     26,000  NO PAYMENT
+Anshsinha                          301   26,000     26,000 full rent                  26,000          0   26,000          0  CLEAR
+anubhav                            307    1,200        520 dep+prorated(13d)               0          0        0        520  NO PAYMENT
+Anukriti Dubey                     402   28,000     28,000 full rent                  28,000          0   28,000          0  CLEAR
+Anuron Dutta                       105   29,000     29,000 full rent                  29,000          0   29,000          0  CLEAR
+Anush Sharma                       206   16,000     16,000 full rent                   2,000          0    2,000     14,000  BAL 14,000
+Aparna Shahare                     G04   15,500     15,500 full rent                       0     15,500   15,500          0  CLEAR
+Aravind                            609   13,000     13,000 full rent                  13,868          0   13,868       -868  CLEAR
+Arjun Kaarthik                     507    1,200      1,000 dep+prorated(25d)               0          0        0      1,000  NO PAYMENT
+Arpit Mathur                       607   24,000     27,200 dep+prorated(19d)          18,000     18,000   36,000     -8,800  CLEAR
+Arun Reji                          506   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Ashish                             310   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Ashmit                             406   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Ashok Reddy                        309   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Avirneni Karthik                   510      700        700 full rent                       0          0        0        700  NO PAYMENT
+Baisali Das                        610   12,500     12,500 full rent                   2,000          0    2,000     10,500  BAL 10,500
+Bala subramanyam                   507        0          0 dep+prorated(23d)               0          0        0          0  N/A
+Bala Subramanyam                   104   15,500     15,500 full rent                       0     15,500   15,500          0  CLEAR
+Bijayananda                        510   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Bimal Pattanaik                    504   16,000     32,000 dep+prorated(30d)          30,000          0   30,000      2,000  BAL 2,000
+Chaitanya Phad                     G03   16,000     16,000 full rent                   8,000      8,000   16,000          0  CLEAR
+Chaitanya Prashant Talokar         407   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Chandru                            G09   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Charul Agarwal                     403   26,500     26,500 full rent                  53,000          0   53,000    -26,500  CLEAR
+Chidambaram                        401   26,000     26,000 full rent                  26,000          0   26,000          0  CLEAR
+Chinmay Pagey                      112   22,000     44,000 dep+prorated(30d)               0     41,000   41,000      3,000  BAL 3,000
+Christy Shawn Franco               205   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Deepak Deedar                      310   14,500     14,500 full rent                  14,000          0   14,000        500  BAL 500
+Devika                             508   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Didla Lochan                       G07   10,000     20,000 dep+prorated(30d)          13,000          0   13,000      7,000  BAL 7,000
+Dinesh                             308   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Diya Gupta                         307   12,000     14,000 dep+prorated(20d)          12,000      6,000   18,000     -4,000  CLEAR
+G.D.Abhishek                       612   26,000     36,500 dep+prorated(15d)          22,000     23,500   45,500     -9,000  CLEAR
+Ganesh Divekar                     603   28,000     28,000 full rent                  28,000          0   28,000          0  CLEAR
+Gunjan                             203   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Gunturu Sai Sri Anvitha            103   17,000     17,000 full rent                  17,000          0   17,000          0  CLEAR
+Harsh                              405   26,000     26,000 full rent                       0     27,700   27,700     -1,700  CLEAR
+Harshitha H                        103   14,500     15,667 dep+prorated(20d)           6,000     14,500   20,500     -4,833  CLEAR
+Ishraque Ahmed                     111   14,500     14,500 full rent                  29,000          0   29,000    -14,500  CLEAR
+Ivish                              507   12,000     14,000 dep+prorated(20d)           6,000     12,000   18,000     -4,000  CLEAR
+Jatin                              412   25,000     25,000 full rent                  25,000          0   25,000          0  CLEAR
+Jay Gandhi                         211   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Jay Mahajan                        507   12,000     14,000 dep+prorated(20d)           6,000     12,000   18,000     -4,000  CLEAR
+Jaya Prakash                       511   14,500     14,500 full rent                       0     14,500   14,500          0  CLEAR
+Jeewan Kant Oberoi                 305   28,000     28,000 full rent                  14,000     14,000   28,000          0  CLEAR
+Jigar Jit Singh                    303   15,000     15,000 full rent                  30,000          0   30,000    -15,000  CLEAR
+Joshua Sakthivel Raju              209   14,500     14,500 full rent                       0          0        0     14,500  NO PAYMENT
+Kamesh                             511   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Kiran                              110   13,500     13,500 full rent                       0     13,500   13,500          0  CLEAR
+Kosuri Anil                        407      750        750 full rent                       0          0        0        750  NO PAYMENT
+Krish Kumar                        512   25,000     25,000 full rent                  25,000          0   25,000          0  CLEAR
+Krishnan                           101   23,500     23,500 full rent                  23,500          0   23,500          0  CLEAR
+Krishnanshu                        211   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Kriti Bhatt                        404   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+LELIN DAS                          308   27,000     27,000 full rent                       0          0        0     27,000  NO PAYMENT
+Lucky Singh                        302   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Mahika Yerneni                     602   15,500     15,500 full rent                  15,000          0   15,000        500  BAL 500
+Mangesh Gosavi                     604      900        360 dep+prorated(12d)               0          0        0        360  NO PAYMENT
+Manideep                           109   14,500     14,500 full rent                  14,000          0   14,000        500  BAL 500
+Manoj                              109   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Mareeswaran J                      202   15,000     15,000 full rent                  30,000          0   30,000    -15,000  CLEAR
+Mathew Koshy                       304   28,000     28,000 full rent                       0          0        0     28,000  NO PAYMENT
+Megala                             408   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Mohit rana                         407    1,200      1,080 dep+prorated(27d)               0          0        0      1,080  NO PAYMENT
+Navdaap Gupta                      506   16,000     17,600 dep+prorated(3d)                0          0        0     17,600  NO PAYMENT
+Navdeep Gupta                      000   16,000     17,600 dep+prorated(3d)            2,000     31,600   33,600    -16,000  CLEAR
+Neha Pramod                        210   13,000     13,000 full rent                       0     13,000   13,000          0  CLEAR
+Nikhil                             G08   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Nithin krishna Ch                  202   15,500     16,017 dep+prorated(1d)            5,032          0    5,032     10,985  BAL 10,985
+Omkar Vijaykumar Tuppe             611   27,000     27,000 full rent                  27,000          0   27,000          0  CLEAR
+P.N.Charan                         510   12,500     12,500 full rent                       0          0        0     12,500  NO PAYMENT
+Parth Hanchate                     104   15,500     25,317 dep+prorated(19d)          23,324          0   23,324      1,993  BAL 1,993
+Prableen                           410   13,500     23,850 dep+prorated(23d)          23,955          0   23,955       -105  CLEAR
+Pranay Samariya                    G02   27,000     27,000 full rent                  27,000          0   27,000          0  CLEAR
+Prasanth Palande                   612    1,200      1,040 dep+prorated(26d)               0          0        0      1,040  NO PAYMENT
+Prashant                           102   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Prateek Singh Khutail              605   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Pratik                             509   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Praveen                            G08   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Preesha                            409   12,000     13,600 dep+prorated(19d)           2,000     13,000   15,000     -1,400  CLEAR
+Priyansh                           504   16,000     16,000 full rent                  32,000          0   32,000    -16,000  CLEAR
+Raghubir Singh                     202   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Rajdeep B                          G10   21,000     21,000 full rent                       0     21,000   21,000          0  CLEAR
+Rakshit Joshi                      208   24,000     28,000 dep+prorated(20d)          18,000     18,000   36,000     -8,000  CLEAR
+REDDY AJAY                         609    1,200        400 dep+prorated(10d)               0          0        0        400  NO PAYMENT
+Revant Godara                      G03   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Ronak Samriya                      203   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Rupali                             201   25,000     25,000 full rent                       0          0        0     25,000  NO PAYMENT
+Rupali Rout                        307      450        450 full rent                       0          0        0        450  NO PAYMENT
+Rutuparnna                         204   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Saksham Tapadia                    206   16,000     16,000 full rent                   2,000          0    2,000     14,000  BAL 14,000
+Sakshi                             404   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Samaptika                          502   15,500     15,500 full rent                  31,000          0   31,000    -15,500  CLEAR
+Sampriti Chowdary                  G04   15,000     15,000 full rent                       0     15,000   15,000          0  CLEAR
+Samruddhi Thanwar                  107   26,000     26,000 full rent                       0          0        0     26,000  NO PAYMENT
+Sanskar Bharadia                   605   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Santhini                           408   13,500     13,500 full rent                  13,500          0   13,500          0  CLEAR
+Santhosh                           609   13,000     13,000 full rent                  13,868          0   13,868       -868  CLEAR
+Sarang Swami                       604   28,000     28,000 full rent                  28,000          0   28,000          0  CLEAR
+sarathbabu                         407      900         60 dep+prorated(2d)                0          0        0         60  NO PAYMENT
+Saurabh Kumar                      303   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Saurabh Kumar Mahra                406   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Saurav Kalia                       505   27,000     27,000 full rent                  27,000          0   27,000          0  CLEAR
+Shilpa Hari Prakash                212   25,000     25,000 full rent                  22,500          0   22,500      2,500  BAL 2,500
+Shirin                             210   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Shivam Nath                        G07   10,000     20,000 dep+prorated(30d)          13,000          0   13,000      7,000  BAL 7,000
+Shiven Keshav                      608   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Shravya                            508   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Shubham Yadav                      209   14,500     14,500 full rent                       0          0        0     14,500  NO PAYMENT
+Shubhi Vishnoi                     304   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Sindhu Krishnamoorthy              410   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Sneha Ak                           503   28,000     28,000 full rent                       0     28,000   28,000          0  CLEAR
+Soham Das                          306   28,000     28,000 full rent                  56,000          0   56,000    -28,000  CLEAR
+Sonali                             307   12,000     14,000 dep+prorated(20d)          12,000      6,000   18,000     -4,000  CLEAR
+Sonali Rout                        307      450        450 full rent                       0          0        0        450  NO PAYMENT
+Soumya Agarwal                     206   27,000     27,000 full rent                  27,000          0   27,000          0  CLEAR
+Sparsh Gupta                       411   12,000     14,000 dep+prorated(20d)           8,000     10,000   18,000     -4,000  CLEAR
+Sumedha                            602   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Suraj Prasana                      106   29,000     29,000 full rent                  27,500          0   27,500      1,500  BAL 1,500
+Suraj SH                           511   24,000     24,000 full rent                   2,000          0    2,000     22,000  BAL 22,000
+Surya Shivani                      606   27,000     54,000 dep+prorated(30d)               0     49,000   49,000      5,000  BAL 5,000
+Syed Arfath                        307    1,000        800 dep+prorated(24d)               0          0        0        800  NO PAYMENT
+T.M.V S G  Pavan                   309   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Tarzen Chugh                       312   22,000     22,000 full rent                  22,000          0   22,000          0  CLEAR
+Tejas Hr                           506   15,000     15,000 full rent                       0     15,000   15,000          0  CLEAR
+Thirumurugan                       G08   10,000     10,000 full rent                       0     10,000   10,000          0  CLEAR
+Vaibhav Mani Tripathi              608   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Vasanth Rai                        205   16,000     16,000 full rent                  32,000          0   32,000    -16,000  CLEAR
+Vedant                             509   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Venkatesh                          308    1,000        133 dep+prorated(4d)                0          0        0        133  NO PAYMENT
+Venkatha Supramanian               311   27,000     27,000 full rent                       0     27,000   27,000          0  CLEAR
+Vinodhini                          502   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Vishnu                             G09   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Yogesh/ Rutika                     210      900         90 dep+prorated(3d)                0          0        0         90  NO PAYMENT
+
+  Total due: 2,550,700 | UPI: 1,828,672 | Cash: 615,050 | Collected: 2,443,722 | Outstanding: 106,978
+  106 cleared | 19 partial | 29 no payment
+
+============================================================================================================================================
+  THOR — MAY 2026
+============================================================================================================================================
+Name                              Room     Rent        Due Basis                         UPI       Cash    Total    Balance  Status
+--------------------------------------------------------------------------------------------------------------------------------------------
+Abhinav                            409    1,200          0 exited before May               0          0        0          0  N/A
+Abhinav Rastogi                    407   13,500     19,379 dep+prorated(29d)           2,000     18,250   20,250       -871  CLEAR
+Abhishek Anand                     302   15,500     15,500 full rent                       0          0        0     15,500  NO PAYMENT
+Abhishek Charan                    411   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Abhishek S Rao                     111   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Abhishek Shebrao Palkar            501   25,000     25,000 full rent                       0          0        0     25,000  NO PAYMENT
+Adarsh Venugopal                   G01   26,000     26,000 full rent                  13,000     13,000   26,000          0  CLEAR
+Aditya                             609    1,000          0 exited before May               0          0        0          0  N/A
+Adnan Doshi                        510   14,500          0 exited before May               0          0        0          0  N/A
+Ahana Dutta                        304   16,000          0 exited before May               0          0        0          0  N/A
+Aishwarya                          601   26,000     26,000 full rent                       0          0        0     26,000  NO PAYMENT
+Akarsh Sm                          102   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Akshayarathna A                    610   12,250     12,250 full rent                       0     12,250   12,250          0  CLEAR
+Albin Varghese Sajan               609      900          0 exited before May           2,600          0    2,600     -2,600  N/A
+Aldrin P Thomas                    G07   10,000     10,000 full rent                   5,000          0    5,000      5,000  BAL 5,000
+Alma Siddique                      210   13,500     26,565 dep+prorated(30d)           8,500     18,500   27,000       -435  CLEAR
+Amisha Mohta                       409   12,000     12,000 full rent                   7,500     15,000   22,500    -10,500  CLEAR
+Anand                              207   26,000     26,000 full rent                       0          0        0     26,000  NO PAYMENT
+Anika Merin Thomas                 609      900          0 exited before May               0          0        0          0  N/A
+Ankita Benarjee                    110   14,000     14,000 full rent                       0          0        0     14,000  NO PAYMENT
+Anshit                             204   16,000     16,000 full rent                       0          0        0     16,000  NO PAYMENT
+Anshsinha                          301   26,000          0 exited before May               0          0        0          0  N/A
+Anshsinha                          301   26,000     26,000 full rent                       0     23,600   23,600      2,400  BAL 2,400
+anubhav                            307    1,200          0 exited before May               0          0        0          0  N/A
+Anukriti Dubey                     402   28,000     28,000 full rent                  28,000          0   28,000          0  CLEAR
+Anuron Dutta                       105   29,000     29,000 full rent                  14,500          0   14,500     14,500  BAL 14,500
+Anush Sharma                       206   16,000     32,000 dep+prorated(31d)          16,000     16,000   32,000          0  CLEAR
+Aparna Shahare                     G04   15,500     15,500 full rent                   7,750          0    7,750      7,750  BAL 7,750
+Aravind                            609   13,000     26,000 dep+prorated(31d)               0     13,000   13,000     13,000  BAL 13,000
+Arjun Kaarthik                     507    1,200          0 exited before May               0          0        0          0  N/A
+Arpit Mathur                       607   24,000     24,000 full rent                   6,000     24,000   30,000     -6,000  CLEAR
+Arun Reji                          506   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Ashish                             310   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Ashmit                             406   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Ashok Reddy                        309   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Avirneni Karthik                   510      700        587 dep+prorated(26d)               0          0        0        587  NO PAYMENT
+Baisali Das                        610   12,500     25,000 dep+prorated(31d)          10,500     25,000   35,500    -10,500  CLEAR
+Bala subramanyam                   507        0          0 exited before May               0          0        0          0  N/A
+Bala Subramanyam                   104   15,500     15,500 full rent                       0          0        0     15,500  NO PAYMENT
+Bijayananda                        510   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Bimal Pattanaik                    504   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Chaitanya Phad                     G03   16,000     16,000 full rent                       0          0        0     16,000  NO PAYMENT
+Chaitanya Prashant Talokar         407   13,500     19,379 dep+prorated(29d)           2,000     18,250   20,250       -871  CLEAR
+Chandru                            G09   10,000     10,000 full rent                       0          0        0     10,000  NO PAYMENT
+Charul Agarwal                     403   26,500     26,500 full rent                       0     26,500   26,500          0  CLEAR
+Chidambaram                        401   26,000     26,000 full rent                       0     26,000   26,000          0  CLEAR
+Chinmay Pagey                      112   22,000     22,000 full rent                  12,500          0   12,500      9,500  BAL 9,500
+Christy Shawn Franco               205   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Deepak Deedar                      310   14,500     14,500 full rent                  14,500          0   14,500          0  CLEAR
+Devika                             508   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Didla Lochan                       G07   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Dinesh                             308   14,000          0 exited before May               0          0        0          0  N/A
+Diya Gupta                         307   12,000     12,000 full rent                   6,000     24,000   30,000    -18,000  CLEAR
+G.D.Abhishek                       612   26,000     26,000 full rent                       0     13,250   13,250     12,750  BAL 12,750
+Ganesh Divekar                     603   28,000     28,000 full rent                   8,000     20,000   28,000          0  CLEAR
+Gunjan                             203   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Gunturu Sai Sri Anvitha            103   17,000     17,000 full rent                  17,000          0   17,000          0  CLEAR
+Harsh                              405   26,000     26,000 full rent                       0     27,700   27,700     -1,700  CLEAR
+Harshitha H                        103   14,500     14,500 full rent                       0     14,500   14,500          0  CLEAR
+Ishraque Ahmed                     111   14,500     14,500 full rent                       0     14,500   14,500          0  CLEAR
+Ivish                              507   12,000     12,000 full rent                       0          0        0     12,000  NO PAYMENT
+Jatin                              412   25,000     25,000 full rent                       0          0        0     25,000  NO PAYMENT
+Jay Gandhi                         211   15,000     15,000 full rent                       0     14,500   14,500        500  BAL 500
+Jay Mahajan                        507   12,000     12,000 full rent                       0     12,000   12,000          0  CLEAR
+Jaya Prakash                       511   14,500          0 exited before May               0          0        0          0  N/A
+Jeewan Kant Oberoi                 305   28,000     28,000 full rent                  14,000          0   14,000     14,000  BAL 14,000
+Jigar Jit Singh                    303   15,000     15,000 full rent                       0          0        0     15,000  NO PAYMENT
+Joshua Sakthivel Raju              209   14,500     20,815 dep+prorated(29d)               0     19,750   19,750      1,065  BAL 1,065
+Kamesh                             511   13,000          0 exited before May               0          0        0          0  N/A
+Kiran                              110   13,500     13,500 full rent                       0     27,000   27,000    -13,500  CLEAR
+Kosuri Anil                        407      750          0 exited before May               0          0        0          0  N/A
+Krish Kumar                        512   25,000     25,000 full rent                  12,500          0   12,500     12,500  BAL 12,500
+Krishnan                           101   23,500     23,500 full rent                       0     23,500   23,500          0  CLEAR
+Krishnanshu                        211   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Kriti Bhatt                        404   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+LELIN DAS                          308   27,000     54,000 dep+prorated(31d)               0     27,000   27,000     27,000  BAL 27,000
+Lucky Singh                        302   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Mahika Yerneni                     602   15,500     15,500 full rent                  15,000          0   15,000        500  BAL 500
+Mangesh Gosavi                     604      900          0 exited before May             400          0      400       -400  N/A
+Manideep                           109   14,500     14,500 full rent                       0     14,500   14,500          0  CLEAR
+Manoj                              109   13,000     13,000 full rent                  13,000          0   13,000          0  CLEAR
+Mareeswaran J                      202   15,000     15,000 full rent                       0          0        0     15,000  NO PAYMENT
+Mathew Koshy                       304   28,000     54,194 dep+prorated(29d)           2,000     54,000   56,000     -1,806  CLEAR
+Megala                             408   14,500     14,500 full rent                       0          0        0     14,500  NO PAYMENT
+Mohit rana                         407    1,200          0 exited before May           8,400          0    8,400     -8,400  N/A
+Navdaap Gupta                      506   16,000     16,000 full rent                   2,000          0    2,000     14,000  BAL 14,000
+Navdeep Gupta                      000   16,000     16,000 full rent                   2,000          0    2,000     14,000  BAL 14,000
+Neha Pramod                        210   13,000          0 exited before May               0          0        0          0  N/A
+Nikhil                             G08   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Nithin krishna Ch                  202   15,500     15,500 full rent                   2,516     29,000   31,516    -16,016  CLEAR
+Omkar Vijaykumar Tuppe             611   27,000     27,000 full rent                   7,000     20,000   27,000          0  CLEAR
+P.N.Charan                         510   12,500     10,887 dep+prorated(27d)           5,000      2,000    7,000      3,887  BAL 3,887
+Parth Hanchate                     104   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Prableen                           410   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Pranay Samariya                    G02   27,000     27,000 full rent                  13,500          0   13,500     13,500  BAL 13,500
+Prasanth Palande                   612    1,200          0 exited before May               0          0        0          0  N/A
+Prashant                           102   15,000     15,000 full rent                       0     15,000   15,000          0  CLEAR
+Prateek Singh Khutail              605   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Pratik                             509   14,000     14,000 full rent                       0     14,000   14,000          0  CLEAR
+Praveen                            G08   10,000     10,000 full rent                  10,000          0   10,000          0  CLEAR
+Preesha                            409   12,000     12,000 full rent                       0     15,000   15,000     -3,000  CLEAR
+Priyansh                           504   16,000     16,000 full rent                       0          0        0     16,000  NO PAYMENT
+Raghubir Singh                     202   15,000          0 exited before May               0          0        0          0  N/A
+Rajdeep B                          G10   21,000     21,000 full rent                       0     21,000   21,000          0  CLEAR
+Rakshit Joshi                      208   24,000     24,000 full rent                  16,000     28,000   44,000    -20,000  CLEAR
+REDDY AJAY                         609    1,200          0 exited before May           1,200          0    1,200     -1,200  N/A
+Revant Godara                      G03   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Ronak Samriya                      203   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Rupali                             201   25,000     25,000 full rent                       0     20,000   20,000      5,000  BAL 5,000
+Rupali Rout                        307      450          0 exited before May           5,000          0    5,000     -5,000  N/A
+Rutuparnna                         204   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Saksham Tapadia                    206   16,000     32,000 dep+prorated(31d)           4,000     32,000   36,000     -4,000  CLEAR
+Sakshi                             404   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Samaptika                          502   15,500     15,500 full rent                       0          0        0     15,500  NO PAYMENT
+Sampriti Chowdary                  G04   15,000     15,000 full rent                       0          0        0     15,000  NO PAYMENT
+Samruddhi Thanwar                  107   26,000     46,129 dep+prorated(24d)               0          0        0     46,129  NO PAYMENT
+Sanskar Bharadia                   605   16,000     16,000 full rent                  16,000          0   16,000          0  CLEAR
+Santhini                           408   13,500     13,500 full rent                       0          0        0     13,500  NO PAYMENT
+Santhosh                           609   13,000     26,000 dep+prorated(31d)               0     13,000   13,000     13,000  BAL 13,000
+Sarang Swami                       604   28,000     28,000 full rent                       0          0        0     28,000  NO PAYMENT
+sarathbabu                         407      900          0 exited before May               0          0        0          0  N/A
+Saurabh Kumar                      303   15,500     15,500 full rent                  15,500          0   15,500          0  CLEAR
+Saurabh Kumar Mahra                406   15,500     15,500 full rent                       0          0        0     15,500  NO PAYMENT
+Saurav Kalia                       505   27,000     27,000 full rent                  14,000          0   14,000     13,000  BAL 13,000
+Shilpa Hari Prakash                212   25,000     25,000 full rent                  12,500          0   12,500     12,500  BAL 12,500
+Shirin                             210   14,500     14,500 full rent                   7,250          0    7,250      7,250  BAL 7,250
+Shivam Nath                        G07   10,000     10,000 full rent                       0     15,000   15,000     -5,000  CLEAR
+Shiven Keshav                      608   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Shravya                            508   15,000     15,000 full rent                  15,000          0   15,000          0  CLEAR
+Shubham Yadav                      209   14,500     20,815 dep+prorated(29d)           4,000     19,750   23,750     -2,935  CLEAR
+Shubhi Vishnoi                     304   15,500          0 exited before May               0          0        0          0  N/A
+Sindhu Krishnamoorthy              410   13,000     13,000 full rent                       0          0        0     13,000  NO PAYMENT
+Sneha Ak                           503   28,000     28,000 full rent                       0     28,000   28,000          0  CLEAR
+Soham Das                          306   28,000     28,000 full rent                       0          0        0     28,000  NO PAYMENT
+Sonali                             307   12,000     12,000 full rent                   6,000     12,000   18,000     -6,000  CLEAR
+Sonali Rout                        307      450          0 exited before May               0          0        0          0  N/A
+Soumya Agarwal                     206   27,000          0 exited before May               0          0        0          0  N/A
+Sparsh Gupta                       411   12,000     12,000 full rent                   6,000      6,000   12,000          0  CLEAR
+Sumedha                            602   16,000     16,000 full rent                       0          0        0     16,000  NO PAYMENT
+Suraj Prasana                      106   29,000     29,000 full rent                  30,500          0   30,500     -1,500  CLEAR
+Suraj SH                           511   24,000     31,355 dep+prorated(25d)               0     12,500   12,500     18,855  BAL 18,855
+Surya Shivani                      606   27,000     27,000 full rent                       0     27,000   27,000          0  CLEAR
+Syed Arfath                        307    1,000          0 exited before May               0          0        0          0  N/A
+T.M.V S G  Pavan                   309   14,000          0 exited before May               0          0        0          0  N/A
+Tarzen Chugh                       312   22,000     22,000 full rent                       0     22,000   22,000          0  CLEAR
+Tejas Hr                           506   15,000     15,000 full rent                       0          0        0     15,000  NO PAYMENT
+Thirumurugan                       G08   10,000     10,000 full rent                       0          0        0     10,000  NO PAYMENT
+Vaibhav Mani Tripathi              608   15,000     15,000 full rent                       0          0        0     15,000  NO PAYMENT
+Vasanth Rai                        205   16,000     16,000 full rent                       0          0        0     16,000  NO PAYMENT
+Vedant                             509   14,000     14,000 full rent                       0          0        0     14,000  NO PAYMENT
+Venkatesh                          308    1,000          0 exited before May               0          0        0          0  N/A
+Venkatha Supramanian               311   27,000     27,000 full rent                       0     27,000   27,000          0  CLEAR
+Vinodhini                          502   15,500     15,500 full rent                       0          0        0     15,500  NO PAYMENT
+Vishnu                             G09   10,000     10,000 full rent                       0          0        0     10,000  NO PAYMENT
+Yogesh/ Rutika                     210      900        900 full rent                       0          0        0        900  NO PAYMENT
+
+  Total due: 2,384,755 | UPI: 766,116 | Cash: 947,800 | Collected: 1,713,916 | Outstanding: 670,839
+  69 cleared | 23 partial | 35 no payment
+
+================================================================================
+  THOR — COMBINED OUTSTANDING (April + May)
+================================================================================
+  Name                              Room    Apr Bal    May Bal      Total
+--------------------------------------------------------------------------------
+  Samruddhi Thanwar                  107     26,000     46,129     72,129
+  LELIN DAS                          308     27,000     27,000     54,000
+  Suraj SH                           511     22,000     18,855     40,855
+  Navdaap Gupta                      506     17,600     14,000     31,600
+  Rupali                             201     25,000      5,000     30,000
+  Sarang Swami                       604          0     28,000     28,000
+  Soham Das                          306    -28,000     28,000     28,000
+  Mathew Koshy                       304     28,000     -1,806     26,194
+  Aishwarya                          601          0     26,000     26,000
+  Anand                              207          0     26,000     26,000
+  Anshsinha                          301     26,000          0     26,000
+  Abhishek Shebrao Palkar            501    -25,000     25,000     25,000
+  Jatin                              412          0     25,000     25,000
+  Abhishek Charan                    411      6,067     13,000     19,067
+  P.N.Charan                         510     12,500      3,887     16,387
+  Anshit                             204          0     16,000     16,000
+  Chaitanya Phad                     G03          0     16,000     16,000
+  Priyansh                           504    -16,000     16,000     16,000
+  Sumedha                            602          0     16,000     16,000
+  Vasanth Rai                        205    -16,000     16,000     16,000
+  Joshua Sakthivel Raju              209     14,500      1,065     15,565
+  Abhishek Anand                     302          0     15,500     15,500
+  Bala Subramanyam                   104          0     15,500     15,500
+  Samaptika                          502    -15,500     15,500     15,500
+  Saurabh Kumar Mahra                406          0     15,500     15,500
+  Vinodhini                          502          0     15,500     15,500
+  Jigar Jit Singh                    303    -15,000     15,000     15,000
+  Mareeswaran J                      202    -15,000     15,000     15,000
+  Sampriti Chowdary                  G04          0     15,000     15,000
+  Shilpa Hari Prakash                212      2,500     12,500     15,000
+  Tejas Hr                           506          0     15,000     15,000
+  Vaibhav Mani Tripathi              608          0     15,000     15,000
+  Anuron Dutta                       105          0     14,500     14,500
+  Megala                             408          0     14,500     14,500
+  Ankita Benarjee                    110          0     14,000     14,000
+  Anush Sharma                       206     14,000          0     14,000
+  Jeewan Kant Oberoi                 305          0     14,000     14,000
+  Navdeep Gupta                      000    -16,000     14,000     14,000
+  Vedant                             509          0     14,000     14,000
+  Prableen                           410       -105     13,500     13,500
+  Pranay Samariya                    G02          0     13,500     13,500
+  Santhini                           408          0     13,500     13,500
+  Aravind                            609       -868     13,000     13,000
+  Santhosh                           609       -868     13,000     13,000
+  Saurav Kalia                       505          0     13,000     13,000
+  Sindhu Krishnamoorthy              410          0     13,000     13,000
+  G.D.Abhishek                       612     -9,000     12,750     12,750
+  Abhinav Rastogi                    407     13,500       -871     12,629
+  Chaitanya Prashant Talokar         407     13,500       -871     12,629
+  Chinmay Pagey                      112      3,000      9,500     12,500
+  Krish Kumar                        512          0     12,500     12,500
+  Aldrin P Thomas                    G07      7,000      5,000     12,000
+  Ivish                              507     -4,000     12,000     12,000
+  Shubham Yadav                      209     14,500     -2,935     11,565
+  Chandru                            G09          0     10,000     10,000
+  Saksham Tapadia                    206     14,000     -4,000     10,000
+  Thirumurugan                       G08          0     10,000     10,000
+  Vishnu                             G09          0     10,000     10,000
+  Alma Siddique                      210      8,500       -435      8,065
+  Aparna Shahare                     G04          0      7,750      7,750
+  Shirin                             210          0      7,250      7,250
+  Didla Lochan                       G07      7,000          0      7,000
+  Surya Shivani                      606      5,000          0      5,000
+  Anshsinha                          301          0      2,400      2,400
+  Bimal Pattanaik                    504      2,000          0      2,000
+  Shivam Nath                        G07      7,000     -5,000      2,000
+  Parth Hanchate                     104      1,993          0      1,993
+  Avirneni Karthik                   510        700        587      1,287
+  Abhinav                            409      1,200          0      1,200
+  Prasanth Palande                   612      1,040          0      1,040
+  Arjun Kaarthik                     507      1,000          0      1,000
+  Mahika Yerneni                     602        500        500      1,000
+  Yogesh/ Rutika                     210         90        900        990
+  Aditya                             609        867          0        867
+  Syed Arfath                        307        800          0        800
+  Kosuri Anil                        407        750          0        750
+  anubhav                            307        520          0        520
+  Deepak Deedar                      310        500          0        500
+  Jay Gandhi                         211          0        500        500
+  Manideep                           109        500          0        500
+  Sonali Rout                        307        450          0        450
+  Anika Merin Thomas                 609        270          0        270
+  Venkatesh                          308        133          0        133
+  sarathbabu                         407         60          0         60
+  Baisali Das                        610     10,500    -10,500          0
+  Suraj Prasana                      106      1,500     -1,500          0
+  Mangesh Gosavi                     604        360       -400        -40
+  REDDY AJAY                         609        400     -1,200       -800
+  Albin Varghese Sajan               609        270     -2,600     -2,330
+  Rupali Rout                        307        450     -5,000     -4,550
+  Nithin krishna Ch                  202     10,985    -16,016     -5,031
+  Mohit rana                         407      1,080     -8,400     -7,320
+--------------------------------------------------------------------------------
+                               GRAND TOTAL                        1,102,624

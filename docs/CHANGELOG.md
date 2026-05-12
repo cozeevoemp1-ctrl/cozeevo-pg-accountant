@@ -2,6 +2,13 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.46] — 2026-05-12 — Other expenses export + session close
+
+### Analysis scripts (one-off, not deployed)
+- **`scripts/_export_other_expenses.py`** — exports 77 unclassified bank expense rows + 6 Volipi rows to `data/reports/other_expenses_classify.xlsx` for Kiran to manually categorize. Groups by payee UPI ID with colour-coded amounts.
+- **`scripts/_output_apr_may.txt`** — Apr/May tenant dues analysis output (329 tenants, HULK + THOR).
+- **VPS deployed** — bank dedup fix (`8277e7d`) now live on production.
+
 ## [1.75.45] — 2026-05-12 — Bank dedup fix + P&L off-record expense integration
 
 ### Bank deduplication (permanent fix)
