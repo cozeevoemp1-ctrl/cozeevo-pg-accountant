@@ -50,11 +50,12 @@ CAPITAL_CONTRIBUTIONS = {
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
     #      Cash  — fire extinguisher ₹1,700, curtains ₹970, HP cylinders ₹6,616, kitchen porter ₹500, cooker lock ₹80, stickers ₹1,020
     #      Cash  — Unisol CCTV system ₹1,00,000, BBMP garbage fine ₹6,000
+    #      Cash  — PG marketing 3rd payment ₹7,500 + marketing ₹7,500 = ₹15,000 (2026-05-12 added)
     # Jan: PhonePe — BBMP fine ₹6K, SN Shop first-aid ₹2,250, ninjacart ₹5,965, Dhanalakshmi hardware ₹450, Shrinivas IT ₹500, ADARSH E V porter ₹760, KAIZEN Engineering ₹30, RADHAKRISHNAN E ₹700 (Other Expense)
     #      Cash  — WorkIndia sub ₹2,773 (Dec charge/Jan sub), plants porter ₹857, 3 wifi recharges ₹3,000, 2 gas cylinders ₹8,000, ₹200 lost, invertor return ₹560
     # Feb: PhonePe — Zepto ₹654
     # Ignored (personal): 9444448314 Dec ₹5,000 + Apr ₹5,000
-    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 136517, 32045, 654, 0, 0],
+    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 151517, 32045, 654, 0, 0],
 }
 
 OPEX = {
@@ -72,7 +73,7 @@ OPEX = {
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
     "Shopping & Supplies":                                        [0, 2730, 35548,  12153,   6127,    6184,    9858],  # Dec +1020 stickers cash; Dec D-Mart ₹23998 (tpasha638) reclassified from Other
     "Operational Expenses":                                       [0, 318, 121970,  18388,   5815,   34950,  146594],  # Dec +1713 cash. Updated 2026-05-12 (volipi, PERSONAL_SBI, Chandra advances, mobile recharges from Other)
-    "Marketing":                                                  [0, 0, 66273,     35595,   7620,   27700,       0],  # Dec +17773 cash. Jan: ₹17700 reclassified from Other (prev session). Feb: Saurav flyers ₹4000
+    "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,       0],  # Dec +17773 cash + 15000 Kiran personal (PG marketing 3rd ₹7500 + marketing ₹7500). Jan: ₹17700 reclassified from Other. Feb: Saurav flyers ₹4000
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     94073,   3000,    3000,    3000],  # Dec: 948 BBMP + 6000 garbage fine cash (74768 BESCOM moved to Electricity); Jan +6000 BBMP cash
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
     "Other Expenses":                                             [0, 15987, 2781,     700,     200,   32789,   38111],  # Nov +10669 Mr V AKIL (Kiran PhonePe); Jan +700 RADHAKRISHNAN E (Kiran PhonePe). Updated 2026-05-12
