@@ -1458,6 +1458,74 @@ async def run_cash_tables_2026_05_11(conn) -> None:
     print("  [ok] cash_expenses + cash_counts created")
 
 
+async def run_btxn_dedup_2026_05_12(conn: AsyncConnection) -> None:
+    """
+    One-time cleanup: deduplicate bank_transactions and fix the unique constraint.
+
+    Root cause: hash was computed from raw CSV description (shorter) but stored
+    description may differ (longer), causing duplicate inserts on re-upload or
+    when import_thor_to_db.py ran afterwards.
+
+    Fix:
+      1. Delete duplicate rows (keep oldest id per txn_date+amount+description+account_name)
+      2. Recompute unique_hash from stored description so hash = sha256 of stored content
+      3. Replace partial index (WHERE unique_hash IS NOT NULL) with full UNIQUE index
+      4. Add composite unique index on content as DB-level dedup guard (no hash dependency)
+    """
+    print("\n-- bank_transactions dedup + constraint fix (2026-05-12) --")
+
+    # 1. Delete duplicates — keep min(id) per logical unique row
+    result = await conn.execute(text("""
+        DELETE FROM bank_transactions
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM bank_transactions
+            GROUP BY txn_date, txn_type, amount, account_name, left(lower(trim(description)), 100)
+        )
+    """))
+    print(f"  Deleted duplicate rows: {result.rowcount}")
+
+    # 2. Recompute unique_hash from stored description for ALL rows
+    #    Formula: sha256(txn_date || '|' || left(lower(trim(description)),80) || '|' || round(amount,2))
+    result = await conn.execute(text("""
+        UPDATE bank_transactions
+        SET unique_hash = encode(
+            sha256(
+                (   txn_date::text
+                 || '|'
+                 || left(lower(trim(coalesce(description,''))), 80)
+                 || '|'
+                 || round(amount, 2)::text
+                )::bytea
+            ),
+            'hex'
+        )
+    """))
+    print(f"  Recomputed hashes for {result.rowcount} rows")
+
+    # 3. Drop partial index, create full unique index on unique_hash
+    await conn.execute(text("DROP INDEX IF EXISTS uq_btxn_hash"))
+    await conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_btxn_hash
+            ON bank_transactions (unique_hash)
+    """))
+    print("  Replaced partial uq_btxn_hash with full UNIQUE index")
+
+    # 4. Composite content-based unique guard (catches any code path, hash-independent)
+    await conn.execute(text("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_btxn_content
+            ON bank_transactions (
+                txn_date,
+                txn_type,
+                amount,
+                account_name,
+                left(lower(trim(coalesce(description,''))), 100)
+            )
+    """))
+    print("  Created uq_btxn_content composite index")
+    print("  [ok] bank_transactions dedup complete")
+
+
 async def run_upi_collection_table_2026_05_11(conn: AsyncConnection) -> None:
     await conn.execute(text("""
         CREATE TABLE IF NOT EXISTS upi_collection_entries (
@@ -1526,6 +1594,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_widen_changed_by_2026_04_29(conn)
             await run_cash_tables_2026_05_11(conn)
             await run_upi_collection_table_2026_05_11(conn)
+            await run_btxn_dedup_2026_05_12(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)

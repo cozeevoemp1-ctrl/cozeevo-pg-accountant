@@ -20,6 +20,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from sqlalchemy import extract, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -402,29 +403,36 @@ async def upload_bank_csv(
 
             new_count = 0
             for txn_date, desc, txn_type, amount in rows:
-                uhash = _make_hash(txn_date, amount, desc)
-                existing = await session.scalar(
-                    select(BankTransaction.id).where(BankTransaction.unique_hash == uhash)
-                )
-                if existing:
-                    total_dup += 1
-                    continue
+                # Normalise description FIRST, then hash — so stored value always
+                # matches the hash. This is the canonical dedup key.
+                norm_desc = (desc or "").strip()
+                uhash = _make_hash(txn_date, amount, norm_desc)
+                cat, sub = classify_txn(norm_desc, txn_type)
 
-                cat, sub = classify_txn(desc, txn_type)
-                txn = BankTransaction(
-                    upload_id=upload.id,
-                    txn_date=txn_date,
-                    description=desc,
-                    amount=amount,
-                    txn_type=txn_type,
-                    category=cat,
-                    sub_category=sub,
-                    unique_hash=uhash,
-                    account_name=account_name,
+                # DB-atomic insert: ON CONFLICT on both the hash index AND the
+                # composite content index (uq_btxn_content) → silently skip dups
+                stmt = (
+                    pg_insert(BankTransaction)
+                    .values(
+                        upload_id=upload.id,
+                        txn_date=txn_date,
+                        description=norm_desc,
+                        amount=amount,
+                        txn_type=txn_type,
+                        category=cat,
+                        sub_category=sub,
+                        unique_hash=uhash,
+                        account_name=account_name,
+                    )
+                    .on_conflict_do_nothing(index_elements=["unique_hash"])
+                    .returning(BankTransaction.id)
                 )
-                session.add(txn)
-                months_affected.add(txn_date.strftime("%Y-%m"))
-                new_count += 1
+                inserted_id = await session.scalar(stmt)
+                if inserted_id:
+                    months_affected.add(txn_date.strftime("%Y-%m"))
+                    new_count += 1
+                else:
+                    total_dup += 1
 
             upload.new_count = new_count
             total_new += new_count
