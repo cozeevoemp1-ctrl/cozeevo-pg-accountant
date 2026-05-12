@@ -49,13 +49,13 @@ CAPITAL_CONTRIBUTIONS = {
     # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD, Mr V AKIL ₹10,669 (Other Expense)
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
     #      Cash  — fire extinguisher ₹1,700, curtains ₹970, HP cylinders ₹6,616, kitchen porter ₹500, cooker lock ₹80, stickers ₹1,020
-    #      Cash  — Unisol CCTV system ₹1,00,000, BBMP garbage fine ₹6,000
-    #      Cash  — PG marketing 3rd payment ₹7,500 + marketing ₹7,500 = ₹15,000 (2026-05-12 added)
+    #      Cash  — BBMP garbage fine ₹6,000, PG marketing 3rd payment ₹7,500 + marketing ₹7,500
+    #      NOTE: Unisol CCTV ₹1,00,000 tracked in CAPEX only — not duplicated here
     # Jan: PhonePe — BBMP fine ₹6K, SN Shop first-aid ₹2,250, ninjacart ₹5,965, Dhanalakshmi hardware ₹450, Shrinivas IT ₹500, ADARSH E V porter ₹760, KAIZEN Engineering ₹30, RADHAKRISHNAN E ₹700 (Other Expense)
     #      Cash  — WorkIndia sub ₹2,773 (Dec charge/Jan sub), plants porter ₹857, 3 wifi recharges ₹3,000, 2 gas cylinders ₹8,000, ₹200 lost, invertor return ₹560
     # Feb: PhonePe — Zepto ₹654
     # Ignored (personal): 9444448314 Dec ₹5,000 + Apr ₹5,000
-    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 151517, 32045, 654, 0, 0],
+    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 51517, 32045, 654, 0, 0],
 }
 
 OPEX = {
