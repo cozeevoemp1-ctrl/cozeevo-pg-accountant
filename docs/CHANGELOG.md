@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.51] — 2026-05-12 — Security deposit / maintenance fee split fix
+
+### pnl_builder.py — critical deduction fix
+- **Bug:** DEPOSITS "Security Deposits" array (₹33,83,875) included maintenance fees (₹10,68,700)
+  — we were wrongly deducting non-refundable maintenance from True Rent Revenue
+- **Fix:** Split into pure refundable security = ₹23,15,175 (deducted) + maintenance ₹10,68,700 (kept in revenue)
+- **Impact on True Rent Revenue:** +₹10,68,700 higher (maintenance no longer wrongly removed)
+- **Impact on Cash Position liability:** ₹33,83,875 → ₹23,15,175 (we owe back less)
+- **True free cash:** −₹11,95,071 → **−₹1,26,371** (bank nearly covers deposit obligations)
+- **Excel regenerated** → `data/reports/PnL_Accrual_2026_05_12.xlsx`
+
+### Memory / SOP updated
+- `sop_pnl.md` — Step 1 True Revenue rule, Step 5 Deposits Held, Step 7 Cash Position all corrected
+- `project_pending_tasks.md` — P&L open items updated
+
 ## [1.75.50] — 2026-05-12 — Kiran Capital Contributions finalised + P&L regenerated
 
 ### pnl_builder.py — Kiran advance row finalised: ₹1,23,217 total
