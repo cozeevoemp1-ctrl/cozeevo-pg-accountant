@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.49] — 2026-05-12 — P&L methodology corrections + capital contributions overhaul
+
+### pnl_builder.py — verified figures updated
+- **Chandra March collection reclassified** — ₹1,60,600 moved from Cash income to THOR NEFT (bank, not physical cash)
+- **Property rent split into 2 lines** — Cash paid + Bank UPI/RTGS paid (confirmed by Kiran):
+  - Feb: ₹15,32,000 cash + ₹6,00,000 RTGS = ₹21,32,000 ✓
+  - Mar: ₹12,90,000 cash + ₹6,05,140 RTGS = ₹18,95,140 (was ₹21,32,000 accrual — changes net by ₹2.37L)
+  - Apr: ₹14,49,100 cash + ₹6,00,000 RTGS = ₹20,49,100 ✓
+- **Capital Contributions expanded** — now 3 people: Lakshmi ₹1.43L (existing) + Chandra ₹0.71L (Mar/Apr ops cash, TBD confirm) + Kiran ~₹1.1L (TBD monthly split)
+- **Loan Repayment renamed → Cash Exchange Repayments** — moved to EXCLUDED (not OPEX). These are bank RTGS repayments for cash received and already spent (double-counting if in OPEX). Explanation added in EXCLUDED section.
+- **Security deposit deduction restored** — "Less: Security Deposits" + "True Rent Revenue" rows back in income section; EBITDA now on True Revenue (was inadvertently removed last session)
+- **Dec Electricity confirmed** — ₹74,768 BESCOM via partner UPI (was in Govt/Regulatory before)
+- **P&L regenerated** → `data/reports/PnL_Accrual_2026_05_03.xlsx`
+
+### Final P&L (with March rent at ₹18.95L)
+| | True Revenue | OPEX | EBITDA | CAPEX | Net |
+|--|--|--|--|--|--|
+| Oct–Apr total | ₹122.7L | ₹102.8L | ₹19.9L | ₹18.9L | **₹1.0L** |
+- ⚠️ March rent PENDING Kiran review — if ₹21.32L (standard), net = **−₹1.35L**
+
+### NOT YET deployed — pnl_builder.py local only
+- All 4 surfaces (live Excel API, JSON API, PWA cards) still show old figures
+- Deploy after Kiran confirms March rent figure
+
 ## [1.75.48] — 2026-05-12 — THOR outstanding analysis + UPI auto-reconciliation build
 
 ### THOR Outstanding May 2026 analysis
