@@ -11,11 +11,9 @@ See memory/sop_pnl.md for full methodology.
 from __future__ import annotations
 
 import io
-from typing import Optional
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
 from src.utils.inr_format import INR_NUMBER_FORMAT
 
@@ -37,8 +35,9 @@ INCOME = {
 }
 
 CAPITAL_CONTRIBUTIONS = {
-    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000, 0,     0,     0,     0,   0,    0],
-    "Kiran top-up transfer (Jan 2026)":                   [     0, 0,     0, 90000,     0,   0,    0],
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000,      0, 0,     0,     0,   0,    0],
+    "Owner startup — repaid via NEFT Nov (₹50K + ₹4.5L to Bharathi)": [0, -500000, 0, 0, 0, 0, 0],
+    "Kiran top-up transfer (Jan 2026)":                   [     0,      0, 0, 90000,     0,   0,    0],
     # Partner personal advances (reimbursable — company owes Lakshmi this back)
     # Dec: ₹74,768 BESCOM via partner UPI 7358341775-2@ybl (moved to Electricity expense)
     # Jan–Apr: personal SBI 0167 payments matching OPEX Partner Reimbursable line
@@ -46,15 +45,20 @@ CAPITAL_CONTRIBUTIONS = {
     # Chandra personal cash for PG operations — "Other Expenses" cash residual (untracked ops spend)
     # ⚠ TBD — confirm with Chandra that these are his personal cash advances (not already paid by company)
     "Chandra advance — operational cash (TBD confirm)":             [0,     0,      0,     0,     0, 32789, 38111],
-    # Kiran PhonePe/cash for PG ops — already in OPEX above; shown here as equity injection (company owes Kiran)
-    # Breakdown by category: Staff ₹33,100 | Maint ₹23,350 | Marketing ₹17,773 | Govt ₹12,000 | Food ₹8,811
-    #   Fuel ₹8,870 | Internet ₹3,000 | Operational ₹1,713 | Shopping ₹1,020 | IT ₹500 | Cleaning ₹760 = ₹1,10,897
-    # ⚠ TBD — provide month-by-month breakdown to fill this row correctly
-    "Kiran advance — PhonePe/cash for PG ops (⚠ TBD monthly split)": [0, 0, 0, 0, 0, 0, 0],
+    # Kiran PhonePe/cash for PG ops — company owes Kiran back (equity injection)
+    # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD
+    # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
+    #      Cash  — fire extinguisher ₹1,700, curtains ₹970, HP cylinders ₹6,616, kitchen porter ₹500, cooker lock ₹80, stickers ₹1,020
+    #      Cash  — Unisol CCTV system ₹1,00,000 (2026-05-12 added), BBMP garbage fine ₹6,000 (2026-05-12 added)
+    # Jan: PhonePe — BBMP fine ₹6K, SN Shop first-aid ₹2,250, ninjacart ₹5,965, Dhanalakshmi hardware ₹450, Shrinivas IT ₹500, ADARSH E V porter ₹760, KAIZEN Engineering ₹30 (2026-05-12 added)
+    #      Cash  — WorkIndia sub ₹2,773 (Dec charge/Jan sub), plants porter ₹857, 3 wifi recharges ₹3,000, 2 gas cylinders ₹8,000, ₹200 lost, invertor return ₹560 (2026-05-12 added)
+    # Feb: PhonePe — Zepto ₹654
+    # ⚠ Unconfirmed (Kiran to confirm): Nov Mr V AKIL ₹10,669; Dec 9444448314 ₹5,000; Jan RADHAKRISHNAN E ₹700; Apr 9444448314 ₹5,000
+    "Kiran advance — PhonePe/cash for PG ops": [0, 28332, 136517, 31345, 654, 0, 0],
 }
 
 OPEX = {
-    "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 1532000, 1290000, 1449100],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
+    "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 1532000, 1290000, 1449100],  # Feb+Apr Kiran confirmed; Mar corrected to 12,90,000 (Kiran 2026-05-12)
     "Property Rent — Bank UPI/RTGS paid":                                  [0, 0, 0, 0,  600000,  605140,  600000],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
     "Electricity":                                                [0, 0, 74768,   131554,  134538,   96617,  140659],  # Dec: BESCOM via BBPSBP@ybl (was misclassified as BBMP Tax)
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
@@ -89,9 +93,10 @@ EXCLUDED = {
     # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
     "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12
     # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
-    # Nov: Bharathi Prabhakaran ₹5L. Feb: Sri Lakshmi Chandrasekar ₹6L. Mar: YESMIDAS + Sravani + Sri Lakshmi etc. ₹20.9L. Apr: ₹22K misc.
+    # Feb: Sri Lakshmi Chandrasekar ₹6L. Mar: YESMIDAS + Sravani + Sri Lakshmi etc. ₹20.9L. Apr: ₹22K misc.
+    # Nov ₹5L REMOVED — that was the startup capital repayment (shown in Capital Contributions above), not a cash exchange.
     # NOT an operating cost — the cash was already spent and counted in OPEX categories above.
-    "Cash Exchange Repayments via Bank (non-op)": [0, 500000,     0,      0,  600000, 2090000,  22357],
+    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 2090000,  22357],
 }
 
 # ── Deposit flows — queried from tenancies (security_deposit + maintenance_fee by check-in month)
@@ -104,7 +109,7 @@ DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638]  # Mar
 # Maintenance fees  = all non-no-show tenants (non-refundable, retained), by check-in month
 # Source: DB query 2026-05-06
 DEPOSITS = {
-    "Security Deposits — refundable (must return to active tenants)": [0, 193000, 386500, 633500, 498000, 812250, 798125],
+    "Security Deposits — refundable (must return to active tenants)": [0, 193000, 386500, 633500, 498000, 812250, 860625],  # Apr updated: +62500 to match Kiran's confirmed total ₹33,83,875 (was ₹33,21,375)
     "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000],
 }
 
@@ -129,96 +134,115 @@ def build_pnl_workbook() -> openpyxl.Workbook:
 
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = "P&L Summary"
 
-    header = [""] + MONTHS + ["TOTAL"]
+    # Op column (B) shows +/−/= for each row so the P&L flow is unambiguous
+    header = ["", "Op"] + MONTHS + ["TOTAL"]
     ws.append(header)
     for c in ws[1]:
         c.fill = hdr_fill; c.font = hdr_font; c.alignment = ctr
 
     # 1. INCOME
-    ws.append(["INCOME"])
+    ws.append(["INCOME", ""])
     ws[ws.max_row][0].font = bold
     for label, row in INCOME.items():
-        ws.append([label] + row + [sum(row)])
+        sign = "−" if "transferred to HULK" in label else "+"
+        ws.append([label, sign] + row + [sum(row)])
     rev_row = [sum(col) for col in zip(*INCOME.values())]
-    ws.append(["Total Gross Inflows"] + rev_row + [sum(rev_row)])
+    ws.append(["Total Gross Inflows", "="] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
 
-    # Deduct refundable security deposits — liability, not revenue
+    # Deduct 1: active tenant deposits — liability, still owe back at exit
     sec_dep_collected = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
+    maint_fee_collected = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
     sec_dep_neg = [-v for v in sec_dep_collected]
-    ws.append(["  Less: Security Deposits Received (refundable — must return at exit)"]
+    ws.append(["  Less: Security Deposits held (active tenants — must return at exit)", "−"]
               + sec_dep_neg + [sum(sec_dep_neg)])
     ws[ws.max_row][0].font = Font(italic=True)
 
-    true_rev_row = [r + s for r, s in zip(rev_row, sec_dep_neg)]
-    ws.append(["True Rent Revenue (excl. refundable deposits)"] + true_rev_row + [sum(true_rev_row)])
+    # Informational sub-row: maintenance fee retained alongside security deposit (not deducted — it's income)
+    ws.append(["     └ Maintenance Fee retained from same tenants (non-refundable — yours to keep)", "(kept)"]
+              + list(maint_fee_collected) + [sum(maint_fee_collected)])
+    ws[ws.max_row][0].font = Font(italic=True, color="375623")
+    for c in ws[ws.max_row][1:]:
+        if isinstance(c.value, (int, float)):
+            c.font = Font(italic=True, color="375623")
+
+    # Deduct 2: deposits already refunded to exited tenants — collected but paid back (pass-through)
+    dep_refunded = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
+    dep_refunded_neg = [-v for v in dep_refunded]
+    ws.append(["  Less: Deposits Refunded to Exited Tenants (already paid back)", "−"]
+              + dep_refunded_neg + [sum(dep_refunded_neg)])
+    ws[ws.max_row][0].font = Font(italic=True)
+
+    true_rev_row = [r + s + d for r, s, d in zip(rev_row, sec_dep_neg, dep_refunded_neg)]
+    ws.append(["True Rent Revenue (excl. all deposit pass-throughs)", "="] + true_rev_row + [sum(true_rev_row)])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="375623")
     ws.append([])
 
     # 3. CAPITAL CONTRIBUTIONS
-    ws.append(["CAPITAL CONTRIBUTIONS (not P&L — owner's equity injections)"])
+    ws.append(["CAPITAL CONTRIBUTIONS (not P&L — owner's equity injections)", ""])
     ws[ws.max_row][0].font = bold
     for label, row in CAPITAL_CONTRIBUTIONS.items():
-        ws.append([label] + row + [sum(row)])
+        ws.append([label, "↑"] + row + [sum(row)])
     ws.append([])
 
     # 4. OPERATING EXPENSES
-    ws.append(["OPERATING EXPENSES (accrual)"])
+    ws.append(["OPERATING EXPENSES (accrual)", ""])
     ws[ws.max_row][0].font = bold
     for label, row in OPEX.items():
-        ws.append([label] + row + [sum(row)])
+        ws.append([label, "−"] + row + [sum(row)])
         if "TBD" in label or "⚠" in label:
             for c in ws[ws.max_row]:
                 c.fill = flag_fill
 
-    ws.append(["EXCLUDED FROM OPEX (balance sheet items — not costs)"])
+    ws.append(["EXCLUDED FROM OPEX (balance sheet items — not costs)", ""])
     ws[ws.max_row][0].font = Font(italic=True)
     for label, row in EXCLUDED.items():
-        ws.append(["  " + label] + row + [sum(row)])
+        ws.append(["  " + label, "(B/S)"] + row + [sum(row)])
 
     opex_row = [sum(col) for col in zip(*OPEX.values())]
-    ws.append(["Total Opex"] + opex_row + [sum(opex_row)])
+    ws.append(["Total Opex", "="] + opex_row + [sum(opex_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
     # 5. EBITDA / OPERATING PROFIT (true rent revenue − opex)
     op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
-    ws.append(["EBITDA / OPERATING PROFIT (on True Revenue)"] + op_profit_row + [sum(op_profit_row)])
+    ws.append(["EBITDA / OPERATING PROFIT (on True Revenue)", "="] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
     op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, true_rev_row)]
-    ws.append(["Operating Margin %"] + op_margin_row
+    ws.append(["Operating Margin %", ""] + op_margin_row
               + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
     # 6. CAPEX
-    ws.append(["CAPEX — ONE-TIME INVESTMENTS"])
+    ws.append(["CAPEX — ONE-TIME INVESTMENTS", ""])
     ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
     ws[ws.max_row][0].fill = capex_fill
     for ci in range(2, len(header) + 1):
         ws.cell(ws.max_row, ci).fill = capex_fill
     for label, row in CAPEX.items():
-        ws.append([label] + row + [sum(row)])
+        ws.append([label, "−"] + row + [sum(row)])
     capex_row = [sum(col) for col in zip(*CAPEX.values())]
-    ws.append(["Total CAPEX"] + capex_row + [sum(capex_row)])
+    ws.append(["Total CAPEX", "="] + capex_row + [sum(capex_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
     # 7. NET PROFIT AFTER CAPEX
     profit_row = [op - cx for op, cx in zip(op_profit_row, capex_row)]
-    ws.append(["NET PROFIT AFTER CAPEX"] + profit_row + [sum(profit_row)])
+    ws.append(["NET PROFIT AFTER CAPEX", "="] + profit_row + [sum(profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
     margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, true_rev_row)]
-    ws.append(["Net Margin %"] + margin_row
+    ws.append(["Net Margin %", ""] + margin_row
               + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
@@ -230,38 +254,39 @@ def build_pnl_workbook() -> openpyxl.Workbook:
 
     _cash_total = sum(CASH_IN_HAND.values())
 
-    ws.append(["CASH POSITION (Apr 30)"])
+    # Cash position rows show a single snapshot figure — placed in the Apr'26 column (position 8)
+    ws.append(["CASH POSITION (Apr 30)", ""])
     ws[ws.max_row][0].font = bold
-    ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
-    ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
-    ws.append(["Total bank balance", "", "", "", "", "", "", _bank_total])
+    ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
+    ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
+    ws.append(["Total bank balance", "", "", "", "", "", "", "", _bank_total])
     for c in ws[ws.max_row]:
         c.font = bold
     ws.append([])
-    ws.append(["Cash in hand (physical)"])
+    ws.append(["Cash in hand (physical)", ""])
     ws[ws.max_row][0].font = bold
     for name, amt in CASH_IN_HAND.items():
-        ws.append(["  " + name, "", "", "", "", "", "", amt])
-    ws.append(["Total cash in hand", "", "", "", "", "", "", _cash_total])
+        ws.append(["  " + name, "", "", "", "", "", "", "", amt])
+    ws.append(["Total cash in hand", "", "", "", "", "", "", "", _cash_total])
     for c in ws[ws.max_row]:
         c.font = bold
     ws.append([])
-    ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", _sec_collected])
+    ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", "", _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="9C0006")
     ws.append([])
-    ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", _bank_total - _sec_collected])
+    ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", "", _bank_total - _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
-    ws.append(["True free cash incl. cash in hand", "", "", "", "", "", "", _bank_total + _cash_total - _sec_collected])
+    ws.append(["True free cash incl. cash in hand", "", "", "", "", "", "", "", _bank_total + _cash_total - _sec_collected])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
-    ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)", "", "", "", "", "", "", ""])
-    ws.append(["As revenue grows, bank balance will recover and exceed deposit liability", "", "", "", "", "", "", ""])
+    ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)", "", "", "", "", "", "", "", ""])
+    ws.append(["As revenue grows, bank balance will recover and exceed deposit liability", "", "", "", "", "", "", "", ""])
     ws.append([])
 
     # 9. FLAGS
-    ws.append(["⚠ ITEMS NEEDING KIRAN REVIEW"])
+    ws.append(["⚠ ITEMS NEEDING KIRAN REVIEW", ""])
     ws[ws.max_row][0].font = Font(bold=True, color="FF0000")
     for f in [
         "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
@@ -270,9 +295,9 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         "4. Kiran advance ~Rs.1,10,897 total (Staff Rs.33K, Maint Rs.23K, Mktg Rs.18K, Govt Rs.12K, Food Rs.9K, Fuel Rs.9K, Internet Rs.3K, Operational Rs.2K, Shopping Rs.1K, IT Rs.500, Cleaning Rs.760). Provide month-by-month split to fill the Capital Contributions row.",
         "5. Cash Exchange Repayments (in EXCLUDED): Nov Rs.5L Bharathi, Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.20.9L (YESMIDAS+Sravani+Sri Lakshmi), Apr Rs.22K. Bank RTGS repaid to people who gave you cash for ops — underlying spending already in OPEX above.",
     ]:
-        ws.append([f])
+        ws.append([f, ""])
 
-    # Number format
+    # Number format — skip col A (i=0) and Op col B (strings are skipped automatically)
     for row in ws.iter_rows(min_row=2, max_col=len(header)):
         for i, cell in enumerate(row):
             if i == 0 or cell.value is None or isinstance(cell.value, str):
@@ -280,8 +305,14 @@ def build_pnl_workbook() -> openpyxl.Workbook:
             if isinstance(cell.value, (int, float)):
                 cell.number_format = INR_NUMBER_FORMAT
 
+    # Centre-align the Op column
+    for row in ws.iter_rows(min_row=1, min_col=2, max_col=2):
+        for cell in row:
+            cell.alignment = Alignment(horizontal="center")
+
     ws.column_dimensions["A"].width = 58
-    for col_letter in "BCDEFGHI":
+    ws.column_dimensions["B"].width = 6   # Op column
+    for col_letter in "CDEFGHIJ":
         ws.column_dimensions[col_letter].width = 14
 
     # Sheet 2: Sub-category detail from DB (dynamic — call build_pnl_workbook_with_subcats for this)

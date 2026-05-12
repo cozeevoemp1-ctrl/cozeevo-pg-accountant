@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.50] — 2026-05-12 — Kiran Capital Contributions verified + P&L regenerated
+
+### pnl_builder.py — Kiran advance row finalised
+- **Kiran advance total: ₹1,96,848** — PhonePe + cash for PG ops (company owes Kiran back)
+  - Nov ₹28,332 | Dec ₹1,36,517 | Jan ₹31,345 | Feb ₹654 | Mar ₹0 | Apr ₹0
+- **Dec additions:** Unisol CCTV system ₹1,00,000 (physical cash, Kiran paid) + BBMP garbage fine ₹6,000
+- **Jan additions:** ADARSH E V porter ₹760 + KAIZEN Engineering ₹30 + invertor return ₹560 (cash)
+- **Removed unused imports** — `Optional` + `get_column_letter` (not used in pnl_builder.py)
+- **Excel regenerated** → `data/reports/PnL_Accrual_2026_05_12.xlsx`
+- **PWA confirmed** — Capital Contributions not displayed in PWA cards (income/opex/profit only); no PWA change needed
+- **Excel API** — `/finance/pnl/excel` auto-picks up changes (calls `build_pnl_bytes()` from pnl_builder.py)
+
+### 4 unconfirmed transactions — Kiran to say yes/no
+- Nov: Mr V AKIL ₹10,669 | Dec: 9444448314 ₹5,000 | Jan: RADHAKRISHNAN E ₹700 | Apr: 9444448314 ₹5,000
+- If all confirmed PG → adds ₹22,369 to Capital Contributions (Nov+Dec+Jan+Apr)
+
 ## [1.75.49] — 2026-05-12 — P&L methodology corrections + capital contributions overhaul
 
 ### pnl_builder.py — verified figures updated
