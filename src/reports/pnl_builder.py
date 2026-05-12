@@ -46,15 +46,15 @@ CAPITAL_CONTRIBUTIONS = {
     # ⚠ TBD — confirm with Chandra that these are his personal cash advances (not already paid by company)
     "Chandra advance — operational cash (TBD confirm)":             [0,     0,      0,     0,     0, 32789, 38111],
     # Kiran PhonePe/cash for PG ops — company owes Kiran back (equity injection)
-    # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD
+    # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD, Mr V AKIL ₹10,669 (Other Expense)
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
     #      Cash  — fire extinguisher ₹1,700, curtains ₹970, HP cylinders ₹6,616, kitchen porter ₹500, cooker lock ₹80, stickers ₹1,020
-    #      Cash  — Unisol CCTV system ₹1,00,000 (2026-05-12 added), BBMP garbage fine ₹6,000 (2026-05-12 added)
-    # Jan: PhonePe — BBMP fine ₹6K, SN Shop first-aid ₹2,250, ninjacart ₹5,965, Dhanalakshmi hardware ₹450, Shrinivas IT ₹500, ADARSH E V porter ₹760, KAIZEN Engineering ₹30 (2026-05-12 added)
-    #      Cash  — WorkIndia sub ₹2,773 (Dec charge/Jan sub), plants porter ₹857, 3 wifi recharges ₹3,000, 2 gas cylinders ₹8,000, ₹200 lost, invertor return ₹560 (2026-05-12 added)
+    #      Cash  — Unisol CCTV system ₹1,00,000, BBMP garbage fine ₹6,000
+    # Jan: PhonePe — BBMP fine ₹6K, SN Shop first-aid ₹2,250, ninjacart ₹5,965, Dhanalakshmi hardware ₹450, Shrinivas IT ₹500, ADARSH E V porter ₹760, KAIZEN Engineering ₹30, RADHAKRISHNAN E ₹700 (Other Expense)
+    #      Cash  — WorkIndia sub ₹2,773 (Dec charge/Jan sub), plants porter ₹857, 3 wifi recharges ₹3,000, 2 gas cylinders ₹8,000, ₹200 lost, invertor return ₹560
     # Feb: PhonePe — Zepto ₹654
-    # ⚠ Unconfirmed (Kiran to confirm): Nov Mr V AKIL ₹10,669; Dec 9444448314 ₹5,000; Jan RADHAKRISHNAN E ₹700; Apr 9444448314 ₹5,000
-    "Kiran advance — PhonePe/cash for PG ops": [0, 28332, 136517, 31345, 654, 0, 0],
+    # Ignored (personal): 9444448314 Dec ₹5,000 + Apr ₹5,000
+    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 136517, 32045, 654, 0, 0],
 }
 
 OPEX = {
@@ -75,7 +75,7 @@ OPEX = {
     "Marketing":                                                  [0, 0, 66273,     35595,   7620,   27700,       0],  # Dec +17773 cash. Jan: ₹17700 reclassified from Other (prev session). Feb: Saurav flyers ₹4000
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     94073,   3000,    3000,    3000],  # Dec: 948 BBMP + 6000 garbage fine cash (74768 BESCOM moved to Electricity); Jan +6000 BBMP cash
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 5318, 2781,       0,     200,   32789,   38111],  # Residual: 1 unidentified bank row (Feb ₹200) + estimated cash ₹79K. Updated 2026-05-12
+    "Other Expenses":                                             [0, 15987, 2781,     700,     200,   32789,   38111],  # Nov +10669 Mr V AKIL (Kiran PhonePe); Jan +700 RADHAKRISHNAN E (Kiran PhonePe). Updated 2026-05-12
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
