@@ -2,21 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
-## [1.75.50] — 2026-05-12 — Kiran Capital Contributions verified + P&L regenerated
+## [1.75.50] — 2026-05-12 — Kiran Capital Contributions finalised + P&L regenerated
 
-### pnl_builder.py — Kiran advance row finalised
-- **Kiran advance total: ₹1,96,848** — PhonePe + cash for PG ops (company owes Kiran back)
-  - Nov ₹28,332 | Dec ₹1,36,517 | Jan ₹31,345 | Feb ₹654 | Mar ₹0 | Apr ₹0
-- **Dec additions:** Unisol CCTV system ₹1,00,000 (physical cash, Kiran paid) + BBMP garbage fine ₹6,000
-- **Jan additions:** ADARSH E V porter ₹760 + KAIZEN Engineering ₹30 + invertor return ₹560 (cash)
-- **Removed unused imports** — `Optional` + `get_column_letter` (not used in pnl_builder.py)
+### pnl_builder.py — Kiran advance row finalised: ₹1,23,217 total
+- **Final values:** `[0, 39001, 51517, 32045, 654, 0, 0]`
+  - Nov ₹39,001 — PhonePe vendors + Mr V AKIL ₹10,669 (Other Expense, confirmed PG)
+  - Dec ₹51,517 — PhonePe + cash: fire ext/curtains/gas/stickers/cooker lock + garbage fine ₹6K + marketing ₹15K (2×₹7,500 payments)
+  - Jan ₹32,045 — PhonePe first-aid/BBMP/ninjacart + wifi/gas cylinders/plants porter + RADHAKRISHNAN E ₹700 (Other Expense)
+  - Feb ₹654 — Zepto PhonePe
+- **Unisol CCTV ₹1,00,000** — tracked in CAPEX only; NOT duplicated in Kiran advance
+- **9444448314 (Dec ₹5K + Apr ₹5K)** — confirmed personal, ignored
+- **Marketing OPEX Dec:** ₹66,273 → ₹81,273 (+₹15,000 Kiran personal marketing payments)
+- **Other Expenses:** Nov +₹10,669 (Mr V AKIL), Jan +₹700 (RADHAKRISHNAN E)
+- **Removed unused imports** — `Optional` + `get_column_letter`
 - **Excel regenerated** → `data/reports/PnL_Accrual_2026_05_12.xlsx`
-- **PWA confirmed** — Capital Contributions not displayed in PWA cards (income/opex/profit only); no PWA change needed
-- **Excel API** — `/finance/pnl/excel` auto-picks up changes (calls `build_pnl_bytes()` from pnl_builder.py)
-
-### 4 unconfirmed transactions — Kiran to say yes/no
-- Nov: Mr V AKIL ₹10,669 | Dec: 9444448314 ₹5,000 | Jan: RADHAKRISHNAN E ₹700 | Apr: 9444448314 ₹5,000
-- If all confirmed PG → adds ₹22,369 to Capital Contributions (Nov+Dec+Jan+Apr)
+- **PWA Excel download** — `/finance/pnl/excel` auto-picks up (calls `build_pnl_bytes()` from pnl_builder.py)
 
 ## [1.75.49] — 2026-05-12 — P&L methodology corrections + capital contributions overhaul
 
