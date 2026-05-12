@@ -24,6 +24,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     # Description-based overrides: the SAME person can receive rent OR a loan;
     # trust the memo keyword. These run BEFORE the landlord-name matches below.
     ("Non-Operating",        "Cash Borrow / Exchange",       ["money exchange","cash borrow","cash borrows","money borrow"]),
+    ("Non-Operating",        "Advance / Loan to Staff",      ["/borrow"]),
+    ("Non-Operating",        "Trial / Test Payment",         ["trial","yespay.ypbsm","yespay.bizsbiz"]),
+    ("Non-Operating",        "Self Transfer",                ["from:7358341775-2@ybl/to:7358341775@ybl"]),
     ("Non-Operating",        "Repayment",                    ["repaymen","repayment","loan repay"]),
     ("Non-Operating",        "Borrowed From",                ["borrowed f","borrowed from"]),
     ("Non-Operating",        "Loan Repayment (Bharathi)",    ["bharathi prabhakaran"]),
@@ -82,6 +85,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Furniture & Fittings", "Porter / Delivery",            ["porter fee","porter","bed frames porter"]),
     ("Furniture & Fittings", "Wardrobes",                    ["wardrobe","mahinmeman7705","sungle wardrobe"]),
     ("Furniture & Fittings", "3-Sharing Beds",               ["3 sharing bed","9035767529"]),
+    ("Furniture & Fittings", "Mirrors",                      ["q411763249","mirrors"]),
+    ("Furniture & Fittings", "Mixer (Kitchen)",              ["q566549919"]),
     ("Furniture & Fittings", "Other Furniture / Fittings",   ["furniture","refurbish","3d bo","laughing bud"]),
 
     # ── FOOD & GROCERIES ──────────────────────────────────────────────────────
@@ -99,6 +104,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Food & Groceries",     "HP Gas",                       ["hp gas","q947171136"]),
     ("Food & Groceries",     "Drumstick / Fresh Veg",        ["drumstick"]),
     ("Food & Groceries",     "Batter / Idli Mix",            ["batter","idli"]),
+    ("Food & Groceries",     "Star Bazaar / Ratnadeep",      ["star bazaar","ratnadeep"]),
+    ("Food & Groceries",     "Flowers / Pooja",              ["pooja flower","flowers","flower"]),
     ("Food & Groceries",     "Other Groceries / Provisions", ["grocer","kirana","milk","food","provision"]),
 
     # ── FUEL & DIESEL ─────────────────────────────────────────────────────────
@@ -107,6 +114,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Fuel & Diesel",        "Diesel Vendor (9888751222)",   ["9888751222"]),
     ("Fuel & Diesel",        "Diesel Vendor (7411535239)",   ["7411535239"]),
     ("Fuel & Diesel",        "Petrol / Fuel",                ["petrol","fuel"]),
+    ("Fuel & Diesel",        "Bus Tickets (PayBus)",         ["paybus8261"]),
+    ("Fuel & Diesel",        "Travel / Bus (Paytm)",         ["travel1paytm","paytm bus: "]),
 
     # ── STAFF & LABOUR ────────────────────────────────────────────────────────
     ("Staff & Labour",       "Salary - Arjun (NEFT)",        ["joshi arjun","yesob6021"]),
@@ -135,6 +144,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff - Various UPI",          ["akmalakmal","kutubuddinku","vishal521","sanket","biplab"]),
     ("Staff & Labour",       "Staff Mobile Recharge (Jio)",  ["jioinappdirect"]),
     ("Staff & Labour",       "Staff Mobile Recharge (Vi)",   ["viinappguj"]),
+    ("Staff & Labour",       "Labour - Cash Exchange (ESOB Tanti)", ["7993273966"]),
 
     # ── GOVT & REGULATORY ─────────────────────────────────────────────────────
     ("Govt & Regulatory",    "BBMP Tax / Property Bill",     ["bbmp","bbpsbp"]),
@@ -186,6 +196,11 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Operational Expenses", "Chairs & Study Tables",        ["q962933392"]),
     ("Operational Expenses", "Kitchen Equipment",            ["9844532900"]),
     ("Operational Expenses", "Misc - akhilreddy007420",      ["akhilreddy007420"]),
+    ("Operational Expenses", "Volipi - Ops Vendor",          ["volipi.l"]),
+    ("Operational Expenses", "Staff Medical",                ["rxdxwhitefield","medical for loki","medicine for loki"]),
+    ("Operational Expenses", "Staff Mobile / Recharge",      ["recharge of jio mobile","recharge of airtel mobile","bill paid - post paid","paid - mobile recharge","hinglaj packaging","shell india markets"]),
+    ("Operational Expenses", "Nursery / Plants",             ["nursery","madeena nursery","madhu — nursery"]),
+    ("Shopping & Supplies",  "Myntra",                       ["paytm-950206","myntra order"]),
     ("Shopping & Supplies",  "Flipkart",                     ["flipkart"]),
     ("Shopping & Supplies",  "BharatPE (POS Payments)",      ["bharatpe","bharat pe"]),
     ("Shopping & Supplies",  "Pine Labs (POS Terminal)",     ["pinelab","pi nelabs"]),

@@ -29,7 +29,7 @@ INCOME = {
     "THOR — UPI batch settlements (merchant QR)":          [0,      0,        0,  175596, 2091597, 2515275, 2834731],
     "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
     "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1254220, 1343783],  # Mar +160000 (Chandra collected from 10 HULK tenants)
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  325572,  656300, 1254820, 1390783],  # Jan +25000 Bala uncle; Feb +3000 Bala uncle; Mar +600 cash exchanges; Apr +35000 Bala uncle + 12000 cash exchanges
     # HULK building (acct ...0881) — live from Mar 2026
     "HULK — UPI batch settlements (merchant QR)":          [0,      0,        0,       0,       0,       0,  247719],
     "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
@@ -46,18 +46,18 @@ OPEX = {
     "Property Rent (cash — Jan rent paid Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 2132000, 2132000, 2132000],
     "Electricity":                                                [0, 0, 0,       131554,  134538,   96617,  140659],
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
-    "IT & Software":                                              [0, 0, 3480,     10620,       0,       0,       0],
-    "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 40946, 70730, 113168, 0, 0],
-    "Food & Groceries":                                           [0, 33632, 89065, 201558,  94931,  237747,  233679],  # Dec +815 (Zepto tomatoes Dec 31 — Lakshmi SBI)
-    "Fuel & Diesel":                                              [0, 0, 200,       9099,  104366,  346308,    2800],
-    "Staff & Labour":                                             [0, 1000, 125935, 112063, 219715,  155641,  199617],
-    "Maintenance & Repairs":                                      [0, 0, 0,            0,     550,   18470,   30740],
-    "Cleaning Supplies":                                          [0, 0, 4414,       1400,     700,    4566,   14500],
+    "IT & Software":                                              [0, 0, 3480,     11120,       0,       0,       0],  # Jan +500 Shrinivas IT band (Kiran PhonePe Jan 6)
+    "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
+    "Food & Groceries":                                           [0, 33632, 95681, 201558,  97126,  237747,  233679],  # Dec +6616 HP gas cylinders (Kiran cash); Feb +2195 Chandra (cans ₹1320 + egg trays ₹875)
+    "Fuel & Diesel":                                              [0, 0, 1200,      9099,  105866,  352678,    2800],  # Dec +1000 HP Auto Care petrol (Kiran PhonePe Dec 24); Feb +1500 Chandra generator; Mar +6370 Chandra diesel
+    "Staff & Labour":                                             [0, 1000, 126435, 112063, 219715,  188241,  199617],  # Dec +500 kitchen porter (Kiran cash); Mar +32600 cash labour (Image 1 — workers paid cash, not UPI)
+    "Maintenance & Repairs":                                      [0, 0, 0,        22450,     550,   19370,   30740],  # Jan +22450: KAIZEN fire ext ₹17700 + first aid ₹2250 (Kiran PhonePe Jan 6/3) + Chandra plumber+carpenter ₹2500; Mar +900 Chandra electricians
+    "Cleaning Supplies":                                          [0, 0, 5174,       1400,     700,    4566,   14500],  # Dec +760 SLN Packaging cleaning liquid (Kiran PhonePe Dec 25)
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
-    "Shopping & Supplies":                                        [0, 2730, 10530,  12036,   6127,    6184,    7442],
-    "Operational Expenses":                                       [0, 0, 47769,     10315,   2174,    3237,  137319],
-    "Marketing":                                                  [0, 0, 48500,     17895,   3620,   27700,       0],
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 75716,     88073,   3000,    3000,    3000],
+    "Shopping & Supplies":                                        [0, 2730, 11550,  12036,   6127,    6184,    7442],  # Dec +1020 stickers (Kiran cash)
+    "Operational Expenses":                                       [0, 0, 49482,     10315,   2174,    3237,  137319],  # Dec +1713: printout ₹663 (Sandeep Nanji Dec 29) + curtains ₹970 + cooler lock ₹80 (Kiran cash/PhonePe)
+    "Marketing":                                                  [0, 0, 66273,     17895,   3620,   27700,       0],  # Dec +17773: BIPLAB SINGHA marketing ₹7500×2 (Dec 25+27) + WorkIndia recruitment ₹2773 (Kiran PhonePe)
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 81716,     94073,   3000,    3000,    3000],  # Dec +6000 garbage fine (Kiran cash); Jan +6000 BBMP (₹5000+₹1000 Kiran PhonePe Jan 2)
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
     "Other Expenses":                                             [0, 10318, 156337,  4564,  23258,   78780,   99306],
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
@@ -70,7 +70,7 @@ OPEX = {
 CAPEX = {
     # THOR/HULK Yes Bank + Lakshmi SBI direct vendor payments combined
     "Furniture & Fittings":                    [0, 125021, 162741, 203815, 1185397,   331,   2163],  # Nov: -24800 Lavanya (net 50%; she refunded Rs.24800 back). Nov/Dec: removed Lakshmi SBI partner tracker items.
-    "Capital Investment (CCTV, 8 Ball Pool)":  [0,  82000,      0,      0,       0,     0,      0],
+    "Capital Investment (CCTV, 8 Ball Pool)":  [0,  82000, 100000,      0,       0,     0,      0],  # Dec +100000 Unisol CCTV system (Kiran cash Dec 2025)
 }
 
 EXCLUDED = {

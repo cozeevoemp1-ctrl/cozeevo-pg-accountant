@@ -2,6 +2,33 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.45] — 2026-05-12 — Bank dedup fix + P&L off-record expense integration
+
+### Bank deduplication (permanent fix)
+- **Root cause found:** 253 duplicate bank_transactions from `import_thor_to_db.py` — hash computed from raw CSV description, stored description differed (longer) → bypassed partial UNIQUE index
+- **Migration `run_btxn_dedup_2026_05_12`:** deleted duplicates (kept min id), recomputed all hashes from stored descriptions, dropped partial index → full UNIQUE index on `unique_hash`, added composite `uq_btxn_content` index as backup guard
+- **Upload API** (`POST /finance/upload`): replaced SELECT-before-INSERT with DB-atomic `pg_insert().on_conflict_do_nothing(index_elements=["unique_hash"]).returning(id)` — true idempotent uploads regardless of THOR vs HULK vs re-upload
+- **rules_data_sync.md §9** — documented both UNIQUE indexes, ON CONFLICT pattern, root cause
+
+### P&L off-record expense integration
+- Read all 12 expense/income images + verified against Kiran's PhonePe statement (May'25–May'26)
+- **pnl_builder.py updated** — 20+ line-item changes across Oct'25–Apr'26:
+  - **CAPEX Dec:** +₹1,00,000 Unisol CCTV system (Kiran cash)
+  - **Cash income Jan:** +₹25,000 Bala uncle; Feb: +₹3,000; Apr: +₹35,000
+  - **Cash income Mar:** +₹600 (esob/lokimom cash exchanges); Apr: +₹12,000 (esob/lsob)
+  - **Marketing Dec:** +₹17,773 (BIPLAB SINGHA ₹7,500×2 + WorkIndia ₹2,773)
+  - **Govt Dec:** +₹6,000 garbage fine; Jan: +₹6,000 BBMP (PhonePe Jan 2)
+  - **Maintenance Jan:** +₹22,450 (KAIZEN fire ext ₹17,700 + first aid ₹2,250 + Chandra plumber+carpenter ₹2,500)
+  - **Maintenance Mar:** +₹900 Chandra electricians
+  - **Staff Mar:** +₹32,600 cash labour (Image 1: Vivek, Ravi, Saurav, Cook, helpers — cash not UPI)
+  - **Fuel Dec:** +₹1,000 HP Auto Care petrol; Feb: +₹1,500 Chandra generator; Mar: +₹6,370 Chandra diesel
+  - **Food Dec:** +₹6,616 HP gas cylinders; Feb: +₹2,195 Chandra (cans+egg trays)
+  - **IT Jan:** +₹500 Shrinivas IT band; Internet Dec: +₹3,000 wifi dongles
+  - **Cleaning Dec:** +₹760 SLN Packaging; Shopping Dec: +₹1,020 stickers
+  - **Operational Dec:** +₹1,713 (printout+curtains+cooler lock); Staff Dec: +₹500 kitchen porter
+- **P&L Excel regenerated** — `data/reports/PnL_Accrual_2026_05_03.xlsx`
+- **Committed:** `59f525c` (dedup fix) + this session
+
 ## [1.75.44] — 2026-05-11 — Outstanding dues analysis: April + May, THOR deep-check
 
 ### Analysis scripts (one-off, not deployed)
