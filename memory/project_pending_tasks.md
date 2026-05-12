@@ -6,7 +6,13 @@ type: project
 
 ## Active / Next Up
 
-### Outstanding dues analysis — resume tomorrow
+### UPI auto-reconciliation — activate before June 1
+0d. **Gmail app password** — create at `myaccount.google.com/apppasswords`, add to VPS `.env` as `GMAIL_APP_PASSWORD` (also set `GMAIL_USER`, `HULK_EMAIL_SUBJECT=HULK`, `THOR_EMAIL_SUBJECT=THOR`)
+0e. **Bank email forwarding** — configure Lakshmi UPI app / Yes Bank dashboard to send daily collection report to `GMAIL_USER` with "HULK" or "THOR" in subject
+0f. **Cron job on VPS** — add: `0 8 * * * cd /opt/pg-accountant && .venv/bin/python -m src.workers.gmail_poller >> /tmp/upi_reconcile.log 2>&1`
+0g. **Deploy new code to VPS** — `git pull && systemctl restart pg-accountant` + rebuild PWA: `cd /opt/kozzy-pwa && git pull && npm run build && systemctl restart kozzy-pwa`
+
+### Outstanding dues analysis — resume when HULK bank available
 0a. **Upload HULK April+May bank statement** — Kiran will upload `hulk bank statement april til now` → re-run `scripts/_thor_outstanding.py` to catch remaining THOR cross-building payments (currently 24 tenants Rs.2,25,434 outstanding but some may be cleared via HULK April bank)
 0b. **G.D.Abhishek (612) manual review** — name has initials only; fuzzy match fails. HULK May bank shows "G D ABHISHEK" Rs.20K + Rs.2K = Rs.22K unmatched. His Sheet cash = Rs.13,250. Clarify actual balance with Kiran.
 0c. **Navdeep/Navdaap duplicate** — rooms 000 + 506, phone 9953195499, same person. Two tenancy records double-count Rs.16K + Rs.14K. Determine which is active tenancy and remove duplicate from reports.

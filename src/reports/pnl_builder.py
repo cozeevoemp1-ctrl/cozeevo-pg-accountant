@@ -27,9 +27,9 @@ MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 INCOME = {
     # THOR building (acct ...0961)
     "THOR — UPI batch settlements (merchant QR)":          [0,      0,        0,  175596, 2091597, 2515275, 2834731],
-    "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  225091,  226807],
+    "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  385691,  226807],  # Mar: +160600 Chandra cash collection reclassified to bank (2026-05-12)
     "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  325572,  656300, 1254820, 1390783],  # Jan +25000 Bala uncle; Feb +3000 Bala uncle; Mar +600 cash exchanges; Apr +35000 Bala uncle + 12000 cash exchanges
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  325572,  656300, 1094220, 1390783],  # Jan +25000 Bala uncle; Feb +3000 Bala uncle; Apr +35000 Bala uncle + 12000 cash exchanges. Mar: Chandra ₹1.60L moved to UPI (2026-05-12)
     # HULK building (acct ...0881) — live from Mar 2026
     "HULK — UPI batch settlements (merchant QR)":          [0,      0,        0,       0,       0,       0,  247719],
     "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
@@ -37,14 +37,26 @@ INCOME = {
 }
 
 CAPITAL_CONTRIBUTIONS = {
-    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000, 0, 0,     0, 0, 0, 0],
-    "Kiran top-up transfer (Jan 2026)":                   [     0, 0, 0, 90000, 0, 0, 0],
-    # THOR→HULK ₹5L transfer (Apr 2026) is already in THOR income — internal bank move, not new capital
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000, 0,     0,     0,     0,   0,    0],
+    "Kiran top-up transfer (Jan 2026)":                   [     0, 0,     0, 90000,     0,   0,    0],
+    # Partner personal advances (reimbursable — company owes Lakshmi this back)
+    # Dec: ₹74,768 BESCOM via partner UPI 7358341775-2@ybl (moved to Electricity expense)
+    # Jan–Apr: personal SBI 0167 payments matching OPEX Partner Reimbursable line
+    "Partner advance — Lakshmi (personal UPI + SBI 0167, reimbursable)": [0, 0, 74768, 41899, 18264, 750, 6928],
+    # Chandra personal cash for PG operations — "Other Expenses" cash residual (untracked ops spend)
+    # ⚠ TBD — confirm with Chandra that these are his personal cash advances (not already paid by company)
+    "Chandra advance — operational cash (TBD confirm)":             [0,     0,      0,     0,     0, 32789, 38111],
+    # Kiran PhonePe/cash for PG ops — already in OPEX above; shown here as equity injection (company owes Kiran)
+    # Breakdown by category: Staff ₹33,100 | Maint ₹23,350 | Marketing ₹17,773 | Govt ₹12,000 | Food ₹8,811
+    #   Fuel ₹8,870 | Internet ₹3,000 | Operational ₹1,713 | Shopping ₹1,020 | IT ₹500 | Cleaning ₹760 = ₹1,10,897
+    # ⚠ TBD — provide month-by-month breakdown to fill this row correctly
+    "Kiran advance — PhonePe/cash for PG ops (⚠ TBD monthly split)": [0, 0, 0, 0, 0, 0, 0],
 }
 
 OPEX = {
-    "Property Rent (cash — Jan rent paid Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 2132000, 2132000, 2132000],
-    "Electricity":                                                [0, 0, 0,       131554,  134538,   96617,  140659],
+    "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 1532000, 1290000, 1449100],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
+    "Property Rent — Bank UPI/RTGS paid":                                  [0, 0, 0, 0,  600000,  605140,  600000],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
+    "Electricity":                                                [0, 0, 74768,   131554,  134538,   96617,  140659],  # Dec: BESCOM via BBPSBP@ybl (was misclassified as BBMP Tax)
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     11120,       0,       0,       0],  # Jan +500 Shrinivas IT band (Kiran PhonePe Jan 6)
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
@@ -57,7 +69,7 @@ OPEX = {
     "Shopping & Supplies":                                        [0, 2730, 35548,  12153,   6127,    6184,    9858],  # Dec +1020 stickers cash; Dec D-Mart ₹23998 (tpasha638) reclassified from Other
     "Operational Expenses":                                       [0, 318, 121970,  18388,   5815,   34950,  146594],  # Dec +1713 cash. Updated 2026-05-12 (volipi, PERSONAL_SBI, Chandra advances, mobile recharges from Other)
     "Marketing":                                                  [0, 0, 66273,     35595,   7620,   27700,       0],  # Dec +17773 cash. Jan: ₹17700 reclassified from Other (prev session). Feb: Saurav flyers ₹4000
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 81716,     94073,   3000,    3000,    3000],  # Dec +6000 garbage fine cash; Jan +6000 BBMP cash
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     94073,   3000,    3000,    3000],  # Dec: 948 BBMP + 6000 garbage fine cash (74768 BESCOM moved to Electricity); Jan +6000 BBMP cash
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
     "Other Expenses":                                             [0, 5318, 2781,       0,     200,   32789,   38111],  # Residual: 1 unidentified bank row (Feb ₹200) + estimated cash ₹79K. Updated 2026-05-12
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
@@ -74,8 +86,12 @@ CAPEX = {
 }
 
 EXCLUDED = {
-    "Tenant Deposit Refund (balance sheet)": [0, 15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12: Radhika, Arun Philip, Majji Divya, Prem, Adithya, Ankit, Anudeep, Dhruv, Akshayaratna, Bhanu reclassified from Other
-    "Loan Repayment / Transfers (non-op)":   [0, 500000,     0,      0,  600000, 2090000, 22357],
+    # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
+    "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12
+    # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
+    # Nov: Bharathi Prabhakaran ₹5L. Feb: Sri Lakshmi Chandrasekar ₹6L. Mar: YESMIDAS + Sravani + Sri Lakshmi etc. ₹20.9L. Apr: ₹22K misc.
+    # NOT an operating cost — the cash was already spent and counted in OPEX categories above.
+    "Cash Exchange Repayments via Bank (non-op)": [0, 500000,     0,      0,  600000, 2090000,  22357],
 }
 
 # ── Deposit flows — queried from tenancies (security_deposit + maintenance_fee by check-in month)
@@ -130,26 +146,17 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
 
-    # Less: refundable security deposits (must return at exit — not revenue)
-    sec_dep = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
+    # Deduct refundable security deposits — liability, not revenue
+    sec_dep_collected = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
+    sec_dep_neg = [-v for v in sec_dep_collected]
     ws.append(["  Less: Security Deposits Received (refundable — must return at exit)"]
-              + [-x for x in sec_dep] + [-sum(sec_dep)])
-    for c in ws[ws.max_row]:
-        c.font = Font(italic=True)
+              + sec_dep_neg + [sum(sec_dep_neg)])
+    ws[ws.max_row][0].font = Font(italic=True)
 
-    # True Rent Revenue = gross − security deposits held
-    true_rev_row = [r - s for r, s in zip(rev_row, sec_dep)]
+    true_rev_row = [r + s for r, s in zip(rev_row, sec_dep_neg)]
     ws.append(["True Rent Revenue (excl. refundable deposits)"] + true_rev_row + [sum(true_rev_row)])
     for c in ws[ws.max_row]:
-        c.font = bold
-        c.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-
-    # Maintenance fee retained (non-refundable context)
-    maint = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
-    ws.append(["  Note: Maintenance Fee retained (non-refundable, included above)"]
-              + maint + [sum(maint)])
-    for c in ws[ws.max_row]:
-        c.font = Font(italic=True)
+        c.font = Font(bold=True, color="375623")
     ws.append([])
 
     # 3. CAPITAL CONTRIBUTIONS
@@ -181,7 +188,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
 
     # 5. EBITDA / OPERATING PROFIT (true rent revenue − opex)
     op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
-    ws.append(["EBITDA / OPERATING PROFIT"] + op_profit_row + [sum(op_profit_row)])
+    ws.append(["EBITDA / OPERATING PROFIT (on True Revenue)"] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
@@ -216,10 +223,9 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append([])
 
     # 8. CASH POSITION
-    # _sec_collected = DB sum of active tenants only — exited tenants are already excluded.
-    # Refunds to exited tenants are already reflected in the bank closing balance (cash left the account).
-    # Do NOT subtract refunds here — that would double-deduct from an already-active-only total.
-    _sec_collected  = sum(DEPOSITS["Security Deposits — refundable (must return to active tenants)"])
+    # _sec_collected = from operational Excel: sum of security_deposit column for all tenants checked in ≤ Apr 30
+    # Updated 2026-05-12: Kiran confirmed ₹33,83,875 from source Excel (screenshot verification)
+    _sec_collected  = 3383875
     _bank_total     = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
 
     _cash_total = sum(CASH_IN_HAND.values())
@@ -260,6 +266,9 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for f in [
         "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
         "2. Apr rent of Rs.21,32,000 paid in May is outside this P&L window — will appear in May P&L.",
+        "3. Chandra advance (Mar Rs.32,789 + Apr Rs.38,111) — confirm these are Chandra's personal cash advances for PG ops, not company-paid cash already counted above.",
+        "4. Kiran advance ~Rs.1,10,897 total (Staff Rs.33K, Maint Rs.23K, Mktg Rs.18K, Govt Rs.12K, Food Rs.9K, Fuel Rs.9K, Internet Rs.3K, Operational Rs.2K, Shopping Rs.1K, IT Rs.500, Cleaning Rs.760). Provide month-by-month split to fill the Capital Contributions row.",
+        "5. Cash Exchange Repayments (in EXCLUDED): Nov Rs.5L Bharathi, Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.20.9L (YESMIDAS+Sravani+Sri Lakshmi), Apr Rs.22K. Bank RTGS repaid to people who gave you cash for ops — underlying spending already in OPEX above.",
     ]:
         ws.append([f])
 

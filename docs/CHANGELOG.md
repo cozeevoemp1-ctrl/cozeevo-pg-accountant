@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.48] — 2026-05-12 — THOR outstanding analysis + UPI auto-reconciliation build
+
+### THOR Outstanding May 2026 analysis
+- **`scripts/_thor_outstanding.py`** — one-off: THOR-only outstanding analysis for May 2026; checks both THOR + HULK bank pools for each tenant (cross-building payments)
+- Result: 24 tenants outstanding, Rs.2,25,434 total
+- 8 cross-building payments found (THOR tenants paying into HULK account)
+- Output: `data/reports/THOR_Outstanding_May2026.xlsx` (THOR Outstanding + THOR All Tenants sheets)
+- Known issues: G.D.Abhishek (initials-only name, Rs.22K unmatched in bank) + Navdeep/Navdaap duplicate (rooms 000+506, same person)
+
+### UPI auto-reconciliation system (full build)
+- **`src/database/models.py`** — added `UpiCollectionEntry` model (rrn, account_name, txn_date, amount, payer_vpa, payer_phone, payer_name, tenancy_id, payment_id, matched_by, period_month; unique on rrn)
+- **`src/database/migrate_all.py`** — added `run_upi_collection_table_2026_05_11()` migration (table created via Supabase MCP due to asyncpg statement_timeout)
+- **`src/services/upi_reconciliation.py`** — core service: parse XLSX/CSV, 3-tier tenant matching (phone from VPA → exact name → fuzzy), create Payment records (unique_hash=rrn), create UpiCollectionEntry, idempotent (safe re-upload)
+- **`src/api/v2/finance.py`** — 3 new endpoints: `POST /finance/upi-reconcile`, `POST /finance/upi-reconcile/assign`, `GET /finance/upi-reconcile/unmatched`
+- **`src/workers/__init__.py`** — new module
+- **`src/workers/gmail_poller.py`** — daily Gmail IMAP poller: fetch unseen emails with HULK/THOR subject keywords → download XLSX/CSV attachment → reconcile → WhatsApp alert for unmatched entries to ADMIN_WHATSAPP
+- **`web/lib/api.ts`** — added `UpiMatchedEntry`, `UpiUnmatchedEntry`, `UpiReconcileResult` types + `uploadUpiFile()`, `getUnmatchedUpi()`, `assignUpiEntry()` functions
+- **`web/components/finance/upi-reconcile-tab.tsx`** — new PWA tab: month picker, HULK/THOR selector, file upload, result summary (matched/unmatched/skipped cards), matched list, unmatched queue with Refresh
+- **`web/app/finance/page.tsx`** — added "UPI" tab (3rd tab alongside P&L + Cash)
+- **`.env.example`** — added GMAIL_USER, GMAIL_APP_PASSWORD, HULK_EMAIL_SUBJECT, THOR_EMAIL_SUBJECT, ADMIN_WHATSAPP
+- **Not yet deployed** — needs VPS git pull + restart + Gmail setup (see pending tasks)
+
 ## [1.75.47] — 2026-05-12 — Other Expenses full reclassification + P&L reconcile
 
 ### Bank expense classification (76 rows reclassified)
