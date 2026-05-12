@@ -110,7 +110,9 @@ DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638]  # Mar
 # Maintenance fees  = all non-no-show tenants (non-refundable, retained), by check-in month
 # Source: DB query 2026-05-06
 DEPOSITS = {
-    "Security Deposits — refundable (must return to active tenants)": [0, 193000, 386500, 633500, 498000, 812250, 860625],  # Apr updated: +62500 to match Kiran's confirmed total ₹33,83,875 (was ₹33,21,375)
+    # Pure refundable security only (combined total was ₹33,83,875 but included maintenance ₹10,68,700)
+    # True refundable = combined − maintenance = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
+    "Security Deposits — refundable (must return to active tenants)": [0, 140000, 266500, 455500, 353000, 526550, 573625],
     "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000],
 }
 
@@ -248,9 +250,10 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append([])
 
     # 8. CASH POSITION
-    # _sec_collected = from operational Excel: sum of security_deposit column for all tenants checked in ≤ Apr 30
-    # Updated 2026-05-12: Kiran confirmed ₹33,83,875 from source Excel (screenshot verification)
-    _sec_collected  = 3383875
+    # _sec_collected = pure refundable security deposits owed to active tenants
+    # Combined total ₹33,83,875 included maintenance ₹10,68,700 — maintenance is non-refundable
+    # True refundable liability = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
+    _sec_collected  = 2315175
     _bank_total     = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
 
     _cash_total = sum(CASH_IN_HAND.values())
