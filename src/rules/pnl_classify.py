@@ -106,6 +106,10 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Food & Groceries",     "Batter / Idli Mix",            ["batter","idli"]),
     ("Food & Groceries",     "Star Bazaar / Ratnadeep",      ["star bazaar","ratnadeep"]),
     ("Food & Groceries",     "Flowers / Pooja",              ["pooja flower","flowers","flower"]),
+    ("Food & Groceries",     "Flipkart Groceries (Paytm)",   ["paytm-56505013"]),
+    ("Food & Groceries",     "Vegetables - Jaydev",          ["jaydevjena73"]),
+    ("Food & Groceries",     "Vegetables - Shahbaz",         ["shahbaz80508637"]),
+    ("Food & Groceries",     "Vegetables (9663049651)",      ["9663049651"]),
     ("Food & Groceries",     "Other Groceries / Provisions", ["grocer","kirana","milk","food","provision"]),
 
     # ── FUEL & DIESEL ─────────────────────────────────────────────────────────
@@ -114,6 +118,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Fuel & Diesel",        "Diesel Vendor (9888751222)",   ["9888751222"]),
     ("Fuel & Diesel",        "Diesel Vendor (7411535239)",   ["7411535239"]),
     ("Fuel & Diesel",        "Petrol / Fuel",                ["petrol","fuel"]),
+    ("Fuel & Diesel",        "Diesel (8951297583)",           ["8951297583"]),
     ("Fuel & Diesel",        "Bus Tickets (PayBus)",         ["paybus8261"]),
     ("Fuel & Diesel",        "Travel / Bus (Paytm)",         ["travel1paytm","paytm bus: "]),
 
@@ -136,6 +141,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff - sachindivya",          ["sachindivya"]),
     ("Staff & Labour",       "Housekeeping / Cleaning Staff",["housekeep","salamtajamul","sarojrout","dilliprout","swamisarang","manisha","9398545495","9611622637","9071242117","8837062479","imranaaazmi58","rabhasoma4"]),
     ("Staff & Labour",       "Urban Company (Cleaning Svc)", ["urbancompany","urban company"]),
+    ("Staff & Labour",       "Salary - Vivek",               ["6202601070","6287677379"]),
+    ("Staff & Labour",       "Salary - Bhukesh",             ["bn895975"]),
     ("Staff & Labour",       "Labour / Helpers",             ["helper","labour","kshitij","vivek"]),
     ("Staff & Labour",       "Staff - 9880401360 (Regular)", ["9880401360"]),
     ("Staff & Labour",       "Salary - Prabhakaran",         ["9444296681"]),
@@ -181,6 +188,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Waste Disposal",       "Pavan (6366411789)",           ["6366411789","garbage collection"]),
 
     # ── CLEANING & HOUSEKEEPING SUPPLIES ──────────────────────────────────────
+    ("Cleaning Supplies",    "Triveni Soap & Oil",           ["9448259556","9989000250","triveni"]),
     ("Cleaning Supplies",    "Garbage Bags / Bins",          ["garbage bag"]),
     ("Cleaning Supplies",    "Phenyl / Disinfectant",        ["phenyl","disinfect","toilet adour","toilet filter","bleaching powder"]),
     ("Cleaning Supplies",    "Mop / Cleaning Tools",         ["mop","broom","knife sharpen"]),
@@ -198,6 +206,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Operational Expenses", "Misc - akhilreddy007420",      ["akhilreddy007420"]),
     ("Operational Expenses", "Volipi - Ops Vendor",          ["volipi.l"]),
     ("Operational Expenses", "Staff Medical",                ["rxdxwhitefield","medical for loki","medicine for loki"]),
+    ("Operational Expenses", "Mobile Recharge (paybil3066)",  ["paybil3066"]),
+    ("Operational Expenses", "Mobile Recharge (payair7673)",  ["payair7673"]),
     ("Operational Expenses", "Staff Mobile / Recharge",      ["recharge of jio mobile","recharge of airtel mobile","bill paid - post paid","paid - mobile recharge","hinglaj packaging","shell india markets"]),
     ("Operational Expenses", "Nursery / Plants",             ["nursery","madeena nursery","madhu — nursery"]),
     ("Shopping & Supplies",  "Myntra",                       ["paytm-950206","myntra order"]),
@@ -215,6 +225,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Maintenance & Repairs","EB Panel Board - Basavaraju",  ["bn.basavaraju"]),
     ("Maintenance & Repairs","Carpenter",                    ["carpenter","r61865951"]),
     ("Maintenance & Repairs","Repairs / Handyman",           ["repair","handyman"]),
+    ("Maintenance & Repairs","Key Maker (9148809732)",        ["9148809732"]),
     ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith","seals"]),
     ("Maintenance & Repairs","Fridge Delivery / Appliance",  ["fridge delivery","fridge"]),
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain"]),

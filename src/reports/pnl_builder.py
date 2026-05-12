@@ -5,7 +5,7 @@ Canonical P&L builder — single source of truth shared by:
   - scripts/export_pnl_2026_05_02.py  (local regeneration)
   - src/api/v2/finance.py  GET /finance/pnl/excel  (PWA download)
 
-Both produce identical output. Verified figures as of 2026-05-10.
+Both produce identical output. Verified figures as of 2026-05-12.
 See memory/sop_pnl.md for full methodology.
 """
 from __future__ import annotations
@@ -48,18 +48,18 @@ OPEX = {
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     11120,       0,       0,       0],  # Jan +500 Shrinivas IT band (Kiran PhonePe Jan 6)
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
-    "Food & Groceries":                                           [0, 33632, 95681, 201558,  97126,  237747,  233679],  # Dec +6616 HP gas cylinders (Kiran cash); Feb +2195 Chandra (cans ₹1320 + egg trays ₹875)
-    "Fuel & Diesel":                                              [0, 0, 1200,      9099,  105866,  352678,    2800],  # Dec +1000 HP Auto Care petrol (Kiran PhonePe Dec 24); Feb +1500 Chandra generator; Mar +6370 Chandra diesel
-    "Staff & Labour":                                             [0, 1000, 126435, 112063, 219715,  188241,  199617],  # Dec +500 kitchen porter (Kiran cash); Mar +32600 cash labour (Image 1 — workers paid cash, not UPI)
-    "Maintenance & Repairs":                                      [0, 0, 0,        22450,     550,   19370,   30740],  # Jan +22450: KAIZEN fire ext ₹17700 + first aid ₹2250 (Kiran PhonePe Jan 6/3) + Chandra plumber+carpenter ₹2500; Mar +900 Chandra electricians
-    "Cleaning Supplies":                                          [0, 0, 5174,       1400,     700,    4566,   14500],  # Dec +760 SLN Packaging cleaning liquid (Kiran PhonePe Dec 25)
+    "Food & Groceries":                                           [0, 33632, 113787, 216418,  114803,  240294,  238122],  # Dec +6616 HP gas cash; Feb +2195 Chandra cash. Updated 2026-05-12 (DB+cash reconcile, prev+this session reclassify)
+    "Fuel & Diesel":                                              [0, 0, 1200,      9099,  105866,  355971,   61578],  # Dec +1000 HP Auto cash; Feb +1500 Chandra; Mar +6370 Chandra diesel. Apr: 8951297583 diesel ₹49679 reclassified from Other
+    "Staff & Labour":                                             [0, 1000, 135435, 115924, 233715,  188341,  193617],  # Dec +500 cash porter; Mar +32600 cash labour. Updated 2026-05-12 (Vivek+Bhukesh reclassified from Other)
+    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,    1850,   21899,   36919],  # Jan +22450 cash (KAIZEN+Chandra); Mar +900 Chandra elec. Dec: key maker+carpenter from Other
+    "Cleaning Supplies":                                          [0, 0, 5674,       1400,    1200,   11272,   17975],  # Dec +760 SLN cash. Triveni (9448259556/9989000250) + Wellcare reclassified from Other
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
-    "Shopping & Supplies":                                        [0, 2730, 11550,  12036,   6127,    6184,    7442],  # Dec +1020 stickers (Kiran cash)
-    "Operational Expenses":                                       [0, 0, 49482,     10315,   2174,    3237,  137319],  # Dec +1713: printout ₹663 (Sandeep Nanji Dec 29) + curtains ₹970 + cooler lock ₹80 (Kiran cash/PhonePe)
-    "Marketing":                                                  [0, 0, 66273,     17895,   3620,   27700,       0],  # Dec +17773: BIPLAB SINGHA marketing ₹7500×2 (Dec 25+27) + WorkIndia recruitment ₹2773 (Kiran PhonePe)
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 81716,     94073,   3000,    3000,    3000],  # Dec +6000 garbage fine (Kiran cash); Jan +6000 BBMP (₹5000+₹1000 Kiran PhonePe Jan 2)
+    "Shopping & Supplies":                                        [0, 2730, 35548,  12153,   6127,    6184,    9858],  # Dec +1020 stickers cash; Dec D-Mart ₹23998 (tpasha638) reclassified from Other
+    "Operational Expenses":                                       [0, 318, 121970,  18388,   5815,   34950,  146594],  # Dec +1713 cash. Updated 2026-05-12 (volipi, PERSONAL_SBI, Chandra advances, mobile recharges from Other)
+    "Marketing":                                                  [0, 0, 66273,     35595,   7620,   27700,       0],  # Dec +17773 cash. Jan: ₹17700 reclassified from Other (prev session). Feb: Saurav flyers ₹4000
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0, 81716,     94073,   3000,    3000,    3000],  # Dec +6000 garbage fine cash; Jan +6000 BBMP cash
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 10318, 156337,  4564,  23258,   78780,   99306],
+    "Other Expenses":                                             [0, 5318, 2781,       0,     200,   32789,   38111],  # Residual: 1 unidentified bank row (Feb ₹200) + estimated cash ₹79K. Updated 2026-05-12
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
@@ -69,12 +69,12 @@ OPEX = {
 
 CAPEX = {
     # THOR/HULK Yes Bank + Lakshmi SBI direct vendor payments combined
-    "Furniture & Fittings":                    [0, 125021, 162741, 203815, 1185397,   331,   2163],  # Nov: -24800 Lavanya (net 50%; she refunded Rs.24800 back). Nov/Dec: removed Lakshmi SBI partner tracker items.
+    "Furniture & Fittings":                    [0, 125021, 167741, 203815, 1185597,  10761,  12363],  # Nov: -24800 Lavanya (net). Updated 2026-05-12: porter charges (bed frames, shoe racks, study tables) + photo frame reclassified from Other
     "Capital Investment (CCTV, 8 Ball Pool)":  [0,  82000, 100000,      0,       0,     0,      0],  # Dec +100000 Unisol CCTV system (Kiran cash Dec 2025)
 }
 
 EXCLUDED = {
-    "Tenant Deposit Refund (balance sheet)": [0, 10000,  21500,  55944,  74532,  160231, 139638],  # Mar +22000, Apr +9970 (personal SBI refunds: Anumola, Aahil, P Deepa)
+    "Tenant Deposit Refund (balance sheet)": [0, 15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12: Radhika, Arun Philip, Majji Divya, Prem, Adithya, Ankit, Anudeep, Dhruv, Akshayaratna, Bhanu reclassified from Other
     "Loan Repayment / Transfers (non-op)":   [0, 500000,     0,      0,  600000, 2090000, 22357],
 }
 

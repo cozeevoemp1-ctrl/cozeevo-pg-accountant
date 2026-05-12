@@ -2,6 +2,38 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.47] — 2026-05-12 — Other Expenses full reclassification + P&L reconcile
+
+### Bank expense classification (76 rows reclassified)
+- **`scripts/_apply_other_expenses_classifications.py`** — one-off: applied Kiran's manual classifications from `others not classified.xlsx` to DB; 76 rows moved from Other Expenses
+- **Reclassified to:**
+  - Food & Groceries: 19 rows (Flipkart paytm-56505013 ×8, vegetables ×5, dairy Real Value Mart, eggs, ice cream, water, staff food, provisions)
+  - Maintenance & Repairs: 11 rows (key maker 9148809732 ×6, carpenter, hardware ×3, fridge installation)
+  - Tenant Deposit Refund: 11 rows (Arun Philip booking cancel, Adithya Saraf, Radhika, Majji Divya, Prem ×2, Akshayaratna, Bhanu, Anudeep, Ankit Kumar, Dhruv)
+  - Cleaning Supplies: 9 rows (Triveni Soap & Oil ×6, Wellcare, housekeeping supplier ×2)
+  - Operational Expenses: 12 rows (Chandra/Akhil advances ×2, mobile recharges ×6, barrels porter, prime realtors, Loki medical, plants porter)
+  - Staff & Labour: 3 rows (Vivek salary ×2, Bhukesh salary)
+  - Furniture & Fittings: 6 rows (porter charges for bed frames ×2, shoe racks ×2, study tables, photo frame)
+  - Shopping & Supplies: 2 rows (D-Mart tpasha638 ×2)
+  - Fuel & Diesel: 2 rows (8951297583 diesel ₹49679, diesel commission)
+  - Marketing: 1 row (Saurav Kumar flyers ₹4000)
+  - 1 row remains Other Expenses (₹200, unidentifiable)
+- **`src/rules/pnl_classify.py`** — 10 new recurring-vendor rules added: 9148809732 key maker, 9448259556+9989000250 Triveni, paybil3066+payair7673 mobile recharge, paytm-56505013 Flipkart groceries, jaydevjena73+shahbaz80508637+9663049651 vegetables, 6202601070+6287677379+bn895975 staff, 8951297583 diesel
+
+### P&L updated (pnl_builder.py)
+- **Food & Groceries:** Dec 95681→113787, Jan 201558→216418, Feb 97126→114803, Mar 237747→240294, Apr 233679→238122
+- **Fuel & Diesel:** Mar 352678→355971, Apr 2800→61578
+- **Staff & Labour:** Dec 126435→135435, Jan 112063→115924, Feb 219715→233715, Mar 188241→188341, Apr 199617→193617
+- **Maintenance & Repairs:** Dec 0→1400, Feb 550→1850, Mar 19370→21899, Apr 30740→36919
+- **Cleaning Supplies:** Dec 5174→5674, Feb 700→1200, Mar 4566→11272, Apr 14500→17975
+- **Shopping & Supplies:** Dec 11550→35548, Jan 12036→12153, Apr 7442→9858
+- **Operational Expenses:** Nov 0→318, Dec 49482→121970, Jan 10315→18388, Feb 2174→5815, Mar 3237→34950, Apr 137319→146594
+- **Marketing:** Jan 17895→35595, Feb 3620→7620
+- **Other Expenses:** Nov 10318→5318, Dec 156337→2781, Jan 4564→0, Feb 23258→200, Mar 78780→32789, Apr 99306→38111
+- **Furniture & Fittings (CAPEX):** Dec 162741→167741, Feb 1185397→1185597, Mar 331→10761, Apr 2163→12363
+- **Tenant Deposit Refund (EXCLUDED):** Nov 10000→15000, Dec 21500→47344, Mar 160231→182441, Apr 139638→151163
+- **Output:** `data/reports/PnL_Accrual_2026_05_12.xlsx`
+
 ## [1.75.46] — 2026-05-12 — Other expenses export + session close
 
 ### Analysis scripts (one-off, not deployed)
