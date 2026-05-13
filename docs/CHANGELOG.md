@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.53] — 2026-05-13 — April/May payment sync + DB/sheet reconciliation complete
+
+### April + May 2026 — DB now matches source sheet exactly
+- **`scripts/_audit_apr_may_payments.py`** — new script; Phase 1 reads sheet+DB, Phase 2 writes with `SET LOCAL allow_historical_write`. Ran `--write`: **30 payments added** (all sheet > DB gaps for April + May).
+- **`scripts/_fix_db_to_match_sheet.py`** — new script; fixed aggregation bug (shared-phone tenants were merging data across different people). Final run `--write`: **25 voided + 7 added** (Dhruv APR ₹6.5K + MAY ₹13K; Priyansh MAY ₹16K; 22 excess voids for tenants where DB had doubled May amounts).
+- **3 phones SKIPped** (shared phone, can't safely attribute — need manual review): V.Sathya Priya/V.Bhanu Prakash (+918106778788), Prateek/Sanskar (+919971427645), Siddharth/Delvin (+917666862904).
+
+### 4 no-show tenants added to DB
+- Ayush Kolte (+918888012597) — HULK floor 5, rent ₹13K, checkin 2026-05-01, ₹2K APR UPI booking
+- Diksha (+918295625664) — HULK floor 5, rent ₹13K, checkin 2026-05-01, ₹2K APR UPI booking
+- Diksha Bhartia (+919331987138) — HULK, rent ₹14K, checkin 2026-05-30, ₹2K MAY UPI booking
+- Devansh (+916290638842) — HULK floor 4 single, rent ₹23K, checkin 2026-05-30, ₹5K MAY UPI booking
+- Synced to TENANTS sheet tab via `resync_missing_tenants_to_sheet.py --write`
+- Skipped: Aditya Sable (Cancelled), Vijay Kumar (room="June" = data error)
+
+### pnl_builder.py — cash holdings + label update
+- `CASH_IN_HAND` updated: Lakshmi Apr closing ₹8,20,883; Prabhakaran ₹5,24,400
+- Section header renamed: "CAPITAL CONTRIBUTIONS" → "BORROWED MONEY — Owner loans & advances (to be repaid, not P&L)"
+
 ## [1.75.52] — 2026-05-13 — Bank-only P&L tab + OPEX analysis + forecast model
 
 ### pnl_builder.py — refactored to shared writer + new tabs
