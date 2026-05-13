@@ -58,6 +58,9 @@ export default function NewOnboardingPage() {
   const [checkoutDate, setCheckoutDate] = useState(addDays(todayISO(), 1))
   const [dailyRate, setDailyRate]       = useState("")
 
+  // Shared
+  const [notes, setNotes]               = useState("")
+
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState("")
   const [success, setSuccess]       = useState<{ token: string; phone: string; waSent?: boolean } | null>(null)
@@ -133,6 +136,7 @@ export default function NewOnboardingPage() {
       checkout_date:    stayType === "daily" ? checkoutDate : "",
       num_days:         stayType === "daily" ? numDays : 0,
       daily_rate:       stayType === "daily" ? Number(dailyRate) : 0,
+      special_terms:    notes.trim(),
     }
 
     setSubmitting(true)
@@ -397,6 +401,10 @@ export default function NewOnboardingPage() {
                 <span className="text-xs font-bold text-brand-blue">₹{totalCost.toLocaleString("en-IN")} total</span>
               </div>
             )}
+            <Field label="Security deposit (₹)">
+              <input type="text" inputMode="numeric" value={deposit} onChange={e => setDeposit(e.target.value)}
+                placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
+            </Field>
             <Field label="Booking advance (₹)">
               <input type="text" inputMode="numeric" value={booking} onChange={e => setBooking(e.target.value)}
                 placeholder="0" className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
@@ -419,6 +427,16 @@ export default function NewOnboardingPage() {
             )}
           </div>
         )}
+
+        {/* Notes — always shown */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <Field label="Notes (optional)">
+            <textarea value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="Any special terms, room preferences, or remarks..."
+              rows={2}
+              className="w-full rounded-tile border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink resize-none" />
+          </Field>
+        </div>
 
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
       </form>
