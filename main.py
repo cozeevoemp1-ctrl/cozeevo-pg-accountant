@@ -36,6 +36,7 @@ class LocalOnlyMiddleware(BaseHTTPMiddleware):
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
                 or path.startswith("/static") or path.startswith("/media")
                 or path.startswith("/onboard")  # tenant onboarding form (public)
+                or path == "/qr"                # QR walk-in → creates session → redirects to /onboard
                 or path.startswith("/admin/onboarding")  # admin onboarding panel
                 or path.startswith("/api/onboarding")  # all onboarding API endpoints
                 or path.startswith("/admin/checkout")   # admin checkout panel
