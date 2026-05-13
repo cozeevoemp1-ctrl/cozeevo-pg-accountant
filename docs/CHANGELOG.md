@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.60] — 2026-05-13 — Onboarding form fixes: QR access + photo + security deposit + notes
+
+### main.py
+- **`/qr` added to `LocalOnlyMiddleware` allowlist** — was returning 403 to external requests. QR endpoint must be public.
+
+### static/onboarding.html
+- **Photo upload always shown** — `selfie-upload-area` was inside `room-summary-card` which only renders when session has pre-filled room/rent. QR-initiated sessions have neither, so photo was hidden. Moved photo card outside — now always shown regardless of session type.
+
+### web/app/onboarding/new/page.tsx
+- **Security deposit added to daily stay** — was only in monthly financials section; daily guests can also have a deposit.
+- **Notes field added** — `special_terms` was wired in the API payload but had no input in the PWA. Added textarea below financials, visible for both monthly and daily.
+
+### Commits
+- `fda621c` — /qr middleware fix
+- `508660f` — photo card fix
+- `e3172ba` — security deposit + notes
+
+---
+
 ## [1.75.59] — 2026-05-13 — P&L: reclassify OE transactions + merge CAPEX into Furniture & Supplies OPEX
 
 ### src/rules/pnl_classify.py
