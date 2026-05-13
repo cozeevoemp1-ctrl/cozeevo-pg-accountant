@@ -130,6 +130,8 @@ Kiran's Excel (offline)
 | `web/app/notices/page.tsx` | PWA Notices page — monthly tenants with formal notice only; deposit eligible if notice given (any day); forfeited only with zero notice |
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
+| `web/app/onboarding/bookings/page.tsx` | PWA Bookings page — lists pending_review onboarding sessions; "Save & Check In" → instant_checkin approve |
+| `src/api/v2/tenants.py` | POST /tenancies/{id}/cancel-no-show — marks no-show as cancelled + audit log |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
 | `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation, unit economics (admin-only) |
 | `src/services/unit_economics.py` | Unit economics — revenue/bed, cost/bed, EBITDA/bed, avg rent, collection rate, investment yield, payback months, break-even occ, economic occ, revenue leakage (True Revenue only) |

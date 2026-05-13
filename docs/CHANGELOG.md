@@ -2,6 +2,48 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.57] — 2026-05-13 — QR walk-in onboarding + bookings page + phone dedup
+
+### QR walk-in flow (main.py)
+- **`GET /qr`** — static QR endpoint; IP rate-limited (3 scans/hr/IP); creates 2-hour `OnboardingSession` with `status=pending_tenant`; redirects to `/onboard/{token}`. One QR covers both buildings — room number on form determines building.
+- `RedirectResponse`, `_rate_check` added to `main.py` imports.
+
+### Onboarding redesign (src/api/onboarding_router.py)
+- **Direct check-in removed** — `POST /direct-checkin` now returns HTTP 410; `DirectCheckinRequest` model deleted. All check-ins must flow through onboarding form.
+- **`instant_checkin: bool = False`** added to `ApproveRequest` — when True, forces `status=active` regardless of future `checkin_date`. Used by the Bookings "Save & Check In" button.
+- **Phone dedup at form submit** — `tenant_submit` now: (1) blocks 409 if phone already has active tenancy, (2) cancels any other `pending_tenant`/`pending_review` sessions for the same phone via raw SQL UPDATE, (3) stores normalised 10-digit phone on the session row.
+
+### New PWA page: Bookings (web/app/onboarding/bookings/page.tsx)
+- Loads `GET /api/onboarding/admin/pending`, filters to `status === "pending_review"` (form completed).
+- Shows tenant name, phone, room, check-in date, rent, "Form filled" badge.
+- "Review & Edit →" opens `admin/onboarding` in new tab.
+- "Save & Check In" button → `POST /{token}/approve` with `instant_checkin: true` → marks tenancy `active` immediately.
+
+### No-show: overdue indicator + cancel booking (src/api/v2/kpi.py, tenants.py)
+- **KPI detail `no_show` items** — now include `is_overdue: bool` and `days_overdue: int` (when `checkin_date < today`).
+- **`POST /tenancies/{id}/cancel-no-show`** — sets `status='cancelled'` (not `exited`), writes AuditLog entry; returns `{ok, tenancy_id, name}`.
+- **PWA no_show panel** — red "Xd late" badge on overdue items; red "Cancel →" button only on overdue rows.
+
+### Vacant beds "Until X" label (web/components/home/kpi-grid.tsx)
+- Vacant panel badge changed from "Booked DD Mon" → "Until DD Mon" for rooms with a future no-show booking.
+
+### web/lib/api.ts
+- `KpiDetailItem`: added `is_overdue?: boolean`, `days_overdue?: number`
+- Added `cancelNoShow(tenancyId: number)` → `POST /api/v2/app/tenancies/{id}/cancel-no-show`
+
+### web/app/page.tsx
+- Added "Bookings" quick-link tile (alongside Checkouts, Notices, Sessions).
+
+### web/app/onboarding/new/page.tsx
+- Removed direct check-in branch (was: name field → immediately active tenancy). Form now always creates an onboarding session and sends WhatsApp link.
+
+### Commits shipped
+- `16ffd79` — vacant "Until X" + no-show overdue + cancel booking
+- `2eb30f4` — QR walk-in + bookings page + remove direct check-in
+- `4844480` — QR rate limit + phone dedup at form submission
+
+---
+
 ## [1.75.54] — 2026-05-13 — Scheduler: rent reminders disabled + prep reminder delivery fix
 
 ### src/scheduler.py
