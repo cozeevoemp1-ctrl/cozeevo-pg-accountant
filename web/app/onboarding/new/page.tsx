@@ -37,6 +37,7 @@ export default function NewOnboardingPage() {
   const router = useRouter()
 
   const [stayType, setStayType]         = useState<StayType>("monthly")
+  const [tenantName, setTenantName]     = useState("")
   const [roomNumber, setRoomNumber]     = useState("")
   const [sharingType, setSharingType]   = useState("")
   const [tenantPhone, setTenantPhone]   = useState("")
@@ -60,7 +61,7 @@ export default function NewOnboardingPage() {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError]           = useState("")
-  const [success, setSuccess]       = useState<{ token: string; phone: string; waSent: boolean } | null>(null)
+  const [success, setSuccess]       = useState<{ token?: string; phone: string; waSent?: boolean; directCheckin?: { name: string; room: string; building: string } } | null>(null)
   const [showVoiceSheet, setShowVoiceSheet] = useState(false)
 
   // Room occupancy check
@@ -87,6 +88,7 @@ export default function NewOnboardingPage() {
   }
 
   function handleVoiceConfirm(fields: OnboardingFields) {
+    if ((fields as { tenant_name?: string }).tenant_name) setTenantName((fields as { tenant_name?: string }).tenant_name!)
     if (fields.room_number)                    { setRoomNumber(fields.room_number); checkRoomOccupancy(fields.room_number) }
     if (fields.sharing_type)                   setSharingType(fields.sharing_type)
     if (fields.tenant_phone)                   setTenantPhone(fields.tenant_phone)
@@ -108,6 +110,8 @@ export default function NewOnboardingPage() {
   const numDays   = stayType === "daily" ? daysBetween(checkinDate, checkoutDate) : 0
   const totalCost = stayType === "daily" && dailyRate ? numDays * Number(dailyRate) : 0
 
+  const isDirect = tenantName.trim().length > 0
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
@@ -116,7 +120,7 @@ export default function NewOnboardingPage() {
     if (stayType === "monthly" && !rent) { setError("Monthly rent is required"); return }
     if (stayType === "daily" && !dailyRate) { setError("Daily rate is required"); return }
 
-    const body: Record<string, unknown> = {
+    const commonBody: Record<string, unknown> = {
       room_number:      roomNumber.trim(),
       sharing_type:     sharingType,
       tenant_phone:     tenantPhone.trim().replace(/\s+/g, ""),
@@ -130,7 +134,6 @@ export default function NewOnboardingPage() {
       lock_in_months:   Number(lockIn || 0),
       future_rent:             stayType === "monthly" && futureRent ? Number(futureRent) : 0,
       future_rent_after_months: stayType === "monthly" && futureRent ? Number(futureRentMonths || 2) : 0,
-      // daily
       checkout_date:    stayType === "daily" ? checkoutDate : "",
       num_days:         stayType === "daily" ? numDays : 0,
       daily_rate:       stayType === "daily" ? Number(dailyRate) : 0,
@@ -138,17 +141,33 @@ export default function NewOnboardingPage() {
 
     setSubmitting(true)
     try {
-      const res = await fetch(`${API_URL}/api/onboarding/create`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
-        body:    JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`)
+      if (isDirect) {
+        // Direct check-in: tenant immediately added to DB, no form link
+        const res = await fetch(`${API_URL}/api/onboarding/direct-checkin`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
+          body:    JSON.stringify({ ...commonBody, name: tenantName.trim() }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`)
+        }
+        const data = await res.json()
+        setSuccess({ phone: tenantPhone.trim(), directCheckin: { name: data.name, room: data.room, building: data.building } })
+      } else {
+        // Session flow: create pending session, send WhatsApp link to tenant
+        const res = await fetch(`${API_URL}/api/onboarding/create`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
+          body:    JSON.stringify(commonBody),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`)
+        }
+        const data = await res.json()
+        setSuccess({ token: data.token, phone: tenantPhone.trim(), waSent: !!data.whatsapp_sent })
       }
-      const data = await res.json()
-      setSuccess({ token: data.token, phone: tenantPhone.trim(), waSent: !!data.whatsapp_sent })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed")
     } finally {
@@ -158,6 +177,48 @@ export default function NewOnboardingPage() {
 
   // ── Success screen ────────────────────────────────────────────────────────
   if (success) {
+    if (success.directCheckin) {
+      // Direct check-in success
+      return (
+        <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
+          <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+            <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
+            <span className="text-base font-extrabold text-ink">Checked In</span>
+          </div>
+          <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
+          <div className="text-center">
+            <h1 className="text-xl font-extrabold text-ink">Tenant Checked In!</h1>
+            <p className="text-sm text-status-ok font-medium mt-1">Added to DB and Sheet</p>
+          </div>
+          <div className="w-full max-w-sm bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-2">
+            <div className="flex justify-between py-1.5 border-b border-[#F5F5F5]">
+              <span className="text-xs text-ink-muted">Name</span>
+              <span className="text-xs font-semibold text-ink">{success.directCheckin.name}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-[#F5F5F5]">
+              <span className="text-xs text-ink-muted">Room</span>
+              <span className="text-xs font-semibold text-ink">{success.directCheckin.room} · {success.directCheckin.building}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-xs text-ink-muted">Phone</span>
+              <span className="text-xs font-semibold text-ink">{success.phone}</span>
+            </div>
+          </div>
+          <div className="flex gap-3 w-full max-w-sm">
+            <button onClick={() => { setSuccess(null); setTenantName("") }}
+              className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
+              + New
+            </button>
+            <button onClick={() => router.push("/")}
+              className="flex-1 rounded-pill bg-brand-pink py-3 text-white font-bold text-sm">
+              ← Home
+            </button>
+          </div>
+        </main>
+      )
+    }
+
+    // Session flow success
     const formLink = `${API_URL}/onboard/${success.token}`
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
@@ -240,6 +301,21 @@ export default function NewOnboardingPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Tenant name (optional — if filled, direct check-in; if blank, session flow) */}
+        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Tenant Name</p>
+          <Field label="Full name">
+            <input value={tenantName} onChange={e => setTenantName(e.target.value)}
+              placeholder="Enter name to check in directly (or leave blank to send form link)"
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2.5 text-sm text-ink outline-none focus:border-brand-pink" />
+          </Field>
+          {tenantName.trim() ? (
+            <p className="text-[10px] text-status-ok font-semibold mt-2">Direct check-in — tenant added immediately, no form needed</p>
+          ) : (
+            <p className="text-[10px] text-ink-muted mt-2">Leave blank to send a WhatsApp form link for tenant to fill their own details</p>
+          )}
         </div>
 
         {/* Room + sharing */}
@@ -430,7 +506,10 @@ export default function NewOnboardingPage() {
           disabled={submitting}
           className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80 disabled:opacity-40"
         >
-          {submitting ? "Creating session…" : "Create & Send WhatsApp Link →"}
+          {submitting
+            ? (isDirect ? "Checking in…" : "Creating session…")
+            : isDirect ? "Check In Directly →" : "Create & Send WhatsApp Link →"
+          }
         </button>
       </div>
       {showVoiceSheet && (

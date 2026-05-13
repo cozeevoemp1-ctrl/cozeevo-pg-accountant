@@ -335,6 +335,251 @@ async def create_session(req: CreateSessionRequest, request: Request):
         }
 
 
+# ── Direct check-in (receptionist handles everything, no tenant form) ─────────
+
+class DirectCheckinRequest(BaseModel):
+    name: str                         # required — what separates this from session flow
+    tenant_phone: str
+    room_number: str = ""
+    sharing_type: str = ""
+    agreed_rent: float
+    security_deposit: float = 0
+    maintenance_fee: float = 0
+    booking_amount: float = 0
+    advance_mode: str = ""
+    checkin_date: str
+    stay_type: str = "monthly"
+    lock_in_months: int = 0
+    checkout_date: str = ""
+    num_days: int = 0
+    daily_rate: float = 0
+    future_rent: float = 0
+    future_rent_after_months: int = 0
+    created_by_phone: str = ""
+
+
+@router.post("/direct-checkin")
+async def direct_checkin(req: DirectCheckinRequest, request: Request):
+    """Bypass session/form flow: receptionist enters all details, tenant is checked in immediately."""
+    _check_admin_pin(request)
+    _rate_check(f"direct:{request.client.host}", 10, 60)
+
+    import re as _re
+    _phone_digits = _re.sub(r"\D", "", req.tenant_phone or "")
+    if len(_phone_digits) < 10:
+        raise HTTPException(400, f"Tenant phone must be at least 10 digits — got '{req.tenant_phone}'")
+    if not req.name.strip():
+        raise HTTPException(400, "Tenant name is required for direct check-in")
+    if req.agreed_rent <= 0:
+        raise HTTPException(422, "agreed_rent must be > 0")
+    if req.booking_amount > 0 and not req.advance_mode:
+        raise HTTPException(400, "Payment method required when booking amount > 0")
+
+    phone = _phone_digits[-10:]  # normalise to 10 digits
+
+    async with get_session() as session:
+        # Blacklist check
+        from src.services.blacklist import check_blacklisted as _check_bl
+        _bl = await _check_bl(session, name=req.name, phone=req.tenant_phone)
+        if _bl:
+            raise HTTPException(403, f"Blacklisted: {_bl['reason']}. Contact Kiran if mistake.")
+
+        # Phone dedup
+        from src.services.room_occupancy import get_active_tenancy_by_phone, check_room_bookable
+        existing = await get_active_tenancy_by_phone(session, req.tenant_phone)
+        if existing:
+            _et, _etn, _er = existing
+            raise HTTPException(
+                409,
+                f"Phone {req.tenant_phone} already has an active tenancy for "
+                f"{_et.name} in Room {_er.room_number}. Checkout first."
+            )
+
+        # Room lookup
+        room = None
+        building = ""
+        if req.room_number.strip():
+            room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number.strip())))
+            if not room:
+                raise HTTPException(404, f"Room {req.room_number} not found")
+            if room.property_id:
+                prop = await session.get(Property, room.property_id)
+                building = prop.name if prop else ""
+            is_daily = req.stay_type == "daily"
+            checkout_for_guard = None
+            if is_daily and req.checkout_date:
+                checkout_for_guard = date.fromisoformat(req.checkout_date)
+            _, _err = await check_room_bookable(
+                session, room.room_number, date.fromisoformat(req.checkin_date),
+                checkout_for_guard, property_id=room.property_id,
+            )
+            if _err:
+                raise HTTPException(409, _err)
+
+        from src.database.models import SharingType
+        rt = room.room_type if room else None
+        sharing_str = (req.sharing_type or "").strip().lower() or (
+            rt.value if hasattr(rt, "value") else str(rt or "")
+        )
+        sharing_enum = None
+        if sharing_str in ("single", "double", "triple", "premium"):
+            try:
+                sharing_enum = SharingType(sharing_str)
+            except ValueError:
+                pass
+
+        checkin = date.fromisoformat(req.checkin_date)
+        is_daily = req.stay_type == "daily"
+
+        # Create or find tenant by phone
+        from sqlalchemy import select as _sel
+        existing_tenant = await session.scalar(_sel(Tenant).where(Tenant.phone == phone))
+        if existing_tenant:
+            tenant = existing_tenant
+            tenant.name = req.name.strip()  # update name if changed
+        else:
+            tenant = Tenant(
+                name=req.name.strip(),
+                phone=phone,
+            )
+            session.add(tenant)
+            await session.flush()
+
+        if is_daily:
+            checkout = date.fromisoformat(req.checkout_date) if req.checkout_date else (
+                checkin + __import__("datetime").timedelta(days=max(1, req.num_days or 1))
+            )
+            num_days = req.num_days or max(1, (checkout - checkin).days)
+            tenancy = Tenancy(
+                tenant_id=tenant.id,
+                room_id=room.id if room else None,
+                stay_type=StayType.daily,
+                status=TenancyStatus.active,
+                checkin_date=checkin,
+                checkout_date=checkout,
+                expected_checkout=checkout,
+                agreed_rent=req.daily_rate or 0,
+                booking_amount=req.booking_amount or 0,
+                maintenance_fee=req.maintenance_fee or 0,
+                sharing_type=sharing_enum,
+                entered_by="direct_checkin",
+            )
+            session.add(tenancy)
+            await session.flush()
+            if req.booking_amount > 0:
+                adv_mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.booking_amount,
+                    payment_date=checkin, payment_mode=adv_mode,
+                    for_type=PaymentFor.rent, notes="day-stay advance",
+                ))
+        else:
+            tenancy = Tenancy(
+                tenant_id=tenant.id,
+                room_id=room.id if room else None,
+                stay_type=StayType.monthly,
+                status=TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show,
+                checkin_date=checkin,
+                agreed_rent=req.agreed_rent,
+                security_deposit=req.security_deposit or 0,
+                booking_amount=req.booking_amount or 0,
+                maintenance_fee=req.maintenance_fee or 0,
+                lock_in_months=req.lock_in_months or 0,
+                sharing_type=sharing_enum,
+                entered_by="direct_checkin",
+            )
+            session.add(tenancy)
+            await session.flush()
+
+            # RentSchedule rows from checkin month → current month
+            from src.services.rent_schedule import first_month_rent_due
+            period = checkin.replace(day=1)
+            current_month = date.today().replace(day=1)
+            while period <= current_month:
+                session.add(RentSchedule(
+                    tenancy_id=tenancy.id, period_month=period,
+                    rent_due=first_month_rent_due(tenancy, period),
+                    maintenance_due=0,
+                    status=RentStatus.pending, due_date=period,
+                ))
+                if period.month == 12:
+                    period = date(period.year + 1, 1, 1)
+                else:
+                    period = date(period.year, period.month + 1, 1)
+
+            if req.booking_amount > 0:
+                adv_mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.booking_amount,
+                    payment_date=checkin, payment_mode=adv_mode,
+                    for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
+                    notes=f"Booking advance ({req.advance_mode})",
+                ))
+
+            if req.future_rent and req.future_rent_after_months:
+                N = req.future_rent_after_months
+                eff_month_idx = checkin.month - 1 + N
+                eff_year = checkin.year + eff_month_idx // 12
+                eff_month = eff_month_idx % 12 + 1
+                session.add(RentRevision(
+                    tenancy_id=tenancy.id,
+                    old_rent=req.agreed_rent,
+                    new_rent=req.future_rent,
+                    effective_date=date(eff_year, eff_month, 1),
+                    changed_by=req.created_by_phone or "direct_checkin",
+                    reason="planned_rent_increase",
+                    org_id=1,
+                ))
+
+        await session.flush()
+
+        # GSheets — best-effort
+        try:
+            phone_sheet = f"+91{phone}" if len(phone) == 10 else phone
+            if is_daily:
+                from src.integrations.gsheets import add_daywise_stay as _gsdw
+                await _gsdw(
+                    room_number=room.room_number if room else "TBD",
+                    tenant_name=req.name.strip(), phone=phone_sheet,
+                    building=building, sharing=sharing_str,
+                    daily_rate=float(req.daily_rate or 0),
+                    num_days=num_days, booking_amount=float(req.booking_amount or 0),
+                    total_paid=float(req.booking_amount or 0), maintenance=float(req.maintenance_fee or 0),
+                    checkin=checkin.strftime("%d/%m/%Y"),
+                    checkout=checkout.strftime("%d/%m/%Y"),
+                    status="ACTIVE", notes="", entered_by="direct_checkin",
+                )
+            else:
+                from src.integrations.gsheets import add_tenant as _gsat
+                await _gsat(
+                    room_number=room.room_number if room else "TBD",
+                    name=req.name.strip(), phone=phone_sheet,
+                    gender="", building=building,
+                    floor=str(room.floor or "") if room else "",
+                    sharing=sharing_str, checkin=checkin.strftime("%d/%m/%Y"),
+                    agreed_rent=float(req.agreed_rent), deposit=float(req.security_deposit or 0),
+                    booking=float(req.booking_amount or 0), maintenance=float(req.maintenance_fee or 0),
+                    notes="", dob="", father_name="", father_phone="", address="",
+                    emergency_contact="", emergency_contact_phone="", emergency_relationship="",
+                    email="", occupation="", education="", office_address="", office_phone="",
+                    id_type="", id_number="", food_pref="", entered_by="direct_checkin",
+                    advance_amount=float(req.booking_amount or 0), advance_mode=req.advance_mode or "",
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("direct_checkin GSheets sync failed: %s", e)
+
+        return {
+            "tenant_id": tenant.id,
+            "tenancy_id": tenancy.id,
+            "name": req.name.strip(),
+            "room": room.room_number if room else "TBD",
+            "building": building,
+            "checkin_date": checkin.isoformat(),
+            "stay_type": req.stay_type,
+        }
+
+
 # ── List pending sessions (admin) ────────────────────────────────────────────
 
 @router.get("/admin/stats")

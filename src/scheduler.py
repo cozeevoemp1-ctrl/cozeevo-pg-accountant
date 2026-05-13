@@ -372,7 +372,7 @@ async def _prep_reminder(when: str = "today") -> None:
             ok = await send_template(
                 phone,
                 "general_notice",
-                body_params=[name, template_body],
+                body_params=[template_body],
             )
             if ok:
                 sent += 1
@@ -552,7 +552,7 @@ async def _daily_reconciliation() -> None:
 
     engine = create_async_engine(_ASYNC_DB_URL, echo=False)
     today  = date.today()
-    period = today.strftime("%Y-%m-01")
+    period = date(today.year, today.month, 1)
 
     logger.info(f"[Scheduler] daily_reconciliation — {today}")
 
@@ -829,7 +829,7 @@ async def _checkout_deposit_alerts() -> None:
                 LEFT JOIN staff s ON s.id = tn.assigned_staff_id
                 WHERE tn.expected_checkout = :today
                   AND tn.status = 'active'
-            """), {"today": today.isoformat()})
+            """), {"today": today})
             monthly_checkouts = rows.fetchall()
 
             # Day-wise stays checking out today
@@ -841,7 +841,7 @@ async def _checkout_deposit_alerts() -> None:
                 FROM daywise_stays
                 WHERE checkout_date = :today
                   AND status = 'ACTIVE'
-            """), {"today": today.isoformat()})
+            """), {"today": today})
             daywise_checkouts = dw_rows.fetchall()
 
             if not monthly_checkouts and not daywise_checkouts:
