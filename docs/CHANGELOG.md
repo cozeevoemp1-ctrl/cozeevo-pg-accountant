@@ -2,6 +2,37 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.59] — 2026-05-13 — P&L: reclassify OE transactions + merge CAPEX into Furniture & Supplies OPEX
+
+### src/rules/pnl_classify.py
+- **Abolished "Operational Expenses" catch-all** — all 71 rows from `reclassify_review.xlsx` now land in specific categories
+- **volipi.l → Staff & Labour** (was OE); kastig soda override BEFORE volipi.l → Cleaning Supplies
+- **Mobile bills → IT & Software**: paybil3066, payair7673, office phone (jio/airtel recharge keywords)
+- **New Food & Groceries**: WholesaleMandi/Origin (origin903039, origin108856); Amazon grocery/India override before generic amazon
+- **New Fuel & Diesel**: Shell India petrol; bus ticket (staff travel)
+- **New Staff & Labour**: petty wages (lucky, muni arun k s, venkatachala, mishrilal, annayappa); staff medical (rxdxwhitefield, medicine for loki)
+- **New Cleaning Supplies**: Hinglaj Packaging
+- **New Marketing**: Naukri QR job posting
+- **New Shopping & Supplies**: Akhil Reddy (akhilreddy007420), Sansar Centre, 7829264915, Q531107921, 9902278720, SV2512112238, paytm-64646105 autopay, ME Services, Global Enterprises, madhu nursery, Chandrasekhar PG expense, paytmqr2810050501, Myntra (paytm-950206)
+- **New Furniture & Supplies**: Mirrors (q411763249); mirrors porte override → Shopping; Atta Mixing Machine (naveenmanly100100); Chairs & Study Tables (q962933392); Kitchen Equipment (9844532900); generic furniture/refurbish keywords; Elgis Fitness gym (was CAPEX)
+- **amazon (generic) → Furniture & Supplies** (was OE); Amazon grocery override to F&G before it
+
+### src/reports/pnl_builder.py
+- **CAPEX section removed** — both "Furniture & Fittings" + "Capital Investment" merged into new "Furniture & Supplies" OPEX line
+- **New OPEX "Furniture & Supplies"**: `[0, 207021, 286755, 212229, 1187771, 13998, 148679]` (old F&F + Cap.Inv. + newly classified items)
+- **Updated OPEX figures**: IT & Software (mobile bills added), Food & Groceries (WholesaleMandi/Amazon grocery), Fuel & Diesel (Shell/bus ticket), Staff & Labour (volipi.l + petty wages + medical), Cleaning Supplies (Hinglaj), Shopping & Supplies (new vendors), Marketing (Naukri QR)
+- **Label changed**: "EBITDA / OPERATING PROFIT" → "NET OPERATING PROFIT (True Revenue − All Opex incl. Furniture & Supplies)"
+- **ADJUSTED NET PROFIT** now: Operating Profit − Borrowed Money (CAPEX no longer a separate subtraction)
+- **Deployed to VPS** (commit 6d640c0); 52 unit tests pass
+
+### memory/reference_pnl_classifications.md
+- CAPEX section updated to "ABOLISHED 2026-05-13 — merged into Furniture & Supplies OPEX"
+- "Operational Expenses" OPEX entry replaced with "Furniture & Supplies" and "~~Operational Expenses~~ (ABOLISHED)"
+- Methodology decisions table updated: CAPEX merge, OE abolish, new NET OPERATING PROFIT label
+- All new vendor→category rules from this session appended to pnl_classify.py rules section
+
+---
+
 ## [1.75.58] — 2026-05-13 — P&L: borrowed money total + adjusted net profit + classification memory
 
 ### src/reports/pnl_builder.py
