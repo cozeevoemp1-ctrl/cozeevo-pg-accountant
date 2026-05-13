@@ -294,10 +294,9 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws[ws.max_row][0].font = Font(bold=True, color="FF0000")
     for f in [
         "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
-        "2. Apr rent of Rs.21,32,000 paid in May is outside this P&L window — will appear in May P&L.",
+        "2. Apr rent of Rs.20,49,100 paid in May is outside this P&L window — will appear in May P&L.",
         "3. Chandra advance (Mar Rs.32,789 + Apr Rs.38,111) — confirm these are Chandra's personal cash advances for PG ops, not company-paid cash already counted above.",
-        "4. Kiran advance ~Rs.1,10,897 total (Staff Rs.33K, Maint Rs.23K, Mktg Rs.18K, Govt Rs.12K, Food Rs.9K, Fuel Rs.9K, Internet Rs.3K, Operational Rs.2K, Shopping Rs.1K, IT Rs.500, Cleaning Rs.760). Provide month-by-month split to fill the Capital Contributions row.",
-        "5. Cash Exchange Repayments (in EXCLUDED): Nov Rs.5L Bharathi, Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.20.9L (YESMIDAS+Sravani+Sri Lakshmi), Apr Rs.22K. Bank RTGS repaid to people who gave you cash for ops — underlying spending already in OPEX above.",
+        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.20.9L (YESMIDAS+Sravani+Sri Lakshmi), Apr Rs.22K. Bank RTGS repaid to people who gave you cash for ops — underlying spending already in OPEX above.",
     ]:
         ws.append([f, ""])
 
