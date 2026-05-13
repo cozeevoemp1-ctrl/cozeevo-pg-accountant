@@ -7,13 +7,20 @@ Canonical P&L builder — single source of truth shared by:
 
 Both produce identical output. Verified figures as of 2026-05-12.
 See memory/sop_pnl.md for full methodology.
+
+Workbook tabs:
+  1. P&L — Full (incl Cash)   — all items, canonical report
+  2. Bank — Digital Only       — same layout; cash income + cash rent excluded
+  3. Rules Applied             — methodology notes
 """
 from __future__ import annotations
 
 import io
+from typing import Dict, List
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.worksheet.worksheet import Worksheet
 
 from src.utils.inr_format import INR_NUMBER_FORMAT
 
@@ -120,52 +127,62 @@ BANK_CLOSING_BALANCE_THOR = 1373863   # THOR acct ...0961 Apr 30
 BANK_CLOSING_BALANCE_HULK =  814941   # HULK acct ...0881 Apr 30
 
 CASH_IN_HAND = {
-    "Lakshmi cash":             1063500,  # Apr 30 confirmed
-    "Prabhakaran cash holding":  823350,  # Apr 30 confirmed
+    "Lakshmi cash (Mar closing ₹2,42,617 → Apr closing)":  820883,  # Apr 30 confirmed 2026-05-13
+    "Prabhakaran cash holding":                              524400,  # Apr 30 confirmed 2026-05-13
 }
 
+# ── Cash items to exclude for the Bank-Only tab ───────────────────────────────
+# Income key containing this fragment is skipped
+_CASH_INCOME_KEY  = "Cash (physical"
+# OPEX key containing this fragment is skipped
+_CASH_RENT_KEY    = "Property Rent — Cash paid"
 
-def build_pnl_workbook() -> openpyxl.Workbook:
-    """Return the canonical P&L workbook (Oct'25 – Apr'26)."""
+
+# ── Shared P&L sheet writer ───────────────────────────────────────────────────
+
+def _write_pnl_tab(
+    ws: Worksheet,
+    income_dict: Dict[str, List[int]],
+    opex_dict: Dict[str, List[int]],
+    tab_note: str = "",
+) -> None:
+    """
+    Render a complete P&L into *ws*.
+
+    income_dict / opex_dict are the (possibly filtered) subsets of INCOME / OPEX.
+    tab_note is shown in the top-left header cell when provided.
+    """
     bold       = Font(bold=True)
     hdr_fill   = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     hdr_font   = Font(bold=True, color="FFFFFF")
     total_fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
     flag_fill  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    ctr        = Alignment(horizontal="center")
     capex_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    ctr        = Alignment(horizontal="center")
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    assert ws is not None
-    ws.title = "P&L Summary"
-
-    # Op column (B) shows +/−/= for each row so the P&L flow is unambiguous
-    header = ["", "Op"] + MONTHS + ["TOTAL"]
+    header = [tab_note or "", "Op"] + MONTHS + ["TOTAL"]
     ws.append(header)
     for c in ws[1]:
         c.fill = hdr_fill; c.font = hdr_font; c.alignment = ctr
 
-    # 1. INCOME
+    # ── 1. INCOME ──────────────────────────────────────────────────────────────
     ws.append(["INCOME", ""])
     ws[ws.max_row][0].font = bold
-    for label, row in INCOME.items():
+    for label, row in income_dict.items():
         sign = "−" if "transferred to HULK" in label else "+"
         ws.append([label, sign] + row + [sum(row)])
-    rev_row = [sum(col) for col in zip(*INCOME.values())]
+    rev_row = [sum(col) for col in zip(*income_dict.values())]
     ws.append(["Total Gross Inflows", "="] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
 
-    # Deduct 1: active tenant deposits — liability, still owe back at exit
-    sec_dep_collected = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
+    sec_dep_collected   = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
     maint_fee_collected = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
-    sec_dep_neg = [-v for v in sec_dep_collected]
+    sec_dep_neg         = [-v for v in sec_dep_collected]
     ws.append(["  Less: Security Deposits held (active tenants — must return at exit)", "−"]
               + sec_dep_neg + [sum(sec_dep_neg)])
     ws[ws.max_row][0].font = Font(italic=True)
 
-    # Informational sub-row: maintenance fee retained alongside security deposit (not deducted — it's income)
     ws.append(["     └ Maintenance Fee retained from same tenants (non-refundable — yours to keep)", "(kept)"]
               + list(maint_fee_collected) + [sum(maint_fee_collected)])
     ws[ws.max_row][0].font = Font(italic=True, color="375623")
@@ -173,8 +190,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         if isinstance(c.value, (int, float)):
             c.font = Font(italic=True, color="375623")
 
-    # Deduct 2: deposits already refunded to exited tenants — collected but paid back (pass-through)
-    dep_refunded = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
+    dep_refunded     = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
     dep_refunded_neg = [-v for v in dep_refunded]
     ws.append(["  Less: Deposits Refunded to Exited Tenants (already paid back)", "−"]
               + dep_refunded_neg + [sum(dep_refunded_neg)])
@@ -186,17 +202,17 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = Font(bold=True, color="375623")
     ws.append([])
 
-    # 3. CAPITAL CONTRIBUTIONS
-    ws.append(["CAPITAL CONTRIBUTIONS (not P&L — owner's equity injections)", ""])
+    # ── 2. BORROWED MONEY / OWNER ADVANCES ────────────────────────────────────
+    ws.append(["BORROWED MONEY — Owner loans & advances (to be repaid, not P&L)", ""])
     ws[ws.max_row][0].font = bold
     for label, row in CAPITAL_CONTRIBUTIONS.items():
         ws.append([label, "↑"] + row + [sum(row)])
     ws.append([])
 
-    # 4. OPERATING EXPENSES
+    # ── 3. OPERATING EXPENSES ──────────────────────────────────────────────────
     ws.append(["OPERATING EXPENSES (accrual)", ""])
     ws[ws.max_row][0].font = bold
-    for label, row in OPEX.items():
+    for label, row in opex_dict.items():
         ws.append([label, "−"] + row + [sum(row)])
         if "TBD" in label or "⚠" in label:
             for c in ws[ws.max_row]:
@@ -207,13 +223,13 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     for label, row in EXCLUDED.items():
         ws.append(["  " + label, "(B/S)"] + row + [sum(row)])
 
-    opex_row = [sum(col) for col in zip(*OPEX.values())]
+    opex_row = [sum(col) for col in zip(*opex_dict.values())]
     ws.append(["Total Opex", "="] + opex_row + [sum(opex_row)])
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 5. EBITDA / OPERATING PROFIT (true rent revenue − opex)
+    # ── 4. EBITDA ──────────────────────────────────────────────────────────────
     op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
     ws.append(["EBITDA / OPERATING PROFIT (on True Revenue)", "="] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
@@ -224,7 +240,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
               + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
-    # 6. CAPEX
+    # ── 5. CAPEX ───────────────────────────────────────────────────────────────
     ws.append(["CAPEX — ONE-TIME INVESTMENTS", ""])
     ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
     ws[ws.max_row][0].fill = capex_fill
@@ -238,7 +254,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         c.font = bold; c.fill = total_fill
     ws.append([])
 
-    # 7. NET PROFIT AFTER CAPEX
+    # ── 6. NET PROFIT AFTER CAPEX ──────────────────────────────────────────────
     profit_row = [op - cx for op, cx in zip(op_profit_row, capex_row)]
     ws.append(["NET PROFIT AFTER CAPEX", "="] + profit_row + [sum(profit_row)])
     for c in ws[ws.max_row]:
@@ -249,16 +265,14 @@ def build_pnl_workbook() -> openpyxl.Workbook:
               + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
-    # 8. CASH POSITION
-    # _sec_collected = pure refundable security deposits owed to active tenants
+    # ── 7. CASH POSITION ───────────────────────────────────────────────────────
+    # Pure refundable security deposits owed to active tenants
     # Combined total ₹33,83,875 included maintenance ₹10,68,700 — maintenance is non-refundable
     # True refundable liability = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
-    _sec_collected  = 2315175
-    _bank_total     = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
+    _sec_collected = 2315175
+    _bank_total    = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
+    _cash_total    = sum(CASH_IN_HAND.values())
 
-    _cash_total = sum(CASH_IN_HAND.values())
-
-    # Cash position rows show a single snapshot figure — placed in the Apr'26 column (position 8)
     ws.append(["CASH POSITION (Apr 30)", ""])
     ws[ws.max_row][0].font = bold
     ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
@@ -289,7 +303,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws.append(["As revenue grows, bank balance will recover and exceed deposit liability", "", "", "", "", "", "", "", ""])
     ws.append([])
 
-    # 9. FLAGS
+    # ── 8. FLAGS ───────────────────────────────────────────────────────────────
     ws.append(["⚠ ITEMS NEEDING KIRAN REVIEW", ""])
     ws[ws.max_row][0].font = Font(bold=True, color="FF0000")
     for f in [
@@ -300,7 +314,7 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ]:
         ws.append([f, ""])
 
-    # Number format — skip col A (i=0) and Op col B (strings are skipped automatically)
+    # ── Formatting ─────────────────────────────────────────────────────────────
     for row in ws.iter_rows(min_row=2, max_col=len(header)):
         for i, cell in enumerate(row):
             if i == 0 or cell.value is None or isinstance(cell.value, str):
@@ -308,39 +322,72 @@ def build_pnl_workbook() -> openpyxl.Workbook:
             if isinstance(cell.value, (int, float)):
                 cell.number_format = INR_NUMBER_FORMAT
 
-    # Centre-align the Op column
     for row in ws.iter_rows(min_row=1, min_col=2, max_col=2):
         for cell in row:
             cell.alignment = Alignment(horizontal="center")
 
-    ws.column_dimensions["A"].width = 58
-    ws.column_dimensions["B"].width = 6   # Op column
+    ws.column_dimensions["A"].width = 62
+    ws.column_dimensions["B"].width = 6
     for col_letter in "CDEFGHIJ":
         ws.column_dimensions[col_letter].width = 14
 
-    # Sheet 2: Sub-category detail from DB (dynamic — call build_pnl_workbook_with_subcats for this)
-    ws2 = wb.create_sheet("Rules Applied")
+
+def build_pnl_workbook() -> openpyxl.Workbook:
+    """
+    Return the canonical P&L workbook (Oct'25 – Apr'26).
+
+    Tabs:
+      1. P&L — Full (incl Cash)   — all items including cash income + cash rent
+      2. Bank — Digital Only       — same layout; cash income + cash rent excluded
+      3. Rules Applied             — methodology notes
+    """
+    wb = openpyxl.Workbook()
+
+    # ── Tab 1: Full P&L (canonical — all items) ────────────────────────────────
+    ws_full = wb.active
+    assert ws_full is not None
+    ws_full.title = "P&L — Full (incl Cash)"
+    _write_pnl_tab(ws_full, INCOME, OPEX)
+
+    # ── Tab 2: Bank / Digital-only P&L ────────────────────────────────────────
+    # Removes: cash income from tenants + cash rent paid to owners
+    # Useful for: loan applications, bank-verified reporting, digital economy view
+    ws_bank = wb.create_sheet("Bank — Digital Only")
+    income_bank = {k: v for k, v in INCOME.items() if _CASH_INCOME_KEY not in k}
+    opex_bank   = {k: v for k, v in OPEX.items()   if _CASH_RENT_KEY   not in k}
+    _write_pnl_tab(
+        ws_bank,
+        income_bank,
+        opex_bank,
+        tab_note="Bank / Digital Only — excl. cash income from tenants + cash rent paid to owners",
+    )
+
+    # ── Tab 3: Rules Applied ───────────────────────────────────────────────────
+    ws_rules = wb.create_sheet("Rules Applied")
     rules = [
         ("Basis", "Accrual — expense in month of service, not payment"),
         ("Income source", "Bank statement credits (verified). Cash from DB payments table."),
-        ("Property Rent", "Rs.22,14,000/mo accrual (164 beds × Rs.13,500). Feb–Apr. Nov-Jan zero (notice period)."),
+        ("Property Rent", "Rs.13,000 × 164 beds = Rs.21,32,000/mo (Jan–Jun 2026). Rs.13,500 × 164 = Rs.22,14,000/mo from Jul 2026."),
         ("Water — Manoj B (9535665407)", "Cash basis. Apr = tanker Rs.42,020 + Mar bill Rs.42,500."),
         ("Internet & WiFi", "Cash-basis. Jan: Airwire Rs.70,730. Feb: 8x Razorpay Rs.1,13,168. Mar-Dec: Rs.0 (prepaid)."),
         ("Police", "Rs.3,000/mo cash accrual Jan onwards."),
         ("Waste Disposal", "Rs.3,500/mo (Pavan 6366411789)."),
         ("Prabhakaran (9444296681)", "All payments = Staff & Labour salary."),
         ("CAPEX", "Furniture & Fittings + CCTV/8-Ball Pool. Chairs/kitchen/atta machine moved to Operational Expenses."),
-        ("Excluded from opex", "Tenant Deposit Refunds (liability) + Loan Repayments (non-operating)."),
+        ("Excluded from opex", "Tenant Deposit Refunds (liability) + Cash Exchange Repayments (non-operating)."),
+        ("Bank-Only tab", "Removes 'Cash (physical)' from income and 'Property Rent — Cash paid' from OPEX. Net effect: cash in ~= cash out so EBITDA is similar; useful for bank-verified view."),
+        ("Rent Jan-Jun", "Rs.21,32,000/mo fixed (Rs.13,000 × 164 beds). From Jul: Rs.22,14,000/mo (Rs.13,500 × 164)."),
+        ("Variable ops benchmark", "Non-rent OPEX ~Rs.9L/mo at 270 beds (91% occ). Variable cost ~Rs.3,333/bed. Fixed staff/contracts ~Rs.2.7L."),
     ]
-    ws2.append(["Rule", "Detail"])
-    for c in ws2[1]:
+    ws_rules.append(["Rule", "Detail"])
+    for c in ws_rules[1]:
         c.fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
         c.font = Font(bold=True, color="FFFFFF")
     for k, v in rules:
-        ws2.append([k, v])
-    ws2.column_dimensions["A"].width = 40
-    ws2.column_dimensions["B"].width = 110
-    for row in ws2.iter_rows():
+        ws_rules.append([k, v])
+    ws_rules.column_dimensions["A"].width = 40
+    ws_rules.column_dimensions["B"].width = 120
+    for row in ws_rules.iter_rows():
         for cell in row:
             cell.alignment = Alignment(wrap_text=True, vertical="top")
 

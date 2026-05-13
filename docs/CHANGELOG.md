@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.52] — 2026-05-13 — Bank-only P&L tab + OPEX analysis + forecast model
+
+### pnl_builder.py — refactored to shared writer + new tabs
+- **Refactor:** extracted `_write_pnl_tab(ws, income_dict, opex_dict)` — single shared renderer
+- **Tab 1:** "P&L — Full (incl Cash)" — canonical report (all items, renamed from "P&L Summary")
+- **Tab 2:** "Bank — Digital Only" — same layout but removes:
+  - `Cash (physical — both buildings combined)` from income
+  - `Property Rent — Cash paid` from OPEX
+  - Result: bank-only EBITDA slightly higher (~₹10.0L Apr) than full EBITDA (₹9.4L Apr) because cash collected (₹13.9L) < cash rent paid (₹14.5L) — cash economy is a ₹0.6L/month drag
+- **Tab 3:** "Rules Applied" updated — rent formula corrected to ₹13,000×164=₹21.32L (Jan–Jun) / ₹13,500×164=₹22.14L (Jul+); forecast benchmarks added
+- **Excel regenerated** → `data/reports/PnL_Accrual_2026_05_13.xlsx`
+
+### OPEX analysis + forecast model (this session)
+- **Rent corrected:** ₹20.5L → ₹21.32L/month (₹13,000 × 164 beds, Jan–Jun 2026); ₹22.14L from Jul
+- **OPEX actual:** Mar ₹29.3L, Apr ₹30.3L — previous ₹28.2L estimate was understated
+- **OPEX split:** Rent ₹21.32L fixed + Non-rent ~₹9L at 270 beds (91% occ)
+- **Variable model (corrected):**
+  - Fixed: Rent ₹21.32L + fixed ops (staff/waste/police/maintenance) ₹2.7L = ₹24.0L total fixed
+  - Variable: ~₹2,593/bed (food, electricity, water, fuel, cleaning ~₹7L at 270 beds)
+  - Break-even: ~66% (211 beds)
+- **Forecast (91% current):** EBITDA ₹9.4L/month = ₹1.12Cr/year
+- **July rent hike impact:** +₹82K/month fixed cost = −₹9.84L/year EBITDA
+
 ## [1.75.51] — 2026-05-12 — Security deposit / maintenance fee split fix
 
 ### pnl_builder.py — critical deduction fix
