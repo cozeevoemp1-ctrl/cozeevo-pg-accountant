@@ -570,7 +570,7 @@
     <div class="step-title">Personal Details</div>
     <div class="step-subtitle">Let's start with your basic information</div>
 
-    <!-- Room card + Photo card side by side, same height -->
+    <!-- Room card — only shown when session has pre-filled room/rent data -->
     <div id="room-summary-card" class="room-photo-row" style="display:none;">
       <div class="room-card">
         <h3>Your Room Booking</h3>
@@ -601,6 +601,10 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Photo card — always shown regardless of session type -->
+    <div style="display:flex; justify-content:center; margin-bottom:12px;">
       <div class="photo-card" id="selfie-upload-area">
         <input type="file" id="selfie-input" accept="image/*" capture="user" style="display:none;" onchange="handleSelfieUpload(this)">
         <div id="selfie-preview-wrap">
