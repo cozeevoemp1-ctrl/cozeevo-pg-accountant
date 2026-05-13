@@ -55,6 +55,9 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("IT & Software",        "Hostinger (VPS Hosting)",      ["hostinger","hostingerpteltd"]),
     ("IT & Software",        "Think Straight (Software)",    ["think straight","thinkstraight"]),
     ("IT & Software",        "KIPINN (Software/ISP)",        ["kipinn","kipnn","kipi nn","kipin"]),
+    ("IT & Software",        "Mobile Bill (paybil3066)",     ["paybil3066"]),
+    ("IT & Software",        "Mobile Bill (payair7673)",     ["payair7673"]),
+    ("IT & Software",        "Office Phone Bill",            ["bill paid - post paid","paid - mobile recharge","recharge of jio mobile"]),
 
     # ── INTERNET & WIFI ───────────────────────────────────────────────────────
     # Keep Airtel/Jio/Vi as specific merchant strings only — raw "airtel"/"jio" matches
@@ -63,31 +66,35 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Internet & WiFi",      "Airtel Recharge (Direct)",     ["airtelpredirect"]),
     ("Internet & WiFi",      "WiFi Vendor",                  ["wifi","wi-fi","broadband"]),
 
-    # ── FURNITURE & FITTINGS ──────────────────────────────────────────────────
-    ("Furniture & Fittings", "Wakefit - Mattresses",         ["wakefit"]),
+    # ── FURNITURE & SUPPLIES — all furniture/equipment from PG bank (2026-05-13: CAPEX folded into OPEX) ─────
+    ("Furniture & Supplies", "Wakefit - Mattresses",         ["wakefit"]),
     # Lakshmi SBI direct vendor payments (initial setup — never through THOR/HULK)
-    ("Furniture & Fittings", "Griham Decor (Furniture)",         ["griham decor","griham"]),
-    ("Furniture & Fittings", "Naveen Kumar (Gym Setup)",         ["naveen kumar"]),
-    ("Furniture & Fittings", "Lavanya Ravishankar (Fittings)",   ["lavanya ravishankar","lavanya"]),
-    ("Furniture & Fittings", "Kumar UC (Fittings)",              ["kumar.u.c","kumar uc"]),
-    ("Furniture & Fittings", "Carpets / Flooring",               ["floors and carpet","carpet"]),
-    ("Furniture & Fittings", "Decor Studio (Plants/Decor)",      ["decor studio"]),
-    ("Furniture & Fittings", "Plants / Nursery (SBI)",           ["madeena nursery","amartradingco","amar trading"]),
-    ("Furniture & Fittings", "Kaizen (Fire Extinguishers)",      ["kaizen"]),
-    ("Furniture & Fittings", "Architect Fee",                    ["architect"]),
+    ("Furniture & Supplies", "Griham Decor (Furniture)",         ["griham decor","griham"]),
+    ("Furniture & Supplies", "Naveen Kumar (Gym Setup)",         ["naveen kumar"]),
+    ("Furniture & Supplies", "Lavanya Ravishankar (Fittings)",   ["lavanya ravishankar","lavanya"]),
+    ("Furniture & Supplies", "Kumar UC (Fittings)",              ["kumar.u.c","kumar uc"]),
+    ("Furniture & Supplies", "Carpets / Flooring",               ["floors and carpet","carpet"]),
+    ("Furniture & Supplies", "Decor Studio (Plants/Decor)",      ["decor studio"]),
+    ("Furniture & Supplies", "Plants / Nursery (SBI)",           ["madeena nursery","amartradingco","amar trading"]),
+    ("Furniture & Supplies", "Kaizen (Fire Extinguishers)",      ["kaizen"]),
+    ("Furniture & Supplies", "Architect Fee",                    ["architect"]),
     ("Marketing",            "Signs & Signages",                 ["signs and signages","signage"]),
-    ("Furniture & Fittings", "Bedsheets / Linen",            ["bedsheet","bed sheet"]),
-    ("Furniture & Fittings", "Shoe Rack / Rack",             ["shoe rack","rack balance","9108617776"]),
-    ("Furniture & Fittings", "Curtains",                     ["curtain"]),
-    ("Furniture & Fittings", "Bedframes (Grace Traders)",    ["grace trader","bedframe","bed frame"]),
-    ("Furniture & Fittings", "Usha Trading (TV/Equipment)",  ["usha trading","usha t rading"]),
-    ("Furniture & Fittings", "Cot Placement / Labour",       ["cot placement","cot place","cot plac","jubair"]),
-    ("Furniture & Fittings", "Porter / Delivery",            ["porter fee","porter","bed frames porter"]),
-    ("Furniture & Fittings", "Wardrobes",                    ["wardrobe","mahinmeman7705","sungle wardrobe"]),
-    ("Furniture & Fittings", "3-Sharing Beds",               ["3 sharing bed","9035767529"]),
-    ("Furniture & Fittings", "Mirrors",                      ["q411763249","mirrors"]),
-    ("Furniture & Fittings", "Mixer (Kitchen)",              ["q566549919"]),
-    ("Furniture & Fittings", "Other Furniture / Fittings",   ["furniture","refurbish","3d bo","laughing bud"]),
+    ("Furniture & Supplies", "Bedsheets / Linen",            ["bedsheet","bed sheet"]),
+    ("Furniture & Supplies", "Shoe Rack / Rack",             ["shoe rack","rack balance","9108617776"]),
+    ("Furniture & Supplies", "Curtains",                     ["curtain"]),
+    ("Furniture & Supplies", "Bedframes (Grace Traders)",    ["grace trader","bedframe","bed frame"]),
+    ("Furniture & Supplies", "Usha Trading (TV/Equipment)",  ["usha trading","usha t rading"]),
+    ("Furniture & Supplies", "Cot Placement / Labour",       ["cot placement","cot place","cot plac","jubair"]),
+    ("Furniture & Supplies", "Porter / Delivery",            ["porter fee","porter","bed frames porter"]),
+    ("Furniture & Supplies", "Wardrobes",                    ["wardrobe","mahinmeman7705","sungle wardrobe"]),
+    ("Furniture & Supplies", "3-Sharing Beds",               ["3 sharing bed","9035767529"]),
+    ("Shopping & Supplies",  "Mirrors — Small Purchase",     ["mirrors porte"]),   # volipi.l small buy; before generic mirrors
+    ("Furniture & Supplies", "Mirrors",                      ["q411763249","mirrors"]),
+    ("Furniture & Supplies", "Mixer (Kitchen)",              ["q566549919"]),
+    ("Furniture & Supplies", "Atta Mixing Machine",          ["naveenmanly100100"]),
+    ("Furniture & Supplies", "Chairs & Study Tables",        ["q962933392"]),
+    ("Furniture & Supplies", "Kitchen Equipment / Vessels",  ["9844532900"]),
+    ("Furniture & Supplies", "Other Furniture / Supplies",   ["furniture","refurbish","3d bo","laughing bud"]),
 
     # ── FOOD & GROCERIES ──────────────────────────────────────────────────────
     ("Food & Groceries",     "Grocery - Virani Trading",     ["virani"]),
@@ -98,7 +105,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Food & Groceries",     "Vegetables & Greens",          ["vegetable","veggies","veggie","greens","tomato","chilli","cucumber","lemon","coriander","pudina","paneer","curd","vangi"]),
     ("Food & Groceries",     "Ninjacart (Veg Supplier)",     ["ninjacart","ninja kart","ninjakart","ninja cart","paytm-7102662","paytm-30461933","oidninj"]),
     ("Food & Groceries",     "Zepto / Blinkit / Swiggy",     ["zepto","blinkit","swiggystores","swiggy484","swiggy","instamart","zeptonow"]),
-    ("Food & Groceries",     "WholesaleMandi / Origin",      ["wholesalemandi","wholesale mandi","origin903039","origin108856"]),
+    ("Food & Groceries",     "Amazon Grocery / India",       ["amazon pay groceries","amazon india"]),  # must be before generic amazon→F&S
+    ("Food & Groceries",     "WholesaleMandi / Origin",      ["wholesalemandi","wholesale mandi","origin903039","origin108856","paid to origin"]),
     ("Food & Groceries",     "D-Mart / Retail",              ["dmart","d-mart","innovdmart"]),
     ("Food & Groceries",     "Cooking Oil / Masala",         ["oil","ruchi gold","basmati rice","rice"]),
     ("Food & Groceries",     "HP Gas",                       ["hp gas","q947171136"]),
@@ -121,6 +129,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Fuel & Diesel",        "Diesel (8951297583)",           ["8951297583"]),
     ("Fuel & Diesel",        "Bus Tickets (PayBus)",         ["paybus8261"]),
     ("Fuel & Diesel",        "Travel / Bus (Paytm)",         ["travel1paytm","paytm bus: "]),
+    ("Fuel & Diesel",        "Petrol / Shell India",         ["shell india"]),
+    ("Fuel & Diesel",        "Bus Ticket (Staff Travel)",    ["bus ticket"]),
 
     # ── STAFF & LABOUR ────────────────────────────────────────────────────────
     ("Staff & Labour",       "Salary - Arjun (NEFT)",        ["joshi arjun","yesob6021"]),
@@ -152,6 +162,12 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff Mobile Recharge (Jio)",  ["jioinappdirect"]),
     ("Staff & Labour",       "Staff Mobile Recharge (Vi)",   ["viinappguj"]),
     ("Staff & Labour",       "Labour - Cash Exchange (ESOB Tanti)", ["7993273966"]),
+    # volipi.l — ops vendor; specific description overrides must come first
+    ("Cleaning Supplies",    "Kastig Soda (volipi.l)",       ["kastig soda"]),          # before generic volipi.l rule
+    ("Staff & Labour",       "Staff - volipi.l (Salary)",    ["volipi.l"]),
+    # Small person-name payments — Jan/Feb confirmed staff wages by Kiran 2026-05-13
+    ("Staff & Labour",       "Staff - Petty Wages",          ["paid to lucky","muni arun k s","venkatachala","mishrilal","annayappa"]),
+    ("Staff & Labour",       "Staff Medical",                ["rxdxwhitefield","medical for loki","medicine for loki"]),
 
     # ── GOVT & REGULATORY ─────────────────────────────────────────────────────
     ("Govt & Regulatory",    "BBMP Tax / Property Bill",     ["bbmp","bbpsbp"]),
@@ -182,6 +198,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Marketing",            "Ad Board / Sun Boards",        ["9845068141","sun board","sunboard"]),
     ("Marketing",            "Flyers / Banners",             ["flyers","flyer","banner","flags"]),
     ("Marketing",            "FindMyPG Listing",             ["find my pg","findmypg"]),
+    ("Marketing",            "Job Posting - Naukri",         ["naukri.qr8"]),
     ("Marketing",            "Marketing / Promotions",       ["marketing","advertisement"]),
 
     # ── WASTE DISPOSAL ────────────────────────────────────────────────────────
@@ -194,22 +211,25 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Cleaning Supplies",    "Mop / Cleaning Tools",         ["mop","broom","knife sharpen"]),
     ("Cleaning Supplies",    "Room Freshener / Hooks",       ["room freshner","freshner","hooks"]),
     ("Cleaning Supplies",    "AdBlue (DG Exhaust Fluid)",    ["adblue","ad blu","as blue"]),
+    ("Cleaning Supplies",    "Hinglaj Packaging (Supplies)", ["hinglaj packaging"]),
 
     # ── SHOPPING & SUPPLIES ───────────────────────────────────────────────────
-    ("Furniture & Fittings", "Elgis Fitness — Gym CAPEX",     ["elgis"]),
-    # Amazon goes to Operational Expenses per Kiran's rule
-    ("Operational Expenses", "Amazon",                       ["amazon"]),
-    ("Operational Expenses", "Job Posting - Naukri",         ["naukri.qr8"]),
-    ("Operational Expenses", "Atta Mixing Machine",          ["naveenmanly100100"]),
-    ("Operational Expenses", "Chairs & Study Tables",        ["q962933392"]),
-    ("Operational Expenses", "Kitchen Equipment",            ["9844532900"]),
-    ("Operational Expenses", "Misc - akhilreddy007420",      ["akhilreddy007420"]),
-    ("Operational Expenses", "Volipi - Ops Vendor",          ["volipi.l"]),
-    ("Operational Expenses", "Staff Medical",                ["rxdxwhitefield","medical for loki","medicine for loki"]),
-    ("Operational Expenses", "Mobile Recharge (paybil3066)",  ["paybil3066"]),
-    ("Operational Expenses", "Mobile Recharge (payair7673)",  ["payair7673"]),
-    ("Operational Expenses", "Staff Mobile / Recharge",      ["recharge of jio mobile","recharge of airtel mobile","bill paid - post paid","paid - mobile recharge","hinglaj packaging","shell india markets"]),
-    ("Operational Expenses", "Nursery / Plants",             ["nursery","madeena nursery","madhu — nursery"]),
+    # ── FURNITURE & SUPPLIES (continued — Amazon for PG, Elgis gym) ─────────────
+    ("Furniture & Supplies", "Elgis Fitness — Gym CAPEX",    ["elgis"]),
+    ("Furniture & Supplies", "Amazon (PG Purchases)",        ["amazon"]),             # generic Amazon after F&G override above
+    # ── SHOPPING & SUPPLIES ───────────────────────────────────────────────────
+    ("Shopping & Supplies",  "Akhil Reddy (PG Setup Purchases)", ["akhilreddy007420"]),
+    ("Shopping & Supplies",  "Sansar Centre (Office Supplies)",  ["sansar centre"]),
+    ("Shopping & Supplies",  "Ops UPI (7829264915)",         ["7829264915"]),
+    ("Shopping & Supplies",  "Ops UPI (Q531)",               ["q531107921"]),
+    ("Shopping & Supplies",  "Ops UPI (9902278720)",         ["9902278720"]),
+    ("Shopping & Supplies",  "Ops UPI (SV2512)",             ["sv2512112238"]),
+    ("Shopping & Supplies",  "Paytm Autopay (Ops)",          ["paytm-64646105"]),
+    ("Shopping & Supplies",  "ME Services",                  ["me services"]),
+    ("Shopping & Supplies",  "Global Enterprises",           ["global enterprises"]),
+    ("Shopping & Supplies",  "Nursery / Plants (Ops Decor)", ["madhu — nursery"]),
+    ("Shopping & Supplies",  "Chandrasekhar PG Expense",     ["chandrasekhar — pg expenses","chandrasekhar — 1 lakh"]),
+    ("Shopping & Supplies",  "Paytm QR Merchant",            ["paytmqr2810050501"]),
     ("Shopping & Supplies",  "Myntra",                       ["paytm-950206","myntra order"]),
     ("Shopping & Supplies",  "Flipkart",                     ["flipkart"]),
     ("Shopping & Supplies",  "BharatPE (POS Payments)",      ["bharatpe","bharat pe"]),

@@ -68,34 +68,35 @@ CAPITAL_CONTRIBUTIONS = {
 OPEX = {
     "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 1532000, 1290000, 1449100],  # Feb+Apr Kiran confirmed; Mar corrected to 12,90,000 (Kiran 2026-05-12)
     "Property Rent — Bank UPI/RTGS paid":                                  [0, 0, 0, 0,  600000,  605140,  600000],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
-    "Electricity":                                                [0, 0, 74768,   131554,  134538,   96617,  140659],  # Dec: BESCOM via BBPSBP@ybl (was misclassified as BBMP Tax)
+    "Electricity":                                                [0, 0, 74768,   131554,  134538,   96617,  140659],  # Dec: BESCOM via BBPSBP@ybl
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
-    "IT & Software":                                              [0, 0, 3480,     11120,       0,       0,       0],  # Jan +500 Shrinivas IT band (Kiran PhonePe Jan 6)
+    "IT & Software":                                              [0, 0, 3480,     12068,     934,    1128,    2348],  # Jan +948 office phone; Feb +934 mobile recharge; Mar +1128 paybil/payair; Apr +2348. Updated 2026-05-13
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
-    "Food & Groceries":                                           [0, 33632, 113787, 216418,  114803,  240294,  238122],  # Dec +6616 HP gas cash; Feb +2195 Chandra cash. Updated 2026-05-12 (DB+cash reconcile, prev+this session reclassify)
-    "Fuel & Diesel":                                              [0, 0, 1200,      9099,  105866,  355971,   61578],  # Dec +1000 HP Auto cash; Feb +1500 Chandra; Mar +6370 Chandra diesel. Apr: 8951297583 diesel ₹49679 reclassified from Other
-    "Staff & Labour":                                             [0, 1000, 135435, 115924, 233715,  188341,  193617],  # Dec +500 cash porter; Mar +32600 cash labour. Updated 2026-05-12 (Vivek+Bhukesh reclassified from Other)
-    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,    1850,   21899,   36919],  # Jan +22450 cash (KAIZEN+Chandra); Mar +900 Chandra elec. Dec: key maker+carpenter from Other
-    "Cleaning Supplies":                                          [0, 0, 5674,       1400,    1200,   11272,   17975],  # Dec +760 SLN cash. Triveni (9448259556/9989000250) + Wellcare reclassified from Other
+    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  238878],  # Jan +1086 Origin veg; Feb +792 Amazon India food; Apr +756 Ratnadeep fruits. Updated 2026-05-13
+    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  355971,   61904],  # Jan +500 Shell India; Apr +326 volipi.l bus ticket. Updated 2026-05-13
+    "Staff & Labour":                                             [0, 1000, 135435, 116714, 234295,  217341,  193617],  # Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-13
+    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,    1850,   21899,   36919],
+    "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
-    "Shopping & Supplies":                                        [0, 2730, 35548,  12153,   6127,    6184,    9858],  # Dec +1020 stickers cash; Dec D-Mart ₹23998 (tpasha638) reclassified from Other
-    "Operational Expenses":                                       [0, 318, 121970,  18388,   5815,   34950,  146594],  # Dec +1713 cash. Updated 2026-05-12 (volipi, PERSONAL_SBI, Chandra advances, mobile recharges from Other)
-    "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,       0],  # Dec +17773 cash + 15000 Kiran personal (PG marketing 3rd ₹7500 + marketing ₹7500). Jan: ₹17700 reclassified from Other. Feb: Saurav flyers ₹4000
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     94073,   3000,    3000,    3000],  # Dec: 948 BBMP + 6000 garbage fine cash (74768 BESCOM moved to Electricity); Jan +6000 BBMP cash
+    # Shopping & Supplies — small operational purchases (akhil setup, misc UPI, nursery decor, CHANDRASEKHAR ops advance etc.)
+    # Updated 2026-05-13: reclassified all items from Operational Expenses; Nov nursery; Dec: Chandra 70K+akhil 28.7K+cash 1.7K; Jan: akhil+Q531; Feb: SV251+paytm+ME+Global+paytmqr; Mar: 9902+volipi.l 444+balaji; Apr: volipi.l mirrors
+    "Shopping & Supplies":                                        [0, 3048, 136960,  18323,   7662,    7770,   10258],
+    # Furniture & Supplies — ALL furniture, equipment, Amazon purchases from PG bank (2026-05-13: CAPEX folded into OPEX per Kiran)
+    # Old CAPEX (F&F + Capital Inv) + chairs ₹47K + atta machine ₹21K + kitchen vessels ₹37.5K + Amazon all months
+    # Nov: F&F 125021 + CCTV/8-Ball 82000. Dec: F&F 167741 + CCTV 100000 + Amazon 19014. Jan: F&F 203815 + Amazon 8414 (4707+3707 cash-counter). Feb: F&F 1185597 + Amazon 2174. Mar: F&F 10761 + Amazon 3237. Apr: F&F 12363 + chairs 47000 + atta 21060 + kitchen 37500 + Amazon 30756
+    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  13998,  148679],
+    "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003],  # Apr +1003 Naukri job posting. Updated 2026-05-13
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     94073,   3000,    3000,    3000],
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 15987, 2781,     700,     200,   32789,   38111],  # Nov +10669 Mr V AKIL (Kiran PhonePe); Jan +700 RADHAKRISHNAN E (Kiran PhonePe). Updated 2026-05-12
+    "Other Expenses":                                             [0, 15987, 2781,     700,       0,   32789,   38111],  # Feb: paytmqr ₹200 reclassified to Shopping & Supplies. Updated 2026-05-13
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
     # Detail: data/reports/SBI_0167_Reimbursement.xlsx
     "Partner Reimbursable (Personal Acct SBI 0167)":            [0,     0,     0, 41899,  18264,     750,    6928],
 }
-
-CAPEX = {
-    # THOR/HULK Yes Bank + Lakshmi SBI direct vendor payments combined
-    "Furniture & Fittings":                    [0, 125021, 167741, 203815, 1185597,  10761,  12363],  # Nov: -24800 Lavanya (net). Updated 2026-05-12: porter charges (bed frames, shoe racks, study tables) + photo frame reclassified from Other
-    "Capital Investment (CCTV, 8 Ball Pool)":  [0,  82000, 100000,      0,       0,     0,      0],  # Dec +100000 Unisol CCTV system (Kiran cash Dec 2025)
-}
+# NOTE: CAPEX removed 2026-05-13 per Kiran — all furniture/equipment spent from PG bank account
+# folded into OPEX as "Furniture & Supplies". No separate CAPEX section.
 
 EXCLUDED = {
     # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
@@ -157,7 +158,6 @@ def _write_pnl_tab(
     hdr_font   = Font(bold=True, color="FFFFFF")
     total_fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
     flag_fill  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    capex_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     ctr        = Alignment(horizontal="center")
 
     header = [tab_note or "", "Op"] + MONTHS + ["TOTAL"]
@@ -237,7 +237,7 @@ def _write_pnl_tab(
 
     # ── 4. EBITDA ──────────────────────────────────────────────────────────────
     op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
-    ws.append(["EBITDA / OPERATING PROFIT (on True Revenue)", "="] + op_profit_row + [sum(op_profit_row)])
+    ws.append(["NET OPERATING PROFIT (True Revenue − All Opex incl. Furniture & Supplies)", "="] + op_profit_row + [sum(op_profit_row)])
     for c in ws[ws.max_row]:
         c.font = bold
 
@@ -246,32 +246,7 @@ def _write_pnl_tab(
               + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
     ws.append([])
 
-    # ── 5. CAPEX ───────────────────────────────────────────────────────────────
-    ws.append(["CAPEX — ONE-TIME INVESTMENTS", ""])
-    ws[ws.max_row][0].font = Font(bold=True, color="FFFFFF")
-    ws[ws.max_row][0].fill = capex_fill
-    for ci in range(2, len(header) + 1):
-        ws.cell(ws.max_row, ci).fill = capex_fill
-    for label, row in CAPEX.items():
-        ws.append([label, "−"] + row + [sum(row)])
-    capex_row = [sum(col) for col in zip(*CAPEX.values())]
-    ws.append(["Total CAPEX", "="] + capex_row + [sum(capex_row)])
-    for c in ws[ws.max_row]:
-        c.font = bold; c.fill = total_fill
-    ws.append([])
-
-    # ── 6. NET PROFIT AFTER CAPEX ──────────────────────────────────────────────
-    profit_row = [op - cx for op, cx in zip(op_profit_row, capex_row)]
-    ws.append(["NET PROFIT AFTER CAPEX", "="] + profit_row + [sum(profit_row)])
-    for c in ws[ws.max_row]:
-        c.font = bold
-
-    margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, true_rev_row)]
-    ws.append(["Net Margin %", ""] + margin_row
-              + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
-    ws.append([])
-
-    # ── 6b. ADJUSTED PROFIT (after deducting borrowed money) ──────────────────
+    # ── 5. ADJUSTED PROFIT (after deducting borrowed money) ───────────────────
     borrowed_neg = [-v for v in borrowed_row]
     ws.append(["  Less: Borrowed Money to repay (owner loans — must be paid back)", "−"]
               + borrowed_neg + [sum(borrowed_neg)])
@@ -280,7 +255,7 @@ def _write_pnl_tab(
         if isinstance(c.value, (int, float)):
             c.font = Font(italic=True, color="9C0006")
 
-    adjusted_row = [p - b for p, b in zip(profit_row, borrowed_row)]
+    adjusted_row = [p - b for p, b in zip(op_profit_row, borrowed_row)]
     ws.append(["ADJUSTED NET PROFIT (after repaying all owner loans)", "="]
               + adjusted_row + [sum(adjusted_row)])
     for c in ws[ws.max_row]:
