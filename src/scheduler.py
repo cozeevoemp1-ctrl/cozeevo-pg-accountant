@@ -127,26 +127,25 @@ def start_scheduler() -> AsyncIOScheduler:
 
     # ── Register jobs ──────────────────────────────────────────────────────────
 
-    # Rent reminder tiers — all active tenants via approved Meta templates.
-    # Day -1: last day of month (advance notice for next month's rent)
-    scheduler.add_job(
-        _rent_reminder,
-        trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
-        id="rent_reminder_advance",
-        name="Rent Reminder — Day -1 (last day of month)",
-        replace_existing=True,
-        kwargs={"mode": "advance"},
-    )
-    # 1st, 3rd, 5th of month — general_notice to unpaid tenants only
-    for _day, _id in [(1, "rent_reminder_day1"), (3, "rent_reminder_day3"), (5, "rent_reminder_day5")]:
-        scheduler.add_job(
-            _rent_reminder,
-            trigger=CronTrigger(day=_day, hour=9, minute=0, timezone="Asia/Kolkata"),
-            id=_id,
-            name=f"Rent Reminder — Day {_day} (overdue tenants)",
-            replace_existing=True,
-            kwargs={"mode": "overdue_daily"},
-        )
+    # !! RENT REMINDERS DISABLED — Kiran 2026-05-13. Do NOT re-enable without explicit instruction.
+    # !! Use PWA to send manually when needed.
+    # scheduler.add_job(
+    #     _rent_reminder,
+    #     trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
+    #     id="rent_reminder_advance",
+    #     name="Rent Reminder — Day -1 (last day of month)",
+    #     replace_existing=True,
+    #     kwargs={"mode": "advance"},
+    # )
+    # for _day, _id in [(1, "rent_reminder_day1"), (3, "rent_reminder_day3"), (5, "rent_reminder_day5")]:
+    #     scheduler.add_job(
+    #         _rent_reminder,
+    #         trigger=CronTrigger(day=_day, hour=9, minute=0, timezone="Asia/Kolkata"),
+    #         id=_id,
+    #         name=f"Rent Reminder — Day {_day} (overdue tenants)",
+    #         replace_existing=True,
+    #         kwargs={"mode": "overdue_daily"},
+    #     )
 
     scheduler.add_job(
         _daily_reconciliation,
@@ -218,7 +217,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
 
     scheduler.start()
-    logger.info("[Scheduler] Started — 9 jobs registered (jobs persist in Supabase)")
+    logger.info("[Scheduler] Started — 5 jobs registered (rent reminders disabled 2026-05-13)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -256,7 +255,7 @@ async def _prep_reminder(when: str = "today") -> None:
     Prabhakaran, Lakshmi, and Lokesh (7680814628, receptionist).
     """
     from datetime import timedelta
-    from src.whatsapp.reminder_sender import send_template
+    from src.whatsapp.webhook_handler import _send_whatsapp
 
     today = date.today()
     if when == "tomorrow":
@@ -360,29 +359,19 @@ async def _prep_reminder(when: str = "today") -> None:
             ph_part = f" ({ph})" if ph else ""
             lines.append(f"• Room {rn} — {nm}{ph_part}")
 
-    # Send via approved "general_notice" template so Meta delivers outside the
-    # 24-hour customer-service window. Body in Meta: "Hi {{1}}, {{2}} - Cozeevo
-    # Co-living" — Meta caps body params at 1024 chars, so truncate defensively
-    # even though prep reminders rarely get close.
     msg = "\n".join(lines)
-    # Meta rejects newlines/tabs in template body params — flatten to single line
-    template_body = msg.replace("\n", " | ").replace("\t", " ")[:1000]
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await send_template(
-                phone,
-                "general_notice",
-                body_params=[template_body],
-            )
+            ok = await _send_whatsapp(phone, msg)
             if ok:
                 sent += 1
-                logger.info(f"[Scheduler] prep_reminder ({when}) — template sent to {phone} ({name})")
+                logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
             else:
-                logger.warning(f"[Scheduler] prep_reminder ({when}) — template send FAILED to {phone}")
+                logger.warning(f"[Scheduler] prep_reminder ({when}) — send FAILED to {phone}")
         except Exception as e:
             logger.warning(f"[Scheduler] prep_reminder ({when}) — send to {phone} exception: {e}")
-    logger.info(f"[Scheduler] prep_reminder ({when}) — {sent}/{len(admin_recipients)} delivered via template")
+    logger.info(f"[Scheduler] prep_reminder ({when}) — {sent}/{len(admin_recipients)} delivered")
 
 
 # ── Job: Rent Reminders ────────────────────────────────────────────────────────
