@@ -1006,6 +1006,38 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
             except Exception as _e:
                 _log.warning("Signature upload failed: %s", _e)
 
+        # Phone uniqueness checks — run BEFORE saving tenant_data
+        import re as _re2
+        _phone_raw = _re2.sub(r"\D", "", req.phone or "")
+        _phone10 = _phone_raw[-10:] if len(_phone_raw) >= 10 else _phone_raw
+
+        # Block if this phone already has an active/no_show tenancy
+        from src.services.room_occupancy import get_active_tenancy_by_phone
+        _existing = await get_active_tenancy_by_phone(session, _phone10)
+        if _existing:
+            _et, _etn, _er = _existing
+            raise HTTPException(
+                409,
+                f"Phone {req.phone} is already registered to {_et.name} in Room {_er.room_number}. "
+                "Each person must use their own phone number."
+            )
+
+        # Cancel any other pending sessions for this phone (avoid duplicate bookings)
+        from sqlalchemy import text as _text
+        await session.execute(
+            _text(
+                "UPDATE onboarding_sessions SET status='cancelled', cancellation_reason='superseded' "
+                "WHERE tenant_phone=:phone AND status IN ('pending_tenant','pending_review') AND token != :token"
+            ),
+            {"phone": _phone10, "token": token},
+        )
+
+        # Store normalised phone on session so receptionist-side dedup sees it
+        await session.execute(
+            _text("UPDATE onboarding_sessions SET tenant_phone=:phone WHERE token=:token"),
+            {"phone": _phone10, "token": token},
+        )
+
         tenant_data = req.model_dump(exclude={"signature_image", "id_photo", "selfie_photo"})
         tenant_data["saved_files"] = saved_files  # paths for approve step
         obs.tenant_data = json.dumps(tenant_data)

@@ -143,7 +143,7 @@ app.include_router(chat_router)
 from src.api.reminder_router import router as reminder_router
 app.include_router(reminder_router)
 
-from src.api.onboarding_router import router as onboarding_router, _check_admin_pin
+from src.api.onboarding_router import router as onboarding_router, _check_admin_pin, _rate_check
 app.include_router(onboarding_router)
 
 from src.api.checkout_router import router as checkout_router
@@ -292,8 +292,9 @@ if docs_dir.exists():
     app.mount("/documents", StaticFiles(directory=str(docs_dir)), name="documents")
 
 @app.get("/qr")
-async def qr_entry(building: str = ""):
+async def qr_entry(request: Request, building: str = ""):
     """Static QR at building entrance → generate unique 2-hour session → redirect to onboarding form."""
+    _rate_check(f"qr:{request.client.host if request.client else 'unknown'}", 3, 3600)  # 3/hr per IP
     import uuid as _uuid
     from datetime import datetime as _dt, timedelta as _td
     from src.database.db_manager import get_session as _get_session
