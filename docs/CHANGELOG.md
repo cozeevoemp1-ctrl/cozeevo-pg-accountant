@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.58] — 2026-05-13 — P&L: borrowed money total + adjusted net profit + classification memory
+
+### src/reports/pnl_builder.py
+- **Borrowed Money total row** — added bold red total row at end of CAPITAL CONTRIBUTIONS section; sums all owner loan/advance columns across all months
+- **Adjusted Net Profit** — new section 6b after Net Profit After CAPEX: "Less: Borrowed Money to repay" + "ADJUSTED NET PROFIT (after repaying all owner loans)"; green if positive, red if negative
+- Excel regenerated → `data/reports/PnL_Accrual_2026_05_13.xlsx`
+- **VPS deploy pending** (pnl_builder.py not yet redeployed)
+
+### Shared-phone tenant fixes (2026-05-13)
+- Prateek Singh Khutail: phone fixed to 9971427645 in DB; payments verified correct
+- Sanskar Bharadia: phone fixed to 7742488168 in DB; payments verified correct
+- Siddharth N. Linge: phone fixed to 7666862904; Delvin's APR+MAY payments (₹25,000 mis-added) voided + moved to correct tenancy
+- Delvin Raj: phone fixed to 7510688159; APR cash ₹11,500 + APR UPI ₹13,500 + MAY UPI ₹13,500 added to correct tenancy
+- is_void=NULL bug: 3 raw-SQL inserts (ids 15367/15368/15369) had NULL is_void; fixed with UPDATE SET is_void=false
+
+### memory/reference_pnl_classifications.md (rewrite + extension)
+- Complete rewrite with every INCOME / CAPITAL / OPEX / CAPEX line documented with Kiran's confirmed comments
+- Added "Classify These (77 rows)" section from other_expenses_classify.xlsx — which items are now resolved vs still unknown
+- Added pnl_classify.py confirmed vendor→category rule summary
+- Rule 11 added to rules_workflow.md: save every classification decision immediately to this file
+
+### scripts/_fix_db_to_match_sheet.py
+- Fixed phone aggregation bug: replaced total-by-phone with phone-grouping + name-check
+- Same-name rows aggregate (correct); different-name rows get SKIPped (safe)
+- Committed and pushed
+
+---
+
 ## [1.75.57] — 2026-05-13 — QR walk-in onboarding + bookings page + phone dedup
 
 ### QR walk-in flow (main.py)

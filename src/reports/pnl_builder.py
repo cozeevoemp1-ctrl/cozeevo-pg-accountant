@@ -207,6 +207,12 @@ def _write_pnl_tab(
     ws[ws.max_row][0].font = bold
     for label, row in CAPITAL_CONTRIBUTIONS.items():
         ws.append([label, "↑"] + row + [sum(row)])
+    borrowed_row = [sum(col) for col in zip(*CAPITAL_CONTRIBUTIONS.values())]
+    ws.append(["Total Borrowed Money (owners must be repaid this)", "="] + borrowed_row + [sum(borrowed_row)])
+    for c in ws[ws.max_row]:
+        c.font = Font(bold=True, color="9C0006")
+        if isinstance(c.value, (int, float)):
+            c.fill = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
     ws.append([])
 
     # ── 3. OPERATING EXPENSES ──────────────────────────────────────────────────
@@ -263,6 +269,26 @@ def _write_pnl_tab(
     margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(profit_row, true_rev_row)]
     ws.append(["Net Margin %", ""] + margin_row
               + [f"{(sum(profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
+    ws.append([])
+
+    # ── 6b. ADJUSTED PROFIT (after deducting borrowed money) ──────────────────
+    borrowed_neg = [-v for v in borrowed_row]
+    ws.append(["  Less: Borrowed Money to repay (owner loans — must be paid back)", "−"]
+              + borrowed_neg + [sum(borrowed_neg)])
+    ws[ws.max_row][0].font = Font(italic=True, color="9C0006")
+    for c in ws[ws.max_row][2:]:
+        if isinstance(c.value, (int, float)):
+            c.font = Font(italic=True, color="9C0006")
+
+    adjusted_row = [p - b for p, b in zip(profit_row, borrowed_row)]
+    ws.append(["ADJUSTED NET PROFIT (after repaying all owner loans)", "="]
+              + adjusted_row + [sum(adjusted_row)])
+    for c in ws[ws.max_row]:
+        c.font = Font(bold=True, color="375623" if sum(adjusted_row) >= 0 else "9C0006")
+        if isinstance(c.value, (int, float)):
+            c.fill = PatternFill(start_color="E2EFDA" if sum(adjusted_row) >= 0 else "FCE4D6",
+                                 end_color="E2EFDA" if sum(adjusted_row) >= 0 else "FCE4D6",
+                                 fill_type="solid")
     ws.append([])
 
     # ── 7. CASH POSITION ───────────────────────────────────────────────────────
