@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.54] — 2026-05-13 — Scheduler: rent reminders disabled + prep reminder delivery fix
+
+### src/scheduler.py
+- **Rent reminder auto-jobs DISABLED** — all 4 jobs (advance, day1, day3, day5) commented out per Kiran instruction 2026-05-13. Tenant rent reminders must now be sent manually via PWA. Do NOT re-enable without explicit instruction.
+- **Prep reminder delivery fixed** — `_prep_reminder` was using `send_template("general_notice", ...)` which is a tenant-facing Meta approved template; admins were not receiving the 9am/2pm check-in/checkout briefings. Switched to `_send_whatsapp()` direct message — Kiran, Lakshmi, Prabhakaran will now receive these.
+- **Lokesh excluded from prep reminders** — recipient query already changed to `role IN ('admin', 'owner')` (deployed earlier); do not add receptionist role back without explicit approval.
+- Job count updated in startup log: 9 → 5.
+- Deployed: commit 7883a51 → VPS active.
+
 ## [1.75.53] — 2026-05-13 — April/May payment sync + DB/sheet reconciliation complete
 
 ### April + May 2026 — DB now matches source sheet exactly
