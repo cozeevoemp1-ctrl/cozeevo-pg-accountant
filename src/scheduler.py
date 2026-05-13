@@ -315,8 +315,9 @@ async def _prep_reminder(when: str = "today") -> None:
             admin_rows = (await conn.execute(text("""
                 SELECT phone, COALESCE(NULLIF(name, ''), 'team') AS name
                 FROM authorized_users
-                WHERE role IN ('admin', 'owner', 'receptionist') AND active = TRUE
+                WHERE role IN ('admin', 'owner') AND active = TRUE
             """))).fetchall()
+            # NOTE: receptionist excluded per Kiran instruction 2026-05-13 — do not add back without explicit approval
     finally:
         await engine.dispose()
 
