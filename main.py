@@ -13,7 +13,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -290,6 +290,28 @@ async def serve_media(path: str, request: Request):
 docs_dir = Path(os.getenv("DATA_DOCUMENTS_DIR", "./data/documents"))
 if docs_dir.exists():
     app.mount("/documents", StaticFiles(directory=str(docs_dir)), name="documents")
+
+@app.get("/qr")
+async def qr_entry(building: str = ""):
+    """Static QR at building entrance → generate unique 2-hour session → redirect to onboarding form."""
+    import uuid as _uuid
+    from datetime import datetime as _dt, timedelta as _td
+    from src.database.db_manager import get_session as _get_session
+    from src.database.models import OnboardingSession as _OBS
+
+    token = str(_uuid.uuid4())
+    building_hint = building.upper().strip()
+    async with _get_session() as _s:
+        _s.add(_OBS(
+            token=token,
+            status="pending_tenant",
+            special_terms=f"QR initiated — building: {building_hint}" if building_hint else "QR initiated",
+            expires_at=_dt.utcnow() + _td(hours=2),
+            created_by_phone="qr_scan",
+        ))
+        await _s.commit()
+    return RedirectResponse(url=f"/onboard/{token}", status_code=302)
+
 
 @app.get("/onboard/{token}", response_class=HTMLResponse)
 async def serve_onboarding_form(token: str):
