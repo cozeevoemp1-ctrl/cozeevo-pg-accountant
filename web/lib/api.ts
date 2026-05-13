@@ -136,6 +136,8 @@ export interface KpiDetailItem {
   building?: string;   // dues items: "THOR" | "HULK"
   deposit_eligible?: boolean;  // notices tile only
   upcoming_checkin?: string | null;  // vacant items: earliest future no-show checkin date (ISO)
+  is_overdue?: boolean;   // no_show items: checkin_date has passed
+  days_overdue?: number;  // no_show items: days since expected checkin
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
@@ -886,6 +888,18 @@ export async function assignUpiEntry(rrn: string, tenancyId: number, periodMonth
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}))
     throw new Error((detail as { detail?: string }).detail ?? `Assign failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function cancelNoShow(tenancyId: number): Promise<{ ok: boolean; name: string }> {
+  const headers = await _authHeaders()
+  const res = await fetch(`${BASE_URL}/api/v2/app/tenancies/${tenancyId}/cancel-no-show`, {
+    method: "POST", headers,
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error((detail as { detail?: string }).detail ?? `Cancel failed: ${res.status}`)
   }
   return res.json()
 }

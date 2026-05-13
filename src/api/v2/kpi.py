@@ -429,15 +429,24 @@ async def get_kpi_detail(
                 )
                 .order_by(Tenancy.checkin_date)
             )).all()
-            return {"type": type, "items": [
-                {
+            items = []
+            for r in rows:
+                overdue = r.checkin_date is not None and r.checkin_date < today
+                days_late = (today - r.checkin_date).days if overdue and r.checkin_date else 0
+                detail = (
+                    f"{days_late}d overdue (was {r.checkin_date.strftime('%-d %b')})"
+                    if overdue
+                    else f"Check-in: {r.checkin_date.strftime('%-d %b') if r.checkin_date else '—'}"
+                )
+                items.append({
                     "tenancy_id": r.id,
                     "name": r.name,
                     "room": r.room_number,
-                    "detail": f"Check-in: {r.checkin_date.strftime('%-d %b') if r.checkin_date else '—'}",
-                }
-                for r in rows
-            ]}
+                    "detail": detail,
+                    "is_overdue": overdue,
+                    "days_overdue": days_late,
+                })
+            return {"type": type, "items": items}
 
         elif type == "notices":
             rows = (await session.execute(

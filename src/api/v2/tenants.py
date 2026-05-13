@@ -735,3 +735,43 @@ async def delete_tenant(
         await session.commit()
 
     return {"deleted": True, "tenancy_id": tenancy_id}
+
+
+@router.post("/tenancies/{tenancy_id}/cancel-no-show")
+async def cancel_no_show(tenancy_id: int, user: AppUser = Depends(get_current_user)):
+    """Cancel a no-show booking — set status to cancelled, checkout_date to today."""
+    today = date.today()
+    async with get_session() as session:
+        row = (await session.execute(
+            select(Tenancy, Tenant, Room)
+            .join(Tenant, Tenant.id == Tenancy.tenant_id)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(Tenancy.id == tenancy_id)
+        )).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Tenancy not found")
+        tenancy, tenant, room = row
+        if tenancy.status != TenancyStatus.no_show:
+            raise HTTPException(status_code=400, detail=f"Tenancy status is '{tenancy.status.value}', expected 'no_show'")
+
+        await session.execute(
+            text("UPDATE tenancies SET status='cancelled', checkout_date=:today WHERE id=:id"),
+            {"today": today, "id": tenancy_id},
+        )
+
+        audit = AuditLog(
+            changed_by=user.phone or user.user_id,
+            entity_type="tenancy",
+            entity_id=tenancy_id,
+            entity_name=tenant.name if tenant else str(tenancy_id),
+            field="status",
+            old_value="no_show",
+            new_value="cancelled",
+            room_number=room.room_number if room else None,
+            source="dashboard",
+            note="Booking cancelled: tenant did not check in (no-show)",
+        )
+        session.add(audit)
+        await session.commit()
+
+    return {"ok": True, "tenancy_id": tenancy_id, "name": tenant.name if tenant else ""}

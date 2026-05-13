@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
-import { getKpiDetail, getTenantDues, type KpiDetailItem, type TenantDues } from "@/lib/api";
+import { getKpiDetail, getTenantDues, cancelNoShow, type KpiDetailItem, type TenantDues } from "@/lib/api";
 import { rupee, rupeeL } from "@/lib/format";
 import type { KpiResponse } from "@/lib/api";
 
@@ -119,6 +119,8 @@ interface PanelProps {
   detailLoading: boolean;
   selectItem: (item: KpiDetailItem) => void;
   setSelected: (v: TenantDues | null) => void;
+  cancellingId: number | null;
+  onCancel: (item: KpiDetailItem) => void;
 }
 
 function ExpansionPanel({
@@ -130,6 +132,7 @@ function ExpansionPanel({
   stayFilter, setStayFilter,
   buildingFilter, setBuildingFilter,
   filtered, loading, selected, detailLoading, selectItem, setSelected,
+  cancellingId, onCancel,
 }: PanelProps) {
   return (
     <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
@@ -235,9 +238,18 @@ function ExpansionPanel({
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
-          {!loading && filtered.length > 0 && (
-            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} total</p>
-          )}
+          {!loading && filtered.length > 0 && (() => {
+            const overdue = filtered.filter((it) => it.is_overdue).length;
+            return (
+              <div className="flex items-center justify-between">
+                {overdue > 0
+                  ? <span className="text-[10px] font-bold text-[#991B1B] bg-[#FEE2E2] px-2 py-0.5 rounded-pill">{overdue} overdue</span>
+                  : <span />
+                }
+                <span className="text-[10px] font-bold text-brand-pink">{filtered.length} total</span>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -330,7 +342,12 @@ function ExpansionPanel({
                     )}
                     {open === "vacant" && item.upcoming_checkin && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
-                        Booked {new Date(item.upcoming_checkin).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        Until {new Date(item.upcoming_checkin).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
+                    {open === "no_show" && item.is_overdue && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">
+                        {item.days_overdue}d late
                       </span>
                     )}
                     <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
@@ -362,6 +379,15 @@ function ExpansionPanel({
                   >
                     Check-in →
                   </Link>
+                )}
+                {open === "no_show" && item.is_overdue && item.tenancy_id && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCancel(item); }}
+                    disabled={cancellingId === item.tenancy_id}
+                    className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-[#991B1B] px-2.5 py-1 rounded-full active:opacity-70 disabled:opacity-50"
+                  >
+                    {cancellingId === item.tenancy_id ? "…" : "Cancel →"}
+                  </button>
                 )}
               </div>
             ))}
@@ -403,6 +429,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
 
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const cache = useRef<Map<string, KpiDetailItem[]>>(
     new Map(Object.entries(initialDetails ?? {}))
@@ -472,6 +499,23 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     setDetailLoading(false);
   }
 
+  async function onCancel(item: KpiDetailItem) {
+    if (!item.tenancy_id) return;
+    if (!confirm(`Cancel booking for ${item.name} (Room ${item.room})? This cannot be undone.`)) return;
+    setCancellingId(item.tenancy_id);
+    try {
+      await cancelNoShow(item.tenancy_id);
+      // Refresh no_show list
+      cache.current.delete("no_show");
+      const res = await getKpiDetail("no_show");
+      cache.current.set("no_show", res.items);
+      setItems(res.items);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Cancel failed");
+    }
+    setCancellingId(null);
+  }
+
   const filtered = items.filter((it) => {
     if (open === "dues") {
       const matchName =
@@ -523,6 +567,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     stayFilter, setStayFilter,
     buildingFilter, setBuildingFilter,
     filtered, loading, selected, detailLoading, selectItem, setSelected,
+    cancellingId, onCancel,
   };
 
   const leftStyle: React.CSSProperties = { left: 0, width: "calc(200% + 0.75rem)" };
