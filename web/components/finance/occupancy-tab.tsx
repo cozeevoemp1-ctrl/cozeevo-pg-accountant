@@ -80,8 +80,8 @@ export function OccupancyTab() {
 
     // Font size scales with chart width: small on phone, larger when fullscreen
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dynFs = (chart: any, min = 8, max = 11) =>
-      Math.max(min, Math.min(max, Math.round(chart.width / 40)))
+    const dynFs = (chart: any, min = 7, max = 9) =>
+      Math.max(min, Math.min(max, Math.round(chart.width / 55)))
 
     // Inline plugin — draws value labels above line chart points
     const occLabelPlugin = {
@@ -90,6 +90,7 @@ export function OccupancyTab() {
       afterDatasetsDraw(chart: any) {
         const { ctx } = chart
         const fs = dynFs(chart)
+        const chartTop = chart.chartArea.top
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         chart.data.datasets.forEach((ds: any, i: number) => {
           if (ds.yAxisID !== "yOcc") return
@@ -98,14 +99,17 @@ export function OccupancyTab() {
           meta.data.forEach((pt: any, j: number) => {
             const pct = Number(ds.data[j])
             const beds = months[j]?.occ_beds ?? 0
+            // clamp so labels never render outside the chart canvas
+            const yBeds = Math.max(chartTop + fs + 2, pt.y - Math.round(fs * 2.2))
+            const yPct  = Math.max(chartTop + fs * 2.5, pt.y - Math.round(fs * 0.8))
             ctx.save()
             ctx.fillStyle = "#ffffff"
             ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`${beds}`, pt.x, pt.y - Math.round(fs * 2.8))
+            ctx.fillText(`${beds}`, pt.x, yBeds)
             ctx.fillStyle = "rgba(255,255,255,0.75)"
-            ctx.fillText(`${pct}%`, pt.x, pt.y - Math.round(fs * 1.2))
+            ctx.fillText(`${pct}%`, pt.x, yPct)
             ctx.restore()
           })
         })
@@ -126,12 +130,14 @@ export function OccupancyTab() {
           meta.data.forEach((pt: any, j: number) => {
             const v = Number(ds.data[j])
             if (!v) return
+            const chartTop = chart.chartArea.top
+            const yLabel = Math.max(chartTop + fs + 2, pt.y - Math.round(fs * 0.9))
             ctx.save()
             ctx.fillStyle = "#F4C842"
             ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - Math.round(fs * 1.2))
+            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, yLabel)
             ctx.restore()
           })
         })
