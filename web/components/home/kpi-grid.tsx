@@ -619,7 +619,7 @@ function ExpansionPanel({
                       </span>
                     )}
                     <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
-                    {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && (
+                    {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && open !== "dues" && (
                       <span className="text-xs text-brand-pink font-bold">
                         {selected?.tenancy_id === item.tenancy_id ? "▾" : "›"}
                       </span>
@@ -656,6 +656,15 @@ function ExpansionPanel({
                   >
                     {cancellingId === item.tenancy_id ? "…" : "Cancel →"}
                   </button>
+                )}
+                {open === "dues" && item.tenancy_id && (
+                  <Link
+                    href={`/payment/new?tenancy_id=${item.tenancy_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                  >
+                    Collect →
+                  </Link>
                 )}
                 {open === "vacant" && (
                   <button
