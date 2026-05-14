@@ -1114,7 +1114,7 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
                     f"Phone: {req.phone}\n"
                     f"Room: {room_str}\n\n"
                     f"Please review and approve:\n"
-                    f"{os.getenv('BASE_URL', 'https://api.getkozzy.com')}/admin/onboarding"
+                    f"{os.getenv('PWA_URL', 'https://app.getkozzy.com')}/onboarding/bookings"
                 )
             except Exception:
                 pass  # non-fatal
