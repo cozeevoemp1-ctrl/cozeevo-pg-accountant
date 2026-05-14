@@ -26,6 +26,16 @@ function daysLabel(days: number): { text: string; color: string } {
   return { text: `${days}d left`, color: "text-ink-muted" }
 }
 
+function monthKey(iso: string): string {
+  // "2026-05-31" → "2026-05"
+  return iso.slice(0, 7)
+}
+
+function monthLabel(key: string): string {
+  const [, m] = key.split("-")
+  return ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m)]
+}
+
 export default function NoticesPage() {
   const router = useRouter()
   const [items,        setItems]        = useState<NoticeItem[]>([])
@@ -33,6 +43,8 @@ export default function NoticesPage() {
   const [error,        setError]        = useState("")
   const [showSearch,   setShowSearch]   = useState(false)
   const [searchQuery,  setSearchQuery]  = useState("")
+  const [sortDir,      setSortDir]      = useState<"asc" | "desc">("asc")
+  const [monthFilter,  setMonthFilter]  = useState<string>("all")
   const [editItem,     setEditItem]     = useState<NoticeItem | null>(null)
   const [editDate,     setEditDate]     = useState("")
   const [editSaving,   setEditSaving]   = useState(false)
@@ -52,19 +64,47 @@ export default function NoticesPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Unique checkout months for filter chips
+  const months = useMemo(() => {
+    const keys = [...new Set(items.map(i => monthKey(i.expected_checkout)))]
+    return keys.sort()
+  }, [items])
+
   const filtered = useMemo(() => {
+    let src = [...items]
+    // Month filter
+    if (monthFilter !== "all") src = src.filter(i => monthKey(i.expected_checkout) === monthFilter)
+    // Search
     const q = searchQuery.trim().toLowerCase()
-    const src = [...items].sort((a, b) => a.days_remaining - b.days_remaining)
-    if (!q) return src
-    return src.filter(i =>
+    if (q) src = src.filter(i =>
       i.tenant_name.toLowerCase().includes(q) ||
       i.room_number.toLowerCase().includes(q) ||
       i.phone.includes(q)
     )
-  }, [items, searchQuery])
+    // Sort
+    src.sort((a, b) => {
+      const diff = a.days_remaining - b.days_remaining
+      return sortDir === "asc" ? diff : -diff
+    })
+    return src
+  }, [items, searchQuery, sortDir, monthFilter])
 
-  const eligible    = filtered.filter(i =>  i.has_notice &&  i.deposit_eligible)
-  const forfeited   = filtered.filter(i =>  i.has_notice && !i.deposit_eligible)
+  // Summary stats
+  const totalBeds    = useMemo(() => filtered.reduce((s, i) => s + i.beds_freed, 0), [filtered])
+  const fullRooms    = useMemo(() => {
+    const seen = new Set<string>()
+    let count = 0
+    for (const i of filtered) {
+      if (i.is_full_exit && !seen.has(i.room_number)) {
+        seen.add(i.room_number)
+        count++
+      }
+    }
+    return count
+  }, [filtered])
+
+  const eligible  = filtered.filter(i => i.deposit_eligible)
+  const forfeited = filtered.filter(i => !i.deposit_eligible)
 
   function openEdit(item: NoticeItem) {
     setEditItem(item)
@@ -135,15 +175,70 @@ export default function NoticesPage() {
         </button>
       </div>
 
-      {/* Search bar */}
-      <div className="px-4 pt-3 pb-1 max-w-lg mx-auto">
+      {/* Summary bar */}
+      {!loading && items.length > 0 && (
+        <div className="px-4 pt-3 pb-0 max-w-lg mx-auto flex gap-3">
+          <div className="flex-1 bg-surface rounded-xl border border-[#F0EDE9] px-3 py-2 text-center">
+            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Beds freeing</p>
+            <p className="text-base font-extrabold text-ink">{totalBeds}</p>
+          </div>
+          <div className="flex-1 bg-surface rounded-xl border border-[#F0EDE9] px-3 py-2 text-center">
+            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Full rooms</p>
+            <p className="text-base font-extrabold text-brand-pink">{fullRooms}</p>
+          </div>
+          <div className="flex-1 bg-surface rounded-xl border border-[#F0EDE9] px-3 py-2 text-center">
+            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Tenants</p>
+            <p className="text-base font-extrabold text-ink">{filtered.length}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Search + sort + month filter row */}
+      <div className="px-4 pt-3 pb-1 max-w-lg mx-auto flex items-center gap-2">
+        {/* Sort toggle */}
+        <button
+          onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+          className="flex-shrink-0 h-9 w-9 rounded-xl border border-[#E5E1DC] bg-surface flex items-center justify-center text-xs font-bold text-ink-muted active:bg-bg"
+          title={sortDir === "asc" ? "Soonest first" : "Latest first"}
+        >
+          {sortDir === "asc" ? "↑" : "↓"}
+        </button>
+
+        {/* Search */}
         <input
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search by name, room, phone…"
-          className="w-full rounded-xl border border-[#E5E1DC] bg-surface px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
+          placeholder="Name or room…"
+          className="flex-1 min-w-0 rounded-xl border border-[#E5E1DC] bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
         />
+
+        {/* Month filter chips */}
+        <div className="flex gap-1 flex-shrink-0">
+          <button
+            onClick={() => setMonthFilter("all")}
+            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+              monthFilter === "all"
+                ? "bg-brand-pink text-white border-brand-pink"
+                : "bg-surface text-ink-muted border-[#E5E1DC]"
+            }`}
+          >
+            All
+          </button>
+          {months.map(mk => (
+            <button
+              key={mk}
+              onClick={() => setMonthFilter(monthFilter === mk ? "all" : mk)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                monthFilter === mk
+                  ? "bg-brand-pink text-white border-brand-pink"
+                  : "bg-surface text-ink-muted border-[#E5E1DC]"
+              }`}
+            >
+              {monthLabel(mk)}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="px-4 pt-3 flex flex-col gap-4 max-w-lg mx-auto">
@@ -162,11 +257,11 @@ export default function NoticesPage() {
         )}
         {!loading && !error && items.length > 0 && filtered.length === 0 && (
           <div className="bg-surface rounded-card border border-[#F0EDE9] p-8 text-center">
-            <p className="text-sm font-semibold text-ink-muted">No matches for "{searchQuery}"</p>
+            <p className="text-sm font-semibold text-ink-muted">No matches</p>
           </div>
         )}
 
-        {/* Deposit eligible — notice on/before 5th */}
+        {/* Deposit eligible */}
         {!loading && eligible.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
@@ -185,7 +280,7 @@ export default function NoticesPage() {
           </section>
         )}
 
-        {/* Deposit forfeited — notice after 5th */}
+        {/* Deposit forfeited */}
         {!loading && forfeited.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
@@ -203,7 +298,6 @@ export default function NoticesPage() {
             </div>
           </section>
         )}
-
 
         {/* Legend */}
         {!loading && items.length > 0 && (
@@ -233,7 +327,7 @@ export default function NoticesPage() {
               }}
             />
             <p className="text-[10px] text-ink-muted text-center">
-              You'll be taken to the tenant edit page — scroll to the Notice section to set the date
+              You&apos;ll be taken to the tenant edit page — scroll to the Notice section to set the date
             </p>
           </div>
         </div>
@@ -317,11 +411,28 @@ function NoticeCard({
 
   return (
     <div className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
-      {/* Top row: name + badges */}
+      {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-ink truncate">{item.tenant_name}</p>
-          <p className="text-xs text-ink-muted mt-0.5">Room {item.room_number} · {item.phone}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-sm font-bold text-ink truncate">{item.tenant_name}</p>
+            {item.is_full_exit && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FFF3E0] text-[#C25000] flex-shrink-0">
+                Full room
+              </span>
+            )}
+            {item.sharing_type === "premium" && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] flex-shrink-0">
+                Premium
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-ink-muted mt-0.5">
+            Room {item.room_number} · {item.phone}
+            {item.beds_freed > 1 && (
+              <span className="ml-1.5 font-semibold text-[#7C3AED]">{item.beds_freed} beds</span>
+            )}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -329,7 +440,7 @@ function NoticeCard({
               ? "bg-tile-green text-status-paid"
               : "bg-tile-orange text-[#C25000]"
           }`}>
-            {item.deposit_eligible ? "Deposit eligible" : "Deposit forfeited"}
+            {item.deposit_eligible ? "Refundable" : "Forfeited"}
           </span>
           <span className={`text-[10px] font-bold ${days.color}`}>{days.text}</span>
         </div>
@@ -346,6 +457,10 @@ function NoticeCard({
         ) : (
           <Detail label="Est. refund" value="₹0 (forfeited)" warn />
         )}
+        <Detail
+          label="Room occupancy"
+          value={`${item.room_notice_count} of ${item.room_active_count} leaving`}
+        />
       </div>
 
       {/* CTAs */}

@@ -432,14 +432,20 @@ export interface NoticeItem {
   tenant_name: string;
   phone: string;
   room_number: string;
-  notice_date: string | null;    // YYYY-MM-DD; null if no formal notice
+  notice_date: string | null;
   has_notice: boolean;
   expected_checkout: string;     // YYYY-MM-DD (last allowed day)
-  deposit_eligible: boolean;     // notice on/before 5th
+  deposit_eligible: boolean;
   security_deposit: number;
   maintenance_fee: number;
   agreed_rent: number;
   days_remaining: number;        // negative = already past due date
+  sharing_type: string | null;   // "single"|"double"|"triple"|"premium"
+  beds_freed: number;            // max_occupancy for premium, else 1
+  room_max_occupancy: number;
+  room_active_count: number;
+  room_notice_count: number;
+  is_full_exit: boolean;
 }
 
 export function getActiveNotices(): Promise<NoticeItem[]> {

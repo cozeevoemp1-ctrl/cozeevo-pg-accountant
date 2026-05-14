@@ -4,10 +4,11 @@ GET /api/v2/app/notices/active  — active monthly tenants who have given formal
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from datetime import date
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -37,25 +38,56 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
             )
         )).all()
 
+        # Total active monthly tenants per room (to detect full-room exits)
+        room_active_rows = (await session.execute(
+            select(Tenancy.room_id, func.count(Tenancy.id).label("cnt"))
+            .join(Room, Tenancy.room_id == Room.id)
+            .where(
+                Room.is_staff_room == False,
+                Room.room_number != "000",
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.stay_type == StayType.monthly,
+            )
+            .group_by(Tenancy.room_id)
+        )).all()
+        room_active_counts: dict[int, int] = {r.room_id: r.cnt for r in room_active_rows}
+
+        # Count notices per room
+        room_notice_counts: dict[int, int] = defaultdict(int)
+        for tenancy, tenant, room in notice_rows:
+            room_notice_counts[room.id] += 1
+
         results = []
         for tenancy, tenant, room in notice_rows:
             nd = tenancy.notice_date
-            deposit_eligible = True  # notice given → always eligible; only forfeited with no notice
             expected_checkout = tenancy.expected_checkout or calc_notice_last_day(nd)
             days_remaining = (expected_checkout - today).days
+
+            is_premium = tenancy.sharing_type is not None and tenancy.sharing_type.value == "premium"
+            beds_freed = room.max_occupancy if is_premium else 1
+            room_active_count = room_active_counts.get(room.id, 0)
+            room_notice_count = room_notice_counts[room.id]
+            is_full_exit = room_notice_count >= room_active_count > 0
+
             results.append({
-                "tenancy_id":        tenancy.id,
-                "tenant_name":       tenant.name,
-                "phone":             tenant.phone,
-                "room_number":       room.room_number,
-                "notice_date":       nd.isoformat(),
-                "expected_checkout": expected_checkout.isoformat(),
-                "deposit_eligible":  deposit_eligible,
-                "has_notice":        True,
-                "security_deposit":  float(tenancy.security_deposit or 0),
-                "maintenance_fee":   float(tenancy.maintenance_fee or 0),
-                "agreed_rent":       float(tenancy.agreed_rent or 0),
-                "days_remaining":    days_remaining,
+                "tenancy_id":         tenancy.id,
+                "tenant_name":        tenant.name,
+                "phone":              tenant.phone,
+                "room_number":        room.room_number,
+                "notice_date":        nd.isoformat(),
+                "expected_checkout":  expected_checkout.isoformat(),
+                "deposit_eligible":   True,   # notice given → always eligible; only forfeited with no notice
+                "has_notice":         True,
+                "security_deposit":   float(tenancy.security_deposit or 0),
+                "maintenance_fee":    float(tenancy.maintenance_fee or 0),
+                "agreed_rent":        float(tenancy.agreed_rent or 0),
+                "days_remaining":     days_remaining,
+                "sharing_type":       tenancy.sharing_type.value if tenancy.sharing_type else None,
+                "beds_freed":         beds_freed,
+                "room_max_occupancy": room.max_occupancy,
+                "room_active_count":  room_active_count,
+                "room_notice_count":  room_notice_count,
+                "is_full_exit":       is_full_exit,
             })
 
         results.sort(key=lambda x: (x["expected_checkout"], x["tenant_name"]))
