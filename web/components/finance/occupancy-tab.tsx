@@ -9,11 +9,34 @@ function fmt(n: number) {
   return n.toLocaleString("en-IN")
 }
 
+function ExpandIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  )
+}
+
+function CollapseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <polyline points="4 14 10 14 10 20" />
+      <polyline points="20 10 14 10 14 4" />
+      <line x1="10" y1="14" x2="3" y2="21" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+    </svg>
+  )
+}
+
 export function OccupancyTab() {
   const [data, setData] = useState<OccupancyData | null>(null)
   const [filter, setFilter] = useState<Filter>("monthly")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [expanded, setExpanded] = useState<null | 1 | 2>(null)
 
   const chart1Ref = useRef<HTMLCanvasElement>(null)
   const chart2Ref = useRef<HTMLCanvasElement>(null)
@@ -26,6 +49,17 @@ export function OccupancyTab() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  // Resize charts when fullscreen state changes (after DOM updates)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(chart1Inst.current as any)?.resize()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(chart2Inst.current as any)?.resize()
+    }, 60)
+    return () => clearTimeout(t)
+  }, [expanded])
 
   useEffect(() => {
     if (!data || !chart1Ref.current || !chart2Ref.current) return
@@ -44,6 +78,63 @@ export function OccupancyTab() {
     const avgRent = months.map((m) => m.avg_rent)
     const showDaily = filter === "all"
 
+    // Inline plugin — draws value labels above line chart points
+    const occLabelPlugin = {
+      id: "occLabel",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      afterDatasetsDraw(chart: any) {
+        const { ctx } = chart
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        chart.data.datasets.forEach((ds: any, i: number) => {
+          if (ds.yAxisID !== "yOcc") return
+          const meta = chart.getDatasetMeta(i)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          meta.data.forEach((pt: any, j: number) => {
+            const v = Number(ds.data[j])
+            ctx.save()
+            ctx.fillStyle = "#ffffff"
+            ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "bottom"
+            ctx.fillText(`${v}%`, pt.x, pt.y - 6)
+            ctx.restore()
+          })
+        })
+      },
+    }
+
+    const rentLabelPlugin = {
+      id: "rentLabel",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      afterDatasetsDraw(chart: any) {
+        const { ctx } = chart
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        chart.data.datasets.forEach((ds: any, i: number) => {
+          if (ds.yAxisID !== "yRent") return
+          const meta = chart.getDatasetMeta(i)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          meta.data.forEach((pt: any, j: number) => {
+            const v = Number(ds.data[j])
+            if (!v) return
+            ctx.save()
+            ctx.fillStyle = "#F4C842"
+            ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "bottom"
+            ctx.fillText(`₹${Math.round(v / 1000)}k`, pt.x, pt.y - 6)
+            ctx.restore()
+          })
+        })
+      },
+    }
+
+    const axisTitle = (text: string, color = "#8899aa") => ({
+      display: true,
+      text,
+      color,
+      font: { size: 9 },
+    })
+
     import("chart.js/auto").then(({ Chart }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(chart1Inst.current as any)?.destroy()
@@ -55,6 +146,7 @@ export function OccupancyTab() {
 
       chart1Inst.current = new Chart(chart1Ref.current!, {
         type: "bar",
+        plugins: [occLabelPlugin],
         data: {
           labels,
           datasets: [
@@ -118,7 +210,7 @@ export function OccupancyTab() {
         },
         options: {
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           interaction: { mode: "index", intersect: false },
           plugins: {
             legend: {
@@ -136,6 +228,13 @@ export function OccupancyTab() {
               titleColor: "#fff",
               bodyColor: "#ccd6e0",
               padding: 10,
+              callbacks: {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                label: (ctx: any) => {
+                  if (ctx.dataset.yAxisID === "yOcc") return ` Occupancy: ${ctx.parsed.y}%`
+                  return ` ${ctx.dataset.label}: ${ctx.parsed.y}`
+                },
+              },
             },
           },
           scales: {
@@ -148,14 +247,16 @@ export function OccupancyTab() {
               position: "left",
               stacked: true,
               min: 0,
-              max: 140,
+              max: 100,
+              title: axisTitle("Check-ins"),
               ticks: { color: "#8899aa", stepSize: 20 },
               grid: { color: gridColor },
             },
             yOcc: {
               position: "right",
               min: 0,
-              max: 120,
+              max: 100,
+              title: axisTitle("Occ %", "#aabbcc"),
               ticks: {
                 color: "#aabbcc",
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,6 +271,7 @@ export function OccupancyTab() {
 
       chart2Inst.current = new Chart(chart2Ref.current!, {
         type: "bar",
+        plugins: [rentLabelPlugin],
         data: {
           labels,
           datasets: [
@@ -212,7 +314,7 @@ export function OccupancyTab() {
         },
         options: {
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           interaction: { mode: "index", intersect: false },
           plugins: {
             legend: {
@@ -230,6 +332,14 @@ export function OccupancyTab() {
               titleColor: "#fff",
               bodyColor: "#ccd6e0",
               padding: 10,
+              callbacks: {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                label: (ctx: any) => {
+                  if (ctx.dataset.yAxisID === "yRent")
+                    return ` Avg Rent: ₹${fmt(ctx.parsed.y)}`
+                  return ` ${ctx.dataset.label}: ${ctx.parsed.y}`
+                },
+              },
             },
           },
           scales: {
@@ -241,6 +351,7 @@ export function OccupancyTab() {
               position: "left",
               min: 0,
               max: 120,
+              title: axisTitle("Count"),
               ticks: { color: "#8899aa", stepSize: 20 },
               grid: { color: gridColor },
             },
@@ -248,6 +359,7 @@ export function OccupancyTab() {
               position: "right",
               min: 0,
               max: 22000,
+              title: axisTitle("Avg Rent", "#F4C842"),
               ticks: {
                 color: "#F4C842",
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -283,21 +395,13 @@ export function OccupancyTab() {
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
-          <span
-            style={{ color: "#EF1F9C" }}
-            className="text-2xl font-extrabold leading-none"
-          >
+          <span style={{ color: "#EF1F9C" }} className="text-2xl font-extrabold leading-none">
             {kpi.today_occ_pct}%
           </span>
-          <span className="text-[10px] text-ink-muted uppercase tracking-wide">
-            Occupancy — Today
-          </span>
+          <span className="text-[10px] text-ink-muted uppercase tracking-wide">Occupancy — Today</span>
         </div>
         <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
-          <span
-            style={{ color: "#00AEED" }}
-            className="text-2xl font-extrabold leading-none"
-          >
+          <span style={{ color: "#00AEED" }} className="text-2xl font-extrabold leading-none">
             {kpi.today_occ_beds}
           </span>
           <span className="text-[10px] text-ink-muted uppercase tracking-wide">
@@ -305,23 +409,17 @@ export function OccupancyTab() {
           </span>
         </div>
         <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
-          <span
-            style={{ color: "#F4C842" }}
-            className="text-2xl font-extrabold leading-none"
-          >
+          <span style={{ color: "#F4C842" }} className="text-2xl font-extrabold leading-none">
             ₹{fmt(kpi.current_avg_rent)}
           </span>
-          <span className="text-[10px] text-ink-muted uppercase tracking-wide">
-            Avg Rent / Bed
-          </span>
+          <span className="text-[10px] text-ink-muted uppercase tracking-wide">Avg Rent / Bed</span>
         </div>
         <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
-          <span className="text-2xl font-extrabold leading-none text-ink">
+          {/* text-white — text-ink = #0F0E0D = same as bg, invisible */}
+          <span className="text-2xl font-extrabold leading-none text-white">
             {kpi.total_checkins}
           </span>
-          <span className="text-[10px] text-ink-muted uppercase tracking-wide">
-            Total Check-ins
-          </span>
+          <span className="text-[10px] text-ink-muted uppercase tracking-wide">Total Check-ins</span>
         </div>
       </div>
 
@@ -332,9 +430,7 @@ export function OccupancyTab() {
           <button
             onClick={() => setFilter("monthly")}
             className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-              filter === "monthly"
-                ? "bg-[#1e3a5a] text-[#00AEED]"
-                : "bg-[#0F0E0D] text-ink-muted"
+              filter === "monthly" ? "bg-[#1e3a5a] text-[#00AEED]" : "bg-[#0F0E0D] text-ink-muted"
             }`}
           >
             Monthly Only
@@ -342,9 +438,7 @@ export function OccupancyTab() {
           <button
             onClick={() => setFilter("all")}
             className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-              filter === "all"
-                ? "bg-[#1e3a5a] text-[#00AEED]"
-                : "bg-[#0F0E0D] text-ink-muted"
+              filter === "all" ? "bg-[#1e3a5a] text-[#00AEED]" : "bg-[#0F0E0D] text-ink-muted"
             }`}
           >
             All incl. Daily
@@ -353,22 +447,63 @@ export function OccupancyTab() {
       </div>
 
       {/* Chart 1 — booking type breakdown + occupancy line */}
-      <div className="rounded-xl bg-[#0F0E0D] p-4">
-        <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide mb-3">
-          Check-ins by Type &amp; Occupancy %
-        </p>
-        <canvas ref={chart1Ref} height={220} />
-        <p className="text-[9px] text-ink-muted mt-2">
-          Bars = new arrivals that month · White line = total occupancy % · Premium booking = 2 beds
-        </p>
+      <div
+        className={
+          expanded === 1
+            ? "fixed inset-0 z-50 bg-[#080d14] flex flex-col p-4"
+            : "rounded-xl bg-[#0F0E0D] p-4"
+        }
+      >
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
+            Check-ins by Type &amp; Occupancy %
+          </p>
+          <button
+            onClick={() => setExpanded(expanded === 1 ? null : 1)}
+            className="text-ink-muted hover:text-white transition-colors p-1"
+            aria-label={expanded === 1 ? "Collapse" : "Expand"}
+          >
+            {expanded === 1 ? <CollapseIcon /> : <ExpandIcon />}
+          </button>
+        </div>
+        <div className={expanded === 1 ? "flex-1" : ""} style={expanded !== 1 ? { height: 230 } : {}}>
+          <canvas ref={chart1Ref} />
+        </div>
+        {expanded !== 1 && (
+          <p className="text-[9px] text-ink-muted mt-2">
+            Bars = new arrivals · White line = total occupancy % · Left axis = check-ins count · Right = occ %
+          </p>
+        )}
       </div>
 
       {/* Chart 2 — check-ins vs check-outs + avg rent */}
-      <div className="rounded-xl bg-[#0F0E0D] p-4">
-        <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide mb-3">
-          Check-ins vs Check-outs &amp; Avg Rent / Bed
-        </p>
-        <canvas ref={chart2Ref} height={200} />
+      <div
+        className={
+          expanded === 2
+            ? "fixed inset-0 z-50 bg-[#080d14] flex flex-col p-4"
+            : "rounded-xl bg-[#0F0E0D] p-4"
+        }
+      >
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
+            Check-ins vs Check-outs &amp; Avg Rent / Bed
+          </p>
+          <button
+            onClick={() => setExpanded(expanded === 2 ? null : 2)}
+            className="text-ink-muted hover:text-white transition-colors p-1"
+            aria-label={expanded === 2 ? "Collapse" : "Expand"}
+          >
+            {expanded === 2 ? <CollapseIcon /> : <ExpandIcon />}
+          </button>
+        </div>
+        <div className={expanded === 2 ? "flex-1" : ""} style={expanded !== 2 ? { height: 210 } : {}}>
+          <canvas ref={chart2Ref} />
+        </div>
+        {expanded !== 2 && (
+          <p className="text-[9px] text-ink-muted mt-2">
+            Left axis = count · Right axis = avg rent · Yellow labels = ₹/bed for each month
+          </p>
+        )}
       </div>
 
       {/* Data table */}
@@ -381,7 +516,7 @@ export function OccupancyTab() {
             <thead>
               <tr className="text-ink-muted">
                 <th className="py-1.5 px-2 text-left font-semibold uppercase tracking-wide">Month</th>
-                <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">Occ</th>
+                <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">Beds</th>
                 <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">Fill%</th>
                 <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">In</th>
                 <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">Out</th>
@@ -402,7 +537,7 @@ export function OccupancyTab() {
                     key={m.month}
                     className={`border-t border-[#1a2535] ${isLast ? "bg-[#1a2a1a]" : ""}`}
                   >
-                    <td className={`py-1.5 px-2 font-semibold ${isLast ? "text-[#F4C842]" : "text-ink"}`}>
+                    <td className={`py-1.5 px-2 font-semibold ${isLast ? "text-[#F4C842]" : "text-white"}`}>
                       {m.label}{isLast ? " ★" : ""}
                     </td>
                     <td className={`py-1.5 px-2 text-right ${isLast ? "text-[#F4C842] font-bold" : "text-ink-muted"}`}>
@@ -411,8 +546,11 @@ export function OccupancyTab() {
                     <td className={`py-1.5 px-2 text-right ${isLast ? "text-[#F4C842] font-bold" : "text-ink-muted"}`}>
                       {m.fill_pct}%
                     </td>
-                    <td className="py-1.5 px-2 text-right text-ink">{ci || "—"}</td>
-                    <td className="py-1.5 px-2 text-right" style={{ color: (m.checkouts ?? 0) > 0 ? "#EF1F9C" : "#3a5068" }}>
+                    <td className="py-1.5 px-2 text-right text-white">{ci || "—"}</td>
+                    <td
+                      className="py-1.5 px-2 text-right"
+                      style={{ color: (m.checkouts ?? 0) > 0 ? "#EF1F9C" : "#3a5068" }}
+                    >
                       {m.checkouts === null ? "—" : m.checkouts || "—"}
                     </td>
                     <td className="py-1.5 px-2 text-right text-ink-muted">{m.ci_single || "—"}</td>
@@ -431,7 +569,6 @@ export function OccupancyTab() {
         </div>
         <p className="text-[9px] text-ink-muted mt-2">
           ★ Current month (partial) · S=Single D=Double T=Triple P=Premium Day=Daily
-          · Nov check-outs: no data (historical import)
         </p>
       </div>
     </div>

@@ -15,7 +15,7 @@ from src.database.models import Room, Tenancy, TenancyStatus, StayType
 
 router = APIRouter(prefix="/analytics")
 
-START_MONTH = date(2025, 10, 1)
+START_MONTH = date(2025, 11, 1)
 MONTH_ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
               7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
