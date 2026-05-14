@@ -463,10 +463,11 @@ function ExpansionPanel({
             </button>
             {!loading && filtered.length > 0 && (() => {
               const beds = filtered.reduce((s, it) => {
+                if (it.is_staff_room) return s;
                 const m = it.detail.match(/^(\d+)/);
                 return s + (m ? parseInt(m[1]) : 1);
               }, 0);
-              return <span className="ml-auto text-[10px] font-bold text-brand-pink">{beds} beds free</span>;
+              return beds > 0 ? <span className="ml-auto text-[10px] font-bold text-brand-pink">{beds} beds free</span> : null;
             })()}
           </div>
         </div>
