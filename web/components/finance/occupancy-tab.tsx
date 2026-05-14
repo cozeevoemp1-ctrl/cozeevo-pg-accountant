@@ -138,11 +138,11 @@ export function OccupancyTab() {
       },
     }
 
-    const axisTitle = (text: string, color = "#8899aa") => ({
+    const axisTitle = (text: string, color = "#9ab8cc") => ({
       display: true,
       text,
       color,
-      font: { size: 10 },
+      font: { size: 11 },
     })
 
     import("chart.js/auto").then(({ Chart }) => {
@@ -225,10 +225,10 @@ export function OccupancyTab() {
           plugins: {
             legend: {
               labels: {
-                color: "#8899aa",
-                font: { size: 11 },
+                color: "#c8dae8",
+                font: { size: 12 },
                 boxWidth: 10,
-                padding: 8,
+                padding: 10,
               },
             },
             tooltip: {
@@ -237,6 +237,8 @@ export function OccupancyTab() {
               borderWidth: 1,
               titleColor: "#fff",
               bodyColor: "#ccd6e0",
+              footerColor: "#ffffff",
+              footerFont: { weight: "bold" as const },
               padding: 10,
               callbacks: {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -244,13 +246,20 @@ export function OccupancyTab() {
                   if (ctx.dataset.yAxisID === "yOcc") return ` Occupancy: ${ctx.parsed.y}%`
                   return ` ${ctx.dataset.label}: ${ctx.parsed.y}`
                 },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                footer: (items: any[]) => {
+                  const total = items
+                    .filter((it: any) => it.dataset.yAxisID === "yCI")
+                    .reduce((sum: number, it: any) => sum + (it.parsed.y ?? 0), 0)
+                  return `Total: ${total}`
+                },
               },
             },
           },
           scales: {
             x: {
               stacked: true,
-              ticks: { color: "#8899aa", font: { size: 11 } },
+              ticks: { color: "#b8ccdc", font: { size: 12 } },
               grid: { color: gridColor },
             },
             yCI: {
@@ -259,16 +268,16 @@ export function OccupancyTab() {
               min: 0,
               max: 100,
               title: axisTitle("Check-ins"),
-              ticks: { color: "#8899aa", stepSize: 20 },
+              ticks: { color: "#b8ccdc", stepSize: 20 },
               grid: { color: gridColor },
             },
             yOcc: {
               position: "right",
               min: 0,
               max: 100,
-              title: axisTitle("Occ %", "#aabbcc"),
+              title: axisTitle("Occ %", "#c0d4e4"),
               ticks: {
-                color: "#aabbcc",
+                color: "#c0d4e4",
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 callback: (v: any) => v + "%",
                 stepSize: 20,
@@ -329,10 +338,10 @@ export function OccupancyTab() {
           plugins: {
             legend: {
               labels: {
-                color: "#8899aa",
-                font: { size: 11 },
+                color: "#c8dae8",
+                font: { size: 12 },
                 boxWidth: 10,
-                padding: 8,
+                padding: 10,
               },
             },
             tooltip: {
@@ -354,7 +363,7 @@ export function OccupancyTab() {
           },
           scales: {
             x: {
-              ticks: { color: "#8899aa", font: { size: 11 } },
+              ticks: { color: "#b8ccdc", font: { size: 12 } },
               grid: { color: gridColor },
             },
             yCount: {
@@ -362,7 +371,7 @@ export function OccupancyTab() {
               min: 0,
               max: 120,
               title: axisTitle("Count"),
-              ticks: { color: "#8899aa", stepSize: 20 },
+              ticks: { color: "#b8ccdc", stepSize: 20 },
               grid: { color: gridColor },
             },
             yRent: {
@@ -464,12 +473,12 @@ export function OccupancyTab() {
       <div
         className={
           expanded === 1
-            ? "fixed inset-0 z-50 bg-[#080d14] flex flex-col p-4"
+            ? "fixed inset-0 z-[60] bg-[#080d14] flex flex-col p-4"
             : "rounded-xl bg-[#0F0E0D] p-4"
         }
       >
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
+          <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide">
             Check-ins by Type &amp; Occupancy %
           </p>
           <button
@@ -484,7 +493,7 @@ export function OccupancyTab() {
           <canvas ref={chart1Ref} />
         </div>
         {expanded !== 1 && (
-          <p className="text-[9px] text-ink-muted mt-2">
+          <p className="text-[9px] text-[#6a8a9a] mt-2">
             Bars = new arrivals · White line = total occupancy % · Left axis = check-ins count · Right = occ %
           </p>
         )}
@@ -494,12 +503,12 @@ export function OccupancyTab() {
       <div
         className={
           expanded === 2
-            ? "fixed inset-0 z-50 bg-[#080d14] flex flex-col p-4"
+            ? "fixed inset-0 z-[60] bg-[#080d14] flex flex-col p-4"
             : "rounded-xl bg-[#0F0E0D] p-4"
         }
       >
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
+          <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide">
             Check-ins vs Check-outs &amp; Avg Rent / Bed
           </p>
           <button
@@ -514,7 +523,7 @@ export function OccupancyTab() {
           <canvas ref={chart2Ref} />
         </div>
         {expanded !== 2 && (
-          <p className="text-[9px] text-ink-muted mt-2">
+          <p className="text-[9px] text-[#6a8a9a] mt-2">
             Left axis = count · Right axis = avg rent · Yellow labels = ₹/bed for each month
           </p>
         )}
@@ -522,7 +531,7 @@ export function OccupancyTab() {
 
       {/* Data table */}
       <div className="rounded-xl bg-[#0F0E0D] p-4">
-        <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide mb-3">
+        <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide mb-3">
           Monthly Breakdown
         </p>
         <div className="overflow-x-auto">

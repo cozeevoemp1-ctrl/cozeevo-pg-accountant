@@ -19,7 +19,7 @@ from reportlab.lib import colors
 
 
 HOUSE_RULES = [
-    "If anybody wants to vacate the PG, they should inform 30 days before and vacating notice before 5th of EVERY MONTH. Otherwise 30 days rent must be paid. (Note: should vacate only on 30th or 31st of any month)",
+    "Vacating notice must be given on or before the 5th of the month. Notice given on/before the 5th: tenant may vacate by month end, deposit refundable. Notice given after the 5th: applies to the next month's cycle, full month's rent required, deposit still refundable. (Note: should vacate only on 30th or 31st of any month)",
     "Rent should be paid on or before 5th of every calendar month.",
     "Once paid the Advance & Rent cannot be refunded.",
     "Outsiders are strictly not allowed.",

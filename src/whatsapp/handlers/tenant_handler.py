@@ -371,13 +371,12 @@ async def _checkout_notice(entities: dict, ctx: CallerContext, session: AsyncSes
     else:
         deposit_msg = (
             f"⚠️ *Notice received after the {_NOTICE_BY_DAY}th of the month.*\n\n"
-            f"As per PG rules, notice must be given *on or before the {_NOTICE_BY_DAY}th* "
-            f"for your deposit to be refunded.\n\n"
-            f"Since notice was given on *{today.strftime('%d %b')}*, your deposit will *not* "
-            f"be refunded as per the PG agreement.\n"
-            f"Your notice period runs until: *{last_date.strftime('%d %b %Y')}*"
+            f"As per PG rules, notice given after the {_NOTICE_BY_DAY}th applies to the "
+            f"*next month's cycle* — one full month's rent will be charged.\n\n"
+            f"Your deposit is *still refundable* once all dues are cleared.\n"
+            f"Your last day will be: *{last_date.strftime('%d %b %Y')}*"
         )
-        closing = "The PG office has been notified. For queries, contact us directly."
+        closing = "The PG office has been notified. Please ensure rent is paid for the full notice month."
 
     # Record the notice
     tenancy.notice_date = today

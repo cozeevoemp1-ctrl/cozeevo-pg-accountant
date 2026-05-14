@@ -350,10 +350,13 @@ async def _build_checkout_summary(action_data: dict, phone: str, session: "Async
         deposit_forfeited = True
         notice_line = "\nNo notice on record — *deposit forfeited*"
     elif tenancy and tenancy.notice_date:
-        timing = "on time" if tenancy.notice_date.day <= _NOTICE_BY_DAY else f"after {_NOTICE_BY_DAY}th — must stay till end of next month"
+        if tenancy.notice_date.day <= _NOTICE_BY_DAY:
+            timing = f"on time (on/before {_NOTICE_BY_DAY}th)"
+        else:
+            timing = f"after {_NOTICE_BY_DAY}th — next month's cycle applies, full month rent required"
         notice_line = (
             f"\nNotice: {tenancy.notice_date.strftime('%d %b %Y')} "
-            f"({timing}) — eligible for refund"
+            f"({timing}) — deposit refundable"
         )
 
     if deposit_forfeited:
