@@ -82,13 +82,6 @@ export default async function HomePage() {
             <p className="text-[10px] text-ink-muted">On notice</p>
           </div>
         </Link>
-        <Link href="/onboarding/sessions" className="flex-1 bg-surface border border-[#F0EDE9] rounded-card px-3 py-2.5 flex items-center gap-2 active:opacity-70">
-          <span className="text-base">📝</span>
-          <div>
-            <p className="text-xs font-bold text-ink">Sessions</p>
-            <p className="text-[10px] text-ink-muted">Onboarding</p>
-          </div>
-        </Link>
         <Link href="/onboarding/bookings" className="flex-1 bg-surface border border-[#F0EDE9] rounded-card px-3 py-2.5 flex items-center gap-2 active:opacity-70">
           <span className="text-base">🏷️</span>
           <div>

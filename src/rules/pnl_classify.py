@@ -30,7 +30,6 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Non-Operating",        "Repayment",                    ["repaymen","repayment","loan repay"]),
     ("Non-Operating",        "Borrowed From",                ["borrowed f","borrowed from"]),
     ("Non-Operating",        "Loan Repayment (Bharathi)",    ["bharathi prabhakaran"]),
-    ("Non-Operating",        "Unknown Transfer (shalu)",     ["shalu.pravi"]),
 
     # ── PROPERTY RENT ─────────────────────────────────────────────────────────
     ("Property Rent",        "Vakkal Sravani",               ["vakkal", "sravani"]),
@@ -94,6 +93,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Furniture & Supplies", "Atta Mixing Machine",          ["naveenmanly100100"]),
     ("Furniture & Supplies", "Chairs & Study Tables",        ["q962933392"]),
     ("Furniture & Supplies", "Kitchen Equipment / Vessels",  ["9844532900"]),
+    ("Furniture & Supplies", "Wooden Stove / Kitchen Items (shalu.pravi)", ["shalu.pravi"]),
     ("Furniture & Supplies", "Other Furniture / Supplies",   ["furniture","refurbish","3d bo","laughing bud"]),
 
     # ── FOOD & GROCERIES ──────────────────────────────────────────────────────

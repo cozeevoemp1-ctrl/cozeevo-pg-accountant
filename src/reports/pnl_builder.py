@@ -102,10 +102,11 @@ EXCLUDED = {
     # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
     "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12
     # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
-    # Feb: Sri Lakshmi Chandrasekar ₹6L. Mar: YESMIDAS + Sravani + Sri Lakshmi etc. ₹20.9L. Apr: ₹22K misc.
-    # Nov ₹5L REMOVED — that was the startup capital repayment (shown in Capital Contributions above), not a cash exchange.
+    # Feb: Sri Lakshmi Chandrasekar ₹6L. Mar: YESMIDAS + Sravani + Sri Lakshmi etc. ₹15.9L. Apr: ₹22K misc.
+    # Nov ₹5L REMOVED — startup capital repayment (Capital Contributions above), not a cash exchange.
+    # Mar ₹5L Bharathi REMOVED — covered by THOR→HULK intercompany transfer, not a separate P&L item.
     # NOT an operating cost — the cash was already spent and counted in OPEX categories above.
-    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 2090000,  22357],
+    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 1590000,  22357],
 }
 
 # ── Deposit flows — queried from tenancies (security_deposit + maintenance_fee by check-in month)
@@ -311,7 +312,7 @@ def _write_pnl_tab(
         "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
         "2. Apr rent of Rs.20,49,100 paid in May is outside this P&L window — will appear in May P&L.",
         "3. Chandra advance (Mar Rs.32,789 + Apr Rs.38,111) — confirm these are Chandra's personal cash advances for PG ops, not company-paid cash already counted above.",
-        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.20.9L (YESMIDAS+Sravani+Sri Lakshmi), Apr Rs.22K. Bank RTGS repaid to people who gave you cash for ops — underlying spending already in OPEX above.",
+        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.15.9L (YESMIDAS+Sravani+Sri Lakshmi; Bharathi Rs.5L excluded — covered by THOR→HULK intercompany transfer), Apr Rs.22K.",
     ]:
         ws.append([f, ""])
 
