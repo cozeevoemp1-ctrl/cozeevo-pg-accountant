@@ -267,6 +267,7 @@ interface PanelProps {
   genderFilter: GenderFilter; setGenderFilter: (v: GenderFilter) => void;
   stayFilter: StayFilter; setStayFilter: (v: StayFilter) => void;
   buildingFilter: BuildingFilter; setBuildingFilter: (v: BuildingFilter) => void;
+  showStaff: boolean; toggleStaff: () => void;
   // data
   filtered: KpiDetailItem[];
   loading: boolean;
@@ -287,6 +288,7 @@ function ExpansionPanel({
   genderFilter, setGenderFilter,
   stayFilter, setStayFilter,
   buildingFilter, setBuildingFilter,
+  showStaff, toggleStaff,
   filtered, loading, selected, detailLoading, selectItem, setSelected,
   cancellingId, onCancel, onBook,
 }: PanelProps) {
@@ -435,7 +437,7 @@ function ExpansionPanel({
             onChange={(e) => setRoomSearch(e.target.value)}
             className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
-          <div className="flex gap-1.5 items-center">
+          <div className="flex gap-1.5 items-center flex-wrap">
             {GENDER_FILTERS.map((gf) => (
               <button
                 key={gf.value}
@@ -449,6 +451,16 @@ function ExpansionPanel({
                 {gf.label}
               </button>
             ))}
+            <button
+              onClick={toggleStaff}
+              className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
+                showStaff
+                  ? "bg-[#6366F1] text-white border-[#6366F1]"
+                  : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+              }`}
+            >
+              Staff
+            </button>
             {!loading && filtered.length > 0 && (() => {
               const beds = filtered.reduce((s, it) => {
                 const m = it.detail.match(/^(\d+)/);
@@ -494,6 +506,11 @@ function ExpansionPanel({
                           : "bg-[#FEE2E2] text-[#991B1B]"
                       }`}>
                         {item.deposit_eligible ? "Refundable" : "Forfeited"}
+                      </span>
+                    )}
+                    {open === "vacant" && item.is_staff_room && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#EEF2FF] text-[#4338CA]">
+                        Staff
                       </span>
                     )}
                     {open === "vacant" && item.upcoming_checkin && (() => {
@@ -594,6 +611,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
   const [stayFilter, setStayFilter] = useState<StayFilter>("all");
   const [buildingFilter, setBuildingFilter] = useState<BuildingFilter>("all");
+  const [showStaff, setShowStaff] = useState(false);
 
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -654,7 +672,25 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     setGenderFilter("all");
     setStayFilter("all");
     setBuildingFilter("all");
+    setShowStaff(false);
     setSelected(null);
+  }
+
+  async function toggleStaff() {
+    const next = !showStaff;
+    setShowStaff(next);
+    const cacheKey = next ? "vacant_staff" : "vacant";
+    if (cache.current.has(cacheKey)) {
+      setItems(cache.current.get(cacheKey)!);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getKpiDetail("vacant", { includeStaff: next });
+      cache.current.set(cacheKey, res.items);
+      setItems(res.items);
+    } catch { setItems([]); }
+    setLoading(false);
   }
 
   async function selectItem(item: KpiDetailItem) {
@@ -735,6 +771,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     genderFilter, setGenderFilter,
     stayFilter, setStayFilter,
     buildingFilter, setBuildingFilter,
+    showStaff, toggleStaff,
     filtered, loading, selected, detailLoading, selectItem, setSelected,
     cancellingId, onCancel,
     onBook: (room: string) => { close(); setBookingRoom(room); },

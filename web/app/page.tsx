@@ -41,7 +41,7 @@ export default async function HomePage() {
     if (kpiValue.checkins_today > 0 || kpiValue.checkouts_today > 0) types.push("checkins_today", "checkouts_today");
     if (kpiValue.no_show_count > 0) types.push("no_show");
     if (kpiValue.notices_count > 0) types.push("notices");
-    const results = await Promise.allSettled(types.map((t) => getKpiDetail(t, token)));
+    const results = await Promise.allSettled(types.map((t) => getKpiDetail(t, undefined, token)));
     results.forEach((r, i) => {
       if (r.status === "fulfilled") initialDetails[types[i]] = r.value.items;
     });

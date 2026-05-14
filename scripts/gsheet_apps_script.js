@@ -22,7 +22,7 @@
  * looks up data by name — never by position.
  */
 
-const TOTAL_BEDS = 296; // updated 2026-05-14; G16 double→single (-1 bed, HULK 150→149)
+const TOTAL_BEDS = 294; // updated 2026-05-14; room 614 → staff (-2 beds, HULK 149→147)
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/i;
 const DROPDOWN_CELL = "E1";  // Where the month picker lives on DASHBOARD

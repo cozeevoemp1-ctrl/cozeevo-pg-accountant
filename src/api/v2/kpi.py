@@ -212,6 +212,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
 @router.get("/kpi-detail")
 async def get_kpi_detail(
     type: str,
+    include_staff: bool = False,
     user: AppUser = Depends(get_current_user),
 ):
     """Return the underlying rows for a KPI tile."""
@@ -274,17 +275,21 @@ async def get_kpi_detail(
                 .group_by(Tenancy.room_id)
                 .subquery()
             )
+            room_filter = [Room.room_number != "000"]
+            if not include_staff:
+                room_filter.append(Room.is_staff_room == False)
             room_rows = (await session.execute(
                 select(
                     Room.id,
                     Room.room_number,
                     Room.max_occupancy,
+                    Room.is_staff_room,
                     func.coalesce(occ_subq.c.occ, 0).label("occupied_count"),
                 )
                 .outerjoin(occ_subq, occ_subq.c.room_id == Room.id)
-                .where(Room.is_staff_room == False, Room.room_number != "000")
+                .where(*room_filter)
                 .having(func.coalesce(occ_subq.c.occ, 0) < Room.max_occupancy)
-                .group_by(Room.id, Room.room_number, Room.max_occupancy, occ_subq.c.occ)
+                .group_by(Room.id, Room.room_number, Room.max_occupancy, Room.is_staff_room, occ_subq.c.occ)
                 .order_by(Room.room_number)
             )).all()
 
@@ -358,6 +363,7 @@ async def get_kpi_detail(
                     "detail": " · ".join(detail_parts),
                     "free_beds": free,
                     "gender": gender,
+                    "is_staff_room": bool(r.is_staff_room),
                     "upcoming_checkin": upcoming.isoformat() if upcoming else None,
                 })
             return {"type": type, "items": items}

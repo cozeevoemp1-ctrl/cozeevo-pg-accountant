@@ -39,7 +39,7 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 |---|---|---|---|---|---|
 | Cozeevo THOR | G + 1-6 + 7 | 12 (x01-x12) | 701, 702 | G01-G10 | **84** |
 | Cozeevo HULK | G + 1-6 | 12 (x13-x24) | none | G11-G20 | **82** |
-| **Total** | | | | | **166** (8 staff, 158 revenue) |
+| **Total** | | | | | **166** (7 staff, 159 revenue) |
 
 ### Room Numbering Convention
 - THOR: `{floor}{01-12}` — e.g. 101, 212, 312, 601
@@ -62,9 +62,11 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | 701 | THOR | 1 | Staff quarters (permanent) |
 | 702 | THOR | 1 | Staff quarters (permanent) |
 | G12 | HULK | 3 | Staff quarters (permanent) |
+| 614 | HULK | 2 | Staff quarters |
 
-**Total staff rooms: 6** (THOR 5 + HULK 1) — **296 revenue beds**
+**Total staff rooms: 7** (THOR 5 + HULK 2) — **294 revenue beds**
 
+> **Changed 2026-05-14:** Room 614 → staff. G16 double→single.
 > **Changed 2026-05-09:** G20 → revenue (Chandraprakash moved in May 2026). Room 107 → revenue (Samruddhi Thanwar moved in May 2026).
 > **Changed 2026-04-26:** 114 and 618 moved from staff → revenue. G20 moved to staff temporarily until April end.
 
@@ -75,15 +77,15 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
 | THOR | 79 | 14 | 62 | 3 | **147** |
-| HULK | 81 | 14 | 65 | 2 | **150** |
-| **Total** | **160** | **28** | **127** | **5** | **297** |
+| HULK | 80 | 15 | 63 | 2 | **147** |
+| **Total** | **159** | **29** | **125** | **5** | **294** |
 
 ### Bed Count Formula
 ```
 Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
                    = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
-                   = 28 + 254 + 15
-                   = 297
+                   = 29 + 250 + 15
+                   = 294
 ```
 
 ### Corner Room Rule (applies to BOTH buildings)
@@ -112,7 +114,7 @@ Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
 ## Occupancy Calculation Rules
 
 ```
-Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 297)
+Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 294)
                      Calculated dynamically from rooms table, never hardcoded.
 
 Occupied Beds      = SUM(
@@ -158,7 +160,7 @@ Reporting format:
 | 6 | 601-612 | 12 | 601=1, 602-611=2, 612=1 |
 | 7 | 701-702 | 2 | **701=staff**, **702=staff** |
 
-## HULK Room Layout (81 revenue + 1 staff = 82)
+## HULK Room Layout (80 revenue + 2 staff = 82)
 
 | Floor | Rooms | Count | Sharing Types |
 |---|---|---|---|
@@ -168,7 +170,7 @@ Reporting format:
 | 3 | 313-324 | 12 | 313=1, 314-323=2, 324=1 |
 | 4 | 413-424 | 12 | 413=1, 414-423=2, 424=1 |
 | 5 | 513-524 | 12 | 513=1, 514-523=2, 524=1 |
-| 6 | 613-624 | 12 | 613=1, 614-617=2, 618=2, 619-623=2, 624=1 |
+| 6 | 613-624 | 12 | 613=1, **614=staff**, 615-617=2, 618=2, 619-623=2, 624=1 |
 
 ---
 
@@ -177,3 +179,4 @@ Reporting format:
 - 2026-04-26: 114 + 618 moved from staff → revenue. G20 moved to staff (temporary, until April 2026 end — returns to revenue May 2026). G05 corrected to staff (was wrongly revenue in DB). G13 corrected to room_type=triple in DB. Revenue beds: 291 → 294 (295 from May 2026).
 - 2026-04-27: Fixed room 120 max_occupancy 3→2 in DB (was a data entry error; docs always said double). Total revenue beds confirmed 294 for April 2026.
 - 2026-05-09: G20 → revenue (Chandraprakash, May 2026). Room 107 → revenue (Samruddhi Thanwar, May 2026). Revenue beds: 294 → 297. Staff rooms: 8 → 6.
+- 2026-05-14: G16 double→single (-1 bed, 297→296). Room 614 → staff (-2 beds, 296→294). Staff rooms: 6 → 7 (THOR 5 + HULK 2).
