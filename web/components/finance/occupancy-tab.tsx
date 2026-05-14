@@ -358,12 +358,16 @@ export function OccupancyTab() {
             yRent: {
               position: "right",
               min: 0,
-              max: 22000,
+              max: 22500,
               title: axisTitle("Avg Rent", "#F4C842"),
               ticks: {
                 color: "#F4C842",
+                stepSize: 2500,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                callback: (v: any) => "₹" + (v / 1000).toFixed(0) + "k",
+                callback: (v: any) => {
+                  const k = v / 1000
+                  return "₹" + (Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)) + "k"
+                },
               },
               grid: { drawOnChartArea: false },
             },

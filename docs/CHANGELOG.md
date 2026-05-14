@@ -2,6 +2,40 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.61] — 2026-05-14 — Occupancy tab: analytics API + PWA charts + Jitendra cash expenses
+
+### src/api/v2/analytics.py
+- **New `/analytics/occupancy` endpoint** — monthly occupancy dashboard: KPIs (today occ %, beds, avg rent, total check-ins/outs) + per-month breakdown (occ beds, fill %, check-ins by type, checkouts, avg rent/bed)
+- **`START_MONTH = date(2025, 11, 1)`** — Oct 2025 had zero tenants; excluded from chart
+- **`VERIFIED_MONTHS` dict** — frozen historical figures for Nov 2025–Apr 2026; never recomputed from live DB
+- **Weighted avg rent** — `SUM(agreed_rent) / SUM(beds_used)` everywhere; premium rooms count max_occupancy beds; removed old `func.avg()` and per-checkin-month avg_map query
+- **`_present_at(target)`** — includes active + exited-with-checkout-after-target + no_show-before-target
+
+### web/components/finance/occupancy-tab.tsx
+- **New `OccupancyTab` component** — 4 KPI cards, filter toggle (Monthly / All incl. Daily), 2 Chart.js charts, data table
+- **Chart 1**: stacked bar (Single/Double/Triple/Premium/Daily check-ins) + white occupancy % line
+- **Chart 2**: check-ins vs check-outs bars + yellow avg rent/bed line
+- **Fullscreen per chart** — expand/collapse button; CSS `fixed inset-0 z-50` overlay (no requestFullscreen — iOS Safari doesn't support it); charts auto-resize via 60ms setTimeout
+- **Data labels** — custom inline Chart.js plugins (`afterDatasetsDraw`) draw % labels on occ line and ₹k labels on rent line; no extra npm package
+- **Axis titles** — "Check-ins", "Occ %", "Count", "Avg Rent" on all axes
+- **Bug fix**: `text-ink` (Tailwind `ink.DEFAULT = #0F0E0D`) was invisible on dark bg; Total Check-ins KPI changed to `text-white`
+- **Avg rent axis**: `stepSize: 2500`, `max: 22500`; callback shows `₹12.5k` etc. for half-k ticks
+
+### web/app/finance/page.tsx
+- Added "Occ." tab; renders `<OccupancyTab />`
+
+### web/lib/api.ts
+- Added `OccupancyMonthData`, `OccupancyKpi`, `OccupancyData` interfaces and `getOccupancyData()` function
+
+### DB — cash_expenses (manual)
+- Inserted 3 Jitendra cash expenses for Jan 2026: Police Pameshwaran cafe ₹3,000 + BBMP fee ₹5,000 + Agreement fee ₹600 (total ₹8,600); created_by='kiran-manual-jan26'
+
+### Commits
+- `23fdeed` — weighted avg rent + VERIFIED_MONTHS freeze
+- `fc40abe` — blank KPI fix + fullscreen + axis labels + data labels
+
+---
+
 ## [1.75.60] — 2026-05-13 — Onboarding form fixes: QR access + photo + security deposit + notes
 
 ### main.py
