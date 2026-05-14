@@ -228,8 +228,9 @@ async def collection_summary(
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
     # ── Payment method breakdown — DATE-SCOPED ───────────────────────────────
-    # All cash/UPI received this month by payment_date, excluding booking advances
-    # (sheet Z/AA tracks everything except booking advances, which have their own column).
+    # Rent payments only, matching sheet Z (UPI) / AA (Cash) columns.
+    # Deposits = backfilled from Excel deposit column, not in sheet Z/AA.
+    # Booking advances = separate sheet column, excluded here.
     method_rows = (
         await session.execute(
             select(
@@ -238,7 +239,7 @@ async def collection_summary(
             )
             .where(
                 Payment.is_void == False,
-                Payment.for_type != PaymentFor.booking,
+                Payment.for_type == PaymentFor.rent,
                 extract("year",  Payment.payment_date) == from_date.year,
                 extract("month", Payment.payment_date) == from_date.month,
             )
