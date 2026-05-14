@@ -39,8 +39,8 @@ class QuickBookRequest(BaseModel):
 
 @router.post("/quick-book")
 async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(403, "Admin only")
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(403, "Admin or staff only")
 
     phone_digits = re.sub(r"\D", "", req.tenant_phone)
     if len(phone_digits) < 10:

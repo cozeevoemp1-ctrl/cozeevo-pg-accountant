@@ -259,6 +259,20 @@ async def run_import(write: bool) -> None:
 
         tenant_cache: dict[str, Tenant] = {}
 
+        # Pre-load existing payments to prevent duplicates on re-run.
+        # Key: (tenancy_id, period_month_str, for_type_str, payment_mode_str) -> total_amount
+        from sqlalchemy import text as _sql_text
+        _ep_rows = (await session.execute(_sql_text(
+            "SELECT tenancy_id, period_month::text, for_type::text, payment_mode::text, "
+            "SUM(amount) as total "
+            "FROM payments WHERE is_void = false "
+            "GROUP BY tenancy_id, period_month, for_type, payment_mode"
+        ))).all()
+        existing_pmt_totals: dict[tuple, float] = {}
+        for _r in _ep_rows:
+            _k = (_r.tenancy_id, str(_r.period_month), str(_r.for_type), str(_r.payment_mode))
+            existing_pmt_totals[_k] = float(_r.total)
+
         for rec in records:
             # 1. Normalize room number (handle edge cases)
             room_num = rec['room']
@@ -419,31 +433,35 @@ async def run_import(write: bool) -> None:
                 if cash_key:
                     cash_val, _, _, _ = clean_num(rec.get(cash_key, 0))
                     if cash_val > 0:
-                        session.add(Payment(
-                            tenancy_id=tenancy.id,
-                            amount=_to_dec(cash_val),
-                            payment_date=period,
-                            payment_mode=PaymentMode.cash,
-                            for_type=PaymentFor.rent,
-                            period_month=period,
-                            notes="Imported from Excel",
-                        ))
-                        stats["payments"] += 1
+                        _ck = (tenancy.id, str(period), "rent", "cash")
+                        if existing_pmt_totals.get(_ck, 0.0) < cash_val:
+                            session.add(Payment(
+                                tenancy_id=tenancy.id,
+                                amount=_to_dec(cash_val - existing_pmt_totals.get(_ck, 0.0)),
+                                payment_date=period,
+                                payment_mode=PaymentMode.cash,
+                                for_type=PaymentFor.rent,
+                                period_month=period,
+                                notes="Imported from Excel",
+                            ))
+                            stats["payments"] += 1
 
                 # UPI payment (use clean_num to match Sheet parsing exactly)
                 if upi_key:
                     upi_val, _, _, _ = clean_num(rec.get(upi_key, 0))
                     if upi_val > 0:
-                        session.add(Payment(
-                            tenancy_id=tenancy.id,
-                            amount=_to_dec(upi_val),
-                            payment_date=period,
-                            payment_mode=PaymentMode.upi,
-                            for_type=PaymentFor.rent,
-                            period_month=period,
-                            notes="Imported from Excel",
-                        ))
-                        stats["payments"] += 1
+                        _uk = (tenancy.id, str(period), "rent", "upi")
+                        if existing_pmt_totals.get(_uk, 0.0) < upi_val:
+                            session.add(Payment(
+                                tenancy_id=tenancy.id,
+                                amount=_to_dec(upi_val - existing_pmt_totals.get(_uk, 0.0)),
+                                payment_date=period,
+                                payment_mode=PaymentMode.upi,
+                                for_type=PaymentFor.rent,
+                                period_month=period,
+                                notes="Imported from Excel",
+                            ))
+                            stats["payments"] += 1
 
             # Apply monthly-classified comment to most recent rent_schedule
             if monthly_note:
@@ -456,29 +474,35 @@ async def run_import(write: bool) -> None:
                     last_rs.notes = monthly_note
 
             # 8. Deposit payment
+            # Excel has no cash/UPI column for deposits — default to UPI.
             if rec['deposit'] > 0:
-                session.add(Payment(
-                    tenancy_id=tenancy.id,
-                    amount=_to_dec(rec['deposit']),
-                    payment_date=checkin,
-                    payment_mode=PaymentMode.cash,
-                    for_type=PaymentFor.deposit,
-                    period_month=None,
-                    notes="Security deposit — imported from Excel",
-                ))
-                stats["payments"] += 1
+                _dk = (tenancy.id, "None", "deposit", "upi")
+                if existing_pmt_totals.get(_dk, 0.0) < rec['deposit']:
+                    session.add(Payment(
+                        tenancy_id=tenancy.id,
+                        amount=_to_dec(rec['deposit']),
+                        payment_date=checkin,
+                        payment_mode=PaymentMode.upi,
+                        for_type=PaymentFor.deposit,
+                        period_month=None,
+                        notes="Security deposit — imported from Excel",
+                    ))
+                    stats["payments"] += 1
 
             # 9. Booking advance
+            # Excel has no cash/UPI column for bookings — default to UPI.
             if rec['booking'] > 0:
-                session.add(Payment(
-                    tenancy_id=tenancy.id,
-                    amount=_to_dec(rec['booking']),
-                    payment_date=checkin,
-                    payment_mode=PaymentMode.cash,
-                    for_type=PaymentFor.booking,
-                    period_month=None,
-                    notes="Booking advance — imported from Excel",
-                ))
+                _bk = (tenancy.id, "None", "booking", "upi")
+                if existing_pmt_totals.get(_bk, 0.0) < rec['booking']:
+                    session.add(Payment(
+                        tenancy_id=tenancy.id,
+                        amount=_to_dec(rec['booking']),
+                        payment_date=checkin,
+                        payment_mode=PaymentMode.upi,
+                        for_type=PaymentFor.booking,
+                        period_month=None,
+                        notes="Booking advance — imported from Excel",
+                    ))
                 stats["payments"] += 1
 
         if write:
