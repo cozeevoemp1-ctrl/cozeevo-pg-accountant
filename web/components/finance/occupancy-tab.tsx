@@ -60,33 +60,33 @@ export function OccupancyTab() {
     if (chartNum === 1 || chartNum === 2) {
       const canvasEl = chartNum === 1 ? chart1Ref.current : chart2Ref.current
       if (!canvasEl) return
-      // Chart.js canvas is transparent — flatten onto dark background so PDF matches live view
+      // Downscale to CSS pixel dimensions — canvas is DPR× larger, squishing to A4 shrinks fonts
+      const dpr = window.devicePixelRatio || 1
+      const cssW = Math.round(canvasEl.width / dpr)
+      const cssH = Math.round(canvasEl.height / dpr)
+      // Flatten transparent Chart.js canvas onto dark background
       const flat = document.createElement("canvas")
-      flat.width = canvasEl.width
-      flat.height = canvasEl.height
-      const ctx = flat.getContext("2d")!
-      ctx.fillStyle = "#080d14"
-      ctx.fillRect(0, 0, flat.width, flat.height)
-      ctx.drawImage(canvasEl, 0, 0)
+      flat.width = cssW
+      flat.height = cssH
+      const flatCtx = flat.getContext("2d")!
+      flatCtx.fillStyle = "#080d14"
+      flatCtx.fillRect(0, 0, cssW, cssH)
+      flatCtx.drawImage(canvasEl, 0, 0, cssW, cssH)
       const imgData = flat.toDataURL("image/png", 1.0)
-      const rect = canvasEl.getBoundingClientRect()
-      const pdf = new jsPDF({ orientation: "landscape", unit: "pt" })
-      const pageW = pdf.internal.pageSize.getWidth()
-      const pageH = pdf.internal.pageSize.getHeight()
-      const ratio = Math.min(pageW / rect.width, pageH / rect.height)
-      pdf.addImage(imgData, "PNG", 0, 0, rect.width * ratio, rect.height * ratio)
+      // PDF page = CSS pixel dimensions (1pt per CSS px) → fonts appear at exact live-view size
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [cssW, cssH] })
+      pdf.addImage(imgData, "PNG", 0, 0, cssW, cssH)
       pdf.save(`kozzy-chart${chartNum === 1 ? "-checkins-type" : "-checkins-rent"}.pdf`)
     } else {
       const el = tableRef.current
       if (!el) return
       const { default: html2canvas } = await import("html2canvas")
+      const rect = el.getBoundingClientRect()
       const canvas = await html2canvas(el, { backgroundColor: "#080d14", scale: 2 })
       const imgData = canvas.toDataURL("image/png", 1.0)
-      const pdf = new jsPDF({ orientation: "landscape", unit: "pt" })
-      const pageW = pdf.internal.pageSize.getWidth()
-      const pageH = pdf.internal.pageSize.getHeight()
-      const ratio = Math.min(pageW / (canvas.width / 2), pageH / (canvas.height / 2))
-      pdf.addImage(imgData, "PNG", 0, 0, (canvas.width / 2) * ratio, (canvas.height / 2) * ratio)
+      // Page size = element CSS dimensions → table text appears at native size
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: [rect.width, rect.height] })
+      pdf.addImage(imgData, "PNG", 0, 0, rect.width, rect.height)
       pdf.save("kozzy-monthly-breakdown.pdf")
     }
   }
