@@ -90,13 +90,18 @@ export function OccupancyTab() {
           const meta = chart.getDatasetMeta(i)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           meta.data.forEach((pt: any, j: number) => {
-            const v = Number(ds.data[j])
+            const pct = Number(ds.data[j])
+            const beds = months[j]?.occ_beds ?? 0
             ctx.save()
             ctx.fillStyle = "#ffffff"
             ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
             ctx.textAlign = "center"
+            // beds count on top line
             ctx.textBaseline = "bottom"
-            ctx.fillText(`${v}%`, pt.x, pt.y - 6)
+            ctx.fillText(`${beds}`, pt.x, pt.y - 15)
+            // % on second line
+            ctx.fillStyle = "rgba(255,255,255,0.75)"
+            ctx.fillText(`${pct}%`, pt.x, pt.y - 5)
             ctx.restore()
           })
         })
