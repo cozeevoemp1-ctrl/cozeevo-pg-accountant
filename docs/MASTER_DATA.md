@@ -63,7 +63,7 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | 702 | THOR | 1 | Staff quarters (permanent) |
 | G12 | HULK | 3 | Staff quarters (permanent) |
 
-**Total staff rooms: 6** (THOR 5 + HULK 1) — **297 revenue beds**
+**Total staff rooms: 6** (THOR 5 + HULK 1) — **296 revenue beds**
 
 > **Changed 2026-05-09:** G20 → revenue (Chandraprakash moved in May 2026). Room 107 → revenue (Samruddhi Thanwar moved in May 2026).
 > **Changed 2026-04-26:** 114 and 618 moved from staff → revenue. G20 moved to staff temporarily until April end.

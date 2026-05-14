@@ -20,7 +20,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 HEADERS = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-TOTAL_BEDS = 297
+TOTAL_BEDS = 296
 
 # ── Fetch data ────────────────────────────────────────────────────────────────
 r = requests.get(f"{SUPABASE_URL}/rest/v1/tenancies", headers=HEADERS,

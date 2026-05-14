@@ -78,12 +78,18 @@ export function OccupancyTab() {
     const avgRent = months.map((m) => m.avg_rent)
     const showDaily = filter === "all"
 
+    // Font size scales with chart width: small on phone, larger when fullscreen
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dynFs = (chart: any, min = 9, max = 14) =>
+      Math.max(min, Math.min(max, Math.round(chart.width / 32)))
+
     // Inline plugin — draws value labels above line chart points
     const occLabelPlugin = {
       id: "occLabel",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       afterDatasetsDraw(chart: any) {
         const { ctx } = chart
+        const fs = dynFs(chart)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         chart.data.datasets.forEach((ds: any, i: number) => {
           if (ds.yAxisID !== "yOcc") return
@@ -94,14 +100,12 @@ export function OccupancyTab() {
             const beds = months[j]?.occ_beds ?? 0
             ctx.save()
             ctx.fillStyle = "#ffffff"
-            ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
             ctx.textAlign = "center"
-            // beds count on top line
             ctx.textBaseline = "bottom"
-            ctx.fillText(`${beds}`, pt.x, pt.y - 35)
-            // % on second line
+            ctx.fillText(`${beds}`, pt.x, pt.y - Math.round(fs * 2.8))
             ctx.fillStyle = "rgba(255,255,255,0.75)"
-            ctx.fillText(`${pct}%`, pt.x, pt.y - 12)
+            ctx.fillText(`${pct}%`, pt.x, pt.y - Math.round(fs * 1.2))
             ctx.restore()
           })
         })
@@ -113,6 +117,7 @@ export function OccupancyTab() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       afterDatasetsDraw(chart: any) {
         const { ctx } = chart
+        const fs = dynFs(chart)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         chart.data.datasets.forEach((ds: any, i: number) => {
           if (ds.yAxisID !== "yRent") return
@@ -123,10 +128,10 @@ export function OccupancyTab() {
             if (!v) return
             ctx.save()
             ctx.fillStyle = "#F4C842"
-            ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - 12)
+            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - Math.round(fs * 1.2))
             ctx.restore()
           })
         })
@@ -137,7 +142,7 @@ export function OccupancyTab() {
       display: true,
       text,
       color,
-      font: { size: 18 },
+      font: { size: 10 },
     })
 
     import("chart.js/auto").then(({ Chart }) => {
@@ -221,9 +226,9 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#8899aa",
-                font: { size: 20 },
+                font: { size: 11 },
                 boxWidth: 10,
-                padding: 10,
+                padding: 8,
               },
             },
             tooltip: {
@@ -245,7 +250,7 @@ export function OccupancyTab() {
           scales: {
             x: {
               stacked: true,
-              ticks: { color: "#8899aa", font: { size: 20 } },
+              ticks: { color: "#8899aa", font: { size: 11 } },
               grid: { color: gridColor },
             },
             yCI: {
@@ -325,9 +330,9 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#8899aa",
-                font: { size: 20 },
+                font: { size: 11 },
                 boxWidth: 10,
-                padding: 10,
+                padding: 8,
               },
             },
             tooltip: {
@@ -349,7 +354,7 @@ export function OccupancyTab() {
           },
           scales: {
             x: {
-              ticks: { color: "#8899aa", font: { size: 20 } },
+              ticks: { color: "#8899aa", font: { size: 11 } },
               grid: { color: gridColor },
             },
             yCount: {

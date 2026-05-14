@@ -16,10 +16,10 @@ Total beds are calculated dynamically from the rooms table, never hardcoded:
 TOTAL_BEDS = SUM(max_occupancy) WHERE is_staff_room = False
 ```
 
-**Current totals (updated 2026-05-09):**
+**Current totals (updated 2026-05-14):**
 - THOR: 147 beds (79 revenue rooms)
-- HULK: 150 beds (81 revenue rooms)
-- **Total: 297 beds**
+- HULK: 149 beds (81 revenue rooms)
+- **Total: 296 beds**
 
 Staff rooms excluded: THOR (G05, G06, 108, 701, 702) + HULK (G12)
 > Changed 2026-05-09: G20 → revenue (+1 bed), room 107 → revenue (+2 beds). Was 294.

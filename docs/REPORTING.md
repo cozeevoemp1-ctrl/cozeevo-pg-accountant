@@ -172,8 +172,8 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 
 ```
 THOR: 147 beds (79 revenue rooms)
-HULK: 150 beds (81 revenue rooms)
-Total: 297 beds  ← updated 2026-05-09; DB verified
+HULK: 149 beds (81 revenue rooms)
+Total: 296 beds  ← updated 2026-05-14; G16 double→single
 
 Staff rooms EXCLUDED (6 rooms, updated 2026-05-09):
   THOR: G05(3), G06(2), 108(2), 701(1), 702(1)
