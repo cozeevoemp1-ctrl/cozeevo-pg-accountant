@@ -147,10 +147,10 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }} onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-full max-w-lg bg-surface rounded-t-2xl px-5 pt-5 pb-8 shadow-xl"
+        className="relative w-full max-w-lg bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
