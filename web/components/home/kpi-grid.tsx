@@ -757,6 +757,9 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
       const matchRoom =
         !roomSearch.trim() ||
         it.room.toLowerCase().includes(roomSearch.toLowerCase());
+      if (showStaff) {
+        return matchRoom && it.is_staff_room === true;
+      }
       const matchGender = matchesGender(it.gender, genderFilter);
       return matchRoom && matchGender;
     }
