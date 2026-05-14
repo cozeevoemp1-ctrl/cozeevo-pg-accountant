@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.68] — 2026-05-14 — Occupancy chart: rolling window filter + PDF fixes
+
+### Occupancy tab rolling window (`src/api/v2/analytics.py`, `web/components/finance/occupancy-tab.tsx`, `web/lib/api.ts`)
+- `GET /analytics/occupancy?months=N` — new query param (default 12); rolling window from today back N months, capped at START_MONTH Nov '25
+- Future months auto-appear in chart as DB fills — no code changes ever needed
+- Frontend: **6M / 12M / All** toggle (pink accent); refetches on change; default 12M
+
+### PDF download fixes (`web/components/finance/occupancy-tab.tsx`)
+- Transparent Chart.js canvas flattened onto `#080d14` before capture → PDF now matches live dark theme
+- Downscale to CSS pixel resolution before capture; PDF page size = CSS dimensions (1pt per px) → fonts identical to live view
+- Download button: white text + frosted-glass pill (`bg-white/10`) → clearly visible in fullscreen
+- All chart fonts (legend, axis labels, ticks) now dynamic via `fontSizePlugin` (10–20px scaling with chart width) → PDF labels readable at all sizes
+
+---
+
 ## [1.75.67] — 2026-05-14 — Occupancy chart: fullscreen table, dynamic fonts, mobile portrait fix, nearTop flip, PDF download
 
 ### Occupancy tab polish (`web/components/finance/occupancy-tab.tsx`)
