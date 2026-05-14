@@ -908,9 +908,12 @@ export async function quickBook(payload: {
   tenant_name: string;
   tenant_phone: string;
   checkin_date: string;
-  monthly_rent: number;
+  stay_type?: "monthly" | "daily";
+  monthly_rent?: number;
   maintenance_fee?: number;
   security_deposit?: number;
+  daily_rate?: number;
+  checkout_date?: string;
 }): Promise<QuickBookResult> {
   return _post("/api/v2/app/bookings/quick-book", payload);
 }

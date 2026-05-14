@@ -109,10 +109,13 @@ interface QuickBookModalProps {
 }
 
 function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
+  const [stayType, setStayType] = useState<"monthly" | "daily">("monthly");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [checkinDate, setCheckinDate] = useState("");
+  const [checkoutDate, setCheckoutDate] = useState("");
   const [rent, setRent] = useState("");
+  const [dailyRate, setDailyRate] = useState("");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
   const [saving, setSaving] = useState(false);
@@ -122,21 +125,37 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!name.trim() || !phone.trim() || !checkinDate || !rent) {
-      setError("All fields are required");
+    if (!name.trim() || !phone.trim() || !checkinDate) {
+      setError("Name, phone and check-in date are required");
       return;
     }
+    if (stayType === "monthly" && !rent) { setError("Monthly rent is required"); return; }
+    if (stayType === "daily" && !dailyRate) { setError("Daily rate is required"); return; }
+    if (stayType === "daily" && !checkoutDate) { setError("Check-out date is required"); return; }
     setSaving(true);
     try {
-      const result = await quickBook({
-        room_number: room,
-        tenant_name: name.trim(),
-        tenant_phone: phone.trim(),
-        checkin_date: checkinDate,
-        monthly_rent: parseFloat(rent),
-        maintenance_fee: parseFloat(maintenance) || 0,
-        security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
-      });
+      const result = await quickBook(
+        stayType === "daily"
+          ? {
+              room_number: room,
+              tenant_name: name.trim(),
+              tenant_phone: phone.trim(),
+              checkin_date: checkinDate,
+              stay_type: "daily",
+              daily_rate: parseFloat(dailyRate),
+              checkout_date: checkoutDate,
+            }
+          : {
+              room_number: room,
+              tenant_name: name.trim(),
+              tenant_phone: phone.trim(),
+              checkin_date: checkinDate,
+              stay_type: "monthly",
+              monthly_rent: parseFloat(rent),
+              maintenance_fee: parseFloat(maintenance) || 0,
+              security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
+            }
+      );
       setSuccess(true);
       if (!result.whatsapp_sent) {
         setError("Booked! WhatsApp message could not be sent — share the link manually.");
@@ -176,6 +195,21 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                 {error}
               </div>
             )}
+            {/* Stay type toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+              {(["monthly", "daily"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setStayType(t)}
+                  className={`flex-1 py-2 text-xs font-bold transition-colors ${
+                    stayType === t ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
+                  }`}
+                >
+                  {t === "monthly" ? "Monthly" : "Day-wise"}
+                </button>
+              ))}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Customer name</label>
@@ -209,39 +243,68 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                   required
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Monthly rent (₹)</label>
-                <input
-                  type="number"
-                  value={rent}
-                  onChange={(e) => { setRent(e.target.value); setDeposit(e.target.value); }}
-                  placeholder="e.g. 12000"
-                  min="1"
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Maintenance (₹/mo)</label>
-                <input
-                  type="number"
-                  value={maintenance}
-                  onChange={(e) => setMaintenance(e.target.value)}
-                  min="0"
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Security deposit (₹)</label>
-                <input
-                  type="number"
-                  value={deposit}
-                  onChange={(e) => setDeposit(e.target.value)}
-                  placeholder="Auto = 1 month rent"
-                  min="0"
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
-                />
-              </div>
+              {stayType === "daily" ? (
+                <>
+                  <div>
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Check-out date</label>
+                    <input
+                      type="date"
+                      value={checkoutDate}
+                      onChange={(e) => setCheckoutDate(e.target.value)}
+                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Daily rate (₹/night)</label>
+                    <input
+                      type="number"
+                      value={dailyRate}
+                      onChange={(e) => setDailyRate(e.target.value)}
+                      placeholder="e.g. 800"
+                      min="1"
+                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Monthly rent (₹)</label>
+                    <input
+                      type="number"
+                      value={rent}
+                      onChange={(e) => { setRent(e.target.value); setDeposit(e.target.value); }}
+                      placeholder="e.g. 12000"
+                      min="1"
+                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Maintenance (₹/mo)</label>
+                    <input
+                      type="number"
+                      value={maintenance}
+                      onChange={(e) => setMaintenance(e.target.value)}
+                      min="0"
+                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Security deposit (₹)</label>
+                    <input
+                      type="number"
+                      value={deposit}
+                      onChange={(e) => setDeposit(e.target.value)}
+                      placeholder="Auto = 1 month rent"
+                      min="0"
+                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                    />
+                  </div>
+                </>
+              )}
             </div>
             <button
               type="submit"

@@ -27,10 +27,13 @@ class QuickBookRequest(BaseModel):
     room_number: str
     tenant_name: str
     tenant_phone: str
-    checkin_date: str   # YYYY-MM-DD
-    monthly_rent: float
+    checkin_date: str       # YYYY-MM-DD
+    stay_type: str = "monthly"
+    monthly_rent: float = 0.0
     maintenance_fee: float = 5000.0
-    security_deposit: float = 0.0  # 0 = auto = monthly_rent
+    security_deposit: float = 0.0   # 0 = auto = monthly_rent
+    daily_rate: float = 0.0
+    checkout_date: str = ""         # YYYY-MM-DD, required for daily
 
 
 @router.post("/quick-book")
@@ -46,13 +49,30 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
     if not req.tenant_name.strip():
         raise HTTPException(400, "Tenant name is required")
 
-    if req.monthly_rent <= 0:
+    if req.stay_type not in ("monthly", "daily"):
+        raise HTTPException(400, "stay_type must be 'monthly' or 'daily'")
+
+    if req.stay_type == "monthly" and req.monthly_rent <= 0:
         raise HTTPException(400, "Monthly rent must be > 0")
+
+    if req.stay_type == "daily" and req.daily_rate <= 0:
+        raise HTTPException(400, "Daily rate must be > 0")
 
     try:
         checkin = date.fromisoformat(req.checkin_date)
     except ValueError:
         raise HTTPException(400, "Invalid date format — use YYYY-MM-DD")
+
+    checkout: date | None = None
+    if req.stay_type == "daily":
+        if not req.checkout_date:
+            raise HTTPException(400, "checkout_date is required for daily stays")
+        try:
+            checkout = date.fromisoformat(req.checkout_date)
+        except ValueError:
+            raise HTTPException(400, "Invalid checkout_date format — use YYYY-MM-DD")
+        if checkout <= checkin:
+            raise HTTPException(400, "checkout_date must be after checkin_date")
 
     async with get_session() as session:
         # Blacklist check
@@ -91,21 +111,39 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
 
         # Create session — pre-fill name in tenant_data so Bookings page shows it immediately
         token = str(uuid.uuid4())
-        deposit = req.security_deposit if req.security_deposit > 0 else req.monthly_rent
-        obs = OnboardingSession(
-            token=token,
-            status="pending_tenant",
-            created_by_phone=user.phone or "",
-            tenant_phone=phone,
-            room_id=room.id,
-            agreed_rent=Decimal(str(req.monthly_rent)),
-            maintenance_fee=Decimal(str(req.maintenance_fee)),
-            security_deposit=Decimal(str(deposit)),
-            checkin_date=checkin,
-            stay_type="monthly",
-            tenant_data=json.dumps({"name": req.tenant_name.strip()}),
-            expires_at=datetime.utcnow() + timedelta(hours=48),
-        )
+        if req.stay_type == "daily":
+            obs = OnboardingSession(
+                token=token,
+                status="pending_tenant",
+                created_by_phone=user.phone or "",
+                tenant_phone=phone,
+                room_id=room.id,
+                agreed_rent=Decimal("0"),
+                daily_rate=Decimal(str(req.daily_rate)),
+                maintenance_fee=Decimal("0"),
+                security_deposit=Decimal("0"),
+                checkin_date=checkin,
+                checkout_date=checkout,
+                stay_type="daily",
+                tenant_data=json.dumps({"name": req.tenant_name.strip()}),
+                expires_at=datetime.utcnow() + timedelta(hours=48),
+            )
+        else:
+            deposit = req.security_deposit if req.security_deposit > 0 else req.monthly_rent
+            obs = OnboardingSession(
+                token=token,
+                status="pending_tenant",
+                created_by_phone=user.phone or "",
+                tenant_phone=phone,
+                room_id=room.id,
+                agreed_rent=Decimal(str(req.monthly_rent)),
+                maintenance_fee=Decimal(str(req.maintenance_fee)),
+                security_deposit=Decimal(str(deposit)),
+                checkin_date=checkin,
+                stay_type="monthly",
+                tenant_data=json.dumps({"name": req.tenant_name.strip()}),
+                expires_at=datetime.utcnow() + timedelta(hours=48),
+            )
         session.add(obs)
         await session.flush()
 
@@ -122,27 +160,43 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         onboard_link = f"{base_url}/onboard/{token}"
         whatsapp_sent = False
         phone_wa = f"91{phone}"
-        rent_str = f"Rs.{int(req.monthly_rent):,}"
         try:
             from src.whatsapp.webhook_handler import _send_whatsapp_template, _send_whatsapp
-            try:
-                await _send_whatsapp_template(
-                    phone_wa, "cozeevo_checkin_form",
-                    [room.room_number, rent_str, onboard_link],
-                )
-                whatsapp_sent = True
-            except Exception:
-                room_line = f"Room *{room.room_number}*" + (f" ({building})" if building else "")
+            room_line = f"Room *{room.room_number}*" + (f" ({building})" if building else "")
+            if req.stay_type == "daily":
+                assert checkout is not None
+                rate_str = f"Rs.{int(req.daily_rate):,}/night"
+                nights = (checkout - checkin).days
                 msg = (
                     f"Hello {req.tenant_name.strip()}! Welcome to *Cozeevo Co-living*\n\n"
                     f"{room_line}\n"
-                    f"Rent: {rent_str}/month\n"
-                    f"Check-in: {checkin.strftime('%d %b %Y')}\n\n"
+                    f"Rate: {rate_str}\n"
+                    f"Check-in: {checkin.strftime('%d %b %Y')}\n"
+                    f"Check-out: {checkout.strftime('%d %b %Y')} ({nights} night{'s' if nights != 1 else ''})\n\n"
                     f"Please complete your registration:\n{onboard_link}\n\n"
                     "This link is valid for 48 hours."
                 )
                 await _send_whatsapp(phone_wa, msg)
                 whatsapp_sent = True
+            else:
+                rent_str = f"Rs.{int(req.monthly_rent):,}"
+                try:
+                    await _send_whatsapp_template(
+                        phone_wa, "cozeevo_checkin_form",
+                        [str(room.room_number), rent_str, onboard_link],
+                    )
+                    whatsapp_sent = True
+                except Exception:
+                    msg = (
+                        f"Hello {req.tenant_name.strip()}! Welcome to *Cozeevo Co-living*\n\n"
+                        f"{room_line}\n"
+                        f"Rent: {rent_str}/month\n"
+                        f"Check-in: {checkin.strftime('%d %b %Y')}\n\n"
+                        f"Please complete your registration:\n{onboard_link}\n\n"
+                        "This link is valid for 48 hours."
+                    )
+                    await _send_whatsapp(phone_wa, msg)
+                    whatsapp_sent = True
         except Exception:
             pass  # Booking succeeds even if WhatsApp fails
 
