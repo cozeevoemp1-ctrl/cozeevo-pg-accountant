@@ -144,7 +144,9 @@ Kiran's Excel (offline)
 | `web/app/auth/update-password/page.tsx` | Set new password — works for any logged-in user; navigate directly after login with temp password |
 | `web/components/home/logout-avatar.tsx` | Avatar button (top-right home) — tap to sign out |
 | `scripts/create_auth_users.py` | One-shot: create Supabase auth users via Admin API with role metadata. Needs SUPABASE_SERVICE_KEY. |
-| `web/app/finance/page.tsx` | PWA Finance page — P&L tab + Cash tab; month picker, upload, reconciliation, unit economics (admin-only) |
+| `web/app/finance/page.tsx` | PWA Finance page — P&L tab + Cash tab + Occ. tab; month picker, upload, reconciliation, unit economics (admin-only) |
+| `src/api/v2/analytics.py` | GET /analytics/occupancy — monthly occupancy dashboard (KPIs + per-month breakdown); VERIFIED_MONTHS frozen for Nov'25–Apr'26 |
+| `web/components/finance/occupancy-tab.tsx` | PWA Occupancy tab — 4 KPI cards, 2 Chart.js charts (type breakdown + occ%; check-ins vs checkouts + avg rent/bed), fullscreen, data table |
 | `web/components/finance/cash-tab.tsx` | PWA Cash tab — monthly cash position: collected (auto), expenses (manual), count check card, 6-month history, add expense + log count sheets |
 | `tests/test_cash_logic.py` | Unit tests for cash balance and variance calculation logic |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |

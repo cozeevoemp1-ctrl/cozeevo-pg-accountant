@@ -86,7 +86,7 @@ OPEX = {
     # Nov: F&F 125021 + CCTV/8-Ball 82000. Dec: F&F 167741 + CCTV 100000 + Amazon 19014. Jan: F&F 203815 + Amazon 8414 (4707+3707 cash-counter). Feb: F&F 1185597 + Amazon 2174. Mar: F&F 10761 + Amazon 3237. Apr: F&F 12363 + chairs 47000 + atta 21060 + kitchen 37500 + Amazon 30756
     "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  13998,  148679],
     "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003],  # Apr +1003 Naukri job posting. Updated 2026-05-13
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     94073,   3000,    3000,    3000],
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   3000,    3000,    3000],  # Jan +5600: Jitendra cash — BBMP ₹5K + Agreement ₹600 (police ₹3K was already in accrual). 2026-05-14
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
     "Other Expenses":                                             [0, 15987, 2781,     700,       0,   32789,   38111],  # Feb: paytmqr ₹200 reclassified to Shopping & Supplies. Updated 2026-05-13
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
