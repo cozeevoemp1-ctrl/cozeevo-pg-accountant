@@ -145,6 +145,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
               stay_type: "daily",
               daily_rate: parseFloat(dailyRate),
               checkout_date: checkoutDate,
+              security_deposit: parseFloat(deposit) || 0,
               booking_amount: parseFloat(advance) || 0,
             }
           : {
@@ -258,7 +259,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                       required
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Daily rate (₹/night)</label>
                     <input
                       type="number"
@@ -268,6 +269,17 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                       min="1"
                       className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                       required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Security deposit (₹)</label>
+                    <input
+                      type="number"
+                      value={deposit}
+                      onChange={(e) => setDeposit(e.target.value)}
+                      placeholder="0 if none"
+                      min="0"
+                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                     />
                   </div>
                 </>
