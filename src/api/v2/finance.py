@@ -125,7 +125,6 @@ async def get_cash_position(
         collected = float(await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.payment_mode == PaymentMode.cash,
-                Payment.for_type == PaymentFor.rent,
                 Payment.is_void == False,
                 extract("year", Payment.payment_date) == year,
                 extract("month", Payment.payment_date) == month_num,
@@ -160,7 +159,6 @@ async def get_cash_position(
             h_col = float(await session.scalar(
                 select(func.coalesce(func.sum(Payment.amount), 0)).where(
                     Payment.payment_mode == PaymentMode.cash,
-                    Payment.for_type == PaymentFor.rent,
                     Payment.is_void == False,
                     extract("year", Payment.payment_date) == hy,
                     extract("month", Payment.payment_date) == hm,
