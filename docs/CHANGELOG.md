@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.67] — 2026-05-14 — Occupancy chart: fullscreen table, dynamic fonts, mobile portrait fix, nearTop flip, PDF download
+
+### Occupancy tab polish (`web/components/finance/occupancy-tab.tsx`)
+- **Table fullscreen** — Monthly Breakdown table gets its own expand button; `expanded` state extended to `null | 1 | 2 | 3` (3 = table)
+- **Dynamic font scaling** — `dynFs(chart, min=7, max=22)` rescaled: divisor 55→65, max cap 9→22; mobile ~7px, desktop ~9px, fullscreen ~22px
+- **Mobile portrait fullscreen** — chart height changed from `flex-1` (caused ~800px on portrait) to `min(calc(100vh - 120px), 80vmin)`; `80vmin` caps height on portrait mobile
+- **nearTop label flip** — high-occupancy months (e.g. 98%) had labels overlapping the chart top; added `nearTop` detection: when label would render above `chartTop + fs*1.5`, flip to draw below the line point instead
+- **PDF download in fullscreen** — download button appears only in fullscreen; charts 1+2 use canvas `toDataURL` → jsPDF landscape; table uses `html2canvas` (scale=2) → jsPDF landscape
+- **Dependencies** — `jspdf` + `html2canvas` added to `web/package.json`
+
+---
+
 ## [1.75.66] — 2026-05-14 — Room type corrections: G16+G19 single, G19 DB fix; TOTAL_BEDS 293
 
 ### DB
