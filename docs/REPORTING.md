@@ -172,14 +172,15 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 
 ```
 THOR: 147 beds (79 revenue rooms)
-HULK: 149 beds (81 revenue rooms)
-Total: 296 beds  ← updated 2026-05-14; G16 double→single
+HULK: 147 beds (80 revenue rooms)
+Total: 294 beds  ← updated 2026-05-14; room 614 → staff
 
-Staff rooms EXCLUDED (6 rooms, updated 2026-05-09):
+Staff rooms EXCLUDED (7 rooms, updated 2026-05-14):
   THOR: G05(3), G06(2), 108(2), 701(1), 702(1)
-  HULK: G12(3)
+  HULK: G12(3), 614(2)
   — 114 and 618 moved to revenue 2026-04-26
   — G20 → revenue 2026-05-09 (Chandraprakash); 107 → revenue 2026-05-09 (Samruddhi Thanwar)
+  — 614 → staff 2026-05-14
 ```
 
 ### 3.2 Formula
@@ -334,7 +335,8 @@ Only applies when tenant stays PAST their agreed checkout date. Charged on top o
 | Checkout scenario | Charge | Deposit |
 |-------------------|--------|---------|
 | Notice by 5th → leave end of month | Full month | Refunded (minus damages/dues) |
-| Notice after 5th → leave end of month | Full month | **Forfeited** |
+| Notice after 5th → leave end of NEXT month | Full month (next month) | Refunded (minus damages/dues) |
+| No notice at all | Full month charged | **Forfeited** |
 | Leaves before agreed checkout (sudden exit) | Full month charged, **no refund** for unused days | Forfeited |
 | Stays past agreed checkout (overstay) | Full month + prorated extra days | Held until settlement |
 
@@ -350,7 +352,8 @@ Only applies when tenant stays PAST their agreed checkout date. Charged on top o
 NOTICE_BY_DAY = 5
 
 IF notice given by 5th of month → deposit refundable, stay ends last day of that month
-IF notice after 5th             → deposit forfeited, tenant charged until end of NEXT month
+IF notice given after 5th       → next month's cycle applies (one full month rent required), deposit still refundable
+IF no notice at all             → deposit forfeited
 ```
 
 ### 7.2 Settlement Formula

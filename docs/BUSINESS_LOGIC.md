@@ -18,10 +18,11 @@ TOTAL_BEDS = SUM(max_occupancy) WHERE is_staff_room = False
 
 **Current totals (updated 2026-05-14):**
 - THOR: 147 beds (79 revenue rooms)
-- HULK: 149 beds (81 revenue rooms)
-- **Total: 296 beds**
+- HULK: 147 beds (80 revenue rooms)
+- **Total: 294 beds**
 
-Staff rooms excluded: THOR (G05, G06, 108, 701, 702) + HULK (G12)
+Staff rooms excluded: THOR (G05, G06, 108, 701, 702) + HULK (G12, 614)
+> Changed 2026-05-14: room 614 → staff (-2 beds). G16 double→single (-1 bed). Was 297.
 > Changed 2026-05-09: G20 → revenue (+1 bed), room 107 → revenue (+2 beds). Was 294.
 
 ### 1.2 Occupied Beds Calculation
@@ -256,8 +257,9 @@ Separate from void -- for exiting tenants. Recorded in Refund table with status 
 
 ### 6.3 Checkout & Notice Rules
 
-- Notice by 5th of month → deposit refundable, leave end of month
-- Notice after 5th → deposit **forfeited**, charged until end of NEXT month
+- Notice by 5th of month → deposit refundable, leave end of that month
+- Notice after 5th → next month's cycle applies (one full month rent required), deposit **still refundable**
+- No notice at all → deposit **forfeited**
 - Early exit (before agreed date) → full month charged, **no refund**
 - Overstay (past agreed date) → prorated extra days charged
 
@@ -338,7 +340,7 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| TOTAL_BEDS | 294 | Dynamic from rooms table (295 from May 2026) |
+| TOTAL_BEDS | 294 | Dynamic from rooms table (614 → staff 2026-05-14) |
 | NOTICE_BY_DAY | 5 | Deposit eligibility cutoff |
 | OVERPAYMENT_NOISE_RS | 10 | Payment rounding tolerance |
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection window |

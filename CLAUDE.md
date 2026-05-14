@@ -127,7 +127,7 @@ Kiran's Excel (offline)
 | `src/api/v2/notices.py` | GET /notices/active — tenants on notice (deposit eligible vs forfeited) |
 | `src/api/v2/rooms.py` | GET /rooms/check — room availability check (free beds, occupants) |
 | `services/room_transfer.py` | Shared execute_room_transfer() — single source of truth for bot + PWA |
-| `web/app/notices/page.tsx` | PWA Notices page — monthly tenants with formal notice only; deposit eligible if notice given (any day); forfeited only with zero notice |
+| `web/app/notices/page.tsx` | PWA Notices page — monthly tenants with formal notice; deposit eligible (refundable) if notice given on any day; late notice (after 5th) = next month cycle + full month rent; forfeited only with zero notice |
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
 | `web/app/onboarding/bookings/page.tsx` | PWA Bookings page — lists pending_review onboarding sessions; "Save & Check In" → instant_checkin approve |

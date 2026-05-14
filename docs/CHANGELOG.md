@@ -2,6 +2,72 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.63] — 2026-05-14 — Notice/deposit logic corrected across all surfaces; sharing_type + G16 room changes; occupancy chart dynamic fonts; bookings edit/cancel; checkout comments; prebook defaults
+
+### Room & sharing type changes (DB already applied)
+- Rooms 304, 614, 511, 519, 618: `sharing_type` changed to `premium` in DB
+- Room G16: `room_type` changed to `single` (max_occupancy 2→1) in DB
+- TOTAL_BEDS 297→296 (G16 lost 1 bed, HULK 150→149)
+
+### TOTAL_BEDS 297 → 296 updated in code
+- `src/integrations/gsheets.py`, `scripts/clean_and_load.py`, `scripts/pg_charts.py`
+- `scripts/gsheet_apps_script.js`, `scripts/gsheet_dashboard_webapp.js`
+- `docs/BUSINESS_LOGIC.md`, `docs/MASTER_DATA.md`, `docs/REPORTING.md`, `docs/SHEET_LOGIC.md`
+
+### Notice / deposit forfeiture — corrected rule (deposit forfeited ONLY with zero notice)
+- **Business rule (final):** Notice on/before 5th → same month exit, deposit refundable. Notice after 5th → next month's cycle, full month rent required, deposit still refundable. No notice at all → deposit forfeited.
+- `src/api/v2/kpi.py` — `deposit_eligible = True if r.notice_date else None` (was `notice_date.day <= 5`)
+- `web/app/checkout/new/page.tsx` — `depositForfeited = !prefetch.notice_date` only; notice banner now 3-state (no notice / late notice amber / on-time green)
+- `web/app/notices/page.tsx` — legend updated with correct 2-point rule
+- `src/whatsapp/handlers/tenant_handler.py` — late notice message now says next month's cycle, full month rent required, deposit still refundable (was wrongly saying forfeited)
+- `src/whatsapp/handlers/owner_handler.py` — checkout notice_line: late notice says "next month's cycle applies, deposit refundable"; forfeited only when no notice
+- `web/app/tenants/[tenancy_id]/edit/page.tsx` — `depositEligible = noticeDate ? true : null`; helper text updated
+- `src/services/pdf_generator.py` — house rule #1 updated with 2-point policy
+- `docs/BUSINESS_LOGIC.md`, `docs/REPORTING.md` — notice table corrected
+
+### Occupancy chart dynamic fonts
+- `web/components/finance/occupancy-tab.tsx` — `dynFs()` helper: font scales with `chart.width / 32` (min 9px, max 14px); label offsets relative to font size; no longer fixed 22px
+
+### Bookings page — edit + cancel
+- `web/app/onboarding/bookings/page.tsx` — `BookingCard` rewritten with 7-field inline edit panel (name, phone, room, checkin, rent, maintenance, deposit); save calls `PATCH /api/onboarding/admin/{token}`; cancel is 2-tap; both reload list
+- `src/api/onboarding_router.py` — `PATCH /admin/{token}` endpoint added; `GET /admin/pending` now returns `maintenance_fee` + `security_deposit`
+- `web/lib/api.ts` — `updateBookingSession()` + `cancelBookingSession()` added
+
+### Prebook modal defaults
+- `web/components/home/kpi-grid.tsx` — maintenance defaults to ₹5,000 (editable); deposit auto-fills from rent; quickBook passes both fields
+- `src/api/v2/bookings.py` — `QuickBookRequest` accepts `maintenance_fee` + `security_deposit`; `deposit = security_deposit if > 0 else monthly_rent`
+
+### Vacant beds "Until X" badge fix
+- Badge now shows 1 day before booking date (e.g. booking Jun 1 → "Until 31 May")
+
+### Checkout comments field
+- `web/app/checkout/new/page.tsx` — Comments textarea added
+- `src/api/v2/checkout.py` — `CheckoutCreateBody.comments` field; maps to `other_comments`
+
+### Commits
+- `4664818` — notice logic fixes across all surfaces (this session final commit)
+
+---
+
+## [1.75.62] — 2026-05-14 — Room 614 → staff room; TOTAL_BEDS 296→294
+
+### DB
+- `UPDATE rooms SET is_staff_room=TRUE WHERE room_number='614'` — 2 beds removed from revenue
+
+### TOTAL_BEDS 296 → 294 (staff rooms: 6 → 7, THOR 5 + HULK 2)
+- `src/integrations/gsheets.py:175`
+- `scripts/clean_and_load.py:23`
+- `scripts/gsheet_apps_script.js:25`
+- `scripts/gsheet_dashboard_webapp.js:19`
+- `scripts/pg_charts.py:23`
+
+### Docs updated
+- `docs/MASTER_DATA.md` — staff table (+614), floor 6 layout, revenue table, formula, changelog
+- `docs/BRAIN.md` — staff table (+614), revenue summary, formula
+- `docs/BUSINESS_LOGIC.md` — HULK beds 149→147, total 296→294, TOTAL_BEDS note
+- `docs/REPORTING.md` — HULK beds 149→147, total 296→294, staff rooms list
+- `docs/SHEET_LOGIC.md` — TOTAL_BEDS 296→294
+
 ## [1.75.61] — 2026-05-14 — Occupancy tab: analytics API + PWA charts + Jitendra cash expenses
 
 ### src/api/v2/analytics.py
