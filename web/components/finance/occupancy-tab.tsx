@@ -94,14 +94,14 @@ export function OccupancyTab() {
             const beds = months[j]?.occ_beds ?? 0
             ctx.save()
             ctx.fillStyle = "#ffffff"
-            ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, sans-serif"
             ctx.textAlign = "center"
             // beds count on top line
             ctx.textBaseline = "bottom"
-            ctx.fillText(`${beds}`, pt.x, pt.y - 15)
+            ctx.fillText(`${beds}`, pt.x, pt.y - 60)
             // % on second line
             ctx.fillStyle = "rgba(255,255,255,0.75)"
-            ctx.fillText(`${pct}%`, pt.x, pt.y - 5)
+            ctx.fillText(`${pct}%`, pt.x, pt.y - 20)
             ctx.restore()
           })
         })
@@ -123,10 +123,10 @@ export function OccupancyTab() {
             if (!v) return
             ctx.save()
             ctx.fillStyle = "#F4C842"
-            ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, sans-serif"
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - 6)
+            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - 20)
             ctx.restore()
           })
         })
@@ -137,7 +137,7 @@ export function OccupancyTab() {
       display: true,
       text,
       color,
-      font: { size: 9 },
+      font: { size: 18 },
     })
 
     import("chart.js/auto").then(({ Chart }) => {
@@ -221,7 +221,7 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#8899aa",
-                font: { size: 10 },
+                font: { size: 20 },
                 boxWidth: 10,
                 padding: 10,
               },
@@ -245,7 +245,7 @@ export function OccupancyTab() {
           scales: {
             x: {
               stacked: true,
-              ticks: { color: "#8899aa", font: { size: 10 } },
+              ticks: { color: "#8899aa", font: { size: 20 } },
               grid: { color: gridColor },
             },
             yCI: {
@@ -325,7 +325,7 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#8899aa",
-                font: { size: 10 },
+                font: { size: 20 },
                 boxWidth: 10,
                 padding: 10,
               },
@@ -349,7 +349,7 @@ export function OccupancyTab() {
           },
           scales: {
             x: {
-              ticks: { color: "#8899aa", font: { size: 10 } },
+              ticks: { color: "#8899aa", font: { size: 20 } },
               grid: { color: gridColor },
             },
             yCount: {
