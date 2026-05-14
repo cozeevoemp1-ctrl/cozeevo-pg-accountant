@@ -80,8 +80,9 @@ export function OccupancyTab() {
 
     // Font size scales with chart width: small on phone, larger when fullscreen
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dynFs = (chart: any, min = 7, max = 9) =>
-      Math.max(min, Math.min(max, Math.round(chart.width / 55)))
+    // min=7 keeps mobile labels legible; max=22 lets fullscreen (~1400px) reach ~22px
+    const dynFs = (chart: any, min = 7, max = 22) =>
+      Math.max(min, Math.min(max, Math.round(chart.width / 65)))
 
     // Inline plugin — draws value labels above line chart points
     const occLabelPlugin = {
