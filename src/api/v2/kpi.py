@@ -470,10 +470,15 @@ async def get_kpi_detail(
             return {"type": type, "items": items}
 
         elif type == "notices":
+            from collections import defaultdict
+            from datetime import date as _date
+            today = _date.today()
+
             rows = (await session.execute(
                 select(
-                    Tenancy.id, Tenant.name, Room.room_number,
+                    Tenancy.id, Tenant.name, Tenant.gender, Room.room_number,
                     Tenancy.notice_date, Tenancy.expected_checkout,
+                    Tenancy.sharing_type, Room.max_occupancy, Room.id.label("room_id"),
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
@@ -486,16 +491,49 @@ async def get_kpi_detail(
                 )
                 .order_by(Tenancy.expected_checkout.asc().nulls_last())
             )).all()
-            return {"type": type, "items": [
-                {
+
+            # Total active monthly tenants per room
+            room_active_rows = (await session.execute(
+                select(Tenancy.room_id, func.count(Tenancy.id).label("cnt"))
+                .join(Room, Tenancy.room_id == Room.id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "000",
+                    Tenancy.status == TenancyStatus.active,
+                    Tenancy.stay_type == StayType.monthly,
+                )
+                .group_by(Tenancy.room_id)
+            )).all()
+            room_active: dict[int, int] = {r.room_id: r.cnt for r in room_active_rows}
+
+            room_notice: dict[int, int] = defaultdict(int)
+            for r in rows:
+                room_notice[r.room_id] += 1
+
+            items = []
+            for r in rows:
+                is_premium = r.sharing_type is not None and r.sharing_type.value == "premium"
+                beds_freed = r.max_occupancy if is_premium else 1
+                room_active_count = room_active.get(r.room_id, 0)
+                room_notice_count = room_notice[r.room_id]
+                eco = r.expected_checkout
+                days_remaining = (eco - today).days if eco else 9999
+                items.append({
                     "tenancy_id": r.id,
                     "name": r.name,
                     "room": r.room_number,
-                    "detail": r.expected_checkout.strftime("%-d %b") if r.expected_checkout else "—",
-                    "deposit_eligible": True if r.notice_date else None,  # forfeited only with NO notice
-                }
-                for r in rows
-            ]}
+                    "detail": eco.strftime("%-d %b") if eco else "—",
+                    "deposit_eligible": True,
+                    "gender": r.gender,
+                    "expected_checkout_iso": eco.isoformat() if eco else None,
+                    "days_remaining": days_remaining,
+                    "beds_freed": beds_freed,
+                    "sharing_type": r.sharing_type.value if r.sharing_type else None,
+                    "is_full_exit": room_notice_count >= room_active_count > 0,
+                    "room_active_count": room_active_count,
+                    "room_notice_count": room_notice_count,
+                })
+            return {"type": type, "items": items}
 
     return {"type": type, "items": []}
 

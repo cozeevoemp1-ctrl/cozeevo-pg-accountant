@@ -74,6 +74,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "tenant_name":        tenant.name,
                 "phone":              tenant.phone,
                 "room_number":        room.room_number,
+                "gender":             tenant.gender,
                 "notice_date":        nd.isoformat(),
                 "expected_checkout":  expected_checkout.isoformat(),
                 "deposit_eligible":   True,   # notice given → always eligible; only forfeited with no notice

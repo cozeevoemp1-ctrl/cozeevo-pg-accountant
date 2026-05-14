@@ -479,6 +479,11 @@ interface PanelProps {
   stayFilter: StayFilter; setStayFilter: (v: StayFilter) => void;
   buildingFilter: BuildingFilter; setBuildingFilter: (v: BuildingFilter) => void;
   showStaff: boolean; toggleStaff: () => void;
+  noticeSortDir: "asc" | "desc"; setNoticeSortDir: (v: "asc" | "desc") => void;
+  noticeMonthFilter: string; setNoticeMonthFilter: (v: string) => void;
+  noticeTypeFilter: "all" | "full_room" | "premium" | "male" | "female"; setNoticeTypeFilter: (v: "all" | "full_room" | "premium" | "male" | "female") => void;
+  noticeMonths: string[];
+  allItems: KpiDetailItem[];
   // data
   filtered: KpiDetailItem[];
   loading: boolean;
@@ -492,6 +497,11 @@ interface PanelProps {
   onCollect: (item: KpiDetailItem) => void;
 }
 
+function monthLabel(key: string): string {
+  const m = parseInt(key.split("-")[1])
+  return ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m]
+}
+
 function ExpansionPanel({
   open, positionStyle,
   nameSearch, setNameSearch,
@@ -501,9 +511,21 @@ function ExpansionPanel({
   stayFilter, setStayFilter,
   buildingFilter, setBuildingFilter,
   showStaff, toggleStaff,
+  noticeSortDir, setNoticeSortDir,
+  noticeMonthFilter, setNoticeMonthFilter,
+  noticeTypeFilter, setNoticeTypeFilter,
+  noticeMonths,
+  allItems,
   filtered, loading, selected, detailLoading, selectItem, setSelected,
   cancellingId, onCancel, onBook, onCollect,
 }: PanelProps) {
+  const noticeTotalBeds = allItems.reduce((s, i) => s + (i.beds_freed ?? 1), 0)
+  const noticeFullRooms = (() => {
+    const seen = new Set<string>()
+    let n = 0
+    for (const i of allItems) { if (i.is_full_exit && !seen.has(i.room)) { seen.add(i.room); n++ } }
+    return n
+  })()
   return (
     <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
 
@@ -626,16 +648,62 @@ function ExpansionPanel({
       {/* Filter bar — notices */}
       {open === "notices" && (
         <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
-          <input
-            type="text"
-            placeholder="Name or room…"
-            value={nameSearch}
-            onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
-          />
-          {!loading && filtered.length > 0 && (
-            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} total</p>
-          )}
+          {/* Summary */}
+          <div className="flex gap-2 text-[10px] font-bold text-ink-muted">
+            <span className="text-ink">{allItems.reduce((s, i) => s + (i.beds_freed ?? 1), 0)} beds</span>
+            <span>·</span>
+            <span className="text-brand-pink">{(() => { const s = new Set<string>(); let n = 0; for (const i of allItems) { if (i.is_full_exit && !s.has(i.room)) { s.add(i.room); n++ } } return n })() } full rooms</span>
+            <span className="ml-auto">{filtered.length} shown</span>
+          </div>
+          {/* Sort + search + month chips */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setNoticeSortDir(noticeSortDir === "asc" ? "desc" : "asc")}
+              className="flex-shrink-0 w-7 h-7 rounded-lg border border-[#E0DDD8] bg-[#F6F5F0] flex items-center justify-center text-[11px] font-bold text-ink-muted"
+            >
+              {noticeSortDir === "asc" ? "↑" : "↓"}
+            </button>
+            <input
+              type="text"
+              placeholder="Name or room…"
+              value={nameSearch}
+              onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+              className="flex-1 min-w-0 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-1.5 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            />
+            <div className="flex gap-1 flex-shrink-0">
+              {["all", ...noticeMonths].map(mk => (
+                <button
+                  key={mk}
+                  onClick={() => setNoticeMonthFilter(mk)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeMonthFilter === mk ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
+                >
+                  {mk === "all" ? "All" : monthLabel(mk)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Type chips */}
+          <div className="flex gap-1 flex-wrap">
+            {(["all", "full_room", "premium", "male", "female"] as const).map(f => {
+              const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female" }
+              const activeColors: Record<string, string> = {
+                all: "bg-brand-pink text-white border-brand-pink",
+                full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
+                premium: "bg-[#F3E8FF] text-[#7C3AED] border-[#D8B4FE]",
+                male: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
+                female: "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
+              }
+              return (
+                <button
+                  key={f}
+                  onClick={() => setNoticeTypeFilter(f)}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilter === f ? activeColors[f] : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
+                >
+                  {labels[f]}
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -833,6 +901,9 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [stayFilter, setStayFilter] = useState<StayFilter>("all");
   const [buildingFilter, setBuildingFilter] = useState<BuildingFilter>("all");
   const [showStaff, setShowStaff] = useState(false);
+  const [noticeSortDir, setNoticeSortDir] = useState<"asc" | "desc">("asc");
+  const [noticeMonthFilter, setNoticeMonthFilter] = useState<string>("all");
+  const [noticeTypeFilter, setNoticeTypeFilter] = useState<"all" | "full_room" | "premium" | "male" | "female">("all");
 
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -895,6 +966,9 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     setStayFilter("all");
     setBuildingFilter("all");
     setShowStaff(false);
+    setNoticeSortDir("asc");
+    setNoticeMonthFilter("all");
+    setNoticeTypeFilter("all");
     setSelected(null);
   }
 
@@ -943,49 +1017,68 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     setCancellingId(null);
   }
 
-  const filtered = items.filter((it) => {
-    if (open === "dues") {
-      const matchName =
-        !nameSearch.trim() ||
-        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
-        it.room.toLowerCase().includes(nameSearch.toLowerCase());
-      const matchBuilding = buildingFilter === "all" || it.building === buildingFilter;
-      return matchName && matchBuilding;
+  const filtered: KpiDetailItem[] = (() => {
+    if (open === "notices") {
+      const q = nameSearch.trim().toLowerCase();
+      return [...items]
+        .filter(it => {
+          if (noticeMonthFilter !== "all" && it.expected_checkout_iso?.slice(0, 7) !== noticeMonthFilter) return false;
+          if (noticeTypeFilter === "full_room" && !it.is_full_exit) return false;
+          if (noticeTypeFilter === "premium" && it.sharing_type !== "premium") return false;
+          if (noticeTypeFilter === "male" && it.gender !== "male") return false;
+          if (noticeTypeFilter === "female" && it.gender !== "female") return false;
+          if (q && !it.name.toLowerCase().includes(q) && !it.room.toLowerCase().includes(q)) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const diff = (a.days_remaining ?? 9999) - (b.days_remaining ?? 9999);
+          return noticeSortDir === "asc" ? diff : -diff;
+        });
     }
-    if (open === "occupied") {
-      const matchName =
-        !nameSearch.trim() ||
-        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
-        it.room.toLowerCase().includes(nameSearch.toLowerCase());
-      return matchName && inRentRange(it.rent, rentRange);
-    }
-    if (open === "checkins_today" || open === "checkouts_today") {
-      const matchName =
-        !nameSearch.trim() ||
-        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
-        it.room.toLowerCase().includes(nameSearch.toLowerCase());
-      const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
-      return matchName && matchStay;
-    }
-    if (open === "no_show" || open === "notices") {
-      return (
-        !nameSearch.trim() ||
-        it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
-        it.room.toLowerCase().includes(nameSearch.toLowerCase())
-      );
-    }
-    if (open === "vacant") {
-      const matchRoom =
-        !roomSearch.trim() ||
-        it.room.toLowerCase().includes(roomSearch.toLowerCase());
-      if (showStaff) {
-        return matchRoom && it.is_staff_room === true;
+    return items.filter((it) => {
+      if (open === "dues") {
+        const matchName =
+          !nameSearch.trim() ||
+          it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+          it.room.toLowerCase().includes(nameSearch.toLowerCase());
+        const matchBuilding = buildingFilter === "all" || it.building === buildingFilter;
+        return matchName && matchBuilding;
       }
-      const matchGender = matchesGender(it.gender, genderFilter);
-      return matchRoom && matchGender;
-    }
-    return true;
-  });
+      if (open === "occupied") {
+        const matchName =
+          !nameSearch.trim() ||
+          it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+          it.room.toLowerCase().includes(nameSearch.toLowerCase());
+        return matchName && inRentRange(it.rent, rentRange);
+      }
+      if (open === "checkins_today" || open === "checkouts_today") {
+        const matchName =
+          !nameSearch.trim() ||
+          it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+          it.room.toLowerCase().includes(nameSearch.toLowerCase());
+        const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
+        return matchName && matchStay;
+      }
+      if (open === "no_show") {
+        return (
+          !nameSearch.trim() ||
+          it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
+          it.room.toLowerCase().includes(nameSearch.toLowerCase())
+        );
+      }
+      if (open === "vacant") {
+        const matchRoom =
+          !roomSearch.trim() ||
+          it.room.toLowerCase().includes(roomSearch.toLowerCase());
+        if (showStaff) return matchRoom && it.is_staff_room === true;
+        const matchGender = matchesGender(it.gender, genderFilter);
+        return matchRoom && matchGender;
+      }
+      return true;
+    });
+  })();
+
+  const noticeMonths = [...new Set(items.map(i => i.expected_checkout_iso?.slice(0, 7) ?? "").filter(Boolean))].sort();
 
   // Shared props for ExpansionPanel
   const panelProps = {
@@ -997,6 +1090,11 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     stayFilter, setStayFilter,
     buildingFilter, setBuildingFilter,
     showStaff, toggleStaff,
+    noticeSortDir, setNoticeSortDir,
+    noticeMonthFilter, setNoticeMonthFilter: (v: string) => setNoticeMonthFilter(v),
+    noticeTypeFilter, setNoticeTypeFilter,
+    noticeMonths,
+    allItems: items,
     filtered, loading, selected, detailLoading, selectItem, setSelected,
     cancellingId, onCancel,
     onBook: (room: string) => { close(); setBookingRoom(room); },

@@ -45,6 +45,7 @@ export default function NoticesPage() {
   const [searchQuery,  setSearchQuery]  = useState("")
   const [sortDir,      setSortDir]      = useState<"asc" | "desc">("asc")
   const [monthFilter,  setMonthFilter]  = useState<string>("all")
+  const [typeFilter,   setTypeFilter]   = useState<"all" | "full_room" | "premium" | "male" | "female">("all")
   const [editItem,     setEditItem]     = useState<NoticeItem | null>(null)
   const [editDate,     setEditDate]     = useState("")
   const [editSaving,   setEditSaving]   = useState(false)
@@ -74,6 +75,11 @@ export default function NoticesPage() {
     let src = [...items]
     // Month filter
     if (monthFilter !== "all") src = src.filter(i => monthKey(i.expected_checkout) === monthFilter)
+    // Type filter
+    if (typeFilter === "full_room") src = src.filter(i => i.is_full_exit)
+    else if (typeFilter === "premium") src = src.filter(i => i.sharing_type === "premium")
+    else if (typeFilter === "male") src = src.filter(i => i.gender === "male")
+    else if (typeFilter === "female") src = src.filter(i => i.gender === "female")
     // Search
     const q = searchQuery.trim().toLowerCase()
     if (q) src = src.filter(i =>
@@ -87,7 +93,7 @@ export default function NoticesPage() {
       return sortDir === "asc" ? diff : -diff
     })
     return src
-  }, [items, searchQuery, sortDir, monthFilter])
+  }, [items, searchQuery, sortDir, monthFilter, typeFilter])
 
   // Summary stats
   const totalBeds    = useMemo(() => filtered.reduce((s, i) => s + i.beds_freed, 0), [filtered])
@@ -239,6 +245,32 @@ export default function NoticesPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Type filter chips */}
+      <div className="px-4 pt-2 pb-0 max-w-lg mx-auto flex gap-1.5 flex-wrap">
+        {(["all", "full_room", "premium", "male", "female"] as const).map(f => {
+          const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female" }
+          const colors: Record<string, string> = {
+            all:       "bg-brand-pink text-white border-brand-pink",
+            full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
+            premium:   "bg-[#F3E8FF] text-[#7C3AED] border-[#D8B4FE]",
+            male:      "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
+            female:    "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
+          }
+          const active = typeFilter === f
+          return (
+            <button
+              key={f}
+              onClick={() => setTypeFilter(f)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                active ? colors[f] : "bg-surface text-ink-muted border-[#E5E1DC]"
+              }`}
+            >
+              {labels[f]}
+            </button>
+          )
+        })}
       </div>
 
       <div className="px-4 pt-3 flex flex-col gap-4 max-w-lg mx-auto">
@@ -417,14 +449,16 @@ function NoticeCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-sm font-bold text-ink truncate">{item.tenant_name}</p>
             {item.is_full_exit && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FFF3E0] text-[#C25000] flex-shrink-0">
-                Full room
-              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FFF3E0] text-[#C25000] flex-shrink-0">Full room</span>
             )}
             {item.sharing_type === "premium" && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] flex-shrink-0">
-                Premium
-              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] flex-shrink-0">Premium</span>
+            )}
+            {item.gender === "male" && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#EFF6FF] text-[#1D4ED8] flex-shrink-0">M</span>
+            )}
+            {item.gender === "female" && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FDF2F8] text-[#BE185D] flex-shrink-0">F</span>
             )}
           </div>
           <p className="text-xs text-ink-muted mt-0.5">

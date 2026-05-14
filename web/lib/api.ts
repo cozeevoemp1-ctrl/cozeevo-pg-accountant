@@ -134,11 +134,19 @@ export interface KpiDetailItem {
   is_checked_out?: boolean;  // checkouts_today: true if already exited
   dues?: number;       // dues items only
   building?: string;   // dues items: "THOR" | "HULK"
-  deposit_eligible?: boolean;  // notices tile only
+  deposit_eligible?: boolean;   // notices tile only
   upcoming_checkin?: string | null;  // vacant items: earliest future no-show checkin date (ISO)
   is_staff_room?: boolean;  // vacant items: true for staff rooms
   is_overdue?: boolean;   // no_show items: checkin_date has passed
   days_overdue?: number;  // no_show items: days since expected checkin
+  // notices tile extras
+  expected_checkout_iso?: string | null;
+  days_remaining?: number;
+  beds_freed?: number;
+  sharing_type?: string | null;
+  is_full_exit?: boolean;
+  room_active_count?: number;
+  room_notice_count?: number;
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
@@ -440,6 +448,7 @@ export interface NoticeItem {
   maintenance_fee: number;
   agreed_rent: number;
   days_remaining: number;        // negative = already past due date
+  gender: string | null;         // "male" | "female" | "other" | null
   sharing_type: string | null;   // "single"|"double"|"triple"|"premium"
   beds_freed: number;            // max_occupancy for premium, else 1
   room_max_occupancy: number;
