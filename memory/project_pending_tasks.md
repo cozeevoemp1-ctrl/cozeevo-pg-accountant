@@ -23,15 +23,12 @@ type: project
 
 ## Active / Next Up
 
-### Data fixes (from May payment import — 2026-05-05)
+### Data fixes (from May payment import — 2026-05-05, updated 2026-05-14)
 1. **G20 reclassification** — `UPDATE rooms SET is_staff_room=false WHERE room_number='G20'` + re-sync + import Chandraprakash ₹33k payment. Blocked because G20 is staff room in DB.
-2. **6 skipped tenants in May import** — need manual payment recording:
-   - Prakashita room 620 (+917275547390)
-   - Chandraprakash room G20 (+919506064442) — blocked on G20 fix above
-   - Mathew Koshy room 304 (+919446655101)
-   - Rama Krishnan room G09 (+919842378754)
-   - Vijay Kumar (room listed "June" in sheet — data error, needs clarification)
-   - Akshitha Jawahar room 214 (+919500006551)
+2. **May payments — still missing:**
+   - Vijay Kumar (room listed "June" in sheet — not in DB, needs clarification which room)
+   - Small residual gap ~₹6K cash vs sheet — from bot-logged payments not in sheet (acceptable)
+3. **May P&L cash expenses not yet added** — May 2026 property rent + ops cash expenses need to be added to cash_expenses table once Kiran confirms amounts
 3. **5 UNASSIGNED-room tenants with dues** — Tanya Rishikesh, Nihanth, Kiran Koushik, Ganesh Magi, Aditya Sable
 4. **Room mismatches** — Gayatri Kulkarni NM (sheet:514, DB:519), Ganesh Magi (sheet:418, DB:219)
 
