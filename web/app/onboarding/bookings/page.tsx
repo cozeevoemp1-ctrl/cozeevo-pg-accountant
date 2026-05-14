@@ -342,14 +342,21 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             </>
           ) : (
             <>
-              <a
-                href={`${API_URL}/admin/onboarding#${b.token}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
-              >
-                Review & Edit →
-              </a>
+              <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
+                className="flex-1 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                Edit
+              </button>
+              {cancelConfirm ? (
+                <button onClick={doCancel} disabled={cancelling}
+                  className="px-4 rounded-pill bg-[#FEE2E2] py-2.5 text-xs font-bold text-[#991B1B] disabled:opacity-50">
+                  {cancelling ? "…" : "Confirm?"}
+                </button>
+              ) : (
+                <button onClick={() => setCancelConfirm(true)}
+                  className="px-4 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted active:opacity-70">
+                  Cancel
+                </button>
+              )}
               <button
                 onClick={() => onCheckin(b.token)}
                 disabled={checkingIn === b.token}
