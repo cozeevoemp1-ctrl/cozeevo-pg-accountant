@@ -575,15 +575,15 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
 | THOR | 79 | 14 | 62 | 3 | **147** |
-| HULK | 80 | 15 | 63 | 2 | **147** |
-| **Total** | **159** | **29** | **125** | **5** | **294** |
+| HULK | 80 | 16 | 62 | 2 | **146** |
+| **Total** | **159** | **30** | **124** | **5** | **293** |
 
 ### Bed Count Formula
 ```
 Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
                    = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
-                   = 29 + 250 + 15
-                   = 294
+                   = 30 + 248 + 15
+                   = 293
 ```
 
 ---

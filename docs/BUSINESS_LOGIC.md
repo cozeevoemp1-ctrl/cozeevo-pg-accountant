@@ -18,11 +18,11 @@ TOTAL_BEDS = SUM(max_occupancy) WHERE is_staff_room = False
 
 **Current totals (updated 2026-05-14):**
 - THOR: 147 beds (79 revenue rooms)
-- HULK: 147 beds (80 revenue rooms)
-- **Total: 294 beds**
+- HULK: 146 beds (80 revenue rooms)
+- **Total: 293 beds**
 
 Staff rooms excluded: THOR (G05, G06, 108, 701, 702) + HULK (G12, 614)
-> Changed 2026-05-14: room 614 → staff (-2 beds). G16 double→single (-1 bed). Was 297.
+> Changed 2026-05-14: G16+G19 double→single (-2 beds). Room 614 → staff (-2 beds). Was 297.
 > Changed 2026-05-09: G20 → revenue (+1 bed), room 107 → revenue (+2 beds). Was 294.
 
 ### 1.2 Occupied Beds Calculation
@@ -97,7 +97,7 @@ active_beds = regular + (premium_count * 2)
 ```
 Checked-in: {active_beds} beds ({regular} regular + {premium_count} premium)
 No-show: {no_show} beds reserved
-Vacant: {294 - active_beds - no_show} beds
+Vacant: {293 - active_beds - no_show} beds
 ```
 
 ---
@@ -340,7 +340,7 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| TOTAL_BEDS | 294 | Dynamic from rooms table (614 → staff 2026-05-14) |
+| TOTAL_BEDS | 293 | Dynamic from rooms table (G16+G19 single, 614→staff 2026-05-14) |
 | NOTICE_BY_DAY | 5 | Deposit eligibility cutoff |
 | OVERPAYMENT_NOISE_RS | 10 | Payment rounding tolerance |
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection window |
