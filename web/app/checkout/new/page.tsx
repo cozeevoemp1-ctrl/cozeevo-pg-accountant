@@ -105,9 +105,9 @@ function NewCheckoutPage() {
   const [refundOverrideVal,  setRefundOverrideVal]  = useState("0")
 
   // Notice / deposit forfeiture
-  const depositForfeited = prefetch
-    ? !prefetch.notice_date || new Date(prefetch.notice_date + "T00:00:00").getDate() > NOTICE_BY_DAY
-    : false
+  // Deposit forfeited ONLY when no notice was given at all.
+  // Late notice (after 5th) = extra month's rent charged, but deposit still refundable.
+  const depositForfeited = prefetch ? !prefetch.notice_date : false
 
   function calcLastDay(noticeDateISO: string): string {
     const d = new Date(noticeDateISO + "T00:00:00")
@@ -444,49 +444,59 @@ function NewCheckoutPage() {
         )}
 
         {/* Notice status banner */}
-        {prefetch && !loadingPre && (
-          <div className={`rounded-card p-3 border ${
-            depositForfeited
-              ? "bg-tile-orange border-[#FFDCC0] text-[#7A3300]"
-              : "bg-tile-green border-[#C4EDD4] text-[#146B2E]"
-          }`}>
-            <div className="flex items-start gap-2">
-              <span className="text-base flex-shrink-0 mt-0.5">
-                {depositForfeited ? "⚠" : "✓"}
-              </span>
-              <div className="flex-1 min-w-0">
-                {!prefetch.notice_date ? (
+        {prefetch && !loadingPre && (() => {
+          const nd = prefetch.notice_date
+          const noticeDay = nd ? new Date(nd + "T00:00:00").getDate() : null
+          const lateNotice = nd && noticeDay! > NOTICE_BY_DAY
+          if (!nd) {
+            // No notice — deposit forfeited
+            return (
+              <div className="rounded-card p-3 border bg-tile-orange border-[#FFDCC0] text-[#7A3300]">
+                <div className="flex items-start gap-2">
+                  <span className="text-base flex-shrink-0 mt-0.5">⚠</span>
                   <p className="text-xs font-bold">No notice on record — deposit forfeited</p>
-                ) : depositForfeited ? (
-                  <>
+                </div>
+              </div>
+            )
+          }
+          if (lateNotice) {
+            // Late notice — deposit still refundable, but extra month's rent applies
+            return (
+              <div className="rounded-card p-3 border bg-[#FFFBEB] border-[#FDE68A] text-[#78350F]">
+                <div className="flex items-start gap-2">
+                  <span className="text-base flex-shrink-0 mt-0.5">⚠</span>
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold">
-                      Notice on {fmtDate(prefetch.notice_date)} (after {NOTICE_BY_DAY}th) — deposit forfeited
+                      Notice on {fmtDate(nd)} (after {NOTICE_BY_DAY}th) — extra month&apos;s rent applies
                     </p>
-                    {expectedLastDay && (
-                      <p className="text-[10px] mt-0.5 opacity-80">
-                        Last day: {fmtDate(expectedLastDay)} · Extra month charged
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs font-bold">
-                      Notice on {fmtDate(prefetch.notice_date)} — Deposit Refundable
+                    <p className="text-[10px] mt-0.5 opacity-80">
+                      Deposit refundable · {expectedLastDay ? `Last day: ${fmtDate(expectedLastDay)}` : ""}
                     </p>
-                    <p className="text-xs font-semibold mt-0.5">
-                      {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.pending_dues))} to return
-                    </p>
-                    {expectedLastDay && (
-                      <p className="text-[10px] mt-0.5 opacity-80">
-                        Last day: {fmtDate(expectedLastDay)}
-                      </p>
-                    )}
-                  </>
-                )}
+                  </div>
+                </div>
+              </div>
+            )
+          }
+          // On-time notice — deposit refundable
+          return (
+            <div className="rounded-card p-3 border bg-tile-green border-[#C4EDD4] text-[#146B2E]">
+              <div className="flex items-start gap-2">
+                <span className="text-base flex-shrink-0 mt-0.5">✓</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold">
+                    Notice on {fmtDate(nd)} — Deposit Refundable
+                  </p>
+                  <p className="text-xs font-semibold mt-0.5">
+                    {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.pending_dues))} to return
+                  </p>
+                  {expectedLastDay && (
+                    <p className="text-[10px] mt-0.5 opacity-80">Last day: {fmtDate(expectedLastDay)}</p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Financial summary */}
         {prefetch && !loadingPre && (

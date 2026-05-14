@@ -486,7 +486,7 @@ async def get_kpi_detail(
                     "name": r.name,
                     "room": r.room_number,
                     "detail": r.expected_checkout.strftime("%-d %b") if r.expected_checkout else "—",
-                    "deposit_eligible": (r.notice_date.day <= 5) if r.notice_date else None,
+                    "deposit_eligible": True if r.notice_date else None,  # forfeited only with NO notice
                 }
                 for r in rows
             ]}

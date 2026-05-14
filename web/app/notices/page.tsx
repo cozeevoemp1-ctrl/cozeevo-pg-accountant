@@ -209,8 +209,9 @@ export default function NoticesPage() {
         {!loading && items.length > 0 && (
           <div className="bg-surface rounded-card border border-[#F0EDE9] p-3 text-xs text-ink-muted">
             <p className="font-semibold text-ink mb-1">Notice rules</p>
-            <p>On/before {NOTICE_BY_DAY}th of month → deposit refunded (deposit − maintenance)</p>
-            <p className="mt-0.5">After {NOTICE_BY_DAY}th → deposit forfeited, extra month charged</p>
+            <p>On/before {NOTICE_BY_DAY}th of month → vacate by month end, deposit refunded</p>
+            <p className="mt-0.5">After {NOTICE_BY_DAY}th → notice applies to next month, extra month&apos;s rent charged, deposit still refundable</p>
+            <p className="mt-0.5">No notice given → deposit forfeited</p>
           </div>
         )}
       </div>
