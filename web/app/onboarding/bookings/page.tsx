@@ -35,6 +35,14 @@ function fmtRent(n?: number) {
   return `₹${n.toLocaleString("en-IN")}/mo`
 }
 
+function proratedRent(rent: number, checkinIso: string): number {
+  const d = new Date(checkinIso)
+  const day = d.getDate()
+  if (day === 1) return rent
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  return Math.floor(rent * (daysInMonth - day + 1) / daysInMonth)
+}
+
 function isToday(iso: string) {
   if (!iso) return false
   const d = new Date(iso)
@@ -257,16 +265,23 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
       {/* Details row */}
       <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: "Room", value: b.room || "TBD" },
-          { label: "Check-in", value: fmtDate(b.checkin_date) },
-          { label: "Rent", value: fmtRent(b.agreed_rent) },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
-            <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">{label}</p>
-            <p className="text-xs font-bold text-ink mt-0.5">{value}</p>
-          </div>
-        ))}
+        <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+          <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Room</p>
+          <p className="text-xs font-bold text-ink mt-0.5">{b.room || "TBD"}</p>
+        </div>
+        <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+          <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Check-in</p>
+          <p className="text-xs font-bold text-ink mt-0.5">{fmtDate(b.checkin_date)}</p>
+        </div>
+        <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+          <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Rent</p>
+          <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.agreed_rent)}</p>
+          {b.agreed_rent && b.checkin_date && new Date(b.checkin_date).getDate() !== 1 && (
+            <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
+              1st mo: ₹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Error */}
