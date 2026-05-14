@@ -41,9 +41,12 @@ function CollapseIcon() {
   )
 }
 
+type MonthWindow = 6 | 12 | 0  // 0 = all time
+
 export function OccupancyTab() {
   const [data, setData] = useState<OccupancyData | null>(null)
   const [filter, setFilter] = useState<Filter>("monthly")
+  const [monthWindow, setMonthWindow] = useState<MonthWindow>(12)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [expanded, setExpanded] = useState<null | 1 | 2 | 3>(null)
@@ -92,11 +95,13 @@ export function OccupancyTab() {
   }
 
   useEffect(() => {
-    getOccupancyData()
+    setLoading(true)
+    setError("")
+    getOccupancyData(monthWindow === 0 ? 120 : monthWindow)
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [monthWindow])
 
   // Resize charts when fullscreen state changes (after DOM updates)
   useEffect(() => {
@@ -527,8 +532,8 @@ export function OccupancyTab() {
         </div>
       </div>
 
-      {/* Filter toggle */}
-      <div className="flex items-center gap-3">
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-[10px] text-ink-muted uppercase tracking-wide">Stay type:</span>
         <div className="flex rounded-lg overflow-hidden border border-[#2a3a50]">
           <button
@@ -547,6 +552,23 @@ export function OccupancyTab() {
           >
             All incl. Daily
           </button>
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-[10px] text-ink-muted uppercase tracking-wide">Window:</span>
+          <div className="flex rounded-lg overflow-hidden border border-[#2a3a50]">
+            {([6, 12, 0] as MonthWindow[]).map((w) => (
+              <button
+                key={w}
+                onClick={() => setMonthWindow(w)}
+                className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  monthWindow === w ? "bg-[#1e3a5a] text-[#EF1F9C]" : "bg-[#0F0E0D] text-ink-muted"
+                }`}
+              >
+                {w === 0 ? "All" : `${w}M`}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

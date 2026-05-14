@@ -992,6 +992,6 @@ export interface OccupancyData {
   months: OccupancyMonthData[]
 }
 
-export function getOccupancyData(): Promise<OccupancyData> {
-  return _get<OccupancyData>("/api/v2/app/analytics/occupancy")
+export function getOccupancyData(months = 12): Promise<OccupancyData> {
+  return _get<OccupancyData>(`/api/v2/app/analytics/occupancy?months=${months}`)
 }

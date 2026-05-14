@@ -5,7 +5,7 @@ from calendar import monthrange
 from datetime import date
 from typing import List, Optional, TypedDict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import case, func, literal_column, select, and_, or_, text
 
@@ -15,7 +15,7 @@ from src.database.models import Room, Tenancy, TenancyStatus, StayType
 
 router = APIRouter(prefix="/analytics")
 
-START_MONTH = date(2025, 11, 1)
+START_MONTH = date(2025, 11, 1)  # absolute earliest — data doesn't exist before this
 MONTH_ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
               7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
@@ -149,9 +149,24 @@ async def _live_month_stats(session, target: date, total_beds: int) -> tuple[int
     return beds, pct, avg_rent
 
 
+def _months_back(today: date, n: int) -> date:
+    """Return the first day of the month that is n-1 months before today's month."""
+    m = today.month - (n - 1)
+    y = today.year
+    while m <= 0:
+        m += 12
+        y -= 1
+    return date(y, m, 1)
+
+
 @router.get("/occupancy", response_model=OccupancyResponse)
-async def get_occupancy(_user: AppUser = Depends(get_current_user)):
+async def get_occupancy(
+    months: int = Query(12, ge=1, le=120, description="Rolling window in months (default 12)"),
+    _user: AppUser = Depends(get_current_user),
+):
     today = date.today()
+    # Rolling window: last N months, but never before our data started
+    window_start = max(_months_back(today, months), START_MONTH)
 
     async with get_session() as session:
         # Total revenue beds
@@ -226,7 +241,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 Room.is_staff_room == False,
                 Room.room_number != "000",
                 Tenancy.stay_type == StayType.monthly,
-                Tenancy.checkin_date >= START_MONTH,
+                Tenancy.checkin_date >= window_start,
             )
             .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date), Tenancy.sharing_type)
         )).all()
@@ -242,7 +257,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 Room.is_staff_room == False,
                 Room.room_number != "000",
                 Tenancy.stay_type == StayType.daily,
-                Tenancy.checkin_date >= START_MONTH,
+                Tenancy.checkin_date >= window_start,
             )
             .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date))
         )).all()
@@ -255,7 +270,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
             )
             .where(
                 Tenancy.checkout_date != None,
-                Tenancy.checkout_date >= START_MONTH,
+                Tenancy.checkout_date >= window_start,
             )
             .group_by(func.date_trunc(text("'month'"), Tenancy.checkout_date))
         )).all()
@@ -271,9 +286,9 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
         ci_daily_map = {(r.m.year, r.m.month): int(r.cnt) for r in ci_daily_rows}
         co_map = {(r.m.year, r.m.month): int(r.cnt) for r in co_rows}
 
-        # Enumerate months
+        # Enumerate months in the rolling window
         months_out: list[MonthData] = []
-        cur = START_MONTH
+        cur = window_start
         while cur <= date(today.year, today.month, 1):
             ym = (cur.year, cur.month)
             lbl = f"{MONTH_ABBR[cur.month]} '{str(cur.year)[2:]}"
