@@ -9,6 +9,16 @@ function fmt(n: number) {
   return n.toLocaleString("en-IN")
 }
 
+function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  )
+}
+
 function ExpandIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -42,6 +52,36 @@ export function OccupancyTab() {
   const chart2Ref = useRef<HTMLCanvasElement>(null)
   const chart1Inst = useRef<unknown>(null)
   const chart2Inst = useRef<unknown>(null)
+  const tableRef = useRef<HTMLDivElement>(null)
+
+  const downloadPDF = async (chartNum: 1 | 2 | 3) => {
+    const { jsPDF } = await import("jspdf")
+
+    if (chartNum === 1 || chartNum === 2) {
+      const canvasEl = chartNum === 1 ? chart1Ref.current : chart2Ref.current
+      if (!canvasEl) return
+      const imgData = canvasEl.toDataURL("image/png", 1.0)
+      const rect = canvasEl.getBoundingClientRect()
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt" })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const ratio = Math.min(pageW / rect.width, pageH / rect.height)
+      pdf.addImage(imgData, "PNG", 0, 0, rect.width * ratio, rect.height * ratio)
+      pdf.save(`kozzy-chart${chartNum === 1 ? "-checkins-type" : "-checkins-rent"}.pdf`)
+    } else {
+      const el = tableRef.current
+      if (!el) return
+      const { default: html2canvas } = await import("html2canvas")
+      const canvas = await html2canvas(el, { backgroundColor: "#080d14", scale: 2 })
+      const imgData = canvas.toDataURL("image/png", 1.0)
+      const pdf = new jsPDF({ orientation: "landscape", unit: "pt" })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const ratio = Math.min(pageW / (canvas.width / 2), pageH / (canvas.height / 2))
+      pdf.addImage(imgData, "PNG", 0, 0, (canvas.width / 2) * ratio, (canvas.height / 2) * ratio)
+      pdf.save("kozzy-monthly-breakdown.pdf")
+    }
+  }
 
   useEffect(() => {
     getOccupancyData()
@@ -494,13 +534,25 @@ export function OccupancyTab() {
           <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide">
             Check-ins by Type &amp; Occupancy %
           </p>
-          <button
-            onClick={() => setExpanded(expanded === 1 ? null : 1)}
-            className="text-ink-muted hover:text-white transition-colors p-1"
-            aria-label={expanded === 1 ? "Collapse" : "Expand"}
-          >
-            {expanded === 1 ? <CollapseIcon /> : <ExpandIcon />}
-          </button>
+          <div className="flex items-center gap-1">
+            {expanded === 1 && (
+              <button
+                onClick={() => downloadPDF(1)}
+                className="text-[#9ab8cc] hover:text-white transition-colors p-1"
+                aria-label="Download PDF"
+                title="Download PDF"
+              >
+                <DownloadIcon />
+              </button>
+            )}
+            <button
+              onClick={() => setExpanded(expanded === 1 ? null : 1)}
+              className="text-ink-muted hover:text-white transition-colors p-1"
+              aria-label={expanded === 1 ? "Collapse" : "Expand"}
+            >
+              {expanded === 1 ? <CollapseIcon /> : <ExpandIcon />}
+            </button>
+          </div>
         </div>
         <div style={expanded === 1 ? { height: "min(calc(100vh - 120px), 80vmin)" } : { height: 230 }}>
           <canvas ref={chart1Ref} />
@@ -524,13 +576,25 @@ export function OccupancyTab() {
           <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide">
             Check-ins vs Check-outs &amp; Avg Rent / Bed
           </p>
-          <button
-            onClick={() => setExpanded(expanded === 2 ? null : 2)}
-            className="text-ink-muted hover:text-white transition-colors p-1"
-            aria-label={expanded === 2 ? "Collapse" : "Expand"}
-          >
-            {expanded === 2 ? <CollapseIcon /> : <ExpandIcon />}
-          </button>
+          <div className="flex items-center gap-1">
+            {expanded === 2 && (
+              <button
+                onClick={() => downloadPDF(2)}
+                className="text-[#9ab8cc] hover:text-white transition-colors p-1"
+                aria-label="Download PDF"
+                title="Download PDF"
+              >
+                <DownloadIcon />
+              </button>
+            )}
+            <button
+              onClick={() => setExpanded(expanded === 2 ? null : 2)}
+              className="text-ink-muted hover:text-white transition-colors p-1"
+              aria-label={expanded === 2 ? "Collapse" : "Expand"}
+            >
+              {expanded === 2 ? <CollapseIcon /> : <ExpandIcon />}
+            </button>
+          </div>
         </div>
         <div style={expanded === 2 ? { height: "min(calc(100vh - 120px), 80vmin)" } : { height: 210 }}>
           <canvas ref={chart2Ref} />
@@ -554,6 +618,17 @@ export function OccupancyTab() {
           <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide">
             Monthly Breakdown
           </p>
+          <div className="flex items-center gap-1">
+            {expanded === 3 && (
+              <button
+                onClick={() => downloadPDF(3)}
+                className="text-[#9ab8cc] hover:text-white transition-colors p-1"
+                aria-label="Download PDF"
+                title="Download PDF"
+              >
+                <DownloadIcon />
+              </button>
+            )}
           <button
             onClick={() => setExpanded(expanded === 3 ? null : 3)}
             className="text-[#6a8a9a] hover:text-white transition-colors p-1"
@@ -561,8 +636,9 @@ export function OccupancyTab() {
           >
             {expanded === 3 ? <CollapseIcon /> : <ExpandIcon />}
           </button>
+          </div>
         </div>
-        <div className={`overflow-x-auto ${expanded === 3 ? "flex-1 overflow-y-auto" : ""}`}>
+        <div ref={tableRef} className={`overflow-x-auto ${expanded === 3 ? "flex-1 overflow-y-auto" : ""}`}>
           <table className={`w-full border-collapse ${expanded === 3 ? "text-[13px]" : "text-[10px] min-w-[500px]"}`}>
             <thead>
               <tr className="text-[#8aacbf]">
