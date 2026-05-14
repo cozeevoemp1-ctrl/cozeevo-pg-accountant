@@ -126,7 +126,7 @@ export function OccupancyTab() {
             ctx.font = "bold 9px -apple-system, BlinkMacSystemFont, sans-serif"
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`₹${Math.round(v / 1000)}k`, pt.x, pt.y - 6)
+            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - 6)
             ctx.restore()
           })
         })
