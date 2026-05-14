@@ -100,17 +100,23 @@ export function OccupancyTab() {
           meta.data.forEach((pt: any, j: number) => {
             const pct = Number(ds.data[j])
             const beds = months[j]?.occ_beds ?? 0
-            // clamp so labels never render outside the chart canvas
-            const yBeds = Math.max(chartTop + fs + 2, pt.y - Math.round(fs * 2.2))
-            const yPct  = Math.max(chartTop + fs * 2.5, pt.y - Math.round(fs * 0.8))
+            // When near the top, draw labels BELOW the point to avoid clipping into the line/legend
+            const nearTop = pt.y - Math.round(fs * 2.2) < chartTop + fs * 1.5
             ctx.save()
             ctx.fillStyle = "#ffffff"
             ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
             ctx.textAlign = "center"
-            ctx.textBaseline = "bottom"
-            ctx.fillText(`${beds}`, pt.x, yBeds)
-            ctx.fillStyle = "rgba(255,255,255,0.75)"
-            ctx.fillText(`${pct}%`, pt.x, yPct)
+            if (nearTop) {
+              ctx.textBaseline = "top"
+              ctx.fillText(`${beds}`, pt.x, pt.y + Math.round(fs * 0.6))
+              ctx.fillStyle = "rgba(255,255,255,0.75)"
+              ctx.fillText(`${pct}%`, pt.x, pt.y + Math.round(fs * 1.8))
+            } else {
+              ctx.textBaseline = "bottom"
+              ctx.fillText(`${beds}`, pt.x, Math.max(chartTop + fs + 2, pt.y - Math.round(fs * 2.2)))
+              ctx.fillStyle = "rgba(255,255,255,0.75)"
+              ctx.fillText(`${pct}%`, pt.x, Math.max(chartTop + fs * 2.5, pt.y - Math.round(fs * 0.8)))
+            }
             ctx.restore()
           })
         })
@@ -496,7 +502,7 @@ export function OccupancyTab() {
             {expanded === 1 ? <CollapseIcon /> : <ExpandIcon />}
           </button>
         </div>
-        <div className={expanded === 1 ? "flex-1" : ""} style={expanded !== 1 ? { height: 230 } : {}}>
+        <div style={expanded === 1 ? { height: "min(calc(100vh - 120px), 80vmin)" } : { height: 230 }}>
           <canvas ref={chart1Ref} />
         </div>
         {expanded !== 1 && (
@@ -526,7 +532,7 @@ export function OccupancyTab() {
             {expanded === 2 ? <CollapseIcon /> : <ExpandIcon />}
           </button>
         </div>
-        <div className={expanded === 2 ? "flex-1" : ""} style={expanded !== 2 ? { height: 210 } : {}}>
+        <div style={expanded === 2 ? { height: "min(calc(100vh - 120px), 80vmin)" } : { height: 210 }}>
           <canvas ref={chart2Ref} />
         </div>
         {expanded !== 2 && (
