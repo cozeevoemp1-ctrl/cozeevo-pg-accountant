@@ -81,6 +81,7 @@ function NewCheckoutPage() {
   const [biometric,   setBiometric]   = useState(false)
   const [conditionOk, setConditionOk] = useState(true)
   const [damageNotes, setDamageNotes] = useState("")
+  const [comments,    setComments]    = useState("")
 
   // Financials
   const [deductions,      setDeductions]      = useState("0")
@@ -216,6 +217,7 @@ function NewCheckoutPage() {
         biometric_removed:     biometric,
         room_condition_ok:     conditionOk,
         damage_notes:          conditionOk ? "" : damageNotes,
+        comments:              comments || undefined,
         security_deposit:      prefetch.security_deposit,
         pending_dues:          totalPendingDues,
         deductions:            deductionsNum,
@@ -428,6 +430,16 @@ function NewCheckoutPage() {
                 className="mt-3 w-full rounded-tile border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink resize-none"
               />
             )}
+            <div className="mt-3">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide mb-1">Comments</p>
+              <textarea
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="Any notes about this checkout (optional)…"
+                rows={2}
+                className="w-full rounded-tile border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink resize-none"
+              />
+            </div>
           </div>
         )}
 

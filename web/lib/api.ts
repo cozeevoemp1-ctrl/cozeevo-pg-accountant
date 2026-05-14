@@ -470,6 +470,7 @@ export interface CheckoutCreateBody {
   biometric_removed: boolean;
   room_condition_ok: boolean;
   damage_notes?: string;
+  comments?: string;
   security_deposit: number;
   pending_dues: number;
   deductions: number;

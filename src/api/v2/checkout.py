@@ -74,6 +74,7 @@ class CheckoutCreateBody(BaseModel):
     biometric_removed:     bool
     room_condition_ok:     bool
     damage_notes:          str = ""
+    comments:              str = ""
     security_deposit:      float
     pending_dues:          float
     deductions:            float
@@ -134,6 +135,7 @@ async def create_checkout(
             biometric_removed     = body.biometric_removed,
             room_condition_ok     = body.room_condition_ok,
             damage_notes          = body.damage_notes or None,
+            other_comments        = body.comments or None,
             security_deposit      = Decimal(str(body.security_deposit)),
             pending_dues          = Decimal(str(body.pending_dues)),
             deductions            = Decimal(str(body.deductions)),
