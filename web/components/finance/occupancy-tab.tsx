@@ -80,10 +80,11 @@ export function OccupancyTab() {
 
     // Font size scales with chart width: small on phone, larger when fullscreen
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dynFs = (chart: any, min = 7, max = 9) =>
-      Math.max(min, Math.min(max, Math.round(chart.width / 55)))
+    const dynFs = (chart: any, min = 6, max = 8) =>
+      Math.max(min, Math.min(max, Math.round(chart.width / 60)))
 
-    // Inline plugin — draws value labels above line chart points
+    // Inline plugin — draws beds + occ% above the BAR TOP (not the line point)
+    // so labels never float inside bars on low-occupancy months
     const occLabelPlugin = {
       id: "occLabel",
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,9 +100,21 @@ export function OccupancyTab() {
           meta.data.forEach((pt: any, j: number) => {
             const pct = Number(ds.data[j])
             const beds = months[j]?.occ_beds ?? 0
-            // clamp so labels never render outside the chart canvas
-            const yBeds = Math.max(chartTop + fs + 2, pt.y - Math.round(fs * 2.2))
-            const yPct  = Math.max(chartTop + fs * 2.5, pt.y - Math.round(fs * 0.8))
+            // Find the top (minimum y) of the stacked bar at this index
+            let barTop = chart.chartArea.bottom
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            chart.data.datasets.forEach((barDs: any, bi: number) => {
+              if (barDs.yAxisID !== "yCI") return
+              const barMeta = chart.getDatasetMeta(bi)
+              if (barMeta.hidden) return
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const barPt = barMeta.data[j] as any
+              if (barPt && barPt.y < barTop) barTop = barPt.y
+            })
+            // Draw labels just above the bar top, clamped to chart area
+            const gap = 3
+            const yBeds = Math.max(chartTop + fs + 2, barTop - gap - fs)
+            const yPct  = Math.max(chartTop + fs * 2.2, barTop - gap)
             ctx.save()
             ctx.fillStyle = "#ffffff"
             ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
@@ -148,7 +161,7 @@ export function OccupancyTab() {
       display: true,
       text,
       color,
-      font: { size: 10 },
+      font: { size: 9 },
     })
 
     import("chart.js/auto").then(({ Chart }) => {
@@ -232,9 +245,9 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#c8dae8",
-                font: { size: 11 },
-                boxWidth: 9,
-                padding: 8,
+                font: { size: 10 },
+                boxWidth: 8,
+                padding: 6,
               },
             },
             tooltip: {
@@ -265,7 +278,7 @@ export function OccupancyTab() {
           scales: {
             x: {
               stacked: true,
-              ticks: { color: "#b8ccdc", font: { size: 11 } },
+              ticks: { color: "#b8ccdc", font: { size: 10 } },
               grid: { color: gridColor },
             },
             yCI: {
@@ -345,9 +358,9 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#c8dae8",
-                font: { size: 11 },
-                boxWidth: 9,
-                padding: 8,
+                font: { size: 10 },
+                boxWidth: 8,
+                padding: 6,
               },
             },
             tooltip: {
@@ -369,7 +382,7 @@ export function OccupancyTab() {
           },
           scales: {
             x: {
-              ticks: { color: "#b8ccdc", font: { size: 11 } },
+              ticks: { color: "#b8ccdc", font: { size: 10 } },
               grid: { color: gridColor },
             },
             yCount: {
