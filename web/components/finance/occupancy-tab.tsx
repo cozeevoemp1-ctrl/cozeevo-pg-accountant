@@ -36,7 +36,7 @@ export function OccupancyTab() {
   const [filter, setFilter] = useState<Filter>("monthly")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [expanded, setExpanded] = useState<null | 1 | 2>(null)
+  const [expanded, setExpanded] = useState<null | 1 | 2 | 3>(null)
 
   const chart1Ref = useRef<HTMLCanvasElement>(null)
   const chart2Ref = useRef<HTMLCanvasElement>(null)
@@ -536,14 +536,29 @@ export function OccupancyTab() {
       </div>
 
       {/* Data table */}
-      <div className="rounded-xl bg-[#0F0E0D] p-4">
-        <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide mb-3">
-          Monthly Breakdown
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[10px] border-collapse min-w-[500px]">
+      <div
+        className={
+          expanded === 3
+            ? "fixed inset-0 z-[60] bg-[#080d14] flex flex-col p-4"
+            : "rounded-xl bg-[#0F0E0D] p-4"
+        }
+      >
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-semibold text-[#9ab8cc] uppercase tracking-wide">
+            Monthly Breakdown
+          </p>
+          <button
+            onClick={() => setExpanded(expanded === 3 ? null : 3)}
+            className="text-[#6a8a9a] hover:text-white transition-colors p-1"
+            aria-label={expanded === 3 ? "Collapse" : "Expand"}
+          >
+            {expanded === 3 ? <CollapseIcon /> : <ExpandIcon />}
+          </button>
+        </div>
+        <div className={`overflow-x-auto ${expanded === 3 ? "flex-1 overflow-y-auto" : ""}`}>
+          <table className={`w-full border-collapse ${expanded === 3 ? "text-[13px]" : "text-[10px] min-w-[500px]"}`}>
             <thead>
-              <tr className="text-ink-muted">
+              <tr className="text-[#8aacbf]">
                 <th className="py-1.5 px-2 text-left font-semibold uppercase tracking-wide">Month</th>
                 <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">Beds</th>
                 <th className="py-1.5 px-2 text-right font-semibold uppercase tracking-wide">Fill%</th>
@@ -569,10 +584,10 @@ export function OccupancyTab() {
                     <td className={`py-1.5 px-2 font-semibold ${isLast ? "text-[#F4C842]" : "text-white"}`}>
                       {m.label}{isLast ? " ★" : ""}
                     </td>
-                    <td className={`py-1.5 px-2 text-right ${isLast ? "text-[#F4C842] font-bold" : "text-ink-muted"}`}>
+                    <td className={`py-1.5 px-2 text-right ${isLast ? "text-[#F4C842] font-bold" : "text-[#8aacbf]"}`}>
                       {m.occ_beds}
                     </td>
-                    <td className={`py-1.5 px-2 text-right ${isLast ? "text-[#F4C842] font-bold" : "text-ink-muted"}`}>
+                    <td className={`py-1.5 px-2 text-right ${isLast ? "text-[#F4C842] font-bold" : "text-[#8aacbf]"}`}>
                       {m.fill_pct}%
                     </td>
                     <td className="py-1.5 px-2 text-right text-white">{ci || "—"}</td>
@@ -582,11 +597,11 @@ export function OccupancyTab() {
                     >
                       {m.checkouts === null ? "—" : m.checkouts || "—"}
                     </td>
-                    <td className="py-1.5 px-2 text-right text-ink-muted">{m.ci_single || "—"}</td>
-                    <td className="py-1.5 px-2 text-right text-ink-muted">{m.ci_double || "—"}</td>
-                    <td className="py-1.5 px-2 text-right text-ink-muted">{m.ci_triple || "—"}</td>
-                    <td className="py-1.5 px-2 text-right text-ink-muted">{m.ci_premium || "—"}</td>
-                    <td className="py-1.5 px-2 text-right text-ink-muted">{m.ci_daily || "—"}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_single || "—"}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_double || "—"}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_triple || "—"}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_premium || "—"}</td>
+                    <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_daily || "—"}</td>
                     <td className="py-1.5 px-2 text-right" style={{ color: "#F4C842" }}>
                       {m.avg_rent > 0 ? `₹${fmt(m.avg_rent)}` : "—"}
                     </td>
@@ -596,7 +611,7 @@ export function OccupancyTab() {
             </tbody>
           </table>
         </div>
-        <p className="text-[9px] text-ink-muted mt-2">
+        <p className="text-[9px] text-[#6a8a9a] mt-2">
           ★ Current month (partial) · S=Single D=Double T=Triple P=Premium Day=Daily
         </p>
       </div>
