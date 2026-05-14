@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import case, func, literal_column, select, and_, or_
+from sqlalchemy import case, func, literal_column, select, and_, or_, text
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -153,7 +153,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
         # Check-ins by month + sharing_type (monthly stays)
         ci_monthly_rows = (await session.execute(
             select(
-                func.date_trunc("month", Tenancy.checkin_date).label("m"),
+                func.date_trunc(text("'month'"), Tenancy.checkin_date).label("m"),
                 Tenancy.sharing_type,
                 func.count().label("cnt"),
             )
@@ -164,13 +164,13 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 Tenancy.stay_type == StayType.monthly,
                 Tenancy.checkin_date >= START_MONTH,
             )
-            .group_by(func.date_trunc("month", Tenancy.checkin_date), Tenancy.sharing_type)
+            .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date), Tenancy.sharing_type)
         )).all()
 
         # Check-ins by month (daily stays)
         ci_daily_rows = (await session.execute(
             select(
-                func.date_trunc("month", Tenancy.checkin_date).label("m"),
+                func.date_trunc(text("'month'"), Tenancy.checkin_date).label("m"),
                 func.count().label("cnt"),
             )
             .join(Room, Room.id == Tenancy.room_id)
@@ -180,26 +180,26 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 Tenancy.stay_type == StayType.daily,
                 Tenancy.checkin_date >= START_MONTH,
             )
-            .group_by(func.date_trunc("month", Tenancy.checkin_date))
+            .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date))
         )).all()
 
         # Checkouts by month (only populated checkout_date rows)
         co_rows = (await session.execute(
             select(
-                func.date_trunc("month", Tenancy.checkout_date).label("m"),
+                func.date_trunc(text("'month'"), Tenancy.checkout_date).label("m"),
                 func.count().label("cnt"),
             )
             .where(
                 Tenancy.checkout_date != None,
                 Tenancy.checkout_date >= START_MONTH,
             )
-            .group_by(func.date_trunc("month", Tenancy.checkout_date))
+            .group_by(func.date_trunc(text("'month'"), Tenancy.checkout_date))
         )).all()
 
         # Avg agreed_rent by checkin month (monthly tenants)
         avg_rows = (await session.execute(
             select(
-                func.date_trunc("month", Tenancy.checkin_date).label("m"),
+                func.date_trunc(text("'month'"), Tenancy.checkin_date).label("m"),
                 func.avg(Tenancy.agreed_rent).label("avg_rent"),
             )
             .join(Room, Room.id == Tenancy.room_id)
@@ -209,7 +209,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 Tenancy.stay_type == StayType.monthly,
                 Tenancy.checkin_date >= START_MONTH,
             )
-            .group_by(func.date_trunc("month", Tenancy.checkin_date))
+            .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date))
         )).all()
 
         # Build lookup dicts keyed by (year, month)
