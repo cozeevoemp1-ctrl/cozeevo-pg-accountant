@@ -34,6 +34,7 @@ class QuickBookRequest(BaseModel):
     security_deposit: float = 0.0   # 0 = auto = monthly_rent
     daily_rate: float = 0.0
     checkout_date: str = ""         # YYYY-MM-DD, required for daily
+    booking_amount: float = 0.0     # advance paid at booking
 
 
 @router.post("/quick-book")
@@ -122,6 +123,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 daily_rate=Decimal(str(req.daily_rate)),
                 maintenance_fee=Decimal("0"),
                 security_deposit=Decimal("0"),
+                booking_amount=Decimal(str(req.booking_amount)),
                 checkin_date=checkin,
                 checkout_date=checkout,
                 stay_type="daily",
@@ -139,6 +141,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 agreed_rent=Decimal(str(req.monthly_rent)),
                 maintenance_fee=Decimal(str(req.maintenance_fee)),
                 security_deposit=Decimal(str(deposit)),
+                booking_amount=Decimal(str(req.booking_amount)),
                 checkin_date=checkin,
                 stay_type="monthly",
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),

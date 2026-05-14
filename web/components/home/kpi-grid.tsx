@@ -116,6 +116,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
   const [checkoutDate, setCheckoutDate] = useState("");
   const [rent, setRent] = useState("");
   const [dailyRate, setDailyRate] = useState("");
+  const [advance, setAdvance] = useState("");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
   const [saving, setSaving] = useState(false);
@@ -144,6 +145,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
               stay_type: "daily",
               daily_rate: parseFloat(dailyRate),
               checkout_date: checkoutDate,
+              booking_amount: parseFloat(advance) || 0,
             }
           : {
               room_number: room,
@@ -154,6 +156,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
               monthly_rent: parseFloat(rent),
               maintenance_fee: parseFloat(maintenance) || 0,
               security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
+              booking_amount: parseFloat(advance) || 0,
             }
       );
       setSuccess(true);
@@ -305,6 +308,18 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                   </div>
                 </>
               )}
+              {/* Advance — common for both stay types */}
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Advance collected (₹)</label>
+                <input
+                  type="number"
+                  value={advance}
+                  onChange={(e) => setAdvance(e.target.value)}
+                  placeholder="0 if none"
+                  min="0"
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                />
+              </div>
             </div>
             <button
               type="submit"
