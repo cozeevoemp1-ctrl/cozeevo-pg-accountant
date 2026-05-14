@@ -904,3 +904,36 @@ export async function cancelNoShow(tenancyId: number): Promise<{ ok: boolean; na
   return res.json()
 }
 
+// ── Occupancy Analytics ───────────────────────────────────────────────────────
+
+export interface OccupancyMonthData {
+  month: string
+  label: string
+  occ_beds: number
+  fill_pct: number
+  ci_single: number
+  ci_double: number
+  ci_triple: number
+  ci_premium: number
+  ci_daily: number
+  checkouts: number | null  // null = no DB data (historical import)
+  avg_rent: number
+}
+
+export interface OccupancyKpi {
+  today_occ_pct: number
+  today_occ_beds: number
+  total_beds: number
+  current_avg_rent: number
+  total_checkins: number
+  total_checkouts: number
+}
+
+export interface OccupancyData {
+  kpi: OccupancyKpi
+  months: OccupancyMonthData[]
+}
+
+export function getOccupancyData(): Promise<OccupancyData> {
+  return _get<OccupancyData>("/api/v2/app/analytics/occupancy")
+}

@@ -9,6 +9,7 @@ import { ReconcileCard } from "@/components/finance/reconcile-card"
 import { UnitEconomicsCard } from "@/components/finance/unit-economics-card"
 import { CashTab } from "@/components/finance/cash-tab"
 import { UpiReconcileTab } from "@/components/finance/upi-reconcile-tab"
+import { OccupancyTab } from "@/components/finance/occupancy-tab"
 import { supabase } from "@/lib/supabase"
 
 function prevMonth(m: string): string {
@@ -42,7 +43,7 @@ export default function FinancePage() {
   const [error, setError] = useState("")
   const [downloading, setDownloading] = useState(false)
   const [downloadingLive, setDownloadingLive] = useState(false)
-  const [tab, setTab] = useState<"pnl" | "cash" | "reconcile">("pnl")
+  const [tab, setTab] = useState<"pnl" | "cash" | "reconcile" | "occupancy">("pnl")
 
   // Admin gate — client-side check
   useEffect(() => {
@@ -114,17 +115,17 @@ export default function FinancePage() {
 
       {/* Tab bar */}
       <div className="flex border-b border-[#F0EDE9]">
-        {(["pnl", "cash", "reconcile"] as const).map(key => (
+        {(["pnl", "cash", "reconcile", "occupancy"] as const).map(key => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
+            className={`px-3 py-3 text-sm font-bold border-b-2 transition-colors ${
               tab === key
                 ? "text-[#EF1F9C] border-[#EF1F9C]"
                 : "text-[#999] border-transparent"
             }`}
           >
-            {key === "pnl" ? "P&L" : key === "cash" ? "Cash" : "UPI"}
+            {key === "pnl" ? "P&L" : key === "cash" ? "Cash" : key === "reconcile" ? "UPI" : "Occ."}
           </button>
         ))}
       </div>
@@ -198,6 +199,7 @@ export default function FinancePage() {
 
       {tab === "cash" && <CashTab />}
       {tab === "reconcile" && <UpiReconcileTab />}
+      {tab === "occupancy" && <OccupancyTab />}
     </main>
   )
 }
