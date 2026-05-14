@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, createPayment, type KpiDetailItem, type TenantDues } from "@/lib/api";
@@ -762,8 +762,8 @@ function ExpansionPanel({
         ) : (
           <div className="flex flex-col divide-y divide-[#F0EDE9]">
             {filtered.map((item, i) => (
+              <React.Fragment key={i}>
               <div
-                key={i}
                 className={`flex justify-between items-center py-2.5 w-full text-left rounded px-1 -mx-1 transition-colors ${
                   item.tenancy_id
                     ? "hover:bg-[#F6F5F0] active:bg-[#EEDFE8]"
@@ -864,6 +864,16 @@ function ExpansionPanel({
                   </button>
                 )}
               </div>
+              {/* Inline detail expand — notices tile only */}
+              {open === "notices" && selected?.tenancy_id === item.tenancy_id && (
+                <div className="py-2 border-t-0">
+                  {detailLoading
+                    ? <p className="text-xs text-center text-ink-muted py-2">Loading…</p>
+                    : selected && <TenantDetailCard dues={selected} onClose={() => setSelected(null)} />
+                  }
+                </div>
+              )}
+              </React.Fragment>
             ))}
           </div>
         )}
@@ -876,15 +886,17 @@ function ExpansionPanel({
         )}
       </div>
 
-      {/* Tenant detail card */}
-      <div className="px-3 pb-3">
-        {detailLoading && (
-          <p className="text-xs text-ink-muted text-center pt-2">Loading details…</p>
-        )}
-        {selected && !detailLoading && (
-          <TenantDetailCard dues={selected} onClose={() => setSelected(null)} />
-        )}
-      </div>
+      {/* Tenant detail card — all tiles except notices (notices uses inline expand) */}
+      {open !== "notices" && (
+        <div className="px-3 pb-3">
+          {detailLoading && (
+            <p className="text-xs text-ink-muted text-center pt-2">Loading details…</p>
+          )}
+          {selected && !detailLoading && (
+            <TenantDetailCard dues={selected} onClose={() => setSelected(null)} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
