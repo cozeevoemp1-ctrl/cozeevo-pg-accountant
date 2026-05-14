@@ -94,14 +94,14 @@ export function OccupancyTab() {
             const beds = months[j]?.occ_beds ?? 0
             ctx.save()
             ctx.fillStyle = "#ffffff"
-            ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif"
             ctx.textAlign = "center"
             // beds count on top line
             ctx.textBaseline = "bottom"
-            ctx.fillText(`${beds}`, pt.x, pt.y - 60)
+            ctx.fillText(`${beds}`, pt.x, pt.y - 35)
             // % on second line
             ctx.fillStyle = "rgba(255,255,255,0.75)"
-            ctx.fillText(`${pct}%`, pt.x, pt.y - 20)
+            ctx.fillText(`${pct}%`, pt.x, pt.y - 12)
             ctx.restore()
           })
         })
@@ -123,10 +123,10 @@ export function OccupancyTab() {
             if (!v) return
             ctx.save()
             ctx.fillStyle = "#F4C842"
-            ctx.font = "bold 36px -apple-system, BlinkMacSystemFont, sans-serif"
+            ctx.font = "bold 22px -apple-system, BlinkMacSystemFont, sans-serif"
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - 20)
+            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, pt.y - 12)
             ctx.restore()
           })
         })
