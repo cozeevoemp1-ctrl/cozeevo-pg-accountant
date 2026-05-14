@@ -131,6 +131,7 @@ Kiran's Excel (offline)
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
 | `web/app/onboarding/bookings/page.tsx` | PWA Bookings page — lists pending_review onboarding sessions; "Save & Check In" → instant_checkin approve |
+| `web/app/tenants/pre-register/page.tsx` | PWA Pre-register — form for future tenants with no room yet; books into room 000 placeholder; appears in Bookings until room assigned |
 | `src/api/v2/tenants.py` | POST /tenancies/{id}/cancel-no-show — marks no-show as cancelled + audit log |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
 | `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation, unit economics (admin-only) |

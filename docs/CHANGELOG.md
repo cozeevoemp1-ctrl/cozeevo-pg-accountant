@@ -2,6 +2,60 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.72] — 2026-05-14 — Auth, onboarding redirect, cash dedup, finance page cleanup
+
+### Lokesh PWA access confirmed
+- Auth account `Sai1522kl@gmail.com` exists with `role=staff`, email confirmed 2026-05-10
+- Middleware already blocks `/finance` for non-admin; all other pages accessible — no code change needed
+
+### Onboarding WhatsApp notification → PWA (`src/api/onboarding_router.py`)
+- When tenant submits form, WhatsApp to receptionist now links to `app.getkozzy.com/onboarding/bookings`
+- Was pointing to `api.getkozzy.com/admin/onboarding` — old PIN-gated HTML page that confused Lokesh
+- Added `PWA_URL=https://app.getkozzy.com` to `.env`
+
+### Old admin/onboarding HTML page removed (`src/api/onboarding_router.py`)
+- `GET /admin/onboarding` (334-line PIN HTML page) replaced with 302 redirect to PWA bookings
+- Component files for P&L/Cash/UPI untouched — can be re-enabled by restoring imports
+
+### May cash dedup fix (DB)
+- `_import_may_payments.py` was run twice; created 134 duplicate cash rent records dated 2026-05-01
+- 134 payment IDs voided; May cash total corrected: ₹42,76,400 → ₹21,26,700 (131 tenancies, ₹21,49,700 excess)
+
+### Finance page: only Occ. tab (`web/app/finance/page.tsx`)
+- P&L, Cash, UPI tabs hidden; Finance page now opens directly to Occupancy tab
+- Component files untouched — tabs can be re-enabled by restoring imports
+
+---
+
+## [1.75.71] — 2026-05-14 — Pre-register future tenant
+
+### Backend (`src/api/v2/bookings.py`)
+- `POST /bookings/quick-book` skips capacity check when `room_number == "000"` — allows parking unlimited future tenants in the placeholder room until room is assigned on check-in day
+
+### PWA — new page (`web/app/tenants/pre-register/page.tsx`)
+- Form: name, phone, expected move-in date, optional monthly rent
+- Submits via `quickBook()` to room 000; sends WhatsApp onboarding link
+- Success screen shows confirmation + link to Bookings; manual-share link shown if WhatsApp failed
+
+### Home page (`web/app/page.tsx`)
+- "Pre-register tenant / Future joiner — no room yet" link row added below the 3 quick-link buttons
+
+---
+
+## [1.75.70] — 2026-05-14 — May 2026 payments cleaned + inline Collect button
+
+### May payment audit + cleanup
+- Audited all May 2026 `payment_for_type=rent` payments — found 295 entries from multiple overlapping import runs (ops-sheet sync + Excel import + audit scripts)
+- Voided all 295 May rent payments in bulk
+- Re-imported 287 clean payments from single source (ops sheet cols Z/AA via `_import_may_payments.py`); totals match sheet exactly
+
+### Inline Collect button (`web/components/home/kpi-grid.tsx`)
+- `QuickCollectModal` bottom sheet added — opens inline from dues panel list; pre-fills outstanding dues amount; method selector (Cash/UPI/Bank/Cheque); calls `createPayment()` directly
+- Dues rows: replaced `<Link href="/payment/new?...">` with `<button onClick={() => onCollect(item)}>` — no page redirect
+- `onCollect` prop threaded through `ExpansionPanel` → `PanelProps`; `collectingItem` state + modal render at KpiGrid level
+
+---
+
 ## [1.75.68] — 2026-05-14 — Occupancy chart: rolling window filter + PDF fixes
 
 ### Occupancy tab rolling window (`src/api/v2/analytics.py`, `web/components/finance/occupancy-tab.tsx`, `web/lib/api.ts`)
