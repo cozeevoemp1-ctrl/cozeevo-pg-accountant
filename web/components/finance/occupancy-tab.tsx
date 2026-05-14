@@ -60,7 +60,15 @@ export function OccupancyTab() {
     if (chartNum === 1 || chartNum === 2) {
       const canvasEl = chartNum === 1 ? chart1Ref.current : chart2Ref.current
       if (!canvasEl) return
-      const imgData = canvasEl.toDataURL("image/png", 1.0)
+      // Chart.js canvas is transparent — flatten onto dark background so PDF matches live view
+      const flat = document.createElement("canvas")
+      flat.width = canvasEl.width
+      flat.height = canvasEl.height
+      const ctx = flat.getContext("2d")!
+      ctx.fillStyle = "#080d14"
+      ctx.fillRect(0, 0, flat.width, flat.height)
+      ctx.drawImage(canvasEl, 0, 0)
+      const imgData = flat.toDataURL("image/png", 1.0)
       const rect = canvasEl.getBoundingClientRect()
       const pdf = new jsPDF({ orientation: "landscape", unit: "pt" })
       const pageW = pdf.internal.pageSize.getWidth()
@@ -538,7 +546,7 @@ export function OccupancyTab() {
             {expanded === 1 && (
               <button
                 onClick={() => downloadPDF(1)}
-                className="text-[#9ab8cc] hover:text-white transition-colors p-1"
+                className="text-white hover:text-[#EF1F9C] transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Download PDF"
                 title="Download PDF"
               >
@@ -580,7 +588,7 @@ export function OccupancyTab() {
             {expanded === 2 && (
               <button
                 onClick={() => downloadPDF(2)}
-                className="text-[#9ab8cc] hover:text-white transition-colors p-1"
+                className="text-white hover:text-[#EF1F9C] transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Download PDF"
                 title="Download PDF"
               >
@@ -622,7 +630,7 @@ export function OccupancyTab() {
             {expanded === 3 && (
               <button
                 onClick={() => downloadPDF(3)}
-                className="text-[#9ab8cc] hover:text-white transition-colors p-1"
+                className="text-white hover:text-[#EF1F9C] transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Download PDF"
                 title="Download PDF"
               >
