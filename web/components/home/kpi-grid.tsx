@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
-import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, type KpiDetailItem, type TenantDues } from "@/lib/api";
+import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, createPayment, type KpiDetailItem, type TenantDues } from "@/lib/api";
 import { rupee, rupeeL } from "@/lib/format";
 import type { KpiResponse } from "@/lib/api";
 
@@ -96,6 +96,127 @@ function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => 
               {rupee(dues.last_payment_amount ?? 0)} · {fmtDate(dues.last_payment_date)}
             </span>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type PayMethod = "CASH" | "UPI" | "BANK" | "OTHER";
+const COLLECT_METHODS: { value: PayMethod; label: string }[] = [
+  { value: "CASH", label: "Cash" },
+  { value: "UPI", label: "UPI" },
+  { value: "BANK", label: "Bank" },
+  { value: "OTHER", label: "Other" },
+];
+
+function QuickCollectModal({ item, onClose, onSuccess }: {
+  item: KpiDetailItem;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState(String(item.dues ?? ""));
+  const [method, setMethod] = useState<PayMethod>("CASH");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [tenantId, setTenantId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!item.tenancy_id) return;
+    getTenantDues(item.tenancy_id).then((d) => setTenantId(d.tenant_id)).catch(() => {});
+  }, [item.tenancy_id]);
+
+  function currentMonth() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tenantId) { setError("Could not load tenant info — try again"); return; }
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { setError("Enter a valid amount"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      await createPayment({ tenant_id: tenantId, amount: amt, method, for_type: "rent", period_month: currentMonth() });
+      setSuccess(true);
+      setTimeout(() => { onSuccess(); onClose(); }, 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-end justify-center px-0" style={{ zIndex: 9999 }} onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative w-full max-w-lg bg-surface rounded-t-2xl px-5 pt-5 pb-8 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Handle bar */}
+        <div className="w-10 h-1 rounded-full bg-[#E0DDD8] mx-auto mb-4" />
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-base font-extrabold text-ink">Collect payment</p>
+            <p className="text-xs text-ink-muted">{item.name} · Room {item.room}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F6F5F0] flex items-center justify-center text-ink-muted font-bold text-lg leading-none">×</button>
+        </div>
+
+        {success ? (
+          <div className="rounded-tile bg-[#D1FAE5] border border-[#6EE7B7] px-4 py-3 text-sm font-semibold text-[#065F46] text-center">
+            Payment recorded!
+          </div>
+        ) : (
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            {error && (
+              <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-3 py-2 text-xs text-status-warn font-medium">{error}</div>
+            )}
+            {/* Amount */}
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Amount (₹)</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="1"
+                className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                autoFocus
+              />
+              {item.dues && item.dues > 0 && (
+                <p className="text-[10px] text-ink-muted mt-1">Dues: <span className="text-status-due font-semibold">{rupee(item.dues)}</span></p>
+              )}
+            </div>
+            {/* Method */}
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-2">Method</label>
+              <div className="flex gap-2">
+                {COLLECT_METHODS.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMethod(m.value)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${
+                      method === m.value ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={saving || !tenantId}
+              className="w-full rounded-pill bg-brand-pink py-3 text-sm font-bold text-white active:opacity-70 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : `Collect ${amount ? rupee(parseFloat(amount) || 0) : ""}`}
+            </button>
+          </form>
         )}
       </div>
     </div>
@@ -368,6 +489,7 @@ interface PanelProps {
   cancellingId: number | null;
   onCancel: (item: KpiDetailItem) => void;
   onBook: (room: string) => void;
+  onCollect: (item: KpiDetailItem) => void;
 }
 
 function ExpansionPanel({
@@ -380,7 +502,7 @@ function ExpansionPanel({
   buildingFilter, setBuildingFilter,
   showStaff, toggleStaff,
   filtered, loading, selected, detailLoading, selectItem, setSelected,
-  cancellingId, onCancel, onBook,
+  cancellingId, onCancel, onBook, onCollect,
 }: PanelProps) {
   return (
     <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
@@ -658,13 +780,12 @@ function ExpansionPanel({
                   </button>
                 )}
                 {open === "dues" && item.tenancy_id && (
-                  <Link
-                    href={`/payment/new?tenancy_id=${item.tenancy_id}`}
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCollect(item); }}
                     className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
                   >
                     Collect →
-                  </Link>
+                  </button>
                 )}
                 {open === "vacant" && (
                   <button
@@ -717,6 +838,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [bookingRoom, setBookingRoom] = useState<string | null>(null);
+  const [collectingItem, setCollectingItem] = useState<KpiDetailItem | null>(null);
 
   const cache = useRef<Map<string, KpiDetailItem[]>>(
     new Map(Object.entries(initialDetails ?? {}))
@@ -878,6 +1000,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     filtered, loading, selected, detailLoading, selectItem, setSelected,
     cancellingId, onCancel,
     onBook: (room: string) => { close(); setBookingRoom(room); },
+    onCollect: (item: KpiDetailItem) => { setCollectingItem(item); },
   };
 
   const leftStyle: React.CSSProperties = { left: 0, width: "calc(200% + 0.75rem)" };
@@ -1002,6 +1125,13 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
         room={bookingRoom}
         onClose={() => setBookingRoom(null)}
         onSuccess={() => { cache.current.delete("vacant"); toggle("vacant"); }}
+      />
+    )}
+    {collectingItem && (
+      <QuickCollectModal
+        item={collectingItem}
+        onClose={() => setCollectingItem(null)}
+        onSuccess={() => { cache.current.delete("dues"); toggle("dues"); }}
       />
     )}
     </>
