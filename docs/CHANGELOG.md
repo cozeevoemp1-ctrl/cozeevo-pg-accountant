@@ -2,6 +2,17 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.64] — 2026-05-14 — Occupancy chart: bright fonts, fullscreen nav fix, tooltip total, smaller labels
+
+### Occupancy chart polish (`web/components/finance/occupancy-tab.tsx`)
+- Legend/tick colors brightened: `#8899aa` → `#c8dae8`/`#b8ccdc` (was near-invisible on dark bg)
+- Section titles: `text-ink-muted` (#6F655D) → `#9ab8cc` (was completely invisible on dark bg)
+- Fullscreen z-index: `z-50` → `z-[60]` so chart covers nav bar in fullscreen mode
+- Tooltip footer: shows `Total: N` (sum of all check-in types) when hovering Chart 1
+- `dynFs`: max capped at 9 (was 14→11), divisor 40→55 — smaller labels on all screen sizes
+- Bar labels clamped to `chartArea.top` — labels no longer clip/overflow at chart top edge
+- Offset multipliers reduced (2.8→2.2, 1.2→0.8) — tighter spacing around line points
+
 ## [1.75.63] — 2026-05-14 — Notice/deposit logic corrected across all surfaces; sharing_type + G16 room changes; occupancy chart dynamic fonts; bookings edit/cancel; checkout comments; prebook defaults
 
 ### Room & sharing type changes (DB already applied)
