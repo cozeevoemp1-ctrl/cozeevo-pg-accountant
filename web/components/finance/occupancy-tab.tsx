@@ -80,8 +80,8 @@ export function OccupancyTab() {
 
     // Font size scales with chart width: small on phone, larger when fullscreen
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const dynFs = (chart: any, min = 9, max = 14) =>
-      Math.max(min, Math.min(max, Math.round(chart.width / 32)))
+    const dynFs = (chart: any, min = 8, max = 11) =>
+      Math.max(min, Math.min(max, Math.round(chart.width / 40)))
 
     // Inline plugin — draws value labels above line chart points
     const occLabelPlugin = {
@@ -142,7 +142,7 @@ export function OccupancyTab() {
       display: true,
       text,
       color,
-      font: { size: 11 },
+      font: { size: 10 },
     })
 
     import("chart.js/auto").then(({ Chart }) => {
@@ -226,9 +226,9 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#c8dae8",
-                font: { size: 12 },
-                boxWidth: 10,
-                padding: 10,
+                font: { size: 11 },
+                boxWidth: 9,
+                padding: 8,
               },
             },
             tooltip: {
@@ -259,7 +259,7 @@ export function OccupancyTab() {
           scales: {
             x: {
               stacked: true,
-              ticks: { color: "#b8ccdc", font: { size: 12 } },
+              ticks: { color: "#b8ccdc", font: { size: 11 } },
               grid: { color: gridColor },
             },
             yCI: {
@@ -339,9 +339,9 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#c8dae8",
-                font: { size: 12 },
-                boxWidth: 10,
-                padding: 10,
+                font: { size: 11 },
+                boxWidth: 9,
+                padding: 8,
               },
             },
             tooltip: {
@@ -363,7 +363,7 @@ export function OccupancyTab() {
           },
           scales: {
             x: {
-              ticks: { color: "#b8ccdc", font: { size: 12 } },
+              ticks: { color: "#b8ccdc", font: { size: 11 } },
               grid: { color: gridColor },
             },
             yCount: {
