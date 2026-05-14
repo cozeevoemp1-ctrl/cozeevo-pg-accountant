@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.76] — 2026-05-14 — Cash/UPI accuracy + bookings UX fixes
+
+### Cash/UPI totals now match sheet Z/AA
+- `src/services/reporting.py`: HOW IT WAS PAID breakdown = rent-only (excludes deposits backfilled from Excel, excludes booking advances which have their own sheet column)
+- `src/api/v2/finance.py`: Cash tab collected = rent-only; booking advances (LELIN DAS ₹27K + Samruddhi ₹52K) were inflating by ₹79K; 6-month history loop fixed too
+- `scripts/_import_may_payments.py --write`: added 6 missing May rent payments; final gap vs sheet < ₹10K (bot-logged payments not in sheet)
+
+### Cash expenses backfilled from verified P&L (Nov 2025–Apr 2026)
+- `scripts/_backfill_cash_expenses.py`: 11 CashExpense entries — property rent cash (Feb ₹15.32L, Mar ₹12.90L, Apr ₹14.49L), Kiran cash ops (Nov–Jan), Chandra cash ops (Mar–Apr), Manoj water cash (Jan+Apr)
+- Cash tab month history now shows real outflows instead of ₹0 expenses
+
+### PWA Bookings
+- `pending_review` cards: inline Edit/Cancel replaces broken "Review & Edit →" link (was opening old PIN-gated admin page)
+- Prorated first month rent shown in pink when check-in ≠ 1st: `INT(rent × days_remaining / days_in_month)`
+
+### Staff quick-book access
+- `src/api/v2/bookings.py`: staff role can now quick-book (was admin-only; Lokesh was blocked)
+
+### Manage Tenants
+- Removed "Onboarding Sessions" tile (was 404; route unused)
+
+---
+
 ## [1.75.72] — 2026-05-14 — Auth, onboarding redirect, cash dedup, finance page cleanup
 
 ### Lokesh PWA access confirmed
