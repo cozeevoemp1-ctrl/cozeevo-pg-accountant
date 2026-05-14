@@ -2,6 +2,49 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.66] — 2026-05-14 — Room type corrections: G16+G19 single, G19 DB fix; TOTAL_BEDS 293
+
+### DB
+- `UPDATE rooms SET max_occupancy=1 WHERE room_number='G19'` — was 2, confirmed single sharing
+
+### TOTAL_BEDS 294 → 293 (HULK 147→146)
+- `src/integrations/gsheets.py`, `scripts/clean_and_load.py`
+- `scripts/gsheet_apps_script.js`, `scripts/gsheet_dashboard_webapp.js`, `scripts/pg_charts.py`
+
+### Docs
+- `docs/MASTER_DATA.md` — HULK G floor layout corrected (G15=2, G16=1, G17-G18=2, G19=1, G20=1); revenue table updated; formula updated
+- `docs/BRAIN.md`, `docs/BUSINESS_LOGIC.md`, `docs/REPORTING.md`, `docs/SHEET_LOGIC.md` — all synced to 293
+
+---
+
+## [1.75.65] — 2026-05-14 — Staff rooms filter in vacant beds panel (count fix)
+
+### web/components/home/kpi-grid.tsx
+- Staff room beds excluded from "X beds free" counter — staff rooms shown via toggle but not counted in revenue vacancy
+- Fix: `if (it.is_staff_room) return s` in beds reducer
+
+---
+
+## [1.75.62] — 2026-05-14 — Room 614 → staff; TOTAL_BEDS 296→294; staff rooms filter
+
+### DB
+- `UPDATE rooms SET is_staff_room=TRUE WHERE room_number='614'` — 2 beds removed from revenue
+
+### TOTAL_BEDS 296 → 294 (staff rooms: 6→7, THOR 5 + HULK 2)
+- `src/integrations/gsheets.py`, `scripts/clean_and_load.py`
+- `scripts/gsheet_apps_script.js`, `scripts/gsheet_dashboard_webapp.js`, `scripts/pg_charts.py`
+
+### PWA — vacant beds Staff toggle
+- `GET /kpi-detail?type=vacant&include_staff=true` — new query param; includes staff rooms when true; returns `is_staff_room` per item
+- Vacant filter bar: "Staff" toggle button (indigo, default off); staff rows show indigo "Staff" badge
+- Separate `"vacant_staff"` cache key; toggling doesn't pollute the regular vacant cache
+- `web/lib/api.ts` — `getKpiDetail(type, opts?, token?)` signature updated; `KpiDetailItem.is_staff_room` added
+
+### Docs
+- `docs/MASTER_DATA.md`, `docs/BRAIN.md`, `docs/BUSINESS_LOGIC.md`, `docs/REPORTING.md`, `docs/SHEET_LOGIC.md` — all synced; HULK floor 6 layout shows 614=staff
+
+---
+
 ## [1.75.64] — 2026-05-14 — Occupancy chart: bright fonts, fullscreen nav fix, tooltip total, smaller labels
 
 ### Occupancy chart polish (`web/components/finance/occupancy-tab.tsx`)
