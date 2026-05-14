@@ -2,6 +2,41 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.77] — 2026-05-14 — Exit notices bulk load + notices UI overhaul
+
+### Exit notices bulk loaded (`scripts/_load_exit_notices.py`)
+- One-shot script bulk-set 46 exit notices with `notice_date = 2026-05-04`
+- Key fix: column is `notice_date` not `notice_given` (was crashing with column-not-found)
+- Dry run: 31 SET, 15 already set, 0 not found. All 31 committed with `--write`
+- 4 tenants with variable stays use `relativedelta` for N-month checkout
+- 3 past-date checkouts (Omkar 611, Prajwal 414, Jahnavi 214) set anyway — will update once Kiran confirms actual dates
+
+### Notices page full redesign (`web/app/notices/page.tsx`)
+- Summary bar: Beds freeing / Full rooms / Tenants — computed from filtered set
+- Sort toggle (asc/desc by days remaining) + name/room search (compact) + month chips on one row
+- Type chips: All / Full room / Premium / Male / Female
+- `NoticeCard`: Full-room orange badge, Premium purple badge, M/F gender badge, "N beds" subtitle for premium, "Room occupancy: X of Y leaving" grid field
+- `monthKey()` / `monthLabel()` helpers for derived month list
+
+### Notices API extended (`src/api/v2/notices.py`)
+- Second query: `room_active_counts` — all active monthly tenants per room (for full-room exit detection)
+- `room_notice_counts` via `defaultdict`
+- New response fields: `gender`, `sharing_type`, `beds_freed`, `room_max_occupancy`, `room_active_count`, `room_notice_count`, `is_full_exit`
+- `beds_freed = room.max_occupancy if is_premium else 1`
+- `is_full_exit = room_notice_count >= room_active_count > 0`
+
+### KPI notices tile enhanced (`web/components/home/kpi-grid.tsx`, `src/api/v2/kpi.py`)
+- Same month / type / gender filters + sort as /notices page
+- Inline detail expand: clicking a notice row shows `TenantDetailCard` inline (no scroll-to-bottom); uses `React.Fragment` pattern
+- Bottom detail card suppressed when notices tile is open
+- `kpi.py` notices query extended with `Tenant.gender`, `Tenancy.sharing_type`, `Room.max_occupancy`, `Room.id` — same room_active/notice logic
+
+### TypeScript types (`web/lib/api.ts`)
+- `NoticeItem` extended: `gender`, `sharing_type`, `beds_freed`, `room_max_occupancy`, `room_active_count`, `room_notice_count`, `is_full_exit`
+- `KpiDetailItem` extended with optional notice fields: `expected_checkout_iso`, `days_remaining`, `beds_freed`, `sharing_type`, `is_full_exit`, `room_active_count`, `room_notice_count`
+
+---
+
 ## [1.75.76] — 2026-05-14 — Cash/UPI accuracy + bookings UX fixes
 
 ### Cash/UPI totals now match sheet Z/AA
