@@ -905,8 +905,45 @@ export async function quickBook(payload: {
   tenant_phone: string;
   checkin_date: string;
   monthly_rent: number;
+  maintenance_fee?: number;
+  security_deposit?: number;
 }): Promise<QuickBookResult> {
   return _post("/api/v2/app/bookings/quick-book", payload);
+}
+
+const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
+
+export async function updateBookingSession(token: string, payload: {
+  agreed_rent?: number;
+  checkin_date?: string;
+  room_number?: string;
+  maintenance_fee?: number;
+  security_deposit?: number;
+  tenant_phone?: string;
+  tenant_name?: string;
+}): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE_URL}/api/onboarding/admin/${token}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error((d as { detail?: string }).detail ?? `Update failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function cancelBookingSession(token: string): Promise<{ status: string }> {
+  const res = await fetch(`${BASE_URL}/api/onboarding/admin/${token}/cancel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
+  })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error((d as { detail?: string }).detail ?? `Cancel failed: ${res.status}`)
+  }
+  return res.json()
 }
 
 export async function cancelNoShow(tenancyId: number): Promise<{ ok: boolean; name: string }> {

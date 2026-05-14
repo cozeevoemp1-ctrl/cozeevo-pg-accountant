@@ -551,12 +551,63 @@ async def list_pending(request: Request):
                 "created_at": obs.created_at.isoformat() if obs.created_at else "",
                 "tenant_name": json.loads(obs.tenant_data).get("name", "") if obs.tenant_data else "",
                 "agreed_rent": float(obs.agreed_rent or 0),
+                "maintenance_fee": float(obs.maintenance_fee or 0),
+                "security_deposit": float(obs.security_deposit or 0),
                 "is_qr": (obs.created_by_phone or "") == "qr_scan",
             })
         return {"sessions": items}
 
 
 # ── Cancel session (admin) ─────────────────────────────────────────────────────
+
+class UpdateSessionRequest(BaseModel):
+    agreed_rent: Optional[float] = None
+    checkin_date: Optional[str] = None   # YYYY-MM-DD
+    room_number: Optional[str] = None
+    maintenance_fee: Optional[float] = None
+    security_deposit: Optional[float] = None
+    tenant_phone: Optional[str] = None
+    tenant_name: Optional[str] = None
+
+
+@router.patch("/admin/{token}")
+async def update_session(token: str, req: UpdateSessionRequest, request: Request):
+    """Edit a pending_tenant or pending_review session before check-in."""
+    import re as _re
+    _check_admin_pin(request)
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status not in ("pending_tenant", "pending_review"):
+            raise HTTPException(400, f"Cannot edit — status is {obs.status}")
+
+        if req.agreed_rent is not None:
+            obs.agreed_rent = Decimal(str(req.agreed_rent))
+        if req.checkin_date is not None:
+            obs.checkin_date = date.fromisoformat(req.checkin_date)
+        if req.room_number is not None:
+            room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
+            if not room:
+                raise HTTPException(404, f"Room {req.room_number} not found")
+            obs.room_id = room.id
+        if req.maintenance_fee is not None:
+            obs.maintenance_fee = Decimal(str(req.maintenance_fee))
+        if req.security_deposit is not None:
+            obs.security_deposit = Decimal(str(req.security_deposit))
+        if req.tenant_phone is not None:
+            digits = _re.sub(r"\D", "", req.tenant_phone)
+            if len(digits) < 10:
+                raise HTTPException(400, "Phone must be at least 10 digits")
+            obs.tenant_phone = digits[-10:]
+        if req.tenant_name is not None:
+            data = json.loads(obs.tenant_data) if obs.tenant_data else {}
+            data["name"] = req.tenant_name.strip()
+            obs.tenant_data = json.dumps(data)
+
+        await session.commit()
+        return {"ok": True, "token": token}
+
 
 @router.post("/admin/{token}/cancel")
 async def cancel_session(token: str, request: Request):

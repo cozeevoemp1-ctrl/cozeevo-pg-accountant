@@ -113,6 +113,8 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
   const [phone, setPhone] = useState("");
   const [checkinDate, setCheckinDate] = useState("");
   const [rent, setRent] = useState("");
+  const [maintenance, setMaintenance] = useState("5000");
+  const [deposit, setDeposit] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -132,6 +134,8 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
         tenant_phone: phone.trim(),
         checkin_date: checkinDate,
         monthly_rent: parseFloat(rent),
+        maintenance_fee: parseFloat(maintenance) || 0,
+        security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
       });
       setSuccess(true);
       if (!result.whatsapp_sent) {
@@ -210,11 +214,32 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                 <input
                   type="number"
                   value={rent}
-                  onChange={(e) => setRent(e.target.value)}
+                  onChange={(e) => { setRent(e.target.value); setDeposit(e.target.value); }}
                   placeholder="e.g. 12000"
                   min="1"
                   className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                   required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Maintenance (₹/mo)</label>
+                <input
+                  type="number"
+                  value={maintenance}
+                  onChange={(e) => setMaintenance(e.target.value)}
+                  min="0"
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Security deposit (₹)</label>
+                <input
+                  type="number"
+                  value={deposit}
+                  onChange={(e) => setDeposit(e.target.value)}
+                  placeholder="Auto = 1 month rent"
+                  min="0"
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                 />
               </div>
             </div>
@@ -471,11 +496,15 @@ function ExpansionPanel({
                         {item.deposit_eligible ? "Refundable" : "Forfeited"}
                       </span>
                     )}
-                    {open === "vacant" && item.upcoming_checkin && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
-                        Until {new Date(item.upcoming_checkin).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                      </span>
-                    )}
+                    {open === "vacant" && item.upcoming_checkin && (() => {
+                      const d = new Date(item.upcoming_checkin)
+                      d.setDate(d.getDate() - 1)
+                      return (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
+                          Until {d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                        </span>
+                      )
+                    })()}
                     {open === "no_show" && item.is_overdue && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">
                         {item.days_overdue}d late

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { updateBookingSession, cancelBookingSession } from "@/lib/api"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
 const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
@@ -19,6 +20,8 @@ interface Booking {
   checkin_date: string
   created_at: string
   agreed_rent?: number
+  maintenance_fee?: number
+  security_deposit?: number
   is_qr?: boolean
 }
 
@@ -141,6 +144,7 @@ export default function BookingsPage() {
                     b={b}
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
+                    onReload={load}
                   />
                 ))}
               </>
@@ -158,6 +162,7 @@ export default function BookingsPage() {
                     b={b}
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
+                    onReload={load}
                   />
                 ))}
               </>
@@ -169,13 +174,61 @@ export default function BookingsPage() {
   )
 }
 
-function BookingCard({ b, checkingIn, onCheckin }: {
+function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   b: Booking
   checkingIn: string | null
   onCheckin: (token: string) => void
+  onReload: () => void
 }) {
   const isPending = b.status === "pending_tenant"
   const checkinToday = isToday(b.checkin_date)
+
+  const [editing, setEditing] = useState(false)
+  const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [err, setErr] = useState("")
+
+  // Edit fields
+  const [editRoom, setEditRoom] = useState(b.room || "")
+  const [editCheckin, setEditCheckin] = useState(b.checkin_date?.slice(0, 10) || "")
+  const [editRent, setEditRent] = useState(String(b.agreed_rent || ""))
+  const [editMaint, setEditMaint] = useState(String(b.maintenance_fee || 5000))
+  const [editDeposit, setEditDeposit] = useState(String(b.security_deposit || b.agreed_rent || ""))
+  const [editPhone, setEditPhone] = useState(b.tenant_phone || "")
+  const [editName, setEditName] = useState(b.tenant_name || "")
+
+  async function saveEdit() {
+    setSaving(true); setErr("")
+    try {
+      await updateBookingSession(b.token, {
+        room_number: editRoom || undefined,
+        checkin_date: editCheckin || undefined,
+        agreed_rent: editRent ? parseFloat(editRent) : undefined,
+        maintenance_fee: editMaint ? parseFloat(editMaint) : undefined,
+        security_deposit: editDeposit ? parseFloat(editDeposit) : undefined,
+        tenant_phone: editPhone || undefined,
+        tenant_name: editName || undefined,
+      })
+      setEditing(false)
+      onReload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Save failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function doCancel() {
+    setCancelling(true); setErr("")
+    try {
+      await cancelBookingSession(b.token)
+      onReload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Cancel failed")
+      setCancelling(false)
+    }
+  }
 
   return (
     <div className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
@@ -189,23 +242,15 @@ function BookingCard({ b, checkingIn, onCheckin }: {
         </div>
         <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
           {checkinToday && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">
-              Today!
-            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">Today!</span>
           )}
           {b.is_qr && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#EDE9FE] text-[#5B21B6]">
-              QR
-            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#EDE9FE] text-[#5B21B6]">QR</span>
           )}
           {isPending ? (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
-              Awaiting form
-            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">Awaiting form</span>
           ) : (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#D1FAE5] text-[#065F46]">
-              Form filled
-            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#D1FAE5] text-[#065F46]">Form filled</span>
           )}
         </div>
       </div>
@@ -224,39 +269,98 @@ function BookingCard({ b, checkingIn, onCheckin }: {
         ))}
       </div>
 
-      {/* Action row */}
-      <div className="flex gap-2 pt-1">
-        {isPending ? (
-          // Awaiting form — show resend link button only
-          <a
-            href={`${API_URL}/onboard/${b.token}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
-          >
-            Copy form link →
-          </a>
-        ) : (
-          // Form filled — full action row
-          <>
-            <a
-              href={`${API_URL}/admin/onboarding#${b.token}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
-            >
-              Review & Edit →
-            </a>
-            <button
-              onClick={() => onCheckin(b.token)}
-              disabled={checkingIn === b.token}
-              className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
-            >
-              {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
+      {/* Error */}
+      {err && <p className="text-xs text-status-warn font-medium">{err}</p>}
+
+      {/* Inline edit panel */}
+      {editing && (
+        <div className="flex flex-col gap-2 border-t border-[#F0EDE9] pt-3">
+          <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Edit booking</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Name", val: editName, set: setEditName, type: "text", placeholder: "Full name" },
+              { label: "Phone", val: editPhone, set: setEditPhone, type: "tel", placeholder: "10 digits" },
+              { label: "Room", val: editRoom, set: setEditRoom, type: "text", placeholder: "e.g. 416" },
+              { label: "Check-in", val: editCheckin, set: setEditCheckin, type: "date", placeholder: "" },
+              { label: "Rent (₹)", val: editRent, set: setEditRent, type: "number", placeholder: "" },
+              { label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" },
+              { label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" },
+            ].map(({ label, val, set, type, placeholder }) => (
+              <div key={label} className={label === "Name" || label === "Check-in" ? "col-span-2" : ""}>
+                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
+                <input
+                  type={type}
+                  value={val}
+                  onChange={(e) => set(e.target.value)}
+                  placeholder={placeholder}
+                  className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setEditing(false); setErr("") }}
+              className="flex-1 rounded-pill border border-[#E2DEDD] py-2 text-xs font-semibold text-ink-muted">
+              Cancel
             </button>
-          </>
-        )}
-      </div>
+            <button onClick={saveEdit} disabled={saving}
+              className="flex-1 rounded-pill bg-brand-pink py-2 text-xs font-bold text-white disabled:opacity-50">
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action row */}
+      {!editing && (
+        <div className="flex gap-2 pt-1">
+          {isPending ? (
+            <>
+              <a
+                href={`${API_URL}/onboard/${b.token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
+              >
+                Copy link →
+              </a>
+              <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
+                className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                Edit
+              </button>
+              {cancelConfirm ? (
+                <button onClick={doCancel} disabled={cancelling}
+                  className="px-4 rounded-pill bg-[#FEE2E2] py-2.5 text-xs font-bold text-[#991B1B] disabled:opacity-50">
+                  {cancelling ? "…" : "Confirm?"}
+                </button>
+              ) : (
+                <button onClick={() => setCancelConfirm(true)}
+                  className="px-4 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted active:opacity-70">
+                  Cancel
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <a
+                href={`${API_URL}/admin/onboarding#${b.token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
+              >
+                Review & Edit →
+              </a>
+              <button
+                onClick={() => onCheckin(b.token)}
+                disabled={checkingIn === b.token}
+                className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+              >
+                {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

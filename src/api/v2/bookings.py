@@ -29,6 +29,8 @@ class QuickBookRequest(BaseModel):
     tenant_phone: str
     checkin_date: str   # YYYY-MM-DD
     monthly_rent: float
+    maintenance_fee: float = 5000.0
+    security_deposit: float = 0.0  # 0 = auto = monthly_rent
 
 
 @router.post("/quick-book")
@@ -89,6 +91,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
 
         # Create session — pre-fill name in tenant_data so Bookings page shows it immediately
         token = str(uuid.uuid4())
+        deposit = req.security_deposit if req.security_deposit > 0 else req.monthly_rent
         obs = OnboardingSession(
             token=token,
             status="pending_tenant",
@@ -96,7 +99,8 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             tenant_phone=phone,
             room_id=room.id,
             agreed_rent=Decimal(str(req.monthly_rent)),
-            security_deposit=Decimal("0"),
+            maintenance_fee=Decimal(str(req.maintenance_fee)),
+            security_deposit=Decimal(str(deposit)),
             checkin_date=checkin,
             stay_type="monthly",
             tenant_data=json.dumps({"name": req.tenant_name.strip()}),
