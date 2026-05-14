@@ -26,7 +26,7 @@ import calendar as _cal
 from dataclasses import dataclass, field
 from datetime import date
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -227,9 +227,8 @@ async def collection_summary(
     collected = max(0, expected - pending)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
-    # ── Payment method breakdown — PERIOD-SCOPED ─────────────────────────────
-    # How this month's rent obligation was paid (Cash vs UPI).
-    # Matches rent_collected; excludes prior dues and future advances.
+    # ── Payment method breakdown — DATE-SCOPED ───────────────────────────────
+    # All cash/UPI received this month by payment_date (matches Cash tab total).
     method_rows = (
         await session.execute(
             select(
@@ -237,9 +236,9 @@ async def collection_summary(
                 func.sum(Payment.amount).label("total"),
             )
             .where(
-                Payment.period_month == from_date,
                 Payment.is_void == False,
-                Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
+                extract("year",  Payment.payment_date) == from_date.year,
+                extract("month", Payment.payment_date) == from_date.month,
             )
             .group_by(Payment.payment_mode)
         )
