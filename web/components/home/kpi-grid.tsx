@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { IconTile } from "@/components/ui/icon-tile";
-import { getKpiDetail, getTenantDues, cancelNoShow, type KpiDetailItem, type TenantDues } from "@/lib/api";
+import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, type KpiDetailItem, type TenantDues } from "@/lib/api";
 import { rupee, rupeeL } from "@/lib/format";
 import type { KpiResponse } from "@/lib/api";
 
@@ -102,6 +102,136 @@ function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => 
   );
 }
 
+interface QuickBookModalProps {
+  room: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [checkinDate, setCheckinDate] = useState("");
+  const [rent, setRent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!name.trim() || !phone.trim() || !checkinDate || !rent) {
+      setError("All fields are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await quickBook({
+        room_number: room,
+        tenant_name: name.trim(),
+        tenant_phone: phone.trim(),
+        checkin_date: checkinDate,
+        monthly_rent: parseFloat(rent),
+      });
+      setSuccess(true);
+      if (!result.whatsapp_sent) {
+        setError("Booked! WhatsApp message could not be sent — share the link manually.");
+      } else {
+        setTimeout(() => { onSuccess(); onClose(); }, 1400);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Booking failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative w-full max-w-lg bg-surface rounded-t-2xl px-5 pt-5 pb-8 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-base font-extrabold text-ink">Pre-book Room {room}</p>
+            <p className="text-xs text-ink-muted">Bed stays vacant until arrival</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F6F5F0] flex items-center justify-center text-ink-muted font-bold text-lg leading-none">×</button>
+        </div>
+
+        {success && !error ? (
+          <div className="rounded-tile bg-[#D1FAE5] border border-[#6EE7B7] px-4 py-3 text-sm font-semibold text-[#065F46] text-center">
+            Booked! WhatsApp sent to customer.
+          </div>
+        ) : (
+          <form onSubmit={submit} className="flex flex-col gap-3">
+            {error && (
+              <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-3 py-2 text-xs text-status-warn font-medium">
+                {error}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Customer name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full name"
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                  required
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">WhatsApp number</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="10-digit mobile"
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Check-in date</label>
+                <input
+                  type="date"
+                  value={checkinDate}
+                  onChange={(e) => setCheckinDate(e.target.value)}
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Monthly rent (₹)</label>
+                <input
+                  type="number"
+                  value={rent}
+                  onChange={(e) => setRent(e.target.value)}
+                  placeholder="e.g. 12000"
+                  min="1"
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                  required
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full rounded-pill bg-brand-pink py-3 text-sm font-bold text-white active:opacity-70 disabled:opacity-50 mt-1"
+            >
+              {saving ? "Booking…" : "Book & send WhatsApp link"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface PanelProps {
   open: TileKey;
   positionStyle: React.CSSProperties;
@@ -121,6 +251,7 @@ interface PanelProps {
   setSelected: (v: TenantDues | null) => void;
   cancellingId: number | null;
   onCancel: (item: KpiDetailItem) => void;
+  onBook: (room: string) => void;
 }
 
 function ExpansionPanel({
@@ -132,7 +263,7 @@ function ExpansionPanel({
   stayFilter, setStayFilter,
   buildingFilter, setBuildingFilter,
   filtered, loading, selected, detailLoading, selectItem, setSelected,
-  cancellingId, onCancel,
+  cancellingId, onCancel, onBook,
 }: PanelProps) {
   return (
     <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
@@ -389,6 +520,14 @@ function ExpansionPanel({
                     {cancellingId === item.tenancy_id ? "…" : "Cancel →"}
                   </button>
                 )}
+                {open === "vacant" && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onBook(item.room); }}
+                    className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                  >
+                    Book →
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -430,6 +569,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [bookingRoom, setBookingRoom] = useState<string | null>(null);
 
   const cache = useRef<Map<string, KpiDetailItem[]>>(
     new Map(Object.entries(initialDetails ?? {}))
@@ -568,6 +708,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     buildingFilter, setBuildingFilter,
     filtered, loading, selected, detailLoading, selectItem, setSelected,
     cancellingId, onCancel,
+    onBook: (room: string) => { close(); setBookingRoom(room); },
   };
 
   const leftStyle: React.CSSProperties = { left: 0, width: "calc(200% + 0.75rem)" };
@@ -575,6 +716,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const fullStyle: React.CSSProperties = { left: 0, right: 0 };
 
   return (
+    <>
     <div className="grid grid-cols-2 gap-3">
       {/* Backdrop — catches outside taps to close the panel */}
       {open && <div className="fixed inset-0 z-10" onClick={close} />}
@@ -685,5 +827,14 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
       )}
 
     </div>
+
+    {bookingRoom && (
+      <QuickBookModal
+        room={bookingRoom}
+        onClose={() => setBookingRoom(null)}
+        onSuccess={() => { cache.current.delete("vacant"); toggle("vacant"); }}
+      />
+    )}
+    </>
   );
 }

@@ -892,6 +892,23 @@ export async function assignUpiEntry(rrn: string, tenancyId: number, periodMonth
   return res.json()
 }
 
+export interface QuickBookResult {
+  token: string;
+  session_id: number;
+  whatsapp_sent: boolean;
+  form_url: string;
+}
+
+export async function quickBook(payload: {
+  room_number: string;
+  tenant_name: string;
+  tenant_phone: string;
+  checkin_date: string;
+  monthly_rent: number;
+}): Promise<QuickBookResult> {
+  return _post("/api/v2/app/bookings/quick-book", payload);
+}
+
 export async function cancelNoShow(tenancyId: number): Promise<{ ok: boolean; name: string }> {
   const headers = await _authHeaders()
   const res = await fetch(`${BASE_URL}/api/v2/app/tenancies/${tenancyId}/cancel-no-show`, {

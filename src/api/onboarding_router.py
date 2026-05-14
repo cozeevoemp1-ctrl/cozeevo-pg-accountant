@@ -550,6 +550,8 @@ async def list_pending(request: Request):
                 "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
                 "created_at": obs.created_at.isoformat() if obs.created_at else "",
                 "tenant_name": json.loads(obs.tenant_data).get("name", "") if obs.tenant_data else "",
+                "agreed_rent": float(obs.agreed_rent or 0),
+                "is_qr": (obs.created_by_phone or "") == "qr_scan",
             })
         return {"sessions": items}
 

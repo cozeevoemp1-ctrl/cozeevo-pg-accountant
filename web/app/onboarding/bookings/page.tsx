@@ -32,6 +32,13 @@ function fmtRent(n?: number) {
   return `₹${n.toLocaleString("en-IN")}/mo`
 }
 
+function isToday(iso: string) {
+  if (!iso) return false
+  const d = new Date(iso)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
+
 export default function BookingsPage() {
   const router = useRouter()
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -45,9 +52,19 @@ export default function BookingsPage() {
       const res = await fetch(`${API_URL}/api/onboarding/admin/pending`, { headers: pinHeaders() })
       if (!res.ok) throw new Error(`Load failed: ${res.status}`)
       const d = await res.json()
-      // Show only pending_review (tenant has filled the form)
-      const ready = (d.sessions as Booking[]).filter((s) => s.status === "pending_review")
-      setBookings(ready)
+      // Show both pending_tenant (awaiting form) and pending_review (ready to check in)
+      const all = (d.sessions as Booking[]).filter(
+        (s) => s.status === "pending_review" || s.status === "pending_tenant"
+      )
+      // Sort: check-in today first, then pending_review before pending_tenant, then by date
+      all.sort((a, b) => {
+        const aToday = isToday(a.checkin_date) ? 0 : 1
+        const bToday = isToday(b.checkin_date) ? 0 : 1
+        if (aToday !== bToday) return aToday - bToday
+        if (a.status !== b.status) return a.status === "pending_review" ? -1 : 1
+        return a.checkin_date.localeCompare(b.checkin_date)
+      })
+      setBookings(all)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed")
     } finally {
@@ -79,6 +96,9 @@ export default function BookingsPage() {
     }
   }
 
+  const ready = bookings.filter((b) => b.status === "pending_review")
+  const awaiting = bookings.filter((b) => b.status === "pending_tenant")
+
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
@@ -105,72 +125,138 @@ export default function BookingsPage() {
           <div className="text-center py-16">
             <p className="text-4xl mb-3">📋</p>
             <p className="text-sm font-semibold text-ink">No pending bookings</p>
-            <p className="text-xs text-ink-muted mt-1">Tenants who complete the onboarding form will appear here</p>
+            <p className="text-xs text-ink-muted mt-1">Pre-book from vacant beds on the home screen</p>
           </div>
         ) : (
           <>
-            <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide">
-              {bookings.length} ready to check in
-            </p>
-            {bookings.map((b) => (
-              <div key={b.token} className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
-                {/* Name + badges */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-ink truncate">
-                      {b.tenant_name || "—"}
-                    </p>
-                    <p className="text-xs text-ink-muted">{b.tenant_phone}</p>
-                  </div>
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    {b.is_qr && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#EDE9FE] text-[#5B21B6]">
-                        QR
-                      </span>
-                    )}
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#D1FAE5] text-[#065F46]">
-                      Form filled
-                    </span>
-                  </div>
-                </div>
+            {/* Ready to check in */}
+            {ready.length > 0 && (
+              <>
+                <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide">
+                  {ready.length} ready to check in
+                </p>
+                {ready.map((b) => (
+                  <BookingCard
+                    key={b.token}
+                    b={b}
+                    checkingIn={checkingIn}
+                    onCheckin={saveAndCheckin}
+                  />
+                ))}
+              </>
+            )}
 
-                {/* Details row */}
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "Room", value: b.room || "TBD" },
-                    { label: "Check-in", value: fmtDate(b.checkin_date) },
-                    { label: "Rent", value: fmtRent(b.agreed_rent) },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
-                      <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">{label}</p>
-                      <p className="text-xs font-bold text-ink mt-0.5">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Action row */}
-                <div className="flex gap-2 pt-1">
-                  <a
-                    href={`${API_URL}/admin/onboarding#${b.token}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
-                  >
-                    Review & Edit →
-                  </a>
-                  <button
-                    onClick={() => saveAndCheckin(b.token)}
-                    disabled={checkingIn === b.token}
-                    className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
-                  >
-                    {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
-                  </button>
-                </div>
-              </div>
-            ))}
+            {/* Awaiting form */}
+            {awaiting.length > 0 && (
+              <>
+                <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide mt-2">
+                  {awaiting.length} awaiting form
+                </p>
+                {awaiting.map((b) => (
+                  <BookingCard
+                    key={b.token}
+                    b={b}
+                    checkingIn={checkingIn}
+                    onCheckin={saveAndCheckin}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
       </div>
     </main>
+  )
+}
+
+function BookingCard({ b, checkingIn, onCheckin }: {
+  b: Booking
+  checkingIn: string | null
+  onCheckin: (token: string) => void
+}) {
+  const isPending = b.status === "pending_tenant"
+  const checkinToday = isToday(b.checkin_date)
+
+  return (
+    <div className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
+      {/* Name + badges */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-ink truncate">
+            {b.tenant_name || b.tenant_phone}
+          </p>
+          <p className="text-xs text-ink-muted">{b.tenant_phone}</p>
+        </div>
+        <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
+          {checkinToday && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">
+              Today!
+            </span>
+          )}
+          {b.is_qr && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#EDE9FE] text-[#5B21B6]">
+              QR
+            </span>
+          )}
+          {isPending ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
+              Awaiting form
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#D1FAE5] text-[#065F46]">
+              Form filled
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Details row */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Room", value: b.room || "TBD" },
+          { label: "Check-in", value: fmtDate(b.checkin_date) },
+          { label: "Rent", value: fmtRent(b.agreed_rent) },
+        ].map(({ label, value }) => (
+          <div key={label} className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+            <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">{label}</p>
+            <p className="text-xs font-bold text-ink mt-0.5">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Action row */}
+      <div className="flex gap-2 pt-1">
+        {isPending ? (
+          // Awaiting form — show resend link button only
+          <a
+            href={`${API_URL}/onboard/${b.token}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
+          >
+            Copy form link →
+          </a>
+        ) : (
+          // Form filled — full action row
+          <>
+            <a
+              href={`${API_URL}/admin/onboarding#${b.token}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
+            >
+              Review & Edit →
+            </a>
+            <button
+              onClick={() => onCheckin(b.token)}
+              disabled={checkingIn === b.token}
+              className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+            >
+              {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }

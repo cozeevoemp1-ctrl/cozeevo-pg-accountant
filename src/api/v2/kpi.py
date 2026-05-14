@@ -10,6 +10,7 @@ from sqlalchemy import case, func, literal_column, select, desc, or_, and_
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
+    OnboardingSession,
     Payment, PaymentFor,
     Property,
     RentSchedule,
@@ -312,7 +313,7 @@ async def get_kpi_detail(
                     return "female"
                 return "mixed"
 
-            # Upcoming no-show bookings for these rooms (checkin_date > today)
+            # Upcoming bookings for these rooms (no-show tenancies + pending onboarding sessions)
             vacant_room_ids = [r.id for r in room_rows]
             upcoming_map: dict[int, date] = {}
             if vacant_room_ids:
@@ -327,6 +328,20 @@ async def get_kpi_detail(
                 )).all()
                 for row in upcoming_rows:
                     upcoming_map[row.room_id] = row.next_checkin
+
+                # Also include pre-bookings (OnboardingSession pending_tenant/pending_review)
+                session_rows = (await session.execute(
+                    select(OnboardingSession.room_id, func.min(OnboardingSession.checkin_date).label("next_checkin"))
+                    .where(
+                        OnboardingSession.room_id.in_(vacant_room_ids),
+                        OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
+                        OnboardingSession.checkin_date > today,
+                    )
+                    .group_by(OnboardingSession.room_id)
+                )).all()
+                for row in session_rows:
+                    if row.room_id not in upcoming_map or row.next_checkin < upcoming_map[row.room_id]:
+                        upcoming_map[row.room_id] = row.next_checkin
 
             items = []
             for r in room_rows:

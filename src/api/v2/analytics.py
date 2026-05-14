@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, TypedDict
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -20,6 +20,26 @@ MONTH_ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
               7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
 
+class _HistoricMonth(TypedDict):
+    occ_beds: int
+    fill_pct: float
+    avg_rent: int
+    checkouts: Optional[int]
+
+
+# Verified historical figures — sourced from DB queries + Excel exit columns.
+# These months are FROZEN; never recompute from live DB.
+# Checkouts for Dec–Mar: from Cozeevo Monthly stay (4).xlsx History tab exit columns.
+VERIFIED_MONTHS: dict[tuple[int, int], _HistoricMonth] = {
+    (2025, 11): {"occ_beds": 13,  "fill_pct": 4.4,  "avg_rent": 16045, "checkouts": None},
+    (2025, 12): {"occ_beds": 43,  "fill_pct": 14.5, "avg_rent": 14520, "checkouts": 6},
+    (2026,  1): {"occ_beds": 99,  "fill_pct": 33.3, "avg_rent": 15247, "checkouts": 10},
+    (2026,  2): {"occ_beds": 144, "fill_pct": 48.5, "avg_rent": 15323, "checkouts": 23},
+    (2026,  3): {"occ_beds": 215, "fill_pct": 72.4, "avg_rent": 14302, "checkouts": 35},
+    (2026,  4): {"occ_beds": 254, "fill_pct": 85.5, "avg_rent": 14535, "checkouts": 61},
+}
+
+
 class MonthData(BaseModel):
     month: str
     label: str
@@ -30,7 +50,7 @@ class MonthData(BaseModel):
     ci_triple: int
     ci_premium: int
     ci_daily: int
-    checkouts: Optional[int]   # None = no checkout_date data in DB for this month
+    checkouts: Optional[int]
     avg_rent: int
 
 
@@ -56,8 +76,27 @@ def _next_month(d: date) -> date:
     return date(d.year + 1, 1, 1) if d.month == 12 else date(d.year, d.month + 1, 1)
 
 
-async def _occ_at(session, target: date, total_beds: int) -> tuple[int, float]:
-    """Occupied beds (premium=max_occ, else=1, per-room capped) at end of `target`."""
+def _present_at(target: date):
+    """Tenancy was occupying a bed on `target` date."""
+    return and_(
+        Tenancy.checkin_date <= target,
+        or_(
+            Tenancy.status == TenancyStatus.active,
+            and_(
+                Tenancy.status == TenancyStatus.exited,
+                Tenancy.checkout_date != None,
+                Tenancy.checkout_date > target,
+            ),
+            and_(
+                Tenancy.status == TenancyStatus.no_show,
+                Tenancy.checkin_date <= target,
+            ),
+        ),
+    )
+
+
+async def _live_month_stats(session, target: date, total_beds: int) -> tuple[int, float, int]:
+    """Return (occ_beds, fill_pct, avg_rent_per_bed) computed from DB for `target` date."""
     per_room = (
         select(
             func.least(
@@ -75,25 +114,39 @@ async def _occ_at(session, target: date, total_beds: int) -> tuple[int, float]:
         .where(
             Room.is_staff_room == False,
             Room.room_number != "000",
-            Tenancy.checkin_date <= target,
-            or_(
-                # Active tenant — still here
-                Tenancy.status == TenancyStatus.active,
-                # Exited but left AFTER the target date
-                and_(
-                    Tenancy.status == TenancyStatus.exited,
-                    Tenancy.checkout_date != None,
-                    Tenancy.checkout_date > target,
-                ),
-            ),
+            _present_at(target),
         )
         .group_by(Room.id, Room.max_occupancy)
         .subquery()
     )
-    raw = await session.scalar(select(func.coalesce(func.sum(per_room.c.capped), 0)))
-    beds = int(raw or 0)
+    beds = int(
+        await session.scalar(select(func.coalesce(func.sum(per_room.c.capped), 0))) or 0
+    )
     pct = round(beds / total_beds * 100, 1) if total_beds else 0.0
-    return beds, pct
+
+    # avg rent per BED: SUM(agreed_rent) / SUM(beds_used) for monthly tenants
+    rent_row = (await session.execute(
+        select(
+            func.sum(Tenancy.agreed_rent).label("total_rent"),
+            func.sum(
+                case(
+                    (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                    else_=literal_column("1"),
+                )
+            ).label("total_beds"),
+        )
+        .select_from(Tenancy)
+        .join(Room, Room.id == Tenancy.room_id)
+        .where(
+            Room.is_staff_room == False,
+            Room.room_number != "000",
+            Tenancy.stay_type == StayType.monthly,
+            _present_at(target),
+        )
+    )).one()
+    avg_rent = int((rent_row.total_rent or 0) / (rent_row.total_beds or 1))
+
+    return beds, pct, avg_rent
 
 
 @router.get("/occupancy", response_model=OccupancyResponse)
@@ -109,7 +162,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Today's occupancy (active only)
+        # Today's live occupancy (active only — KPI card)
         per_room_now = (
             select(
                 func.least(
@@ -137,9 +190,18 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
         )
         today_pct = round(today_beds / total_beds * 100, 1) if total_beds else 0.0
 
-        # Current month avg rent (active monthly tenants)
-        cur_avg = await session.scalar(
-            select(func.avg(Tenancy.agreed_rent))
+        # Current month avg rent per bed (KPI card)
+        cur_rent_row = (await session.execute(
+            select(
+                func.sum(Tenancy.agreed_rent).label("total_rent"),
+                func.sum(
+                    case(
+                        (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                        else_=literal_column("1"),
+                    )
+                ).label("total_beds"),
+            )
+            .select_from(Tenancy)
             .join(Room, Room.id == Tenancy.room_id)
             .where(
                 Room.is_staff_room == False,
@@ -147,10 +209,12 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 Tenancy.stay_type == StayType.monthly,
                 Tenancy.status == TenancyStatus.active,
             )
+        )).one()
+        current_avg_rent = int(
+            (cur_rent_row.total_rent or 0) / (cur_rent_row.total_beds or 1)
         )
-        current_avg_rent = int(cur_avg or 0)
 
-        # Check-ins by month + sharing_type (monthly stays)
+        # Check-ins by month + sharing_type (monthly stays) — always from DB
         ci_monthly_rows = (await session.execute(
             select(
                 func.date_trunc(text("'month'"), Tenancy.checkin_date).label("m"),
@@ -183,7 +247,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
             .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date))
         )).all()
 
-        # Checkouts by month (only populated checkout_date rows)
+        # Checkouts by month from DB (for non-frozen months)
         co_rows = (await session.execute(
             select(
                 func.date_trunc(text("'month'"), Tenancy.checkout_date).label("m"),
@@ -196,23 +260,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
             .group_by(func.date_trunc(text("'month'"), Tenancy.checkout_date))
         )).all()
 
-        # Avg agreed_rent by checkin month (monthly tenants)
-        avg_rows = (await session.execute(
-            select(
-                func.date_trunc(text("'month'"), Tenancy.checkin_date).label("m"),
-                func.avg(Tenancy.agreed_rent).label("avg_rent"),
-            )
-            .join(Room, Room.id == Tenancy.room_id)
-            .where(
-                Room.is_staff_room == False,
-                Room.room_number != "000",
-                Tenancy.stay_type == StayType.monthly,
-                Tenancy.checkin_date >= START_MONTH,
-            )
-            .group_by(func.date_trunc(text("'month'"), Tenancy.checkin_date))
-        )).all()
-
-        # Build lookup dicts keyed by (year, month)
+        # Build lookup dicts
         ci_type_map: dict[tuple, dict] = {}
         for r in ci_monthly_rows:
             ym = (r.m.year, r.m.month)
@@ -222,25 +270,27 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
 
         ci_daily_map = {(r.m.year, r.m.month): int(r.cnt) for r in ci_daily_rows}
         co_map = {(r.m.year, r.m.month): int(r.cnt) for r in co_rows}
-        avg_map = {(r.m.year, r.m.month): int(r.avg_rent or 0) for r in avg_rows}
 
-        # Enumerate months from START_MONTH to current
+        # Enumerate months
         months_out: list[MonthData] = []
         cur = START_MONTH
         while cur <= date(today.year, today.month, 1):
             ym = (cur.year, cur.month)
-            occ_date = min(_month_end(cur.year, cur.month), today)
-            occ_beds, fill_pct = await _occ_at(session, occ_date, total_beds)
-            types = ci_type_map.get(ym, {})
             lbl = f"{MONTH_ABBR[cur.month]} '{str(cur.year)[2:]}"
+            types = ci_type_map.get(ym, {})
 
-            # checkouts: None means no DB data (historical tenants without checkout_date)
-            # For months where DB has some data, return the count; otherwise None
-            has_co_data = ym in co_map
-            co_val: Optional[int] = co_map.get(ym) if has_co_data else None
-
-            # avg_rent: use checkin-month avg; fallback to current for current month
-            ar = avg_map.get(ym, current_avg_rent if ym == (today.year, today.month) else 0)
+            if ym in VERIFIED_MONTHS:
+                # Frozen month — use verified figures directly
+                v = VERIFIED_MONTHS[ym]
+                occ_beds  = v["occ_beds"]
+                fill_pct  = v["fill_pct"]
+                avg_rent  = v["avg_rent"]
+                co_val    = v["checkouts"]
+            else:
+                # Live month — compute from DB
+                occ_date = min(_month_end(cur.year, cur.month), today)
+                occ_beds, fill_pct, avg_rent = await _live_month_stats(session, occ_date, total_beds)
+                co_val = co_map.get(ym)
 
             months_out.append(MonthData(
                 month=cur.strftime("%Y-%m"),
@@ -253,7 +303,7 @@ async def get_occupancy(_user: AppUser = Depends(get_current_user)):
                 ci_premium=types.get("premium", 0),
                 ci_daily=ci_daily_map.get(ym, 0),
                 checkouts=co_val,
-                avg_rent=ar,
+                avg_rent=avg_rent,
             ))
             cur = _next_month(cur)
 
