@@ -132,6 +132,28 @@ export function OccupancyTab() {
     const dynFs = (chart: any, min = 7, max = 22) =>
       Math.max(min, Math.min(max, Math.round(chart.width / 65)))
 
+    // Plugin: scales ALL chart fonts (legend, ticks, axis titles) with chart width
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fontSizePlugin = {
+      id: "fontSizer",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      beforeUpdate(chart: any) {
+        if (!chart.width) return
+        const fs = dynFs(chart, 10, 20)
+        const titleFs = Math.max(8, fs - 2)
+        if (chart.options.plugins?.legend?.labels) {
+          chart.options.plugins.legend.labels.font = { size: fs }
+        }
+        if (chart.options.scales) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          Object.values(chart.options.scales as Record<string, any>).forEach((scale: any) => {
+            if (scale.ticks) scale.ticks.font = { size: fs }
+            if (scale.title?.display) scale.title.font = { size: titleFs }
+          })
+        }
+      },
+    }
+
     // Inline plugin — draws value labels above line chart points
     const occLabelPlugin = {
       id: "occLabel",
@@ -217,7 +239,7 @@ export function OccupancyTab() {
 
       chart1Inst.current = new Chart(chart1Ref.current!, {
         type: "bar",
-        plugins: [occLabelPlugin],
+        plugins: [occLabelPlugin, fontSizePlugin],
         data: {
           labels,
           datasets: [
@@ -287,7 +309,6 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#c8dae8",
-                font: { size: 11 },
                 boxWidth: 9,
                 padding: 8,
               },
@@ -320,7 +341,7 @@ export function OccupancyTab() {
           scales: {
             x: {
               stacked: true,
-              ticks: { color: "#b8ccdc", font: { size: 11 } },
+              ticks: { color: "#b8ccdc" },
               grid: { color: gridColor },
             },
             yCI: {
@@ -351,7 +372,7 @@ export function OccupancyTab() {
 
       chart2Inst.current = new Chart(chart2Ref.current!, {
         type: "bar",
-        plugins: [rentLabelPlugin],
+        plugins: [rentLabelPlugin, fontSizePlugin],
         data: {
           labels,
           datasets: [
@@ -400,7 +421,6 @@ export function OccupancyTab() {
             legend: {
               labels: {
                 color: "#c8dae8",
-                font: { size: 11 },
                 boxWidth: 9,
                 padding: 8,
               },
@@ -424,7 +444,7 @@ export function OccupancyTab() {
           },
           scales: {
             x: {
-              ticks: { color: "#b8ccdc", font: { size: 11 } },
+              ticks: { color: "#b8ccdc" },
               grid: { color: gridColor },
             },
             yCount: {
