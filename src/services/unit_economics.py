@@ -84,9 +84,21 @@ async def get_unit_economics(month: date, session: AsyncSession) -> dict:
         )
     ) or 0)
 
-    # ── 4. Avg agreed rent — monthly tenants only, True Rent (no deposits) ────
-    avg_rent_scalar = await session.scalar(
-        select(func.avg(Tenancy.agreed_rent))
+    # ── 4. Avg agreed rent per BED — monthly tenants only, weighted by beds used ──
+    # Premium tenant pays for Room.max_occupancy beds; regular tenants count as 1.
+    # SUM(rent) / SUM(beds) gives the correct per-bed average; func.avg() would
+    # inflate the figure because premium tenants pay 2× rent for 2× beds.
+    avg_rent_row = (await session.execute(
+        select(
+            func.sum(Tenancy.agreed_rent).label("total_rent"),
+            func.sum(
+                case(
+                    (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                    else_=literal_column("1"),
+                )
+            ).label("total_beds"),
+        )
+        .select_from(Tenancy)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Tenancy.status == TenancyStatus.active,
@@ -94,8 +106,10 @@ async def get_unit_economics(month: date, session: AsyncSession) -> dict:
             Room.is_staff_room == False,
             Room.room_number != "000",
         )
+    )).one()
+    avg_agreed_rent = round(
+        float(avg_rent_row.total_rent or 0) / float(avg_rent_row.total_beds or 1)
     )
-    avg_agreed_rent = round(float(avg_rent_scalar or 0))
 
     # ── 5. Collection rate (rent billed vs collected for this month) ──────────
     total_billed = float(await session.scalar(
