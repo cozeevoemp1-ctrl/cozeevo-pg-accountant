@@ -23,6 +23,8 @@ interface Booking {
   maintenance_fee?: number
   security_deposit?: number
   booking_amount?: number
+  daily_rate?: number
+  stay_type?: string
   is_qr?: boolean
 }
 
@@ -293,11 +295,26 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         </div>
         <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
           <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Rent</p>
-          <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.agreed_rent)}</p>
-          {b.agreed_rent && b.checkin_date && new Date(b.checkin_date).getDate() !== 1 && (
-            <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
-              1st mo: ₹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}
-            </p>
+          {b.stay_type === "daily" ? (
+            <>
+              <p className="text-xs font-bold text-ink mt-0.5">
+                {b.daily_rate ? `₹${b.daily_rate.toLocaleString("en-IN")}/day` : "—"}
+              </p>
+              {b.booking_amount ? (
+                <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
+                  Adv: ₹{b.booking_amount.toLocaleString("en-IN")}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.agreed_rent)}</p>
+              {b.agreed_rent && b.checkin_date && new Date(b.checkin_date).getDate() !== 1 && (
+                <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
+                  1st mo: ₹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -316,7 +333,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               { label: "Room", val: editRoom, set: setEditRoom, type: "text", placeholder: "e.g. 416" },
               { label: "Check-in", val: editCheckin, set: setEditCheckin, type: "date", placeholder: "" },
               { label: "Rent (₹)", val: editRent, set: setEditRent, type: "number", placeholder: "" },
-              { label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" },
+              ...(b.stay_type !== "daily" ? [{ label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" }] : []),
               { label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" },
             ].map(({ label, val, set, type, placeholder }) => (
               <div key={label} className={label === "Name" || label === "Check-in" ? "col-span-2" : ""}>
