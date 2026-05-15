@@ -17,6 +17,7 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
   const [selected, setSelected] = useState<TenantSearchResult | null>(defaultTenant ?? null)
   const [open, setOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   async function runSearch(q: string) {
     if (q.trim().length < 1) { setResults([]); setOpen(false); return }
@@ -63,8 +64,8 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
           type="text"
           value={query}
           onChange={handleInput}
-          onFocus={() => results.length > 0 && setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onFocus={() => { clearTimeout(blurTimerRef.current); if (results.length > 0) setOpen(true) }}
+          onBlur={() => { blurTimerRef.current = setTimeout(() => setOpen(false), 150) }}
           placeholder={placeholder}
           className="w-full rounded-pill border border-[#E2DEDD] bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
         />
