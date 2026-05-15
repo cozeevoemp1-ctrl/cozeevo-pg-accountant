@@ -206,6 +206,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                   type="number"
                   value={rentAmt}
                   onChange={(e) => setRentAmt(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min="0"
                   className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
                   autoFocus
@@ -233,10 +234,29 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                   type="number"
                   value={depositAmt}
                   onChange={(e) => setDepositAmt(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   min="0"
                   className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
                 />
                 <p className="text-[10px] text-[#00AEED] font-bold mt-1">Always recorded as UPI</p>
+              </div>
+            )}
+
+            {/* Summary: outstanding / collecting / remaining */}
+            {fullDues && (
+              <div className="rounded-tile bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-1">
+                {[
+                  { label: "Total outstanding", value: rentDue + depositDue, muted: true },
+                  { label: "Collecting now",     value: totalCollect,         muted: false },
+                  { label: "Remaining after",    value: Math.max(0, (rentDue + depositDue) - totalCollect), muted: true, warn: (rentDue + depositDue) - totalCollect > 0 },
+                ].map(({ label, value, muted, warn }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-[11px] text-ink-muted">{label}</span>
+                    <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
+                      {rupee(value)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
