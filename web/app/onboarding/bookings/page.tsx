@@ -128,7 +128,7 @@ export default function BookingsPage() {
   const expired = bookings.filter((b) => b.status === "expired")
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
         <button onClick={() => router.back()}
@@ -488,14 +488,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
-                <input type="number" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
+                <input type="number" inputMode="decimal" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
                   className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                 />
                 <ModeToggle mode={rentDuesMode} setMode={setRentDuesMode} />
               </div>
               <div>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
-                <input type="number" value={collectDepositDues} onChange={(e) => setCollectDepositDues(e.target.value)}
+                <input type="number" inputMode="decimal" value={collectDepositDues} onChange={(e) => setCollectDepositDues(e.target.value)}
                   className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                 />
                 <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
