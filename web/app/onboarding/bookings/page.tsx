@@ -264,22 +264,33 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
   // Pre-fill outstanding dues for form-filled bookings
   useEffect(() => {
-    if (b.status !== "pending_review" || !b.tenancy_id) return
-    supabase().auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token
-      if (!token) return
-      fetch(`${API_URL}/api/v2/app/tenants/${b.tenancy_id}/dues`, {
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      })
-        .then((r) => r.ok ? r.json() : null)
-        .then((d) => {
-          if (!d) return
-          const outstanding = Math.max(0, (d.rent_due ?? 0) - (d.paid_amount ?? 0) + (d.adjustment ?? 0))
-          if (outstanding > 0) setCollectRentDues(String(outstanding))
+    if (b.status !== "pending_review") return
+
+    if (b.tenancy_id) {
+      // Tenancy exists — fetch live dues from DB
+      supabase().auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token
+        if (!token) return
+        fetch(`${API_URL}/api/v2/app/tenants/${b.tenancy_id}/dues`, {
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         })
-        .catch(() => {})
-    })
-  }, [b.tenancy_id, b.status])
+          .then((r) => r.ok ? r.json() : null)
+          .then((d) => {
+            if (!d) return
+            const outstanding = Math.max(0, (d.rent_due ?? 0) - (d.paid_amount ?? 0) + (d.adjustment ?? 0))
+            if (outstanding > 0) setCollectRentDues(String(outstanding))
+            if (d.deposit_paid > 0 && d.deposit_due > 0) setCollectDepositDues(String(d.deposit_due))
+          })
+          .catch(() => {})
+      })
+    } else {
+      // No tenancy yet — calculate expected dues from booking form data
+      const rentDue = Math.max(0, proRata - (b.booking_amount || 0))
+      const depositDue = b.security_deposit || 0
+      if (rentDue > 0) setCollectRentDues(String(rentDue))
+      if (depositDue > 0) setCollectDepositDues(String(depositDue))
+    }
+  }, [b.tenancy_id, b.status, proRata, b.booking_amount, b.security_deposit])
 
   async function saveEdit() {
     setSaving(true); setErr("")
