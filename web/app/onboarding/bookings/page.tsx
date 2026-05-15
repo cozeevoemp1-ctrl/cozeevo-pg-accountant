@@ -511,10 +511,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             return (
               <div className="flex items-baseline justify-between">
                 <p className="text-[9px] text-ink-muted uppercase tracking-wide font-semibold">Total collecting</p>
-                <p className="text-xs font-bold text-ink">
-                  ₹{total.toLocaleString("en-IN")}
-                  {total > 0 && <span className="text-[9px] text-ink-muted font-normal ml-1">{hasCash ? "Cash + UPI" : "UPI"}</span>}
-                </p>
+                <p className="text-xs font-bold text-ink">₹{total.toLocaleString("en-IN")}</p>
               </div>
             )
           })()}
