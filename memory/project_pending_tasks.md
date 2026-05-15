@@ -6,6 +6,14 @@ type: project
 
 ## Active / Next Up
 
+### EBITDA matrix — done, pending commit
+- `scripts/ebitda_matrix_jun2026.py` — complete, generates `scripts/ebitda_matrix_jun2026.xlsx`
+- Not yet committed to git (untracked file)
+
+### Cash reconciliation — blocked on HULK bank statement
+- ₹12-13L gap between (adjusted profit + deposits) and actual holdings cannot be explained without HULK Apr+May bank statement
+- Do NOT guess at outstanding dues until bank reconciliation is complete
+
 ### UPI auto-reconciliation — activate before June 1
 0d. **Gmail app password** — create at `myaccount.google.com/apppasswords`, add to VPS `.env` as `GMAIL_APP_PASSWORD` (also set `GMAIL_USER`, `HULK_EMAIL_SUBJECT=HULK`, `THOR_EMAIL_SUBJECT=THOR`)
 0e. **Bank email forwarding** — configure Lakshmi UPI app / Yes Bank dashboard to send daily collection report to `GMAIL_USER` with "HULK" or "THOR" in subject

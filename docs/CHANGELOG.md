@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.80] — 2026-05-15 — EBITDA matrix + financial analysis session
+
+### Scripts
+- `scripts/ebitda_matrix_jun2026.py` — EBITDA sensitivity matrix for Jun 2026 rent planning
+  - Layout: Metric | Rent/bed | 80%–100% occupancy columns
+  - 3 price points: ₹14,000 / ₹13,500 / ₹13,000 (descending)
+  - 3 sections per scenario: EBITDA | After GST 12% | Net-Net (GST+IT 8%)
+  - 2 scenarios: S1 current property rent ₹21,32,000 | S2 post-increase ₹22,14,000 (+₹82K)
+  - OPEX: fixed (property rent) + variable (Apr'26 actual ₹9,93,067 at 270 beds, scaled by occupancy)
+
+### Financial analysis (no code changes)
+- Confirmed GST exemption: Cozeevo rates ₹433–₹467/day well below ₹1,000/day threshold → no GST liability
+- Explained April actual EBITDA (₹9,33,085) vs matrix projection gap: higher occupancy (91% vs 85%) + maintenance fees ₹2.87L (lumpy, check-in month only) + property rent timing
+- Maintenance fees confirmed as non-recurring (only on new check-ins, not steady-state)
+- P&L vs balance sheet reconciliation: P&L = profitability this month; balance sheet = cumulative cash position since Oct'25
+- Cash reconciliation: ₹13.14L gap between (adjusted profit + deposits) and actual holdings explained by owner loans still in bank + April rent not yet paid
+
 ## [1.75.79] — 2026-05-15 — Bookings check-in UX overhaul + dues calculation fixes
 
 ### Bookings page — check-in collection form (`web/app/onboarding/bookings/page.tsx`)
