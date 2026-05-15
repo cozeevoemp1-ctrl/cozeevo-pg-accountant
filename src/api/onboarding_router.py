@@ -309,7 +309,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
                         rent_line += f" → {future_str}/month from {_eff}"
                     summary_lines.append(rent_line)
                     summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
-                    summary_lines.append(f"\nThis link is valid for 2 hours.")
+                    summary_lines.append(f"\nThis link is valid for 48 hours.")
                     await _send_whatsapp(phone_wa, "\n".join(summary_lines))
                     whatsapp_sent = True
             except Exception as e:
