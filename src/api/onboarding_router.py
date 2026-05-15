@@ -1164,10 +1164,9 @@ class ApproveRequest(BaseModel):
     approved_by_phone: str = ""  # phone of the staff member approving
     entry_source: str = "onboarding_form"  # "onboarding_form" | "physical_form"
     instant_checkin: bool = False  # True → force status=active even if checkin_date is future
-    # Payments collected at check-in (recorded as Payment rows immediately)
-    # Deposit: receptionist enters amount; always recorded as UPI
-    collected_deposit: float = 0
-    # Against dues — split into rent portion (cash/upi selectable) and deposit portion (always UPI)
+    # Payments collected at check-in (entered by receptionist on the bookings screen)
+    # Deposit + advance are auto-recorded from obs fields at UPI; no request field needed.
+    # Against dues — rent portion (cash/upi selectable) and deposit portion (always UPI)
     collected_rent_dues: float = 0
     rent_dues_mode: str = "cash"   # "cash" | "upi"
     collected_deposit_dues: float = 0   # always UPI
@@ -1549,27 +1548,27 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 else:
                     period = date(period.year, period.month + 1, 1)
 
-            # Advance payment (from onboarding session)
+            # Advance payment (from onboarding session) — always UPI
             if obs.booking_amount and obs.booking_amount > 0:
-                adv_mode = PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=obs.booking_amount,
-                    payment_date=checkin, payment_mode=adv_mode,
+                    payment_date=checkin, payment_mode=PaymentMode.upi,
                     for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
-                    notes=f"Booking advance ({obs.advance_mode})",
+                    notes="Booking advance (upi)",
+                ))
+
+            # Security deposit (from onboarding session) — always UPI
+            if obs.security_deposit and obs.security_deposit > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=obs.security_deposit,
+                    payment_date=checkin, payment_mode=PaymentMode.upi,
+                    for_type=PaymentFor.deposit,
+                    notes="Security deposit at check-in (upi)",
                 ))
 
             # Payments collected at check-in (entered by receptionist on the bookings screen)
             def _ci_mode(field_mode: str) -> PaymentMode:
                 return PaymentMode.upi if field_mode == "upi" else PaymentMode.cash
-
-            if req and req.collected_deposit > 0:
-                session.add(Payment(
-                    tenancy_id=tenancy.id, amount=req.collected_deposit,
-                    payment_date=checkin, payment_mode=PaymentMode.upi,
-                    for_type=PaymentFor.deposit,
-                    notes="Security deposit collected at check-in (upi)",
-                ))
             if req and req.collected_rent_dues > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_rent_dues,

@@ -95,7 +95,6 @@ export default function BookingsPage() {
   useEffect(() => { load() }, [load])
 
   async function saveAndCheckin(token: string, collection?: {
-    collected_deposit: number
     collected_rent_dues: number
     rent_dues_mode: string
     collected_deposit_dues: number
@@ -234,7 +233,7 @@ function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cas
 function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   b: Booking
   checkingIn: string | null
-  onCheckin: (token: string, collection?: { collected_deposit: number; collected_rent_dues: number; rent_dues_mode: string; collected_deposit_dues: number }) => void
+  onCheckin: (token: string, collection?: { collected_rent_dues: number; rent_dues_mode: string; collected_deposit_dues: number }) => void
   onReload: () => void
 }) {
   const isPending = b.status === "pending_tenant"
@@ -259,7 +258,6 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
   // Collection at check-in
   const proRata = b.agreed_rent && b.checkin_date ? proratedRent(b.agreed_rent, b.checkin_date) : 0
-  const [collectDeposit, setCollectDeposit] = useState(String(b.security_deposit || ""))
   const [collectRentDues, setCollectRentDues] = useState("")
   const [rentDuesMode, setRentDuesMode] = useState<"cash" | "upi">("cash")
   const [collectDepositDues, setCollectDepositDues] = useState("")
@@ -463,16 +461,13 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             </div>
           </div>
 
-          {/* Deposit — user enters amount, always UPI */}
-          <div>
-            <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
-            <input type="number" value={collectDeposit} onChange={(e) => setCollectDeposit(e.target.value)}
-              className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-            />
-            <div className="flex items-center justify-between mt-0.5">
-              <p className="text-[9px] text-ink-muted">Agreed: ₹{(b.security_deposit || 0).toLocaleString("en-IN")}</p>
-              <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30">UPI</span>
-            </div>
+          {/* Deposit — reference only, always UPI */}
+          <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+            <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Deposit</p>
+            <p className="text-xs font-bold text-ink mt-0.5">
+              {b.security_deposit ? `₹${b.security_deposit.toLocaleString("en-IN")}` : "—"}
+            </p>
+            <p className="text-[9px] text-ink-muted">Auto-recorded · UPI</p>
           </div>
 
           {/* Against dues — split into rent (selectable mode) + deposit (always UPI) */}
@@ -498,15 +493,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
           {/* Collection summary */}
           {(() => {
-            const dep = parseFloat(collectDeposit) || 0
             const rd = parseFloat(collectRentDues) || 0
             const dd = parseFloat(collectDepositDues) || 0
-            const total = dep + rd + dd
+            const total = rd + dd
             if (total <= 0) return null
             const hasCash = rd > 0 && rentDuesMode === "cash"
             return (
               <p className="text-[9px] text-ink-muted text-right">
-                Recording ₹{total.toLocaleString("en-IN")} · {hasCash ? "Cash + UPI" : "UPI"}
+                Dues: ₹{total.toLocaleString("en-IN")} · {hasCash ? "Cash + UPI" : "UPI"}
               </p>
             )
           })()}
@@ -586,7 +580,6 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               )}
               <button
                 onClick={() => onCheckin(b.token, {
-                  collected_deposit: parseFloat(collectDeposit) || 0,
                   collected_rent_dues: parseFloat(collectRentDues) || 0,
                   rent_dues_mode: rentDuesMode,
                   collected_deposit_dues: parseFloat(collectDepositDues) || 0,
