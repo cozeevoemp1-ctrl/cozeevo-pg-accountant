@@ -128,7 +128,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     if (!item.tenancy_id) return;
     getTenantDues(item.tenancy_id).then((d) => {
       setFullDues(d);
-      if (d.deposit_due > 0) setDepositAmt(String(d.deposit_due));
+      if (d.deposit_paid > 0 && d.deposit_due > 0) setDepositAmt(String(d.deposit_due));
     }).catch(() => {});
   }, [item.tenancy_id]);
 
