@@ -2,6 +2,38 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.78] — 2026-05-15 — Bookings check-in collection + notices fix + data ops
+
+### Bookings: collected-at-check-in payments (`web/app/onboarding/bookings/page.tsx`, `src/api/onboarding_router.py`)
+- New "Collected at check-in" section on each `pending_review` booking card
+- Fields: 1st month rent (pro-rata pre-filled for mid-month check-ins), Security deposit, Advance paid, Against dues
+- Cash / UPI toggle; "Due at check-in" summary shows outstanding before confirming
+- Backend `ApproveRequest` extended: `collected_rent`, `collected_deposit`, `collected_advance`, `collected_dues`, `checkin_payment_mode`
+- On approve, backend creates Payment rows immediately (`for_type`: rent / deposit / booking / rent); notes = "Collected at check-in"
+- Day-stay bookings: maintenance field hidden; rent tile shows `₹900/day + Adv: ₹10,000` instead of blank
+- Added `booking_amount`, `daily_rate`, `stay_type` to `Booking` interface in TypeScript
+
+### Notices: `is_full_exit` date-aware fix (`src/api/v2/notices.py`)
+- Bug: Room 621 showed "Full room / 2 of 2 leaving" in May filter even though Sajith leaves June 14 (only Ashit leaves May)
+- Fix: pre-compute per-tenancy `expected_checkout` and `room_notice_checkouts`; `is_full_exit` now True only for the tenant with the **latest** checkout date in that room (`expected_checkout >= room_max_checkout`)
+- Same fix applied to `kpi.py` notices query
+
+### Sharing type in tenant detail card (`src/api/v2/tenants.py`, `web/lib/api.ts`, `web/components/home/kpi-grid.tsx`)
+- `GET /tenants/{id}/dues` now returns `sharing_type`
+- `TenantDues` TypeScript interface extended with `sharing_type: string | null`
+- `TenantDetailCard` shows "Sharing type" row between Check-in and Agreed rent
+
+### Onboarding link text fix (`src/api/onboarding_router.py`)
+- WhatsApp message was saying "2 hours" — corrected to "48 hours" (link validity was already 48h in DB)
+
+### Data ops
+- Restored Pratham S Kore (Room 420, token `f0e7fc81`) from `cancelled` → `pending_review` (accidentally cancelled)
+- Voided 6 ops-sheet-imported payments for Prithviraj Rai (Room 420): IDs 3017, 3018, 14243, 14244, 14789, 15505 (total ₹73,000)
+  - Required `SET LOCAL app.allow_historical_write = 'true'` for historical rows
+- **Policy established**: ops-sheet payments (`notes ILIKE '%source sheet%'`) are ALWAYS voided — saved to `memory/rules_data_sync.md` §10
+
+---
+
 ## [1.75.77] — 2026-05-14 — Exit notices bulk load + notices UI overhaul
 
 ### Exit notices bulk loaded (`scripts/_load_exit_notices.py`)
