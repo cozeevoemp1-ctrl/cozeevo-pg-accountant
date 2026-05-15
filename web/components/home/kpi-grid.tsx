@@ -161,7 +161,9 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   }
 
   const rentDue = item.dues ?? 0;
-  const depositDue = fullDues?.deposit_due ?? 0;
+  // Only show deposit field if we have evidence deposit is being tracked in DB
+  // (deposit_paid > 0 means at least one deposit payment was recorded)
+  const depositDue = (fullDues && fullDues.deposit_paid > 0) ? fullDues.deposit_due : 0;
   const totalCollect = (parseFloat(rentAmt) || 0) + (parseFloat(depositAmt) || 0);
 
   return (
