@@ -74,6 +74,7 @@ function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => 
       <div className="flex flex-col divide-y divide-[#F0EDE9]">
         {[
           { label: "Check-in", value: fmtDate(dues.checkin_date) },
+          { label: "Sharing type", value: dues.sharing_type ? dues.sharing_type.charAt(0).toUpperCase() + dues.sharing_type.slice(1) : "—" },
           { label: "Agreed rent", value: rupee(dues.rent) + "/mo" },
           { label: "Security deposit", value: rupee(dues.security_deposit) },
           { label: "Maintenance", value: dues.maintenance_fee > 0 ? rupee(dues.maintenance_fee) + "/mo" : "—" },

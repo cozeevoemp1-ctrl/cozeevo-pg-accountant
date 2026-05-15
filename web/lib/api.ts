@@ -200,6 +200,7 @@ export interface TenantDues {
   period_month: string;
   notice_date: string | null;
   expected_checkout: string | null;
+  sharing_type: string | null;
 }
 
 export function searchTenants(q: string): Promise<TenantSearchResult[]> {

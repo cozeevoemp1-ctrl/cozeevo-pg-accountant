@@ -250,6 +250,7 @@ async def get_tenant_dues(
         "period_month": period_month.strftime("%Y-%m"),
         "notice_date": tenancy.notice_date.isoformat() if tenancy.notice_date else None,
         "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
+        "sharing_type": tenancy.sharing_type.value if tenancy.sharing_type else None,
     }
 
 
