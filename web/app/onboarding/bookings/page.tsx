@@ -441,7 +441,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       {/* Collection at check-in (only for form-filled cards) */}
       {!editing && !isPending && !isExpired && (
         <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
-          <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
+          <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Agreed terms</p>
 
           {/* Reference info — display only */}
           <div className="grid grid-cols-2 gap-2">
@@ -472,7 +472,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
           {/* Against dues — split into rent (selectable mode) + deposit (always UPI) */}
           <div className="flex flex-col gap-1.5">
-            <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Against dues</p>
+            <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
@@ -496,11 +496,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             const rd = parseFloat(collectRentDues) || 0
             const dd = parseFloat(collectDepositDues) || 0
             const total = rd + dd
-            if (total <= 0) return null
             const hasCash = rd > 0 && rentDuesMode === "cash"
             return (
               <p className="text-[9px] text-ink-muted text-right">
-                Dues: ₹{total.toLocaleString("en-IN")} · {hasCash ? "Cash + UPI" : "UPI"}
+                Total collecting: <span className="font-bold text-ink">₹{total.toLocaleString("en-IN")}</span>
+                {total > 0 && <> · {hasCash ? "Cash + UPI" : "UPI"}</>}
               </p>
             )
           })()}
