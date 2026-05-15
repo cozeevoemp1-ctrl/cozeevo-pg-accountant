@@ -128,7 +128,10 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     if (!item.tenancy_id) return;
     getTenantDues(item.tenancy_id).then((d) => {
       setFullDues(d);
-      if (d.deposit_paid > 0 && d.deposit_due > 0) setDepositAmt(String(d.deposit_due));
+      const depDue = d.deposit_paid > 0 ? Math.max(0, d.deposit_due) : 0;
+      const rentOnly = Math.max(0, (d.dues ?? 0) - depDue);
+      if (depDue > 0) setDepositAmt(String(depDue));
+      if (rentOnly >= 0) setRentAmt(String(rentOnly));
     }).catch(() => {});
   }, [item.tenancy_id]);
 
@@ -160,10 +163,12 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     }
   }
 
-  const rentDue = item.dues ?? 0;
-  // Only show deposit field if we have evidence deposit is being tracked in DB
-  // (deposit_paid > 0 means at least one deposit payment was recorded)
+  // Once fullDues loads, separate rent from deposit:
+  // item.dues bundles rent+deposit remaining; subtract deposit_due to get rent-only portion
   const depositDue = (fullDues && fullDues.deposit_paid > 0) ? fullDues.deposit_due : 0;
+  const rentDue = fullDues
+    ? Math.max(0, (fullDues.dues ?? item.dues ?? 0) - depositDue)
+    : (item.dues ?? 0);
   const totalCollect = (parseFloat(rentAmt) || 0) + (parseFloat(depositAmt) || 0);
 
   return (

@@ -234,7 +234,8 @@ async def get_tenant_dues(
 
     deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
     deposit_paid = float(deposit_paid_result) if deposit_paid_result else 0.0
-    deposit_due = max(0.0, deposit_agreed - deposit_paid)
+    # booking_amount (advance) counts against deposit — subtract it so we don't double-charge
+    deposit_due = max(0.0, deposit_agreed - booking_amount - deposit_paid)
 
     return {
         "tenancy_id": tenancy.id,
