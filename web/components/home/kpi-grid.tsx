@@ -116,16 +116,20 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [amount, setAmount] = useState(String(item.dues ?? ""));
-  const [method, setMethod] = useState<PayMethod>("CASH");
+  const [rentAmt, setRentAmt] = useState(String(item.dues ?? ""));
+  const [depositAmt, setDepositAmt] = useState("");
+  const [rentMethod, setRentMethod] = useState<PayMethod>("CASH");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [tenantId, setTenantId] = useState<number | null>(null);
+  const [fullDues, setFullDues] = useState<import("@/lib/api").TenantDues | null>(null);
 
   useEffect(() => {
     if (!item.tenancy_id) return;
-    getTenantDues(item.tenancy_id).then((d) => setTenantId(d.tenant_id)).catch(() => {});
+    getTenantDues(item.tenancy_id).then((d) => {
+      setFullDues(d);
+      if (d.deposit_due > 0) setDepositAmt(String(d.deposit_due));
+    }).catch(() => {});
   }, [item.tenancy_id]);
 
   function currentMonth() {
@@ -135,13 +139,18 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!tenantId) { setError("Could not load tenant info — try again"); return; }
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { setError("Enter a valid amount"); return; }
-    setSaving(true);
-    setError("");
+    if (!fullDues) { setError("Could not load tenant info — try again"); return; }
+    const ra = parseFloat(rentAmt) || 0;
+    const da = parseFloat(depositAmt) || 0;
+    if (ra <= 0 && da <= 0) { setError("Enter at least one amount"); return; }
+    setSaving(true); setError("");
     try {
-      await createPayment({ tenant_id: tenantId, amount: amt, method, for_type: "rent", period_month: currentMonth() });
+      if (ra > 0) {
+        await createPayment({ tenant_id: fullDues.tenant_id, amount: ra, method: rentMethod, for_type: "rent", period_month: currentMonth() });
+      }
+      if (da > 0) {
+        await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: "UPI", for_type: "deposit", period_month: currentMonth() });
+      }
       setSuccess(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
     } catch (err) {
@@ -151,15 +160,17 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     }
   }
 
+  const rentDue = item.dues ?? 0;
+  const depositDue = fullDues?.deposit_due ?? 0;
+  const totalCollect = (parseFloat(rentAmt) || 0) + (parseFloat(depositAmt) || 0);
+
   return (
-    <div className="fixed inset-0 flex items-end justify-center px-0" style={{ zIndex: 9999 }} onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }} onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
       <div
-        className="relative w-full max-w-lg bg-surface rounded-t-2xl px-5 pt-5 pb-8 shadow-xl"
+        className="relative w-full max-w-sm bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Handle bar */}
-        <div className="w-10 h-1 rounded-full bg-[#E0DDD8] mx-auto mb-4" />
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-base font-extrabold text-ink">Collect payment</p>
@@ -177,45 +188,57 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
             {error && (
               <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-3 py-2 text-xs text-status-warn font-medium">{error}</div>
             )}
-            {/* Amount */}
-            <div>
-              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Amount (₹)</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min="1"
-                className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
-                autoFocus
-              />
-              {item.dues && item.dues > 0 && (
-                <p className="text-[10px] text-ink-muted mt-1">Dues: <span className="text-status-due font-semibold">{rupee(item.dues)}</span></p>
-              )}
-            </div>
-            {/* Method */}
-            <div>
-              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-2">Method</label>
-              <div className="flex gap-2">
-                {COLLECT_METHODS.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setMethod(m.value)}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${
-                      method === m.value ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
+
+            {/* Rent dues field — always shown */}
+            {rentDue > 0 && (
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
+                  Rent dues (₹) · <span className="text-status-due">{rupee(rentDue)} outstanding</span>
+                </label>
+                <input
+                  type="number"
+                  value={rentAmt}
+                  onChange={(e) => setRentAmt(e.target.value)}
+                  min="0"
+                  className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                  autoFocus
+                />
+                <div className="flex gap-1.5 mt-1.5">
+                  {COLLECT_METHODS.map((m) => (
+                    <button key={m.value} type="button" onClick={() => setRentMethod(m.value)}
+                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${
+                        rentMethod === m.value ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                      }`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Deposit dues field — only shown if unpaid deposit exists */}
+            {depositDue > 0 && (
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
+                  Deposit (₹) · <span className="text-status-due">{rupee(depositDue)} unpaid</span>
+                </label>
+                <input
+                  type="number"
+                  value={depositAmt}
+                  onChange={(e) => setDepositAmt(e.target.value)}
+                  min="0"
+                  className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                />
+                <p className="text-[10px] text-[#00AEED] font-bold mt-1">Always recorded as UPI</p>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={saving || !tenantId}
+              disabled={saving || !fullDues}
               className="w-full rounded-pill bg-brand-pink py-3 text-sm font-bold text-white active:opacity-70 disabled:opacity-50"
             >
-              {saving ? "Saving…" : `Collect ${amount ? rupee(parseFloat(amount) || 0) : ""}`}
+              {saving ? "Saving…" : totalCollect > 0 ? `Collect ${rupee(totalCollect)}` : "Collect"}
             </button>
           </form>
         )}

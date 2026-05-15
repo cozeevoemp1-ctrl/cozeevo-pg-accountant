@@ -224,6 +224,17 @@ async def get_tenant_dues(
             .order_by(Payment.payment_date.desc())
             .limit(1)
         )
+        deposit_paid_result = await session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.tenancy_id == tenancy_id,
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.deposit,
+            )
+        )
+
+    deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
+    deposit_paid = float(deposit_paid_result) if deposit_paid_result else 0.0
+    deposit_due = max(0.0, deposit_agreed - deposit_paid)
 
     return {
         "tenancy_id": tenancy.id,
@@ -240,6 +251,8 @@ async def get_tenant_dues(
         "booking_amount": booking_amount,
         "dues": dues,
         "credit": credit,
+        "deposit_due": deposit_due,
+        "deposit_paid": deposit_paid,
         "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
         "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
         "maintenance_fee": float(tenancy.maintenance_fee) if tenancy.maintenance_fee is not None else 0.0,

@@ -190,6 +190,8 @@ export interface TenantDues {
   booking_amount: number;
   dues: number;
   credit: number;
+  deposit_due: number;
+  deposit_paid: number;
   checkin_date: string | null;
   security_deposit: number;
   maintenance_fee: number;
