@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { updateBookingSession, cancelBookingSession } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
@@ -261,13 +261,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [collectRentDues, setCollectRentDues] = useState("")
   const [rentDuesMode, setRentDuesMode] = useState<"cash" | "upi">("cash")
   const [collectDepositDues, setCollectDepositDues] = useState("")
+  const [totalDues, setTotalDues] = useState(0)  // frozen at first pre-fill, never changes
+  const prefillDone = useRef(false)
 
-  // Pre-fill outstanding dues for form-filled bookings
+  // Pre-fill outstanding dues once on mount — never overwrites user edits
   useEffect(() => {
-    if (b.status !== "pending_review") return
+    if (prefillDone.current || b.status !== "pending_review") return
 
     if (b.tenancy_id) {
-      // Tenancy exists — fetch live dues from DB
       supabase().auth.getSession().then(({ data }) => {
         const token = data.session?.access_token
         if (!token) return
@@ -278,20 +279,25 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           .then((d) => {
             if (!d) return
             const outstanding = Math.max(0, (d.rent_due ?? 0) - (d.paid_amount ?? 0) + (d.adjustment ?? 0))
+            const depDue = (d.deposit_paid > 0 && d.deposit_due > 0) ? d.deposit_due : 0
             if (outstanding > 0) setCollectRentDues(String(outstanding))
-            if (d.deposit_paid > 0 && d.deposit_due > 0) setCollectDepositDues(String(d.deposit_due))
+            if (depDue > 0) setCollectDepositDues(String(depDue))
+            setTotalDues(outstanding + depDue)
+            prefillDone.current = true
           })
           .catch(() => {})
       })
     } else {
-      // No tenancy yet — calculate expected dues from booking form data
-      // Advance (booking_amount) is deducted from deposit, not rent
+      // Advance (booking_amount) deducted from deposit, not rent
       const rentDue = proRata
       const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
       if (rentDue > 0) setCollectRentDues(String(rentDue))
       if (depositDue > 0) setCollectDepositDues(String(depositDue))
+      setTotalDues(rentDue + depositDue)
+      prefillDone.current = true
     }
-  }, [b.tenancy_id, b.status, proRata, b.booking_amount, b.security_deposit])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function saveEdit() {
     setSaving(true); setErr("")
@@ -508,11 +514,18 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             const rd = parseFloat(collectRentDues) || 0
             const dd = parseFloat(collectDepositDues) || 0
             const total = rd + dd
-            const hasCash = rd > 0 && rentDuesMode === "cash"
             return (
-              <div className="flex items-baseline justify-between">
-                <p className="text-[9px] text-ink-muted uppercase tracking-wide font-semibold">Total collecting</p>
-                <p className="text-xs font-bold text-ink">₹{total.toLocaleString("en-IN")}</p>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-[9px] text-ink-muted uppercase tracking-wide font-semibold">Total collecting</p>
+                  <p className="text-xs font-bold text-ink">₹{total.toLocaleString("en-IN")}</p>
+                </div>
+                {totalDues > 0 && (
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-[9px] text-ink-muted uppercase tracking-wide font-semibold">Total dues</p>
+                    <p className="text-[9px] text-ink-muted font-semibold">₹{totalDues.toLocaleString("en-IN")}</p>
+                  </div>
+                )}
               </div>
             )
           })()}
