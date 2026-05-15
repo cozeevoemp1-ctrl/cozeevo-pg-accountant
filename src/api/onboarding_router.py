@@ -1165,15 +1165,13 @@ class ApproveRequest(BaseModel):
     entry_source: str = "onboarding_form"  # "onboarding_form" | "physical_form"
     instant_checkin: bool = False  # True → force status=active even if checkin_date is future
     # Payments collected at check-in (recorded as Payment rows immediately)
-    collected_rent: float = 0      # first-month rent received (usually pro-rata)
-    collected_deposit: float = 0   # security deposit received
-    collected_advance: float = 0   # any advance/token payment received
-    collected_dues: float = 0      # additional amount collected against outstanding dues
-    rent_mode: str = "cash"        # "cash" | "upi" per field
-    deposit_mode: str = "cash"
-    advance_mode: str = "cash"
-    dues_mode: str = "cash"
-    # legacy single-mode field — kept for backward compat; per-field modes take precedence
+    # Deposit: receptionist enters amount; always recorded as UPI
+    collected_deposit: float = 0
+    # Against dues — split into rent portion (cash/upi selectable) and deposit portion (always UPI)
+    collected_rent_dues: float = 0
+    rent_dues_mode: str = "cash"   # "cash" | "upi"
+    collected_deposit_dues: float = 0   # always UPI
+    # legacy single-mode field — kept for backward compat
     checkin_payment_mode: str = "cash"
     # Optional receptionist overrides — any field name in this dict replaces
     # the tenant-submitted value. Editable from the admin review screen.
@@ -1565,33 +1563,26 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             def _ci_mode(field_mode: str) -> PaymentMode:
                 return PaymentMode.upi if field_mode == "upi" else PaymentMode.cash
 
-            if req and req.collected_rent > 0:
-                session.add(Payment(
-                    tenancy_id=tenancy.id, amount=req.collected_rent,
-                    payment_date=checkin, payment_mode=_ci_mode(req.rent_mode),
-                    for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
-                    notes=f"Collected at check-in ({req.rent_mode})",
-                ))
             if req and req.collected_deposit > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_deposit,
-                    payment_date=checkin, payment_mode=_ci_mode(req.deposit_mode),
+                    payment_date=checkin, payment_mode=PaymentMode.upi,
                     for_type=PaymentFor.deposit,
-                    notes=f"Security deposit collected at check-in ({req.deposit_mode})",
+                    notes="Security deposit collected at check-in (upi)",
                 ))
-            if req and req.collected_advance > 0:
+            if req and req.collected_rent_dues > 0:
                 session.add(Payment(
-                    tenancy_id=tenancy.id, amount=req.collected_advance,
-                    payment_date=checkin, payment_mode=_ci_mode(req.advance_mode),
-                    for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
-                    notes=f"Advance collected at check-in ({req.advance_mode})",
-                ))
-            if req and req.collected_dues > 0:
-                session.add(Payment(
-                    tenancy_id=tenancy.id, amount=req.collected_dues,
-                    payment_date=checkin, payment_mode=_ci_mode(req.dues_mode),
+                    tenancy_id=tenancy.id, amount=req.collected_rent_dues,
+                    payment_date=checkin, payment_mode=_ci_mode(req.rent_dues_mode),
                     for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
-                    notes=f"Dues collected at check-in ({req.dues_mode})",
+                    notes=f"Rent dues collected at check-in ({req.rent_dues_mode})",
+                ))
+            if req and req.collected_deposit_dues > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.collected_deposit_dues,
+                    payment_date=checkin, payment_mode=PaymentMode.upi,
+                    for_type=PaymentFor.deposit,
+                    notes="Deposit dues collected at check-in (upi)",
                 ))
 
             obs.status = "approved"

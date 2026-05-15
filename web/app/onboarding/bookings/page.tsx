@@ -95,14 +95,10 @@ export default function BookingsPage() {
   useEffect(() => { load() }, [load])
 
   async function saveAndCheckin(token: string, collection?: {
-    collected_rent: number
     collected_deposit: number
-    collected_advance: number
-    collected_dues: number
-    rent_mode: string
-    deposit_mode: string
-    advance_mode: string
-    dues_mode: string
+    collected_rent_dues: number
+    rent_dues_mode: string
+    collected_deposit_dues: number
   }) {
     if (!confirm("Save details and check in this tenant now? Their status will become Active.")) return
     setCheckingIn(token)
@@ -238,7 +234,7 @@ function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cas
 function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   b: Booking
   checkingIn: string | null
-  onCheckin: (token: string, collection?: { collected_rent: number; collected_deposit: number; collected_advance: number; collected_dues: number; rent_mode: string; deposit_mode: string; advance_mode: string; dues_mode: string }) => void
+  onCheckin: (token: string, collection?: { collected_deposit: number; collected_rent_dues: number; rent_dues_mode: string; collected_deposit_dues: number }) => void
   onReload: () => void
 }) {
   const isPending = b.status === "pending_tenant"
@@ -263,14 +259,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
   // Collection at check-in
   const proRata = b.agreed_rent && b.checkin_date ? proratedRent(b.agreed_rent, b.checkin_date) : 0
-  const [collectRent, setCollectRent] = useState(String(proRata || ""))
   const [collectDeposit, setCollectDeposit] = useState(String(b.security_deposit || ""))
-  const [collectAdvance, setCollectAdvance] = useState(String(b.booking_amount || ""))
-  const [collectDues, setCollectDues] = useState("")
-  const [rentMode, setRentMode] = useState<"cash" | "upi">("cash")
-  const [depositMode, setDepositMode] = useState<"cash" | "upi">("cash")
-  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("cash")
-  const [duesMode, setDuesMode] = useState<"cash" | "upi">("cash")
+  const [collectRentDues, setCollectRentDues] = useState("")
+  const [rentDuesMode, setRentDuesMode] = useState<"cash" | "upi">("cash")
+  const [collectDepositDues, setCollectDepositDues] = useState("")
 
   // Pre-fill outstanding dues for form-filled bookings
   useEffect(() => {
@@ -285,7 +277,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         .then((d) => {
           if (!d) return
           const outstanding = Math.max(0, (d.rent_due ?? 0) - (d.paid_amount ?? 0) + (d.adjustment ?? 0))
-          if (outstanding > 0) setCollectDues(String(outstanding))
+          if (outstanding > 0) setCollectRentDues(String(outstanding))
         })
         .catch(() => {})
     })
@@ -452,76 +444,70 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       {!editing && !isPending && !isExpired && (
         <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
+
+          {/* Reference info — display only */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+              <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">1st Month Rent</p>
+              <p className="text-xs font-bold text-ink mt-0.5">
+                {proRata ? `₹${proRata.toLocaleString("en-IN")}` : "—"}
+              </p>
+              <p className="text-[9px] text-ink-muted">Reference only</p>
+            </div>
+            <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+              <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Advance Paid</p>
+              <p className="text-xs font-bold text-ink mt-0.5">
+                {b.booking_amount ? `₹${b.booking_amount.toLocaleString("en-IN")}` : "—"}
+              </p>
+              <p className="text-[9px] text-ink-muted">Auto-recorded · UPI</p>
+            </div>
+          </div>
+
+          {/* Deposit — user enters amount, always UPI */}
+          <div>
+            <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
+            <input type="number" value={collectDeposit} onChange={(e) => setCollectDeposit(e.target.value)}
+              className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+            />
+            <div className="flex items-center justify-between mt-0.5">
+              <p className="text-[9px] text-ink-muted">Agreed: ₹{(b.security_deposit || 0).toLocaleString("en-IN")}</p>
+              <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30">UPI</span>
+            </div>
+          </div>
+
+          {/* Against dues — split into rent (selectable mode) + deposit (always UPI) */}
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Against dues</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
+                <input type="number" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
+                  className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                />
+                <ModeToggle mode={rentDuesMode} setMode={setRentDuesMode} />
+              </div>
+              <div>
+                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
+                <input type="number" value={collectDepositDues} onChange={(e) => setCollectDepositDues(e.target.value)}
+                  className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                />
+                <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Collection summary */}
           {(() => {
-            const rent = parseFloat(collectRent) || 0
             const dep = parseFloat(collectDeposit) || 0
-            const adv = parseFloat(collectAdvance) || 0
-            const dues = parseFloat(collectDues) || 0
-            const due = (proRata + (b.security_deposit || 0)) - adv
-            const totalCollected = rent + dep + adv + dues
+            const rd = parseFloat(collectRentDues) || 0
+            const dd = parseFloat(collectDepositDues) || 0
+            const total = dep + rd + dd
+            if (total <= 0) return null
+            const hasCash = rd > 0 && rentDuesMode === "cash"
             return (
-              <>
-                {/* 1st Month Rent — full width */}
-                <div>
-                  <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">1st Month Rent (₹)</label>
-                  <input type="number" value={collectRent} onChange={(e) => setCollectRent(e.target.value)}
-                    className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-                  />
-                  <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-[9px] text-ink-muted">Pro-rata: ₹{proRata.toLocaleString("en-IN")}</p>
-                    <ModeToggle mode={rentMode} setMode={setRentMode} />
-                  </div>
-                </div>
-                {/* Deposit + Advance — 2 columns */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
-                    <input type="number" value={collectDeposit} onChange={(e) => setCollectDeposit(e.target.value)}
-                      className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-                    />
-                    <div className="flex items-center justify-between mt-0.5">
-                      <p className="text-[9px] text-ink-muted">₹{(b.security_deposit || 0).toLocaleString("en-IN")}</p>
-                      <ModeToggle mode={depositMode} setMode={setDepositMode} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Advance paid (₹)</label>
-                    <input type="number" value={collectAdvance} onChange={(e) => setCollectAdvance(e.target.value)}
-                      className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-                    />
-                    <div className="flex items-center justify-between mt-0.5">
-                      <p className="text-[9px] text-ink-muted">Token amount</p>
-                      <ModeToggle mode={advanceMode} setMode={setAdvanceMode} />
-                    </div>
-                  </div>
-                </div>
-                {/* Against dues — full width */}
-                <div>
-                  <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Against dues (₹)</label>
-                  <input type="number" value={collectDues} onChange={(e) => setCollectDues(e.target.value)}
-                    className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-                  />
-                  <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-[9px] text-ink-muted">Outstanding dues</p>
-                    <ModeToggle mode={duesMode} setMode={setDuesMode} />
-                  </div>
-                </div>
-                {/* Due summary */}
-                <div className="flex justify-between items-center bg-[#F6F5F0] rounded-tile px-3 py-2">
-                  <div>
-                    <p className="text-[9px] text-ink-muted font-semibold uppercase">Due at check-in</p>
-                    <p className="text-[9px] text-ink-muted">Pro-rata + deposit − advance</p>
-                  </div>
-                  <p className={`text-sm font-extrabold ${due <= 0 ? "text-status-paid" : "text-status-due"}`}>
-                    ₹{Math.max(due, 0).toLocaleString("en-IN")}
-                  </p>
-                </div>
-                {totalCollected > 0 && (
-                  <p className="text-[9px] text-ink-muted text-right">
-                    Recording ₹{totalCollected.toLocaleString("en-IN")} across {new Set([rentMode, depositMode, advanceMode, duesMode]).size > 1 ? "Cash + UPI" : rentMode.toUpperCase()}
-                  </p>
-                )}
-              </>
+              <p className="text-[9px] text-ink-muted text-right">
+                Recording ₹{total.toLocaleString("en-IN")} · {hasCash ? "Cash + UPI" : "UPI"}
+              </p>
             )
           })()}
         </div>
@@ -600,14 +586,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               )}
               <button
                 onClick={() => onCheckin(b.token, {
-                  collected_rent: parseFloat(collectRent) || 0,
                   collected_deposit: parseFloat(collectDeposit) || 0,
-                  collected_advance: parseFloat(collectAdvance) || 0,
-                  collected_dues: parseFloat(collectDues) || 0,
-                  rent_mode: rentMode,
-                  deposit_mode: depositMode,
-                  advance_mode: advanceMode,
-                  dues_mode: duesMode,
+                  collected_rent_dues: parseFloat(collectRentDues) || 0,
+                  rent_dues_mode: rentDuesMode,
+                  collected_deposit_dues: parseFloat(collectDepositDues) || 0,
                 })}
                 disabled={checkingIn === b.token}
                 className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
