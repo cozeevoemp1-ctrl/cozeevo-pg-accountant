@@ -285,8 +285,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       })
     } else {
       // No tenancy yet — calculate expected dues from booking form data
-      const rentDue = Math.max(0, proRata - (b.booking_amount || 0))
-      const depositDue = b.security_deposit || 0
+      // Advance (booking_amount) is deducted from deposit, not rent
+      const rentDue = proRata
+      const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
       if (rentDue > 0) setCollectRentDues(String(rentDue))
       if (depositDue > 0) setCollectDepositDues(String(depositDue))
     }
