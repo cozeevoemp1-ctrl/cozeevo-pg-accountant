@@ -583,6 +583,8 @@ class UpdateSessionRequest(BaseModel):
     room_number: Optional[str] = None
     maintenance_fee: Optional[float] = None
     security_deposit: Optional[float] = None
+    booking_amount: Optional[float] = None  # advance / token payment
+    advance_mode: Optional[str] = None      # "cash" | "upi"
     tenant_phone: Optional[str] = None
     tenant_name: Optional[str] = None
 
@@ -612,6 +614,10 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
             obs.maintenance_fee = Decimal(str(req.maintenance_fee))
         if req.security_deposit is not None:
             obs.security_deposit = Decimal(str(req.security_deposit))
+        if req.booking_amount is not None:
+            obs.booking_amount = Decimal(str(req.booking_amount))
+        if req.advance_mode is not None:
+            obs.advance_mode = req.advance_mode
         if req.tenant_phone is not None:
             digits = _re.sub(r"\D", "", req.tenant_phone)
             if len(digits) < 10:
