@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.79] — 2026-05-15 — Bookings check-in UX overhaul + dues calculation fixes
+
+### Bookings page — check-in collection form (`web/app/onboarding/bookings/page.tsx`)
+- Removed auto-payment creation for `obs.booking_amount` and `obs.security_deposit` — these are reference-only agreed amounts, not collected at check-in
+- Reference tiles renamed to **Agreed Terms** section (1st Month Rent, Advance Paid, Deposit — display only)
+- Input section renamed to **Collected at Check-in** (Rent + Deposit fields with CASH/UPI toggle)
+- Advance (booking_amount) now deducted from deposit pre-fill, not rent: `deposit_prefill = security_deposit − booking_amount`
+- Frozen **Total dues** line shows original calculated amount; **Total collecting** updates dynamically as fields are typed
+- Pre-fill runs once on mount via `useRef` guard — user edits never overwritten by re-renders
+- Pre-fill from booking data when no tenancy yet (before check-in); from live dues API when tenancy exists
+- iOS scroll fix: `overflow-y-auto + WebkitOverflowScrolling: touch` on page container
+
+### Dues modal (`web/components/home/kpi-grid.tsx`)
+- **Rent field** now shows rent-only portion: `total_dues − deposit_due` (was showing bundled total)
+- **Deposit field** pre-fill corrected: uses `fullDues` with proper `booking_amount` deduction
+- Input amounts updated when `fullDues` loads so fields match actual remaining
+
+### Backend dues endpoint (`src/api/v2/tenants.py`)
+- `deposit_due = max(0, security_deposit − booking_amount − deposit_paid)` — advance now correctly deducted from deposit outstanding
+
+### Data ops (Pratham S Kore test resets)
+- Cancelled tenancy 1102 (no_show → cancelled) to clear room 420 overlap during re-test
+- Cancelled tenancy 1103 + voided payments 15968/15969 after final test; session reset to pending_review
+
 ## [1.75.78] — 2026-05-15 — Bookings check-in collection + notices fix + data ops
 
 ### Bookings: collected-at-check-in payments (`web/app/onboarding/bookings/page.tsx`, `src/api/onboarding_router.py`)

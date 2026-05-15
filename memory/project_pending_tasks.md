@@ -40,6 +40,10 @@ type: project
 7. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
 8. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row. (Backend done; PWA UI done on edit-tenant page — may already be complete, verify.)
 
+### Bookings check-in — remaining
+9. **Pratham S Kore** — still in `pending_review`, pending final check-in test. Session token `f0e7fc81`. Room 420, 19 May 2026, rent ₹13,500, advance ₹2,000, deposit ₹13,500.
+10. **"Auto-recorded · UPI" label on Agreed Terms tiles** — misleading (nothing auto-recorded). Should say "Reference only" for both Advance Paid and Deposit tiles. Low priority.
+
 ### Completed this session (2026-05-06 — blacklist + reminders pause)
 - ✅ **Blacklist system** — DB table, service layer, REST API, onboarding guard, bot commands (add/show/remove with disambiguation), 28/28 E2E tests passing.
 - ✅ **Prem Prasana blacklisted** — "Do not admit — flagged by owner."
