@@ -52,22 +52,32 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
         )).all()
         room_active_counts: dict[int, int] = {r.room_id: r.cnt for r in room_active_rows}
 
-        # Count notices per room
+        # Count notices per room + track each tenancy's expected_checkout
         room_notice_counts: dict[int, int] = defaultdict(int)
+        tenancy_expected: dict[int, date] = {}
+        room_notice_checkouts: dict[int, list[date]] = defaultdict(list)
         for tenancy, tenant, room in notice_rows:
             room_notice_counts[room.id] += 1
+            ec = tenancy.expected_checkout or calc_notice_last_day(tenancy.notice_date)
+            tenancy_expected[tenancy.id] = ec
+            room_notice_checkouts[room.id].append(ec)
 
         results = []
         for tenancy, tenant, room in notice_rows:
             nd = tenancy.notice_date
-            expected_checkout = tenancy.expected_checkout or calc_notice_last_day(nd)
+            expected_checkout = tenancy_expected[tenancy.id]
             days_remaining = (expected_checkout - today).days
 
             is_premium = tenancy.sharing_type is not None and tenancy.sharing_type.value == "premium"
             beds_freed = room.max_occupancy if is_premium else 1
             room_active_count = room_active_counts.get(room.id, 0)
             room_notice_count = room_notice_counts[room.id]
-            is_full_exit = room_notice_count >= room_active_count > 0
+            # Full exit = all active tenants have notice AND this is the last one out
+            room_max_checkout = max(room_notice_checkouts[room.id])
+            is_full_exit = (
+                room_notice_count >= room_active_count > 0
+                and expected_checkout >= room_max_checkout
+            )
 
             results.append({
                 "tenancy_id":         tenancy.id,
