@@ -22,6 +22,7 @@ interface Booking {
   agreed_rent?: number
   maintenance_fee?: number
   security_deposit?: number
+  booking_amount?: number
   is_qr?: boolean
 }
 
@@ -85,7 +86,13 @@ export default function BookingsPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function saveAndCheckin(token: string) {
+  async function saveAndCheckin(token: string, collection?: {
+    collected_rent: number
+    collected_deposit: number
+    collected_advance: number
+    collected_dues: number
+    checkin_payment_mode: string
+  }) {
     if (!confirm("Save details and check in this tenant now? Their status will become Active.")) return
     setCheckingIn(token)
     setError("")
@@ -93,7 +100,10 @@ export default function BookingsPage() {
       const res = await fetch(`${API_URL}/api/onboarding/${token}/approve`, {
         method: "POST",
         headers: pinHeaders(),
-        body: JSON.stringify({ instant_checkin: true, approved_by_phone: "", overrides: {} }),
+        body: JSON.stringify({
+          instant_checkin: true, approved_by_phone: "", overrides: {},
+          ...(collection ?? {}),
+        }),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -185,7 +195,7 @@ export default function BookingsPage() {
 function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   b: Booking
   checkingIn: string | null
-  onCheckin: (token: string) => void
+  onCheckin: (token: string, collection?: { collected_rent: number; collected_deposit: number; collected_advance: number; collected_dues: number; checkin_payment_mode: string }) => void
   onReload: () => void
 }) {
   const isPending = b.status === "pending_tenant"
@@ -205,6 +215,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [editDeposit, setEditDeposit] = useState(String(b.security_deposit || b.agreed_rent || ""))
   const [editPhone, setEditPhone] = useState(b.tenant_phone || "")
   const [editName, setEditName] = useState(b.tenant_name || "")
+
+  // Collection at check-in
+  const proRata = b.agreed_rent && b.checkin_date ? proratedRent(b.agreed_rent, b.checkin_date) : 0
+  const [collectRent, setCollectRent] = useState(String(proRata || ""))
+  const [collectDeposit, setCollectDeposit] = useState(String(b.security_deposit || ""))
+  const [collectAdvance, setCollectAdvance] = useState(String(b.booking_amount || ""))
+  const [collectDues, setCollectDues] = useState("")
+  const [collectMode, setCollectMode] = useState<"cash" | "upi">("cash")
 
   async function saveEdit() {
     setSaving(true); setErr("")
@@ -326,6 +344,66 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         </div>
       )}
 
+      {/* Collection at check-in (only for form-filled cards) */}
+      {!editing && !isPending && (
+        <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
+          <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
+          {(() => {
+            const rent = parseFloat(collectRent) || 0
+            const dep = parseFloat(collectDeposit) || 0
+            const adv = parseFloat(collectAdvance) || 0
+            const total = rent + dep + adv
+            const due = (proRata + (b.security_deposit || 0)) - adv
+            const dues = parseFloat(collectDues) || 0
+            const totalCollected = rent + dep + adv + dues
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: "1st Month Rent (₹)", val: collectRent, set: setCollectRent, hint: `Pro-rata: ₹${proRata.toLocaleString("en-IN")}`, full: true },
+                    { label: "Deposit (₹)", val: collectDeposit, set: setCollectDeposit, hint: `Agreed: ₹${(b.security_deposit || 0).toLocaleString("en-IN")}`, full: false },
+                    { label: "Advance paid (₹)", val: collectAdvance, set: setCollectAdvance, hint: "Token / booking amount", full: false },
+                    { label: "Against dues (₹)", val: collectDues, set: setCollectDues, hint: "Outstanding dues collected", full: false },
+                  ].map(({ label, val, set, hint, full }) => (
+                    <div key={label} className={full ? "col-span-2" : ""}>
+                      <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
+                      <input type="number" value={val} onChange={(e) => set(e.target.value)}
+                        className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                      />
+                      <p className="text-[9px] text-ink-muted mt-0.5">{hint}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Payment mode */}
+                <div className="flex gap-2">
+                  {(["cash", "upi"] as const).map((m) => (
+                    <button key={m} onClick={() => setCollectMode(m)}
+                      className={`flex-1 py-1.5 rounded-pill text-xs font-semibold border ${collectMode === m ? "bg-brand-pink text-white border-brand-pink" : "border-[#E2DEDD] text-ink-muted"}`}>
+                      {m.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                {/* Due summary */}
+                <div className="flex justify-between items-center bg-[#F6F5F0] rounded-tile px-3 py-2">
+                  <div>
+                    <p className="text-[9px] text-ink-muted font-semibold uppercase">Due at check-in</p>
+                    <p className="text-[9px] text-ink-muted">Pro-rata + deposit − advance</p>
+                  </div>
+                  <p className={`text-sm font-extrabold ${due <= 0 ? "text-status-paid" : "text-status-due"}`}>
+                    ₹{Math.max(due, 0).toLocaleString("en-IN")}
+                  </p>
+                </div>
+                {totalCollected > 0 && (
+                  <p className="text-[9px] text-ink-muted text-right">
+                    Recording ₹{totalCollected.toLocaleString("en-IN")} via {collectMode.toUpperCase()}
+                  </p>
+                )}
+              </>
+            )
+          })()}
+        </div>
+      )}
+
       {/* Action row */}
       {!editing && (
         <div className="flex gap-2 pt-1">
@@ -373,7 +451,13 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                 </button>
               )}
               <button
-                onClick={() => onCheckin(b.token)}
+                onClick={() => onCheckin(b.token, {
+                  collected_rent: parseFloat(collectRent) || 0,
+                  collected_deposit: parseFloat(collectDeposit) || 0,
+                  collected_advance: parseFloat(collectAdvance) || 0,
+                  collected_dues: parseFloat(collectDues) || 0,
+                  checkin_payment_mode: collectMode,
+                })}
                 disabled={checkingIn === b.token}
                 className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
               >

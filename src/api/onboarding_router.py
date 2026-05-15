@@ -1129,6 +1129,12 @@ class ApproveRequest(BaseModel):
     approved_by_phone: str = ""  # phone of the staff member approving
     entry_source: str = "onboarding_form"  # "onboarding_form" | "physical_form"
     instant_checkin: bool = False  # True → force status=active even if checkin_date is future
+    # Payments collected at check-in (recorded as Payment rows immediately)
+    collected_rent: float = 0      # first-month rent received (usually pro-rata)
+    collected_deposit: float = 0   # security deposit received
+    collected_advance: float = 0   # any advance/token payment received
+    collected_dues: float = 0      # additional amount collected against outstanding dues
+    checkin_payment_mode: str = "cash"  # "cash" | "upi"
     # Optional receptionist overrides — any field name in this dict replaces
     # the tenant-submitted value. Editable from the admin review screen.
     # Supported keys (financial): agreed_rent, security_deposit, maintenance_fee,
@@ -1505,7 +1511,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 else:
                     period = date(period.year, period.month + 1, 1)
 
-            # Advance payment
+            # Advance payment (from onboarding session)
             if obs.booking_amount and obs.booking_amount > 0:
                 adv_mode = PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash
                 session.add(Payment(
@@ -1513,6 +1519,37 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     payment_date=checkin, payment_mode=adv_mode,
                     for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
                     notes=f"Booking advance ({obs.advance_mode})",
+                ))
+
+            # Payments collected at check-in (entered by receptionist on the bookings screen)
+            _ci_mode = PaymentMode.upi if (req and req.checkin_payment_mode == "upi") else PaymentMode.cash
+            if req and req.collected_rent > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.collected_rent,
+                    payment_date=checkin, payment_mode=_ci_mode,
+                    for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
+                    notes="Collected at check-in",
+                ))
+            if req and req.collected_deposit > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.collected_deposit,
+                    payment_date=checkin, payment_mode=_ci_mode,
+                    for_type=PaymentFor.deposit,
+                    notes="Security deposit collected at check-in",
+                ))
+            if req and req.collected_advance > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.collected_advance,
+                    payment_date=checkin, payment_mode=_ci_mode,
+                    for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
+                    notes="Advance collected at check-in",
+                ))
+            if req and req.collected_dues > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=req.collected_dues,
+                    payment_date=checkin, payment_mode=_ci_mode,
+                    for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
+                    notes="Dues collected at check-in",
                 ))
 
             obs.status = "approved"
