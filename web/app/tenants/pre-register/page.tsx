@@ -8,36 +8,43 @@ import Link from "next/link";
 
 export default function PreRegisterPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName]             = useState("");
+  const [phone, setPhone]           = useState("");
   const [checkinDate, setCheckinDate] = useState("");
-  const [rent, setRent] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState<{ form_url: string; whatsapp_sent: boolean } | null>(null);
+  const [rent, setRent]             = useState("");
+  const [maintenance, setMaintenance] = useState("5000");
+  const [deposit, setDeposit]       = useState("");
+  const [advance, setAdvance]       = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
+  const [done, setDone]             = useState<{ form_url: string; whatsapp_sent: boolean } | null>(null);
+
+  const rentNum = parseFloat(rent) || 0;
+  const depositNum = deposit ? parseFloat(deposit) : (rentNum || undefined);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!name.trim()) { setError("Name is required"); return; }
-    if (!phone.trim()) { setError("Phone is required"); return; }
-    if (!checkinDate) { setError("Expected move-in date is required"); return; }
+    if (!name.trim())    { setError("Name is required"); return; }
+    if (!phone.trim())   { setError("Phone is required"); return; }
+    if (!checkinDate)    { setError("Expected move-in date is required"); return; }
 
     setLoading(true);
     try {
       const result = await quickBook({
-        room_number: "000",
-        tenant_name: name.trim(),
-        tenant_phone: phone.trim(),
-        checkin_date: checkinDate,
-        stay_type: "monthly",
-        monthly_rent: rent ? parseFloat(rent) : 1,
-        security_deposit: 0,
+        room_number:      "000",
+        tenant_name:      name.trim(),
+        tenant_phone:     phone.trim(),
+        checkin_date:     checkinDate,
+        stay_type:        "monthly",
+        monthly_rent:     rentNum || 1,
+        maintenance_fee:  parseFloat(maintenance) || 5000,
+        security_deposit: depositNum,
+        booking_amount:   parseFloat(advance) || 0,
       });
       setDone(result);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to pre-register";
-      setError(msg);
+      setError(err instanceof Error ? err.message : "Failed to pre-register");
     } finally {
       setLoading(false);
     }
@@ -60,9 +67,7 @@ export default function PreRegisterPage() {
           {!done.whatsapp_sent && (
             <p className="text-xs font-mono break-all text-ink">{done.form_url}</p>
           )}
-          <p className="text-xs text-ink-muted">
-            Appears in Bookings as pending. Assign a room when they check in.
-          </p>
+          <p className="text-xs text-ink-muted">Appears in Bookings as pending. Assign a room when they check in.</p>
           <div className="flex gap-2 mt-2">
             <Link href="/onboarding/bookings" className="flex-1 text-center text-sm font-semibold text-brand-pink py-2 border border-brand-pink rounded-lg">
               View Bookings
@@ -91,8 +96,9 @@ export default function PreRegisterPage() {
           Use this for tenants who confirmed joining but have no room yet. They go into Bookings (Room 000) until you assign them a room on check-in day.
         </p>
         <form onSubmit={submit} className="flex flex-col gap-4">
+
           <div>
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Name *</label>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Customer name *</label>
             <input
               type="text"
               value={name}
@@ -101,36 +107,79 @@ export default function PreRegisterPage() {
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
+
           <div>
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Phone *</label>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">WhatsApp number *</label>
             <input
               type="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
-              placeholder="10-digit mobile number"
+              placeholder="10-digit mobile"
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Expected move-in date *</label>
-            <input
-              type="date"
-              value={checkinDate}
-              onChange={e => setCheckinDate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-pink"
-            />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Check-in date *</label>
+              <input
+                type="date"
+                value={checkinDate}
+                onChange={e => setCheckinDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-pink"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Monthly rent (₹)</label>
+              <input
+                type="number"
+                value={rent}
+                onChange={e => setRent(e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                placeholder="e.g. 12000"
+                min="0"
+                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              />
+            </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Maintenance (₹/mo)</label>
+              <input
+                type="number"
+                value={maintenance}
+                onChange={e => setMaintenance(e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                min="0"
+                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Security deposit (₹)</label>
+              <input
+                type="number"
+                value={deposit}
+                onChange={e => setDeposit(e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                placeholder="Auto = 1 month rent"
+                min="0"
+                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Monthly rent (optional)</label>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Advance collected (₹)</label>
             <input
               type="number"
-              value={rent}
-              onChange={e => setRent(e.target.value)}
-              placeholder="e.g. 8000"
+              value={advance}
+              onChange={e => setAdvance(e.target.value)}
+              onWheel={e => e.currentTarget.blur()}
+              placeholder="0 if none"
               min="0"
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
-            <p className="text-[10px] text-ink-muted mt-1">Can be set when assigning a room later</p>
           </div>
 
           {error && <p className="text-xs text-status-due font-medium">{error}</p>}
@@ -140,7 +189,7 @@ export default function PreRegisterPage() {
             disabled={loading}
             className="w-full py-3 rounded-xl bg-brand-pink text-white text-sm font-bold disabled:opacity-50 active:opacity-80"
           >
-            {loading ? "Registering…" : "Pre-register tenant"}
+            {loading ? "Registering…" : "Book & send WhatsApp link"}
           </button>
         </form>
       </Card>
