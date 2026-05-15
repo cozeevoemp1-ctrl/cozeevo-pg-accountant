@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { updateBookingSession, cancelBookingSession } from "@/lib/api"
+import { supabase } from "@/lib/supabase"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
 const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
@@ -25,6 +26,9 @@ interface Booking {
   booking_amount?: number
   daily_rate?: number
   stay_type?: string
+  tenancy_id?: number
+  expires_at?: string
+  expired_ago?: string
   is_qr?: boolean
 }
 
@@ -66,16 +70,18 @@ export default function BookingsPage() {
       const res = await fetch(`${API_URL}/api/onboarding/admin/pending`, { headers: pinHeaders() })
       if (!res.ok) throw new Error(`Load failed: ${res.status}`)
       const d = await res.json()
-      // Show both pending_tenant (awaiting form) and pending_review (ready to check in)
+      // Show pending_review, pending_tenant (awaiting form), and expired
       const all = (d.sessions as Booking[]).filter(
-        (s) => s.status === "pending_review" || s.status === "pending_tenant"
+        (s) => s.status === "pending_review" || s.status === "pending_tenant" || s.status === "expired"
       )
-      // Sort: check-in today first, then pending_review before pending_tenant, then by date
+      // Sort: check-in today first, then pending_review → pending_tenant → expired, then by date
+      const statusOrder: Record<string, number> = { pending_review: 0, pending_tenant: 1, expired: 2 }
       all.sort((a, b) => {
         const aToday = isToday(a.checkin_date) ? 0 : 1
         const bToday = isToday(b.checkin_date) ? 0 : 1
         if (aToday !== bToday) return aToday - bToday
-        if (a.status !== b.status) return a.status === "pending_review" ? -1 : 1
+        const so = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3)
+        if (so !== 0) return so
         return a.checkin_date.localeCompare(b.checkin_date)
       })
       setBookings(all)
@@ -93,7 +99,10 @@ export default function BookingsPage() {
     collected_deposit: number
     collected_advance: number
     collected_dues: number
-    checkin_payment_mode: string
+    rent_mode: string
+    deposit_mode: string
+    advance_mode: string
+    dues_mode: string
   }) {
     if (!confirm("Save details and check in this tenant now? Their status will become Active.")) return
     setCheckingIn(token)
@@ -121,6 +130,7 @@ export default function BookingsPage() {
 
   const ready = bookings.filter((b) => b.status === "pending_review")
   const awaiting = bookings.filter((b) => b.status === "pending_tenant")
+  const expired = bookings.filter((b) => b.status === "expired")
 
   return (
     <main className="min-h-screen bg-bg">
@@ -187,6 +197,24 @@ export default function BookingsPage() {
                 ))}
               </>
             )}
+
+            {/* Expired — link expired, tenant never filled */}
+            {expired.length > 0 && (
+              <>
+                <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide mt-2">
+                  {expired.length} link expired
+                </p>
+                {expired.map((b) => (
+                  <BookingCard
+                    key={b.token}
+                    b={b}
+                    checkingIn={checkingIn}
+                    onCheckin={saveAndCheckin}
+                    onReload={load}
+                  />
+                ))}
+              </>
+            )}
           </>
         )}
       </div>
@@ -194,19 +222,34 @@ export default function BookingsPage() {
   )
 }
 
+function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cash" | "upi") => void }) {
+  return (
+    <div className="flex gap-1 mt-1">
+      {(["cash", "upi"] as const).map((m) => (
+        <button key={m} onClick={() => setMode(m)}
+          className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${mode === m ? "bg-brand-pink text-white border-brand-pink" : "border-[#E0DDD8] text-ink-muted"}`}>
+          {m.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   b: Booking
   checkingIn: string | null
-  onCheckin: (token: string, collection?: { collected_rent: number; collected_deposit: number; collected_advance: number; collected_dues: number; checkin_payment_mode: string }) => void
+  onCheckin: (token: string, collection?: { collected_rent: number; collected_deposit: number; collected_advance: number; collected_dues: number; rent_mode: string; deposit_mode: string; advance_mode: string; dues_mode: string }) => void
   onReload: () => void
 }) {
   const isPending = b.status === "pending_tenant"
+  const isExpired = b.status === "expired"
   const checkinToday = isToday(b.checkin_date)
 
   const [editing, setEditing] = useState(false)
   const [cancelConfirm, setCancelConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [resending, setResending] = useState(false)
   const [err, setErr] = useState("")
 
   // Edit fields
@@ -224,7 +267,29 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [collectDeposit, setCollectDeposit] = useState(String(b.security_deposit || ""))
   const [collectAdvance, setCollectAdvance] = useState(String(b.booking_amount || ""))
   const [collectDues, setCollectDues] = useState("")
-  const [collectMode, setCollectMode] = useState<"cash" | "upi">("cash")
+  const [rentMode, setRentMode] = useState<"cash" | "upi">("cash")
+  const [depositMode, setDepositMode] = useState<"cash" | "upi">("cash")
+  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("cash")
+  const [duesMode, setDuesMode] = useState<"cash" | "upi">("cash")
+
+  // Pre-fill outstanding dues for form-filled bookings
+  useEffect(() => {
+    if (b.status !== "pending_review" || !b.tenancy_id) return
+    supabase().auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token
+      if (!token) return
+      fetch(`${API_URL}/api/v2/app/tenants/${b.tenancy_id}/dues`, {
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => {
+          if (!d) return
+          const outstanding = Math.max(0, (d.rent_due ?? 0) - (d.paid_amount ?? 0) + (d.adjustment ?? 0))
+          if (outstanding > 0) setCollectDues(String(outstanding))
+        })
+        .catch(() => {})
+    })
+  }, [b.tenancy_id, b.status])
 
   async function saveEdit() {
     setSaving(true); setErr("")
@@ -258,6 +323,24 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
     }
   }
 
+  async function doResend() {
+    setResending(true); setErr("")
+    try {
+      const res = await fetch(`${API_URL}/api/onboarding/admin/${b.token}/resend`, {
+        method: "POST", headers: pinHeaders(),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error((d as { detail?: string }).detail ?? `Error ${res.status}`)
+      }
+      onReload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Resend failed")
+    } finally {
+      setResending(false)
+    }
+  }
+
   return (
     <div className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
       {/* Name + badges */}
@@ -275,7 +358,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           {b.is_qr && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#EDE9FE] text-[#5B21B6]">QR</span>
           )}
-          {isPending ? (
+          {isExpired ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">
+              Link expired{b.expired_ago ? ` · ${b.expired_ago}` : ""}
+            </span>
+          ) : isPending ? (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">Awaiting form</span>
           ) : (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#D1FAE5] text-[#065F46]">Form filled</span>
@@ -362,43 +449,62 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       )}
 
       {/* Collection at check-in (only for form-filled cards) */}
-      {!editing && !isPending && (
+      {!editing && !isPending && !isExpired && (
         <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
           {(() => {
             const rent = parseFloat(collectRent) || 0
             const dep = parseFloat(collectDeposit) || 0
             const adv = parseFloat(collectAdvance) || 0
-            const total = rent + dep + adv
-            const due = (proRata + (b.security_deposit || 0)) - adv
             const dues = parseFloat(collectDues) || 0
+            const due = (proRata + (b.security_deposit || 0)) - adv
             const totalCollected = rent + dep + adv + dues
             return (
               <>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "1st Month Rent (₹)", val: collectRent, set: setCollectRent, hint: `Pro-rata: ₹${proRata.toLocaleString("en-IN")}`, full: true },
-                    { label: "Deposit (₹)", val: collectDeposit, set: setCollectDeposit, hint: `Agreed: ₹${(b.security_deposit || 0).toLocaleString("en-IN")}`, full: false },
-                    { label: "Advance paid (₹)", val: collectAdvance, set: setCollectAdvance, hint: "Token / booking amount", full: false },
-                    { label: "Against dues (₹)", val: collectDues, set: setCollectDues, hint: "Outstanding dues collected", full: false },
-                  ].map(({ label, val, set, hint, full }) => (
-                    <div key={label} className={full ? "col-span-2" : ""}>
-                      <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
-                      <input type="number" value={val} onChange={(e) => set(e.target.value)}
-                        className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-                      />
-                      <p className="text-[9px] text-ink-muted mt-0.5">{hint}</p>
-                    </div>
-                  ))}
+                {/* 1st Month Rent — full width */}
+                <div>
+                  <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">1st Month Rent (₹)</label>
+                  <input type="number" value={collectRent} onChange={(e) => setCollectRent(e.target.value)}
+                    className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                  />
+                  <div className="flex items-center justify-between mt-0.5">
+                    <p className="text-[9px] text-ink-muted">Pro-rata: ₹{proRata.toLocaleString("en-IN")}</p>
+                    <ModeToggle mode={rentMode} setMode={setRentMode} />
+                  </div>
                 </div>
-                {/* Payment mode */}
-                <div className="flex gap-2">
-                  {(["cash", "upi"] as const).map((m) => (
-                    <button key={m} onClick={() => setCollectMode(m)}
-                      className={`flex-1 py-1.5 rounded-pill text-xs font-semibold border ${collectMode === m ? "bg-brand-pink text-white border-brand-pink" : "border-[#E2DEDD] text-ink-muted"}`}>
-                      {m.toUpperCase()}
-                    </button>
-                  ))}
+                {/* Deposit + Advance — 2 columns */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
+                    <input type="number" value={collectDeposit} onChange={(e) => setCollectDeposit(e.target.value)}
+                      className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                    />
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-[9px] text-ink-muted">₹{(b.security_deposit || 0).toLocaleString("en-IN")}</p>
+                      <ModeToggle mode={depositMode} setMode={setDepositMode} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Advance paid (₹)</label>
+                    <input type="number" value={collectAdvance} onChange={(e) => setCollectAdvance(e.target.value)}
+                      className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                    />
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-[9px] text-ink-muted">Token amount</p>
+                      <ModeToggle mode={advanceMode} setMode={setAdvanceMode} />
+                    </div>
+                  </div>
+                </div>
+                {/* Against dues — full width */}
+                <div>
+                  <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Against dues (₹)</label>
+                  <input type="number" value={collectDues} onChange={(e) => setCollectDues(e.target.value)}
+                    className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                  />
+                  <div className="flex items-center justify-between mt-0.5">
+                    <p className="text-[9px] text-ink-muted">Outstanding dues</p>
+                    <ModeToggle mode={duesMode} setMode={setDuesMode} />
+                  </div>
                 </div>
                 {/* Due summary */}
                 <div className="flex justify-between items-center bg-[#F6F5F0] rounded-tile px-3 py-2">
@@ -412,7 +518,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                 </div>
                 {totalCollected > 0 && (
                   <p className="text-[9px] text-ink-muted text-right">
-                    Recording ₹{totalCollected.toLocaleString("en-IN")} via {collectMode.toUpperCase()}
+                    Recording ₹{totalCollected.toLocaleString("en-IN")} across {new Set([rentMode, depositMode, advanceMode, duesMode]).size > 1 ? "Cash + UPI" : rentMode.toUpperCase()}
                   </p>
                 )}
               </>
@@ -423,19 +529,16 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
       {/* Action row */}
       {!editing && (
-        <div className="flex gap-2 pt-1">
-          {isPending ? (
+        <div className="flex gap-2 pt-1 flex-wrap">
+          {isExpired ? (
+            /* Expired: Regenerate & send + Edit + Cancel */
             <>
-              <a
-                href={`${API_URL}/onboard/${b.token}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70"
-              >
-                Copy link →
-              </a>
+              <button onClick={doResend} disabled={resending}
+                className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white disabled:opacity-50">
+                {resending ? "Sending…" : "Regenerate & send →"}
+              </button>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
-                className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED]">
                 Edit
               </button>
               {cancelConfirm ? (
@@ -445,12 +548,40 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
-                  className="px-4 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted active:opacity-70">
+                  className="px-3 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted">
+                  Cancel
+                </button>
+              )}
+            </>
+          ) : isPending ? (
+            /* Awaiting form: Copy link + Resend + Edit + Cancel */
+            <>
+              <a href={`${API_URL}/onboard/${b.token}`} target="_blank" rel="noopener noreferrer"
+                className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70">
+                Copy link →
+              </a>
+              <button onClick={doResend} disabled={resending}
+                className="px-3 rounded-pill border border-brand-pink py-2.5 text-xs font-semibold text-brand-pink disabled:opacity-50">
+                {resending ? "…" : "Resend"}
+              </button>
+              <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
+                className="px-3 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED]">
+                Edit
+              </button>
+              {cancelConfirm ? (
+                <button onClick={doCancel} disabled={cancelling}
+                  className="px-3 rounded-pill bg-[#FEE2E2] py-2.5 text-xs font-bold text-[#991B1B] disabled:opacity-50">
+                  {cancelling ? "…" : "Sure?"}
+                </button>
+              ) : (
+                <button onClick={() => setCancelConfirm(true)}
+                  className="px-3 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted">
                   Cancel
                 </button>
               )}
             </>
           ) : (
+            /* Form filled: Edit + Cancel + Save & Check In */
             <>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
                 className="flex-1 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
@@ -473,7 +604,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                   collected_deposit: parseFloat(collectDeposit) || 0,
                   collected_advance: parseFloat(collectAdvance) || 0,
                   collected_dues: parseFloat(collectDues) || 0,
-                  checkin_payment_mode: collectMode,
+                  rent_mode: rentMode,
+                  deposit_mode: depositMode,
+                  advance_mode: advanceMode,
+                  dues_mode: duesMode,
                 })}
                 disabled={checkingIn === b.token}
                 className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"

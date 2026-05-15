@@ -532,27 +532,44 @@ async def get_session_detail(token: str, request: Request):
 @router.get("/admin/pending")
 async def list_pending(request: Request):
     _check_admin_pin(request)
+    now = datetime.utcnow()
     async with get_session() as session:
         result = await session.execute(
             select(OnboardingSession).where(
-                OnboardingSession.status.in_(["pending_tenant", "pending_review"])
-            ).order_by(OnboardingSession.created_at.desc())
+                OnboardingSession.status.in_(["pending_tenant", "pending_review", "expired"])
+            ).order_by(OnboardingSession.created_at.desc()).limit(100)
         )
         sessions = result.scalars().all()
         items = []
         for obs in sessions:
             room = await session.get(Room, obs.room_id) if obs.room_id else None
+            td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+            # Lazily compute effective status
+            effective_status = obs.status
+            if obs.status == "pending_tenant" and obs.expires_at and obs.expires_at < now:
+                effective_status = "expired"
+            expired_ago = ""
+            if effective_status == "expired" and obs.expires_at:
+                delta = now - obs.expires_at
+                hours = int(delta.total_seconds() // 3600)
+                expired_ago = f"{hours}h ago" if hours < 24 else f"{hours // 24}d ago"
             items.append({
                 "token": obs.token,
-                "status": obs.status,
+                "status": effective_status,
                 "room": room.room_number if room else "",
                 "tenant_phone": obs.tenant_phone,
                 "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
                 "created_at": obs.created_at.isoformat() if obs.created_at else "",
-                "tenant_name": json.loads(obs.tenant_data).get("name", "") if obs.tenant_data else "",
+                "tenant_name": td.get("name", ""),
                 "agreed_rent": float(obs.agreed_rent or 0),
                 "maintenance_fee": float(obs.maintenance_fee or 0),
                 "security_deposit": float(obs.security_deposit or 0),
+                "booking_amount": float(obs.booking_amount or 0),
+                "daily_rate": float(obs.daily_rate or 0) if hasattr(obs, "daily_rate") else 0,
+                "stay_type": obs.stay_type or "monthly",
+                "tenancy_id": obs.tenancy_id,
+                "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
+                "expired_ago": expired_ago,
                 "is_qr": (obs.created_by_phone or "") == "qr_scan",
             })
         return {"sessions": items}
@@ -632,8 +649,20 @@ async def resend_link(token: str, request: Request):
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
             raise HTTPException(404, "Session not found")
-        if obs.status not in ("pending_tenant", "pending_review"):
+
+        is_expired = obs.status == "expired" or (
+            obs.status == "pending_tenant"
+            and obs.expires_at is not None
+            and obs.expires_at < datetime.utcnow()
+        )
+
+        if obs.status not in ("pending_tenant", "pending_review", "expired") and not is_expired:
             raise HTTPException(400, f"Cannot resend — status is {obs.status}")
+
+        # For expired sessions: reset so tenant can fill again
+        if is_expired or obs.status == "expired":
+            obs.status = "pending_tenant"
+            obs.expires_at = datetime.utcnow() + timedelta(hours=48)
 
         base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
         onboard_link = f"{base_url}/onboard/{token}"
@@ -649,9 +678,9 @@ async def resend_link(token: str, request: Request):
             phone_wa,
             f"Reminder from *Cozeevo Co-living*\n\n"
             f"Please complete your registration:\n{onboard_link}\n\n"
-            f"This link is valid for 2 hours."
+            f"This link is valid for 48 hours."
         )
-        return {"status": "sent", "token": token}
+        return {"status": "sent", "token": token, "regenerated": is_expired or obs.status == "expired"}
 
 
 @router.post("/admin/{token}/regen-pdf")
@@ -1134,7 +1163,12 @@ class ApproveRequest(BaseModel):
     collected_deposit: float = 0   # security deposit received
     collected_advance: float = 0   # any advance/token payment received
     collected_dues: float = 0      # additional amount collected against outstanding dues
-    checkin_payment_mode: str = "cash"  # "cash" | "upi"
+    rent_mode: str = "cash"        # "cash" | "upi" per field
+    deposit_mode: str = "cash"
+    advance_mode: str = "cash"
+    dues_mode: str = "cash"
+    # legacy single-mode field — kept for backward compat; per-field modes take precedence
+    checkin_payment_mode: str = "cash"
     # Optional receptionist overrides — any field name in this dict replaces
     # the tenant-submitted value. Editable from the admin review screen.
     # Supported keys (financial): agreed_rent, security_deposit, maintenance_fee,
@@ -1522,34 +1556,36 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 ))
 
             # Payments collected at check-in (entered by receptionist on the bookings screen)
-            _ci_mode = PaymentMode.upi if (req and req.checkin_payment_mode == "upi") else PaymentMode.cash
+            def _ci_mode(field_mode: str) -> PaymentMode:
+                return PaymentMode.upi if field_mode == "upi" else PaymentMode.cash
+
             if req and req.collected_rent > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_rent,
-                    payment_date=checkin, payment_mode=_ci_mode,
+                    payment_date=checkin, payment_mode=_ci_mode(req.rent_mode),
                     for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
-                    notes="Collected at check-in",
+                    notes=f"Collected at check-in ({req.rent_mode})",
                 ))
             if req and req.collected_deposit > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_deposit,
-                    payment_date=checkin, payment_mode=_ci_mode,
+                    payment_date=checkin, payment_mode=_ci_mode(req.deposit_mode),
                     for_type=PaymentFor.deposit,
-                    notes="Security deposit collected at check-in",
+                    notes=f"Security deposit collected at check-in ({req.deposit_mode})",
                 ))
             if req and req.collected_advance > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_advance,
-                    payment_date=checkin, payment_mode=_ci_mode,
+                    payment_date=checkin, payment_mode=_ci_mode(req.advance_mode),
                     for_type=PaymentFor.booking, period_month=checkin.replace(day=1),
-                    notes="Advance collected at check-in",
+                    notes=f"Advance collected at check-in ({req.advance_mode})",
                 ))
             if req and req.collected_dues > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_dues,
-                    payment_date=checkin, payment_mode=_ci_mode,
+                    payment_date=checkin, payment_mode=_ci_mode(req.dues_mode),
                     for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
-                    notes="Dues collected at check-in",
+                    notes=f"Dues collected at check-in ({req.dues_mode})",
                 ))
 
             obs.status = "approved"
