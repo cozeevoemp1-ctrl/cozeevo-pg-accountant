@@ -84,7 +84,7 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
     for tenancy, tenant, room, prop, rent_due, adjustment, paid in rows:
         rd = float(rent_due or tenancy.agreed_rent or 0)
         adj = float(adjustment or 0)
-        dues = math.ceil(max(rd + adj - float(paid), 0.0))
+        dues = math.ceil(max(rd + adj - float(paid), 0.0) / 100) * 100
         result.append({
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,
@@ -216,7 +216,7 @@ async def get_tenant_dues(
     adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
 
     effective_due = rent_due + adjustment
-    dues = math.ceil(max(effective_due - paid, 0.0))
+    dues = math.ceil(max(effective_due - paid, 0.0) / 100) * 100
     credit = max(paid - effective_due, 0.0)
     booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
 
@@ -243,7 +243,7 @@ async def get_tenant_dues(
     deposit_paid = float(deposit_paid_result) if deposit_paid_result else 0.0
     # Advance covers rent first; only the surplus (credit) carries over to deposit
     booking_surplus = max(0.0, booking_amount - effective_due)
-    deposit_due = math.ceil(max(0.0, deposit_agreed - deposit_paid - booking_surplus))
+    deposit_due = math.ceil(max(0.0, deposit_agreed - deposit_paid - booking_surplus) / 100) * 100
 
     return {
         "tenancy_id": tenancy.id,
