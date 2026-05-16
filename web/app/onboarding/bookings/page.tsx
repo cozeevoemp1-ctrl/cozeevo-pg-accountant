@@ -63,6 +63,7 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true)
   const [checkingIn, setCheckingIn] = useState<string | null>(null)
   const [error, setError] = useState("")
+  const [filter, setFilter] = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,9 +124,15 @@ export default function BookingsPage() {
     }
   }
 
-  const ready = bookings.filter((b) => b.status === "pending_review")
-  const awaiting = bookings.filter((b) => b.status === "pending_tenant")
-  const expired = bookings.filter((b) => b.status === "expired")
+  const q = filter.trim().toLowerCase()
+  const match = (b: Booking) =>
+    !q ||
+    (b.tenant_name || "").toLowerCase().includes(q) ||
+    (b.room || "").toLowerCase().includes(q)
+
+  const ready   = bookings.filter((b) => b.status === "pending_review" && match(b))
+  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b))
+  const expired  = bookings.filter((b) => b.status === "expired"        && match(b))
 
   return (
     <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -141,6 +148,14 @@ export default function BookingsPage() {
       </div>
 
       <div className="px-4 pt-4 pb-32 max-w-lg mx-auto flex flex-col gap-3">
+        <input
+          type="search"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          placeholder="Search by name or room…"
+          className="w-full h-[42px] rounded-xl border border-[#E0DDD8] bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+        />
+
         {error && (
           <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-4 py-3 text-xs text-status-warn font-medium">
             {error}
