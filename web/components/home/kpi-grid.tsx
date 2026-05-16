@@ -822,7 +822,7 @@ function ExpansionPanel({
                 } ${selected?.tenancy_id === item.tenancy_id ? "bg-[#FCE2EE]" : ""}`}
               >
                 <button
-                  onClick={() => selectItem(item)}
+                  onClick={() => open === "dues" ? (item.tenancy_id ? onCollect(item) : undefined) : selectItem(item)}
                   disabled={!item.tenancy_id}
                   className={`flex-1 flex justify-between items-center text-left min-w-0 ${item.tenancy_id ? "cursor-pointer" : "cursor-default"}`}
                 >
@@ -917,10 +917,44 @@ function ExpansionPanel({
               </div>
               {/* Inline detail expand — notices tile only */}
               {open === "notices" && selected?.tenancy_id === item.tenancy_id && (
-                <div className="py-2 border-t-0">
+                <div className="pb-3 pt-1">
                   {detailLoading
                     ? <p className="text-xs text-center text-ink-muted py-2">Loading…</p>
-                    : selected && <TenantDetailCard dues={selected} onClose={() => setSelected(null)} />
+                    : selected && (() => {
+                        const totalDue = (selected.dues || 0) + (selected.deposit_due || 0)
+                        return (
+                          <div className="rounded-tile border border-[#F0EDE9] bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-ink-muted">Dues outstanding</span>
+                              <span className={`text-xs font-bold ${totalDue > 0 ? "text-status-due" : "text-status-paid"}`}>
+                                {totalDue > 0 ? rupee(totalDue) : "Clear ✓"}
+                              </span>
+                            </div>
+                            {selected.deposit_due > 0 && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-[11px] text-ink-muted">Deposit due</span>
+                                <span className="text-[11px] font-semibold text-ink-muted">{rupee(selected.deposit_due)}</span>
+                              </div>
+                            )}
+                            <div className="flex gap-2 pt-1">
+                              {totalDue > 0 && (
+                                <Link
+                                  href={`/payment/new?tenancy_id=${selected.tenancy_id}`}
+                                  className="flex-1 text-center rounded-pill bg-brand-pink py-2 text-[11px] font-bold text-white active:opacity-70"
+                                >
+                                  Collect ₹{totalDue.toLocaleString("en-IN")} →
+                                </Link>
+                              )}
+                              <Link
+                                href={`/checkout/new?tenancy_id=${selected.tenancy_id}`}
+                                className={`${totalDue > 0 ? "" : "flex-1"} text-center rounded-pill border border-[#E2DEDD] py-2 px-3 text-[11px] font-bold text-ink active:opacity-70`}
+                              >
+                                Check-out →
+                              </Link>
+                            </div>
+                          </div>
+                        )
+                      })()
                   }
                 </div>
               )}
@@ -937,8 +971,8 @@ function ExpansionPanel({
         )}
       </div>
 
-      {/* Tenant detail card — all tiles except notices (notices uses inline expand) */}
-      {open !== "notices" && (
+      {/* Tenant detail card — tiles that use bottom expand (not notices, not dues) */}
+      {open !== "notices" && open !== "dues" && (
         <div className="px-3 pb-3">
           {detailLoading && (
             <p className="text-xs text-ink-muted text-center pt-2">Loading details…</p>
