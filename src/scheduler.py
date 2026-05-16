@@ -255,7 +255,7 @@ async def _prep_reminder(when: str = "today") -> None:
     Prabhakaran, Lakshmi, and Lokesh (7680814628, receptionist).
     """
     from datetime import timedelta
-    from src.whatsapp.webhook_handler import _send_whatsapp
+    from src.whatsapp.reminder_sender import send_template
 
     today = date.today()
     if when == "tomorrow":
@@ -359,10 +359,14 @@ async def _prep_reminder(when: str = "today") -> None:
             lines.append(f"• Room {rn} — {nm}{ph_part}")
 
     msg = "\n".join(lines)
+    # Recipients: admin / owner / receptionist only — never tenants.
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await _send_whatsapp(phone, msg)
+            ok = await send_template(
+                phone, "general_notice",
+                body_params=[name, msg[:900]],
+            )
             if ok:
                 sent += 1
                 logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
