@@ -26,13 +26,13 @@ export default function PreRegisterPage() {
   const depositNum = parseFloat(depositDisplay) || rentNum || undefined;
 
   function handleDepositChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const val = e.target.value;
-    if (val === "") {
+    setDeposit(e.target.value);
+    setDepositOverridden(true);
+  }
+
+  function handleDepositBlur() {
+    if (deposit === "") {
       setDepositOverridden(false);
-      setDeposit("");
-    } else {
-      setDepositOverridden(true);
-      setDeposit(val);
     }
   }
 
@@ -180,6 +180,7 @@ export default function PreRegisterPage() {
                 type="number"
                 value={depositDisplay}
                 onChange={handleDepositChange}
+                onBlur={handleDepositBlur}
                 onWheel={e => e.currentTarget.blur()}
                 placeholder="Auto = 1 month rent"
                 min="0"
