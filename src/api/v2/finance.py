@@ -26,7 +26,7 @@ from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
     BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
-    Payment, PaymentFor, PaymentMode, Tenancy, Tenant, UpiCollectionEntry,
+    InvestmentExpense, Payment, PaymentFor, PaymentMode, Tenancy, Tenant, UpiCollectionEntry,
 )
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.reports.pnl_builder import build_pnl_bytes
@@ -1266,6 +1266,47 @@ async def assign_upi_entry(
     async with get_session() as session:
         payment_id = await _assign(session, rrn, tenancy_id, mon)
     return {"payment_id": payment_id, "rrn": rrn, "tenancy_id": tenancy_id}
+
+
+@router.get("/finance/investments")
+async def get_investments(user: AppUser = Depends(get_current_user)):
+    """Return Whitefield investment tracker — grouped by investor, ordered by date."""
+    _require_admin(user)
+    from sqlalchemy import select as sa_select
+
+    async with get_session() as session:
+        rows = await session.execute(
+            sa_select(InvestmentExpense)
+            .where(InvestmentExpense.is_void == False)
+            .order_by(InvestmentExpense.paid_by, InvestmentExpense.transaction_date)
+        )
+        txns = rows.scalars().all()
+
+    # Group by investor
+    groups: dict[str, dict] = {}
+    for t in txns:
+        investor = str(t.paid_by) if t.paid_by else "Unknown"
+        if investor not in groups:
+            groups[investor] = {"investor": investor, "total": 0.0, "rows": []}
+        amt = float(str(t.amount))
+        groups[investor]["total"] += amt
+        groups[investor]["rows"].append({
+            "id": t.id,
+            "date": str(t.transaction_date) if t.transaction_date else "",
+            "purpose": t.purpose,
+            "vendor": t.paid_to or "",
+            "amount": amt,
+            "utr": t.transaction_id or "",
+            "property": t.property or "Whitefield",
+            "notes": t.notes or "",
+        })
+
+    grand_total = sum(g["total"] for g in groups.values())
+    return {
+        "groups": list(groups.values()),
+        "grand_total": round(grand_total, 2),
+        "count": len(txns),
+    }
 
 
 @router.get("/finance/upi-reconcile/unmatched")

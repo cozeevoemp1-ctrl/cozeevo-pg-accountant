@@ -1018,3 +1018,30 @@ export interface OccupancyData {
 export function getOccupancyData(months = 12): Promise<OccupancyData> {
   return _get<OccupancyData>(`/api/v2/app/analytics/occupancy?months=${months}`)
 }
+
+export interface InvestmentRow {
+  id: number
+  date: string
+  purpose: string
+  vendor: string
+  amount: number
+  utr: string
+  property: string
+  notes: string
+}
+
+export interface InvestorGroup {
+  investor: string
+  total: number
+  rows: InvestmentRow[]
+}
+
+export interface InvestmentsData {
+  groups: InvestorGroup[]
+  grand_total: number
+  count: number
+}
+
+export function getInvestments(): Promise<InvestmentsData> {
+  return _get<InvestmentsData>("/api/v2/app/finance/investments")
+}

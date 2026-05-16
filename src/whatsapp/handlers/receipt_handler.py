@@ -93,7 +93,7 @@ async def handle_media_upload(
         # Auto-route based on Gemini classification
         if doc_type == "payment_receipt":
             # Gemini extracted payment details — try to match and log
-            return await _handle_gemini_receipt(vision_result, media_id, media_mime, phone, ctx, session)
+            return await _handle_vision_receipt(vision_result, media_id, media_mime, phone, ctx, session)
         elif doc_type == "expense_bill":
             return await _handle_expense_receipt(media_id, media_mime, vision_result.get("summary", ""), phone, ctx, session)
         elif doc_type == "id_proof":
@@ -532,7 +532,7 @@ async def _claude_read_image(media_id: str, media_mime: str) -> Optional[dict]:
         return None
 
 
-async def _handle_gemini_receipt(
+async def _handle_vision_receipt(
     vision: dict,
     media_id: str,
     media_mime: str,

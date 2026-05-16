@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { OccupancyTab } from "@/components/finance/occupancy-tab"
+import { InvestmentSection } from "@/components/finance/investment-section"
 import { supabase } from "@/lib/supabase"
 
 export default function FinancePage() {
@@ -28,6 +29,7 @@ export default function FinancePage() {
       </div>
 
       <OccupancyTab />
+      <InvestmentSection />
     </main>
   )
 }
