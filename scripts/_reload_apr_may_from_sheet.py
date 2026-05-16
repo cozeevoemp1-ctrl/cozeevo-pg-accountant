@@ -67,12 +67,9 @@ HEADER_MAP = {
     # rent overrides — sheet headers: "From 1st FEB", "From 1st May"
     "rent feb": "rent_feb", "feb rent": "rent_feb", "from 1st feb": "rent_feb",
     "rent may": "rent_may", "may rent": "rent_may", "from 1st may": "rent_may",
-    # April payment columns — sheet headers are mislabeled:
-    #   col V "April cash"  = ignored (contains something else)
-    #   col W "April UPI"   = actually contains CASH totals
-    #   col X "April Balance" = actually contains UPI totals
-    "april upi": "apr_cash",    # col W — mislabeled; actually cash
-    "april balance": "apr_upi", # col X — mislabeled; actually UPI
+    # April payment columns
+    "april cash": "apr_cash",
+    "april upi":  "apr_upi",
     # May columns — headers are correct
     "may upi": "may_upi", "may cash": "may_cash",
 }
