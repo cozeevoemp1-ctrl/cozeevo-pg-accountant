@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.89] — 2026-05-16 — Payment editor + CI/CD webhook pipeline
+
+### PWA: Payment edit modal
+- Added **Type** selector (Rent / Deposit / Advance / Maint. / Food / Penalty / Other) to Edit Payment modal
+- Simplified payment methods to **UPI + Cash only** (removed Bank, Card, Other) across: history page, new payment page, quick collect modal (kpi-grid)
+- Historical payments with old methods (BANK/CARD) still display correctly
+- Backend: `PaymentEdit` schema + `edit_payment` handler now accept `for_type` field
+
+### CI/CD: Fully automated deploy pipeline
+- **Removed** GitHub Actions SSH deploy (`.github/workflows/deploy.yml`) — was failing because Hostinger firewall blocks GitHub Actions IPs (same reason Claude's SSH times out)
+- **Added** Claude Code Stop hook (`.claude/settings.json`) — auto-commits + pushes on every session end when changes exist
+- **Added** VPS webhook listener (`/opt/webhook.py` + `kozzy-webhook.service` on port 9876) — receives GitHub push events, runs `/opt/deploy.sh`
+- **Added** UFW rule: port 9876 open for GitHub webhook delivery
+- **`/opt/deploy.sh`**: git pull → restart pg-accountant → if web/ changed: npm build + restart kozzy-pwa
+- Security: HMAC-SHA256 signature verification on every webhook POST; unsigned requests get 403
+
+### Pipeline flow (permanent, no intervention needed)
+```
+Claude changes → auto-commit + push → GitHub webhook → VPS deploy.sh → services restarted
+```
+
+---
+
 ## [1.75.88] — 2026-05-16 — Staff room fix + TOTAL_BEDS 293→295
 
 ### Root cause
