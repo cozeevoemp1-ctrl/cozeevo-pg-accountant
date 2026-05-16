@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.93] — 2026-05-16 — April dues reconciliation: fix shared-room double-payments
+
+### Data ops
+- **April column mapping fixed** — `_reload_apr_may_from_sheet.py` had wrong HEADER_MAP: "april upi"→apr_cash and "april balance"→apr_upi. Corrected to "april cash"→apr_cash and "april upi"→apr_upi. Re-ran full wipe+reload with correct mapping.
+- **Deposit double-stacking fixed** — added deposit wipe (payment_date IN Apr1/May1, period_month NULL) before reload to prevent stacking on re-runs. April Total now ₹45,40,698 (was inflated to ₹50,41,933 from stacked deposits).
+- **`scripts/_fix_apr_may_dues.py`** (new) — for each tenant with nonzero sheet balance (April Balance / June Balance cols), voids all existing rent payments for that period and creates one payment for `RS rent_due − sheet_balance`. 16 fixes applied across shared rooms: rooms 117 (Claudin+Arun), 319 (Abhiram), 616 (Omkar+Swarup), G07 (Shivam+Aldrin), 623 (Veena+Sachin), 516 (Ajay Mohan May), plus Prashanth, Preesha, Tanishka, Abhishek Charan, Chandraprakash, Delvin Raj.
+- **April RS created for 2 skipped tenants** — Sachin Kumar Yadav (tid=795, rent_due=₹5,250, status=pending) and Abhishek Vishwakarma (tid=828, rent_due=₹4,500, status=pending); both now appear as having outstanding April dues.
+- **4 skipped (not fixable)** — Sai Shankar (exited, bad debt ₹6K), Sachin KY (no RS → created above), Abhishek V (no RS → created above), Akshay Kothari (no active tenancy — June joinee, already in bookings as no_show room 522).
+- **June joinees confirmed** — all tenants with JunBal > 0 in sheet are already in DB; Akshay Kothari in system as no_show room 522, check-in Jun 1.
+
+### Verified final April figures
+- Cash ₹13,45,283 | UPI ₹31,95,415 | Total ₹45,40,698
+- Sheet Cash matches exactly; UPI ₹7K short = Aditya Sable (no tenancy in DB, room "May 30th") + day-wise residual
+- All 16 shared-room dues verified correct via direct DB queries post-fix
+
+---
+
 ## [1.75.92] — 2026-05-16 — Claude vision + investment section + May import final
 
 ### Features
@@ -37,9 +54,9 @@ All notable changes to PG Accountant will be documented here.
 - `src/services/reporting.py` `method_breakdown`: now includes deposits + filters rent by `period_month` (not `payment_date`) so old catch-up payments don't inflate the totals
 - "HOW IT WAS PAID" in PWA now matches sheet cash/UPI columns exactly (within ₹2,000 = 2 unmatched tenants Aditya Sable + Vijay Kumar — to be fixed manually)
 
-### Result
-- April: Cash ₹32,00,415 / UPI ₹92,766 (off ₹2,000 from unmatched)
-- May: Cash ₹21,62,100 / UPI ₹22,49,170 (off ₹2,000 from unmatched)
+### Result (corrected in [1.75.93] after column-mapping fix)
+- April: Cash ₹13,45,283 / UPI ₹31,95,415 / Total ₹45,40,698 (column mapping was wrong in this run; fixed next session)
+- May: Cash ₹21,26,700 / UPI ₹44,60,340 (correct at time of run)
 - No duplicate payments, clean history in PWA
 
 ---
