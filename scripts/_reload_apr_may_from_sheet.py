@@ -29,7 +29,7 @@ from dotenv import load_dotenv; load_dotenv()
 
 import gspread
 from google.oauth2.service_account import Credentials
-from sqlalchemy import select, delete as sa_delete, func
+from sqlalchemy import select, delete as sa_delete, func, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -232,6 +232,7 @@ async def run(write: bool):
 
         # ── Step 2: Wipe Apr + May payments + rent schedules ─────────────
         if write:
+            await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
             del_pay = await session.execute(
                 sa_delete(Payment).where(
                     Payment.period_month.in_([APR, MAY])
