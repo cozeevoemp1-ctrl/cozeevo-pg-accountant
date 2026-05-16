@@ -1605,19 +1605,19 @@ async def main(args: argparse.Namespace) -> None:
             await run_upi_collection_table_2026_05_11(conn)
             await run_btxn_dedup_2026_05_12(conn)
             await run_add_checkout_session_other_comments_2026_05_16(conn)
-        # Runs outside the main transaction (needs separate commits for enum values)
-        try:
-            await run_simplify_roles_2026_04_01(engine)
-        except Exception as e:
-            print(f"  [warn] simplify_roles failed (non-fatal): {e}")
-        await engine.dispose()  # Reset pool — clears dirty connections from enum migration timeout
-        engine = create_async_engine(DB_URL, echo=False)
-        # Staff KYC fields — own transaction (main tx may be aborted by deadlock in earlier step)
+    # Runs outside the main transaction (needs separate commits for enum values)
+    try:
+        await run_simplify_roles_2026_04_01(engine)
+    except Exception as e:
+        print(f"  [warn] simplify_roles failed (non-fatal): {e}")
+    await engine.dispose()  # Reset pool — clears dirty connections from enum migration timeout
+    engine = create_async_engine(DB_URL, echo=False)
+    # Staff KYC fields — own transaction
+    async with engine.begin() as conn2:
+        await run_add_staff_kyc_fields_2026_04_26(conn2)
+    if args.seed:
         async with engine.begin() as conn2:
-            await run_add_staff_kyc_fields_2026_04_26(conn2)
-        if args.seed:
-            async with engine.begin() as conn2:
-                await run_seed(conn2)
+            await run_seed(conn2)
     # RLS in its own transaction so it always commits independently
     async with engine.begin() as conn:
         await run_enable_rls_all_tables(conn)
