@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.84] — 2026-05-16 — Checkout fix + auto-deploy + UPI default
+
+### Checkout bug fixes (`src/database/models.py`, `src/database/migrate_all.py`)
+- **`other_comments` missing from ORM model** — added `other_comments = Column(Text, nullable=True)` to `CheckoutSession`; was causing `TypeError: 'other_comments' is an invalid keyword argument`
+- **Column missing from DB** — ran `ALTER TABLE checkout_sessions ADD COLUMN IF NOT EXISTS other_comments TEXT` directly (migration hung due to slow remote Supabase connection)
+- **Net result**: checkout flow (app.getkozzy.com/checkout/new) now completes without "Failed to fetch"
+
+### PWA — Checkout form (`web/app/checkout/new/page.tsx`)
+- **Default refund mode changed from CASH → UPI** — matches real-world usage
+
+### CI/CD — GitHub Actions auto-deploy (`.github/workflows/deploy.yml`)
+- **Created deploy workflow** — triggers on push to master; SSH deploys to VPS, runs migrations, restarts pg-accountant; only rebuilds PWA if `web/` changed
+- **Added `VPS_SSH_KEY` GitHub secret** — dedicated ed25519 deploy key generated on VPS; public key in `authorized_keys`; private key stored as GitHub Actions secret
+
 ## [1.75.83] — 2026-05-16 — April payment reconciliation (sheet vs DB)
 
 ### April 2026 payment cleanup (`scripts/_fix_april_payments.py`)
