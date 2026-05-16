@@ -44,20 +44,32 @@ CREDS_FILE      = "credentials/gsheets_service_account.json"
 APR = date(2026, 4, 1)
 MAY = date(2026, 5, 1)
 
-# 0-based column indices in "Long term" tab
-COL_ROOM     = 0   # A
-COL_NAME     = 1   # B
-COL_CHECKIN  = 4   # E
-COL_BOOKING  = 5   # F  advance already paid (reduces deposit shortfall)
-COL_DEPOSIT  = 6   # G  agreed security deposit
-COL_RENT_M   = 9   # J  agreed rent (monthly base)
-COL_RENT_FEB = 10  # K  rent override from Feb
-COL_RENT_MAY = 11  # L  rent override from May
-COL_PHONE    = 3   # D
-COL_APR_CASH = 22  # W
-COL_APR_UPI  = 23  # X
-COL_MAY_UPI  = 25  # Z
-COL_MAY_CASH = 26  # AA
+# Column aliases: keys are lowercase stripped header variants we accept
+# Each value is the canonical field name in our row dict
+HEADER_MAP = {
+    # room
+    "room number": "room", "room": "room", "room no": "room",
+    # name
+    "name": "name",
+    # phone
+    "phone": "phone", "phone number": "phone", "mobile": "phone",
+    # checkin
+    "checkin": "checkin", "check in": "checkin", "check-in": "checkin",
+    "checkin date": "checkin", "check in date": "checkin",
+    # booking advance
+    "booking": "booking_advance", "advance": "booking_advance",
+    "booking amount": "booking_advance", "advance paid": "booking_advance",
+    # deposit
+    "deposit": "agreed_deposit", "security deposit": "agreed_deposit",
+    # rent columns  (first match wins — rent > rent monthly > etc.)
+    "rent": "rent_base", "rent monthly": "rent_base", "monthly rent": "rent_base",
+    "rent feb": "rent_feb", "feb rent": "rent_feb",
+    "rent may": "rent_may", "may rent": "rent_may",
+    # payment columns — these are found by the exact payment header
+    "april cash": "apr_cash", "apr cash": "apr_cash",
+    "april upi": "apr_upi", "apr upi": "apr_upi",
+    "may upi": "may_upi", "may cash": "may_cash",
+}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -113,32 +125,60 @@ def read_sheet():
     ws = sh.worksheet("Long term")
     all_rows = ws.get_all_values()
 
+    if not all_rows:
+        raise ValueError("Sheet is empty")
+
+    # ── Build header index from row 1 ─────────────────────────────────
+    header_row = all_rows[0]
+    col_idx: dict[str, int] = {}  # canonical field name -> 0-based index
+    print("  Sheet headers found:")
+    for i, h in enumerate(header_row):
+        key = h.strip().lower()
+        field = HEADER_MAP.get(key)
+        if field and field not in col_idx:  # first match wins
+            col_idx[field] = i
+            print(f"    col {i:2d} ({chr(65+i) if i<26 else 'A'+chr(65+i-26)}) "
+                  f"'{h.strip()}' -> {field}")
+
+    # Mandatory payment columns
+    for required in ("apr_cash", "apr_upi", "may_upi", "may_cash"):
+        if required not in col_idx:
+            raise ValueError(
+                f"Could not find column for '{required}' in sheet headers. "
+                f"Headers: {header_row}"
+            )
+
+    def _c(r, field, default=""):
+        idx = col_idx.get(field)
+        if idx is None or idx >= len(r):
+            return default
+        return r[idx].strip()
+
     data = []
     for r in all_rows[1:]:
-        def _c(col): return r[col].strip() if len(r) > col else ""
-
-        name = _c(COL_NAME)
+        name = _c(r, "name")
         if not name:
             continue
 
-        # Agreed rent: may-override > feb-override > monthly base
-        rent_base = pn(_c(COL_RENT_M))
-        rent_feb  = pn(_c(COL_RENT_FEB))
-        rent_may  = pn(_c(COL_RENT_MAY))
+        # Agreed rent: may-override > feb-override > base
+        rent_base = pn(_c(r, "rent_base"))
+        rent_feb  = pn(_c(r, "rent_feb"))
+        rent_may  = pn(_c(r, "rent_may"))
         agreed_rent = rent_may or rent_feb or rent_base
 
+        room_raw = _c(r, "room")
         data.append({
             "name":            name,
-            "room":            re.sub(r"\.0$", "", _c(COL_ROOM)),
-            "phone":           norm_phone(_c(COL_PHONE)),
-            "checkin":         parse_date(_c(COL_CHECKIN)),
+            "room":            re.sub(r"\.0$", "", room_raw),
+            "phone":           norm_phone(_c(r, "phone")),
+            "checkin":         parse_date(_c(r, "checkin")),
             "agreed_rent":     agreed_rent,
-            "agreed_deposit":  pn(_c(COL_DEPOSIT)),
-            "booking_advance": pn(_c(COL_BOOKING)),   # advance already paid, not part of Apr/May
-            "apr_cash":        pn(_c(COL_APR_CASH)),
-            "apr_upi":         pn(_c(COL_APR_UPI)),
-            "may_cash":        pn(_c(COL_MAY_CASH)),
-            "may_upi":         pn(_c(COL_MAY_UPI)),
+            "agreed_deposit":  pn(_c(r, "agreed_deposit")),
+            "booking_advance": pn(_c(r, "booking_advance")),
+            "apr_cash":        pn(_c(r, "apr_cash")),
+            "apr_upi":         pn(_c(r, "apr_upi")),
+            "may_cash":        pn(_c(r, "may_cash")),
+            "may_upi":         pn(_c(r, "may_upi")),
         })
 
     return data
