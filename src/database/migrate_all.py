@@ -1610,6 +1610,8 @@ async def main(args: argparse.Namespace) -> None:
             await run_simplify_roles_2026_04_01(engine)
         except Exception as e:
             print(f"  [warn] simplify_roles failed (non-fatal): {e}")
+        await engine.dispose()  # Reset pool — clears dirty connections from enum migration timeout
+        engine = create_async_engine(DB_URL, echo=False)
         # Staff KYC fields — own transaction (main tx may be aborted by deadlock in earlier step)
         async with engine.begin() as conn2:
             await run_add_staff_kyc_fields_2026_04_26(conn2)
