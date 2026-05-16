@@ -4,6 +4,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { HomeTabBar } from "@/components/home/home-tab-bar";
 import { NavWrapper } from "@/components/home/nav-wrapper";
+import { NoScrollNumberInputs } from "@/components/ui/no-scroll-number-inputs";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -37,6 +38,7 @@ export default function RootLayout({
     <html lang="en" className={dmSans.variable}>
       <body className="bg-bg text-ink font-sans min-h-screen" suppressHydrationWarning>
         <AuthProvider>
+          <NoScrollNumberInputs />
           <PullToRefresh>{children}</PullToRefresh>
           <NavWrapper />
         </AuthProvider>
