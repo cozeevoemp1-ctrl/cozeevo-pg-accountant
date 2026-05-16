@@ -80,7 +80,8 @@ export default function NewPaymentPage() {
       }
       setTenant(t)
       setDues(d)
-      if (d.dues > 0) setAmount(String(Math.round(d.dues)))
+      const total = (d.dues || 0) + (d.deposit_due || 0)
+      if (total > 0) setAmount(String(Math.round(total)))
     }).catch(() => {/* ignore */})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -90,7 +91,8 @@ export default function NewPaymentPage() {
     try {
       const d = await getTenantDues(t.tenancy_id)
       setDues(d)
-      if (!amount && d.dues > 0) setAmount(String(Math.round(d.dues)))
+      const total = (d.dues || 0) + (d.deposit_due || 0)
+      if (!amount && total > 0) setAmount(String(Math.round(total)))
     } catch {
       // best-effort
     }
@@ -163,7 +165,8 @@ export default function NewPaymentPage() {
     }
   }
 
-  const balanceAfter = dues ? dues.dues - Number(amount || 0) : null
+  const totalDues = dues ? (dues.dues || 0) + (dues.deposit_due || 0) : 0
+  const balanceAfter = dues ? totalDues - Number(amount || 0) : null
 
   function resetForm() {
     setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes("")
@@ -255,25 +258,36 @@ export default function NewPaymentPage() {
         </div>
 
         {/* Dues preview */}
-        {dues && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex justify-between items-center">
-            <div>
-              <p className="text-xs text-ink-muted font-medium">Outstanding this month</p>
-              <p className={`text-lg font-extrabold mt-0.5 ${dues.dues > 0 ? "text-status-warn" : "text-status-paid"}`}>
-                {dues.dues > 0 ? `₹${dues.dues.toLocaleString("en-IN")} due` : "Fully paid ✓"}
-              </p>
-            </div>
-            {dues.last_payment_date && (
-              <div className="text-right">
-                <p className="text-xs text-ink-muted">Last paid</p>
-                <p className="text-xs font-semibold text-ink">₹{(dues.last_payment_amount ?? 0).toLocaleString("en-IN")}</p>
+        {dues && (() => {
+          const totalOutstanding = (dues.dues || 0) + (dues.deposit_due || 0)
+          return (
+            <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs text-ink-muted font-medium">Outstanding this month</p>
+                  <p className={`text-lg font-extrabold mt-0.5 ${totalOutstanding > 0 ? "text-status-warn" : "text-status-paid"}`}>
+                    {totalOutstanding > 0 ? `₹${totalOutstanding.toLocaleString("en-IN")} due` : "Fully paid ✓"}
+                  </p>
+                </div>
+                {dues.last_payment_date && (
+                  <div className="text-right">
+                    <p className="text-xs text-ink-muted">Last paid</p>
+                    <p className="text-xs font-semibold text-ink">₹{(dues.last_payment_amount ?? 0).toLocaleString("en-IN")}</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+              {totalOutstanding > 0 && dues.deposit_due > 0 && (
+                <div className="mt-2 flex gap-3">
+                  {dues.dues > 0 && <span className="text-[11px] text-ink-muted">Rent ₹{dues.dues.toLocaleString("en-IN")}</span>}
+                  <span className="text-[11px] text-ink-muted">Deposit ₹{dues.deposit_due.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Numpad */}
-        <Numpad value={amount} onChange={setAmount} suggestAmounts={dues && dues.dues > 0 ? [Math.round(dues.dues)] : []} />
+        <Numpad value={amount} onChange={setAmount} suggestAmounts={dues && ((dues.dues || 0) + (dues.deposit_due || 0)) > 0 ? [Math.round((dues.dues || 0) + (dues.deposit_due || 0))] : []} />
 
         {/* Method */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">

@@ -278,11 +278,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           .then((r) => r.ok ? r.json() : null)
           .then((d) => {
             if (!d) return
-            const outstanding = Math.max(0, (d.rent_due ?? 0) - (d.paid_amount ?? 0) + (d.adjustment ?? 0))
-            const depDue = (d.deposit_paid > 0 && d.deposit_due > 0) ? d.deposit_due : 0
-            if (outstanding > 0) setCollectRentDues(String(outstanding))
-            if (depDue > 0) setCollectDepositDues(String(depDue))
-            setTotalDues(outstanding + depDue)
+            const rentDue = d.dues ?? 0
+            const depDue = d.deposit_due ?? 0
+            if (rentDue > 0) setCollectRentDues(String(Math.round(rentDue)))
+            if (depDue > 0) setCollectDepositDues(String(Math.round(depDue)))
+            setTotalDues(rentDue + depDue)
             prefillDone.current = true
           })
           .catch(() => {})
@@ -513,19 +513,22 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           {(() => {
             const rd = parseFloat(collectRentDues) || 0
             const dd = parseFloat(collectDepositDues) || 0
-            const total = rd + dd
+            const collecting = rd + dd
+            const remaining = Math.max(0, totalDues - collecting)
             return (
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-baseline justify-between">
-                  <p className="text-[9px] text-ink-muted uppercase tracking-wide font-semibold">Total collecting</p>
-                  <p className="text-xs font-bold text-ink">₹{total.toLocaleString("en-IN")}</p>
-                </div>
-                {totalDues > 0 && (
-                  <div className="flex items-baseline justify-between">
-                    <p className="text-[9px] text-ink-muted uppercase tracking-wide font-semibold">Total dues</p>
-                    <p className="text-[9px] text-ink-muted font-semibold">₹{totalDues.toLocaleString("en-IN")}</p>
+              <div className="rounded-tile bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-1">
+                {[
+                  { label: "Total outstanding", value: totalDues, muted: true, warn: false },
+                  { label: "Collecting now",     value: collecting, muted: false, warn: false },
+                  { label: "Remaining after",    value: remaining, muted: true, warn: remaining > 0 },
+                ].map(({ label, value, muted, warn }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-[11px] text-ink-muted">{label}</span>
+                    <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
+                      ₹{value.toLocaleString("en-IN")}
+                    </span>
                   </div>
-                )}
+                ))}
               </div>
             )
           })()}

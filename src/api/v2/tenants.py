@@ -176,7 +176,7 @@ async def get_tenant_dues(
     period_end = date(next_y, next_m, 1)
 
     async with get_session() as session:
-        # Rent paid this period — includes deposit/booking paid in same calendar month
+        # Rent paid this period — includes booking/deposit credits made in this calendar month
         paid_result = await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.tenancy_id == tenancy_id,
@@ -184,8 +184,14 @@ async def get_tenant_dues(
                 or_(
                     and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period_month),
                     and_(
-                        Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                        Payment.for_type == PaymentFor.deposit,
                         Payment.period_month == None,
+                        Payment.payment_date >= period_month,
+                        Payment.payment_date < period_end,
+                    ),
+                    # Booking advances: include regardless of whether period_month is set or NULL
+                    and_(
+                        Payment.for_type == PaymentFor.booking,
                         Payment.payment_date >= period_month,
                         Payment.payment_date < period_end,
                     ),
@@ -234,8 +240,9 @@ async def get_tenant_dues(
 
     deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
     deposit_paid = float(deposit_paid_result) if deposit_paid_result else 0.0
-    # booking_amount (advance) counts against deposit — subtract it so we don't double-charge
-    deposit_due = max(0.0, deposit_agreed - booking_amount - deposit_paid)
+    # Advance covers rent first; only the surplus (credit) carries over to deposit
+    booking_surplus = max(0.0, booking_amount - effective_due)
+    deposit_due = max(0.0, deposit_agreed - deposit_paid - booking_surplus)
 
     return {
         "tenancy_id": tenancy.id,
