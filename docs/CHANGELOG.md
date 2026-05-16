@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.82] — 2026-05-16 — Dues formula fixes + waive toggle + Nikhil payment fix
+
+### Backend dues calculation (`src/api/v2/tenants.py`, `src/api/v2/kpi.py`)
+- **Ceiling rounding** — all dues and deposit_due round UP to nearest ₹100 (e.g. ₹10,387 → ₹10,400)
+- **Booking advance query fix** — booking-type payments included regardless of `period_month` (was excluded when period_month was set, hiding Nikhil's ₹14K advance)
+- **deposit_due formula corrected** — `deposit_due = max(0, deposit_agreed − deposit_paid − booking_surplus)` where `booking_surplus = max(0, booking_amount − effective_rent_due)` (was incorrectly using full booking_amount, showing ₹0 deposit due for Nikhil)
+- **kpi.py dues list** — now includes deposit_due in total_dues; tenants with only deposit outstanding (no rent dues) now appear in home dues list
+
+### PWA — Collect Payment (`web/app/payment/new/page.tsx`)
+- **Waive remaining toggle** — shown when balance after payment is ₹1–₹500; fires `patchAdjustment(-balanceAfter)` after payment saves; useful for rounding differences
+- **Live summary card** — Total outstanding / Collecting now / Remaining after (consistent with rest of app)
+- **totalDues** — now `dues + deposit_due` so outstanding includes both rent and deposit when both exist
+
+### PWA — Home screen (`web/components/home/kpi-grid.tsx`)
+- **Dues panel** — tap row opens QuickCollectModal directly (removed TenantDetailCard expansion for dues)
+- **Notices panel** — inline action card shows dues breakdown + "Collect →" (if dues > 0) + "Check-out →" per tenant; no longer requires navigating away
+- **QuickCollectModal deposit_paid > 0 bug** — was hiding deposit_due if no deposit ever paid; fixed to `deposit_due > 0`
+- **QuickCollectModal display** — rentDue and depositDue now correctly separated (was bundling them)
+
+### DB fix — Nikhil Mistry (tenancy 1090, room 121)
+- Payment 15182 reclassified: `for_type='booking'` → `'deposit'`, `payment_mode='upi'` → `'cash'`
+- Tenancy 1090: `booking_amount=14000` → `0` (no booking advance; ₹14K was deposit)
+- Result: deposit fully paid, rent outstanding ₹10,400 (prorated from May 9); QuickCollectModal now shows RENT not DEPOSIT
+
 ## [1.75.81] — 2026-05-16 — Prep reminders via template + PWA bookings UX
 
 ### Scheduler — prep reminders (`src/scheduler.py`, `src/whatsapp/reminder_sender.py`)
