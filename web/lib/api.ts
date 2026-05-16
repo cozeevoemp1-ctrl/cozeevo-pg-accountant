@@ -62,7 +62,7 @@ export interface PaymentResponse {
 export interface PaymentCreate {
   tenant_id: number;
   amount: number;
-  method: "UPI" | "CASH" | "BANK" | "CARD" | "OTHER";
+  method: "UPI" | "CASH";
   for_type: "rent" | "deposit" | "maintenance" | "booking" | "adjustment";
   period_month: string; // YYYY-MM
   notes?: string;
@@ -562,9 +562,10 @@ export interface PaymentListItem {
 }
 
 export interface PaymentEditBody {
-  method?: "UPI" | "CASH" | "BANK" | "CARD" | "OTHER";
+  method?: "UPI" | "CASH";
   amount?: number;
   notes?: string;
+  for_type?: "rent" | "deposit" | "booking" | "maintenance" | "food" | "penalty" | "other";
 }
 
 export interface OcrResult {

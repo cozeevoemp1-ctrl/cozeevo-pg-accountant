@@ -11,28 +11,36 @@ import {
   PaymentEditBody,
 } from "@/lib/api"
 
-type Method = "UPI" | "CASH" | "BANK" | "CARD" | "OTHER"
+type Method = "UPI" | "CASH"
+type ForType = "rent" | "deposit" | "booking" | "maintenance" | "food" | "penalty" | "other"
 
 const METHODS: { value: Method; label: string }[] = [
   { value: "UPI", label: "UPI" },
   { value: "CASH", label: "Cash" },
-  { value: "BANK", label: "Bank" },
-  { value: "CARD", label: "Card" },
-  { value: "OTHER", label: "Other" },
 ]
 
 const METHOD_COLOR: Record<string, string> = {
   UPI: "bg-blue-50 text-blue-700 border-blue-200",
   CASH: "bg-green-50 text-green-700 border-green-200",
-  BANK: "bg-purple-50 text-purple-700 border-purple-200",
-  CARD: "bg-orange-50 text-orange-700 border-orange-200",
+  BANK: "bg-blue-50 text-blue-700 border-blue-200",
+  CARD: "bg-blue-50 text-blue-700 border-blue-200",
   OTHER: "bg-gray-100 text-gray-600 border-gray-200",
 }
 
 const FOR_TYPE_LABEL: Record<string, string> = {
   rent: "Rent", deposit: "Deposit", maintenance: "Maint.",
-  booking: "Advance", adjustment: "Adj.",
+  booking: "Advance", food: "Food", penalty: "Penalty", other: "Other",
 }
+
+const FOR_TYPES: { value: ForType; label: string }[] = [
+  { value: "rent", label: "Rent" },
+  { value: "deposit", label: "Deposit" },
+  { value: "booking", label: "Advance" },
+  { value: "maintenance", label: "Maint." },
+  { value: "food", label: "Food" },
+  { value: "penalty", label: "Penalty" },
+  { value: "other", label: "Other" },
+]
 
 export default function PaymentHistoryPage() {
   const router = useRouter()
@@ -50,6 +58,7 @@ export default function PaymentHistoryPage() {
   // Edit sheet state
   const [editing, setEditing] = useState<PaymentListItem | null>(null)
   const [editMethod, setEditMethod] = useState<Method>("UPI")
+  const [editForType, setEditForType] = useState<ForType>("rent")
   const [editAmount, setEditAmount] = useState("")
   const [editNotes, setEditNotes] = useState("")
   const [saving, setSaving] = useState(false)
@@ -84,6 +93,7 @@ export default function PaymentHistoryPage() {
   function openEdit(p: PaymentListItem) {
     setEditing(p)
     setEditMethod((p.method?.toUpperCase() as Method) ?? "CASH")
+    setEditForType((p.for_type as ForType) ?? "rent")
     setEditAmount(String(Math.round(p.amount)))
     setEditNotes(p.notes ?? "")
     setSaveError("")
@@ -96,6 +106,7 @@ export default function PaymentHistoryPage() {
     try {
       const body: PaymentEditBody = {}
       if (editMethod !== editing.method) body.method = editMethod
+      if (editForType !== editing.for_type) body.for_type = editForType
       if (Number(editAmount) !== Math.round(editing.amount)) body.amount = Number(editAmount)
       if (editNotes !== (editing.notes ?? "")) body.notes = editNotes
       if (Object.keys(body).length === 0) { setEditing(null); return }
@@ -198,6 +209,23 @@ export default function PaymentHistoryPage() {
               {" · "}₹{Math.round(editing.amount).toLocaleString("en-IN")}
               {" · "}{editing.payment_date}
               {editing.period_month ? ` · ${editing.period_month}` : ""}
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Type</p>
+              <div className="flex gap-2 flex-wrap">
+                {FOR_TYPES.map(f => (
+                  <button
+                    key={f.value}
+                    onClick={() => setEditForType(f.value)}
+                    className={`rounded-pill px-4 py-2 text-xs font-bold border-2 transition-colors ${
+                      editForType === f.value
+                        ? "border-brand-pink bg-tile-pink text-brand-pink"
+                        : "border-[#E2DEDD] bg-bg text-ink"
+                    }`}
+                  >{f.label}</button>
+                ))}
+              </div>
             </div>
 
             <div>

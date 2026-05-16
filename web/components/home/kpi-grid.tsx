@@ -103,12 +103,10 @@ function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => 
   );
 }
 
-type PayMethod = "CASH" | "UPI" | "BANK" | "OTHER";
+type PayMethod = "CASH" | "UPI";
 const COLLECT_METHODS: { value: PayMethod; label: string }[] = [
   { value: "CASH", label: "Cash" },
   { value: "UPI", label: "UPI" },
-  { value: "BANK", label: "Bank" },
-  { value: "OTHER", label: "Other" },
 ];
 
 function QuickCollectModal({ item, onClose, onSuccess }: {

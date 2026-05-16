@@ -17,14 +17,12 @@ import {
   PaymentIntent,
 } from "@/lib/api"
 
-type Method = "UPI" | "CASH" | "BANK" | "CARD" | "OTHER"
+type Method = "UPI" | "CASH"
 type ForType = "rent" | "deposit" | "maintenance" | "booking" | "adjustment"
 
 const METHODS: { value: Method; label: string; icon: string }[] = [
   { value: "CASH", label: "Cash", icon: "💵" },
   { value: "UPI", label: "UPI", icon: "📱" },
-  { value: "BANK", label: "Bank", icon: "🏦" },
-  { value: "OTHER", label: "Other", icon: "💳" },
 ]
 
 const FOR_TYPES: { value: ForType; label: string }[] = [
@@ -114,9 +112,8 @@ export default function NewPaymentPage() {
     // Pre-fill amount if not already entered
     if (result.ocr.amount && !amount) setAmount(String(result.ocr.amount))
     // Auto-set method
-    if (result.ocr.method === "UPI") setMethod("UPI")
-    else if (result.ocr.method === "BANK") setMethod("BANK")
-    else if (result.ocr.method === "CASH") setMethod("CASH")
+    if (result.ocr.method === "CASH") setMethod("CASH")
+    else if (result.ocr.method) setMethod("UPI")
     // Store transaction ID
     if (result.ocr.transaction_id) setTransactionId(result.ocr.transaction_id)
   }
@@ -336,7 +333,7 @@ export default function NewPaymentPage() {
         {/* Method */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {METHODS.map((m) => (
               <button key={m.value} type="button" onClick={() => setMethod(m.value)}
                 className={`rounded-tile py-2.5 text-center border-2 transition-colors ${method === m.value ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"}`}>

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class PaymentCreate(BaseModel):
     tenant_id: int = Field(gt=0, description="Tenant PK — endpoint resolves active tenancy")
     amount: int = Field(gt=0, description="Amount in rupees (no paise)")
-    method: Literal["UPI", "CASH", "BANK", "CARD", "OTHER"] = "CASH"
+    method: Literal["UPI", "CASH", "BANK", "CARD", "OTHER"] = "CASH"  # BANK/CARD/OTHER kept for bot compat
     for_type: Literal["rent", "deposit", "maintenance", "booking", "adjustment"] = "rent"
     period_month: Optional[str] = Field(
         default=None,
@@ -28,6 +28,7 @@ class PaymentEdit(BaseModel):
     method: Optional[Literal["UPI", "CASH", "BANK", "CARD", "OTHER"]] = None
     amount: Optional[int] = Field(default=None, gt=0)
     notes: Optional[str] = None
+    for_type: Optional[Literal["rent", "deposit", "booking", "maintenance", "food", "penalty", "other"]] = None
 
 
 class PaymentListItem(BaseModel):

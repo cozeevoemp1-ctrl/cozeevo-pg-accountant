@@ -14,7 +14,7 @@ from sqlalchemy import desc, select
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from sqlalchemy.orm import aliased
-from src.database.models import Payment, PaymentMode, Room, StayType, Tenancy, TenancyStatus, Tenant
+from src.database.models import Payment, PaymentFor, PaymentMode, Room, StayType, Tenancy, TenancyStatus, Tenant
 from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, update_payment as gsheets_update
 from src.schemas.payments import PaymentCreate, PaymentEdit, PaymentListItem, PaymentResponse
 from src.services.payments import _resolve_payment_mode, log_payment
@@ -211,6 +211,9 @@ async def edit_payment(
         if body.notes is not None:
             payment.notes = body.notes
             changed.append("notes updated")
+        if body.for_type is not None:
+            payment.for_type = PaymentFor(body.for_type)  # type: ignore[assignment]
+            changed.append(f"for_type→{body.for_type}")
 
         await session.commit()
         await session.refresh(payment)
