@@ -131,7 +131,12 @@ def read_sheet():
     # ── Build header index from row 1 ─────────────────────────────────
     header_row = all_rows[0]
     col_idx: dict[str, int] = {}  # canonical field name -> 0-based index
-    print("  Sheet headers found:")
+    print("  All sheet headers:")
+    for i, h in enumerate(header_row):
+        if h.strip():
+            col_letter = chr(65+i) if i<26 else 'A'+chr(65+i-26)
+            print(f"    col {i:2d} ({col_letter}) '{h.strip()}'")
+    print("  Matched headers:")
     for i, h in enumerate(header_row):
         key = h.strip().lower()
         field = HEADER_MAP.get(key)
