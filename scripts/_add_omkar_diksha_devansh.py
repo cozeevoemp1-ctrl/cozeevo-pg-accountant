@@ -164,8 +164,8 @@ async def run(write: bool):
 
                         rs = RentSchedule(
                             tenancy_id=tn.id, period_month=MAY,
-                            rent_due=int(rent), paid_amount=0,
-                            status=RentStatus.unpaid,
+                            rent_due=int(rent),
+                            status=RentStatus.partial,
                         )
                         s.add(rs)
 
