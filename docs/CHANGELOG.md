@@ -2,6 +2,25 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.90] — 2026-05-16 — Apr+May payment wipe+reload from sheet
+
+### Apr+May payment reload
+- **Wiped all April + May 2026 payments and rent_schedules** from DB; reloaded line-by-line from Google Sheet "Long term" tab
+- `scripts/_reload_apr_may_from_sheet.py`: header-based column lookup (no hardcoded indices), fixed April column mapping (sheet cols W/X mislabeled as UPI/Balance but contain cash/UPI), split logic: rent first then deposit, deposits stored with `period_month=None`
+- `scripts/_cleanup_dup_payments.py`: raw SQL cleanup script — deletes all period_month Apr/May payments + stray NULL-period deposits with payment_date in Apr/May
+- `scripts/_backup_apr_may_payments.py` + `_restore_apr_may_payments.py`: backup/restore pair (taken before any changes)
+
+### Reporting fix: method breakdown
+- `src/services/reporting.py` `method_breakdown`: now includes deposits + filters rent by `period_month` (not `payment_date`) so old catch-up payments don't inflate the totals
+- "HOW IT WAS PAID" in PWA now matches sheet cash/UPI columns exactly (within ₹2,000 = 2 unmatched tenants Aditya Sable + Vijay Kumar — to be fixed manually)
+
+### Result
+- April: Cash ₹32,00,415 / UPI ₹92,766 (off ₹2,000 from unmatched)
+- May: Cash ₹21,62,100 / UPI ₹22,49,170 (off ₹2,000 from unmatched)
+- No duplicate payments, clean history in PWA
+
+---
+
 ## [1.75.89] — 2026-05-16 — Payment editor + CI/CD webhook pipeline
 
 ### PWA: Payment edit modal
