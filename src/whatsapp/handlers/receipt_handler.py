@@ -83,12 +83,12 @@ async def handle_media_upload(
         # Very likely a receipt for the recent payment
         return await handle_receipt_upload(media_id, media_mime, "", phone, ctx, session)
 
-    # ── No caption, no recent payment → use Gemini Vision to read the image ──
-    vision_result = await _gemini_read_image(media_id, media_mime)
+    # ── No caption, no recent payment → use Claude vision to read the image ──
+    vision_result = await _claude_read_image(media_id, media_mime)
 
     if vision_result:
         doc_type = vision_result.get("type", "other")
-        logger.info(f"[Media] Gemini classified as: {doc_type} | {vision_result}")
+        logger.info(f"[Media] Claude classified as: {doc_type} | {vision_result}")
 
         # Auto-route based on Gemini classification
         if doc_type == "payment_receipt":
@@ -450,19 +450,22 @@ async def handle_media_classify_selection(
         return "Could not download the image."
 
 
-# ── Gemini Vision ────────────────────────────────────────────────────────────
+# ── Claude Vision ────────────────────────────────────────────────────────────
 
-async def _gemini_read_image(media_id: str, media_mime: str) -> Optional[dict]:
+async def _claude_read_image(media_id: str, media_mime: str) -> Optional[dict]:
     """
-    Download image from WhatsApp, send to Gemini Flash for classification + extraction.
-    Returns dict with: type, amount, name, date, upi_ref, summary — or None on failure.
+    Download image from WhatsApp, send to Claude Haiku for classification + extraction.
+    Returns dict with: type, amount, name, date, upi_ref, payment_mode, summary — or None on failure.
     """
-    import httpx
+    import asyncio
     import base64
-    import os
     import json
+    import os
 
-    api_key = os.getenv("GEMINI_API_KEY", "")
+    import anthropic
+    import httpx
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
     wa_token = os.getenv("WHATSAPP_TOKEN", "")
     if not api_key or not wa_token:
         return None
@@ -483,58 +486,49 @@ async def _gemini_read_image(media_id: str, media_mime: str) -> Optional[dict]:
             img_resp = await client.get(media_url, headers={"Authorization": f"Bearer {wa_token}"})
             img_resp.raise_for_status()
             img_bytes = img_resp.content
-            img_b64 = base64.b64encode(img_bytes).decode()
 
-            # Step 3: Send to Gemini Flash
-            gemini_resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
-                json={
-                    "contents": [{
-                        "parts": [
-                            {"inline_data": {"mime_type": media_mime or "image/jpeg", "data": img_b64}},
-                            {"text": """Analyze this image and respond in JSON only. Classify it as one of:
-- payment_receipt (UPI screenshot, bank transfer, cash receipt, payment confirmation)
-- expense_bill (electricity bill, water bill, vendor invoice, plumber receipt)
-- id_proof (Aadhaar, passport, driving license, PAN card, voter ID)
-- license (FSSAI, trade license, fire safety certificate, NOC)
-- vendor_slip (delivery challan, stock receipt, order slip)
-- other (anything else)
+        media_type = media_mime if media_mime in ("image/jpeg", "image/png", "image/webp", "image/gif") else "image/jpeg"
+        img_b64 = base64.standard_b64encode(img_bytes).decode()
 
-Extract whatever you can read from the image.
+        # Step 3: Send to Claude Haiku
+        claude = anthropic.AsyncAnthropic(api_key=api_key)
+        msg = await asyncio.wait_for(
+            claude.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=300,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                        {"type": "text", "text": (
+                            "Analyze this image and respond in JSON only. Classify it as one of:\n"
+                            "- payment_receipt (UPI screenshot, bank transfer, cash receipt, payment confirmation)\n"
+                            "- expense_bill (electricity bill, water bill, vendor invoice, plumber receipt)\n"
+                            "- id_proof (Aadhaar, passport, driving license, PAN card, voter ID)\n"
+                            "- license (FSSAI, trade license, fire safety certificate, NOC)\n"
+                            "- vendor_slip (delivery challan, stock receipt, order slip)\n"
+                            "- other (anything else)\n\n"
+                            "Extract whatever you can read from the image.\n\n"
+                            "Respond ONLY with this JSON:\n"
+                            '{"type":"payment_receipt|expense_bill|id_proof|license|vendor_slip|other",'
+                            '"amount":0,"name":"","date":"","upi_ref":"",'
+                            '"payment_mode":"upi|cash|bank_transfer|unknown",'
+                            '"summary":"one line description of what this image shows"}'
+                        )},
+                    ],
+                }],
+            ),
+            timeout=20,
+        )
 
-Respond ONLY with this JSON:
-{
-  "type": "payment_receipt|expense_bill|id_proof|license|vendor_slip|other",
-  "amount": 0,
-  "name": "",
-  "date": "",
-  "upi_ref": "",
-  "payment_mode": "upi|cash|bank_transfer|unknown",
-  "summary": "one line description of what this image shows"
-}"""}
-                        ]
-                    }],
-                    "generationConfig": {"temperature": 0.0, "maxOutputTokens": 300},
-                },
-                timeout=15,
-            )
-            gemini_resp.raise_for_status()
-
-            # Parse response
-            text = gemini_resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-            # Clean markdown fences
-            text = text.strip().strip("`").lstrip("json").strip()
-            if text.startswith("```"):
-                text = text.split("```")[1].strip()
-                if text.startswith("json"):
-                    text = text[4:].strip()
-
-            result = json.loads(text)
-            logger.info(f"[Gemini] Image classified: {result.get('type')} | {result.get('summary', '')}")
-            return result
+        raw = next(b.text for b in msg.content if hasattr(b, "text")).strip()
+        raw = raw.lstrip("```json").lstrip("```").rstrip("```").strip()
+        result = json.loads(raw)
+        logger.info(f"[Vision] Image classified: {result.get('type')} | {result.get('summary', '')}")
+        return result
 
     except Exception as e:
-        logger.warning(f"[Gemini] Vision failed: {e}")
+        logger.warning(f"[Vision] Claude image read failed: {e}")
         return None
 
 
@@ -546,7 +540,7 @@ async def _handle_gemini_receipt(
     ctx: CallerContext,
     session: AsyncSession,
 ) -> str:
-    """Handle a receipt identified by Gemini — try to match tenant and attach."""
+    """Handle a receipt identified by Claude vision — try to match tenant and attach."""
     from src.whatsapp.media_handler import download_whatsapp_media
 
     amount = vision.get("amount", 0)
