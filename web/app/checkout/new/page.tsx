@@ -86,7 +86,7 @@ function NewCheckoutPage() {
   // Financials
   const [deductions,      setDeductions]      = useState("0")
   const [deductionReason, setDeductionReason] = useState("")
-  const [refundMode,      setRefundMode]      = useState<RefundMode>("CASH")
+  const [refundMode,      setRefundMode]      = useState<RefundMode>("UPI")
 
   // Form flow
   const [showConfirm, setShowConfirm] = useState(false)
