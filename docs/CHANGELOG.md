@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.92] — 2026-05-16 — Claude vision + investment section + May import final
+
+### Features
+- **Claude Haiku vision for receipt handler** — replaced broken Gemini (429-failing all May); `_claude_read_image()` in `receipt_handler.py` uses Anthropic SDK (same pattern as `payments.py` OCR); tenants' UPI screenshots now processed correctly
+- **Finance Investment section** — `GET /finance/investments` reads `investment_expenses` table grouped by investor (`paid_by`); `InvestmentSection` component on Finance page shows collapsible per-investor rows with date/purpose/vendor/UTR + grand total; hides if no data
+
+### Data ops
+- **Omkar deodher (room 616)** — added to DB: tenant=1029, tenancy=1108, check-in Apr 4 2026, rent ₹11K, May cash ₹11K + UPI ₹5.5K; read from source sheet
+- **Diksha Bhartia + Devansh** — check-in May 30 confirmed, staying in room 000 placeholder
+- **May import final** — 254 tenants reconciled, 0 additions pending; only Vijay Kumar permanently skipped (room "June" = data error)
+- **Lenin Das** — both payments confirmed in DB: pmt 19331 (₹27K cash rent) + pmt 19332 (₹27K cash deposit)
+
 ## [1.75.91] — 2026-05-16 — May import complete + Akshat added
 
 ### Data ops
