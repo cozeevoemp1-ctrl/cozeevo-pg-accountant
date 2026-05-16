@@ -228,9 +228,9 @@ async def _do_confirm_checkout(
         tenancy.status = TenancyStatus.exited
         tenancy.checkout_date = cs.checkout_date
         tenant = await session.get(Tenant, tenancy.tenant_id)
-        tenant_name = tenant.name if tenant else ""
+        tenant_name = str(tenant.name) if tenant else ""
         room = await session.get(Room, tenancy.room_id)
-        room_number = room.room_number if room else ""
+        room_number = str(room.room_number) if room else ""
         if tenancy.notice_date:
             notice_str = tenancy.notice_date.strftime("%d/%m/%Y")
 
@@ -271,31 +271,38 @@ async def _do_confirm_checkout(
     cs.confirmed_at = datetime.utcnow()
     await session.flush()
 
-    # Google Sheet sync — 10s timeout so a slow Sheets API never blocks the HTTP response
+    # Capture values before handing off to background tasks
+    _checkout_date_str = cs.checkout_date.strftime("%d/%m/%Y")
+    _checkout_month    = cs.checkout_date.month
+    _checkout_year     = cs.checkout_date.year
+    _is_daily          = tenancy and tenancy.stay_type.value == "daily"
+    _tenant_phone      = cs.tenant_phone
+    _refund_amount     = int(cs.refund_amount)
+    _refund_mode       = cs.refund_mode
+
     import asyncio as _asyncio
-    try:
-        from src.integrations.gsheets import record_checkout as _gs_checkout
-        from src.integrations import gsheets as _gs
-        await _asyncio.wait_for(
-            _gs_checkout(
-                room_number,
-                tenant_name,
-                notice_str,
-                cs.checkout_date.strftime("%d/%m/%Y"),
-            ),
-            timeout=10,
-        )
-        is_daily = tenancy and tenancy.stay_type.value == "daily"
-        if is_daily:
-            _gs.trigger_daywise_sheet_sync()
-        else:
-            _gs.trigger_monthly_sheet_sync(cs.checkout_date.month, cs.checkout_date.year)
-    except Exception as _e:
-        logger.warning("Sheet sync failed on checkout confirm: %s", _e)
+
+    # Fire-and-forget: Sheet sync — does NOT block the HTTP response
+    async def _gs_task() -> None:
+        try:
+            from src.integrations.gsheets import record_checkout as _gs_checkout
+            from src.integrations import gsheets as _gs
+            await _asyncio.wait_for(
+                _gs_checkout(room_number, tenant_name, notice_str, _checkout_date_str),
+                timeout=15,
+            )
+            if _is_daily:
+                _gs.trigger_daywise_sheet_sync()
+            else:
+                _gs.trigger_monthly_sheet_sync(_checkout_month, _checkout_year)
+        except Exception as _e:
+            logger.warning("Sheet sync failed on checkout confirm: %s", _e)
+
+    _asyncio.create_task(_gs_task())
 
     refund_line = (
-        f"Refund: Rs.{int(cs.refund_amount):,} via {cs.refund_mode}"
-        if cs.refund_amount > 0
+        f"Refund: Rs.{_refund_amount:,} via {_refund_mode}"
+        if _refund_amount > 0
         else "No refund."
     )
     summary = (
@@ -304,24 +311,28 @@ async def _do_confirm_checkout(
         f"{refund_line}"
     )
 
-    # Notify tenant (one-way confirmation, no approval needed)
-    if cs.tenant_phone:
-        try:
-            from src.whatsapp.webhook_handler import _send_whatsapp
-            phone_wa = f"+91{cs.tenant_phone}" if not cs.tenant_phone.startswith("+") else cs.tenant_phone
-            wa_refund = (
-                f"Refund of Rs.{int(cs.refund_amount):,} will be processed by the receptionist."
-                if cs.refund_amount > 0 else ""
-            )
-            msg = (
-                f"Your checkout from Room {room_number} on "
-                f"{cs.checkout_date.strftime('%d %b %Y')} has been recorded.\n"
-                + (f"{wa_refund}\n" if wa_refund else "")
-                + "Thank you for staying with Cozeevo."
-            )
-            await _asyncio.wait_for(_send_whatsapp(phone_wa, msg), timeout=8)
-        except Exception as _e:
-            logger.warning("WhatsApp checkout notification failed: %s", _e)
+    # Fire-and-forget: WhatsApp tenant notification — does NOT block the HTTP response
+    if _tenant_phone:
+        _phone_wa = f"+91{_tenant_phone}" if not _tenant_phone.startswith("+") else _tenant_phone
+        _wa_refund = (
+            f"Refund of Rs.{_refund_amount:,} will be processed by the receptionist."
+            if _refund_amount > 0 else ""
+        )
+        _wa_msg = (
+            f"Your checkout from Room {room_number} on "
+            f"{cs.checkout_date.strftime('%d %b %Y')} has been recorded.\n"
+            + (f"{_wa_refund}\n" if _wa_refund else "")
+            + "Thank you for staying with Cozeevo."
+        )
+
+        async def _wa_task() -> None:
+            try:
+                from src.whatsapp.webhook_handler import _send_whatsapp
+                await _asyncio.wait_for(_send_whatsapp(_phone_wa, _wa_msg), timeout=10)
+            except Exception as _e:
+                logger.warning("WhatsApp checkout notification failed: %s", _e)
+
+        _asyncio.create_task(_wa_task())
 
     return summary
 
