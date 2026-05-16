@@ -1561,6 +1561,26 @@ async def run_add_checkout_session_other_comments_2026_05_16(conn: AsyncConnecti
     print("  [ok] checkout_sessions.other_comments added")
 
 
+async def run_staff_room_corrections_2026_05_16(conn: AsyncConnection) -> None:
+    """
+    Rooms 114 and 618 were removed from staff via bot commands but earlier migrations
+    (run_room_master_fix, run_room_cleanup_2026_03_23) re-applied is_staff_room=TRUE on
+    every deploy. This migration permanently overrides that so deploys don't revert it.
+
+    Confirmed staff rooms as of 2026-05-16:
+      THOR: G05, G06, 107, 108, 701
+      HULK: G12, 702, 614
+    NOT staff: 114, 618
+    """
+    print("\n-- Staff room corrections (2026-05-16) --")
+    r = await conn.execute(text("""
+        UPDATE rooms SET is_staff_room = FALSE
+        WHERE room_number IN ('114', '618')
+          AND is_staff_room IS DISTINCT FROM FALSE
+    """))
+    print(f"  [ok] Rooms 114 + 618 set to non-staff: {r.rowcount} updated")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1605,6 +1625,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_upi_collection_table_2026_05_11(conn)
             await run_btxn_dedup_2026_05_12(conn)
             await run_add_checkout_session_other_comments_2026_05_16(conn)
+            await run_staff_room_corrections_2026_05_16(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)
