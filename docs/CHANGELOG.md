@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.81] — 2026-05-16 — Prep reminders via template + PWA bookings UX
+
+### Scheduler — prep reminders (`src/scheduler.py`, `src/whatsapp/reminder_sender.py`)
+- Switched `_prep_reminder` from `_send_whatsapp` (free-form, 24hr window only) to `send_template` with `general_notice` template
+- Reminders now delivered outside the 24-hour window — Lokesh (and all admin/owner/receptionist) receive 9am + 2pm checkin/checkout alerts reliably
+- Fixed `TEMPLATE_PARAM_NAMES["general_notice"]` from `["month"]` → `["name", "message"]` to match approved Meta template
+- Recipients: `authorized_users` with role `admin/owner/receptionist` only — tenants never included
+
+### PWA — Pre-register (`web/app/tenants/pre-register/page.tsx`)
+- Security deposit field now auto-fills from monthly rent in real time (`depositOverridden` state)
+- Clearing the field and tabbing away reverts to auto (rent value); typing a new value overrides
+- "auto = 1 month rent" hint shown below the field (not in the label — prevents label wrapping on mobile)
+- All inputs normalised to `h-[42px]` — fixes misaligned grid boxes on mobile (date input was shorter than number inputs)
+
+### PWA — Bookings (`web/app/onboarding/bookings/page.tsx`)
+- Ready-to-check-in cards now collapsed by default — shows name, room, check-in, rent only
+- "▼ View details & collect" toggle expands agreed terms + collection form
+- "Check In →" on collapsed card auto-expands; "Save & Check In" only appears when expanded
+- Search input style matched to checkouts/notices pattern (`bg-bg`, `focus:ring-2 focus:ring-brand-pink/40`)
+- Search filter by name or room across all sections (ready / awaiting / expired)
+- "Total outstanding" value now bold dark ink, same weight as "Collecting now"
+
 ## [1.75.80] — 2026-05-15 — EBITDA matrix + financial analysis session
 
 ### Scripts
