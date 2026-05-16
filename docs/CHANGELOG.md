@@ -2,6 +2,13 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.85] — 2026-05-16 — Fix CI deploy (asyncpg pool reset after migration timeout)
+
+### CI/CD fix (`src/database/migrate_all.py`)
+- **Root cause**: `simplify_roles` migration hits Supabase `statement_timeout`, leaving asyncpg pool with dirty connections; subsequent `engine.begin()` for KYC migration failed with unhandled exception, exiting non-zero → `set -e` in deploy script aborted before `systemctl restart pg-accountant`
+- **Fix**: `await engine.dispose()` + `engine = create_async_engine(DB_URL)` after the simplify_roles try/except block — fresh pool for all subsequent migrations
+- **Result**: GitHub Actions deploy now completes fully (migrations → service restart)
+
 ## [1.75.84] — 2026-05-16 — Checkout fix + auto-deploy + UPI default
 
 ### Checkout bug fixes (`src/database/models.py`, `src/database/migrate_all.py`)
