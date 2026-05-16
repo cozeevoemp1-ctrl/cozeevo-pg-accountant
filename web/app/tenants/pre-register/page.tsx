@@ -15,12 +15,26 @@ export default function PreRegisterPage() {
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit]       = useState("");
   const [advance, setAdvance]       = useState("");
+  const [depositOverridden, setDepositOverridden] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
   const [done, setDone]             = useState<{ form_url: string; whatsapp_sent: boolean } | null>(null);
 
   const rentNum = parseFloat(rent) || 0;
-  const depositNum = deposit ? parseFloat(deposit) : (rentNum || undefined);
+  // deposit field mirrors rent unless user has manually overridden it
+  const depositDisplay = depositOverridden ? deposit : rent;
+  const depositNum = parseFloat(depositDisplay) || rentNum || undefined;
+
+  function handleDepositChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    if (val === "") {
+      setDepositOverridden(false);
+      setDeposit("");
+    } else {
+      setDepositOverridden(true);
+      setDeposit(val);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -156,11 +170,16 @@ export default function PreRegisterPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Security deposit (₹)</label>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                Security deposit (₹)
+                {rentNum > 0 && !depositOverridden && (
+                  <span className="ml-1 normal-case font-normal text-ink-muted">(auto)</span>
+                )}
+              </label>
               <input
                 type="number"
-                value={deposit}
-                onChange={e => setDeposit(e.target.value)}
+                value={depositDisplay}
+                onChange={handleDepositChange}
                 onWheel={e => e.currentTarget.blur()}
                 placeholder="Auto = 1 month rent"
                 min="0"
