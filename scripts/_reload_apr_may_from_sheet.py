@@ -29,7 +29,7 @@ from dotenv import load_dotenv; load_dotenv()
 
 import gspread
 from google.oauth2.service_account import Credentials
-from sqlalchemy import select, delete as sa_delete, func, text
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
@@ -232,19 +232,16 @@ async def run(write: bool):
 
         # ── Step 2: Wipe Apr + May payments + rent schedules ─────────────
         if write:
+            # Raw SQL required — ORM bulk delete bypasses the row-level trigger check
             await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
-            del_pay = await session.execute(
-                sa_delete(Payment).where(
-                    Payment.period_month.in_([APR, MAY])
-                )
-            )
-            del_rs = await session.execute(
-                sa_delete(RentSchedule).where(
-                    RentSchedule.period_month.in_([APR, MAY])
-                )
-            )
+            r1 = await session.execute(text(
+                "DELETE FROM payments WHERE period_month IN ('2026-04-01', '2026-05-01')"
+            ))
+            r2 = await session.execute(text(
+                "DELETE FROM rent_schedule WHERE period_month IN ('2026-04-01', '2026-05-01')"
+            ))
             await session.flush()
-            print(f"\nStep 2: Wiped {del_pay.rowcount} payments + {del_rs.rowcount} rent_schedules")
+            print(f"\nStep 2: Wiped {r1.rowcount} payments + {r2.rowcount} rent_schedules")
         else:
             cnt_pay = await session.scalar(
                 select(func.count()).select_from(Payment).where(
