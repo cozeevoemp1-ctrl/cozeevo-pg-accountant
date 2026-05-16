@@ -121,6 +121,7 @@ Kiran's Excel (offline)
 | `src/whatsapp/handlers/update_handler.py` | Update + staff handlers (add_staff, assign/exit staff, query staff rooms) |
 | `src/whatsapp/chat_api.py` | Webhook + pending state |
 | `src/whatsapp/media_handler.py` | WhatsApp media download + Supabase KYC upload |
+| `src/whatsapp/handlers/receipt_handler.py` | Receipt image handler — Claude Haiku vision (`_claude_read_image`) classifies tenant UPI screenshots; replaced Gemini (429-failing) |
 | `src/services/storage.py` | Supabase Storage wrapper (kyc-documents, agreements buckets) |
 | `src/database/models.py` | ORM models |
 | `src/database/migrate_all.py` | Master migration (append only, never remove) |
@@ -137,6 +138,7 @@ Kiran's Excel (offline)
 | `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation, unit economics (admin-only) |
 | `src/services/unit_economics.py` | Unit economics — revenue/bed, cost/bed, EBITDA/bed, avg rent, collection rate, investment yield, payback months, break-even occ, economic occ, revenue leakage (True Revenue only) |
 | `web/components/finance/unit-economics-card.tsx` | PWA Unit Economics card — occupancy, avg rent, collection rate, per-bed KPIs, Investment Return section (dark navy, bank-gated), Revenue Quality section |
+| `web/components/finance/investment-section.tsx` | Finance Investment section — collapsible per-investor groups from `investment_expenses` table; hides if count=0 |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
 | `web/middleware.ts` | Next.js auth gate — unauthenticated → /login; staff on /finance/** → /; 3s timeout fail-open; /auth/** always allowed |

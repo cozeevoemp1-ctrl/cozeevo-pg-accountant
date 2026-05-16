@@ -354,13 +354,15 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/llm_gateway/claude_client.py` | LLM client (Ollama/Groq/Anthropic) |
 | `src/reports/reconciliation.py` | Reconciliation engine |
 | `src/reports/pnl_builder.py` | **Canonical P&L builder** — hardcoded verified Oct'25–Apr'26; shared by `/finance/pnl/excel` endpoint |
-| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L (live + verified Excel), reconciliation, unit economics |
+| `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L (live + verified Excel), reconciliation, unit economics, investment expenses (`GET /finance/investments`) |
 | `src/services/unit_economics.py` | Unit economics service — revenue/bed, cost/bed, avg rent, collection rate, EBITDA/bed, investment yield %, payback months, break-even occupancy, economic occupancy %, revenue leakage (True Revenue only) |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export scripts |
 | `src/services/blacklist.py` | Blacklist service — fuzzy name + phone check, add/list/remove |
 | `src/services/room_transfer.py` | Shared room transfer — single source of truth for bot + PWA |
 | `src/utils/inr_format.py` | INR number format helpers — inr() / inr_short() |
-| `web/app/finance/page.tsx` | Finance page (PWA) — month picker, P&L dashboard, upload, reconciliation (admin-only) |
+| `web/app/finance/page.tsx` | Finance page (PWA) — month picker, P&L dashboard, upload, reconciliation, InvestmentSection (admin-only) |
+| `web/components/finance/investment-section.tsx` | Finance Investment section — collapsible per-investor groups from `investment_expenses` table; hides if no data |
+| `src/whatsapp/handlers/receipt_handler.py` | Receipt image handler — Claude Haiku vision (`_claude_read_image`) classifies tenant UPI screenshots; replaced Gemini (was 429-failing) |
 | `web/app/notices/page.tsx` | Notices page (PWA) — monthly tenants with formal notice |
 | `web/app/checkouts/page.tsx` | Checkouts page (PWA) — monthly checkout history, All/Regular/Day-wise filter |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | Edit Tenant (PWA) — all fields, balance adjustment, room transfer, notice |
