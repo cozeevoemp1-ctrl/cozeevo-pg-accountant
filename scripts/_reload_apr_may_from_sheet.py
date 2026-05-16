@@ -51,8 +51,9 @@ HEADER_MAP = {
     "room number": "room", "room": "room", "room no": "room",
     # name
     "name": "name",
-    # phone
+    # phone — sheet header is "Mobile Number"
     "phone": "phone", "phone number": "phone", "mobile": "phone",
+    "mobile number": "phone",
     # checkin
     "checkin": "checkin", "check in": "checkin", "check-in": "checkin",
     "checkin date": "checkin", "check in date": "checkin",
@@ -63,11 +64,16 @@ HEADER_MAP = {
     "deposit": "agreed_deposit", "security deposit": "agreed_deposit",
     # rent columns  (first match wins — rent > rent monthly > etc.)
     "rent": "rent_base", "rent monthly": "rent_base", "monthly rent": "rent_base",
-    "rent feb": "rent_feb", "feb rent": "rent_feb",
-    "rent may": "rent_may", "may rent": "rent_may",
-    # payment columns — these are found by the exact payment header
-    "april cash": "apr_cash", "apr cash": "apr_cash",
-    "april upi": "apr_upi", "apr upi": "apr_upi",
+    # rent overrides — sheet headers: "From 1st FEB", "From 1st May"
+    "rent feb": "rent_feb", "feb rent": "rent_feb", "from 1st feb": "rent_feb",
+    "rent may": "rent_may", "may rent": "rent_may", "from 1st may": "rent_may",
+    # April payment columns — sheet headers are mislabeled:
+    #   col V "April cash"  = ignored (contains something else)
+    #   col W "April UPI"   = actually contains CASH totals
+    #   col X "April Balance" = actually contains UPI totals
+    "april upi": "apr_cash",    # col W — mislabeled; actually cash
+    "april balance": "apr_upi", # col X — mislabeled; actually UPI
+    # May columns — headers are correct
     "may upi": "may_upi", "may cash": "may_cash",
 }
 
