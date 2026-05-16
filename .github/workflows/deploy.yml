@@ -20,6 +20,8 @@ jobs:
             set -e
             cd /opt/pg-accountant
             git pull origin master
+            source venv/bin/activate
+            python -m src.database.migrate_all
             systemctl restart pg-accountant
             echo "Backend deployed: $(git log --oneline -1)"
 
