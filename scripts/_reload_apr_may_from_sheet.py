@@ -207,8 +207,11 @@ async def run(write: bool):
             print(f"\nStep 2 (dry): Would wipe {cnt_pay} payments + {cnt_rs} rent_schedules")
 
         # ── Step 3: Match + record ────────────────────────────────────────
-        print(f"\nStep 3: Processing rows...")
-        seen_tenancies = set()  # guard against duplicate rows for same tenancy
+        # ── Step 3a: Match all rows → accumulate per tenancy ────────────
+        print(f"\nStep 3: Matching rows to tenancies...")
+
+        # tenancy_id -> accumulated totals + metadata
+        tenancy_buckets: dict[int, dict] = {}
 
         for rec in rows:
             apr_total = rec["apr_cash"] + rec["apr_upi"]
@@ -216,16 +219,15 @@ async def run(write: bool):
             if apr_total == 0 and may_total == 0:
                 continue
 
-            # ── Match tenancy ────────────────────────────────────────────
-            phone  = rec["phone"]
-            room   = rec["room"]
-            name   = rec["name"]
+            phone = rec["phone"]
+            room  = rec["room"]
+            name  = rec["name"]
 
             if not phone:
                 no_phone.append(f"{name}  room {room}")
                 continue
 
-            # Try phone match first
+            # Phone match first
             tenant = await session.scalar(
                 select(Tenant).where(Tenant.phone == phone)
             )
@@ -238,7 +240,6 @@ async def run(write: bool):
                     )
                 )
                 if not tenancy:
-                    # fallback: any tenancy (exited tenants still had payments)
                     tenancy = await session.scalar(
                         select(Tenancy).where(
                             Tenancy.tenant_id == tenant.id,
@@ -262,18 +263,53 @@ async def run(write: bool):
                 no_match.append(f"{name}  room {room}  phone {phone}")
                 continue
 
-            if tenancy.id in seen_tenancies:
-                warnings.append(f"Duplicate row for {name} room {room} -- skipping second row")
-                continue
-            seen_tenancies.add(tenancy.id)
-            matched_cnt += 1
+            tid = tenancy.id
+            if tid not in tenancy_buckets:
+                tenancy_buckets[tid] = {
+                    "tenancy":         tenancy,
+                    "names":           [],
+                    "apr_cash":        0.0,
+                    "apr_upi":         0.0,
+                    "may_cash":        0.0,
+                    "may_upi":         0.0,
+                    # take first row's agreed values (they should match)
+                    "agreed_rent":     rec["agreed_rent"],
+                    "agreed_deposit":  rec["agreed_deposit"],
+                    "booking_advance": rec["booking_advance"],
+                    "checkin":         rec["checkin"],
+                }
+            b = tenancy_buckets[tid]
+            b["names"].append(name)
+            b["apr_cash"] += rec["apr_cash"]
+            b["apr_upi"]  += rec["apr_upi"]
+            b["may_cash"] += rec["may_cash"]
+            b["may_upi"]  += rec["may_upi"]
+
+        # Report rows that merged
+        for tid, b in tenancy_buckets.items():
+            if len(b["names"]) > 1:
+                warnings.append(
+                    f"Merged {len(b['names'])} rows for tenancy {tid} "
+                    f"({' + '.join(b['names'])})"
+                )
+
+        matched_cnt = len(tenancy_buckets)
+        print(f"  {matched_cnt} unique tenancies matched "
+              f"({sum(1 for b in tenancy_buckets.values() if len(b['names'])>1)} merged)")
+
+        # ── Step 3b: Record per tenancy ───────────────────────────────────
+        for tid, b in tenancy_buckets.items():
+            tenancy = b["tenancy"]
 
             # ── Deposit shortfall from SHEET data only ───────────────────
-            booking_advance  = rec["booking_advance"]   # already paid before Apr/May
-            agreed_deposit   = rec["agreed_deposit"]
+            booking_advance   = b["booking_advance"]
+            agreed_deposit    = b["agreed_deposit"]
             deposit_shortfall = max(0.0, agreed_deposit - booking_advance)
 
             # ── Helper: split + record for one month ─────────────────────
+            name = " + ".join(b["names"])
+            room = ""  # not needed past this point
+
             def record_month(cash: float, upi: float, period: date, label: str):
                 nonlocal deposit_shortfall
                 nonlocal apr_rent_n, apr_rent_t, apr_dep_n, apr_dep_t
@@ -284,11 +320,11 @@ async def run(write: bool):
                     return
 
                 # Rent due for this month (prorated if 1st month)
-                agreed = rec["agreed_rent"]
+                agreed = b["agreed_rent"]
                 if agreed == 0:
                     agreed = total  # no rent info -> treat all as rent
-                    warnings.append(f"{name} room {room}: no agreed_rent in sheet for {label}")
-                rent_due = prorate(agreed, rec["checkin"], period)
+                    warnings.append(f"{name}: no agreed_rent in sheet for {label}")
+                rent_due = prorate(agreed, b["checkin"], period)
 
                 # Allocate
                 rent_target = min(total, rent_due)
@@ -354,8 +390,8 @@ async def run(write: bool):
                     if cash_dep  > 0: may_dep_n  += 1; may_dep_t  += cash_dep
                     if upi_dep   > 0: may_dep_n  += 1; may_dep_t  += upi_dep
 
-            record_month(rec["apr_cash"], rec["apr_upi"], APR, "Apr")
-            record_month(rec["may_cash"], rec["may_upi"], MAY, "May")
+            record_month(b["apr_cash"], b["apr_upi"], APR, "Apr")
+            record_month(b["may_cash"], b["may_upi"], MAY, "May")
 
         if write:
             await session.commit()
