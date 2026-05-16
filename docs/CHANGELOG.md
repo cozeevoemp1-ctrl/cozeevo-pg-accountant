@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.83] — 2026-05-16 — April payment reconciliation (sheet vs DB)
+
+### April 2026 payment cleanup (`scripts/_fix_april_payments.py`)
+- **Un-voided 5 wrongly-voided cash payments** — previous dedup session incorrectly treated split payments (cash + UPI both real) as duplicates; un-voided: Jeewan Kant Oberoi ₹14K, Prithviraj ₹12K, Chaitanya Phad ₹8K, Rakshit Joshi ₹18K, Arpit Mathur ₹18K
+- **Voided 2 duplicate payments** — Dhruv UPI ₹6,500 (added by fix script), Rakesh Thallapally cash ₹35,533 (wrongly attributed to shared-phone tenant T.Rakesh Chetan)
+- **Added 2 missing UPI payments** — Didla Lochan ₹5,000 (DB had 13K, sheet shows 18K), Saurav Mishra ₹2,000 (DB had 25K, sheet shows 27K)
+- **Result**: April cash = ₹13,45,283 (exact match with ops sheet); UPI = ₹31,95,415 (₹7,000 short — Aditya Sable ₹2K has no tenancy in DB + day-wise residual)
+- April effectively frozen via DB trigger (writes require `allow_historical_write` bypass)
+
 ## [1.75.82] — 2026-05-16 — Dues formula fixes + waive toggle + Nikhil payment fix
 
 ### Backend dues calculation (`src/api/v2/tenants.py`, `src/api/v2/kpi.py`)
