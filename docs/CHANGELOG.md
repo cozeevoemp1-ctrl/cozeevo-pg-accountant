@@ -2,6 +2,17 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.91] — 2026-05-16 — May import complete + Akshat added
+
+### Data ops
+- **Akshat (room 416)** — added to DB: tenant_id=1026, tenancy_id=1105, agreed_rent=₹2,000, active 2026-05-01; May UPI ₹2,000 added as pmt 18135
+- **May import finalized** — 253 skipped (already in DB), Akshat's ₹2K added; import idempotent on re-run
+- **LELIN DAS** — pmt 17463 (cash ₹27,000 May rent) confirmed correctly in DB; no action needed
+- **Vijay Kumar** (+919600288048, room "June") — permanent skip (source sheet data error)
+- **Missing tenants** (not in DB, no confirmation): Omkar deodher room 616 (+917888016785) — pending Kiran decision
+
+---
+
 ## [1.75.90] — 2026-05-16 — Apr+May payment wipe+reload from sheet
 
 ### Apr+May payment reload
