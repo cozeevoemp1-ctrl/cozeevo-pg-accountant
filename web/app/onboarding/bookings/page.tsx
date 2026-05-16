@@ -149,11 +149,11 @@ export default function BookingsPage() {
 
       <div className="px-4 pt-4 pb-32 max-w-lg mx-auto flex flex-col gap-3">
         <input
-          type="search"
+          type="text"
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          placeholder="Search by name or room…"
-          className="w-full h-[42px] rounded-xl border border-[#E0DDD8] bg-surface px-4 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+          placeholder="Name or room…"
+          className="w-full rounded-xl border border-[#E5E1DC] bg-bg px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
         />
 
         {error && (
@@ -253,8 +253,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 }) {
   const isPending = b.status === "pending_tenant"
   const isExpired = b.status === "expired"
+  const isReady   = b.status === "pending_review"
   const checkinToday = isToday(b.checkin_date)
 
+  const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [cancelConfirm, setCancelConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -429,6 +431,16 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         </div>
       </div>
 
+      {/* Expand toggle — only for ready-to-check-in cards */}
+      {isReady && !editing && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="text-[11px] font-semibold text-brand-pink text-left -mt-1"
+        >
+          {expanded ? "▲ Hide details" : "▼ View details & collect"}
+        </button>
+      )}
+
       {/* Error */}
       {err && <p className="text-xs text-status-warn font-medium">{err}</p>}
 
@@ -471,8 +483,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         </div>
       )}
 
-      {/* Collection at check-in (only for form-filled cards) */}
-      {!editing && !isPending && !isExpired && (
+      {/* Collection at check-in (form-filled, expanded only) */}
+      {!editing && isReady && expanded && (
         <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Agreed terms</p>
 
@@ -604,10 +616,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               )}
             </>
           ) : (
-            /* Form filled: Edit + Cancel + Save & Check In */
+            /* Form filled: Edit + Cancel + Check In (expand to collect first) */
             <>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
-                className="flex-1 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
                 Edit
               </button>
               {cancelConfirm ? (
@@ -621,17 +633,26 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                   Cancel
                 </button>
               )}
-              <button
-                onClick={() => onCheckin(b.token, {
-                  collected_rent_dues: parseFloat(collectRentDues) || 0,
-                  rent_dues_mode: rentDuesMode,
-                  collected_deposit_dues: parseFloat(collectDepositDues) || 0,
-                })}
-                disabled={checkingIn === b.token}
-                className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
-              >
-                {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
-              </button>
+              {expanded ? (
+                <button
+                  onClick={() => onCheckin(b.token, {
+                    collected_rent_dues: parseFloat(collectRentDues) || 0,
+                    rent_dues_mode: rentDuesMode,
+                    collected_deposit_dues: parseFloat(collectDepositDues) || 0,
+                  })}
+                  disabled={checkingIn === b.token}
+                  className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+                >
+                  {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setExpanded(true)}
+                  className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70"
+                >
+                  Check In →
+                </button>
+              )}
             </>
           )}
         </div>
