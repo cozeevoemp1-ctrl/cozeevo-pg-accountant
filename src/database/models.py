@@ -888,6 +888,7 @@ class CheckoutSession(Base):
     biometric_removed     = Column(Boolean, nullable=False, default=False)
     room_condition_ok     = Column(Boolean, nullable=False, default=True)
     damage_notes          = Column(Text, nullable=True)
+    other_comments        = Column(Text, nullable=True)
     security_deposit      = Column(Numeric(12, 2), nullable=False, default=0)
     pending_dues          = Column(Numeric(12, 2), nullable=False, default=0)
     deductions            = Column(Numeric(12, 2), nullable=False, default=0)
