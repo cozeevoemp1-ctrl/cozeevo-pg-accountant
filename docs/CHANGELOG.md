@@ -2,12 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.86] — 2026-05-16 — Fix CI deploy (indentation bug in migrate_all.py)
+
+### CI/CD fix (`src/database/migrate_all.py`)
+- **Root cause**: `simplify_roles`, `engine.dispose()`, KYC migration, and RLS steps were still inside the outer `async with engine.begin() as conn:` block; calling `dispose()` on the live pool caused a crash when the outer context tried to commit, exiting non-zero → `set -e` aborted deploy before `systemctl restart`
+- **Fix**: dedented all post-enum steps outside the outer `engine.begin()` block so the main transaction commits cleanly first, then the pool is reset and fresh connections used for remaining steps
+- **Result**: Run #9 — green. Auto-deploy now fully working. Push to master → VPS updated + service restarted automatically.
+
 ## [1.75.85] — 2026-05-16 — Fix CI deploy (asyncpg pool reset after migration timeout)
 
 ### CI/CD fix (`src/database/migrate_all.py`)
-- **Root cause**: `simplify_roles` migration hits Supabase `statement_timeout`, leaving asyncpg pool with dirty connections; subsequent `engine.begin()` for KYC migration failed with unhandled exception, exiting non-zero → `set -e` in deploy script aborted before `systemctl restart pg-accountant`
-- **Fix**: `await engine.dispose()` + `engine = create_async_engine(DB_URL)` after the simplify_roles try/except block — fresh pool for all subsequent migrations
-- **Result**: GitHub Actions deploy now completes fully (migrations → service restart)
+- **Partial fix** (superseded by v1.75.86): added `engine.dispose()` + pool recreate after simplify_roles, but still inside the outer `engine.begin()` block — caused the outer commit to crash
+
 
 ## [1.75.84] — 2026-05-16 — Checkout fix + auto-deploy + UPI default
 

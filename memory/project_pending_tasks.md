@@ -6,11 +6,10 @@ type: project
 
 ## Active / Next Up
 
-### CI/CD — auto-deploy now functional (2026-05-16)
-- GitHub Actions deploy workflow: push to master → SSH → git pull → migrations → `systemctl restart pg-accountant`
+### CI/CD — auto-deploy WORKING ✓ (2026-05-16)
+- Run #9 passed (green) — commit bd25c14
+- Push to master → SSH → git pull → migrate_all → `systemctl restart pg-accountant` — fully automated
 - VPS_SSH_KEY secret set in GitHub repo
-- Pool reset fix committed (bfd69d1) — Run #7 in progress; should fully succeed now
-- If Run #7 still fails, check GitHub Actions logs at github.com/cozeevoemp1-ctrl/cozeevo-pg-accountant/actions
 
 ### EBITDA matrix — done, pending commit
 - `scripts/ebitda_matrix_jun2026.py` — complete, generates `scripts/ebitda_matrix_jun2026.xlsx`
