@@ -10,6 +10,7 @@ import { ReceiptScanner, ReceiptScanResult } from "@/components/forms/receipt-sc
 import {
   createPayment,
   getTenantDues,
+  patchAdjustment,
   uploadReceipt,
   TenantSearchResult,
   TenantDues,
@@ -56,6 +57,7 @@ export default function NewPaymentPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
   const [voiceHint, setVoiceHint] = useState("")
+  const [waiveRemaining, setWaiveRemaining] = useState(false)
 
   // Receipt state — scanned on form, uploaded after save
   const [scannedFile, setScannedFile] = useState<File | null>(null)
@@ -156,6 +158,15 @@ export default function NewPaymentPage() {
         }
       }
 
+      // Waive the remaining balance if toggled
+      if (waiveRemaining && balanceAfter !== null && balanceAfter > 0) {
+        try {
+          await patchAdjustment(tenant.tenancy_id, -Math.round(balanceAfter), "Waived rounding difference")
+        } catch {
+          // non-critical — payment already saved
+        }
+      }
+
       setShowConfirm(false)
       setSuccess(true)
     } catch (err) {
@@ -171,6 +182,7 @@ export default function NewPaymentPage() {
   function resetForm() {
     setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes("")
     setScannedFile(null); setReceiptUrl(null); setTransactionId(null); setLastPaymentId(null)
+    setWaiveRemaining(false)
   }
 
   if (success) {
@@ -289,6 +301,38 @@ export default function NewPaymentPage() {
         {/* Numpad */}
         <Numpad value={amount} onChange={setAmount} suggestAmounts={dues && ((dues.dues || 0) + (dues.deposit_due || 0)) > 0 ? [Math.round((dues.dues || 0) + (dues.deposit_due || 0))] : []} />
 
+        {/* Live summary + waive toggle */}
+        {dues && totalDues > 0 && Number(amount) > 0 && (
+          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-2">
+            {[
+              { label: "Total outstanding", value: totalDues, muted: true, warn: false },
+              { label: "Collecting now",    value: Number(amount), muted: false, warn: false },
+              { label: "Remaining after",   value: Math.max(0, balanceAfter ?? 0), muted: true, warn: (balanceAfter ?? 0) > 0 },
+            ].map(({ label, value, muted, warn }) => (
+              <div key={label} className="flex items-center justify-between">
+                <span className="text-[11px] text-ink-muted">{label}</span>
+                <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
+                  ₹{value.toLocaleString("en-IN")}
+                </span>
+              </div>
+            ))}
+            {balanceAfter !== null && balanceAfter > 0 && balanceAfter <= 500 && (
+              <button
+                type="button"
+                onClick={() => setWaiveRemaining((v) => !v)}
+                className={`mt-1 flex items-center justify-between px-3 py-2 rounded-tile border-2 transition-colors ${waiveRemaining ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"}`}
+              >
+                <span className={`text-xs font-semibold ${waiveRemaining ? "text-brand-pink" : "text-ink-muted"}`}>
+                  Waive ₹{Math.round(balanceAfter).toLocaleString("en-IN")} remaining
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${waiveRemaining ? "bg-brand-pink text-white" : "bg-[#E2DEDD] text-ink-muted"}`}>
+                  {waiveRemaining ? "ON" : "OFF"}
+                </span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Method */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
@@ -350,7 +394,8 @@ export default function NewPaymentPage() {
             { label: "Period", value: periodMonth },
             ...(notes ? [{ label: "Note", value: notes }] : []),
             ...(transactionId ? [{ label: "Ref", value: transactionId }] : []),
-            ...(balanceAfter !== null ? [{ label: "Balance after", value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${balanceAfter.toLocaleString("en-IN")} remaining` }] : []),
+            ...(balanceAfter !== null ? [{ label: "Balance after", value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${Math.round(balanceAfter).toLocaleString("en-IN")} remaining` }] : []),
+            ...(waiveRemaining && balanceAfter !== null && balanceAfter > 0 ? [{ label: "Also waiving", value: `₹${Math.round(balanceAfter).toLocaleString("en-IN")} (rounding)` }] : []),
           ]}
           onConfirm={handleConfirm}
           error={error}
