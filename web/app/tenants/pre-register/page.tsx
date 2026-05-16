@@ -118,7 +118,7 @@ export default function PreRegisterPage() {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Full name"
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
 
@@ -129,7 +129,7 @@ export default function PreRegisterPage() {
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="10-digit mobile"
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
 
@@ -140,7 +140,7 @@ export default function PreRegisterPage() {
                 type="date"
                 value={checkinDate}
                 onChange={e => setCheckinDate(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-brand-pink"
+                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
               />
             </div>
             <div>
@@ -152,7 +152,7 @@ export default function PreRegisterPage() {
                 onWheel={e => e.currentTarget.blur()}
                 placeholder="e.g. 12000"
                 min="0"
-                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
               />
             </div>
           </div>
@@ -166,16 +166,11 @@ export default function PreRegisterPage() {
                 onChange={e => setMaintenance(e.target.value)}
                 onWheel={e => e.currentTarget.blur()}
                 min="0"
-                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                Security deposit (₹)
-                {rentNum > 0 && !depositOverridden && (
-                  <span className="ml-1 normal-case font-normal text-ink-muted">(auto)</span>
-                )}
-              </label>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Security deposit (₹)</label>
               <input
                 type="number"
                 value={depositDisplay}
@@ -184,8 +179,11 @@ export default function PreRegisterPage() {
                 onWheel={e => e.currentTarget.blur()}
                 placeholder="Auto = 1 month rent"
                 min="0"
-                className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
               />
+              {rentNum > 0 && !depositOverridden && (
+                <p className="mt-0.5 text-[10px] text-ink-muted">auto = 1 month rent</p>
+              )}
             </div>
           </div>
 
@@ -198,7 +196,7 @@ export default function PreRegisterPage() {
               onWheel={e => e.currentTarget.blur()}
               placeholder="0 if none"
               min="0"
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
 
