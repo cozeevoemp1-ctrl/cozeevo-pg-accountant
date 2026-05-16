@@ -1566,10 +1566,10 @@ async def run_staff_room_corrections_2026_05_16(conn: AsyncConnection) -> None:
     Earlier migrations re-applied is_staff_room=TRUE on every deploy for rooms that
     were manually changed via bot. This migration permanently overrides that.
 
-    Confirmed staff rooms as of 2026-05-16:
+    Confirmed staff rooms as of 2026-05-16 (7 total):
       THOR: G05, G06, 108, 701
       HULK: G12, 702, 614
-    NOT staff: 107 (Samruddhi Thanwar, paying tenant), 114, 618
+    Revenue (NOT staff): 107 (Samruddhi Thanwar), 114, 618 → 295 revenue beds
     """
     print("\n-- Staff room corrections (2026-05-16) --")
     r = await conn.execute(text("""

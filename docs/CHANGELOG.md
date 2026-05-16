@@ -2,6 +2,47 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.88] — 2026-05-16 — Staff room fix + TOTAL_BEDS 293→295
+
+### Root cause
+`migrate_all.py` migrations (`run_room_master_fix`, `run_room_cleanup_2026_03_23`) hard-coded
+`is_staff_room=TRUE` for rooms 107, 114, 618 and re-applied on every CI/CD deploy, overwriting
+bot changes that set those rooms to revenue.
+
+### Fix (`src/database/migrate_all.py`)
+- Added `run_staff_room_corrections_2026_05_16` — runs after old migrations, explicitly sets
+  107 + 114 + 618 to `is_staff_room=FALSE`. Idempotent. Future deploys cannot revert this.
+
+### Files updated (293 → 295)
+- `src/integrations/gsheets.py` TOTAL_BEDS
+- `scripts/clean_and_load.py` TOTAL_BEDS
+- `scripts/gsheet_apps_script.js` TOTAL_BEDS
+- `scripts/gsheet_dashboard_webapp.js` TOTAL_BEDS
+- `src/whatsapp/handlers/account_handler.py` fallback
+- `docs/MASTER_DATA.md` staff rooms table + revenue beds count
+- `docs/BRAIN.md` revenue summary + bed count formula
+
+### Confirmed staff rooms (7): G05, G06, 108, 701, 702, G12, 614 — 295 revenue beds
+
+---
+
+## [1.75.87] — 2026-05-16 — May import dedup fix + 11 duplicate payments voided
+
+### Root cause (`scripts/_import_may_payments.py`)
+Import dedup only checked `for_type='rent'`. New May check-ins had booking advances already in
+DB as `for_type='booking'`; script saw db_upi=0 and added the same amount again as rent.
+
+### Fix
+Added second dedup query for `for_type IN ('booking','deposit')` with `payment_date >= 2026-04-01`.
+Future runs are idempotent and won't double-count booking advances.
+
+### Data fix (`scripts/_void_may_dupe_imports.py`)
+Voided 11 confirmed duplicate May rent payments (IDs 16229,16231,16235,16237,16239,16241,16242,
+16245,16254,16255,16260). Mathew Koshy (16233) voided separately.
+Impact: May UPI −₹45,500 / May Cash −₹27,000.
+
+---
+
 ## [1.75.86] — 2026-05-16 — Fix CI deploy (indentation bug in migrate_all.py)
 
 ### CI/CD fix (`src/database/migrate_all.py`)
