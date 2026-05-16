@@ -1552,6 +1552,15 @@ async def run_upi_collection_table_2026_05_11(conn: AsyncConnection) -> None:
     print("  [ok] upi_collection_entries created")
 
 
+async def run_add_checkout_session_other_comments_2026_05_16(conn: AsyncConnection) -> None:
+    """Add other_comments column to checkout_sessions (was in model but missing from DB table)."""
+    print("\n-- checkout_sessions.other_comments column (2026-05-16) --")
+    await conn.execute(text(
+        "ALTER TABLE checkout_sessions ADD COLUMN IF NOT EXISTS other_comments TEXT"
+    ))
+    print("  [ok] checkout_sessions.other_comments added")
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1595,6 +1604,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_cash_tables_2026_05_11(conn)
             await run_upi_collection_table_2026_05_11(conn)
             await run_btxn_dedup_2026_05_12(conn)
+            await run_add_checkout_session_other_comments_2026_05_16(conn)
         # Runs outside the main transaction (needs separate commits for enum values)
         try:
             await run_simplify_roles_2026_04_01(engine)
