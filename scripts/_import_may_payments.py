@@ -103,7 +103,12 @@ async def run(write: bool):
     print("\nStep 2: Checking DB + importing missing payments...")
 
     async with Session() as session:
-        # Pre-load existing May payments by tenancy_id
+        # Pre-load existing May payments by tenancy_id.
+        # Include ALL for_types (rent + booking + deposit) because the source sheet's
+        # Z/AA columns include booking advances paid in May for new check-ins.
+        # Without this, advances already in DB get added again as rent (duplicate).
+        # Use payment_date >= 2026-04-01 for advances so we don't count old deposits
+        # paid months ago (which are NOT in the May Z/AA columns).
         from sqlalchemy import text
         existing_q = await session.execute(text("""
             SELECT p.tenancy_id, p.payment_mode, SUM(p.amount) as total
@@ -117,6 +122,22 @@ async def run(write: bool):
             if tid not in existing_pmts:
                 existing_pmts[tid] = {'cash': 0.0, 'upi': 0.0}
             existing_pmts[tid][row.payment_mode] = float(row.total)
+
+        # Also count recent booking/deposit advances (payment_date >= Apr 2026)
+        # These appear in the sheet's Z/AA columns for May check-ins
+        advance_q = await session.execute(text("""
+            SELECT p.tenancy_id, p.payment_mode, SUM(p.amount) as total
+            FROM payments p
+            WHERE p.for_type IN ('booking', 'deposit')
+              AND p.payment_date >= '2026-04-01'
+              AND p.is_void = false
+            GROUP BY p.tenancy_id, p.payment_mode
+        """))
+        for row in advance_q:
+            tid = row.tenancy_id
+            if tid not in existing_pmts:
+                existing_pmts[tid] = {'cash': 0.0, 'upi': 0.0}
+            existing_pmts[tid][row.payment_mode] += float(row.total)
 
         for rec in sheet_data:
             phone = rec['phone_db']
