@@ -237,8 +237,16 @@ async def run(write: bool):
             r2 = await session.execute(text(
                 "DELETE FROM rent_schedule WHERE period_month IN ('2026-04-01', '2026-05-01')"
             ))
+            # Also wipe deposit payments created by reload (payment_date = period start,
+            # period_month = NULL). These don't get caught by the period_month filter above.
+            r3 = await session.execute(text(
+                "DELETE FROM payments WHERE period_month IS NULL"
+                "  AND for_type = 'deposit'"
+                "  AND payment_date IN ('2026-04-01', '2026-05-01')"
+            ))
             await session.flush()
-            print(f"\nStep 2: Wiped {r1.rowcount} payments + {r2.rowcount} rent_schedules")
+            print(f"\nStep 2: Wiped {r1.rowcount} payments + {r2.rowcount} rent_schedules"
+                  f" + {r3.rowcount} reload deposits")
         else:
             cnt_pay = await session.scalar(
                 select(func.count()).select_from(Payment).where(
