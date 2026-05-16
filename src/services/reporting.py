@@ -227,10 +227,9 @@ async def collection_summary(
     collected = max(0, expected - pending)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
-    # ── Payment method breakdown — DATE-SCOPED ───────────────────────────────
-    # Rent payments only, matching sheet Z (UPI) / AA (Cash) columns.
-    # Deposits = backfilled from Excel deposit column, not in sheet Z/AA.
-    # Booking advances = separate sheet column, excluded here.
+    # ── Payment method breakdown — matches sheet cash/UPI columns ────────────
+    # Rent: filter by period_month (excludes old-period catch-ups received this month).
+    # Deposits: filter by payment_date (period_month=None for all deposits).
     method_rows = (
         await session.execute(
             select(
@@ -239,9 +238,13 @@ async def collection_summary(
             )
             .where(
                 Payment.is_void == False,
-                Payment.for_type == PaymentFor.rent,
-                extract("year",  Payment.payment_date) == from_date.year,
-                extract("month", Payment.payment_date) == from_date.month,
+                or_(
+                    and_(Payment.for_type == PaymentFor.rent,
+                         Payment.period_month == from_date),
+                    and_(Payment.for_type == PaymentFor.deposit,
+                         extract("year",  Payment.payment_date) == from_date.year,
+                         extract("month", Payment.payment_date) == from_date.month),
+                ),
             )
             .group_by(Payment.payment_mode)
         )

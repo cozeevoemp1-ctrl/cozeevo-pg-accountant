@@ -400,7 +400,7 @@ async def run(write: bool):
                         notes=f"{label} sheet reload",
                     ))
 
-                    def _pay(amt, mode, ftype):
+                    def _pay(amt, mode, ftype, pm):
                         if amt > 0:
                             session.add(Payment(
                                 tenancy_id=tenancy.id,
@@ -408,14 +408,15 @@ async def run(write: bool):
                                 payment_date=period,
                                 payment_mode=mode,
                                 for_type=ftype,
-                                period_month=period,
+                                period_month=pm,
                                 notes=f"{label} sheet reload",
                             ))
 
-                    _pay(cash_rent, PaymentMode.cash, PaymentFor.rent)
-                    _pay(upi_rent,  PaymentMode.upi,  PaymentFor.rent)
-                    _pay(cash_dep,  PaymentMode.cash, PaymentFor.deposit)
-                    _pay(upi_dep,   PaymentMode.upi,  PaymentFor.deposit)
+                    _pay(cash_rent, PaymentMode.cash, PaymentFor.rent,    period)
+                    _pay(upi_rent,  PaymentMode.upi,  PaymentFor.rent,    period)
+                    # Deposits: period_month=None so pending calc counts them correctly
+                    _pay(cash_dep,  PaymentMode.cash, PaymentFor.deposit, None)
+                    _pay(upi_dep,   PaymentMode.upi,  PaymentFor.deposit, None)
 
                 # Stats
                 if period == APR:
