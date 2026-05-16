@@ -383,19 +383,27 @@ async def get_kpi_detail(
             ]}
 
         elif type == "dues":
+            import math as _math
             period = date(today.year, today.month, 1)
             next_m = today.month % 12 + 1
             next_y = today.year + (1 if today.month == 12 else 0)
             period_end = date(next_y, next_m, 1)
-            paid_subq = (
+            # Rent credits: rent payments for period + deposit/booking in date range
+            # Booking advances included regardless of period_month (same fix as tenants.py)
+            rent_paid_subq = (
                 select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
                 .where(
                     Payment.is_void == False,
                     or_(
                         and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
                         and_(
-                            Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                            Payment.for_type == PaymentFor.deposit,
                             Payment.period_month == None,
+                            Payment.payment_date >= period,
+                            Payment.payment_date < period_end,
+                        ),
+                        and_(
+                            Payment.for_type == PaymentFor.booking,
                             Payment.payment_date >= period,
                             Payment.payment_date < period_end,
                         ),
@@ -404,39 +412,59 @@ async def get_kpi_detail(
                 .group_by(Payment.tenancy_id)
                 .subquery()
             )
+            deposit_paid_subq = (
+                select(Payment.tenancy_id, func.sum(Payment.amount).label("dep_paid"))
+                .where(Payment.is_void == False, Payment.for_type == PaymentFor.deposit)
+                .group_by(Payment.tenancy_id)
+                .subquery()
+            )
             eff_due_col = (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)).label("effective_due")
             rows = (await session.execute(
                 select(
                     Tenancy.id,
+                    Tenancy.security_deposit,
+                    Tenancy.booking_amount,
                     Tenant.name,
                     Room.room_number,
                     Property.name.label("property_name"),
                     eff_due_col,
-                    func.coalesce(paid_subq.c.paid, 0).label("paid"),
+                    func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
+                    func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
                 .join(Property, Property.id == Room.property_id)
                 .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
-                .outerjoin(paid_subq, paid_subq.c.tenancy_id == Tenancy.id)
+                .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == Tenancy.id)
+                .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
                 .where(
                     RentSchedule.period_month == period,
                     Tenancy.status == TenancyStatus.active,
-                    (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)) > func.coalesce(paid_subq.c.paid, 0),
                 )
-                .order_by(desc(RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0) - func.coalesce(paid_subq.c.paid, 0)))
             )).all()
-            return {"type": type, "items": [
-                {
+            items = []
+            for r in rows:
+                eff = float(r.effective_due or 0)
+                rent_paid = float(r.rent_paid or 0)
+                dep_paid = float(r.dep_paid or 0)
+                booking_amt = float(r.booking_amount or 0)
+                dep_agreed = float(r.security_deposit or 0)
+                rent_dues = _math.ceil(max(0.0, eff - rent_paid) / 100) * 100
+                booking_surplus = max(0.0, booking_amt - eff)
+                dep_due = _math.ceil(max(0.0, dep_agreed - dep_paid - booking_surplus) / 100) * 100
+                total_dues = rent_dues + dep_due
+                if total_dues <= 0:
+                    continue
+                items.append({
                     "tenancy_id": r.id,
                     "name": r.name,
                     "room": r.room_number,
                     "building": (r.property_name or "").split()[-1] if r.property_name else "",
-                    "detail": f"₹{int(r.effective_due - r.paid):,}",
-                    "dues": int(r.effective_due - r.paid),
-                }
-                for r in rows
-            ]}
+                    "detail": f"₹{total_dues:,}",
+                    "dues": total_dues,
+                })
+            items.sort(key=lambda x: x["dues"], reverse=True)
+            return {"type": type, "items": items}
 
         elif type == "no_show":
             rows = (await session.execute(
