@@ -352,17 +352,11 @@ async def run(write: bool):
         for tid, b in tenancy_buckets.items():
             tenancy = b["tenancy"]
 
-            # ── Deposit shortfall from SHEET data only ───────────────────
-            booking_advance   = b["booking_advance"]
-            agreed_deposit    = b["agreed_deposit"]
-            deposit_shortfall = max(0.0, agreed_deposit - booking_advance)
-
             # ── Helper: split + record for one month ─────────────────────
             name = " + ".join(b["names"])
             room = ""  # not needed past this point
 
             def record_month(cash: float, upi: float, period: date, label: str):
-                nonlocal deposit_shortfall
                 nonlocal apr_rent_n, apr_rent_t, apr_dep_n, apr_dep_t
                 nonlocal may_rent_n, may_rent_t, may_dep_n, may_dep_t
 
@@ -377,10 +371,8 @@ async def run(write: bool):
                     warnings.append(f"{name}: no agreed_rent in sheet for {label}")
                 rent_due = prorate(agreed, b["checkin"], period)
 
-                # Allocate
+                # Allocate: rent first, all remaining goes to deposit (no cap)
                 rent_target = min(total, rent_due)
-                raw_excess  = total - rent_target
-                dep_target  = min(raw_excess, deposit_shortfall)
 
                 # Cash goes first toward rent, then UPI
                 cash_rent = min(cash, rent_target)
@@ -388,10 +380,8 @@ async def run(write: bool):
                 cash_over = cash - cash_rent
                 upi_over  = upi  - upi_rent
 
-                cash_dep  = min(cash_over, dep_target)
-                upi_dep   = min(upi_over,  max(0.0, dep_target - cash_dep))
-
-                deposit_shortfall -= (cash_dep + upi_dep)
+                cash_dep  = cash_over
+                upi_dep   = upi_over
 
                 # Rent schedule (status based on coverage)
                 if rent_target >= rent_due:
