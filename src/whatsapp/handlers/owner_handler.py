@@ -271,15 +271,19 @@ async def _do_confirm_checkout(
     cs.confirmed_at = datetime.utcnow()
     await session.flush()
 
-    # Google Sheet sync
+    # Google Sheet sync — 10s timeout so a slow Sheets API never blocks the HTTP response
+    import asyncio as _asyncio
     try:
         from src.integrations.gsheets import record_checkout as _gs_checkout
         from src.integrations import gsheets as _gs
-        await _gs_checkout(
-            room_number,
-            tenant_name,
-            notice_str,
-            cs.checkout_date.strftime("%d/%m/%Y"),
+        await _asyncio.wait_for(
+            _gs_checkout(
+                room_number,
+                tenant_name,
+                notice_str,
+                cs.checkout_date.strftime("%d/%m/%Y"),
+            ),
+            timeout=10,
         )
         is_daily = tenancy and tenancy.stay_type.value == "daily"
         if is_daily:
@@ -315,7 +319,7 @@ async def _do_confirm_checkout(
                 + (f"{wa_refund}\n" if wa_refund else "")
                 + "Thank you for staying with Cozeevo."
             )
-            await _send_whatsapp(phone_wa, msg)
+            await _asyncio.wait_for(_send_whatsapp(phone_wa, msg), timeout=8)
         except Exception as _e:
             logger.warning("WhatsApp checkout notification failed: %s", _e)
 
