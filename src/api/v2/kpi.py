@@ -115,13 +115,13 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Pre-booked: onboarding sessions (link sent, form not yet filled)
+        # Pre-booked: pending_tenant (link sent) + pending_review (form filled, awaiting approval)
         # + no_show tenants in room 000 (pre-booked via old bot flow)
         prebooked_form = (
             await session.scalar(
                 select(func.count(OnboardingSession.id))
                 .where(
-                    OnboardingSession.status == "pending_tenant",
+                    OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
                     or_(
                         OnboardingSession.expires_at == None,
                         OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
@@ -517,9 +517,11 @@ async def get_kpi_detail(
                     OnboardingSession.room_number,
                     OnboardingSession.checkin_date,
                     OnboardingSession.expires_at,
+                    OnboardingSession.status,
+                    OnboardingSession.tenant_data,
                 )
                 .where(
-                    OnboardingSession.status == "pending_tenant",
+                    OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
                     or_(
                         OnboardingSession.expires_at == None,
                         OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
@@ -537,13 +539,19 @@ async def get_kpi_detail(
                 )
                 .order_by(Tenancy.checkin_date.asc().nulls_last())
             )).all()
+            import json as _json
             items = []
             for r in obs_rows:
+                td = _json.loads(r.tenant_data) if r.tenant_data else {}
+                name = td.get("name") or r.tenant_name or "—"
                 expires = r.expires_at
-                detail = f"Link expires {expires.strftime('%-d %b')}" if expires else "Link sent"
+                if r.status == "pending_review":
+                    detail = "Form filled · awaiting check-in"
+                else:
+                    detail = f"Link expires {expires.strftime('%-d %b')}" if expires else "Link sent"
                 items.append({
                     "tenancy_id": None,
-                    "name": r.tenant_name or "—",
+                    "name": name,
                     "room": r.room_number or "TBD",
                     "detail": detail,
                     "is_overdue": False,
