@@ -49,9 +49,8 @@ CAPITAL_CONTRIBUTIONS = {
     # Dec: ₹74,768 BESCOM via partner UPI 7358341775-2@ybl (moved to Electricity expense)
     # Jan–Apr: personal SBI 0167 payments matching OPEX Partner Reimbursable line
     "Partner advance — Lakshmi (personal UPI + SBI 0167, reimbursable)": [0, 0, 74768, 41899, 18264, 750, 6928],
-    # Chandra personal cash for PG operations — "Other Expenses" cash residual (untracked ops spend)
-    # ⚠ TBD — confirm with Chandra that these are his personal cash advances (not already paid by company)
-    "Chandra advance — operational cash (TBD confirm)":             [0,     0,      0,     0,     0, 32789, 38111],
+    # Chandra advance: removed 2026-05-17 — could not confirm bank source (not in any bank_transactions row)
+    # Add back if Chandra confirms he personally advanced cash for Mar/Apr ops (₹32,789 + ₹38,111)
     # Kiran PhonePe/cash for PG ops — company owes Kiran back (equity injection)
     # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD, Mr V AKIL ₹10,669 (Other Expense)
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
@@ -88,7 +87,7 @@ OPEX = {
     "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003],  # Apr +1003 Naukri job posting. Updated 2026-05-13
     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   3000,    3000,    3000],  # Jan +5600: Jitendra cash — BBMP ₹5K + Agreement ₹600 (police ₹3K was already in accrual). 2026-05-14
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 15987, 2781,     700,       0,   32789,   38111],  # Feb: paytmqr ₹200 reclassified to Shopping & Supplies. Updated 2026-05-13
+    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0],  # Mar+Apr Chandra-attributed cash removed 2026-05-17 (no bank source — pending confirmation)
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
@@ -102,11 +101,14 @@ EXCLUDED = {
     # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
     "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12
     # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
-    # Feb: Sri Lakshmi Chandrasekar ₹6L. Mar: YESMIDAS + Sravani + Sri Lakshmi etc. ₹15.9L. Apr: ₹22K misc.
+    # Feb: Sri Lakshmi Chandrasekar ₹6L (id 1885)
+    # Mar: Sravani ₹7.5L (id 1714) + Sri Lakshmi ₹6L (id 1623) + Bharathi ₹2L (id 1652) = ₹15.5L
+    #      ₹40K shalu.pravi2125@okicici REMOVED 2026-05-17 (unknown UPI Mar 15 — not a confirmed cash exchange)
+    # Apr: Prabhakaran borrow/return ₹20K (ids 1191+1175) + Amazon Pay Later ₹2,357 (ids 1179+1053+1006) = ₹22,357
     # Nov ₹5L REMOVED — startup capital repayment (Capital Contributions above), not a cash exchange.
     # Mar ₹5L Bharathi REMOVED — covered by THOR→HULK intercompany transfer, not a separate P&L item.
     # NOT an operating cost — the cash was already spent and counted in OPEX categories above.
-    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 1590000,  22357],
+    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 1550000,  22357],
 }
 
 # ── Deposit flows — queried from tenancies (security_deposit + maintenance_fee by check-in month)
@@ -267,7 +269,7 @@ def _write_pnl_tab(
                                  fill_type="solid")
     ws.append([])
 
-    # ── 7. CASH POSITION ───────────────────────────────────────────────────────
+    # ── 7. BALANCE SHEET ITEMS ────────────────────────────────────────────────
     # Pure refundable security deposits owed to active tenants
     # Combined total ₹33,83,875 included maintenance ₹10,68,700 — maintenance is non-refundable
     # True refundable liability = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
@@ -275,7 +277,7 @@ def _write_pnl_tab(
     _bank_total    = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
     _cash_total    = sum(CASH_IN_HAND.values())
 
-    ws.append(["CASH POSITION (Apr 30)", ""])
+    ws.append(["BALANCE SHEET ITEMS (Apr 30)", ""])
     ws[ws.max_row][0].font = bold
     ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
     ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
@@ -311,8 +313,8 @@ def _write_pnl_tab(
     for f in [
         "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
         "2. Apr rent of Rs.20,49,100 paid in May is outside this P&L window — will appear in May P&L.",
-        "3. Chandra advance (Mar Rs.32,789 + Apr Rs.38,111) — confirm these are Chandra's personal cash advances for PG ops, not company-paid cash already counted above.",
-        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi Chandrasekar, Mar Rs.15.9L (YESMIDAS+Sravani+Sri Lakshmi; Bharathi Rs.5L excluded — covered by THOR→HULK intercompany transfer), Apr Rs.22K.",
+        "3. Chandra advance REMOVED (Mar Rs.32,789 + Apr Rs.38,111) — no bank transaction found; re-add if Chandra confirms personal cash advances.",
+        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi, Mar Rs.15.5L (Sravani 7.5L+Sri Lakshmi 6L+Bharathi 2L; Rs.40K shalu removed — unconfirmed), Apr Rs.22K (Prabhakaran+Amazon Pay Later).",
     ]:
         ws.append([f, ""])
 
