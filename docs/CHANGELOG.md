@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.1] — 2026-05-17 — PWA Notices UX: rolling month chips, day-stay filter, free-from date
+
+### PWA: Notices page (`web/app/notices/page.tsx`)
+- Month chips now auto-roll 4 months from current month — no past months ever shown
+- Added "Day stay" type filter chip (green) — filters list to `stay_type === "daily"` tenants only; day-stay section also respects month + search filters now (derived from `filtered`, not raw `items`)
+- Added `freeFrom()` helper (checkout + 1 day); "Free from" shown in green in NoticeCard detail grid
+
+### PWA: Home notices tile (`web/components/home/kpi-grid.tsx`)
+- Added "Free from" date (checkout + 1 day, in green) at top of inline expand panel when a notice row is tapped
+
 ## [1.76.0] — 2026-05-17 — PWA fixes: scroll bug, check-in deep link, day-stay notices, data cleanup
 
 ### PWA: KPI awaiting check-in tile (`web/components/home/kpi-grid.tsx`)
