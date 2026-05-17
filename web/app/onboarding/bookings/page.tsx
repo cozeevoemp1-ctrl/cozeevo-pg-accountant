@@ -280,6 +280,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [collectDepositDues, setCollectDepositDues] = useState("")
   const [totalDues, setTotalDues] = useState(0)  // frozen at first pre-fill, never changes
   const prefillDone = useRef(false)
+  const defaultRentDues = useRef("")
+  const defaultDepositDues = useRef("")
 
   // Pre-fill outstanding dues once on mount — never overwrites user edits
   useEffect(() => {
@@ -297,8 +299,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             if (!d) return
             const rentDue = d.dues ?? 0
             const depDue = d.deposit_due ?? 0
-            if (rentDue > 0) setCollectRentDues(String(Math.round(rentDue)))
-            if (depDue > 0) setCollectDepositDues(String(Math.round(depDue)))
+            if (rentDue > 0) { const v = String(Math.round(rentDue)); setCollectRentDues(v); defaultRentDues.current = v }
+            if (depDue > 0) { const v = String(Math.round(depDue)); setCollectDepositDues(v); defaultDepositDues.current = v }
             setTotalDues(rentDue + depDue)
             prefillDone.current = true
           })
@@ -308,8 +310,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       // Advance (booking_amount) deducted from deposit, not rent
       const rentDue = proRata
       const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
-      if (rentDue > 0) setCollectRentDues(String(rentDue))
-      if (depositDue > 0) setCollectDepositDues(String(depositDue))
+      if (rentDue > 0) { const v = String(rentDue); setCollectRentDues(v); defaultRentDues.current = v }
+      if (depositDue > 0) { const v = String(depositDue); setCollectDepositDues(v); defaultDepositDues.current = v }
       setTotalDues(rentDue + depositDue)
       prefillDone.current = true
     }
@@ -522,6 +524,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               <div>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
                 <input type="number" inputMode="decimal" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
+                  onBlur={() => { if (collectRentDues === "" && defaultRentDues.current) setCollectRentDues(defaultRentDues.current) }}
                   className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                 />
                 <ModeToggle mode={rentDuesMode} setMode={setRentDuesMode} />
@@ -529,6 +532,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               <div>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
                 <input type="number" inputMode="decimal" value={collectDepositDues} onChange={(e) => setCollectDepositDues(e.target.value)}
+                  onBlur={() => { if (collectDepositDues === "" && defaultDepositDues.current) setCollectDepositDues(defaultDepositDues.current) }}
                   className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                 />
                 <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
