@@ -14,6 +14,13 @@ function fmtDate(iso: string | null): string {
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`
 }
 
+function freeFrom(checkout: string | null): string {
+  if (!checkout) return "—"
+  const d = new Date(checkout + "T00:00:00")
+  d.setDate(d.getDate() + 1)
+  return fmtDate(d.toISOString().slice(0, 10))
+}
+
 function fmtINR(n: number): string {
   return `₹${Math.round(n).toLocaleString("en-IN")}`
 }
@@ -522,6 +529,7 @@ function NoticeCard({
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
         <Detail label="Notice given" value={item.notice_date ? `${fmtDate(item.notice_date)} (${noticeDay! <= NOTICE_BY_DAY ? "on time" : "late"})` : "No notice given"} />
         <Detail label="Last day" value={fmtDate(item.expected_checkout)} />
+        <Detail label="Free from" value={freeFrom(item.expected_checkout)} highlight />
         <Detail label="Security deposit" value={fmtINR(item.security_deposit)} />
         <Detail label="Agreed rent" value={`${fmtINR(item.agreed_rent)}/mo`} />
         {item.deposit_eligible ? (
