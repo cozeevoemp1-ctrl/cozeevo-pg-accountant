@@ -115,8 +115,9 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Pre-booked: onboarding sessions where form not yet filled (link sent, awaiting tenant)
-        prebooked_count = (
+        # Pre-booked: onboarding sessions (link sent, form not yet filled)
+        # + no_show tenants in room 000 (pre-booked via old bot flow)
+        prebooked_form = (
             await session.scalar(
                 select(func.count(OnboardingSession.id))
                 .where(
@@ -128,6 +129,17 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 )
             ) or 0
         )
+        prebooked_room000 = (
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.room_number == "000",
+                    Tenancy.status == TenancyStatus.no_show,
+                )
+            ) or 0
+        )
+        prebooked_count = prebooked_form + prebooked_room000
 
         # Monthly tenants with formal notice
         notices_count = int(
@@ -494,6 +506,63 @@ async def get_kpi_detail(
                     "detail": detail,
                     "is_overdue": overdue,
                     "days_overdue": days_late,
+                })
+            return {"type": type, "items": items}
+
+        elif type == "prebooked":
+            obs_rows = (await session.execute(
+                select(
+                    OnboardingSession.id,
+                    OnboardingSession.tenant_name,
+                    OnboardingSession.room_number,
+                    OnboardingSession.checkin_date,
+                    OnboardingSession.expires_at,
+                )
+                .where(
+                    OnboardingSession.status == "pending_tenant",
+                    or_(
+                        OnboardingSession.expires_at == None,
+                        OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
+                    ),
+                )
+                .order_by(OnboardingSession.checkin_date.asc().nulls_last())
+            )).all()
+            noshow000_rows = (await session.execute(
+                select(Tenancy.id, Tenant.name, Tenancy.checkin_date)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.room_number == "000",
+                    Tenancy.status == TenancyStatus.no_show,
+                )
+                .order_by(Tenancy.checkin_date.asc().nulls_last())
+            )).all()
+            items = []
+            for r in obs_rows:
+                expires = r.expires_at
+                detail = f"Link expires {expires.strftime('%-d %b')}" if expires else "Link sent"
+                items.append({
+                    "tenancy_id": None,
+                    "name": r.tenant_name or "—",
+                    "room": r.room_number or "TBD",
+                    "detail": detail,
+                    "is_overdue": False,
+                })
+            for r in noshow000_rows:
+                checkin = r.checkin_date
+                overdue = checkin is not None and checkin < today
+                days_late = (today - checkin).days if overdue and checkin else 0
+                detail = (
+                    f"{days_late}d overdue"
+                    if overdue
+                    else f"Check-in: {checkin.strftime('%-d %b') if checkin else '—'}"
+                )
+                items.append({
+                    "tenancy_id": r.id,
+                    "name": r.name,
+                    "room": "TBD",
+                    "detail": detail,
+                    "is_overdue": overdue,
                 })
             return {"type": type, "items": items}
 

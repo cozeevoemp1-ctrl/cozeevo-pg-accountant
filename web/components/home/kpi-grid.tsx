@@ -12,7 +12,7 @@ interface KpiGridProps {
   initialDetails?: Record<string, KpiDetailItem[]>;
 }
 
-type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | "no_show" | "notices" | null;
+type TileKey = "occupied" | "vacant" | "checkins_today" | "checkouts_today" | "dues" | "no_show" | "notices" | "prebooked" | null;
 type RentRange = "all" | "lt12" | "12to15" | "15to20" | "gt20";
 type GenderFilter = "all" | "male" | "female" | "empty";
 type StayFilter = "all" | "monthly" | "daily";
@@ -690,6 +690,22 @@ function ExpansionPanel({
         </div>
       )}
 
+      {/* Filter bar — prebooked */}
+      {open === "prebooked" && (
+        <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
+          <input
+            type="text"
+            placeholder="Name…"
+            value={nameSearch}
+            onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
+            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+          />
+          {!loading && filtered.length > 0 && (
+            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} total</p>
+          )}
+        </div>
+      )}
+
       {/* Filter bar — notices */}
       {open === "notices" && (
         <div className="px-3 pt-3 pb-2 flex flex-col gap-2">
@@ -816,8 +832,8 @@ function ExpansionPanel({
                 } ${selected?.tenancy_id === item.tenancy_id ? "bg-[#FCE2EE]" : ""}`}
               >
                 <button
-                  onClick={() => open === "dues" ? (item.tenancy_id ? onCollect(item) : undefined) : selectItem(item)}
-                  disabled={!item.tenancy_id}
+                  onClick={() => open === "dues" ? (item.tenancy_id ? onCollect(item) : undefined) : open === "prebooked" ? undefined : selectItem(item)}
+                  disabled={!item.tenancy_id || open === "prebooked"}
                   className={`flex-1 flex justify-between items-center text-left min-w-0 ${item.tenancy_id ? "cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="min-w-0">
@@ -854,7 +870,7 @@ function ExpansionPanel({
                       </span>
                     )}
                     <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
-                    {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && open !== "dues" && (
+                    {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && open !== "dues" && open !== "prebooked" && (
                       <span className="text-xs text-brand-pink font-bold">
                         {selected?.tenancy_id === item.tenancy_id ? "▾" : "›"}
                       </span>
@@ -963,10 +979,17 @@ function ExpansionPanel({
             </Link>
           </div>
         )}
+        {open === "prebooked" && (
+          <div className="px-3 pb-2 pt-1">
+            <Link href="/onboarding/bookings" className="block text-center text-xs font-bold text-brand-pink py-1.5 rounded-xl border border-brand-pink/30 active:opacity-70">
+              View all in Bookings →
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Tenant detail card — tiles that use bottom expand (not notices, not dues) */}
-      {open !== "notices" && open !== "dues" && (
+      {open !== "notices" && open !== "dues" && open !== "prebooked" && (
         <div className="px-3 pb-3">
           {detailLoading && (
             <p className="text-xs text-ink-muted text-center pt-2">Loading details…</p>
@@ -1012,6 +1035,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     const keys: TileKey[] = ["occupied", "vacant", "dues"];
     if (data.checkins_today > 0 || data.checkouts_today > 0) keys.push("checkins_today", "checkouts_today");
     if (data.no_show_count > 0) keys.push("no_show");
+    if (data.prebooked_count > 0) keys.push("prebooked");
     if (data.notices_count > 0) keys.push("notices");
     keys.forEach((k) => prefetch(k));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1161,7 +1185,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
         const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
         return matchName && matchStay;
       }
-      if (open === "no_show") {
+      if (open === "no_show" || open === "prebooked") {
         return (
           !nameSearch.trim() ||
           it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
@@ -1309,9 +1333,12 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
                 <IconTile
                   icon="🔖" label="Pre-booked"
                   value={data.prebooked_count}
-                  color="orange" active={false}
-                  onClick={() => { window.location.href = "/onboarding/bookings" }}
+                  color="orange" active={open === "prebooked"}
+                  onClick={() => toggle("prebooked")}
                 />
+                {open === "prebooked" && (
+                  <ExpansionPanel {...panelProps} positionStyle={rightStyle} />
+                )}
               </div>
             </>
           ) : data.no_show_count > 0 ? (
@@ -1333,9 +1360,12 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
               <IconTile
                 icon="🔖" label="Pre-booked"
                 value={data.prebooked_count}
-                color="orange" active={false}
-                onClick={() => { window.location.href = "/onboarding/bookings" }}
+                color="orange" active={open === "prebooked"}
+                onClick={() => toggle("prebooked")}
               />
+              {open === "prebooked" && (
+                <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+              )}
             </div>
           )}
         </>
