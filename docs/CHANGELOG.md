@@ -59,6 +59,32 @@ All notable changes to PG Accountant will be documented here.
 
 ---
 
+## [1.75.95] — 2026-05-17 — Fix advance/deposit/proration bugs for new check-ins
+
+### Bug fix: booking_amount applied to deposit incorrectly (Sathish K, Room G14)
+
+**Root cause**: Three interrelated bugs when a tenant's advance (booking_amount) equals deposit:
+1. `deposit_due` was computed via `booking_surplus = max(0, booking_amount - effective_due)` — applied advance to rent first, only surplus to deposit. Since RS.rent_due already nets booking (via `first_month_rent_due`), `effective_due` was prorated+deposit−booking, making the surplus calculation wrong and leaving deposit showing as partially unpaid.
+2. `get_tenant_dues()` included `PaymentFor.booking` in `paid_result` query — double-deducted advance (also already netted in RS.rent_due formula).
+3. `list_tenants()` included `PaymentFor.booking` in deposit `paid_subq` — same double-deduction.
+4. Commit `4a61d4b` removed auto-recording of booking_amount as Payment at check-in — advance was tracked on tenancy but never in payment history.
+5. Sathish K: RS.rent_due = 4600 (agreed_rent, RS row used full month instead of prorated 15/31 days = 2225).
+
+**Fixes in `src/api/v2/tenants.py`**:
+- `get_tenant_dues()`: removed `PaymentFor.booking` from `paid_result` query
+- `get_tenant_dues()`: changed deposit_due to `max(0, deposit_agreed - deposit_paid - booking_amount)` (booking applied directly to deposit, not via surplus)
+- `list_tenants()`: removed `PaymentFor.booking` from `paid_subq` (deposit column only)
+
+**Fix in `src/api/onboarding_router.py`**:
+- `_approve_session_impl()`: restored auto-recording of `booking_amount` as `Payment(for_type=booking)` at check-in approval. Now excluded from paid_result in dues query so no double-deduction.
+
+**One-off DB fix `scripts/_fix_sathish_g14.py`**:
+- Corrects Sathish K (room G14) RS.rent_due to prorated value: `floor(4600 * 15/31)` = 2225
+- Creates missing booking Payment row (₹9,500)
+- **Must be run on VPS**: `python scripts/_fix_sathish_g14.py --write`
+
+---
+
 ## [1.75.94] — 2026-05-17 — P&L April cash correction + May RS KPI bug fix
 
 ### P&L
