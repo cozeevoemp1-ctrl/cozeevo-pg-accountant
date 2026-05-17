@@ -34,7 +34,7 @@ INCOME = {
     "THOR — UPI batch settlements (merchant QR)":          [0,      0,        0,  175596, 2091597, 2515275, 2834731],
     "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  385691,  226807],  # Mar: +160600 Chandra cash collection reclassified to bank (2026-05-12)
     "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  325572,  656300, 1094220, 1359283],  # Jan +25000 Bala uncle; Feb +3000 Bala uncle; Apr +35000 Bala uncle (−12000 moved to May — collected in May). Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May (collected in May, not Apr). Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
     # HULK building (acct ...0881) — live from Mar 2026
     "HULK — UPI batch settlements (merchant QR)":          [0,      0,        0,       0,       0,       0,  247719],
     "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
