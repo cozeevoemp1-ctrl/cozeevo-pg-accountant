@@ -2,6 +2,52 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.99] — 2026-05-17 — PWA UX overhaul: KPI panel centering, scroll trap, admin notes, bookings filters, signature fix + style preview
+
+### PWA: KPI grid panel recentering (`web/components/home/kpi-grid.tsx`)
+- Each row wrapped in `col-span-2 relative` container so expansion panels are positioned relative to full row width (not individual tiles)
+- `ExpansionPanel` uses `left:0, right:0` for full-width — matches the "On notice" panel behaviour throughout
+- `scrollIntoView({ behavior:"smooth", block:"center" })` fires 50ms after panel opens — panel auto-centers in viewport on tap
+- `scrollGrace` ref (1s window) prevents close-on-scroll handler from firing during the `scrollIntoView` scroll
+- Non-passive `wheel` event handler on scrollable list div — scroll is contained within pink-bordered box; `preventDefault()` at top/bottom boundaries, `stopPropagation()` always
+
+### PWA: Admin Notes field (`web/components/home/kpi-grid.tsx`, `web/app/tenants/pre-register/page.tsx`, `web/lib/api.ts`)
+- Notes textarea added to QuickBookModal (in KPI grid) and Pre-register page
+- Stored in `onboarding_sessions.special_terms` — no new migration needed
+- Notes are admin-only: not visible on the tenant-facing onboarding form link
+- Amber NOTE banner shown on Bookings page check-in cards when `notes` is present
+- `src/api/v2/bookings.py` — `notes: str = ""` added to `QuickBookRequest`, wired to `special_terms`
+- `src/api/onboarding_router.py` — `/admin/pending` response now includes `notes` field
+
+### PWA: Bookings page totals + filter chips (`web/app/onboarding/bookings/page.tsx`)
+- Summary bar: "N active bookings" count with breakdown in subtitle
+- Filter chips: All (total), Ready to check in (green), Awaiting form (amber), Expired (red)
+- Active chip inverts to solid fill; chips with 0 count hidden (except All)
+- `statusMatch()` helper gates list render
+
+### Form: Signature auto-mirror (`static/onboarding.html`)
+- `mirrorSignature()` helper: mirrors tenant full name into `#typed-signature` span on Step 4
+- Timestamp (`Signed on DD Mon YYYY at HH:MM`) set once on first call, never overwritten
+- Fires on: `#name` input event, `#agree-checkbox` change event, `goToStep(4)` (resets timestamp then calls helper)
+- Fixes "—" showing as signature when name wasn't entered before navigating to Step 4
+
+### PDF: Visitors house rule updated (`src/services/pdf_generator.py`)
+- Rule 4 now reads: "Visitors are strictly not allowed inside the premises. If any resident is found bringing a visitor, an immediate charge equivalent to one day-wise stay rate will be levied — no exceptions."
+
+### DB patch: 5 room-000 tenant_data nulls fixed
+- 5 migrated onboarding sessions had `tenant_data=NULL` (asyncpg binding bug during bulk INSERT)
+- Direct DB UPDATE patched `tenant_data` with correct JSON for each phone number
+- Bookings page now shows real names instead of phone numbers
+
+### Style preview (`static/style-preview.html`)
+- Standalone HTML mockup (no server needed) showing 3 design directions across 3 screens (Home, Bookings, Tenants)
+- Style 1 "Cosmos": dark navy, neon-glow tiles, high-contrast
+- Style 2 "Frost": deep purple-blue gradient, glassmorphism cards
+- Style 3 "Studio": clean white cards, subtle shadows, color-coded bottom bars
+- Pending: Kiran to pick a style for production implementation
+
+---
+
 ## [1.75.98] — 2026-05-17 — Onboarding form trimmed: removed email, education, occupation, office fields
 
 ### UX: Customer onboarding form simplified (`static/onboarding.html`)
