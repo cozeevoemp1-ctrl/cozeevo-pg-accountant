@@ -22,7 +22,7 @@ HOUSE_RULES = [
     "Vacating notice must be given on or before the 5th of the month. Notice given on/before the 5th: tenant may vacate by month end, deposit refundable. Notice given after the 5th: applies to the next month's cycle, full month's rent required, deposit still refundable. (Note: should vacate only on 30th or 31st of any month)",
     "Rent should be paid on or before 5th of every calendar month.",
     "Once paid the Advance & Rent cannot be refunded.",
-    "Outsiders are strictly not allowed.",
+    "Visitors are strictly not allowed inside the premises. If any resident is found bringing a visitor, an immediate charge equivalent to one day-wise stay rate will be levied — no exceptions.",
     "Guest Accommodation with / without food will be charged Rs.1200/- per day.",
     "Iron box, Kettle, Induction Stove etc., usage not allowed.",
     "Maintenance Charges are fixed @ {maintenance}/-",

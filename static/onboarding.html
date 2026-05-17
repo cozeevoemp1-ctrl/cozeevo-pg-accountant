@@ -902,6 +902,9 @@
     // Save draft on every text/radio/checkbox change.
     document.addEventListener('input', saveDraft);
     document.addEventListener('change', saveDraft);
+    // Signature mirror: update typed-signature whenever name changes or checkbox toggled.
+    document.getElementById('name').addEventListener('input', mirrorSignature);
+    document.getElementById('agree-checkbox').addEventListener('change', mirrorSignature);
   });
 
   function extractToken() {
@@ -1018,6 +1021,20 @@
     }[c]));
   }
 
+  // ── Signature mirror ───────────────────────────────────────────────────────
+  function mirrorSignature() {
+    const sig = document.getElementById('typed-signature');
+    if (!sig) return;
+    const name = document.getElementById('name').value.trim();
+    sig.textContent = name || '—';
+    const ts = document.getElementById('sig-timestamp');
+    if (ts && !ts.textContent) {
+      const now = new Date();
+      ts.textContent = 'Signed on ' + now.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) +
+        ' at ' + now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+    }
+  }
+
   // ── Step navigation ────────────────────────────────────────────────────────
   function nextStep(from) {
     if (!validateStep(from)) return;
@@ -1042,11 +1059,9 @@
     if (n === 4) {
       const name = document.getElementById('name').value.trim();
       document.getElementById('agree-name').textContent = name || '—';
-      document.getElementById('typed-signature').textContent = name || '—';
-      const now = new Date();
-      document.getElementById('sig-timestamp').textContent =
-        'Signed on ' + now.toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) +
-        ' at ' + now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+      // Reset timestamp so mirrorSignature sets a fresh one for this visit
+      document.getElementById('sig-timestamp').textContent = '';
+      mirrorSignature();
     }
   }
 
