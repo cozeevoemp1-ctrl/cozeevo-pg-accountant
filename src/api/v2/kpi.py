@@ -510,16 +510,19 @@ async def get_kpi_detail(
             return {"type": type, "items": items}
 
         elif type == "prebooked":
+            import json as _json
             obs_rows = (await session.execute(
                 select(
                     OnboardingSession.id,
-                    OnboardingSession.tenant_name,
-                    OnboardingSession.room_number,
+                    OnboardingSession.tenant_data,
+                    OnboardingSession.tenant_phone,
                     OnboardingSession.checkin_date,
                     OnboardingSession.expires_at,
                     OnboardingSession.status,
-                    OnboardingSession.tenant_data,
+                    OnboardingSession.room_id,
+                    Room.room_number,
                 )
+                .outerjoin(Room, Room.id == OnboardingSession.room_id)
                 .where(
                     OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
                     or_(
@@ -539,21 +542,24 @@ async def get_kpi_detail(
                 )
                 .order_by(Tenancy.checkin_date.asc().nulls_last())
             )).all()
-            import json as _json
             items = []
             for r in obs_rows:
                 td = _json.loads(r.tenant_data) if r.tenant_data else {}
-                name = td.get("name") or r.tenant_name or "—"
+                name = td.get("name") or r.tenant_phone or "—"
+                room = r.room_number or "TBD"
                 expires = r.expires_at
                 if r.status == "pending_review":
-                    detail = "Form filled · awaiting check-in"
+                    detail = "Ready to check in"
                 else:
                     detail = f"Link expires {expires.strftime('%-d %b')}" if expires else "Link sent"
+                checkin = r.checkin_date
+                checkin_str = checkin.strftime("%-d %b") if checkin else "—"
                 items.append({
                     "tenancy_id": None,
                     "name": name,
-                    "room": r.room_number or "TBD",
-                    "detail": detail,
+                    "room": room,
+                    "detail": f"Check-in: {checkin_str}",
+                    "sub_detail": detail,
                     "is_overdue": False,
                 })
             for r in noshow000_rows:
