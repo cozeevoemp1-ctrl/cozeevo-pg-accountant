@@ -5,7 +5,7 @@ Canonical P&L builder — single source of truth shared by:
   - scripts/export_pnl_2026_05_02.py  (local regeneration)
   - src/api/v2/finance.py  GET /finance/pnl/excel  (PWA download)
 
-Both produce identical output. Verified figures as of 2026-05-12.
+Both produce identical output. Verified figures as of 2026-05-17.
 See memory/sop_pnl.md for full methodology.
 
 Workbook tabs:
