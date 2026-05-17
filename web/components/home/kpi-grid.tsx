@@ -982,8 +982,21 @@ function ExpansionPanel({
                     ? <p className="text-xs text-center text-ink-muted py-2">Loading…</p>
                     : selected && (() => {
                         const totalDue = (selected.dues || 0) + (selected.deposit_due || 0)
+                        const freeFromDate = item.expected_checkout_iso
+                          ? (() => {
+                              const d = new Date(item.expected_checkout_iso + "T00:00:00")
+                              d.setDate(d.getDate() + 1)
+                              return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                            })()
+                          : null
                         return (
                           <div className="rounded-tile border border-[#F0EDE9] bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-2">
+                            {freeFromDate && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-ink-muted">Free from</span>
+                                <span className="text-xs font-bold text-[#15803D]">{freeFromDate}</span>
+                              </div>
+                            )}
                             <div className="flex justify-between items-center">
                               <span className="text-xs text-ink-muted">Dues outstanding</span>
                               <span className={`text-xs font-bold ${totalDue > 0 ? "text-status-due" : "text-status-paid"}`}>
