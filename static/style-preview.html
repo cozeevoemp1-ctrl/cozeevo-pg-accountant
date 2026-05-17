@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cozeevo PWA — Style Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#08080E;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;}
+.bar{position:fixed;inset:0 0 auto 0;z-index:100;background:rgba(8,8,14,0.95);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.07);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.bar-title{color:#fff;font-size:13px;font-weight:700;margin-right:6px;}
+.bar-title span{color:#EF1F9C;}
+.tab{padding:6px 18px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.1);font-size:12px;font-weight:600;cursor:pointer;color:#888;background:transparent;transition:all .2s;}
+.tab:hover{color:#fff;border-color:rgba(255,255,255,0.3);}
+.tab.on{background:#EF1F9C;border-color:#EF1F9C;color:#fff;}
+.hint{margin-left:auto;color:#444;font-size:11px;}
+.preview{padding:72px 40px 60px;display:none;justify-content:center;gap:28px;flex-wrap:wrap;}
+.preview.on{display:flex;}
+.pw{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.plabel{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#444;}
+.phone{width:300px;height:648px;border-radius:32px;overflow:hidden;border:1.5px solid rgba(255,255,255,0.06);box-shadow:0 24px 48px rgba(0,0,0,0.6);position:relative;flex-shrink:0;}
+.sbar{display:flex;justify-content:space-between;align-items:center;height:28px;font-size:10px;font-weight:600;padding:0 16px;}
+.bnav{display:flex;border-top:1px solid;}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0;font-size:9px;font-weight:600;gap:3px;cursor:pointer;}
+.bnav-icon{font-size:16px;line-height:1;}
+.pscroll{overflow-y:auto;flex:1;}
+.pscroll::-webkit-scrollbar{display:none;}
+
+/* ══ STYLE 1: COSMOS / DARK ══ */
+.s1{background:#08080E;color:#F0F0F8;}
+.s1 .sbar{background:#0F0F1C;color:#F0F0F8;}
+.s1 .bnav{background:#0F0F1C;border-color:rgba(255,255,255,0.06);}
+.s1 .bnav-item{color:#444;}
+.s1 .bnav-item.act{color:#EF1F9C;}
+.s1 .hdr{padding:8px 16px 12px;background:linear-gradient(180deg,#0F0F1C 0%,#08080E 100%);border-bottom:1px solid rgba(255,255,255,0.05);}
+.s1 .greeting{font-size:10px;color:#555;font-weight:500;}
+.s1 .pg-title{font-size:19px;font-weight:800;color:#fff;line-height:1.1;}
+.s1 .pg-title span{color:#EF1F9C;}
+.s1 .pg-sub{font-size:10px;color:#555;margin-top:1px;}
+.s1 .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 4px;}
+.s1 .tile{border-radius:16px;padding:12px;border:1px solid rgba(255,255,255,0.07);background:#111120;position:relative;overflow:hidden;}
+.s1 .tile::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 60%);}
+.s1 .t-icon{font-size:18px;margin-bottom:4px;}
+.s1 .t-val{font-size:20px;font-weight:900;color:#fff;line-height:1;}
+.s1 .t-lbl{font-size:8px;font-weight:700;color:#555;letter-spacing:.7px;text-transform:uppercase;margin-top:3px;}
+.s1 .t-sub{font-size:9px;color:#666;margin-top:1px;}
+.s1 .t-dot{position:absolute;top:9px;right:9px;width:5px;height:5px;border-radius:50%;}
+.s1 .tp .t-val{color:#EF1F9C;} .s1 .tp{background:rgba(239,31,156,.1);border-color:rgba(239,31,156,.2);} .s1 .tp .t-dot{background:#EF1F9C;box-shadow:0 0 5px #EF1F9C;}
+.s1 .tb .t-val{color:#00AEED;} .s1 .tb{background:rgba(0,149,217,.1);border-color:rgba(0,149,217,.2);} .s1 .tb .t-dot{background:#00AEED;box-shadow:0 0 5px #00AEED;}
+.s1 .tg .t-val{color:#34D399;} .s1 .tg{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.15);} .s1 .tg .t-dot{background:#34D399;box-shadow:0 0 5px #34D399;}
+.s1 .ta .t-val{color:#FBBF24;} .s1 .ta{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.15);} .s1 .ta .t-dot{background:#FBBF24;box-shadow:0 0 5px #FBBF24;}
+.s1 .sec{font-size:9px;font-weight:700;color:#444;letter-spacing:1px;text-transform:uppercase;padding:8px 14px 4px;}
+.s1 .aitem{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.s1 .av{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;}
+.s1 .avp{background:linear-gradient(135deg,#EF1F9C,#7B2FBE);}
+.s1 .avb{background:linear-gradient(135deg,#00AEED,#0048CC);}
+.s1 .avg{background:linear-gradient(135deg,#34D399,#059669);}
+.s1 .aname{font-size:11px;font-weight:600;color:#E0E0F0;}
+.s1 .aroom{font-size:9px;color:#555;}
+.s1 .chips{display:flex;gap:5px;padding:5px 12px;overflow-x:auto;}
+.s1 .chips::-webkit-scrollbar{display:none;}
+.s1 .chip{padding:4px 10px;border-radius:10px;font-size:9px;font-weight:700;white-space:nowrap;border:1px solid rgba(255,255,255,.1);color:#555;background:transparent;}
+.s1 .chip.on{background:#EF1F9C;border-color:#EF1F9C;color:#fff;}
+.s1 .chip.cg{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25);color:#34D399;}
+.s1 .chip.ca{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.25);color:#FBBF24;}
+.s1 .bcard{margin:5px 12px;background:#111120;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:11px;position:relative;overflow:hidden;}
+.s1 .bcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:0 2px 2px 0;}
+.s1 .bcard.rdy::before{background:#34D399;}
+.s1 .bcard.awt::before{background:#FBBF24;}
+.s1 .bc-name{font-size:13px;font-weight:700;color:#fff;}
+.s1 .bc-room{font-size:9px;color:#666;margin-top:1px;}
+.s1 .bc-row{display:flex;justify-content:space-between;align-items:center;margin-top:7px;}
+.s1 .bc-rent{font-size:14px;font-weight:800;color:#00AEED;}
+.s1 .bstat{display:inline-block;padding:2px 7px;border-radius:6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.s1 .bstat.rdy{background:rgba(52,211,153,.15);color:#34D399;}
+.s1 .bstat.awt{background:rgba(251,191,36,.15);color:#FBBF24;}
+.s1 .bnote{margin-top:5px;padding:5px 7px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.15);border-radius:7px;font-size:9px;color:#FBBF24;}
+.s1 .srch{margin:6px 12px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:7px 10px;}
+.s1 .srch-ph{font-size:11px;color:#444;}
+.s1 .tcard{display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.04);}
+.s1 .tav{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.s1 .tavp{background:rgba(239,31,156,.2);border:1px solid rgba(239,31,156,.3);color:#EF1F9C;}
+.s1 .tavb{background:rgba(0,174,237,.2);border:1px solid rgba(0,174,237,.3);color:#00AEED;}
+.s1 .tavg{background:rgba(52,211,153,.2);border:1px solid rgba(52,211,153,.3);color:#34D399;}
+.s1 .tname{font-size:11px;font-weight:700;color:#E0E0F0;}
+.s1 .troom{font-size:9px;color:#555;}
+.s1 .tr{margin-left:auto;text-align:right;}
+.s1 .tdues{font-size:11px;font-weight:700;color:#EF1F9C;}
+.s1 .tpaid{color:#34D399;}
+.s1 .tbadge{display:inline-block;padding:2px 6px;border-radius:5px;font-size:8px;font-weight:700;text-transform:uppercase;}
+.s1 .tbadge.act{background:rgba(52,211,153,.15);color:#34D399;}
+.s1 .tbadge.ntc{background:rgba(251,191,36,.15);color:#FBBF24;}
+
+/* ══ STYLE 2: FROST / GLASS ══ */
+.s2{background:linear-gradient(145deg,#1a0533 0%,#2d1b6e 35%,#0d3b6e 70%,#0a2447 100%);color:#fff;}
+.s2-glow{position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(239,31,156,.25) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(0,149,217,.2) 0%,transparent 50%);pointer-events:none;}
+.s2 .sbar{color:rgba(255,255,255,.9);}
+.s2 .bnav{background:rgba(10,15,40,.85);border-color:rgba(255,255,255,.1);backdrop-filter:blur(16px);}
+.s2 .bnav-item{color:rgba(255,255,255,.3);}
+.s2 .bnav-item.act{color:#FF6FCC;}
+.s2 .hdr{padding:8px 16px 12px;}
+.s2 .greeting{font-size:10px;color:rgba(255,255,255,.5);font-weight:500;}
+.s2 .pg-title{font-size:19px;font-weight:800;color:#fff;line-height:1.1;}
+.s2 .pg-title span{color:#FF6FCC;}
+.s2 .pg-sub{font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;}
+.s2 .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 4px;}
+.s2 .tile{border-radius:18px;padding:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);backdrop-filter:blur(12px);position:relative;overflow:hidden;}
+.s2 .tile::after{content:'';position:absolute;top:-20px;right:-20px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.05);}
+.s2 .t-icon{font-size:18px;margin-bottom:4px;}
+.s2 .t-val{font-size:20px;font-weight:900;color:#fff;line-height:1;}
+.s2 .t-lbl{font-size:8px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.7px;text-transform:uppercase;margin-top:3px;}
+.s2 .t-sub{font-size:9px;color:rgba(255,255,255,.5);margin-top:1px;}
+.s2 .tp{background:rgba(239,31,156,.25);border-color:rgba(239,31,156,.4);}
+.s2 .tb{background:rgba(0,149,217,.25);border-color:rgba(0,149,217,.4);}
+.s2 .tg{background:rgba(52,211,153,.2);border-color:rgba(52,211,153,.35);}
+.s2 .ta{background:rgba(251,191,36,.2);border-color:rgba(251,191,36,.35);}
+.s2 .sec{font-size:9px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:1px;text-transform:uppercase;padding:8px 14px 4px;}
+.s2 .aitem{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:0 12px 5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;}
+.s2 .av{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;}
+.s2 .avp{background:rgba(239,31,156,.35);border:1px solid rgba(239,31,156,.4);}
+.s2 .avb{background:rgba(0,149,217,.35);border:1px solid rgba(0,149,217,.4);}
+.s2 .avg{background:rgba(52,211,153,.35);border:1px solid rgba(52,211,153,.4);}
+.s2 .aname{font-size:11px;font-weight:600;color:#fff;}
+.s2 .aroom{font-size:9px;color:rgba(255,255,255,.4);}
+.s2 .chips{display:flex;gap:5px;padding:5px 12px;overflow-x:auto;}
+.s2 .chips::-webkit-scrollbar{display:none;}
+.s2 .chip{padding:4px 10px;border-radius:10px;font-size:9px;font-weight:700;white-space:nowrap;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);}
+.s2 .chip.on{background:rgba(239,31,156,.35);border-color:rgba(239,31,156,.5);color:#fff;}
+.s2 .chip.cg{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#4ADE80;}
+.s2 .chip.ca{background:rgba(251,191,36,.15);border-color:rgba(251,191,36,.3);color:#FCD34D;}
+.s2 .bcard{margin:5px 12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);backdrop-filter:blur(8px);border-radius:16px;padding:11px;}
+.s2 .bc-name{font-size:13px;font-weight:700;color:#fff;}
+.s2 .bc-room{font-size:9px;color:rgba(255,255,255,.45);margin-top:1px;}
+.s2 .bc-row{display:flex;justify-content:space-between;align-items:center;margin-top:7px;}
+.s2 .bc-rent{font-size:14px;font-weight:800;color:#60D0FF;}
+.s2 .bstat{display:inline-block;padding:2px 7px;border-radius:6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.s2 .bstat.rdy{background:rgba(52,211,153,.2);color:#4ADE80;border:1px solid rgba(52,211,153,.3);}
+.s2 .bstat.awt{background:rgba(251,191,36,.2);color:#FCD34D;border:1px solid rgba(251,191,36,.3);}
+.s2 .bc-btn{padding:5px 12px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(239,31,156,.3);border:1px solid rgba(239,31,156,.5);color:#fff;}
+.s2 .bnote{margin-top:5px;padding:5px 7px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.2);border-radius:7px;font-size:9px;color:#FCD34D;}
+.s2 .srch{margin:6px 12px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:11px;padding:7px 10px;backdrop-filter:blur(8px);}
+.s2 .srch-ph{font-size:11px;color:rgba(255,255,255,.35);}
+.s2 .tcard{display:flex;align-items:center;gap:9px;padding:8px 10px;margin:0 12px 5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:12px;backdrop-filter:blur(8px);}
+.s2 .tav{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.s2 .tavp{background:rgba(239,31,156,.3);border:1px solid rgba(239,31,156,.4);color:#fff;}
+.s2 .tavb{background:rgba(0,174,237,.3);border:1px solid rgba(0,174,237,.4);color:#fff;}
+.s2 .tavg{background:rgba(52,211,153,.3);border:1px solid rgba(52,211,153,.4);color:#fff;}
+.s2 .tname{font-size:11px;font-weight:700;color:#fff;}
+.s2 .troom{font-size:9px;color:rgba(255,255,255,.4);}
+.s2 .tr{margin-left:auto;text-align:right;}
+.s2 .tdues{font-size:11px;font-weight:700;color:#FF6FCC;}
+.s2 .tpaid{color:#4ADE80;}
+.s2 .tbadge{display:inline-block;padding:2px 6px;border-radius:5px;font-size:8px;font-weight:700;text-transform:uppercase;}
+.s2 .tbadge.act{background:rgba(52,211,153,.2);color:#4ADE80;}
+.s2 .tbadge.ntc{background:rgba(251,191,36,.2);color:#FCD34D;}
+
+/* ══ STYLE 3: STUDIO / CLEAN ══ */
+.s3{background:#EEECEA;color:#18181B;}
+.s3 .sbar{background:#fff;color:#18181B;}
+.s3 .bnav{background:#fff;border-color:#E4E2DF;}
+.s3 .bnav-item{color:#C0BDBA;}
+.s3 .bnav-item.act{color:#EF1F9C;}
+.s3 .hdr{padding:8px 16px 12px;background:#fff;border-bottom:1px solid #E4E2DF;}
+.s3 .greeting{font-size:10px;color:#A8A5A0;font-weight:500;}
+.s3 .pg-title{font-size:19px;font-weight:800;color:#18181B;line-height:1.1;}
+.s3 .pg-title span{color:#EF1F9C;}
+.s3 .pg-sub{font-size:10px;color:#B0ADA8;margin-top:1px;}
+.s3 .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 4px;}
+.s3 .tile{border-radius:20px;padding:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);position:relative;overflow:hidden;}
+.s3 .t-icon-box{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.s3 .t-icon{font-size:18px;margin-bottom:4px;}
+.s3 .t-val{font-size:20px;font-weight:900;color:#18181B;line-height:1;margin-top:16px;}
+.s3 .t-lbl{font-size:8px;font-weight:600;color:#A8A5A0;letter-spacing:.5px;margin-top:4px;}
+.s3 .t-sub{font-size:9px;color:#C0BDBA;margin-top:1px;}
+.s3 .t-bar{position:absolute;bottom:0;left:0;right:0;height:3px;border-radius:0 0 20px 20px;}
+.s3 .tp .t-icon-box{background:#FFF0F7;} .s3 .tp .t-bar{background:#EF1F9C;}
+.s3 .tb .t-icon-box{background:#EBF8FF;} .s3 .tb .t-bar{background:#00AEED;}
+.s3 .tg .t-icon-box{background:#F0FDF4;} .s3 .tg .t-bar{background:#22C55E;}
+.s3 .ta .t-icon-box{background:#FFFBEB;} .s3 .ta .t-bar{background:#F59E0B;}
+.s3 .sec{font-size:9px;font-weight:700;color:#C0BDBA;letter-spacing:1px;text-transform:uppercase;padding:10px 14px 5px;}
+.s3 .aitem{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:0 12px 5px;background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.s3 .av{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;}
+.s3 .avp{background:#FFF0F7;color:#EF1F9C;}
+.s3 .avb{background:#EBF8FF;color:#00AEED;}
+.s3 .avg{background:#F0FDF4;color:#22C55E;}
+.s3 .aname{font-size:11px;font-weight:600;color:#18181B;}
+.s3 .aroom{font-size:9px;color:#A8A5A0;}
+.s3 .chips{display:flex;gap:5px;padding:7px 12px;overflow-x:auto;}
+.s3 .chips::-webkit-scrollbar{display:none;}
+.s3 .chip{padding:4px 10px;border-radius:10px;font-size:9px;font-weight:600;white-space:nowrap;background:#fff;border:1.5px solid #E4E2DF;color:#A8A5A0;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.s3 .chip.on{background:#EF1F9C;border-color:#EF1F9C;color:#fff;}
+.s3 .chip.cg{background:#F0FDF4;border-color:#BBF7D0;color:#16A34A;}
+.s3 .chip.ca{background:#FFFBEB;border-color:#FDE68A;color:#D97706;}
+.s3 .bcard{margin:5px 12px;background:#fff;border-radius:16px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);position:relative;overflow:hidden;}
+.s3 .bcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.s3 .bcard.rdy::before{background:#22C55E;}
+.s3 .bcard.awt::before{background:#F59E0B;}
+.s3 .bc-name{font-size:13px;font-weight:700;color:#18181B;}
+.s3 .bc-room{font-size:9px;color:#A8A5A0;margin-top:1px;}
+.s3 .bc-row{display:flex;justify-content:space-between;align-items:center;margin-top:7px;}
+.s3 .bc-rent{font-size:14px;font-weight:800;color:#00AEED;}
+.s3 .bstat{display:inline-block;padding:2px 7px;border-radius:6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.s3 .bstat.rdy{background:#F0FDF4;color:#16A34A;}
+.s3 .bstat.awt{background:#FFFBEB;color:#D97706;}
+.s3 .bc-btn{padding:5px 12px;border-radius:8px;font-size:9px;font-weight:700;background:#EF1F9C;color:#fff;}
+.s3 .bnote{margin-top:6px;padding:5px 7px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:7px;font-size:9px;color:#92400E;}
+.s3 .srch{margin:6px 12px;display:flex;align-items:center;gap:7px;background:#fff;border:1.5px solid #E4E2DF;border-radius:10px;padding:7px 10px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.s3 .srch-ph{font-size:11px;color:#C0BDBA;}
+.s3 .tcard{display:flex;align-items:center;gap:9px;padding:9px 14px;background:#fff;margin:0 12px 5px;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.04);}
+.s3 .tav{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;}
+.s3 .tavp{background:#FFF0F7;color:#EF1F9C;}
+.s3 .tavb{background:#EBF8FF;color:#00AEED;}
+.s3 .tavg{background:#F0FDF4;color:#22C55E;}
+.s3 .tname{font-size:11px;font-weight:700;color:#18181B;}
+.s3 .troom{font-size:9px;color:#A8A5A0;}
+.s3 .tr{margin-left:auto;text-align:right;}
+.s3 .tdues{font-size:11px;font-weight:700;color:#EF1F9C;}
+.s3 .tpaid{color:#22C55E;}
+.s3 .tbadge{display:inline-block;padding:2px 6px;border-radius:5px;font-size:8px;font-weight:700;text-transform:uppercase;}
+.s3 .tbadge.act{background:#F0FDF4;color:#16A34A;}
+.s3 .tbadge.ntc{background:#FFFBEB;color:#D97706;}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="bar-title">Cozeevo <span>PWA</span> · Style Preview</span>
+  <button class="tab on" onclick="show('p1',this)">① Cosmos · Dark Pro</button>
+  <button class="tab" onclick="show('p2',this)">② Frost · Glass</button>
+  <button class="tab" onclick="show('p3',this)">③ Studio · Clean</button>
+  <span class="hint">Not production · click each to compare · pick your favourite</span>
+</div>
+
+<!-- ════════════════════════════════════════════
+     STYLE 1: COSMOS / DARK
+════════════════════════════════════════════ -->
+<div class="preview on" id="p1">
+
+  <!-- HOME -->
+  <div class="pw">
+    <div class="plabel">Home</div>
+    <div class="phone">
+      <div class="s1" style="height:100%;display:flex;flex-direction:column;">
+        <div class="sbar s1" style="background:#0F0F1C;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="s1 hdr">
+            <div class="greeting">Good morning, Kiran</div>
+            <div class="pg-title">Cozeevo <span>Help Desk</span></div>
+            <div class="pg-sub">Sun, 17 May 2026</div>
+          </div>
+          <div class="s1 kgrid">
+            <div class="s1 tile tp"><div class="t-dot"></div><div class="t-icon">🏠</div><div class="t-val">253</div><div class="t-lbl">Active Tenants</div><div class="t-sub">THOR · HULK</div></div>
+            <div class="s1 tile tb"><div class="t-dot"></div><div class="t-icon">💰</div><div class="t-val">₹12.4L</div><div class="t-lbl">May Revenue</div><div class="t-sub">86% collected</div></div>
+            <div class="s1 tile ta"><div class="t-dot"></div><div class="t-icon">⚠️</div><div class="t-val">₹2.1L</div><div class="t-lbl">Dues</div><div class="t-sub">31 tenants</div></div>
+            <div class="s1 tile tg"><div class="t-dot"></div><div class="t-icon">📊</div><div class="t-val">85%</div><div class="t-lbl">Occupancy</div><div class="t-sub">253 / 297 beds</div></div>
+          </div>
+          <div class="s1 sec">Recent Activity</div>
+          <div class="pscroll">
+            <div class="s1 aitem"><div class="s1 av avp">RK</div><div><div class="aname">Rahul Kumar</div><div class="aroom">614 · paid rent</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#34D399;">+₹8,500</div><div style="font-size:9px;color:#444;">2h ago</div></div></div>
+            <div class="s1 aitem"><div class="s1 av avb">AS</div><div><div class="aname">Arjun Sharma</div><div class="aroom">302 · checked in</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#00AEED;">New</div><div style="font-size:9px;color:#444;">5h ago</div></div></div>
+            <div class="s1 aitem"><div class="s1 av avg">PN</div><div><div class="aname">Priya Nair</div><div class="aroom">414 · form pending</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#FBBF24;">Pending</div><div style="font-size:9px;color:#444;">1d ago</div></div></div>
+            <div class="s1 aitem"><div class="s1 av avp">MK</div><div><div class="aname">Meera Krishnan</div><div class="aroom">411 · paid rent</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#34D399;">+₹7,500</div><div style="font-size:9px;color:#444;">2d ago</div></div></div>
+          </div>
+        </div>
+        <div class="s1 bnav">
+          <div class="bnav-item act"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKINGS -->
+  <div class="pw">
+    <div class="plabel">Bookings</div>
+    <div class="phone">
+      <div class="s1" style="height:100%;display:flex;flex-direction:column;">
+        <div class="sbar s1" style="background:#0F0F1C;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="s1 hdr">
+            <div class="pg-title">Bookings</div>
+            <div class="pg-sub">3 pending · May 2026</div>
+          </div>
+          <div class="s1 chips">
+            <div class="s1 chip on">All 3</div>
+            <div class="s1 chip cg">Ready 2</div>
+            <div class="s1 chip ca">Awaiting 1</div>
+          </div>
+          <div class="pscroll" style="padding-bottom:8px;">
+            <div class="s1 bcard rdy">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Arjun Sharma</div><div class="bc-room">📍 Room 302 · HULK · 2-share</div></div><div class="bstat rdy">Ready</div></div>
+              <div class="bc-row"><div class="bc-rent">₹8,500/mo</div><div style="font-size:9px;color:#555;">Check-in: 20 May</div></div>
+            </div>
+            <div class="s1 bcard awt">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Priya Nair</div><div class="bc-room">📍 Room 414 · THOR · 3-share</div></div><div class="bstat awt">Awaiting form</div></div>
+              <div class="bnote">Referred by Kiran · needs veg food</div>
+              <div class="bc-row"><div class="bc-rent">₹7,500/mo</div><div style="font-size:9px;color:#555;">22 May</div></div>
+            </div>
+            <div class="s1 bcard rdy">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Vikram Patel</div><div class="bc-room">📍 Room 501 · THOR · 2-share</div></div><div class="bstat rdy">Ready</div></div>
+              <div class="bc-row"><div class="bc-rent">₹9,000/mo</div><div style="font-size:9px;color:#555;">25 May</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="s1 bnav">
+          <div class="bnav-item"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item act"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TENANTS -->
+  <div class="pw">
+    <div class="plabel">Tenants</div>
+    <div class="phone">
+      <div class="s1" style="height:100%;display:flex;flex-direction:column;">
+        <div class="sbar s1" style="background:#0F0F1C;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="s1 hdr">
+            <div class="pg-title">Tenants</div>
+            <div class="pg-sub">253 active · 14 on notice</div>
+          </div>
+          <div class="s1 srch"><span>🔍</span><span class="srch-ph">Search name or room…</span></div>
+          <div class="pscroll" style="padding-top:6px;">
+            <div class="s1 tcard"><div class="s1 tav tavp">RK</div><div><div class="tname">Rahul Kumar</div><div class="troom">614 · HULK · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge act">Active</div></div></div>
+            <div class="s1 tcard"><div class="s1 tav tavb">AS</div><div><div class="tname">Ananya Singh</div><div class="troom">302 · HULK · 3-share</div></div><div class="tr"><div class="tdues">₹3,200</div><div class="tbadge act">Active</div></div></div>
+            <div class="s1 tcard"><div class="s1 tav tavg">VP</div><div><div class="tname">Vikram Patel</div><div class="troom">501 · THOR · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge ntc">Notice</div></div></div>
+            <div class="s1 tcard"><div class="s1 tav tavp">MK</div><div><div class="tname">Meera Krishnan</div><div class="troom">411 · THOR · 3-share</div></div><div class="tr"><div class="tdues">₹7,500</div><div class="tbadge act">Active</div></div></div>
+            <div class="s1 tcard"><div class="s1 tav tavb">SR</div><div><div class="tname">Suresh Reddy</div><div class="troom">213 · HULK · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge act">Active</div></div></div>
+            <div class="s1 tcard"><div class="s1 tav tavg">PM</div><div><div class="tname">Pooja Menon</div><div class="troom">312 · THOR · 4-share</div></div><div class="tr"><div class="tdues">₹1,800</div><div class="tbadge act">Active</div></div></div>
+          </div>
+        </div>
+        <div class="s1 bnav">
+          <div class="bnav-item"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item act"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     STYLE 2: FROST / GLASS
+════════════════════════════════════════════ -->
+<div class="preview" id="p2">
+
+  <!-- HOME -->
+  <div class="pw">
+    <div class="plabel">Home</div>
+    <div class="phone">
+      <div class="s2" style="height:100%;display:flex;flex-direction:column;position:relative;">
+        <div class="s2-glow"></div>
+        <div class="sbar" style="background:transparent;color:rgba(255,255,255,.9);position:relative;z-index:1;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative;z-index:1;">
+          <div class="s2 hdr">
+            <div class="greeting">Good morning, Kiran</div>
+            <div class="pg-title">Cozeevo <span>Help Desk</span></div>
+          </div>
+          <div class="s2 kgrid">
+            <div class="s2 tile tp"><div class="t-icon">🏠</div><div class="t-val">253</div><div class="t-lbl">Active Tenants</div><div class="t-sub">THOR · HULK</div></div>
+            <div class="s2 tile tb"><div class="t-icon">💰</div><div class="t-val">₹12.4L</div><div class="t-lbl">May Revenue</div><div class="t-sub">86% collected</div></div>
+            <div class="s2 tile ta"><div class="t-icon">⚠️</div><div class="t-val">₹2.1L</div><div class="t-lbl">Dues</div><div class="t-sub">31 tenants</div></div>
+            <div class="s2 tile tg"><div class="t-icon">📊</div><div class="t-val">85%</div><div class="t-lbl">Occupancy</div><div class="t-sub">253 / 297 beds</div></div>
+          </div>
+          <div class="s2 sec">Recent Activity</div>
+          <div class="pscroll">
+            <div class="s2 aitem"><div class="s2 av avp">RK</div><div><div class="aname">Rahul Kumar</div><div class="aroom">614 · paid rent</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#4ADE80;">+₹8,500</div><div style="font-size:9px;color:rgba(255,255,255,.3);">2h ago</div></div></div>
+            <div class="s2 aitem"><div class="s2 av avb">AS</div><div><div class="aname">Arjun Sharma</div><div class="aroom">302 · checked in</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#60D0FF;">New</div><div style="font-size:9px;color:rgba(255,255,255,.3);">5h ago</div></div></div>
+            <div class="s2 aitem"><div class="s2 av avg">PN</div><div><div class="aname">Priya Nair</div><div class="aroom">414 · form pending</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#FCD34D;">Pending</div><div style="font-size:9px;color:rgba(255,255,255,.3);">1d ago</div></div></div>
+            <div class="s2 aitem"><div class="s2 av avp">MK</div><div><div class="aname">Meera Krishnan</div><div class="aroom">411 · paid rent</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#4ADE80;">+₹7,500</div><div style="font-size:9px;color:rgba(255,255,255,.3);">2d ago</div></div></div>
+          </div>
+        </div>
+        <div class="s2 bnav" style="position:relative;z-index:1;">
+          <div class="bnav-item act"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKINGS -->
+  <div class="pw">
+    <div class="plabel">Bookings</div>
+    <div class="phone">
+      <div class="s2" style="height:100%;display:flex;flex-direction:column;position:relative;">
+        <div class="s2-glow"></div>
+        <div class="sbar" style="background:transparent;color:rgba(255,255,255,.9);position:relative;z-index:1;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative;z-index:1;">
+          <div class="s2 hdr"><div class="pg-title">Bookings</div><div class="pg-sub">3 pending · May 2026</div></div>
+          <div class="s2 chips"><div class="s2 chip on">All 3</div><div class="s2 chip cg">Ready 2</div><div class="s2 chip ca">Awaiting 1</div></div>
+          <div class="pscroll" style="padding-bottom:8px;">
+            <div class="s2 bcard">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Arjun Sharma</div><div class="bc-room">Room 302 · HULK · 2-share</div></div><div class="bstat rdy">Ready</div></div>
+              <div class="bc-row"><div class="bc-rent">₹8,500/mo</div><div class="bc-btn">Check In</div></div>
+            </div>
+            <div class="s2 bcard">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Priya Nair</div><div class="bc-room">Room 414 · THOR · 3-share</div></div><div class="bstat awt">Awaiting form</div></div>
+              <div class="bnote">Referred by Kiran · needs veg food</div>
+              <div class="bc-row"><div class="bc-rent">₹7,500/mo</div><div style="font-size:9px;color:rgba(255,255,255,.3);">22 May</div></div>
+            </div>
+            <div class="s2 bcard">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Vikram Patel</div><div class="bc-room">Room 501 · THOR · 2-share</div></div><div class="bstat rdy">Ready</div></div>
+              <div class="bc-row"><div class="bc-rent">₹9,000/mo</div><div class="bc-btn">Check In</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="s2 bnav" style="position:relative;z-index:1;">
+          <div class="bnav-item"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item act"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TENANTS -->
+  <div class="pw">
+    <div class="plabel">Tenants</div>
+    <div class="phone">
+      <div class="s2" style="height:100%;display:flex;flex-direction:column;position:relative;">
+        <div class="s2-glow"></div>
+        <div class="sbar" style="background:transparent;color:rgba(255,255,255,.9);position:relative;z-index:1;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative;z-index:1;">
+          <div class="s2 hdr"><div class="pg-title">Tenants</div><div class="pg-sub">253 active · 14 on notice</div></div>
+          <div class="s2 srch"><span>🔍</span><span class="srch-ph">Search name or room…</span></div>
+          <div class="pscroll" style="padding-top:6px;">
+            <div class="s2 tcard"><div class="s2 tav tavp">RK</div><div><div class="tname">Rahul Kumar</div><div class="troom">614 · HULK · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge act">Active</div></div></div>
+            <div class="s2 tcard"><div class="s2 tav tavb">AS</div><div><div class="tname">Ananya Singh</div><div class="troom">302 · HULK · 3-share</div></div><div class="tr"><div class="tdues">₹3,200</div><div class="tbadge act">Active</div></div></div>
+            <div class="s2 tcard"><div class="s2 tav tavg">VP</div><div><div class="tname">Vikram Patel</div><div class="troom">501 · THOR · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge ntc">Notice</div></div></div>
+            <div class="s2 tcard"><div class="s2 tav tavp">MK</div><div><div class="tname">Meera Krishnan</div><div class="troom">411 · THOR · 3-share</div></div><div class="tr"><div class="tdues">₹7,500</div><div class="tbadge act">Active</div></div></div>
+            <div class="s2 tcard"><div class="s2 tav tavb">SR</div><div><div class="tname">Suresh Reddy</div><div class="troom">213 · HULK · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge act">Active</div></div></div>
+            <div class="s2 tcard"><div class="s2 tav tavg">PM</div><div><div class="tname">Pooja Menon</div><div class="troom">312 · THOR · 4-share</div></div><div class="tr"><div class="tdues">₹1,800</div><div class="tbadge act">Active</div></div></div>
+          </div>
+        </div>
+        <div class="s2 bnav" style="position:relative;z-index:1;">
+          <div class="bnav-item"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item act"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     STYLE 3: STUDIO / CLEAN
+════════════════════════════════════════════ -->
+<div class="preview" id="p3">
+
+  <!-- HOME -->
+  <div class="pw">
+    <div class="plabel">Home</div>
+    <div class="phone">
+      <div class="s3" style="height:100%;display:flex;flex-direction:column;">
+        <div class="sbar" style="background:#fff;color:#18181B;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="s3 hdr">
+            <div class="greeting">Good morning, Kiran</div>
+            <div class="pg-title">Cozeevo <span>Help Desk</span></div>
+            <div class="pg-sub">Sun, 17 May 2026</div>
+          </div>
+          <div class="s3 kgrid">
+            <div class="s3 tile tp"><div class="t-icon-box">🏠</div><div class="t-val">253</div><div class="t-lbl">Active Tenants</div><div class="t-sub">THOR · HULK</div><div class="t-bar"></div></div>
+            <div class="s3 tile tb"><div class="t-icon-box">💰</div><div class="t-val">₹12.4L</div><div class="t-lbl">May Revenue</div><div class="t-sub">86% collected</div><div class="t-bar"></div></div>
+            <div class="s3 tile ta"><div class="t-icon-box">⚠️</div><div class="t-val">₹2.1L</div><div class="t-lbl">Dues</div><div class="t-sub">31 tenants</div><div class="t-bar"></div></div>
+            <div class="s3 tile tg"><div class="t-icon-box">📊</div><div class="t-val">85%</div><div class="t-lbl">Occupancy</div><div class="t-sub">253 / 297 beds</div><div class="t-bar"></div></div>
+          </div>
+          <div class="s3 sec">Recent Activity</div>
+          <div class="pscroll">
+            <div class="s3 aitem"><div class="s3 av avp">RK</div><div><div class="aname">Rahul Kumar</div><div class="aroom">614 · paid rent</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#22C55E;">+₹8,500</div><div style="font-size:9px;color:#C0BDBA;">2h ago</div></div></div>
+            <div class="s3 aitem"><div class="s3 av avb">AS</div><div><div class="aname">Arjun Sharma</div><div class="aroom">302 · checked in</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#00AEED;">New</div><div style="font-size:9px;color:#C0BDBA;">5h ago</div></div></div>
+            <div class="s3 aitem"><div class="s3 av avg">PN</div><div><div class="aname">Priya Nair</div><div class="aroom">414 · form pending</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#F59E0B;">Pending</div><div style="font-size:9px;color:#C0BDBA;">1d ago</div></div></div>
+            <div class="s3 aitem"><div class="s3 av avp">MK</div><div><div class="aname">Meera Krishnan</div><div class="aroom">411 · paid rent</div></div><div style="margin-left:auto;text-align:right;"><div style="font-size:11px;font-weight:700;color:#22C55E;">+₹7,500</div><div style="font-size:9px;color:#C0BDBA;">2d ago</div></div></div>
+          </div>
+        </div>
+        <div class="s3 bnav">
+          <div class="bnav-item act"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKINGS -->
+  <div class="pw">
+    <div class="plabel">Bookings</div>
+    <div class="phone">
+      <div class="s3" style="height:100%;display:flex;flex-direction:column;">
+        <div class="sbar" style="background:#fff;color:#18181B;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="s3 hdr"><div class="pg-title">Bookings</div><div class="pg-sub">3 pending · May 2026</div></div>
+          <div class="s3 chips"><div class="s3 chip on">All 3</div><div class="s3 chip cg">Ready 2</div><div class="s3 chip ca">Awaiting 1</div></div>
+          <div class="pscroll" style="padding-bottom:8px;">
+            <div class="s3 bcard rdy">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Arjun Sharma</div><div class="bc-room">Room 302 · HULK · 2-share</div></div><div class="bstat rdy">Ready</div></div>
+              <div class="bc-row"><div class="bc-rent">₹8,500/mo</div><div class="bc-btn">Check In</div></div>
+            </div>
+            <div class="s3 bcard awt">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Priya Nair</div><div class="bc-room">Room 414 · THOR · 3-share</div></div><div class="bstat awt">Awaiting form</div></div>
+              <div class="bnote">Referred by Kiran · needs veg food</div>
+              <div class="bc-row"><div class="bc-rent">₹7,500/mo</div><div style="font-size:9px;color:#A8A5A0;">22 May</div></div>
+            </div>
+            <div class="s3 bcard rdy">
+              <div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="bc-name">Vikram Patel</div><div class="bc-room">Room 501 · THOR · 2-share</div></div><div class="bstat rdy">Ready</div></div>
+              <div class="bc-row"><div class="bc-rent">₹9,000/mo</div><div class="bc-btn">Check In</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="s3 bnav">
+          <div class="bnav-item"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item act"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TENANTS -->
+  <div class="pw">
+    <div class="plabel">Tenants</div>
+    <div class="phone">
+      <div class="s3" style="height:100%;display:flex;flex-direction:column;">
+        <div class="sbar" style="background:#fff;color:#18181B;"><span>9:41</span><span>●●● 5G ▌</span></div>
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+          <div class="s3 hdr"><div class="pg-title">Tenants</div><div class="pg-sub">253 active · 14 on notice</div></div>
+          <div class="s3 srch"><span>🔍</span><span class="srch-ph">Search name or room…</span></div>
+          <div class="pscroll" style="padding-top:6px;">
+            <div class="s3 tcard"><div class="s3 tav tavp">RK</div><div><div class="tname">Rahul Kumar</div><div class="troom">614 · HULK · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge act">Active</div></div></div>
+            <div class="s3 tcard"><div class="s3 tav tavb">AS</div><div><div class="tname">Ananya Singh</div><div class="troom">302 · HULK · 3-share</div></div><div class="tr"><div class="tdues">₹3,200</div><div class="tbadge act">Active</div></div></div>
+            <div class="s3 tcard"><div class="s3 tav tavg">VP</div><div><div class="tname">Vikram Patel</div><div class="troom">501 · THOR · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge ntc">Notice</div></div></div>
+            <div class="s3 tcard"><div class="s3 tav tavp">MK</div><div><div class="tname">Meera Krishnan</div><div class="troom">411 · THOR · 3-share</div></div><div class="tr"><div class="tdues">₹7,500</div><div class="tbadge act">Active</div></div></div>
+            <div class="s3 tcard"><div class="s3 tav tavb">SR</div><div><div class="tname">Suresh Reddy</div><div class="troom">213 · HULK · 2-share</div></div><div class="tr"><div class="tdues tpaid">Paid</div><div class="tbadge act">Active</div></div></div>
+            <div class="s3 tcard"><div class="s3 tav tavg">PM</div><div><div class="tname">Pooja Menon</div><div class="troom">312 · THOR · 4-share</div></div><div class="tr"><div class="tdues">₹1,800</div><div class="tbadge act">Active</div></div></div>
+          </div>
+        </div>
+        <div class="s3 bnav">
+          <div class="bnav-item"><span class="bnav-icon">🏠</span><span>Home</span></div>
+          <div class="bnav-item act"><span class="bnav-icon">👥</span><span>Tenants</span></div>
+          <div class="bnav-item"><span class="bnav-icon">📋</span><span>Bookings</span></div>
+          <div class="bnav-item"><span class="bnav-icon">💳</span><span>Finance</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function show(id, btn) {
+  document.querySelectorAll('.preview').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  btn.classList.add('on');
+}
+</script>
+</body>
+</html>
