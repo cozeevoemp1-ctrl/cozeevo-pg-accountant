@@ -872,8 +872,8 @@ function ExpansionPanel({
                 } ${selected?.tenancy_id === item.tenancy_id ? "bg-[#FCE2EE]" : ""}`}
               >
                 <button
-                  onClick={() => open === "dues" ? (item.tenancy_id ? onCollect(item) : undefined) : open === "prebooked" ? undefined : selectItem(item)}
-                  disabled={!item.tenancy_id || open === "prebooked"}
+                  onClick={() => open === "dues" ? (item.tenancy_id ? onCollect(item) : undefined) : (open === "prebooked" || open === "no_show") ? undefined : selectItem(item)}
+                  disabled={!item.tenancy_id || open === "prebooked" || open === "no_show"}
                   className={`flex-1 flex justify-between items-center text-left min-w-0 ${item.tenancy_id ? "cursor-pointer" : "cursor-default"}`}
                 >
                   <div className="min-w-0">
@@ -910,7 +910,7 @@ function ExpansionPanel({
                       </span>
                     )}
                     <p className={`text-xs font-medium ${open === "dues" ? "text-status-due font-semibold" : "text-ink-muted"}`}>{item.detail}</p>
-                    {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && open !== "dues" && open !== "prebooked" && (
+                    {item.tenancy_id && open !== "checkouts_today" && open !== "checkins_today" && open !== "dues" && open !== "prebooked" && open !== "no_show" && (
                       <span className="text-xs text-brand-pink font-bold">
                         {selected?.tenancy_id === item.tenancy_id ? "▾" : "›"}
                       </span>
@@ -939,14 +939,24 @@ function ExpansionPanel({
                     Check-in →
                   </Link>
                 )}
-                {open === "no_show" && item.is_overdue && item.tenancy_id && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onCancel(item); }}
-                    disabled={cancellingId === item.tenancy_id}
-                    className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-[#991B1B] px-2.5 py-1 rounded-full active:opacity-70 disabled:opacity-50"
-                  >
-                    {cancellingId === item.tenancy_id ? "…" : "Cancel →"}
-                  </button>
+                {open === "no_show" && (
+                  <div className="ml-2 flex-shrink-0 flex gap-1.5">
+                    <Link
+                      href="/onboarding/bookings"
+                      className="text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                    >
+                      Check In →
+                    </Link>
+                    {item.is_overdue && item.tenancy_id && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onCancel(item); }}
+                        disabled={cancellingId === item.tenancy_id}
+                        className="text-[10px] font-bold text-white bg-[#991B1B] px-2.5 py-1 rounded-full active:opacity-70 disabled:opacity-50"
+                      >
+                        {cancellingId === item.tenancy_id ? "…" : "Cancel →"}
+                      </button>
+                    )}
+                  </div>
                 )}
                 {open === "dues" && item.tenancy_id && (
                   <button
@@ -1028,8 +1038,8 @@ function ExpansionPanel({
         )}
       </div>
 
-      {/* Tenant detail card — tiles that use bottom expand (not notices, not dues) */}
-      {open !== "notices" && open !== "dues" && open !== "prebooked" && (
+      {/* Tenant detail card — tiles that use bottom expand (not notices, not dues, not no_show) */}
+      {open !== "notices" && open !== "dues" && open !== "prebooked" && open !== "no_show" && (
         <div className="px-3 pb-3">
           {detailLoading && (
             <p className="text-xs text-ink-muted text-center pt-2">Loading details…</p>
@@ -1114,8 +1124,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     if (open === key) { close(); return; }
     // Allow scrollIntoView to run without triggering close-on-scroll
     scrollGrace.current = true;
-    openScrollY.current = window.scrollY;
-    setTimeout(() => { scrollGrace.current = false; }, 1000);
+    setTimeout(() => { scrollGrace.current = false; openScrollY.current = window.scrollY; }, 1000);
     setOpen(key);
     resetFilters();
     if (cache.current.has(key!)) {
