@@ -65,11 +65,14 @@ export default function NoticesPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Unique checkout months for filter chips
+  // Rolling 4-month window starting from current month (never shows past months)
   const months = useMemo(() => {
-    const keys = [...new Set(items.map(i => monthKey(i.expected_checkout)))]
-    return keys.sort()
-  }, [items])
+    const now = new Date()
+    return Array.from({ length: 4 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    })
+  }, [])
 
   const filtered = useMemo(() => {
     let src = [...items]
