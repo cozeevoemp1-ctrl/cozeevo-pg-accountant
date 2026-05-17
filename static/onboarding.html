@@ -641,15 +641,9 @@
       <div class="error-msg" id="err-gender">Please select your gender</div>
     </div>
 
-    <div class="two-col">
-      <div class="field">
-        <label for="dob">Date of Birth</label>
-        <input type="date" id="dob" autocomplete="bday">
-      </div>
-      <div class="field">
-        <label for="email">Email</label>
-        <input type="email" id="email" placeholder="Optional" autocomplete="email">
-      </div>
+    <div class="field">
+      <label for="dob">Date of Birth</label>
+      <input type="date" id="dob" autocomplete="bday">
     </div>
 
     <div class="field">
@@ -730,43 +724,14 @@
     </div>
   </div>
 
-  <!-- STEP 3: Address & Work -->
+  <!-- STEP 3: Address -->
   <div id="step-3" class="step">
-    <div class="step-title">Address & Occupation</div>
-    <div class="step-subtitle">Your permanent address and work details</div>
-
-    <div class="section-divider">Permanent Address</div>
+    <div class="step-title">Address</div>
+    <div class="step-subtitle">Your permanent address</div>
 
     <div class="field">
       <label for="perm-address">Permanent Address</label>
       <textarea id="perm-address" placeholder="House No, Street, City, State, PIN"></textarea>
-    </div>
-
-    <div class="section-divider">Work / Education</div>
-
-    <div class="field">
-      <label for="occupation">Occupation</label>
-      <input type="text" id="occupation" placeholder="e.g. Software Engineer, Student">
-    </div>
-
-    <div class="field">
-      <label for="education">Education</label>
-      <input type="text" id="education" placeholder="e.g. B.Tech, MBA">
-    </div>
-
-    <div class="field">
-      <label for="office-name">Office / College Name</label>
-      <input type="text" id="office-name" placeholder="Company or institution name">
-    </div>
-    <div class="field">
-      <label for="office-address">Office / College Address</label>
-      <textarea id="office-address" placeholder="Full address (optional)"></textarea>
-    </div>
-
-    <div class="field">
-      <label for="office-phone">Office / College Phone</label>
-      <input type="tel" id="office-phone" placeholder="Optional" maxlength="10">
-      <div class="error-msg" id="err-office-phone">Enter a valid 10-digit number</div>
     </div>
 
     <div class="nav-buttons">
@@ -1164,13 +1129,6 @@
       }
     }
 
-    if (step === 3) {
-      const officePhone = document.getElementById('office-phone').value.trim();
-      if (officePhone && stripDigits(officePhone).length !== 10) {
-        setError('office-phone', 'err-office-phone'); ok = false;
-      }
-    }
-
     if (step === 4) {
       const idType   = document.getElementById('id-type').value;
       const idNumber = document.getElementById('id-number').value.trim();
@@ -1442,7 +1400,6 @@
       phone: stripDigits(document.getElementById('phone').value),
       gender: ((document.querySelector('input[name="gender"]:checked') || {}).value || '').toLowerCase(),
       date_of_birth: document.getElementById('dob').value,
-      email: document.getElementById('email').value.trim(),
       food_preference: ((document.querySelector('input[name="food"]:checked') || {}).value || '').toLowerCase(),
       // Step 2
       father_name: document.getElementById('father-name').value.trim(),
@@ -1452,10 +1409,6 @@
       emergency_contact_relationship: document.getElementById('emg-rel').value,
       // Step 3
       permanent_address: document.getElementById('perm-address').value.trim(),
-      occupation: document.getElementById('occupation').value.trim(),
-      educational_qualification: document.getElementById('education').value.trim(),
-      office_address: [document.getElementById('office-name').value.trim(), document.getElementById('office-address').value.trim()].filter(Boolean).join(', '),
-      office_phone: stripDigits(document.getElementById('office-phone').value),
       // Step 4
       id_proof_type: document.getElementById('id-type').value,
       id_proof_number: document.getElementById('id-number').value.trim().toUpperCase(),
