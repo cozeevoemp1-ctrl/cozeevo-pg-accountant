@@ -65,6 +65,7 @@ export default function BookingsPage() {
   const [checkingIn, setCheckingIn] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [filter, setFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending_review" | "pending_tenant" | "expired">("all")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -131,9 +132,10 @@ export default function BookingsPage() {
     (b.tenant_name || "").toLowerCase().includes(q) ||
     (b.room || "").toLowerCase().includes(q)
 
-  const ready   = bookings.filter((b) => b.status === "pending_review" && match(b))
-  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b))
-  const expired  = bookings.filter((b) => b.status === "expired"        && match(b))
+  const statusMatch = (b: Booking) => statusFilter === "all" || b.status === statusFilter
+  const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b))
+  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b))
+  const expired  = bookings.filter((b) => b.status === "expired"        && match(b) && statusMatch(b))
 
   return (
     <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -157,19 +159,23 @@ export default function BookingsPage() {
           className="w-full rounded-xl border border-[#E5E1DC] bg-bg px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
         />
 
-        {/* Totals summary */}
+        {/* Totals summary + filter chips */}
         {!loading && bookings.length > 0 && (
           <div className="flex gap-2 flex-wrap">
             {[
-              { label: "Total", count: bookings.length, color: "bg-[#F6F5F0] text-ink border-[#E0DDD8]" },
-              { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, color: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]" },
-              { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, color: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]" },
-              { label: "Expired", count: bookings.filter(b => b.status === "expired").length, color: "bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]" },
-            ].filter(s => s.count > 0).map(s => (
-              <div key={s.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold ${s.color}`}>
+              { label: "All", count: bookings.length, key: "all" as const, color: "bg-[#F6F5F0] text-ink border-[#E0DDD8]", activeColor: "bg-ink text-white border-ink" },
+              { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, key: "pending_review" as const, color: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]", activeColor: "bg-[#065F46] text-white border-[#065F46]" },
+              { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, key: "pending_tenant" as const, color: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]", activeColor: "bg-[#92400E] text-white border-[#92400E]" },
+              { label: "Expired", count: bookings.filter(b => b.status === "expired").length, key: "expired" as const, color: "bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]", activeColor: "bg-[#991B1B] text-white border-[#991B1B]" },
+            ].filter(s => s.count > 0 || s.key === "all").map(s => (
+              <button
+                key={s.key}
+                onClick={() => setStatusFilter(s.key)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${statusFilter === s.key ? s.activeColor : s.color}`}
+              >
                 <span className="text-base font-extrabold leading-none">{s.count}</span>
-                <span className="font-medium opacity-80">{s.label}</span>
-              </div>
+                <span className="font-medium opacity-90">{s.label}</span>
+              </button>
             ))}
           </div>
         )}
