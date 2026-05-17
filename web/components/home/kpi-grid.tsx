@@ -1017,6 +1017,17 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Close panel on page scroll — prevents the fixed backdrop from blocking scroll
+  // after the user scrolls away from the KPI section
+  const openRef = useRef(open);
+  openRef.current = open;
+  useEffect(() => {
+    function onScroll() { if (openRef.current) { setOpen(null); resetFilters(); } }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function prefetch(key: TileKey) {
     if (!key || cache.current.has(key) || inflight.current.has(key)) return;
     inflight.current.add(key);
