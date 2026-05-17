@@ -53,6 +53,11 @@ type: project
 7. **Create Supabase account for Lokesh** — so he can log into `app.getkozzy.com` as receptionist. Email: TBD from Kiran.
 8. **PWA adjustment form** — set `adjustment + adjustment_note` on tenant's current month row. (Backend done; PWA UI done on edit-tenant page — may already be complete, verify.)
 
+### PWA — Notices page (done 2026-05-17, v1.76.1)
+- ✅ Month chips auto-roll 4 months from current month (no past months shown)
+- ✅ "Day stay" type filter chip added
+- ✅ "Free from" date shown in NoticeCard detail grid + home tile inline expand
+
 ### Bookings check-in — remaining
 9. **Pratham S Kore** — still in `pending_review`, pending final check-in test. Session token `f0e7fc81`. Room 420, 19 May 2026, rent ₹13,500, advance ₹2,000, deposit ₹13,500.
 10. **"Auto-recorded · UPI" label on Agreed Terms tiles** — misleading (nothing auto-recorded). Should say "Reference only" for both Advance Paid and Deposit tiles. Low priority.
