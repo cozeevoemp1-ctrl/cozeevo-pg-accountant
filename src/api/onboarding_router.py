@@ -1548,12 +1548,24 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 else:
                     period = date(period.year, period.month + 1, 1)
 
-            # Advance payment (from onboarding session) — always UPI
-            # Payments collected at check-in (entered by receptionist on the bookings screen)
-            # booking_amount and security_deposit on obs are reference-only (agreed amounts),
-            # NOT auto-created as payments — receptionist records actual collected amounts below.
+            # Payments at check-in
             def _ci_mode(field_mode: str) -> PaymentMode:
                 return PaymentMode.upi if field_mode == "upi" else PaymentMode.cash
+
+            # Auto-record advance (booking_amount) as a booking payment so it appears
+            # in payment history. It is NOT counted in rent paid_result (dues query
+            # excludes booking type) — it is accounted for directly in deposit_due via
+            # tenancy.booking_amount on the tenants dues endpoint.
+            if obs.booking_amount and float(obs.booking_amount) > 0:
+                session.add(Payment(
+                    tenancy_id=tenancy.id, amount=obs.booking_amount,
+                    payment_date=checkin,
+                    payment_mode=PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash,
+                    for_type=PaymentFor.booking, period_month=None,
+                    notes=f"Advance/booking payment recorded at check-in ({obs.advance_mode or 'cash'})",
+                ))
+
+            # Additional dues collected at check-in by receptionist
             if req and req.collected_rent_dues > 0:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=req.collected_rent_dues,
