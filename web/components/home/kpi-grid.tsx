@@ -815,7 +815,7 @@ function ExpansionPanel({
       )}
 
       {/* Scrollable list */}
-      <div className="overflow-y-auto px-3" style={{ maxHeight: "256px" }}>
+      <div className="overflow-y-auto px-3" style={{ maxHeight: "256px", overscrollBehavior: "contain" }}>
         {loading ? (
           <p className="text-xs text-ink-muted text-center py-4">Loading…</p>
         ) : filtered.length === 0 ? (
@@ -1227,8 +1227,6 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     onCollect: (item: KpiDetailItem) => { setCollectingItem(item); },
   };
 
-  const leftStyle: React.CSSProperties = { left: 0, width: "calc(200% + 0.75rem)" };
-  const rightStyle: React.CSSProperties = { right: 0, width: "calc(200% + 0.75rem)" };
   const fullStyle: React.CSSProperties = { left: 0, right: 0 };
 
   return (
@@ -1237,138 +1235,121 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
       {/* Backdrop — catches outside taps to close the panel */}
       {open && <div className="fixed inset-0 z-10" onClick={close} />}
 
-      {/* Occupied beds — left col */}
-      <div className="relative">
-        <IconTile
-          icon="🏠" label="Occupied beds"
-          value={`${data.occupied_beds} / ${data.total_beds}`}
-          color="blue" active={open === "occupied"}
-          onClick={() => toggle("occupied")}
-        />
-        {open === "occupied" && (
-          <ExpansionPanel {...panelProps} positionStyle={leftStyle} />
+      {/* Row 1: Occupied + Vacant */}
+      <div className="col-span-2 relative">
+        <div className="grid grid-cols-2 gap-3">
+          <IconTile
+            icon="🏠" label="Occupied beds"
+            value={`${data.occupied_beds} / ${data.total_beds}`}
+            color="blue" active={open === "occupied"}
+            onClick={() => toggle("occupied")}
+          />
+          <IconTile
+            icon="🪟" label="Vacant beds"
+            value={data.vacant_beds}
+            color="green" active={open === "vacant"}
+            onClick={() => toggle("vacant")}
+          />
+        </div>
+        {(open === "occupied" || open === "vacant") && (
+          <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
         )}
       </div>
 
-      {/* Vacant beds — right col */}
-      <div className="relative">
-        <IconTile
-          icon="🪟" label="Vacant beds"
-          value={data.vacant_beds}
-          color="green" active={open === "vacant"}
-          onClick={() => toggle("vacant")}
-        />
-        {open === "vacant" && (
-          <ExpansionPanel {...panelProps} positionStyle={rightStyle} />
-        )}
-      </div>
-
-      {/* Active tenants — no expansion */}
-      <IconTile
-        icon="👥" label="Active tenants"
-        value={data.active_tenants}
-        color="pink"
-      />
-
-      {/* Dues pending — right col */}
-      <div className="relative">
-        <IconTile
-          icon="💸" label={`Dues pending · ${data.overdue_tenants}`}
-          value={rupeeL(data.overdue_amount)}
-          color={data.overdue_tenants > 0 ? "orange" : "green"}
-          active={open === "dues"}
-          onClick={() => toggle("dues")}
-        />
+      {/* Row 2: Active tenants + Dues */}
+      <div className="col-span-2 relative">
+        <div className="grid grid-cols-2 gap-3">
+          <IconTile
+            icon="👥" label="Active tenants"
+            value={data.active_tenants}
+            color="pink"
+          />
+          <IconTile
+            icon="💸" label={`Dues pending · ${data.overdue_tenants}`}
+            value={rupeeL(data.overdue_amount)}
+            color={data.overdue_tenants > 0 ? "orange" : "green"}
+            active={open === "dues"}
+            onClick={() => toggle("dues")}
+          />
+        </div>
         {open === "dues" && (
-          <ExpansionPanel {...panelProps} positionStyle={rightStyle} />
+          <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
         )}
       </div>
 
-      {/* Check-ins / Check-outs — conditional */}
+      {/* Row 3: Check-ins + Check-outs — conditional */}
       {(data.checkins_today > 0 || data.checkouts_today > 0) && (
-        <>
-          <div className="relative">
+        <div className="col-span-2 relative">
+          <div className="grid grid-cols-2 gap-3">
             <IconTile
               icon="↗️" label="Check-ins today"
               value={data.checkins_today}
               color="green" active={open === "checkins_today"}
               onClick={() => toggle("checkins_today")}
             />
-            {open === "checkins_today" && (
-              <ExpansionPanel {...panelProps} positionStyle={leftStyle} />
-            )}
-          </div>
-          <div className="relative">
             <IconTile
               icon="↙️" label="Check-outs today"
               value={data.checkouts_today}
               color="orange" active={open === "checkouts_today"}
               onClick={() => toggle("checkouts_today")}
             />
-            {open === "checkouts_today" && (
-              <ExpansionPanel {...panelProps} positionStyle={rightStyle} />
-            )}
           </div>
-        </>
+          {(open === "checkins_today" || open === "checkouts_today") && (
+            <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+          )}
+        </div>
       )}
 
-      {/* Awaiting check-in + Pre-booked row */}
+      {/* Row 4: Awaiting check-in + Pre-booked — conditional */}
       {(data.no_show_count > 0 || data.prebooked_count > 0) && (
-        <>
-          {data.no_show_count > 0 && data.prebooked_count > 0 ? (
-            /* Both exist — side by side */
-            <>
-              <div className="relative">
-                <IconTile
-                  icon="⏳" label="Awaiting check-in"
-                  value={data.no_show_count}
-                  color="orange" active={open === "no_show"}
-                  onClick={() => toggle("no_show")}
-                />
-                {open === "no_show" && (
-                  <ExpansionPanel {...panelProps} positionStyle={leftStyle} />
-                )}
-              </div>
-              <div className="relative">
-                <IconTile
-                  icon="🔖" label="Pre-booked"
-                  value={data.prebooked_count}
-                  color="orange" active={open === "prebooked"}
-                  onClick={() => toggle("prebooked")}
-                />
-                {open === "prebooked" && (
-                  <ExpansionPanel {...panelProps} positionStyle={rightStyle} />
-                )}
-              </div>
-            </>
-          ) : data.no_show_count > 0 ? (
-            /* Only awaiting check-in — full width */
-            <div className="col-span-2 relative">
+        data.no_show_count > 0 && data.prebooked_count > 0 ? (
+          /* Both exist — side by side in full-width row wrapper */
+          <div className="col-span-2 relative">
+            <div className="grid grid-cols-2 gap-3">
               <IconTile
                 icon="⏳" label="Awaiting check-in"
                 value={data.no_show_count}
                 color="orange" active={open === "no_show"}
                 onClick={() => toggle("no_show")}
               />
-              {open === "no_show" && (
-                <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
-              )}
-            </div>
-          ) : (
-            /* Only pre-booked — full width */
-            <div className="col-span-2 relative">
               <IconTile
                 icon="🔖" label="Pre-booked"
                 value={data.prebooked_count}
                 color="orange" active={open === "prebooked"}
                 onClick={() => toggle("prebooked")}
               />
-              {open === "prebooked" && (
-                <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
-              )}
             </div>
-          )}
-        </>
+            {(open === "no_show" || open === "prebooked") && (
+              <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+            )}
+          </div>
+        ) : data.no_show_count > 0 ? (
+          /* Only awaiting check-in — full width */
+          <div className="col-span-2 relative">
+            <IconTile
+              icon="⏳" label="Awaiting check-in"
+              value={data.no_show_count}
+              color="orange" active={open === "no_show"}
+              onClick={() => toggle("no_show")}
+            />
+            {open === "no_show" && (
+              <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+            )}
+          </div>
+        ) : (
+          /* Only pre-booked — full width */
+          <div className="col-span-2 relative">
+            <IconTile
+              icon="🔖" label="Pre-booked"
+              value={data.prebooked_count}
+              color="orange" active={open === "prebooked"}
+              onClick={() => toggle("prebooked")}
+            />
+            {open === "prebooked" && (
+              <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+            )}
+          </div>
+        )
       )}
 
       {/* On notice — full width */}
