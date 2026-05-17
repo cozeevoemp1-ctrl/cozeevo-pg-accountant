@@ -51,6 +51,21 @@ All notable changes to PG Accountant will be documented here.
 
 ---
 
+## [1.75.94] — 2026-05-17 — P&L April cash correction + May RS KPI bug fix
+
+### P&L
+- **April cash revised** — pnl_builder.py: cash column Apr 2026 reduced by ₹19,500 (dues reconciliation 2026-05-16 fixed shared-room overpayments for Tanishka/Veena.T/Sachin/Preesha). sop_pnl.md updated.
+- **PnL_Accrual_2026_05_17.xlsx** regenerated
+
+### Bug fix: May 2026 KPI dues tile
+- **Root cause** — KPI dues tile uses INNER JOIN on `rent_schedule`. 14 active monthly tenants had no May 2026 RS row → completely invisible (0 due showed). Was showing 9 tenants / ₹28,625 total.
+- **Fix** — `scripts/_fix_missing_may_rs.py`: creates RS rows for monthly tenants missing May RS; skips day-wise (stay_type=daily) and room 000 placeholders; prorates rent for May check-ins (days_occupied/31 days).
+- **14 RS rows created**: Arun Vasavan (216), V.Bhanu Prakash (314), Prasad Vadlamani (318), Sparsh Rawat (413), Dhruv Singh (414), T.Rakesh Chetan (415), Yelagani Anuhya (421), Navdeep Gupta (506), Ivish (507), Delvin Raj (520), Vadi Raj Nandlal (521), Sanskar Bharadia (605), Omkar Deodher (616), Siddharth Dewangan (619).
+- **Result** — KPI dues tile now shows 62 tenants / ₹604,700.
+- **Audit script** — `scripts/_check_may_dues.py`: checks Ivish specifically, lists all active tenants with no May RS, shows full dues table with rent/deposit breakdown.
+
+---
+
 ## [1.75.91] — 2026-05-16 — May import complete + Akshat added
 
 ### Data ops
