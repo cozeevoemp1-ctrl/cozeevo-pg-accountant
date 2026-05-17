@@ -157,6 +157,23 @@ export default function BookingsPage() {
           className="w-full rounded-xl border border-[#E5E1DC] bg-bg px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
         />
 
+        {/* Totals summary */}
+        {!loading && bookings.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            {[
+              { label: "Total", count: bookings.length, color: "bg-[#F6F5F0] text-ink border-[#E0DDD8]" },
+              { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, color: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]" },
+              { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, color: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]" },
+              { label: "Expired", count: bookings.filter(b => b.status === "expired").length, color: "bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]" },
+            ].filter(s => s.count > 0).map(s => (
+              <div key={s.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold ${s.color}`}>
+                <span className="text-base font-extrabold leading-none">{s.count}</span>
+                <span className="font-medium opacity-80">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {error && (
           <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-4 py-3 text-xs text-status-warn font-medium">
             {error}
