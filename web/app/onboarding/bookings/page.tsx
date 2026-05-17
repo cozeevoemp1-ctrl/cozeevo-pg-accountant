@@ -190,11 +190,11 @@ export default function BookingsPage() {
               </>
             )}
 
-            {/* Awaiting form */}
+            {/* Pre-booked — link sent, form not filled yet */}
             {awaiting.length > 0 && (
               <>
                 <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide mt-2">
-                  {awaiting.length} awaiting form
+                  {awaiting.length} pre-booked
                 </p>
                 {awaiting.map((b) => (
                   <BookingCard
@@ -432,6 +432,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           )}
         </div>
       </div>
+
+      {/* Pre-booked info line — show when booked and when link expires */}
+      {isPending && !editing && (
+        <p className="text-[10px] text-ink-muted -mt-1">
+          Booked {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+          {b.expires_at ? ` · Link expires ${new Date(b.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+        </p>
+      )}
 
       {/* Expand toggle — only for ready-to-check-in cards */}
       {isReady && !editing && (
