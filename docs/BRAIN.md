@@ -577,9 +577,9 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
-| THOR | 81 | 16 | 62 | 3 | **149** |
-| HULK | 82 | 16 | 63 | 3 | **148** |
-| **Total** | **163** | **32** | **125** | **6** | **297** |
+| THOR | 79 | 14 | 62 | 3 | **147** |
+| HULK | 81 | 14 | 65 | 2 | **150** |
+| **Total** | **160** | **28** | **127** | **5** | **297** |
 
 ### Bed Count Formula
 ```
