@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { updateBookingSession, cancelBookingSession } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
 
@@ -60,11 +60,12 @@ function isToday(iso: string) {
 
 export default function BookingsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [checkingIn, setCheckingIn] = useState<string | null>(null)
   const [error, setError] = useState("")
-  const [filter, setFilter] = useState("")
+  const [filter, setFilter] = useState(searchParams.get("q") ?? "")
   const [statusFilter, setStatusFilter] = useState<"all" | "pending_review" | "pending_tenant" | "expired">("all")
 
   const load = useCallback(async () => {

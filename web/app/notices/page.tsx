@@ -109,8 +109,10 @@ export default function NoticesPage() {
     return count
   }, [filtered])
 
-  const eligible  = filtered.filter(i => i.deposit_eligible)
-  const forfeited = filtered.filter(i => !i.deposit_eligible)
+  const monthlyItems = useMemo(() => filtered.filter(i => i.stay_type !== "daily"), [filtered])
+  const dailyItems   = useMemo(() => items.filter(i => i.stay_type === "daily").sort((a, b) => a.days_remaining - b.days_remaining), [items])
+  const eligible  = monthlyItems.filter(i => i.deposit_eligible)
+  const forfeited = monthlyItems.filter(i => !i.deposit_eligible)
 
   function openEdit(item: NoticeItem) {
     setEditItem(item)
@@ -327,6 +329,37 @@ export default function NoticesPage() {
                   onEdit={() => openEdit(item)}
                 />
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* Day-stay leaving within 30 days */}
+        {!loading && dailyItems.length > 0 && (
+          <section>
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
+              Day-stay Leaving ({dailyItems.length})
+            </p>
+            <div className="flex flex-col gap-2">
+              {dailyItems.map(item => {
+                const dl = daysLabel(item.days_remaining)
+                return (
+                  <div key={item.tenancy_id} className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink truncate">{item.tenant_name}</p>
+                      <p className="text-xs text-ink-muted">Room {item.room_number} · Checkout {fmtDate(item.expected_checkout)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[11px] font-bold ${dl.color}`}>{dl.text}</span>
+                      <button
+                        onClick={() => router.push(`/checkout/new?tenancy_id=${item.tenancy_id}`)}
+                        className="text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
+                      >
+                        Check-out →
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}

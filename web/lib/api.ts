@@ -459,6 +459,7 @@ export interface NoticeItem {
   room_active_count: number;
   room_notice_count: number;
   is_full_exit: boolean;
+  stay_type?: string;               // "daily" for day-stay, undefined/absent for monthly
 }
 
 export function getActiveNotices(): Promise<NoticeItem[]> {

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
@@ -102,4 +102,47 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
             })
 
         results.sort(key=lambda x: (x["expected_checkout"], x["tenant_name"]))
+
+        # Day-stay tenants checking out within 30 days
+        daily_rows = (await session.execute(
+            select(Tenancy, Tenant, Room)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Tenancy.room_id == Room.id)
+            .where(
+                Room.is_staff_room == False,
+                Room.room_number != "000",
+                Tenancy.status == TenancyStatus.active,
+                Tenancy.stay_type == StayType.daily,
+                Tenancy.checkout_date.isnot(None),
+                Tenancy.checkout_date >= today,
+                Tenancy.checkout_date <= today + timedelta(days=30),
+            )
+        )).all()
+
+        for tenancy, tenant, room in daily_rows:
+            co = tenancy.checkout_date
+            days_remaining = (co - today).days if co else 9999
+            results.append({
+                "tenancy_id":        tenancy.id,
+                "tenant_name":       tenant.name,
+                "phone":             tenant.phone,
+                "room_number":       room.room_number,
+                "gender":            tenant.gender,
+                "notice_date":       None,
+                "expected_checkout": co.isoformat() if co else None,
+                "deposit_eligible":  False,
+                "has_notice":        False,
+                "stay_type":         "daily",
+                "security_deposit":  float(tenancy.security_deposit or 0),
+                "maintenance_fee":   float(tenancy.maintenance_fee or 0),
+                "agreed_rent":       float(tenancy.agreed_rent or 0),
+                "days_remaining":    days_remaining,
+                "sharing_type":      tenancy.sharing_type.value if tenancy.sharing_type else None,
+                "beds_freed":        1,
+                "room_max_occupancy": room.max_occupancy,
+                "room_active_count": 1,
+                "room_notice_count": 1,
+                "is_full_exit":      False,
+            })
+
         return results

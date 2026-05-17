@@ -942,7 +942,7 @@ function ExpansionPanel({
                 {open === "no_show" && (
                   <div className="ml-2 flex-shrink-0 flex gap-1.5">
                     <Link
-                      href="/onboarding/bookings"
+                      href={`/onboarding/bookings?q=${encodeURIComponent(item.name)}`}
                       className="text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
                     >
                       Check In →

@@ -141,8 +141,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         )
         prebooked_count = prebooked_form + prebooked_room000
 
-        # Monthly tenants with formal notice
-        notices_count = int(
+        # Monthly tenants with formal notice + day-stay checking out within 30 days
+        _monthly_notices = int(
             await session.scalar(
                 select(func.count(Tenancy.id))
                 .join(Room, Room.id == Tenancy.room_id)
@@ -155,6 +155,22 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 )
             ) or 0
         )
+        _daily_leaving = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "000",
+                    Tenancy.status == TenancyStatus.active,
+                    Tenancy.stay_type == StayType.daily,
+                    Tenancy.checkout_date.isnot(None),
+                    Tenancy.checkout_date >= today,
+                    Tenancy.checkout_date <= today + timedelta(days=30),
+                )
+            ) or 0
+        )
+        notices_count = _monthly_notices + _daily_leaving
 
         # Check-ins today — only no_show tenants (pending physical arrival)
         checkins_today = int(
@@ -643,6 +659,44 @@ async def get_kpi_detail(
                     "is_full_exit": room_notice_count >= room_active_count > 0,
                     "room_active_count": room_active_count,
                     "room_notice_count": room_notice_count,
+                })
+            # Day-stay tenants checking out within 30 days
+            daily_rows = (await session.execute(
+                select(
+                    Tenancy.id, Tenant.name, Tenant.gender, Room.room_number,
+                    Tenancy.checkout_date,
+                )
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "000",
+                    Tenancy.status == TenancyStatus.active,
+                    Tenancy.stay_type == StayType.daily,
+                    Tenancy.checkout_date.isnot(None),
+                    Tenancy.checkout_date >= today,
+                    Tenancy.checkout_date <= today + timedelta(days=30),
+                )
+                .order_by(Tenancy.checkout_date.asc())
+            )).all()
+            for r in daily_rows:
+                co = r.checkout_date
+                days_remaining = (co - today).days if co else 9999
+                items.append({
+                    "tenancy_id": r.id,
+                    "name": r.name,
+                    "room": r.room_number,
+                    "detail": co.strftime("%-d %b") if co else "—",
+                    "deposit_eligible": False,
+                    "gender": r.gender,
+                    "expected_checkout_iso": co.isoformat() if co else None,
+                    "days_remaining": days_remaining,
+                    "beds_freed": 1,
+                    "sharing_type": None,
+                    "is_full_exit": False,
+                    "room_active_count": 1,
+                    "room_notice_count": 1,
+                    "stay_type": "daily",
                 })
             return {"type": type, "items": items}
 
