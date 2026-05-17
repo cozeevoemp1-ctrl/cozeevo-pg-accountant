@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.98] — 2026-05-17 — Onboarding form trimmed: removed email, education, occupation, office fields
+
+### UX: Customer onboarding form simplified (`static/onboarding.html`)
+- Removed fields that were highlighted on the physical form as unnecessary for digital collection:
+  - **Email** (Step 1) — was optional, removed
+  - **Education / Educational Qualification** (Step 3) — removed
+  - **Occupation / Present Employee** (Step 3) — removed
+  - **Office/College Name** (Step 3) — removed
+  - **Office/College Address** (Step 3) — removed
+  - **Office/College Phone** (Step 3) — removed, including its validation logic
+- Step 3 title renamed: "Address & Occupation" → "Address"
+- JS submit payload cleaned: `email`, `occupation`, `educational_qualification`, `office_address`, `office_phone` removed from submission object
+- Backend unchanged — all these fields are optional and default to empty string; no API changes needed
+
+---
+
 ## [1.75.97] — 2026-05-17 — KPI scroll bug + Sathish booking payment + Bala uncle cash moved to May
 
 ### Bug fix: KPI panel backdrop blocking page scroll (desktop)
