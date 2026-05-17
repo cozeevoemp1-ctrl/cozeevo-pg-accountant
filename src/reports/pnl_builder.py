@@ -54,6 +54,10 @@ CAPITAL_CONTRIBUTIONS = {
     # Mar: Police ₹3,000 + Diesel ₹6,370 + Cans ₹1,820 + Carpenter ₹1,000 + Generator ₹500 = ₹12,690
     # Apr: Dilip plumber ₹1,000 + Dilip brother ₹500 + Electrician Krishna ₹500+200+200 + Egg trays ₹875 = ₹3,275
     "Chandra advance — confirmed cash (police/diesel/plumber/carpenter/electrician)": [0, 0, 0, 0, 3000, 12690, 3275],
+    # Jitendra personal cash for PG ops (Jan 3 2026) — confirmed from handwritten notebook (2026-05-17)
+    # BBMP ₹5,000 + Agreement ₹600 = ₹5,600 (personal funds; police ₹3K was from PG collections — excluded)
+    # Matching OPEX: Govt & Regulatory Jan already includes BBMP+Agreement (₹99,673 total)
+    "Jitendra advance — personal cash (BBMP Rs.5K + agreement Rs.600, Jan 3 2026)": [0, 0, 0, 5600, 0, 0, 0],
     # Kiran PhonePe/cash for PG ops — company owes Kiran back (equity injection)
     # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD, Mr V AKIL ₹10,669 (Other Expense)
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
@@ -316,8 +320,9 @@ def _write_pnl_tab(
     for f in [
         "1. Manoj water bill for April (paid in May — amount TBD). Add to Water line when known.",
         "2. Apr rent of Rs.20,49,100 paid in May is outside this P&L window — will appear in May P&L.",
-        "3. Chandra advance REMOVED (Mar Rs.32,789 + Apr Rs.38,111) — no bank transaction found; re-add if Chandra confirms personal cash advances.",
-        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi, Mar Rs.15.5L (Sravani 7.5L+Sri Lakshmi 6L+Bharathi 2L; Rs.40K shalu removed — unconfirmed), Apr Rs.22K (Prabhakaran+Amazon Pay Later).",
+        "3. Chandra advance Rs.18,965 confirmed from handwritten notebook (2026-05-17): Feb police Rs.3K, Mar diesel Rs.6,370+cans Rs.1,820+carpenter Rs.1K+generator Rs.500+police Rs.3K=Rs.12,690, Apr plumber Rs.1,500+elec Rs.900+egg trays Rs.875=Rs.3,275. Added to OPEX categories (Fuel/Govt/Maintenance/Food) and Capital Contributions.",
+        "4. Cash Exchange Repayments (in EXCLUDED): Feb Rs.6L Sri Lakshmi, Mar Rs.15.5L (Sravani 7.5L+Sri Lakshmi 6L+Bharathi 2L), Apr Rs.22K (Prabhakaran+Amazon Pay Later). Rs.40K shalu (id 1655) confirmed fire stove purchase — moved to Furniture & Supplies Mar.",
+        "5. bank_transactions id 1655 (shalu Rs.40K) category still shows Non-Operating in DB — update to Furniture & Fittings for live P&L endpoint to match this report.",
     ]:
         ws.append([f, ""])
 
