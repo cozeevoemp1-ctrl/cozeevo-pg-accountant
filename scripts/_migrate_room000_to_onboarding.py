@@ -11,7 +11,6 @@ What it does (per tenant):
 Dry-run by default. Pass --write to apply.
 """
 import asyncio, json, sys, uuid
-from datetime import date
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
@@ -107,9 +106,9 @@ async def main(write: bool) -> None:
                 # 3. Cancel old room-000 tenancy
                 await s.execute(text("""
                     UPDATE tenancies
-                    SET status = 'cancelled', checkout_date = :today
+                    SET status = 'cancelled'
                     WHERE id = :tid
-                """), {"tid": r["tenancy_id"], "today": date.today()})
+                """), {"tid": r["tenancy_id"]})
 
                 print(f"    OK - old tenancy cancelled\n")
             else:
