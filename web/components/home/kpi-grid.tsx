@@ -571,8 +571,32 @@ function ExpansionPanel({
     for (const i of allItems) { if (i.is_full_exit && !seen.has(i.room)) { seen.add(i.room); n++ } }
     return n
   })()
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll panel into view when it opens
+  useEffect(() => {
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
+  // Trap wheel scroll inside the list — stop it from scrolling the page
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const atTop = scrollTop <= 0 && e.deltaY < 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1 && e.deltaY > 0;
+      e.stopPropagation();
+      if (atTop || atBottom) e.preventDefault();
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
   return (
-    <div className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
+    <div ref={panelRef} className="absolute top-full mt-1.5 z-20 rounded-tile border-2 border-brand-pink bg-surface overflow-hidden shadow-lg" style={{ ...positionStyle, animation: "panel-in 150ms ease-out" }}>
 
       {/* Filter bar — dues */}
       {open === "dues" && (
@@ -815,7 +839,7 @@ function ExpansionPanel({
       )}
 
       {/* Scrollable list */}
-      <div className="overflow-y-auto px-3" style={{ maxHeight: "256px", overscrollBehavior: "contain" }}>
+      <div ref={scrollRef} className="overflow-y-auto px-3" style={{ maxHeight: "256px", overscrollBehavior: "contain" }}>
         {loading ? (
           <p className="text-xs text-ink-muted text-center py-4">Loading…</p>
         ) : filtered.length === 0 ? (
@@ -1029,6 +1053,8 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     new Map(Object.entries(initialDetails ?? {}))
   );
   const inflight = useRef<Set<string>>(new Set());
+  // Grace period: ignore window scroll events fired by panel's scrollIntoView
+  const scrollGrace = useRef(false);
 
   // Warm cache on mount — only for tiles that will actually render
   useEffect(() => {
@@ -1046,7 +1072,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const openRef = useRef(open);
   openRef.current = open;
   useEffect(() => {
-    function onScroll() { if (openRef.current) { setOpen(null); resetFilters(); } }
+    function onScroll() { if (openRef.current && !scrollGrace.current) { setOpen(null); resetFilters(); } }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1069,6 +1095,9 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
 
   async function toggle(key: TileKey) {
     if (open === key) { close(); return; }
+    // Allow scrollIntoView to run without triggering close-on-scroll
+    scrollGrace.current = true;
+    setTimeout(() => { scrollGrace.current = false; }, 1000);
     setOpen(key);
     resetFilters();
     if (cache.current.has(key!)) {
