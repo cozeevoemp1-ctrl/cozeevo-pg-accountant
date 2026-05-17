@@ -49,8 +49,11 @@ CAPITAL_CONTRIBUTIONS = {
     # Dec: ₹74,768 BESCOM via partner UPI 7358341775-2@ybl (moved to Electricity expense)
     # Jan–Apr: personal SBI 0167 payments matching OPEX Partner Reimbursable line
     "Partner advance — Lakshmi (personal UPI + SBI 0167, reimbursable)": [0, 0, 74768, 41899, 18264, 750, 6928],
-    # Chandra advance: removed 2026-05-17 — could not confirm bank source (not in any bank_transactions row)
-    # Add back if Chandra confirms he personally advanced cash for Mar/Apr ops (₹32,789 + ₹38,111)
+    # Chandra personal cash for PG operations — confirmed from handwritten notebook (2026-05-17)
+    # Feb: Pradeep police ₹3,000
+    # Mar: Police ₹3,000 + Diesel ₹6,370 + Cans ₹1,820 + Carpenter ₹1,000 + Generator ₹500 = ₹12,690
+    # Apr: Dilip plumber ₹1,000 + Dilip brother ₹500 + Electrician Krishna ₹500+200+200 + Egg trays ₹875 = ₹3,275
+    "Chandra advance — confirmed cash (police/diesel/plumber/carpenter/electrician)": [0, 0, 0, 0, 3000, 12690, 3275],
     # Kiran PhonePe/cash for PG ops — company owes Kiran back (equity injection)
     # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD, Mr V AKIL ₹10,669 (Other Expense)
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
@@ -71,10 +74,10 @@ OPEX = {
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
     "IT & Software":                                              [0, 0, 3480,     12068,     934,    1128,    2348],  # Jan +948 office phone; Feb +934 mobile recharge; Mar +1128 paybil/payair; Apr +2348. Updated 2026-05-13
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
-    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  238878],  # Jan +1086 Origin veg; Feb +792 Amazon India food; Apr +756 Ratnadeep fruits. Updated 2026-05-13
-    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  355971,   61904],  # Jan +500 Shell India; Apr +326 volipi.l bus ticket. Updated 2026-05-13
+    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  239753],  # Apr +875 Chandra cash (egg trays). Jan +1086 Origin veg; Feb +792 Amazon food; Apr +756 Ratnadeep. 2026-05-17
+    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  364161,   61904],  # Mar +8190 Chandra cash (diesel 6370+cans 1820). Jan +500 Shell India; Apr +326 volipi.l. 2026-05-17
     "Staff & Labour":                                             [0, 1000, 135435, 116714, 234295,  217341,  193617],  # Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-13
-    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,    1850,   21899,   36919],
+    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,    1850,   23399,   39319],  # Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). 2026-05-17
     "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
     # Shopping & Supplies — small operational purchases (akhil setup, misc UPI, nursery decor, CHANDRASEKHAR ops advance etc.)
@@ -83,11 +86,11 @@ OPEX = {
     # Furniture & Supplies — ALL furniture, equipment, Amazon purchases from PG bank (2026-05-13: CAPEX folded into OPEX per Kiran)
     # Old CAPEX (F&F + Capital Inv) + chairs ₹47K + atta machine ₹21K + kitchen vessels ₹37.5K + Amazon all months
     # Nov: F&F 125021 + CCTV/8-Ball 82000. Dec: F&F 167741 + CCTV 100000 + Amazon 19014. Jan: F&F 203815 + Amazon 8414 (4707+3707 cash-counter). Feb: F&F 1185597 + Amazon 2174. Mar: F&F 10761 + Amazon 3237. Apr: F&F 12363 + chairs 47000 + atta 21060 + kitchen 37500 + Amazon 30756
-    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  13998,  148679],
+    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  53998,  148679],  # Mar +40000: fire stove (shalu UPI Mar 15, id 1655 — was in EXCLUDED/Non-Op, reclassified to ops 2026-05-17)
     "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003],  # Apr +1003 Naukri job posting. Updated 2026-05-13
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   3000,    3000,    3000],  # Jan +5600: Jitendra cash — BBMP ₹5K + Agreement ₹600 (police ₹3K was already in accrual). 2026-05-14
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   6000,    6000,    3000],  # Feb +3000 Chandra (Pradeep police); Mar +3000 Chandra (police). Jan Jitendra BBMP+Agreement. 2026-05-17
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0],  # Mar+Apr Chandra-attributed cash removed 2026-05-17 (no bank source — pending confirmation)
+    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0],  # Chandra cash now in proper categories (Fuel/Govt/Maintenance/Food). Mar+Apr = 0.
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
     "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
@@ -103,7 +106,7 @@ EXCLUDED = {
     # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
     # Feb: Sri Lakshmi Chandrasekar ₹6L (id 1885)
     # Mar: Sravani ₹7.5L (id 1714) + Sri Lakshmi ₹6L (id 1623) + Bharathi ₹2L (id 1652) = ₹15.5L
-    #      ₹40K shalu.pravi2125@okicici REMOVED 2026-05-17 (unknown UPI Mar 15 — not a confirmed cash exchange)
+    #      ₹40K shalu.pravi2125@okicici MOVED to Furniture&Supplies (fire stove purchase, Mar 15, id 1655)
     # Apr: Prabhakaran borrow/return ₹20K (ids 1191+1175) + Amazon Pay Later ₹2,357 (ids 1179+1053+1006) = ₹22,357
     # Nov ₹5L REMOVED — startup capital repayment (Capital Contributions above), not a cash exchange.
     # Mar ₹5L Bharathi REMOVED — covered by THOR→HULK intercompany transfer, not a separate P&L item.
