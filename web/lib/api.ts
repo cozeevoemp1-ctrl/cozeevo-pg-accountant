@@ -75,6 +75,7 @@ export interface KpiResponse {
   occupancy_pct: number;
   active_tenants: number;
   no_show_count: number;
+  prebooked_count: number;
   notices_count: number;
   checkins_today: number;
   checkouts_today: number;

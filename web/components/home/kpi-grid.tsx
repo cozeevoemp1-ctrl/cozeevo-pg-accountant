@@ -1288,19 +1288,57 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
         </>
       )}
 
-      {/* Awaiting check-in — full width */}
-      {data.no_show_count > 0 && (
-        <div className="col-span-2 relative">
-          <IconTile
-            icon="⏳" label="Awaiting check-in"
-            value={data.no_show_count}
-            color="orange" active={open === "no_show"}
-            onClick={() => toggle("no_show")}
-          />
-          {open === "no_show" && (
-            <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+      {/* Awaiting check-in + Pre-booked row */}
+      {(data.no_show_count > 0 || data.prebooked_count > 0) && (
+        <>
+          {data.no_show_count > 0 && data.prebooked_count > 0 ? (
+            /* Both exist — side by side */
+            <>
+              <div className="relative">
+                <IconTile
+                  icon="⏳" label="Awaiting check-in"
+                  value={data.no_show_count}
+                  color="orange" active={open === "no_show"}
+                  onClick={() => toggle("no_show")}
+                />
+                {open === "no_show" && (
+                  <ExpansionPanel {...panelProps} positionStyle={leftStyle} />
+                )}
+              </div>
+              <div className="relative">
+                <IconTile
+                  icon="🔖" label="Pre-booked"
+                  value={data.prebooked_count}
+                  color="orange" active={false}
+                  onClick={() => { window.location.href = "/onboarding/bookings" }}
+                />
+              </div>
+            </>
+          ) : data.no_show_count > 0 ? (
+            /* Only awaiting check-in — full width */
+            <div className="col-span-2 relative">
+              <IconTile
+                icon="⏳" label="Awaiting check-in"
+                value={data.no_show_count}
+                color="orange" active={open === "no_show"}
+                onClick={() => toggle("no_show")}
+              />
+              {open === "no_show" && (
+                <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+              )}
+            </div>
+          ) : (
+            /* Only pre-booked — full width */
+            <div className="col-span-2 relative">
+              <IconTile
+                icon="🔖" label="Pre-booked"
+                value={data.prebooked_count}
+                color="orange" active={false}
+                onClick={() => { window.location.href = "/onboarding/bookings" }}
+              />
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* On notice — full width */}

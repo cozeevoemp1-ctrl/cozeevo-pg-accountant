@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import case, func, literal_column, select, desc, or_, and_
@@ -115,6 +115,20 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
+        # Pre-booked: onboarding sessions where form not yet filled (link sent, awaiting tenant)
+        prebooked_count = (
+            await session.scalar(
+                select(func.count(OnboardingSession.id))
+                .where(
+                    OnboardingSession.status == "pending_tenant",
+                    or_(
+                        OnboardingSession.expires_at == None,
+                        OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
+                    ),
+                )
+            ) or 0
+        )
+
         # Monthly tenants with formal notice
         notices_count = int(
             await session.scalar(
@@ -201,6 +215,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         occupancy_pct=occ_pct,
         active_tenants=active_tenants,
         no_show_count=no_show_count,
+        prebooked_count=prebooked_count,
         notices_count=notices_count,
         checkins_today=checkins_today,
         checkouts_today=checkouts_today,

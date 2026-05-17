@@ -10,6 +10,7 @@ class KpiResponse(BaseModel):
     occupancy_pct: float
     active_tenants: int
     no_show_count: int
+    prebooked_count: int
     notices_count: int
     checkins_today: int
     checkouts_today: int
