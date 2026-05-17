@@ -637,7 +637,7 @@
     </div>
 
     <div class="field">
-      <label for="dob">Date of Birth</label>
+      <label for="dob" class="required">Date of Birth</label>
       <input type="date" id="dob" autocomplete="bday">
       <div class="error-msg" id="err-dob">Must be 18 or older</div>
     </div>
@@ -1089,7 +1089,10 @@
       if (!gender) { setGroupError('gender-group', 'err-gender'); ok = false; }
       if (!food) { setGroupError('food-group', 'err-food'); ok = false; }
       const dob = document.getElementById('dob').value;
-      if (dob) {
+      if (!dob) {
+        document.getElementById('err-dob').textContent = 'Date of birth is required';
+        setError('dob', 'err-dob'); ok = false;
+      } else {
         const dobDate = new Date(dob);
         const today = new Date();
         const age = today.getFullYear() - dobDate.getFullYear() - (today < new Date(today.getFullYear(), dobDate.getMonth(), dobDate.getDate()) ? 1 : 0);
@@ -1109,15 +1112,26 @@
       const emgName = document.getElementById('emg-name').value.trim();
       const emgPhone = stripDigits(document.getElementById('emg-phone').value);
       const emgRel = document.getElementById('emg-rel').value;
+      const selfName = document.getElementById('name').value.trim();
 
       if (!emgName) { setError('emg-name', 'err-emg-name'); ok = false; }
+      else if (selfName && emgName.toLowerCase() === selfName.toLowerCase()) {
+        document.getElementById('err-emg-name').textContent = 'Emergency contact must be a different person';
+        setError('emg-name', 'err-emg-name'); ok = false;
+      }
       if (emgPhone.length !== 10) { setError('emg-phone', 'err-emg-phone'); ok = false; }
       if (!emgRel) { setError('emg-rel', 'err-emg-rel'); ok = false; }
     }
 
     if (step === 3) {
       const addr = document.getElementById('perm-address').value.trim();
-      if (!addr) { setError('perm-address', 'err-perm-address'); ok = false; }
+      if (!addr) {
+        document.getElementById('err-perm-address').textContent = 'Permanent address is required';
+        setError('perm-address', 'err-perm-address'); ok = false;
+      } else if (addr.length < 10) {
+        document.getElementById('err-perm-address').textContent = 'Please enter a complete address (too short)';
+        setError('perm-address', 'err-perm-address'); ok = false;
+      }
     }
 
     if (step === 4) {
