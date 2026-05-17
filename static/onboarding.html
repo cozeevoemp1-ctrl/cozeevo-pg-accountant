@@ -552,14 +552,12 @@
       <div class="progress-segment" id="seg-2"></div>
       <div class="progress-segment" id="seg-3"></div>
       <div class="progress-segment" id="seg-4"></div>
-      <div class="progress-segment" id="seg-5"></div>
     </div>
     <div class="progress-labels">
       <div class="progress-label active" id="lbl-1">Personal</div>
       <div class="progress-label" id="lbl-2">Family</div>
-      <div class="progress-label" id="lbl-3">Address</div>
-      <div class="progress-label" id="lbl-4">ID Proof</div>
-      <div class="progress-label" id="lbl-5">Agreement</div>
+      <div class="progress-label" id="lbl-3">ID &amp; Address</div>
+      <div class="progress-label" id="lbl-4">Agreement</div>
     </div>
   </div>
 
@@ -707,27 +705,10 @@
     </div>
   </div>
 
-  <!-- STEP 3: Address -->
+  <!-- STEP 3: ID Proof + Address (address auto-fills from Aadhaar OCR) -->
   <div id="step-3" class="step">
-    <div class="step-title">Address</div>
-    <div class="step-subtitle">Your permanent address</div>
-
-    <div class="field">
-      <label for="perm-address" class="required">Permanent Address</label>
-      <textarea id="perm-address" placeholder="House No, Street, City, State, PIN"></textarea>
-      <div class="error-msg" id="err-perm-address">Please enter your permanent address</div>
-    </div>
-
-    <div class="nav-buttons">
-      <button type="button" class="btn btn-secondary" onclick="prevStep(3)">&larr;</button>
-      <button type="button" class="btn btn-primary" onclick="nextStep(3)">Next &rarr;</button>
-    </div>
-  </div>
-
-  <!-- STEP 4: ID Proof -->
-  <div id="step-4" class="step">
-    <div class="step-title">ID Proof</div>
-    <div class="step-subtitle">Government-issued photo ID for verification</div>
+    <div class="step-title">ID &amp; Address</div>
+    <div class="step-subtitle">Upload your Aadhaar — details and address will auto-fill</div>
 
     <div class="field">
       <label for="id-type" class="required">ID Type</label>
@@ -769,14 +750,20 @@
       Your ID and photo are used only for verification and stored securely. We do not share them with any third party.
     </div>
 
+    <div class="field" style="margin-top:16px;">
+      <label for="perm-address" class="required">Permanent Address</label>
+      <textarea id="perm-address" placeholder="Auto-fills from Aadhaar above — you can edit if needed"></textarea>
+      <div class="error-msg" id="err-perm-address">Please enter your permanent address</div>
+    </div>
+
     <div class="nav-buttons">
-      <button type="button" class="btn btn-secondary" onclick="prevStep(4)">&larr;</button>
-      <button type="button" class="btn btn-primary" onclick="nextStep(4)">Next &rarr;</button>
+      <button type="button" class="btn btn-secondary" onclick="prevStep(3)">&larr;</button>
+      <button type="button" class="btn btn-primary" onclick="nextStep(3)">Next &rarr;</button>
     </div>
   </div>
 
-  <!-- STEP 5: Agreement & Signature -->
-  <div id="step-5" class="step">
+  <!-- STEP 4: Agreement & Signature -->
+  <div id="step-4" class="step">
     <div class="step-title">Agreement & Signature</div>
     <div class="step-subtitle">Review terms and sign to complete registration</div>
 
@@ -819,7 +806,7 @@
     </div>
 
     <div class="nav-buttons">
-      <button type="button" class="btn btn-secondary" onclick="prevStep(5)">&larr;</button>
+      <button type="button" class="btn btn-secondary" onclick="prevStep(4)">&larr;</button>
       <button type="button" class="btn btn-primary" id="submit-btn" onclick="submitForm()">Submit Registration</button>
     </div>
   </div>
@@ -1123,18 +1110,10 @@
       if (!emgRel) { setError('emg-rel', 'err-emg-rel'); ok = false; }
     }
 
-    if (step === 3) {
-      const addr = document.getElementById('perm-address').value.trim();
-      if (!addr) {
-        document.getElementById('err-perm-address').textContent = 'Permanent address is required';
-        setError('perm-address', 'err-perm-address'); ok = false;
-      } else if (addr.length < 10) {
-        document.getElementById('err-perm-address').textContent = 'Please enter a complete address (too short)';
-        setError('perm-address', 'err-perm-address'); ok = false;
-      }
-    }
+    // Step 3 address: allow blank here — Aadhaar OCR auto-fills it in step 4.
+    // Final check happens at submitForm() before sending.
 
-    if (step === 4) {
+    if (step === 3) {
       const idType   = document.getElementById('id-type').value;
       const idNumber = document.getElementById('id-number').value.trim();
       const idPhoto  = document.getElementById('id-photo-input').files;
@@ -1147,6 +1126,11 @@
         ok = false;
       }
       if (!idPhoto || idPhoto.length === 0) { setError('id-upload-area', 'err-id-photo'); ok = false; }
+      const addr = document.getElementById('perm-address').value.trim();
+      if (!addr || addr.length < 5) {
+        document.getElementById('err-perm-address').textContent = addr ? 'Please enter a complete address' : 'Permanent address is required (auto-fills from Aadhaar above)';
+        setError('perm-address', 'err-perm-address'); ok = false;
+      }
     }
 
     return ok;
@@ -1426,7 +1410,7 @@
       })()
     };
 
-    // Validate mandatory uploads
+    // Validate mandatory uploads + address
     if (!payload.selfie_photo) { showError('Please upload your photo (Step 1 — tap the circle next to your room details).'); return; }
     if (!payload.id_photo) { showError('Please upload your ID proof document (Step 4).'); return; }
 
@@ -1654,7 +1638,7 @@
     const isArrowUp = e.key === 'ArrowUp';
 
     if (!(isArrowRight || isArrowLeft || isArrowDown || isArrowUp)) return;
-    if (!currentStep || currentStep > 5) return;
+    if (!currentStep || currentStep > 4) return;
 
     const t = document.activeElement;
     // Skip radio/checkbox (they have their own arrow key behavior)
@@ -1672,7 +1656,7 @@
       console.log('Available fields in step', currentStep, ':', fields.length);
       const moved = focusNextField(currentStep);
       console.log('focusNextField returned:', moved);
-      if (!moved && currentStep < 5) {
+      if (!moved && currentStep < 4) {
         // At last field, go to next step
         if (validateStep(currentStep)) {
           goToStep(currentStep + 1);
