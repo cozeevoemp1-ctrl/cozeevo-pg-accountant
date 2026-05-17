@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.95] — 2026-05-17 — Memory/rules maintenance
+
+### Memory
+- **`rules_impact_map.md`** — added "Financial record integrity" cross-table linkage rules (rent_schedule ↔ payment_history) + full 5-layer "Dependency audit" checklist (DB → API → Bot → Sheet/PWA → Docs) mandatory before closing any feature
+- **`sop_code_standards.md`** — added "New Feature Rule" pointer to impact map; removed duplicate content
+- **`rules_workflow.md`** — merged `feedback_auth_user_creation.md` content as §14 (email verification flow)
+- **`rules_data_sync.md`** — §6 now references impact map instead of duplicating the outputs checklist
+- **`feedback_auth_user_creation.md`** — deleted (content merged into rules_workflow.md §14)
+- **`MEMORY.md`** — updated index: removed orphan feedback row, updated rules_workflow.md description
+- **`user_growth.md`** — added recurring mistake #7: jumping into work without reading relevant files first; confirmed read-before-work protocol
+
+---
+
 ## [1.75.94] — 2026-05-17 — WhatsApp notice confirmation template
 
 ### WhatsApp
