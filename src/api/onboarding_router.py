@@ -1008,6 +1008,7 @@ async def get_session_data(token: str, request: Request):
 
         return {
             "status": obs.status,
+            "tenant_phone": obs.tenant_phone or "",
             "room": {"number": room.room_number if room else "", "building": building, "floor": str(room.floor or "") if room else "", "sharing": sharing},
             "agreed_rent": float(obs.agreed_rent or 0),
             "security_deposit": float(obs.security_deposit or 0),

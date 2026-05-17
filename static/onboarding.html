@@ -620,11 +620,6 @@
       <div class="error-msg" id="err-name">Please enter your full name</div>
     </div>
 
-    <div class="field">
-      <label for="phone" class="required">Mobile Number</label>
-      <input type="tel" id="phone" placeholder="10-digit mobile number" maxlength="10" autocomplete="tel">
-      <div class="error-msg" id="err-phone">Enter a valid 10-digit mobile number</div>
-    </div>
 
     <div class="field">
       <label class="required">Gender</label>
@@ -675,19 +670,6 @@
     <div class="step-title">Family & Emergency Contact</div>
     <div class="step-subtitle">For safety and communication purposes</div>
 
-    <div class="section-divider">Father / Guardian</div>
-
-    <div class="field">
-      <label for="father-name">Father / Guardian Name</label>
-      <input type="text" id="father-name" placeholder="Optional" autocomplete="off">
-    </div>
-
-    <div class="field">
-      <label for="father-phone">Father / Guardian Phone</label>
-      <input type="tel" id="father-phone" placeholder="Optional" maxlength="10">
-      <div class="error-msg" id="err-father-phone">Enter a valid 10-digit number</div>
-    </div>
-
     <div class="section-divider">Emergency Contact</div>
 
     <div class="field">
@@ -730,8 +712,9 @@
     <div class="step-subtitle">Your permanent address</div>
 
     <div class="field">
-      <label for="perm-address">Permanent Address</label>
+      <label for="perm-address" class="required">Permanent Address</label>
       <textarea id="perm-address" placeholder="House No, Street, City, State, PIN"></textarea>
+      <div class="error-msg" id="err-perm-address">Please enter your permanent address</div>
     </div>
 
     <div class="nav-buttons">
@@ -1097,13 +1080,11 @@
 
     if (step === 1) {
       const name = document.getElementById('name').value.trim();
-      const phone = stripDigits(document.getElementById('phone').value);
       const gender = document.querySelector('input[name="gender"]:checked');
       const food = document.querySelector('input[name="food"]:checked');
       const selfie = getUploadDataUrl('selfie-preview-wrap');
 
       if (!name) { setError('name', 'err-name'); ok = false; }
-      if (phone.length !== 10) { setError('phone', 'err-phone'); ok = false; }
       if (!gender) { setGroupError('gender-group', 'err-gender'); ok = false; }
       if (!food) { setGroupError('food-group', 'err-food'); ok = false; }
       if (!selfie) {
@@ -1119,14 +1100,15 @@
       const emgName = document.getElementById('emg-name').value.trim();
       const emgPhone = stripDigits(document.getElementById('emg-phone').value);
       const emgRel = document.getElementById('emg-rel').value;
-      const fatherPhone = document.getElementById('father-phone').value.trim();
 
       if (!emgName) { setError('emg-name', 'err-emg-name'); ok = false; }
       if (emgPhone.length !== 10) { setError('emg-phone', 'err-emg-phone'); ok = false; }
       if (!emgRel) { setError('emg-rel', 'err-emg-rel'); ok = false; }
-      if (fatherPhone && stripDigits(fatherPhone).length !== 10) {
-        setError('father-phone', 'err-father-phone'); ok = false;
-      }
+    }
+
+    if (step === 3) {
+      const addr = document.getElementById('perm-address').value.trim();
+      if (!addr) { setError('perm-address', 'err-perm-address'); ok = false; }
     }
 
     if (step === 4) {
@@ -1397,13 +1379,11 @@
     const payload = {
       // Step 1 — match API field names exactly (TenantSubmitRequest)
       name: document.getElementById('name').value.trim(),
-      phone: stripDigits(document.getElementById('phone').value),
+      phone: (sessionData && sessionData.tenant_phone) || '',
       gender: ((document.querySelector('input[name="gender"]:checked') || {}).value || '').toLowerCase(),
       date_of_birth: document.getElementById('dob').value,
       food_preference: ((document.querySelector('input[name="food"]:checked') || {}).value || '').toLowerCase(),
       // Step 2
-      father_name: document.getElementById('father-name').value.trim(),
-      father_phone: stripDigits(document.getElementById('father-phone').value),
       emergency_contact_name: document.getElementById('emg-name').value.trim(),
       emergency_contact_phone: stripDigits(document.getElementById('emg-phone').value),
       emergency_contact_relationship: document.getElementById('emg-rel').value,
