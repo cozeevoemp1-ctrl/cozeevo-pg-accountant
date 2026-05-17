@@ -42,7 +42,7 @@ def _build_paid_subq(period: date, period_end: date):
             or_(
                 and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
                 and_(
-                    Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                    Payment.for_type == PaymentFor.deposit,
                     Payment.period_month == None,
                     Payment.payment_date >= period,
                     Payment.payment_date < period_end,
