@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.97] — 2026-05-17 — KPI scroll bug + Sathish booking payment + Bala uncle cash moved to May
+
+### Bug fix: KPI panel backdrop blocking page scroll (desktop)
+- **Root cause:** When a KPI tile panel (Dues, Occupied, etc.) was opened and the user scrolled down, the panel moved off-screen but the transparent `fixed inset-0 z-10` backdrop stayed covering the viewport. On desktop Chrome this backdrop could intercept scroll events, making the page appear stuck.
+- **Fix:** `web/components/home/kpi-grid.tsx` — added `window scroll` listener (passive) that closes any open KPI panel when the user scrolls. Uses a ref to avoid stale closure. Panel still closes on click-away as before.
+
+### Data fix: Sathish K (Room G14, tnid=1109) missing booking payment
+- **Root cause:** Timing — `_approve_session_impl()` booking auto-record fix was deployed today; Sathish's check-in was approved in the ~30s window before CI/CD completed. Old code ran, no payment created.
+- **Fix:** Manually inserted pmt id=20853 — ₹9,500 UPI booking 2026-05-17. RS rent_due=₹4,596 (prorated 15/31 days) was already correct from onboarding flow.
+- **Rule saved:** Deposit/booking payments are always UPI — never ask, always `payment_mode='upi'`.
+
+### P&L: Bala uncle cash removed from Oct–Apr + May P&L prep saved
+- **Removed from Oct–Apr P&L:** Jan −₹25,000, Feb −₹3,000, Apr −₹23,000 net = ₹51,000 total. All confirmed as May collections.
+- **May P&L prep note saved** in `memory/sop_pnl.md`: Bala uncle ₹63,000 (₹25K+₹3K+₹35K) + day-stay cash ₹12K (not yet in DB) to include in May P&L.
+- **`PnL_Accrual_2026_05_17e.xlsx`** generated.
+
+---
+
 ## [1.75.96] — 2026-05-17 — P&L corrections: Chandra confirmed + fire stove reclassified + Jitendra advance
 
 ### P&L (pnl_builder.py)
