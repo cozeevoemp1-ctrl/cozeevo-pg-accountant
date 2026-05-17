@@ -115,7 +115,7 @@ Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
 ## Occupancy Calculation Rules
 
 ```
-Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 293)
+Total Capacity     = SUM(max_occupancy) for all non-staff rooms (currently 296)
                      Calculated dynamically from rooms table, never hardcoded.
 
 Occupied Beds      = SUM(

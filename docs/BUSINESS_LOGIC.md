@@ -16,14 +16,15 @@ Total beds are calculated dynamically from the rooms table, never hardcoded:
 TOTAL_BEDS = SUM(max_occupancy) WHERE is_staff_room = False
 ```
 
-**Current totals (updated 2026-05-14):**
+**Current totals (updated 2026-05-17):**
 - THOR: 147 beds (79 revenue rooms)
-- HULK: 146 beds (80 revenue rooms)
-- **Total: 293 beds**
+- HULK: 149 beds (81 revenue rooms)
+- **Total: 296 beds**
 
-Staff rooms excluded: THOR (G05, G06, 108, 701, 702) + HULK (G12, 614)
+Staff rooms excluded: THOR (G05, G06, 108, 701, 702) + HULK (G12 only)
+> Changed 2026-05-17: 614 → revenue (+2 beds). G16 max_occupancy fixed 2→1 (-1 bed). Net 295→296.
+> Changed 2026-05-16: 107+114+618 locked as revenue. 293→295.
 > Changed 2026-05-14: G16+G19 double→single (-2 beds). Room 614 → staff (-2 beds). Was 297.
-> Changed 2026-05-09: G20 → revenue (+1 bed), room 107 → revenue (+2 beds). Was 294.
 
 ### 1.2 Occupied Beds Calculation
 
@@ -97,7 +98,7 @@ active_beds = regular + (premium_count * 2)
 ```
 Checked-in: {active_beds} beds ({regular} regular + {premium_count} premium)
 No-show: {no_show} beds reserved
-Vacant: {293 - active_beds - no_show} beds
+Vacant: {296 - active_beds - no_show} beds
 ```
 
 ---
@@ -340,7 +341,7 @@ SHA-256 hash of `date + description[:80] + amount`. Re-uploading same statement 
 
 | Constant | Value | Notes |
 |----------|-------|-------|
-| TOTAL_BEDS | 293 | Dynamic from rooms table (G16+G19 single, 614→staff 2026-05-14) |
+| TOTAL_BEDS | 296 | Dynamic from rooms table (614→revenue, G16 max_occ=1 fixed 2026-05-17) |
 | NOTICE_BY_DAY | 5 | Deposit eligibility cutoff |
 | OVERPAYMENT_NOISE_RS | 10 | Payment rounding tolerance |
 | DUPLICATE_PAYMENT_HOURS | 24 | Duplicate detection window |

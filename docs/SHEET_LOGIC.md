@@ -137,15 +137,15 @@ Premium tenants = active AND sharing == Premium
 Regular count = active - premium
 Beds = regular + (premium * 2)
 No-show = ALL tenants with status == No-show (NO date filter)
-Vacant = 297 - beds - no_show
-Occupancy % = beds / 297 * 100
+Vacant = 296 - beds - no_show
+Occupancy % = beds / 296 * 100
 ```
 
 ### THOR / HULK Split
 ```
 Filter by BLOCK column (col 17) = THOR or HULK
 Same formula per building
-TOTAL_BEDS = 293 (THOR 147 + HULK 146)  -- updated 2026-05-14; G16+G19 single, 614→staff
+TOTAL_BEDS = 296 (THOR 147 + HULK 149)  -- updated 2026-05-17; 614→revenue, G16 max_occ=1
 ```
 
 ### Verified March 2026

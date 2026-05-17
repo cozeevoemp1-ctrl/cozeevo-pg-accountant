@@ -172,15 +172,15 @@ New arrivals in month M haven't had time to pay yet. They're not "overdue" — t
 
 ```
 THOR: 147 beds (79 revenue rooms)
-HULK: 146 beds (80 revenue rooms)
-Total: 293 beds  ← updated 2026-05-14; G16+G19 double→single, 614→staff
+HULK: 149 beds (81 revenue rooms)
+Total: 296 beds  ← updated 2026-05-17; 614→revenue, G16 max_occ fixed to 1
 
-Staff rooms EXCLUDED (7 rooms, updated 2026-05-14):
+Staff rooms EXCLUDED (6 rooms, updated 2026-05-17):
   THOR: G05(3), G06(2), 108(2), 701(1), 702(1)
-  HULK: G12(3), 614(2)
+  HULK: G12(3)
   — 114 and 618 moved to revenue 2026-04-26
   — G20 → revenue 2026-05-09 (Chandraprakash); 107 → revenue 2026-05-09 (Samruddhi Thanwar)
-  — 614 → staff 2026-05-14
+  — 614 → revenue 2026-05-17 (available for booking)
 ```
 
 ### 3.2 Formula
@@ -596,7 +596,7 @@ Unit economics = per-bed breakdown of revenue, cost, and profit. All figures use
 
 | Constant | Value | Where Used |
 |---|---|---|
-| TOTAL_REVENUE_BEDS | 294–295 (verify DB) | Occupancy KPI — G20 revenue from May 2026 |
+| TOTAL_REVENUE_BEDS | 296 | DB-verified 2026-05-17; 614→revenue, G16 max_occ=1 |
 | THOR_BEDS | 145 | Property occupancy |
 | HULK_BEDS | 149 (⚠ section 12 says 146 — verify DB) | Property occupancy |
 | NOTICE_BY_DAY | 5 | Deposit eligibility |
