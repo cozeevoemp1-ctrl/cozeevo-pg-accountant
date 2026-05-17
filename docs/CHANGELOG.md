@@ -2,6 +2,35 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.0] — 2026-05-17 — PWA fixes: scroll bug, check-in deep link, day-stay notices, data cleanup
+
+### PWA: KPI awaiting check-in tile (`web/components/home/kpi-grid.tsx`)
+- Removed preview detail card for `no_show` tile — was confusing, not needed
+- Added pink "Check In →" button per row linking directly to `/onboarding/bookings?q=<name>` (deep link)
+- Added "View all in Bookings →" footer link (same as prebooked tile)
+- Removed row click / chevron for no_show (no expand needed)
+
+### PWA: Scroll closes panel bug fixed (`web/components/home/kpi-grid.tsx`)
+- `openScrollY` captured after 1s grace period (post `scrollIntoView` settle), not at open time
+- Panel only closes if user scrolls >150px from that position — small in-panel scrolls no longer dismiss
+
+### PWA: Day-stay tenants on Notices page (`web/app/notices/page.tsx`, `src/api/v2/notices.py`, `src/api/v2/kpi.py`)
+- Notices API now returns day-stay tenants with checkout within 30 days (separate list, `stay_type: "daily"`)
+- Notices KPI tile count includes day-stay leaving within 30 days
+- KPI detail `notices` type includes day-stay rows with `stay_type: "daily"` indicator
+- Notices page: new "Day-stay Leaving" section with checkout date + "Check-out →" button per row
+
+### PWA: Bookings page deep link (`web/app/onboarding/bookings/page.tsx`)
+- Reads `?q=` query param on mount, pre-populates search filter — landing from "Check In →" shows that tenant immediately
+
+### Data fixes
+- Akshat (room 416): wrong tenancy (₹2,000, no onboarding) cancelled + payment voided; orphaned onboarding session (₹13,500, form filled May 15) now correctly visible in Bookings
+- Yogesh/Rutika (room 210): day-stay tenancy marked exited (checkout May 1 was overdue)
+- Shaik Umar (room G03) + Yogesh/Rutika "rent mismatch": confirmed correct — tenancy stores daily rate, session stores total
+
+### Auth
+- Lakshmi password updated to Krishlachu@6 via Supabase admin API
+
 ## [1.75.99] — 2026-05-17 — PWA UX overhaul: KPI panel centering, scroll trap, admin notes, bookings filters, signature fix + style preview
 
 ### PWA: KPI grid panel recentering (`web/components/home/kpi-grid.tsx`)
