@@ -63,9 +63,9 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | 702 | THOR | 1 | Staff quarters (permanent) |
 | G12 | HULK | 3 | Staff quarters (permanent) |
 
-**Total staff rooms: 6** (THOR 5 + HULK 1) — **297 revenue beds**
+**Total staff rooms: 6** (THOR 5 + HULK 1) — **296 revenue beds**
 
-> **Changed 2026-05-17:** 614 moved to revenue (available for booking). TOTAL_BEDS 295→297.
+> **Changed 2026-05-17:** 614 moved to revenue (+2 beds). G16 max_occupancy fixed 2→1 (-1 bed). Net TOTAL_BEDS 295→296.
 > **Changed 2026-05-16:** 107, 114, 618 confirmed revenue (not staff). Migration `run_staff_room_corrections_2026_05_16` locks this permanently so deploys can't revert.
 > **Changed 2026-05-14:** Room 614 → staff. G16+G19 double→single (HULK 150→146).
 > **Changed 2026-05-09:** G20 → revenue (Chandraprakash). 107 → revenue (Samruddhi Thanwar).
@@ -78,15 +78,15 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
 | THOR | 79 | 14 | 62 | 3 | **147** |
-| HULK | 81 | 14 | 65 | 2 | **150** |
-| **Total** | **160** | **28** | **127** | **5** | **297** |
+| HULK | 81 | 15 | 64 | 2 | **149** |
+| **Total** | **160** | **29** | **126** | **5** | **296** |
 
 ### Bed Count Formula
 ```
 Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
                    = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
-                   = 28 + 254 + 15
-                   = 297
+                   = 29 + 252 + 15
+                   = 296
 ```
 
 ### Corner Room Rule (applies to BOTH buildings)
@@ -182,4 +182,4 @@ Reporting format:
 - 2026-05-09: G20 → revenue (Chandraprakash, May 2026). Room 107 → revenue (Samruddhi Thanwar, May 2026). Revenue beds: 294 → 297. Staff rooms: 8 → 6.
 - 2026-05-14: G16 double→single (-1 bed, 297→296). Room 614 → staff (-2 beds, 296→294). G19 double→single (-1 bed, 294→293). Staff rooms: 6 → 7 (THOR 5 + HULK 2).
 - 2026-05-16: 107, 114, 618 confirmed revenue (not staff). TOTAL_BEDS 293→295. Staff rooms: 7 → 7 (no net change — these were wrongly flipped by migrate_all). Migration run_staff_room_corrections_2026_05_16 locks this permanently.
-- 2026-05-17: Room 614 → revenue (available for booking). TOTAL_BEDS 295→297. Staff rooms: 7 → 6 (THOR 5 + HULK 1).
+- 2026-05-17: Room 614 → revenue (+2 beds). G16 max_occupancy corrected 2→1 (-1 bed). Net TOTAL_BEDS 295→296. Staff rooms: 7 → 6 (THOR 5 + HULK 1).

@@ -22,7 +22,7 @@
  * looks up data by name — never by position.
  */
 
-const TOTAL_BEDS = 297; // updated 2026-05-17; 614 revenue (not staff)
+const TOTAL_BEDS = 296; // updated 2026-05-17; G16 max_occupancy fixed to 1
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/i;
 const DROPDOWN_CELL = "E1";  // Where the month picker lives on DASHBOARD

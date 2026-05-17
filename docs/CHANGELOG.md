@@ -31,18 +31,23 @@ All notable changes to PG Accountant will be documented here.
 - **May import final** — 254 tenants reconciled, 0 additions pending; only Vijay Kumar permanently skipped (room "June" = data error)
 - **Lenin Das** — both payments confirmed in DB: pmt 19331 (₹27K cash rent) + pmt 19332 (₹27K cash deposit)
 
-## [1.75.93] — 2026-05-17 — Room 614 revenue + docs corrected
+## [1.75.93] — 2026-05-17 — Room 614 revenue + G16 fix + docs corrected
 
 ### Room 614 → revenue (HULK, 2 beds)
 - DB: `is_staff_room = FALSE` for room 614
-- TOTAL_BEDS 295 → 297 updated in: gsheets.py, clean_and_load.py, gsheet_apps_script.js, gsheet_dashboard_webapp.js, account_handler.py
 - migrate_all `run_staff_room_corrections_2026_05_16`: added 614 to permanent non-staff list
-- Staff rooms now 6 (THOR: G05, G06, 108, 701 — HULK: G12 only)
+- Staff rooms now 6 (THOR: G05, G06, 108, 701, 702 — HULK: G12 only)
+
+### G16 max_occupancy bug fixed
+- G16 had `room_type=single` but `max_occupancy=2` — was counting as 2 beds instead of 1
+- DB: `max_occupancy=1` for G16. Net change: +2 (614) −1 (G16) = TOTAL_BEDS 295→296
+
+### TOTAL_BEDS 295 → 296
+- Updated in: gsheets.py, clean_and_load.py, gsheet_apps_script.js, gsheet_dashboard_webapp.js, account_handler.py
 
 ### Docs corrected (DB-verified numbers)
-- MASTER_DATA.md revenue table: 293→297 (was stale); HULK 80 rooms/146 beds → 81 rooms/150 beds
-- BRAIN.md revenue summary: matched DB exactly (THOR 79/147, HULK 81/150, Total 160/297)
-- Both docs now match `SUM(max_occupancy) WHERE is_staff_room=FALSE` = 297
+- MASTER_DATA.md + BRAIN.md: THOR 79/147, HULK 81/149, Total 160/296
+- Both docs now match `SUM(max_occupancy) WHERE is_staff_room=FALSE` = 296
 
 ---
 
