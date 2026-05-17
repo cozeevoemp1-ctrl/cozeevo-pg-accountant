@@ -45,7 +45,7 @@ export default function NoticesPage() {
   const [searchQuery,  setSearchQuery]  = useState("")
   const [sortDir,      setSortDir]      = useState<"asc" | "desc">("asc")
   const [monthFilter,  setMonthFilter]  = useState<string>("all")
-  const [typeFilter,   setTypeFilter]   = useState<"all" | "full_room" | "premium" | "male" | "female">("all")
+  const [typeFilter,   setTypeFilter]   = useState<"all" | "full_room" | "premium" | "male" | "female" | "day_stay">("all")
   const [editItem,     setEditItem]     = useState<NoticeItem | null>(null)
   const [editDate,     setEditDate]     = useState("")
   const [editSaving,   setEditSaving]   = useState(false)
@@ -83,6 +83,7 @@ export default function NoticesPage() {
     else if (typeFilter === "premium") src = src.filter(i => i.sharing_type === "premium")
     else if (typeFilter === "male") src = src.filter(i => i.gender === "male")
     else if (typeFilter === "female") src = src.filter(i => i.gender === "female")
+    else if (typeFilter === "day_stay") src = src.filter(i => i.stay_type === "daily")
     // Search
     const q = searchQuery.trim().toLowerCase()
     if (q) src = src.filter(i =>
@@ -113,7 +114,7 @@ export default function NoticesPage() {
   }, [filtered])
 
   const monthlyItems = useMemo(() => filtered.filter(i => i.stay_type !== "daily"), [filtered])
-  const dailyItems   = useMemo(() => items.filter(i => i.stay_type === "daily").sort((a, b) => a.days_remaining - b.days_remaining), [items])
+  const dailyItems   = useMemo(() => filtered.filter(i => i.stay_type === "daily").sort((a, b) => a.days_remaining - b.days_remaining), [filtered])
   const eligible  = monthlyItems.filter(i => i.deposit_eligible)
   const forfeited = monthlyItems.filter(i => !i.deposit_eligible)
 
@@ -254,14 +255,15 @@ export default function NoticesPage() {
 
       {/* Type filter chips */}
       <div className="px-4 pt-2 pb-0 max-w-lg mx-auto flex gap-1.5 flex-wrap">
-        {(["all", "full_room", "premium", "male", "female"] as const).map(f => {
-          const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female" }
+        {(["all", "full_room", "premium", "male", "female", "day_stay"] as const).map(f => {
+          const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female", day_stay: "Day stay" }
           const colors: Record<string, string> = {
             all:       "bg-brand-pink text-white border-brand-pink",
             full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
             premium:   "bg-[#F3E8FF] text-[#7C3AED] border-[#D8B4FE]",
             male:      "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
             female:    "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
+            day_stay:  "bg-[#F0FDF4] text-[#15803D] border-[#86EFAC]",
           }
           const active = typeFilter === f
           return (
