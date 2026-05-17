@@ -40,9 +40,10 @@ _API_VERSION = "v18.0"
 
 # Map template names to their variable names (must match what's in Meta Business Manager)
 TEMPLATE_PARAM_NAMES = {
-    "rent_reminder":         ["name"],
-    "general_notice":        ["name", "message"],
-    "checkout_confirmation": ["name", "room", "date", "refund", "link"],
+    "rent_reminder":              ["name"],
+    "general_notice":             ["name", "message"],
+    "checkout_confirmation":      ["name", "room", "date", "refund", "link"],
+    "cozeevo_notice_confirmation": ["name", "room", "checkout_date"],
 }
 
 
