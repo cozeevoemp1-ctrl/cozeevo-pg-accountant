@@ -2,6 +2,14 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.94] — 2026-05-17 — WhatsApp notice confirmation template
+
+### WhatsApp
+- **`cozeevo_notice_confirmation` template submitted to Meta** — ID `36035874426026254`, status PENDING (~24-48h approval). 3 params: `{{1}}`=name, `{{2}}`=room, `{{3}}`=checkout_date. Body: notice registered, room cleared at or before 5pm on checkout date, contact 8548884455.
+- **`reminder_sender.py` updated** — `cozeevo_notice_confirmation` added to `TEMPLATE_PARAM_NAMES` with params `["name", "room", "checkout_date"]`.
+
+---
+
 ## [1.75.93] — 2026-05-16 — April dues reconciliation: fix shared-room double-payments
 
 ### Data ops
