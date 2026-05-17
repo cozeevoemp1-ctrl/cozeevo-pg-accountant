@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.75.96] — 2026-05-17 — P&L corrections: Chandra confirmed + fire stove reclassified + Jitendra advance
+
+### P&L (pnl_builder.py)
+- **Chandra advance confirmed from handwritten notebook** — old estimates (Mar ₹32,789 + Apr ₹38,111) replaced with notebook-confirmed ₹18,965 total:
+  - Feb: Pradeep police ₹3,000 → Govt & Regulatory
+  - Mar: Police ₹3,000 + Diesel ₹6,370 + Cans ₹1,820 + Carpenter ₹1,000 + Generator ₹500 = ₹12,690 → Fuel/Govt/Maintenance
+  - Apr: Dilip plumber ₹1,000 + brother ₹500 + Electrician Krishna ₹900 + Egg trays ₹875 = ₹3,275 → Maintenance/Food
+  - Added to CAPITAL_CONTRIBUTIONS as confirmed personal advance
+- **Fire stove ₹40,000 reclassified** — `bank_transactions` id 1655 (shalu.pravi2125@okicici, Mar 15) was in EXCLUDED/Cash Exchange Repayments. Confirmed as fire stove purchase → moved to OPEX Furniture & Supplies Mar. Cash Exchange Repayments Mar: ₹15,90,000 → ₹15,50,000.
+- **T.Rakesh Chetan (room 415, tnid=901)** — ₹26,000 May cash payment added to DB (pmt 20852); RS status → paid.
+- **Jitendra advance ₹5,600 added** — personal cash Jan 3 2026: BBMP ₹5,000 + Agreement ₹600. Police ₹3,000 excluded (borrowed from PG collections, not personal). Added to CAPITAL_CONTRIBUTIONS Jan column.
+- **Section renamed** — "CASH POSITION" → "BALANCE SHEET ITEMS (Apr 30)"
+- **Flags updated** — item 3 corrected (Chandra confirmed not removed), item 4 updated (fire stove confirmed), item 5 added (bank_transactions id 1655 needs category update in DB).
+- **`PnL_Accrual_2026_05_17d.xlsx`** regenerated
+
+### DB
+- **14 May RS rows created** — `scripts/_fix_missing_may_rs.py --write`; covered Ivish (507), Sparsh Rawat (413), Sanskar Bharadia (605), Arun Vasavan (216), V.Bhanu Prakash (314), T.Rakesh Chetan (415), Dhruv Singh (414), Yelagani Anuhya (421), Navdeep Gupta (506), Delvin Raj (520), Vadi Raj Nandlal (521), Omkar Deodher (616), Siddharth Dewangan (619), Prasad Vadlamani (318). KPI: 9/₹28,625 → 62/₹6,04,700.
+
+---
+
 ## [1.75.95] — 2026-05-17 — Memory/rules maintenance
 
 ### Memory
