@@ -1019,7 +1019,7 @@ function ExpansionPanel({
             </Link>
           </div>
         )}
-        {open === "prebooked" && (
+        {(open === "prebooked" || open === "no_show") && (
           <div className="px-3 pb-2 pt-1">
             <Link href="/onboarding/bookings" className="block text-center text-xs font-bold text-brand-pink py-1.5 rounded-xl border border-brand-pink/30 active:opacity-70">
               View all in Bookings →
@@ -1071,6 +1071,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const inflight = useRef<Set<string>>(new Set());
   // Grace period: ignore window scroll events fired by panel's scrollIntoView
   const scrollGrace = useRef(false);
+  const openScrollY = useRef(0);
 
   // Warm cache on mount — only for tiles that will actually render
   useEffect(() => {
@@ -1088,7 +1089,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const openRef = useRef(open);
   openRef.current = open;
   useEffect(() => {
-    function onScroll() { if (openRef.current && !scrollGrace.current) { setOpen(null); resetFilters(); } }
+    function onScroll() { if (openRef.current && !scrollGrace.current && Math.abs(window.scrollY - openScrollY.current) > 150) { setOpen(null); resetFilters(); } }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1113,6 +1114,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     if (open === key) { close(); return; }
     // Allow scrollIntoView to run without triggering close-on-scroll
     scrollGrace.current = true;
+    openScrollY.current = window.scrollY;
     setTimeout(() => { scrollGrace.current = false; }, 1000);
     setOpen(key);
     resetFilters();
