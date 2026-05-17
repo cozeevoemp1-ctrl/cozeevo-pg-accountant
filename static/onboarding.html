@@ -1037,9 +1037,9 @@
     saveDraft();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // On reaching step 5: mirror the tenant's name into both the booking
+    // On reaching step 4 (Agreement): mirror the tenant's name into the
     // summary line AND the digital-signature preview block.
-    if (n === 5) {
+    if (n === 4) {
       const name = document.getElementById('name').value.trim();
       document.getElementById('agree-name').textContent = name || '—';
       document.getElementById('typed-signature').textContent = name || '—';
