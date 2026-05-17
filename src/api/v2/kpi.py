@@ -159,11 +159,11 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .where(
                 Payment.is_void == False,
                 or_(
-                    # Regular rent payments for this period
                     and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
-                    # Deposit/booking paid in this calendar month (period_month=NULL for these)
+                    # Deposit paid this month counts against first-month RS.rent_due.
+                    # Booking excluded — RS.rent_due already nets booking via first_month_rent_due.
                     and_(
-                        Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                        Payment.for_type == PaymentFor.deposit,
                         Payment.period_month == None,
                         Payment.payment_date >= period,
                         Payment.payment_date < period_end,
@@ -385,29 +385,15 @@ async def get_kpi_detail(
         elif type == "dues":
             import math as _math
             period = date(today.year, today.month, 1)
-            next_m = today.month % 12 + 1
-            next_y = today.year + (1 if today.month == 12 else 0)
-            period_end = date(next_y, next_m, 1)
-            # Rent credits: rent payments for period + deposit/booking in date range
-            # Booking advances included regardless of period_month (same fix as tenants.py)
+
+            # Rent credits: rent payments only (booking excluded — booking_amount is
+            # applied directly to deposit_due below; including it here double-deducts).
             rent_paid_subq = (
                 select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
                 .where(
                     Payment.is_void == False,
-                    or_(
-                        and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
-                        and_(
-                            Payment.for_type == PaymentFor.deposit,
-                            Payment.period_month == None,
-                            Payment.payment_date >= period,
-                            Payment.payment_date < period_end,
-                        ),
-                        and_(
-                            Payment.for_type == PaymentFor.booking,
-                            Payment.payment_date >= period,
-                            Payment.payment_date < period_end,
-                        ),
-                    ),
+                    Payment.for_type == PaymentFor.rent,
+                    Payment.period_month == period,
                 )
                 .group_by(Payment.tenancy_id)
                 .subquery()
@@ -450,8 +436,7 @@ async def get_kpi_detail(
                 booking_amt = float(r.booking_amount or 0)
                 dep_agreed = float(r.security_deposit or 0)
                 rent_dues = _math.ceil(max(0.0, eff - rent_paid) / 100) * 100
-                booking_surplus = max(0.0, booking_amt - eff)
-                dep_due = _math.ceil(max(0.0, dep_agreed - dep_paid - booking_surplus) / 100) * 100
+                dep_due = _math.ceil(max(0.0, dep_agreed - dep_paid - booking_amt) / 100) * 100
                 total_dues = rent_dues + dep_due
                 if total_dues <= 0:
                     continue
