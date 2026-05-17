@@ -15,6 +15,7 @@ export default function PreRegisterPage() {
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit]       = useState("");
   const [advance, setAdvance]       = useState("");
+  const [notes, setNotes]           = useState("");
   const [depositOverridden, setDepositOverridden] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
@@ -55,6 +56,7 @@ export default function PreRegisterPage() {
         maintenance_fee:  parseFloat(maintenance) || 5000,
         security_deposit: depositNum,
         booking_amount:   parseFloat(advance) || 0,
+        notes:            notes.trim() || undefined,
       });
       setDone(result);
     } catch (err: unknown) {
@@ -197,6 +199,17 @@ export default function PreRegisterPage() {
               placeholder="0 if none"
               min="0"
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. referred by Kiran, needs AC room, twin-share preferred…"
+              rows={2}
+              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink resize-none"
             />
           </div>
 

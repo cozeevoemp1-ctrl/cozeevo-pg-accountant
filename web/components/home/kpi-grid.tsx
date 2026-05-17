@@ -285,6 +285,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
   const [advance, setAdvance] = useState("");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -313,6 +314,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
               checkout_date: checkoutDate,
               security_deposit: parseFloat(deposit) || 0,
               booking_amount: parseFloat(advance) || 0,
+              notes: notes.trim() || undefined,
             }
           : {
               room_number: room,
@@ -324,6 +326,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
               maintenance_fee: parseFloat(maintenance) || 0,
               security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
               booking_amount: parseFloat(advance) || 0,
+              notes: notes.trim() || undefined,
             }
       );
       setSuccess(true);
@@ -498,6 +501,16 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                   className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                 />
               </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Notes (admin only)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. referred by Kiran, needs AC room…"
+                  rows={2}
+                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink resize-none"
+                />
+              </div>
             </div>
             <button
               type="submit"
@@ -575,9 +588,12 @@ function ExpansionPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Scroll panel into view when it opens
+  // Scroll panel into view centered in the viewport when it opens
   useEffect(() => {
-    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const t = setTimeout(() => {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => clearTimeout(t);
   }, []);
 
   // Trap wheel scroll inside the list — stop it from scrolling the page

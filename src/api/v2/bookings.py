@@ -35,6 +35,7 @@ class QuickBookRequest(BaseModel):
     daily_rate: float = 0.0
     checkout_date: str = ""         # YYYY-MM-DD, required for daily
     booking_amount: float = 0.0     # advance paid at booking
+    notes: str = ""                 # stored in onboarding_sessions.special_terms
 
 
 @router.post("/quick-book")
@@ -129,6 +130,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 checkout_date=checkout,
                 stay_type="daily",
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
+                special_terms=req.notes.strip() or None,
                 expires_at=datetime.utcnow() + timedelta(hours=48),
             )
         else:
@@ -146,6 +148,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 checkin_date=checkin,
                 stay_type="monthly",
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
+                special_terms=req.notes.strip() or None,
                 expires_at=datetime.utcnow() + timedelta(hours=48),
             )
         session.add(obs)
