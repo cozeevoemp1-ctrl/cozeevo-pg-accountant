@@ -30,6 +30,7 @@ interface Booking {
   expires_at?: string
   expired_ago?: string
   is_qr?: boolean
+  notes?: string
 }
 
 function fmtDate(iso: string) {
@@ -432,6 +433,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           )}
         </div>
       </div>
+
+      {/* Admin notes */}
+      {b.notes && !editing && (
+        <div className="flex items-start gap-1.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2.5 py-2 -mt-1">
+          <span className="text-[10px] font-bold text-[#92400E] flex-shrink-0 mt-0.5">NOTE</span>
+          <p className="text-[11px] text-[#78350F] leading-snug">{b.notes}</p>
+        </div>
+      )}
 
       {/* Pre-booked info line — show when booked and when link expires */}
       {isPending && !editing && (

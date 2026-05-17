@@ -571,6 +571,7 @@ async def list_pending(request: Request):
                 "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
                 "expired_ago": expired_ago,
                 "is_qr": (obs.created_by_phone or "") == "qr_scan",
+                "notes": obs.special_terms or "",
             })
         return {"sessions": items}
 
