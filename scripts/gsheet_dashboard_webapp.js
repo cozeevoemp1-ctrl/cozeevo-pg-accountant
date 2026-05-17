@@ -16,7 +16,7 @@
  *              and TENANTS tab. No hardcoded cell positions.
  */
 
-const TOTAL_BEDS = 295; // updated 2026-05-16; 107+114+618 revenue (not staff)
+const TOTAL_BEDS = 297; // updated 2026-05-17; 614 revenue (not staff)
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
   "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
 const MONTH_TAB_RE = /^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\s+\d{4}$/i;

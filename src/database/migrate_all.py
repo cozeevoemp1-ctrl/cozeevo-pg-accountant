@@ -1566,18 +1566,18 @@ async def run_staff_room_corrections_2026_05_16(conn: AsyncConnection) -> None:
     Earlier migrations re-applied is_staff_room=TRUE on every deploy for rooms that
     were manually changed via bot. This migration permanently overrides that.
 
-    Confirmed staff rooms as of 2026-05-16 (7 total):
+    Confirmed staff rooms as of 2026-05-17 (6 total):
       THOR: G05, G06, 108, 701
-      HULK: G12, 702, 614
-    Revenue (NOT staff): 107 (Samruddhi Thanwar), 114, 618 → 295 revenue beds
+      HULK: G12, 702
+    Revenue (NOT staff): 107 (Samruddhi Thanwar), 114, 618, 614 → 297 revenue beds
     """
-    print("\n-- Staff room corrections (2026-05-16) --")
+    print("\n-- Staff room corrections (2026-05-16/17) --")
     r = await conn.execute(text("""
         UPDATE rooms SET is_staff_room = FALSE
-        WHERE room_number IN ('107', '114', '618')
+        WHERE room_number IN ('107', '114', '618', '614')
           AND is_staff_room IS DISTINCT FROM FALSE
     """))
-    print(f"  [ok] Rooms 107 + 114 + 618 set to non-staff: {r.rowcount} updated")
+    print(f"  [ok] Rooms 107 + 114 + 618 + 614 set to non-staff: {r.rowcount} updated")
 
 
 async def main(args: argparse.Namespace) -> None:

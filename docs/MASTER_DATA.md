@@ -62,10 +62,10 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 | 701 | THOR | 1 | Staff quarters (permanent) |
 | 702 | THOR | 1 | Staff quarters (permanent) |
 | G12 | HULK | 3 | Staff quarters (permanent) |
-| 614 | HULK | 2 | Staff quarters |
 
-**Total staff rooms: 7** (THOR 5 + HULK 2) — **295 revenue beds**
+**Total staff rooms: 6** (THOR 5 + HULK 1) — **297 revenue beds**
 
+> **Changed 2026-05-17:** 614 moved to revenue (available for booking). TOTAL_BEDS 295→297.
 > **Changed 2026-05-16:** 107, 114, 618 confirmed revenue (not staff). Migration `run_staff_room_corrections_2026_05_16` locks this permanently so deploys can't revert.
 > **Changed 2026-05-14:** Room 614 → staff. G16+G19 double→single (HULK 150→146).
 > **Changed 2026-05-09:** G20 → revenue (Chandraprakash). 107 → revenue (Samruddhi Thanwar).
@@ -171,7 +171,7 @@ Reporting format:
 | 3 | 313-324 | 12 | 313=1, 314-323=2, 324=1 |
 | 4 | 413-424 | 12 | 413=1, 414-423=2, 424=1 |
 | 5 | 513-524 | 12 | 513=1, 514-523=2, 524=1 |
-| 6 | 613-624 | 12 | 613=1, **614=staff**, 615-617=2, 618=2, 619-623=2, 624=1 |
+| 6 | 613-624 | 12 | 613=1, 614=2, 615-617=2, 618=2, 619-623=2, 624=1 |
 
 ---
 

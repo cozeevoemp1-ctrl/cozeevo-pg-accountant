@@ -566,9 +566,9 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 | 701  | THOR | 1 | Staff quarters (permanent) |
 | 702  | THOR | 1 | Staff quarters (permanent) |
 | G12  | HULK | 3 | Staff quarters (permanent) |
-| 614  | HULK | 2 | Staff quarters |
 
-> Changed 2026-05-16: 107+114+618 confirmed revenue. Migration locks this (deploys can't revert). **295 revenue beds.**
+> Changed 2026-05-17: 614 → revenue (available for booking). **297 revenue beds.**
+> Changed 2026-05-16: 107+114+618 confirmed revenue. Migration locks this (deploys can't revert).
 > Changed 2026-05-14: Room 614 → staff (-2 beds). G16+G19 double→single (-2 beds).
 > Changed 2026-05-09: G20 → revenue (Chandraprakash). Room 107 → revenue (Samruddhi Thanwar).
 > Changed 2026-04-26: 114 + 618 moved staff→revenue (paying tenants).
@@ -578,14 +578,14 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
 | THOR | 81 | 16 | 62 | 3 | **149** |
-| HULK | 81 | 16 | 62 | 3 | **146** |
-| **Total** | **162** | **32** | **124** | **6** | **295** |
+| HULK | 82 | 16 | 63 | 3 | **148** |
+| **Total** | **163** | **32** | **125** | **6** | **297** |
 
 ### Bed Count Formula
 ```
-Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms = 295
-Staff rooms (7): G05(3) + G06(2) + 108(2) + 701(1) + 702(1) + G12(3) + 614(2) = 14 beds
-All rooms total: 309 beds — 14 staff = 295 revenue
+Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms = 297
+Staff rooms (6): G05(3) + G06(2) + 108(2) + 701(1) + 702(1) + G12(3) = 12 beds
+All rooms total: 309 beds — 12 staff = 297 revenue
 ```
 
 ---

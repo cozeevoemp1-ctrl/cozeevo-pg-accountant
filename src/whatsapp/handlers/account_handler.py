@@ -2142,7 +2142,7 @@ async def _single_month_report(current_month: date, session: AsyncSession) -> st
     hulk_vacant = building_vacant.get("HULK", 0)
     vacant_line = f"  THOR: {thor_vacant} empty | HULK: {hulk_vacant} empty"
     # Occupied = total rooms counted minus vacant (derived from room-by-room, always consistent)
-    total_revenue_beds = sum((r.max_occupancy or 1) for r, _ in all_rooms) if all_rooms else 295
+    total_revenue_beds = sum((r.max_occupancy or 1) for r, _ in all_rooms) if all_rooms else 297
     active_beds = total_revenue_beds - vacant_beds
 
     # Expense source note
