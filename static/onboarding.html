@@ -639,6 +639,7 @@
     <div class="field">
       <label for="dob">Date of Birth</label>
       <input type="date" id="dob" autocomplete="bday">
+      <div class="error-msg" id="err-dob">Must be 18 or older</div>
     </div>
 
     <div class="field">
@@ -1087,6 +1088,14 @@
       if (!name) { setError('name', 'err-name'); ok = false; }
       if (!gender) { setGroupError('gender-group', 'err-gender'); ok = false; }
       if (!food) { setGroupError('food-group', 'err-food'); ok = false; }
+      const dob = document.getElementById('dob').value;
+      if (dob) {
+        const dobDate = new Date(dob);
+        const today = new Date();
+        const age = today.getFullYear() - dobDate.getFullYear() - (today < new Date(today.getFullYear(), dobDate.getMonth(), dobDate.getDate()) ? 1 : 0);
+        if (dobDate >= today) { document.getElementById('err-dob').textContent = 'Date of birth cannot be in the future'; setError('dob', 'err-dob'); ok = false; }
+        else if (age < 18) { document.getElementById('err-dob').textContent = 'Must be 18 or older'; setError('dob', 'err-dob'); ok = false; }
+      }
       if (!selfie) {
         const card = document.getElementById('selfie-upload-area');
         card.style.border = '2px solid #E53E3E';
