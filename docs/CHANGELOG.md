@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.2] — 2026-05-18 — Dues fixes + Delvin Raj April prorated dues
+
+### Bug fixes (deployed earlier today)
+- **payments.py** — NameError: `period` variable referenced before assignment inside gsheets sync block
+- **kpi.py** — KPI overdue_amount now includes deposit dues, matching dues panel total (were diverged)
+- **tenants.py** — Future check-in tenants (checkin_date > today) now return dues=0; was showing full rent+deposit
+- **onboarding_router.py** — Double-booking guard now excludes the session's own no_show tenancy; was blocking valid check-ins
+
+### Data fix
+- **Delvin Raj (tenancy 1071, room 406):** Added ₹400 adjustment on May 2026 rent_schedule (1-day prorated April rent, checked in 30 Apr). Initial April-period entry was wrong (invisible to dues panel) — corrected to adjustment on current month.
+
+### Memory
+- `rules_financial.md` §11: dues panel only shows current month — use adjustment on current row, not new past-month row
+- `rules_financial.md` §12–13: same-formula divergence rule + edge case guards (future checkin, own tenancy in capacity check)
+- `sop_code_standards.md`: read consumer query before inserting data
+
 ## [1.76.1] — 2026-05-17 — PWA Notices UX: rolling month chips, day-stay filter, free-from date
 
 ### PWA: Notices page (`web/app/notices/page.tsx`)
