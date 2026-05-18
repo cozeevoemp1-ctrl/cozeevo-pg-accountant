@@ -103,7 +103,6 @@ export default function BookingsPage() {
     rent_dues_mode: string
     collected_deposit_dues: number
   }) {
-    if (!confirm("Save details and check in this tenant now? Their status will become Active.")) return
     setCheckingIn(token)
     setError("")
     try {
@@ -284,6 +283,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [cancelConfirm, setCancelConfirm] = useState(false)
+  const [checkInConfirm, setCheckInConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [resending, setResending] = useState(false)
