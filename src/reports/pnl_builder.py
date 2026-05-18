@@ -444,7 +444,104 @@ def build_pnl_workbook() -> openpyxl.Workbook:
         tab_note="Bank / Digital Only — excl. cash income from tenants + cash rent paid to owners",
     )
 
-    # ── Tab 3: Rules Applied ───────────────────────────────────────────────────
+    # ── Tab 3: THOR Bank Reconciliation ───────────────────────────────────────
+    # Shows actual bank cash flow — Opening + bank credits - bank debits = Closing
+    # Implied outflows = everything that left THOR bank acct (OPEX + refunds + repayments + withdrawals)
+    ws_recon = wb.create_sheet("THOR Bank Reconciliation")
+
+    # Capital flows that actually hit the THOR bank account (not cash/personal advances)
+    _thor_cap_in  = [500000, 0,      0, 90000, 0, 0,      0]  # Oct: startup ₹5L; Jan: Kiran top-up ₹90K
+    _thor_cap_out = [0,      500000, 0, 0,     0, 0, 500000]  # Nov: startup repaid ₹5L; Apr: transferred to HULK ₹5L
+
+    _thor_income  = INCOME["THOR — Bank Income (UPI + NEFT)"]
+    _thor_open    = [BANK_BALANCE_THOR[m][0] for m in MONTHS]
+    _thor_close   = [BANK_BALANCE_THOR[m][1] for m in MONTHS]
+
+    # Balancing figure — all debits from THOR bank (OPEX from bank + deposit refunds + repayments + withdrawals)
+    _thor_out = [
+        _thor_open[i] + _thor_income[i] + _thor_cap_in[i] - _thor_cap_out[i] - _thor_close[i]
+        for i in range(len(MONTHS))
+    ]
+
+    R_HDR  = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    R_OPEN = PatternFill(start_color="DEEAF1", end_color="DEEAF1", fill_type="solid")
+    R_INC  = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+    R_CAP  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    R_OUT  = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    R_CLOSE= PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+    R_NOTE = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+    WBOLD  = Font(bold=True, color="FFFFFF")
+
+    def _recon_row(ws, label, sign, values, fill, bold=False, total=True):
+        row_vals = [label, sign] + values + ([sum(v for v in values if v is not None)] if total else [None])
+        ws.append(row_vals)
+        for c in ws[ws.max_row]:
+            c.fill = fill
+            if bold:
+                c.font = Font(bold=True)
+        for i, c in enumerate(ws[ws.max_row]):
+            if i > 1 and isinstance(c.value, (int, float)):
+                c.number_format = INR_NUMBER_FORMAT
+
+    # Header
+    recon_hdr = ["THOR acct ...0961 — Bank Cash Flow Reconciliation", ""] + MONTHS + ["TOTAL"]
+    ws_recon.append(recon_hdr)
+    for c in ws_recon[1]:
+        c.fill = R_HDR; c.font = WBOLD; c.alignment = Alignment(horizontal="center")
+
+    ws_recon.append(["How the bank balance changed each month — Opening + Credits − Debits = Closing", ""] + [""] * (len(MONTHS) + 1))
+    ws_recon[ws_recon.max_row][0].font = Font(italic=True, color="595959")
+    ws_recon.append([])
+
+    _recon_row(ws_recon, "Opening Balance",                   "",  _thor_open,   R_OPEN,  bold=True,  total=False)
+    _recon_row(ws_recon, "+ Bank Income (UPI + NEFT)",        "+", _thor_income, R_INC,   bold=False)
+    _recon_row(ws_recon, "+ Capital injected into bank",      "+", _thor_cap_in, R_CAP,   bold=False)
+    _recon_row(ws_recon, "− Capital repaid / transferred out","−", _thor_cap_out,R_CAP,   bold=False)
+
+    # Available subtotal
+    _avail = [_thor_open[i] + _thor_income[i] + _thor_cap_in[i] - _thor_cap_out[i] for i in range(len(MONTHS))]
+    _recon_row(ws_recon, "= Available before outflows",       "=", _avail,       R_OPEN,  bold=True)
+
+    ws_recon.append([])
+    _recon_row(ws_recon, "− Implied Bank Outflows (see note below)", "−", _thor_out, R_OUT, bold=True)
+    ws_recon.append([])
+    _recon_row(ws_recon, "= Closing Balance (verified from statement)", "=", _thor_close, R_CLOSE, bold=True, total=False)
+
+    ws_recon.append([])
+    ws_recon.append([])
+
+    # Explanation note
+    notes = [
+        ("Why does P&L Gross Income ≠ bank balance change?", ""),
+        ("The P&L is ACCRUAL-based and includes both bank and cash flows.", "The bank reconciliation above shows ONLY what moved through the bank account."),
+        ("Cash income (physical rent collected)", "₹0 / ₹0 / ₹0 / ₹3.0L / ₹6.5L / ₹10.9L / ₹13.4L  — collected in cash, never deposited to bank"),
+        ("Cash expenses (property rent paid cash)", "₹0 / ₹0 / ₹0 / ₹0 / ₹15.3L / ₹12.9L / ₹14.5L  — paid in cash, never leaves bank"),
+        ("Net cash items (income − expense)", "Both are roughly equal, so they largely cancel in profit — but neither affects the bank balance"),
+        ("", ""),
+        ("Implied Bank Outflows includes:", "All actual debits from THOR bank account:"),
+        ("  • OPEX paid via UPI/RTGS (electricity, food, staff, furniture, marketing, WiFi…)", ""),
+        ("  • Property rent paid via UPI/RTGS", ""),
+        ("  • Tenant deposit refunds sent from bank", ""),
+        ("  • Cash exchange repayments (non-operating: Sri Lakshmi ₹6L Feb, Sravani ₹7.5L Mar, etc.)", ""),
+        ("  • Capital repayments (above, separated out)", ""),
+        ("  • Any other bank withdrawals / debits", ""),
+    ]
+    for label, detail in notes:
+        ws_recon.append([label, detail])
+        row = ws_recon[ws_recon.max_row]
+        row[0].fill = R_NOTE
+        row[1].fill = R_NOTE
+        if label.startswith("Why") or label.startswith("Implied"):
+            row[0].font = Font(bold=True)
+
+    ws_recon.column_dimensions["A"].width = 55
+    ws_recon.column_dimensions["B"].width = 6
+    for i, col in enumerate("CDEFGHIJ"):
+        ws_recon.column_dimensions[col].width = 14
+    ws_recon.row_dimensions[1].height = 20
+    ws_recon.freeze_panes = "C2"
+
+    # ── Tab 4: Rules Applied ───────────────────────────────────────────────────
     ws_rules = wb.create_sheet("Rules Applied")
     rules = [
         ("Basis", "Accrual — expense in month of service, not payment"),
