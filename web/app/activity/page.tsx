@@ -97,6 +97,14 @@ export default async function ActivityPage() {
                         {ev.sublabel && (
                           <p className="text-xs text-ink-muted mt-0.5 truncate">{ev.sublabel}</p>
                         )}
+                        {ev.detail && (
+                          <p className="text-[11px] text-ink-muted mt-0.5 truncate">{ev.detail}</p>
+                        )}
+                        {ev.changed_by && (
+                          <p className="text-[10px] text-ink-muted/60 mt-1">
+                            by {ev.changed_by}{ev.source && ev.source !== "dashboard" ? ` · ${ev.source}` : ""}
+                          </p>
+                        )}
                       </div>
                       <p className="text-[10px] text-ink-muted flex-shrink-0 mt-0.5">{_timeLabel(ev.ts)}</p>
                     </div>

@@ -132,6 +132,7 @@ export interface ActivityFeedEvent {
   type: "payment" | "checkin" | "checkout" | "rent_change" | "room_change" | "void" | "adjustment" | "notice" | "other";
   label: string;
   sublabel: string;
+  detail: string;
   entity_name: string;
   room_number: string;
   changed_by: string;

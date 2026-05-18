@@ -763,8 +763,7 @@ async def get_activity_feed(
     user: AppUser = Depends(get_current_user),
 ):
     """Global activity feed — payments, check-ins, check-outs, rent changes, room moves, voids."""
-    from src.database.models import AuditLog
-    from sqlalchemy import text as _text
+    from src.database.models import AuditLog, AuthorizedUser
 
     INCLUDE_FIELDS = {
         "payment.log", "agreed_rent", "status", "status+checkout_date",
@@ -773,27 +772,46 @@ async def get_activity_feed(
     async with get_session() as session:
         rows = (await session.execute(
             select(
-                AuditLog.id,
-                AuditLog.entity_type,
-                AuditLog.field,
-                AuditLog.entity_name,
-                AuditLog.old_value,
-                AuditLog.new_value,
-                AuditLog.room_number,
-                AuditLog.note,
-                AuditLog.changed_by,
-                AuditLog.source,
-                AuditLog.created_at,
+                AuditLog.id, AuditLog.entity_type, AuditLog.field,
+                AuditLog.entity_name, AuditLog.old_value, AuditLog.new_value,
+                AuditLog.room_number, AuditLog.note, AuditLog.changed_by,
+                AuditLog.source, AuditLog.created_at,
             )
             .where(AuditLog.field.in_(INCLUDE_FIELDS))
             .order_by(desc(AuditLog.created_at))
-            .limit(limit * 3)  # over-fetch to account for filtered-out rows
+            .limit(limit * 3)
         )).all()
+
+        # Build phone→name map for changed_by resolution
+        staff_rows = (await session.execute(
+            select(AuthorizedUser.phone, AuthorizedUser.name)
+        )).all()
+
+    phone_to_name: dict[str, str] = {}
+    for s in staff_rows:
+        if s.phone and s.name:
+            phone_to_name[s.phone.lstrip("+").lstrip("91")] = s.name
+            phone_to_name[s.phone] = s.name
+
+    def _resolve_name(changed_by: str) -> str:
+        if not changed_by:
+            return ""
+        cb = changed_by.strip()
+        if cb in phone_to_name:
+            return phone_to_name[cb]
+        bare = cb.lstrip("+").lstrip("91")
+        if bare in phone_to_name:
+            return phone_to_name[bare]
+        # system / import / bot labels
+        if cb in ("system", "import", "onboarding_form", "onboarding", "dashboard", "whatsapp"):
+            return cb.replace("_", " ").title()
+        return cb  # fall back to raw value (phone or name already)
 
     events = []
     for r in rows:
         ev_type = "other"
         label = ""
+        detail = ""  # old→new or note context shown below sublabel
         sublabel = r.entity_name or ""
         if r.room_number:
             sublabel += f" · Room {r.room_number}"
@@ -804,9 +822,8 @@ async def get_activity_feed(
                 amt = int(float(r.new_value or 0))
             except (ValueError, TypeError):
                 amt = 0
-            # Parse note: "Payment Rs.13,000 CASH for deposit"
             note_lower = (r.note or "").lower()
-            method = "upi" if "upi" in note_lower else "cash" if "cash" in note_lower else "transfer" if "transfer" in note_lower else ""
+            method = "UPI" if "upi" in note_lower else "Cash" if "cash" in note_lower else "Transfer" if "transfer" in note_lower else ""
             for_what = ""
             if "for rent" in note_lower or "for may" in note_lower or "for april" in note_lower or "for june" in note_lower:
                 for_what = "rent"
@@ -818,7 +835,7 @@ async def get_activity_feed(
                 for_what = "advance"
             label_parts = [f"₹{amt:,}"]
             if method:
-                label_parts.append(method.upper())
+                label_parts.append(method)
             if for_what:
                 label_parts.append(for_what)
             label = " · ".join(label_parts)
@@ -835,7 +852,7 @@ async def get_activity_feed(
                 ev_type = "notice"
                 label = "Notice given"
             else:
-                continue  # skip no_show, cancelled etc.
+                continue
 
         elif r.field == "agreed_rent":
             ev_type = "rent_change"
@@ -843,22 +860,27 @@ async def get_activity_feed(
                 old_amt = int(float(r.old_value or 0))
                 new_amt = int(float(r.new_value or 0))
                 label = f"Rent ₹{old_amt:,} → ₹{new_amt:,}"
+                detail = "increased" if new_amt > old_amt else "decreased"
             except (ValueError, TypeError):
                 label = "Rent changed"
 
         elif r.field == "room_id":
             ev_type = "room_change"
-            label = f"Room changed {r.old_value or '?'} → {r.new_value or '?'}"
+            old_r = (r.old_value or "?")
+            new_r = (r.new_value or "?")
+            label = f"Room {old_r} → {new_r}"
 
         elif r.field == "is_void":
             ev_type = "void"
             label = "Payment voided"
+            if r.note:
+                detail = r.note[:80]
 
         elif r.field in ("adjustment", "rent_schedule_one_off"):
             ev_type = "adjustment"
             try:
                 amt = int(float(r.new_value or 0))
-                label = f"Rent adjustment ₹{amt:,}"
+                label = f"Rent credit ₹{abs(amt):,}" if amt < 0 else f"Rent adjustment +₹{amt:,}"
             except (ValueError, TypeError):
                 label = "Rent adjustment"
 
@@ -869,14 +891,17 @@ async def get_activity_feed(
         if ts and ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
 
+        by_name = _resolve_name(r.changed_by or "")
+
         events.append({
             "id": r.id,
             "type": ev_type,
             "label": label,
             "sublabel": sublabel,
+            "detail": detail,
             "entity_name": r.entity_name or "",
             "room_number": r.room_number or "",
-            "changed_by": r.changed_by or "",
+            "changed_by": by_name,
             "source": r.source or "",
             "ts": ts.isoformat() if ts else "",
         })
