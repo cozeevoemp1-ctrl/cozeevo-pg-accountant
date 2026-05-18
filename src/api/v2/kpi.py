@@ -757,6 +757,136 @@ async def get_recent_activity(
     return ActivityResponse(items=items)
 
 
+@activity_router.get("/feed")
+async def get_activity_feed(
+    limit: int = 60,
+    user: AppUser = Depends(get_current_user),
+):
+    """Global activity feed — payments, check-ins, check-outs, rent changes, room moves, voids."""
+    from src.database.models import AuditLog
+    from sqlalchemy import text as _text
+
+    INCLUDE_FIELDS = {
+        "payment.log", "agreed_rent", "status", "status+checkout_date",
+        "room_id", "is_void", "adjustment", "rent_schedule_one_off",
+    }
+    async with get_session() as session:
+        rows = (await session.execute(
+            select(
+                AuditLog.id,
+                AuditLog.entity_type,
+                AuditLog.field,
+                AuditLog.entity_name,
+                AuditLog.old_value,
+                AuditLog.new_value,
+                AuditLog.room_number,
+                AuditLog.note,
+                AuditLog.changed_by,
+                AuditLog.source,
+                AuditLog.created_at,
+            )
+            .where(AuditLog.field.in_(INCLUDE_FIELDS))
+            .order_by(desc(AuditLog.created_at))
+            .limit(limit * 3)  # over-fetch to account for filtered-out rows
+        )).all()
+
+    events = []
+    for r in rows:
+        ev_type = "other"
+        label = ""
+        sublabel = r.entity_name or ""
+        if r.room_number:
+            sublabel += f" · Room {r.room_number}"
+
+        if r.field == "payment.log":
+            ev_type = "payment"
+            try:
+                amt = int(float(r.new_value or 0))
+            except (ValueError, TypeError):
+                amt = 0
+            # Parse note: "Payment Rs.13,000 CASH for deposit"
+            note_lower = (r.note or "").lower()
+            method = "upi" if "upi" in note_lower else "cash" if "cash" in note_lower else "transfer" if "transfer" in note_lower else ""
+            for_what = ""
+            if "for rent" in note_lower or "for may" in note_lower or "for april" in note_lower or "for june" in note_lower:
+                for_what = "rent"
+            elif "deposit" in note_lower:
+                for_what = "deposit"
+            elif "maintenance" in note_lower:
+                for_what = "maintenance"
+            elif "booking" in note_lower or "advance" in note_lower:
+                for_what = "advance"
+            label_parts = [f"₹{amt:,}"]
+            if method:
+                label_parts.append(method.upper())
+            if for_what:
+                label_parts.append(for_what)
+            label = " · ".join(label_parts)
+
+        elif r.field in ("status", "status+checkout_date"):
+            new_val = (r.new_value or "").lower()
+            if new_val == "active":
+                ev_type = "checkin"
+                label = "Checked in"
+            elif new_val in ("exited", "exit"):
+                ev_type = "checkout"
+                label = "Checked out"
+            elif new_val == "on_notice":
+                ev_type = "notice"
+                label = "Notice given"
+            else:
+                continue  # skip no_show, cancelled etc.
+
+        elif r.field == "agreed_rent":
+            ev_type = "rent_change"
+            try:
+                old_amt = int(float(r.old_value or 0))
+                new_amt = int(float(r.new_value or 0))
+                label = f"Rent ₹{old_amt:,} → ₹{new_amt:,}"
+            except (ValueError, TypeError):
+                label = "Rent changed"
+
+        elif r.field == "room_id":
+            ev_type = "room_change"
+            label = f"Room changed {r.old_value or '?'} → {r.new_value or '?'}"
+
+        elif r.field == "is_void":
+            ev_type = "void"
+            label = "Payment voided"
+
+        elif r.field in ("adjustment", "rent_schedule_one_off"):
+            ev_type = "adjustment"
+            try:
+                amt = int(float(r.new_value or 0))
+                label = f"Rent adjustment ₹{amt:,}"
+            except (ValueError, TypeError):
+                label = "Rent adjustment"
+
+        else:
+            continue
+
+        ts = r.created_at
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+
+        events.append({
+            "id": r.id,
+            "type": ev_type,
+            "label": label,
+            "sublabel": sublabel,
+            "entity_name": r.entity_name or "",
+            "room_number": r.room_number or "",
+            "changed_by": r.changed_by or "",
+            "source": r.source or "",
+            "ts": ts.isoformat() if ts else "",
+        })
+
+        if len(events) >= limit:
+            break
+
+    return {"events": events}
+
+
 @activity_router.get("/recent-checkins")
 async def get_recent_checkins(
     limit: int = 10,

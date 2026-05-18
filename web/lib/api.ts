@@ -127,6 +127,22 @@ export function getRecentActivity(limit = 20, token?: string): Promise<ActivityR
   return _get(`/api/v2/app/activity/recent?limit=${limit}`, token);
 }
 
+export interface ActivityFeedEvent {
+  id: number;
+  type: "payment" | "checkin" | "checkout" | "rent_change" | "room_change" | "void" | "adjustment" | "notice" | "other";
+  label: string;
+  sublabel: string;
+  entity_name: string;
+  room_number: string;
+  changed_by: string;
+  source: string;
+  ts: string;
+}
+
+export function getActivityFeed(limit = 60, token?: string): Promise<{ events: ActivityFeedEvent[] }> {
+  return _get(`/api/v2/app/activity/feed?limit=${limit}`, token);
+}
+
 export interface KpiDetailItem {
   tenancy_id?: number;
   name: string;

@@ -91,6 +91,16 @@ export default async function HomePage() {
         </Link>
       </div>
 
+      {/* Activity feed link */}
+      <Link href="/activity" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
+        <span className="text-base">📝</span>
+        <div className="flex-1">
+          <p className="text-xs font-bold text-ink">Activity log</p>
+          <p className="text-[10px] text-ink-muted">Payments · check-ins · rent changes</p>
+        </div>
+        <span className="text-ink-muted text-sm">›</span>
+      </Link>
+
       {/* Pre-register */}
       <Link href="/tenants/pre-register" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
         <span className="text-base">📝</span>
