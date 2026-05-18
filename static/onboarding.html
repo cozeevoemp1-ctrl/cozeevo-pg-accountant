@@ -1060,7 +1060,7 @@
       const name = document.getElementById('name').value.trim();
       document.getElementById('agree-name').textContent = name || '—';
       // Re-populate booking summary from sessionData in case DOM was reset
-      if (sessionData && sessionData.agreed_rent !== undefined) {
+      if (sessionData) {
         populateRoomCard({
           room_number: sessionData.room ? sessionData.room.number : '',
           bed_label: sessionData.room ? (sessionData.room.building + ', Floor ' + sessionData.room.floor + ' — ' + sessionData.room.sharing) : '',
@@ -1081,9 +1081,10 @@
   }
 
   function updateProgress(step) {
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 4; i++) {
       const seg = document.getElementById('seg-' + i);
       const lbl = document.getElementById('lbl-' + i);
+      if (!seg || !lbl) continue;
       seg.className = 'progress-segment';
       lbl.className = 'progress-label';
       if (i < step) { seg.classList.add('done'); lbl.classList.add('done'); }
