@@ -1378,6 +1378,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             _, _guard_err = await check_room_bookable(
                 session, room.room_number, checkin, _guard_checkout,
                 property_id=room.property_id,
+                exclude_tenancy_id=obs.tenancy_id,  # don't count this session's own no_show tenancy
             )
             if _guard_err:
                 raise HTTPException(409, _guard_err)
