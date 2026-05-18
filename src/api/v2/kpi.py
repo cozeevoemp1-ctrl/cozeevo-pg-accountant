@@ -191,50 +191,56 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             ) or 0
         )
 
-        # Overdue tenants — active tenancies with rent_due > paid for current month
+        # Overdue tenants — same logic as dues panel: rent_dues + deposit_due per tenant
+        import math as _math
         period = date(today.year, today.month, 1)
-        next_m = today.month % 12 + 1
-        next_y = today.year + (1 if today.month == 12 else 0)
-        period_end = date(next_y, next_m, 1)
-        paid_subq = (
+        rent_paid_subq = (
             select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
             .where(
                 Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
-                    # Deposit paid this month counts against first-month RS.rent_due.
-                    # Booking excluded — RS.rent_due already nets booking via first_month_rent_due.
-                    and_(
-                        Payment.for_type == PaymentFor.deposit,
-                        Payment.period_month == None,
-                        Payment.payment_date >= period,
-                        Payment.payment_date < period_end,
-                    ),
-                ),
+                Payment.for_type == PaymentFor.rent,
+                Payment.period_month == period,
             )
             .group_by(Payment.tenancy_id)
             .subquery()
         )
-        adj = func.coalesce(RentSchedule.adjustment, 0)
-        effective_due = RentSchedule.rent_due + adj
-        overdue_rows = (await session.execute(
+        deposit_paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("dep_paid"))
+            .where(Payment.is_void == False, Payment.for_type == PaymentFor.deposit)
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
+        eff_due_col = (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)).label("effective_due")
+        dues_rows = (await session.execute(
             select(
-                func.count(RentSchedule.id),
-                func.coalesce(
-                    func.sum(effective_due - func.coalesce(paid_subq.c.paid, 0)),
-                    0,
-                ),
+                Tenancy.security_deposit,
+                Tenancy.booking_amount,
+                eff_due_col,
+                func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
+                func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
             )
-            .outerjoin(paid_subq, paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
             .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
+            .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
+            .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
             .where(
                 RentSchedule.period_month == period,
                 Tenancy.status == TenancyStatus.active,
-                effective_due > func.coalesce(paid_subq.c.paid, 0),
             )
-        )).one()
-        overdue_tenants = int(overdue_rows[0] or 0)
-        overdue_amount = float(overdue_rows[1] or 0)
+        )).all()
+        overdue_tenants = 0
+        overdue_amount = 0.0
+        for _r in dues_rows:
+            _eff = float(_r.effective_due or 0)
+            _rent_paid = float(_r.rent_paid or 0)
+            _dep_paid = float(_r.dep_paid or 0)
+            _booking = float(_r.booking_amount or 0)
+            _dep_agreed = float(_r.security_deposit or 0)
+            _rent_dues = _math.ceil(max(0.0, _eff - _rent_paid) / 100) * 100
+            _dep_due = _math.ceil(max(0.0, _dep_agreed - _dep_paid - _booking) / 100) * 100
+            _total = _rent_dues + _dep_due
+            if _total > 0:
+                overdue_tenants += 1
+                overdue_amount += _total
 
     return KpiResponse(
         occupied_beds=occupied_beds,
