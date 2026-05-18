@@ -1059,6 +1059,21 @@
     if (n === 4) {
       const name = document.getElementById('name').value.trim();
       document.getElementById('agree-name').textContent = name || '—';
+      // Re-populate booking summary from sessionData in case DOM was reset
+      if (sessionData && sessionData.agreed_rent !== undefined) {
+        populateRoomCard({
+          room_number: sessionData.room ? sessionData.room.number : '',
+          bed_label: sessionData.room ? (sessionData.room.building + ', Floor ' + sessionData.room.floor + ' — ' + sessionData.room.sharing) : '',
+          checkin_date: sessionData.checkin_date || '',
+          monthly_rent: sessionData.agreed_rent || 0,
+          deposit: sessionData.security_deposit || 0,
+          lockin_months: sessionData.lock_in_months || 0,
+          maintenance: sessionData.maintenance_fee || 0,
+          future_rent: sessionData.future_rent || null,
+          future_rent_after_months: sessionData.future_rent_after_months || null,
+          rules: sessionData.rules || [],
+        });
+      }
       // Reset timestamp so mirrorSignature sets a fresh one for this visit
       document.getElementById('sig-timestamp').textContent = '';
       mirrorSignature();
@@ -1450,7 +1465,7 @@
       clearDraft();
 
       // Show confirmation
-      document.getElementById('step-5').classList.remove('active');
+      document.getElementById('step-' + currentStep).classList.remove('active');
       document.getElementById('progress-bar').style.display = 'none';
       document.getElementById('confirmation').classList.add('active');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1468,6 +1483,7 @@
   // ── Signature canvas ───────────────────────────────────────────────────────
   function initSignatureCanvas() {
     const canvas = document.getElementById('signature-canvas');
+    if (!canvas) return; // canvas removed — signature is now typed name
     const ctx = canvas.getContext('2d');
 
     // Set actual pixel dimensions
