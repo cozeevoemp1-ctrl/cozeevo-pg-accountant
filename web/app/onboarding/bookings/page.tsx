@@ -679,17 +679,30 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                 </button>
               )}
               {expanded ? (
-                <button
-                  onClick={() => onCheckin(b.token, {
-                    collected_rent_dues: parseFloat(collectRentDues) || 0,
-                    rent_dues_mode: rentDuesMode,
-                    collected_deposit_dues: parseFloat(collectDepositDues) || 0,
-                  })}
-                  disabled={checkingIn === b.token}
-                  className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
-                >
-                  {checkingIn === b.token ? "Checking in…" : "Save & Check In"}
-                </button>
+                checkInConfirm ? (
+                  <button
+                    onClick={() => {
+                      setCheckInConfirm(false)
+                      onCheckin(b.token, {
+                        collected_rent_dues: parseFloat(collectRentDues) || 0,
+                        rent_dues_mode: rentDuesMode,
+                        collected_deposit_dues: parseFloat(collectDepositDues) || 0,
+                      })
+                    }}
+                    disabled={checkingIn === b.token}
+                    className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+                  >
+                    {checkingIn === b.token ? "Checking in…" : "Confirm check in?"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setCheckInConfirm(true)}
+                    disabled={checkingIn === b.token}
+                    className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+                  >
+                    Save & Check In
+                  </button>
+                )
               ) : (
                 <button
                   onClick={() => setExpanded(true)}
