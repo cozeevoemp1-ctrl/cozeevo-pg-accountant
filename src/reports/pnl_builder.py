@@ -242,16 +242,12 @@ def _write_pnl_tab(
     ws.append([])
 
     # ── HULK group ────────────────────────────────────────────────────────────
-    _acct_row("HULK acct ...0881 — Opening Balance (live from Mar'26)",
-              [BANK_BALANCE_HULK[m][0] for m in MONTHS], acct_fill)
     row = _get("HULK — Bank Income (UPI + cheque)")
     if row:
-        ws.append(["  HULK — Bank Income (UPI + cheque)", "+"] + row + [sum(row)])
+        ws.append(["HULK — Bank Income (UPI + cheque)", "+"] + row + [sum(row)])
     row = _get("HULK — received from THOR acct (reclassification)")
     if any(row):
-        ws.append(["  HULK — received from THOR acct (reclassification)", "+"] + row + [sum(row)])
-    _acct_row("HULK acct ...0881 — Closing Balance",
-              [BANK_BALANCE_HULK[m][1] for m in MONTHS], close_fill)
+        ws.append(["HULK — received from THOR acct (reclassification)", "+"] + row + [sum(row)])
 
     ws.append([])
 
