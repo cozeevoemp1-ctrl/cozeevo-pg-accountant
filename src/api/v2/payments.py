@@ -79,6 +79,12 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
             body.tenant_id, tenancy.id, body.amount, user.phone,
         )
 
+        # Resolve period for sheet sync (always needed, regardless of for_type)
+        if body.period_month:
+            period = datetime.strptime(body.period_month, "%Y-%m")
+        else:
+            period = date.today()
+
         # Mirror to Google Sheet (same pattern as WhatsApp handler — 10s timeout)
         # Only rent payments go to Cash/UPI column. Deposit/booking/maintenance are
         # tracked via deposit_credit / booking_credit in sync_sheet_from_db's balance
@@ -87,10 +93,6 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         room = await session.get(Room, tenancy.room_id)
         if room and tenant and body.for_type == "rent":
             try:
-                if body.period_month:
-                    period = datetime.strptime(body.period_month, "%Y-%m")
-                else:
-                    period = date.today()
                 resolved_method = _resolve_payment_mode(body.method).value
                 await asyncio.wait_for(
                     gsheets_update(
