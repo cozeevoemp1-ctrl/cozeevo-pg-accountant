@@ -144,8 +144,8 @@ DEPOSITS = {
 BANK_BALANCE_THOR: Dict[str, tuple] = {
     "Oct'25": (      0,   500000),
     "Nov'25": ( 500000,   616192),
-    "Dec'25": ( 616192,  1376418),
-    "Jan'26": (1437933,  1878517),  # opening > Dec closing: Dec 31 txns bridged in gap
+    "Dec'25": ( 616192,  1437933),  # Dec 30 stmt showed 1376418; Dec 31 txns brought it to 1437933 (= Jan 1 opening)
+    "Jan'26": (1437933,  1878517),
     "Feb'26": (1878517,  1250402),
     "Mar'26": (1250402,   205008),
     "Apr'26": ( 205008,  1373863),
