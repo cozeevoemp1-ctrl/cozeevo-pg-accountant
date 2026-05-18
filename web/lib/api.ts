@@ -111,6 +111,10 @@ export function getCollectionSummary(periodMonth: string, token?: string): Promi
   return _get(`/api/v2/app/reporting/collection?period_month=${encodeURIComponent(periodMonth)}`, token);
 }
 
+export function getCollectionHistory(months = 6, token?: string): Promise<CollectionSummary[]> {
+  return _get(`/api/v2/app/reporting/collection-history?months=${months}`, token);
+}
+
 export function getDepositsHeld(token?: string): Promise<{ held: number; maintenance: number; refundable: number }> {
   return _get("/api/v2/app/reporting/deposits-held", token);
 }

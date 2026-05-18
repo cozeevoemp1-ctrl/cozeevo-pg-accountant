@@ -84,6 +84,12 @@ export default async function CollectionBreakdownPage({
           <p className="text-xs text-ink-muted font-medium">Collection breakdown</p>
           <h1 className="text-lg font-extrabold text-ink leading-tight">Money Dashboard</h1>
         </div>
+        <Link
+          href="/collection/history"
+          className="ml-auto text-xs font-semibold text-brand-pink px-3 py-1.5 rounded-pill border border-brand-pink"
+        >
+          History
+        </Link>
       </div>
 
       {/* Month navigation */}
