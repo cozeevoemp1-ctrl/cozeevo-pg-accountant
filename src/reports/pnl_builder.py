@@ -134,8 +134,33 @@ DEPOSITS = {
     "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000],
 }
 
-BANK_CLOSING_BALANCE_THOR = 1373863   # THOR acct ...0961 Apr 30
-BANK_CLOSING_BALANCE_HULK =  814941   # HULK acct ...0881 Apr 30
+# Monthly bank balances — from Yes Bank statements (verified)
+# THOR acct ...0961: Oct'25 statement + 2026 statement.csv
+# HULK acct ...0881: AccountSummary Cozeevo hulk_formatted.xlsx (live from Mar 4 2026)
+# Note: Dec'25 statement runs to Dec 30 only — Jan'26 opening reflects Dec 31 transactions (+₹61,515 gap)
+# Tuple: (opening_balance, closing_balance) per month. None = account not yet open.
+BANK_BALANCE_THOR: Dict[str, tuple] = {
+    "Oct'25": (      0,   500000),
+    "Nov'25": ( 500000,   616192),
+    "Dec'25": ( 616192,  1376418),
+    "Jan'26": (1437933,  1878517),  # opening > Dec closing: Dec 31 txns bridged in gap
+    "Feb'26": (1878517,  1250402),
+    "Mar'26": (1250402,   205008),
+    "Apr'26": ( 205008,  1373863),
+}
+
+BANK_BALANCE_HULK: Dict[str, tuple] = {
+    "Oct'25": (None, None),
+    "Nov'25": (None, None),
+    "Dec'25": (None, None),
+    "Jan'26": (None, None),
+    "Feb'26": (None, None),
+    "Mar'26": (  10000,  571550),
+    "Apr'26": ( 571550,  814941),  # verified Apr 30 figure
+}
+
+BANK_CLOSING_BALANCE_THOR = BANK_BALANCE_THOR["Apr'26"][1]
+BANK_CLOSING_BALANCE_HULK = BANK_BALANCE_HULK["Apr'26"][1]
 
 CASH_IN_HAND = {
     "Lakshmi cash (Mar closing ₹2,42,617 → Apr closing)":  820883,  # Apr 30 confirmed 2026-05-13
@@ -284,13 +309,43 @@ def _write_pnl_tab(
     _bank_total    = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
     _cash_total    = sum(CASH_IN_HAND.values())
 
-    ws.append(["BALANCE SHEET ITEMS (Apr 30)", ""])
+    ws.append(["BALANCE SHEET ITEMS", ""])
     ws[ws.max_row][0].font = bold
-    ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
-    ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
-    ws.append(["Total bank balance", "", "", "", "", "", "", "", _bank_total])
-    for c in ws[ws.max_row]:
-        c.font = bold
+
+    # ── Monthly bank opening & closing balances ──────────────────────────────
+    bal_fill   = PatternFill(start_color="DEEAF1", end_color="DEEAF1", fill_type="solid")
+    bal_fill2  = PatternFill(start_color="EBF3FB", end_color="EBF3FB", fill_type="solid")
+    total_fill2 = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+
+    def _bal_row(label, values, fill, bold_row=False):
+        row = [label, ""] + values + [None]
+        ws.append(row)
+        for c in ws[ws.max_row]:
+            c.fill = fill
+            if bold_row:
+                c.font = bold
+
+    ws.append(["THOR acct ...0961 — Monthly Bank Balance", ""] + [""] * len(MONTHS) + [""])
+    ws[ws.max_row][0].font = Font(bold=True)
+
+    _bal_row("  Opening Balance", [BANK_BALANCE_THOR[m][0] for m in MONTHS], bal_fill)
+    _bal_row("  Closing Balance", [BANK_BALANCE_THOR[m][1] for m in MONTHS], bal_fill2)
+    ws.append([])
+
+    ws.append(["HULK acct ...0881 — Monthly Bank Balance (live from Mar'26)", ""] + [""] * len(MONTHS) + [""])
+    ws[ws.max_row][0].font = Font(bold=True)
+
+    _bal_row("  Opening Balance", [BANK_BALANCE_HULK[m][0] for m in MONTHS], bal_fill)
+    _bal_row("  Closing Balance", [BANK_BALANCE_HULK[m][1] for m in MONTHS], bal_fill2)
+    ws.append([])
+
+    # Combined closing balance row
+    combined_closing = [
+        (BANK_BALANCE_THOR[m][1] or 0) + (BANK_BALANCE_HULK[m][1] or 0)
+        for m in MONTHS
+    ]
+    _bal_row("Total Bank Closing Balance (THOR + HULK)", combined_closing, total_fill2, bold_row=True)
+    ws.append([])
     ws.append([])
     ws.append(["Cash in hand (physical)", ""])
     ws[ws.max_row][0].font = bold
