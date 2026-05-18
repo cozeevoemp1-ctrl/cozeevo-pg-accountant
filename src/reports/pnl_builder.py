@@ -30,15 +30,17 @@ from src.utils.inr_format import INR_NUMBER_FORMAT
 MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
 
 INCOME = {
-    # THOR building (acct ...0961)
-    "THOR — UPI batch settlements (merchant QR)":          [0,      0,        0,  175596, 2091597, 2515275, 2834731],
-    "THOR — individual direct payments + NEFT":            [0, 723007, 1350547, 1083628,  420690,  385691,  226807],  # Mar: +160600 Chandra cash collection reclassified to bank (2026-05-12)
+    # THOR building (acct ...0961) — UPI batch + direct NEFT merged
+    # UPI batch: [0, 0, 0, 175596, 2091597, 2515275, 2834731]
+    # Direct NEFT: [0, 723007, 1350547, 1083628, 420690, 385691, 226807]  # Mar: +160600 Chandra cash reclassified to bank (2026-05-12)
+    "THOR — Bank Income (UPI + NEFT)":                     [0, 723007, 1350547, 1259224, 2512287, 2900966, 3061538],
     "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May (collected in May, not Apr). Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
-    # HULK building (acct ...0881) — live from Mar 2026
-    "HULK — UPI batch settlements (merchant QR)":          [0,      0,        0,       0,       0,       0,  247719],
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May. Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
+    # HULK building (acct ...0881) — live from Mar 2026; UPI + cheque merged
+    # UPI batch: [0, 0, 0, 0, 0, 0, 247719]
+    # Cheque/other: [0, 0, 0, 0, 0, 71550, 0]
+    "HULK — Bank Income (UPI + cheque)":                   [0,      0,        0,       0,       0,   71550,  247719],
     "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
-    "HULK — cheque / other deposits":                      [0,      0,        0,       0,       0,   71550,       0],
 }
 
 CAPITAL_CONTRIBUTIONS = {
@@ -201,11 +203,58 @@ def _write_pnl_tab(
         c.fill = hdr_fill; c.font = hdr_font; c.alignment = ctr
 
     # ── 1. INCOME ──────────────────────────────────────────────────────────────
+    acct_fill  = PatternFill(start_color="DEEAF1", end_color="DEEAF1", fill_type="solid")
+    close_fill = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+    acct_font  = Font(bold=True, color="1F4E78")
+
+    def _acct_row(label, values, fill):
+        ws.append([label, ""] + values + [None])
+        for c in ws[ws.max_row]:
+            c.fill = fill
+            c.font = acct_font
+
+    def _get(key):
+        return income_dict.get(key, [0] * len(MONTHS))
+
     ws.append(["INCOME", ""])
     ws[ws.max_row][0].font = bold
-    for label, row in income_dict.items():
-        sign = "−" if "transferred to HULK" in label else "+"
-        ws.append([label, sign] + row + [sum(row)])
+
+    # ── THOR group ────────────────────────────────────────────────────────────
+    _acct_row("THOR acct ...0961 — Opening Balance",
+              [BANK_BALANCE_THOR[m][0] for m in MONTHS], acct_fill)
+    row = _get("THOR — Bank Income (UPI + NEFT)")
+    if row:
+        ws.append(["  THOR — Bank Income (UPI + NEFT)", "+"] + row + [sum(row)])
+    row = _get("THOR — transferred to HULK acct (reclassification)")
+    if any(row):
+        ws.append(["  THOR — transferred to HULK acct (reclassification)", "−"] + row + [sum(row)])
+    _acct_row("THOR acct ...0961 — Closing Balance",
+              [BANK_BALANCE_THOR[m][1] for m in MONTHS], close_fill)
+
+    ws.append([])
+
+    # ── Cash ──────────────────────────────────────────────────────────────────
+    cash_key = "Cash (physical — both buildings combined)"
+    if cash_key in income_dict:
+        row = income_dict[cash_key]
+        ws.append([cash_key, "+"] + row + [sum(row)])
+
+    ws.append([])
+
+    # ── HULK group ────────────────────────────────────────────────────────────
+    _acct_row("HULK acct ...0881 — Opening Balance (live from Mar'26)",
+              [BANK_BALANCE_HULK[m][0] for m in MONTHS], acct_fill)
+    row = _get("HULK — Bank Income (UPI + cheque)")
+    if row:
+        ws.append(["  HULK — Bank Income (UPI + cheque)", "+"] + row + [sum(row)])
+    row = _get("HULK — received from THOR acct (reclassification)")
+    if any(row):
+        ws.append(["  HULK — received from THOR acct (reclassification)", "+"] + row + [sum(row)])
+    _acct_row("HULK acct ...0881 — Closing Balance",
+              [BANK_BALANCE_HULK[m][1] for m in MONTHS], close_fill)
+
+    ws.append([])
+
     rev_row = [sum(col) for col in zip(*income_dict.values())]
     ws.append(["Total Gross Inflows", "="] + rev_row + [sum(rev_row)])
     for c in ws[ws.max_row]:
@@ -309,43 +358,13 @@ def _write_pnl_tab(
     _bank_total    = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
     _cash_total    = sum(CASH_IN_HAND.values())
 
-    ws.append(["BALANCE SHEET ITEMS", ""])
+    ws.append(["BALANCE SHEET ITEMS (Apr 30)", ""])
     ws[ws.max_row][0].font = bold
-
-    # ── Monthly bank opening & closing balances ──────────────────────────────
-    bal_fill   = PatternFill(start_color="DEEAF1", end_color="DEEAF1", fill_type="solid")
-    bal_fill2  = PatternFill(start_color="EBF3FB", end_color="EBF3FB", fill_type="solid")
-    total_fill2 = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
-
-    def _bal_row(label, values, fill, bold_row=False):
-        row = [label, ""] + values + [None]
-        ws.append(row)
-        for c in ws[ws.max_row]:
-            c.fill = fill
-            if bold_row:
-                c.font = bold
-
-    ws.append(["THOR acct ...0961 — Monthly Bank Balance", ""] + [""] * len(MONTHS) + [""])
-    ws[ws.max_row][0].font = Font(bold=True)
-
-    _bal_row("  Opening Balance", [BANK_BALANCE_THOR[m][0] for m in MONTHS], bal_fill)
-    _bal_row("  Closing Balance", [BANK_BALANCE_THOR[m][1] for m in MONTHS], bal_fill2)
-    ws.append([])
-
-    ws.append(["HULK acct ...0881 — Monthly Bank Balance (live from Mar'26)", ""] + [""] * len(MONTHS) + [""])
-    ws[ws.max_row][0].font = Font(bold=True)
-
-    _bal_row("  Opening Balance", [BANK_BALANCE_HULK[m][0] for m in MONTHS], bal_fill)
-    _bal_row("  Closing Balance", [BANK_BALANCE_HULK[m][1] for m in MONTHS], bal_fill2)
-    ws.append([])
-
-    # Combined closing balance row
-    combined_closing = [
-        (BANK_BALANCE_THOR[m][1] or 0) + (BANK_BALANCE_HULK[m][1] or 0)
-        for m in MONTHS
-    ]
-    _bal_row("Total Bank Closing Balance (THOR + HULK)", combined_closing, total_fill2, bold_row=True)
-    ws.append([])
+    ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
+    ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
+    ws.append(["Total bank balance", "", "", "", "", "", "", "", _bank_total])
+    for c in ws[ws.max_row]:
+        c.font = bold
     ws.append([])
     ws.append(["Cash in hand (physical)", ""])
     ws[ws.max_row][0].font = bold
