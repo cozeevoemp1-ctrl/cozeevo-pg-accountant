@@ -2,6 +2,14 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.3] — 2026-05-18 — Fix Claude Code "Unhandled case" error from Stop hook
+
+### Claude Code config (`.claude/settings.json`)
+- Stop hook now redirects all intermediate stdout/stderr to `/dev/null`
+- SSH background deploy also redirects to `/dev/null` (was leaking async output)
+- Hook outputs a single `{"systemMessage": "auto: ..."}` JSON at the end — Claude Code renders this cleanly instead of hitting an unhandled render case
+- Root cause: raw git + SSH text output was being received by the VSCode extension renderer, which hit an unhandled switch case for non-JSON content blocks
+
 ## [1.76.2] — 2026-05-18 — Dues fixes + Delvin Raj April prorated dues
 
 ### Bug fixes (deployed earlier today)
