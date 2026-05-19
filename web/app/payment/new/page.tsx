@@ -38,6 +38,8 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
 }
 
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
 export default function NewPaymentPage() {
   const router = useRouter()
 
@@ -56,6 +58,14 @@ export default function NewPaymentPage() {
   const [success, setSuccess] = useState(false)
   const [voiceHint, setVoiceHint] = useState("")
   const [waiveRemaining, setWaiveRemaining] = useState(false)
+
+  const monthScrollRef = useRef<HTMLDivElement>(null)
+
+  // Scroll selected month chip into view on mount
+  useEffect(() => {
+    const el = monthScrollRef.current?.querySelector<HTMLElement>("[data-selected=true]")
+    el?.scrollIntoView({ behavior: "instant", inline: "center", block: "nearest" })
+  }, [])
 
   // Receipt state — scanned on form, uploaded after save
   const [scannedFile, setScannedFile] = useState<File | null>(null)
@@ -122,10 +132,6 @@ export default function NewPaymentPage() {
     setError("")
     if (!tenant) { setError("Select a tenant first"); return }
     if (!amount || Number(amount) <= 0) { setError("Enter a valid amount"); return }
-    if (periodMonth < currentMonth()) {
-      setError(`${periodMonth} is a closed period — use the adjustment line to correct discrepancies.`)
-      return
-    }
     setShowConfirm(true)
   }
 
@@ -355,10 +361,26 @@ export default function NewPaymentPage() {
               </button>
             ))}
           </div>
-          <div className="mt-3 flex gap-2 items-center">
-            <label className="text-xs text-ink-muted font-medium whitespace-nowrap">Period</label>
-            <input type="month" value={periodMonth} min={currentMonth()} onChange={(e) => setPeriodMonth(e.target.value)}
-              className="flex-1 rounded-pill border border-[#E2DEDD] bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-brand-pink" />
+          <div className="mt-3">
+            <p className="text-xs text-ink-muted font-medium mb-2">Period</p>
+            <div ref={monthScrollRef} className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {MONTH_NAMES.map((name, idx) => {
+                const todayIdx = new Date().getMonth()
+                const val = `${new Date().getFullYear()}-${String(idx + 1).padStart(2, "0")}`
+                const isSelected = periodMonth === val
+                const isPast = idx < todayIdx
+                return (
+                  <button key={val} type="button" data-selected={isSelected} onClick={() => setPeriodMonth(val)}
+                    className={`flex-shrink-0 rounded-pill px-3 py-1.5 text-xs font-semibold border-2 transition-colors ${
+                      isSelected ? "bg-brand-pink text-white border-brand-pink"
+                      : isPast   ? "bg-bg text-ink-muted border-[#E2DEDD] opacity-50"
+                      :            "bg-bg text-ink border-[#E2DEDD]"
+                    }`}>
+                    {name}
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Note (optional)…"
             className="mt-2 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink" />
@@ -388,7 +410,7 @@ export default function NewPaymentPage() {
             { label: "Amount", value: `₹${Number(amount).toLocaleString("en-IN")}`, highlight: true },
             { label: "Method", value: `${METHODS.find(m => m.value === method)?.icon} ${method}` },
             { label: "For", value: FOR_TYPES.find(f => f.value === forType)?.label ?? forType },
-            { label: "Period", value: periodMonth },
+            { label: "Period", value: (() => { const [y, m] = periodMonth.split("-"); return `${MONTH_NAMES[parseInt(m)-1]} ${y}` })() },
             ...(notes ? [{ label: "Note", value: notes }] : []),
             ...(transactionId ? [{ label: "Ref", value: transactionId }] : []),
             ...(balanceAfter !== null ? [{ label: "Balance after", value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${Math.round(balanceAfter).toLocaleString("en-IN")} remaining` }] : []),
