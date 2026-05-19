@@ -49,9 +49,10 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         if tenancy is None:
             raise HTTPException(status_code=404, detail=f"No active tenancy for tenant {body.tenant_id}")
 
-        # Resolve tenant name for audit trail
+        # Resolve tenant + room for audit trail
         tenant = await session.get(Tenant, body.tenant_id)
         entity_name = tenant.name if tenant else None
+        room = await session.get(Room, tenancy.room_id)
 
         try:
             result = await log_payment(
@@ -64,7 +65,7 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
                 session=session,
                 notes=body.notes or None,
                 source="pwa",
-                room_number=None,
+                room_number=str(room.room_number) if room and room.room_number else None,
                 entity_name=entity_name,
             )
         except ValueError as exc:
@@ -90,7 +91,6 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         # tracked via deposit_credit / booking_credit in sync_sheet_from_db's balance
         # formula — adding them here inflates the Cash column then gets corrected by
         # the background full sync, causing visible temporary inflation on every payment.
-        room = await session.get(Room, tenancy.room_id)
         if room and tenant and body.for_type == "rent":
             try:
                 resolved_method = _resolve_payment_mode(body.method).value

@@ -821,6 +821,12 @@ async def get_activity_feed(
             select(AuthorizedUser.phone, AuthorizedUser.name, AuthorizedUser.supabase_auth_id)
         )).all()
 
+        # Build room ID → room_number map (WhatsApp bot stores int IDs; PWA stores room number strings)
+        room_id_rows = (await session.execute(
+            select(Room.id, Room.room_number)
+        )).all()
+        room_id_to_number: dict[int, str] = {r.id: str(r.room_number) for r in room_id_rows}
+
     phone_to_name: dict[str, str] = {}
     uuid_to_name:  dict[str, str] = {}
     for s in staff_rows:
