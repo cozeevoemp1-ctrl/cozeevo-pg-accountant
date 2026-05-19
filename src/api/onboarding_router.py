@@ -624,6 +624,10 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
             if len(digits) < 10:
                 raise HTTPException(400, "Phone must be at least 10 digits")
             obs.tenant_phone = digits[-10:]
+            # Sync into tenant_data so approve sees the corrected phone
+            _td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+            _td["phone"] = obs.tenant_phone
+            obs.tenant_data = json.dumps(_td)
         if req.tenant_name is not None:
             data = json.loads(obs.tenant_data) if obs.tenant_data else {}
             data["name"] = req.tenant_name.strip()
@@ -1280,8 +1284,12 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         for k in _KYC_FIELD_LABELS.keys():
             if k in overrides:
                 td[k] = overrides[k]
+        # QR walk-ins have no pre-filled phone — fall back to obs.tenant_phone
+        # (set by the edit endpoint when receptionist fills it in).
+        if not td.get("phone") and obs.tenant_phone:
+            td["phone"] = obs.tenant_phone
         if not td.get("name") or not td.get("phone"):
-            raise HTTPException(400, "Tenant data incomplete")
+            raise HTTPException(400, "Tenant data incomplete — please edit the booking and add the tenant's phone number")
 
         # Blacklist check (name + phone from KYC — catches name-only entries)
         from src.services.blacklist import check_blacklisted as _check_bl
