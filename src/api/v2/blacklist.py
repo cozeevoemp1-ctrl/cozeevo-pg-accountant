@@ -41,7 +41,7 @@ async def post_blacklist(body: dict, user: AppUser = Depends(get_current_user)):
         raise HTTPException(400, "reason is required")
     async with get_session() as session:
         new_id = await add_to_blacklist(
-            session, name=name, phone=phone, reason=reason, added_by=user.user_id
+            session, name=name, phone=phone, reason=reason, added_by=user.actor
         )
     return {"id": new_id, "name": name, "phone": phone, "status": "blacklisted"}
 
