@@ -226,7 +226,7 @@ export default function PaymentHistoryPage() {
                   <button
                     onClick={() => setConfirmDelete(true)}
                     disabled={saving || deleting}
-                    className="text-xs font-bold text-red-500 disabled:opacity-50"
+                    className="text-sm font-bold text-red-500 disabled:opacity-50"
                   >Delete</button>
                 ) : (
                   <div className="flex items-center gap-2">
