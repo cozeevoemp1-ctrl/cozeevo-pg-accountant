@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.6] — 2026-05-19 — Activity log: room display, transfer resolution, filter chips
+
+### feat — activity log improvements (kpi.py, payments.py, PWA)
+- **payments.py** `create_payment`: fetch room before `log_payment` so PWA payment audit entries now carry `room_number` — sublabel shows "Tenant · Room 101" correctly
+- **kpi.py** `get_activity_feed`: build `room_id → room_number` map; room transfer events now show room numbers ("Room 101 → 205") instead of raw integer IDs (which the WhatsApp bot stores)
+- **web/components/activity/activity-feed.tsx** (new client component): filter chips — All · Payments · Check-ins · Checkouts · Room moves · Rent · Notices · Voids. "Rent" filter includes adjustments. Chips are horizontally scrollable, pink when active.
+- **web/app/activity/page.tsx**: simplified to server-side fetch (120 events), render delegated to `ActivityFeed` client component
+
+---
+
 ## [1.76.5] — 2026-05-19 — Dues formula consistency + rounding removal + activity log names
 
 ### Bug fix — dues formula consistency (kpi.py, tenants.py)
