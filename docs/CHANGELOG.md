@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.4] — 2026-05-19 — Fix prep reminder not sending to admins
+
+### Bug fix — `src/scheduler.py`
+- `_prep_reminder()` was switched to `send_template` (general_notice) on 2026-05-16 (commit 6b4bb22) — nobody received prep reminders since then
+- Reverted back to free-form `_send_whatsapp` (pre-May-16 behaviour)
+- Import changed: `send_template` → `_send_whatsapp` from `webhook_handler`
+- Send call changed from `send_template(phone, "general_notice", body_params=[name, msg[:900]])` → `_send_whatsapp(phone, msg)`
+- Trade-off: free-form only works within 24h window, but all admin recipients message the bot regularly
+
+### New endpoint — `src/api/reminder_router.py`
+- Added `POST /api/reminders/trigger-prep?when=today|tomorrow` for manual testing/triggering of prep reminders
+- Calls `_prep_reminder(when=when)` directly
+
 ## [1.76.3] — 2026-05-18 — Fix Claude Code "Unhandled case" error from Stop hook
 
 ### Claude Code config (`.claude/settings.json`)

@@ -350,7 +350,7 @@ Message -> Learned Rules (JSON) -> Regex Patterns (50+) -> AI Fallback (Groq)
 | `src/database/seed.py` | Seed data (users, properties, food, categories) |
 | `src/database/excel_import.py` | Excel import script |
 | `src/database/migrate_all.py` | Master migration (idempotent, append only) |
-| `src/scheduler.py` | 9 jobs — rent reminders (day-1, day+2), prep reminders (9am/2pm), nightly sheet audit, checkout deposit alerts |
+| `src/scheduler.py` | 7 active jobs — prep reminders (9am/2pm IST, free-form text), checkout deposit alerts, daily reconciliation, nightly sheet audit, monthly tab rollover, weekly backup. Rent reminders DISABLED since 2026-05-13. |
 | `src/llm_gateway/claude_client.py` | LLM client (Ollama/Groq/Anthropic) |
 | `src/reports/reconciliation.py` | Reconciliation engine |
 | `src/reports/pnl_builder.py` | **Canonical P&L builder** — hardcoded verified Oct'25–Apr'26; shared by `/finance/pnl/excel` endpoint |
