@@ -132,16 +132,17 @@ async def checkin_preview(
 
         tenancy, tenant, room, prop = result
 
-        # Check for existing same-day physical check-in payment (prevents double-recording
-        # when the Bookings onboarding flow already created payments and the receptionist
-        # also opens the Physical Check-in form for the same tenant)
+        # Check for any same-day rent payment created at check-in — covers both:
+        #   "Physical check-in payment"          (from /checkin/new)
+        #   "Rent dues collected at check-in …"  (from Bookings onboarding approval)
+        # Prevents double-recording when both flows are used for the same tenant.
         same_day_checkin_payment = await session.scalar(
             select(Payment).where(
                 Payment.tenancy_id == tenancy_id,
                 Payment.for_type   == PaymentFor.rent,
                 Payment.payment_date == parsed_date,
                 Payment.is_void    == False,
-                Payment.notes.like("%Physical check-in%"),
+                Payment.notes.like("%check-in%"),
             )
         )
 
