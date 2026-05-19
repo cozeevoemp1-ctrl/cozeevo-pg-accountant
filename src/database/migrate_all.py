@@ -1561,6 +1561,27 @@ async def run_add_checkout_session_other_comments_2026_05_16(conn: AsyncConnecti
     print("  [ok] checkout_sessions.other_comments added")
 
 
+async def run_add_supabase_auth_id_2026_05_19(conn: AsyncConnection) -> None:
+    """Add supabase_auth_id to authorized_users for UUID→name resolution in activity feed."""
+    print("\n-- authorized_users.supabase_auth_id column (2026-05-19) --")
+    await conn.execute(text(
+        "ALTER TABLE authorized_users ADD COLUMN IF NOT EXISTS supabase_auth_id VARCHAR(36) UNIQUE"
+    ))
+    # Populate known UUIDs from Supabase auth (fetched 2026-05-19)
+    known = [
+        ("7845952289",  "5e177046-32cb-4d77-8523-a2257c9f9331"),  # Kiran
+        ("7358341775",  "829d64d6-0682-4b67-ab9e-394163d334d2"),  # Lakshmi
+        ("9444296681",  "aa55df44-a6bc-4f2b-889d-f88def37a97c"),  # Prabhakaran
+        ("7680814628",  "647047b9-5bdc-46b4-a353-2ef17070e408"),  # Lokesh
+    ]
+    for phone, uid in known:
+        await conn.execute(text("""
+            UPDATE authorized_users SET supabase_auth_id = :uid
+            WHERE phone = :phone AND (supabase_auth_id IS NULL OR supabase_auth_id != :uid)
+        """), {"uid": uid, "phone": phone})
+    print("  [ok] supabase_auth_id added and populated")
+
+
 async def run_staff_room_corrections_2026_05_16(conn: AsyncConnection) -> None:
     """
     Earlier migrations re-applied is_staff_room=TRUE on every deploy for rooms that
@@ -1625,6 +1646,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_btxn_dedup_2026_05_12(conn)
             await run_add_checkout_session_other_comments_2026_05_16(conn)
             await run_staff_room_corrections_2026_05_16(conn)
+            await run_add_supabase_auth_id_2026_05_19(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-server";
 import { getActivityFeed, type ActivityFeedEvent } from "@/lib/api";
 import Link from "next/link";
+import { LogoutAvatar } from "@/components/home/logout-avatar";
 
 const TYPE_CONFIG: Record<ActivityFeedEvent["type"], { icon: string; color: string }> = {
   payment:     { icon: "₹", color: "bg-[#D1FAE5] text-[#065F46]" },
@@ -41,6 +42,8 @@ export default async function ActivityPage() {
   if (!session) redirect("/login");
 
   const token = session.session.access_token;
+  const userName = (session.user.user_metadata?.name as string | undefined) ?? session.user.email ?? "U";
+  const userInitial = userName[0].toUpperCase();
   let events: ActivityFeedEvent[] = [];
   let error = false;
   try {
@@ -73,6 +76,7 @@ export default async function ActivityPage() {
           <p className="text-xs text-ink-muted font-medium">Cozeevo</p>
           <h1 className="text-lg font-extrabold text-ink leading-tight">Activity</h1>
         </div>
+        <LogoutAvatar initial={userInitial} />
       </div>
 
       <div className="px-4 pt-4 pb-32 max-w-lg mx-auto flex flex-col gap-4">

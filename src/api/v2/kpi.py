@@ -782,37 +782,19 @@ async def get_activity_feed(
             .limit(limit * 3)
         )).all()
 
-        # Build phone→name map for changed_by resolution
+        # Build phone→name and UUID→name maps from authorized_users
         staff_rows = (await session.execute(
-            select(AuthorizedUser.phone, AuthorizedUser.name)
+            select(AuthorizedUser.phone, AuthorizedUser.name, AuthorizedUser.supabase_auth_id)
         )).all()
 
     phone_to_name: dict[str, str] = {}
+    uuid_to_name:  dict[str, str] = {}
     for s in staff_rows:
         if s.phone and s.name:
             phone_to_name[s.phone.lstrip("+").lstrip("91")] = s.name
             phone_to_name[s.phone] = s.name
-
-    # Build UUID→name map from Supabase auth users (resolves entries stored as auth UUID)
-    import os, httpx
-    _uuid_to_name: dict[str, str] = {}
-    try:
-        _supa_url = os.environ.get("SUPABASE_URL", "").rstrip("/")
-        _svc_key  = os.environ.get("SUPABASE_SERVICE_KEY", "")
-        if _supa_url and _svc_key:
-            async with httpx.AsyncClient(timeout=5) as _hc:
-                _resp = await _hc.get(
-                    f"{_supa_url}/auth/v1/admin/users?per_page=1000",
-                    headers={"apikey": _svc_key, "Authorization": f"Bearer {_svc_key}"},
-                )
-            if _resp.status_code == 200:
-                for _u in _resp.json().get("users", []):
-                    _uid  = _u.get("id", "")
-                    _name = (_u.get("user_metadata") or {}).get("name", "")
-                    if _uid and _name:
-                        _uuid_to_name[_uid] = _name
-    except Exception:
-        pass  # non-fatal — fall back to raw UUID
+        if s.supabase_auth_id and s.name:
+            uuid_to_name[s.supabase_auth_id] = s.name
 
     def _resolve_name(changed_by: str) -> str:
         if not changed_by:
@@ -823,13 +805,11 @@ async def get_activity_feed(
         bare = cb.lstrip("+").lstrip("91")
         if bare in phone_to_name:
             return phone_to_name[bare]
-        # Supabase auth UUID (36-char hyphenated)
-        if cb in _uuid_to_name:
-            return _uuid_to_name[cb]
-        # system / import / bot labels
+        if cb in uuid_to_name:
+            return uuid_to_name[cb]
         if cb in ("system", "import", "onboarding_form", "onboarding", "dashboard", "whatsapp"):
             return cb.replace("_", " ").title()
-        return cb  # fall back to raw value
+        return cb
 
     events = []
     for r in rows:

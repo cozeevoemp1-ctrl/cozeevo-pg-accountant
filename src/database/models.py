@@ -759,15 +759,16 @@ class AuthorizedUser(Base):
     """
     __tablename__ = "authorized_users"
 
-    id           = Column(Integer, primary_key=True)
-    phone        = Column(String(20), unique=True, nullable=False)
-    name         = Column(String(120))
-    role         = Column(Enum(UserRole), nullable=False)
-    property_id  = Column(Integer, ForeignKey("properties.id"), nullable=True)  # KEY_USER scoped to a property
-    added_by     = Column(String(20))    # phone of who added them
-    active       = Column(Boolean, default=True)
-    created_at   = Column(DateTime, default=datetime.utcnow)
-    deactivated_at = Column(DateTime)
+    id               = Column(Integer, primary_key=True)
+    phone            = Column(String(20), unique=True, nullable=False)
+    name             = Column(String(120))
+    role             = Column(Enum(UserRole), nullable=False)
+    property_id      = Column(Integer, ForeignKey("properties.id"), nullable=True)
+    added_by         = Column(String(20))
+    active           = Column(Boolean, default=True)
+    created_at       = Column(DateTime, default=datetime.utcnow)
+    deactivated_at   = Column(DateTime)
+    supabase_auth_id = Column(String(36), unique=True, nullable=True)  # Supabase auth UUID for PWA users
 
     __table_args__ = (
         Index("ix_authorized_users_phone", "phone"),
