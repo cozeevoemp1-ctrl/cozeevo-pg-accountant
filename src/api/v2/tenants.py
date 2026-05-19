@@ -477,10 +477,13 @@ async def update_tenant(
                 _rs.rent_due = _rs_amount
                 session.add(_rs)
             else:
+                from src.services.rent_schedule import first_month_rent_due
+                _checkin = tenancy.checkin_date
+                _is_checkin_month = _checkin and _checkin.replace(day=1) == _period
                 session.add(RentSchedule(
                     tenancy_id=tenancy_id,
                     period_month=_period,
-                    rent_due=_rs_amount,
+                    rent_due=first_month_rent_due(tenancy, _period) if _is_checkin_month else _rs_amount,
                     org_id=tenancy.org_id,
                 ))
 
