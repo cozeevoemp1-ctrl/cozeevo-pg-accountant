@@ -1,0 +1,133 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import type { ActivityFeedEvent } from "@/lib/api";
+
+const TYPE_CONFIG: Record<ActivityFeedEvent["type"], { icon: string; color: string }> = {
+  payment:     { icon: "₹", color: "bg-[#D1FAE5] text-[#065F46]" },
+  checkin:     { icon: "→", color: "bg-[#DBEAFE] text-[#1D4ED8]" },
+  checkout:    { icon: "←", color: "bg-[#FEF3C7] text-[#92400E]" },
+  rent_change: { icon: "↑", color: "bg-[#EDE9FE] text-[#5B21B6]" },
+  room_change: { icon: "⇄", color: "bg-[#FCE7F3] text-[#9D174D]" },
+  void:        { icon: "✕", color: "bg-[#FEE2E2] text-[#991B1B]" },
+  adjustment:  { icon: "~", color: "bg-[#FEF3C7] text-[#78350F]" },
+  notice:      { icon: "!", color: "bg-[#FEF3C7] text-[#B45309]" },
+  other:       { icon: "•", color: "bg-[#F6F5F0] text-ink-muted" },
+};
+
+const FILTERS = [
+  { key: "all",         label: "All" },
+  { key: "payment",     label: "Payments" },
+  { key: "checkin",     label: "Check-ins" },
+  { key: "checkout",    label: "Checkouts" },
+  { key: "room_change", label: "Room moves" },
+  { key: "rent_change", label: "Rent" },
+  { key: "notice",      label: "Notices" },
+  { key: "void",        label: "Voids" },
+] as const;
+
+type FilterKey = typeof FILTERS[number]["key"];
+
+function _dayLabel(ts: string): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day   = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff  = Math.round((today.getTime() - day.getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7)  return d.toLocaleDateString("en-IN", { weekday: "long" });
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function _timeLabel(ts: string): string {
+  return new Date(ts).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
+function _dayKey(ts: string): string {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
+  const [filter, setFilter] = useState<FilterKey>("all");
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return events;
+    if (filter === "rent_change") return events.filter(ev => ev.type === "rent_change" || ev.type === "adjustment");
+    return events.filter(ev => ev.type === filter);
+  }, [events, filter]);
+
+  const groups = useMemo(() => {
+    const g: { key: string; label: string; events: ActivityFeedEvent[] }[] = [];
+    for (const ev of filtered) {
+      const key = _dayKey(ev.ts);
+      const last = g[g.length - 1];
+      if (last && last.key === key) {
+        last.events.push(ev);
+      } else {
+        g.push({ key, label: _dayLabel(ev.ts), events: [ev] });
+      }
+    }
+    return g;
+  }, [filtered]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Filter chips */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
+        {FILTERS.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              filter === f.key
+                ? "bg-[#EF1F9C] text-white"
+                : "bg-[#F0EDE9] text-ink-muted"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Events grouped by day */}
+      {groups.length === 0 ? (
+        <p className="text-sm text-ink-muted text-center mt-8">No activity</p>
+      ) : (
+        groups.map((group) => (
+          <section key={group.key}>
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">{group.label}</p>
+            <div className="bg-surface rounded-card border border-[#F0EDE9] divide-y divide-[#F0EDE9]">
+              {group.events.map((ev) => {
+                const cfg = TYPE_CONFIG[ev.type] ?? TYPE_CONFIG.other;
+                return (
+                  <div key={ev.id} className="flex items-start gap-3 px-4 py-3">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${cfg.color}`}>
+                      {cfg.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-ink leading-snug">{ev.label}</p>
+                      {ev.sublabel && (
+                        <p className="text-xs text-ink-muted mt-0.5 truncate">{ev.sublabel}</p>
+                      )}
+                      {ev.detail && (
+                        <p className="text-[11px] text-ink-muted mt-0.5 truncate">{ev.detail}</p>
+                      )}
+                      {ev.changed_by && (
+                        <p className="text-[10px] text-ink-muted/60 mt-1">
+                          by {ev.changed_by}{ev.source && ev.source !== "dashboard" ? ` · ${ev.source}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-ink-muted flex-shrink-0 mt-0.5">{_timeLabel(ev.ts)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))
+      )}
+    </div>
+  );
+}

@@ -912,8 +912,15 @@ async def get_activity_feed(
 
         elif r.field == "room_id":
             ev_type = "room_change"
-            old_r = (r.old_value or "?")
-            new_r = (r.new_value or "?")
+            def _rn(val: str | None) -> str:
+                if not val:
+                    return "?"
+                try:
+                    return room_id_to_number.get(int(val), val)
+                except ValueError:
+                    return val
+            old_r = _rn(r.old_value)
+            new_r = _rn(r.new_value)
             label = f"Room {old_r} → {new_r}"
 
         elif r.field == "is_void":
