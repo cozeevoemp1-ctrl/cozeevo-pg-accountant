@@ -228,7 +228,7 @@ async def get_tenant_dues(
                 Payment.tenancy_id == tenancy_id,
                 Payment.is_void == False,
             )
-            .order_by(Payment.payment_date.desc())
+            .order_by(Payment.payment_date.desc(), Payment.id.desc())
             .limit(1)
         )
         deposit_paid_result = await session.scalar(
