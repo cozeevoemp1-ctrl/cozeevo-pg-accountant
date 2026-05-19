@@ -622,6 +622,15 @@ export function editPayment(paymentId: number, body: PaymentEditBody): Promise<P
   return _patch<PaymentListItem>(`/api/v2/app/payments/${paymentId}`, body);
 }
 
+export async function voidPayment(paymentId: number): Promise<void> {
+  const headers = await _authHeaders();
+  const res = await fetch(`${BASE_URL}/api/v2/app/payments/${paymentId}`, { method: "DELETE", headers });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error((detail as { detail?: string }).detail ?? `Delete failed ${res.status}`);
+  }
+}
+
 // ── Recent check-ins ─────────────────────────────────────────────────────────
 
 export interface RecentCheckinItem {

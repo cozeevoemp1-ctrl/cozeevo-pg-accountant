@@ -187,6 +187,27 @@ async def list_payments(
     return result
 
 
+@router.delete("/payments/{payment_id}", status_code=204)
+async def void_payment(
+    payment_id: int,
+    user: AppUser = Depends(get_current_user),
+):
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="admin or staff only")
+
+    async with get_session() as session:
+        payment = await session.get(Payment, payment_id)
+        if payment is None:
+            raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
+        if payment.is_void:
+            raise HTTPException(status_code=409, detail="Already voided")
+
+        payment.is_void = True
+        await session.commit()
+
+    logger.info("[PWA] payment voided: id=%s by=%s", payment_id, user.actor)
+
+
 @router.patch("/payments/{payment_id}", response_model=PaymentListItem)
 async def edit_payment(
     payment_id: int,
