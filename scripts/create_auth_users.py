@@ -50,7 +50,7 @@ def list_existing_emails() -> set[str]:
     return {u["email"].lower() for u in users}
 
 
-def create_user(email: str, role: str, password: str, write: bool) -> str:
+def create_user(email: str, role: str, name: str, password: str, write: bool) -> str:
     """Create user and return status string."""
     payload = {
         "email": email,
@@ -59,6 +59,7 @@ def create_user(email: str, role: str, password: str, write: bool) -> str:
         "user_metadata": {
             "role": role,
             "org_id": 1,
+            "name": name,
         },
     }
     if not write:
@@ -94,7 +95,7 @@ def main():
             credentials.append((u["name"], email, "— already exists, use existing password"))
             continue
         password = gen_password()
-        status = create_user(email, u["role"], password, args.write)
+        status = create_user(email, u["role"], u["name"], password, args.write)
         print(f"  {status}")
         credentials.append((u["name"], email, password))
 

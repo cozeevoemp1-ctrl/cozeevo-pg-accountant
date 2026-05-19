@@ -126,7 +126,7 @@ async def create_checkout(
         cs = CheckoutSession(
             token                 = str(uuid.uuid4()),
             status                = CheckoutSessionStatus.confirmed.value,
-            created_by_phone      = user.phone or user.user_id or "pwa",
+            created_by_phone      = user.phone or user.actor,
             tenant_phone          = tenant.phone,
             tenancy_id            = body.tenancy_id,
             checkout_date         = checkout_date_obj,

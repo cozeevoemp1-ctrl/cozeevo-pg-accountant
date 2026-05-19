@@ -21,6 +21,13 @@ class AppUser:
     phone: str
     role: str
     org_id: int
+    name: str = ""
+    email: str = ""
+
+    @property
+    def actor(self) -> str:
+        """Best available human-readable identifier for audit logs."""
+        return (self.name or self.phone or self.email or self.user_id or "")[:40]
 
 
 @lru_cache(maxsize=1)
@@ -75,4 +82,6 @@ def get_current_user(authorization: str = Header(default=None)) -> AppUser:
         phone=payload.get("phone", ""),
         role=meta.get("role", "tenant"),
         org_id=org_id_val,
+        name=meta.get("name", ""),
+        email=payload.get("email", ""),
     )

@@ -785,7 +785,7 @@ async def cancel_no_show(tenancy_id: int, user: AppUser = Depends(get_current_us
         )
 
         audit = AuditLog(
-            changed_by=user.phone or user.user_id,
+            changed_by=user.actor,
             entity_type="tenancy",
             entity_id=tenancy_id,
             entity_name=tenant.name if tenant else str(tenancy_id),
