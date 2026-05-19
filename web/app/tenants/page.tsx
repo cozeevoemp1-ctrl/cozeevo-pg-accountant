@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { getTenantsList, TenantListItem, TenantSearchResult } from "@/lib/api"
+import { LogoutButton } from "@/components/home/logout-avatar"
 
 const QUICK_ACTIONS = [
   {
@@ -121,7 +122,8 @@ export default function ManageTenantsPage() {
         >
           ←
         </button>
-        <h1 className="text-lg font-extrabold text-ink">Manage Tenants</h1>
+        <h1 className="text-lg font-extrabold text-ink flex-1">Manage Tenants</h1>
+        <LogoutButton />
       </div>
 
       <div className="px-4 pt-4 pb-32 flex flex-col gap-5 max-w-lg mx-auto">
