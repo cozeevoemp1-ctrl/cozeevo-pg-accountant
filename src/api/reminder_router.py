@@ -177,6 +177,18 @@ async def trigger_rent_reminders(req: TriggerRentRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/trigger-prep")
+async def trigger_prep_reminder(when: str = "today"):
+    """Manually trigger prep reminder (today or tomorrow). Returns sent/failed counts."""
+    from src.scheduler import _prep_reminder
+    try:
+        await _prep_reminder(when=when)
+        return {"status": "ok", "when": when}
+    except Exception as e:
+        logger.error(f"[Reminder API] trigger-prep failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/send-custom")
 async def send_custom_message(req: CustomMessageRequest):
     """Send a template or text message to specific phone numbers."""
