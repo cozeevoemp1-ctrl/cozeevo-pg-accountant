@@ -127,18 +127,33 @@ async def checkin_preview(
         )
         result = row.first()
 
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"Tenancy {tenancy_id} not found")
+        if result is None:
+            raise HTTPException(status_code=404, detail=f"Tenancy {tenancy_id} not found")
 
-    tenancy, tenant, room, prop = result
+        tenancy, tenant, room, prop = result
 
-    # already_checked_in: monthly active tenants whose check-in was 3+ days ago
-    # are settled residents — the check-in form is not the right tool; use payment form
+        # Check for existing same-day physical check-in payment (prevents double-recording
+        # when the Bookings onboarding flow already created payments and the receptionist
+        # also opens the Physical Check-in form for the same tenant)
+        same_day_checkin_payment = await session.scalar(
+            select(Payment).where(
+                Payment.tenancy_id == tenancy_id,
+                Payment.for_type   == PaymentFor.rent,
+                Payment.payment_date == parsed_date,
+                Payment.is_void    == False,
+                Payment.notes.like("%Physical check-in%"),
+            )
+        )
+
+    # already_checked_in: settled monthly tenants (3+ days) OR same-day duplicate guard
     already_checked_in = (
-        tenancy.status == TenancyStatus.active
-        and tenancy.stay_type != StayType.daily
-        and tenancy.checkin_date is not None
-        and (parsed_date - tenancy.checkin_date).days >= 3
+        (
+            tenancy.status == TenancyStatus.active
+            and tenancy.stay_type != StayType.daily
+            and tenancy.checkin_date is not None
+            and (parsed_date - tenancy.checkin_date).days >= 3
+        )
+        or same_day_checkin_payment is not None
     )
 
     preview = _calc_preview(tenancy, parsed_date, prorate=prorate)
@@ -283,6 +298,22 @@ async def record_physical_checkin(
                         due_date        = period,
                     ))
             await session.flush()
+
+        # Guard: block duplicate physical check-in payment on the same day
+        existing_today = await session.scalar(
+            select(Payment).where(
+                Payment.tenancy_id   == tenancy.id,
+                Payment.for_type     == PaymentFor.rent,
+                Payment.payment_date == actual_date,
+                Payment.is_void      == False,
+                Payment.notes.like("%Physical check-in%"),
+            )
+        )
+        if existing_today:
+            raise HTTPException(
+                status_code=409,
+                detail="Physical check-in payment already recorded for today. Use the Payment form to collect additional dues.",
+            )
 
         # Log payment if amount > 0
         payment_id = None
