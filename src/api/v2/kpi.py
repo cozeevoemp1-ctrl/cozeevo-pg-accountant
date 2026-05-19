@@ -795,6 +795,8 @@ async def get_activity_feed(
             phone_to_name[s.phone] = s.name
         if s.supabase_auth_id and s.name:
             uuid_to_name[s.supabase_auth_id] = s.name
+            # Old entries were stored truncated to 30 chars — index that prefix too
+            uuid_to_name[s.supabase_auth_id[:30]] = s.name
 
     def _resolve_name(changed_by: str) -> str:
         if not changed_by:
