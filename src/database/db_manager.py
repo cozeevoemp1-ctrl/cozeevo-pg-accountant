@@ -171,7 +171,7 @@ async def get_payments_for_tenancy(tenancy_id: int, limit: int = 6) -> list[Paym
         result = await session.execute(
             select(Payment)
             .where(and_(Payment.tenancy_id == tenancy_id, Payment.is_void == False))
-            .order_by(Payment.payment_date.desc())
+            .order_by(Payment.payment_date.desc(), Payment.id.desc())
             .limit(limit)
         )
         return result.scalars().all()

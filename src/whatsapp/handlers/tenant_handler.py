@@ -252,7 +252,7 @@ async def _my_payments(entities: dict, ctx: CallerContext, session: AsyncSession
             Payment.tenancy_id == tenancy.id,
             Payment.period_month == target_month,
             Payment.is_void == False,
-        ).order_by(Payment.payment_date.desc())
+        ).order_by(Payment.payment_date.desc(), Payment.id.desc())
     )
     payments = result.scalars().all()
 
@@ -716,7 +716,7 @@ async def _request_receipt(entities: dict, ctx: CallerContext, session: AsyncSes
             Payment.tenancy_id == tenancy.id,
             Payment.period_month == target_month,
             Payment.is_void == False,
-        ).order_by(Payment.payment_date.desc())
+        ).order_by(Payment.payment_date.desc(), Payment.id.desc())
     )
     payments = result.scalars().all()
     if not payments:
