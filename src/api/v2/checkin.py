@@ -302,7 +302,7 @@ async def record_physical_checkin(
         # Guard: block duplicate physical check-in payment on the same day
         existing_today = await session.scalar(
             select(Payment).where(
-                Payment.tenancy_id   == tenancy.id,
+                Payment.tenancy_id   == body.tenancy_id,
                 Payment.for_type     == PaymentFor.rent,
                 Payment.payment_date == actual_date,
                 Payment.is_void      == False,
