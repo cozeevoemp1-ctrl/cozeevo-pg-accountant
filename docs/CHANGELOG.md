@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.5] — 2026-05-19 — Dues formula consistency + rounding removal + activity log names
+
+### Bug fix — dues formula consistency (kpi.py, tenants.py)
+- **kpi.py tile + kpi-detail panel**: first-month tenants showed inflated dues because `eff - rent_paid` used `eff = RS.rent_due` (which includes deposit) but only subtracted rent payments. Fixed by adding period-scoped deposit subquery in both the tile aggregate and kpi-detail/dues panel. Now all three endpoints (kpi tile, kpi panel, /dues) produce the same number.
+- **tenants.py /dues endpoint**: `deposit_due` formula now uses `max(0, deposit_agreed - deposit_paid - booking_amount)` — booking advance correctly applied against deposit, not re-applied against rent.
+- **tenants.py RS creation path**: When the `/dues` endpoint creates a missing first-month rent_schedule row (prorate_this_month branch), it now uses `first_month_rent_due(tenancy, period)` — was incorrectly using prorated rent only, omitting deposit.
+
+### Bug fix — ceil-to-100 rounding removed from all dues (6 sites)
+- Removed `math.ceil(x/100)*100` from: kpi.py tile, kpi.py panel, tenants.py list dues, tenants.py /dues endpoint, tenants.py /dues + deposit. All dues now return exact rupee amounts.
+- Removed now-unused `import math` and `import math as _math`.
+
+### Bug fix — activity log shows names not UUIDs
+- `src/api/v2/activity.py`: `changed_by` field was storing raw Supabase UUID (30-char truncated). Fixed by resolving UUID → name via `supabase.auth.admin.get_user()` with fallback chain (metadata.name → email → UUID).
+- Added logout button to activity page header.
+
+### Bug fix — user.actor across PWA endpoints
+- Replaced all remaining `user.user_id`, `user.phone or ...` with `user.actor` across all `/api/v2/*.py` endpoints — consistent audit trail.
+
+### Data fix — Pratham S Kore (tenancy 1104, room 420)
+- No May rent_schedule existed → created with `rent_due = 17161` (prorated 5661 + deposit 11500; booking ₹2K already deducted per `first_month_rent_due`).
+- Voided payment 20895 (₹2,000 deposit — double-counted booking advance).
+- Voided payment 20834 (₹2,000 rent — phantom "May sheet reload" entry, no rent was paid).
+- Current state: RS.rent_due=17161, paid=11500 deposit, dues=5661 (prorated May rent outstanding).
+
 ## [1.76.4] — 2026-05-19 — Fix prep reminder not sending to admins
 
 ### Bug fix — `src/scheduler.py`
