@@ -1139,26 +1139,38 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
         obs.status = "pending_review"
         obs.completed_at = datetime.utcnow()
 
-        # Notify receptionist via WhatsApp
-        if obs.created_by_phone:
-            try:
-                from src.whatsapp.webhook_handler import _send_whatsapp
-                notify_phone = obs.created_by_phone.strip()
-                if not notify_phone.startswith("91"):
-                    notify_phone = "91" + notify_phone
-                room = await session.get(Room, obs.room_id) if obs.room_id else None
-                room_str = room.room_number if room else "—"
-                await _send_whatsapp(
-                    notify_phone,
-                    f"*Onboarding form submitted*\n\n"
-                    f"Tenant: *{req.name}*\n"
-                    f"Phone: {req.phone}\n"
-                    f"Room: {room_str}\n\n"
-                    f"Please review and approve:\n"
-                    f"{os.getenv('PWA_URL', 'https://app.getkozzy.com')}/onboarding/bookings"
-                )
-            except Exception:
-                pass  # non-fatal
+        # Notify via WhatsApp on form submission.
+        # QR walk-ins: notify all admin phones from org config.
+        # Receptionist-created sessions: notify the creating receptionist.
+        try:
+            from src.whatsapp.webhook_handler import _send_whatsapp
+            from src.database.models import PgConfig as _PC
+            _room_s = await session.get(Room, obs.room_id) if obs.room_id else None
+            _room_str = _room_s.room_number if _room_s else "—"
+            _msg = (
+                f"*New walk-in registration*\n\n"
+                f"Tenant: *{req.name}*\n"
+                f"Phone: {req.phone}\n"
+                f"Room: {_room_str}\n\n"
+                f"Please review and approve:\n"
+                f"{os.getenv('PWA_URL', 'https://app.getkozzy.com')}/onboarding/bookings"
+            )
+            if obs.created_by_phone == "qr_scan":
+                # QR walk-in — broadcast to all admins
+                _cfg = await session.scalar(select(_PC))
+                _admin_phones = (_cfg.admin_phones or []) if _cfg else []
+                for _ap in _admin_phones:
+                    _ap = str(_ap).strip()
+                    if not _ap.startswith("91"):
+                        _ap = "91" + _ap.lstrip("+")
+                    await _send_whatsapp(_ap, _msg)
+            elif obs.created_by_phone:
+                _notify = obs.created_by_phone.strip()
+                if not _notify.startswith("91"):
+                    _notify = "91" + _notify
+                await _send_whatsapp(_notify, _msg)
+        except Exception:
+            pass  # non-fatal
 
         return {"status": "pending_review", "message": "Submitted. Receptionist will review."}
 
