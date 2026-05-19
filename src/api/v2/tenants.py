@@ -327,7 +327,7 @@ async def update_tenant(
                     old_rent=current_rent,
                     new_rent=new_rent,
                     effective_date=date.today(),
-                    changed_by=user.user_id or "pwa",
+                    changed_by=user.actor,
                     reason=body.get("rent_change_reason", ""),
                     org_id=tenancy.org_id,
                 )
@@ -412,7 +412,7 @@ async def update_tenant(
                     pass
 
                 session.add(AuditLog(
-                    changed_by=user.user_id or "pwa",
+                    changed_by=user.actor,
                     entity_type="tenancy",
                     entity_id=tenancy_id,
                     entity_name=tenant.name,
@@ -599,7 +599,7 @@ async def patch_adjustment(
             ))
 
         session.add(AuditLog(
-            changed_by=user.user_id or "pwa",
+            changed_by=user.actor,
             entity_type="rent_schedule",
             entity_id=tenancy_id,
             entity_name=tenant.name,
@@ -649,7 +649,7 @@ async def transfer_room(
             to_room_number=body.to_room_number,
             new_rent=body.new_rent,
             extra_deposit=body.extra_deposit,
-            changed_by=user.user_id or "pwa",
+            changed_by=user.actor,
             source="pwa",
             session=session,
         )
@@ -696,7 +696,7 @@ async def delete_tenant(
 
         # Write audit trail before deleting so there's a permanent record
         session.add(AuditLog(
-            changed_by=user.user_id or "pwa",
+            changed_by=user.actor,
             entity_type="tenancy",
             entity_id=tenancy_id,
             entity_name=tenant.name,
