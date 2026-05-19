@@ -192,7 +192,6 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         )
 
         # Overdue tenants — same logic as dues panel: rent_dues + deposit_due per tenant
-        import math as _math
         period = date(today.year, today.month, 1)
         next_period = date(period.year + (1 if period.month == 12 else 0), period.month % 12 + 1, 1)
         rent_paid_subq = (
@@ -252,8 +251,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             _dep_paid = float(_r.dep_paid or 0)
             _booking = float(_r.booking_amount or 0)
             _dep_agreed = float(_r.security_deposit or 0)
-            _rent_dues = _math.ceil(max(0.0, _eff - _rent_paid - _dep_paid_period) / 100) * 100
-            _dep_due = _math.ceil(max(0.0, _dep_agreed - _dep_paid - _booking) / 100) * 100
+            _rent_dues = max(0.0, _eff - _rent_paid - _dep_paid_period)
+            _dep_due = max(0.0, _dep_agreed - _dep_paid - _booking)
             _total = _rent_dues + _dep_due
             if _total > 0:
                 overdue_tenants += 1
@@ -449,7 +448,6 @@ async def get_kpi_detail(
             ]}
 
         elif type == "dues":
-            import math as _math
             period = date(today.year, today.month, 1)
             next_period = date(period.year + (1 if period.month == 12 else 0), period.month % 12 + 1, 1)
 
@@ -518,8 +516,8 @@ async def get_kpi_detail(
                 dep_paid = float(r.dep_paid or 0)
                 booking_amt = float(r.booking_amount or 0)
                 dep_agreed = float(r.security_deposit or 0)
-                rent_dues = _math.ceil(max(0.0, eff - rent_paid - dep_paid_period) / 100) * 100
-                dep_due = _math.ceil(max(0.0, dep_agreed - dep_paid - booking_amt) / 100) * 100
+                rent_dues = max(0.0, eff - rent_paid - dep_paid_period)
+                dep_due = max(0.0, dep_agreed - dep_paid - booking_amt)
                 total_dues = rent_dues + dep_due
                 if total_dues <= 0:
                     continue

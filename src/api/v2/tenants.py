@@ -4,7 +4,6 @@ GET /api/v2/app/tenants/{tenancy_id}/dues — dues for current month.
 from __future__ import annotations
 
 import logging
-import math
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -87,7 +86,7 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
         rd = float(rent_due or tenancy.agreed_rent or 0)
         adj = float(adjustment or 0)
         not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
-        dues = 0 if not_yet_checked_in else math.ceil(max(rd + adj - float(paid), 0.0) / 100) * 100
+        dues = 0 if not_yet_checked_in else max(rd + adj - float(paid), 0.0)
         result.append({
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,
@@ -217,7 +216,7 @@ async def get_tenant_dues(
 
     effective_due = rent_due + adjustment
     not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
-    dues = 0 if not_yet_checked_in else math.ceil(max(effective_due - paid, 0.0) / 100) * 100
+    dues = 0 if not_yet_checked_in else max(effective_due - paid, 0.0)
     credit = 0.0 if not_yet_checked_in else max(paid - effective_due, 0.0)
     booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
 
@@ -245,7 +244,7 @@ async def get_tenant_dues(
     # Advance (booking_amount) is the security deposit — apply it directly.
     # RS.rent_due already nets booking out via first_month_rent_due formula, so
     # we must NOT re-apply it through rent dues.  Apply it straight to deposit.
-    deposit_due = 0 if not_yet_checked_in else math.ceil(max(0.0, deposit_agreed - deposit_paid - booking_amount) / 100) * 100
+    deposit_due = 0 if not_yet_checked_in else max(0.0, deposit_agreed - deposit_paid - booking_amount)
 
     return {
         "tenancy_id": tenancy.id,
