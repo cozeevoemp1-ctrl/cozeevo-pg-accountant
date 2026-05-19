@@ -793,6 +793,27 @@ async def get_activity_feed(
             phone_to_name[s.phone.lstrip("+").lstrip("91")] = s.name
             phone_to_name[s.phone] = s.name
 
+    # Build UUID→name map from Supabase auth users (resolves entries stored as auth UUID)
+    import os, httpx
+    _uuid_to_name: dict[str, str] = {}
+    try:
+        _supa_url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+        _svc_key  = os.environ.get("SUPABASE_SERVICE_KEY", "")
+        if _supa_url and _svc_key:
+            async with httpx.AsyncClient(timeout=5) as _hc:
+                _resp = await _hc.get(
+                    f"{_supa_url}/auth/v1/admin/users?per_page=1000",
+                    headers={"apikey": _svc_key, "Authorization": f"Bearer {_svc_key}"},
+                )
+            if _resp.status_code == 200:
+                for _u in _resp.json().get("users", []):
+                    _uid  = _u.get("id", "")
+                    _name = (_u.get("user_metadata") or {}).get("name", "")
+                    if _uid and _name:
+                        _uuid_to_name[_uid] = _name
+    except Exception:
+        pass  # non-fatal — fall back to raw UUID
+
     def _resolve_name(changed_by: str) -> str:
         if not changed_by:
             return ""
@@ -802,10 +823,13 @@ async def get_activity_feed(
         bare = cb.lstrip("+").lstrip("91")
         if bare in phone_to_name:
             return phone_to_name[bare]
+        # Supabase auth UUID (36-char hyphenated)
+        if cb in _uuid_to_name:
+            return _uuid_to_name[cb]
         # system / import / bot labels
         if cb in ("system", "import", "onboarding_form", "onboarding", "dashboard", "whatsapp"):
             return cb.replace("_", " ").title()
-        return cb  # fall back to raw value (phone or name already)
+        return cb  # fall back to raw value
 
     events = []
     for r in rows:
