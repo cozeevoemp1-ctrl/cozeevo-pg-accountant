@@ -412,7 +412,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         checkin_date: editCheckin || undefined,
         agreed_rent: editRent ? parseFloat(editRent) : undefined,
         maintenance_fee: editMaint ? parseFloat(editMaint) : undefined,
-        security_deposit: editDeposit ? parseFloat(editDeposit) : undefined,
+        security_deposit: editDeposit ? parseFloat(editDeposit) : (editRent ? parseFloat(editRent) : undefined),
         tenant_phone: editPhone || undefined,
         tenant_name: editName || undefined,
       })
@@ -689,7 +689,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               { label: "Phone", val: editPhone, set: setEditPhone, type: "tel", placeholder: "10 digits" },
               { label: "Room", val: editRoom, set: setEditRoom, type: "text", placeholder: "e.g. 416" },
               { label: "Check-in", val: editCheckin, set: setEditCheckin, type: "date", placeholder: "" },
-              { label: "Rent (₹)", val: editRent, set: setEditRent, type: "number", placeholder: "" },
+              { label: "Rent (₹)", val: editRent, set: (v: string) => { setEditRent(v); if (!editDeposit || editDeposit === editRent) setEditDeposit(v) }, type: "number", placeholder: "" },
               ...(b.stay_type !== "daily" ? [{ label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" }] : []),
               { label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" },
             ].map(({ label, val, set, type, placeholder }) => (
