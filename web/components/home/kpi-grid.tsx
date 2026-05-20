@@ -270,6 +270,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
 
 interface QuickBookModalProps {
   room: string;
+  freeBeds: number;
+  maxOccupancy: number;
   onClose: () => void;
   onSuccess: () => void;
 }
