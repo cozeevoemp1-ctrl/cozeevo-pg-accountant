@@ -99,8 +99,9 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         if room.room_number != "000":
             from src.services.room_occupancy import get_room_occupants
             occ = await get_room_occupants(session, room)
-            if occ.total_occupied >= (room.max_occupancy or 1):
-                raise HTTPException(409, f"Room {room.room_number} is full ({occ.total_occupied}/{room.max_occupancy} beds)")
+            max_occ = room.max_occupancy or 1
+            if occ.beds_occupied(max_occ) >= max_occ:
+                raise HTTPException(409, f"Room {room.room_number} is full ({occ.beds_occupied(max_occ)}/{max_occ} beds)")
 
         # Cancel old pending sessions for the same phone
         old = await session.execute(

@@ -92,15 +92,23 @@ class RoomOccupants:
 
     `tenancies` are (Tenant, Tenancy) pairs for long-term residents.
     `daywise` are Tenancy(stay_type=daily) rows for guests sleeping in the room today.
-    `total_occupied` counts humans, not beds (premium stays count as
-    max_occupancy since one person reserves all beds).
     """
     tenancies: list[tuple[Tenant, Tenancy]]
     daywise: list[Tenancy]
 
     @property
     def total_occupied(self) -> int:
+        """Head count only — does not account for sharing_type.
+        Use beds_occupied(max_occupancy) for capacity checks."""
         return len(self.tenancies) + len(self.daywise)
+
+    def beds_occupied(self, max_occupancy: int) -> int:
+        """Beds consumed, respecting premium sharing_type (whole room per tenant)."""
+        lt = sum(max_occupancy if getattr(tc, "sharing_type", None) == "premium" else 1
+                 for _, tc in self.tenancies)
+        dw = sum(max_occupancy if getattr(tc, "sharing_type", None) == "premium" else 1
+                 for tc in self.daywise)
+        return lt + dw
 
 
 async def get_room_occupants(
@@ -230,7 +238,7 @@ async def find_overlap_conflict(
 
     # Day-stay overlap — Tenancy(stay_type=daily) is wired to Room by FK.
     dw_rows = (await session.execute(
-        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date)
+        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date, Tenancy.sharing_type)
         .join(Tenant, Tenant.id == Tenancy.tenant_id)
         .where(
             Tenancy.room_id == room_id,
@@ -238,11 +246,11 @@ async def find_overlap_conflict(
             Tenancy.status == TenancyStatus.active,
         )
     )).all()
-    for name, chk, out in dw_rows:
+    for name, chk, out, sharing_type in dw_rows:
         existing_end = out or far_future
         if start_date < existing_end and period_end > chk:
             conflict_names.append(f"{name} (day-stay)")
-            beds_used += 1
+            beds_used += max_occ if sharing_type == "premium" else 1
 
     if beds_used >= max_occ and conflict_names:
         return conflict_names[0]
@@ -376,8 +384,14 @@ async def beds_free_on_date(
         )
     ) or 0
 
+    from sqlalchemy import case as sa_case
     occupied_dw = await session.scalar(
-        select(func.count())
+        select(func.coalesce(func.sum(
+            sa_case(
+                (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                else_=literal_column("1"),
+            )
+        ), 0))
         .select_from(Tenancy)
         .join(Room, Room.id == Tenancy.room_id)
         .where(
@@ -431,8 +445,14 @@ async def count_occupied_beds(
         )
     ) or 0
 
+    from sqlalchemy import case as sa_case
     dw = await session.scalar(
-        select(func.count())
+        select(func.coalesce(func.sum(
+            sa_case(
+                (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                else_=literal_column("1"),
+            )
+        ), 0))
         .select_from(Tenancy)
         .join(Room, Room.id == Tenancy.room_id)
         .where(

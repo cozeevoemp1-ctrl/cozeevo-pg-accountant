@@ -33,7 +33,7 @@ async def check_room_availability(
         occupants = await get_room_occupants(session, db_room)
 
     max_occ = int(db_room.max_occupancy or 1)
-    free_beds = max(max_occ - occupants.total_occupied, 0)
+    free_beds = max(max_occ - occupants.beds_occupied(max_occ), 0)
 
     return {
         "room_number": room_number,
