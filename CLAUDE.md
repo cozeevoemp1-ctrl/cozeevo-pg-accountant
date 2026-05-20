@@ -11,9 +11,11 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
 - **`docs/REPORTING.md`** — single source of truth for ALL financial logic
 - **`docs/EXCEL_IMPORT.md`** — single source of truth for Excel → Sheet → DB workflow
 - **`docs/SHEET_LOGIC.md`** — parsing rules for messy Excel cells
-- **Never hard-delete financial records** — use `is_void = True`
+- **Never hard-delete financial records** — use `is_void = True`; void endpoint MUST write AuditLog
 - **Regex handles 97% of intents** — AI (Groq) only for ambiguous/lead/classification
 - **Test locally before any VPS deploy**
+- **`security_deposit` is required on monthly bookings** — never default to agreed_rent; reject with 422
+- **First-month RS auto-recalc** — whenever security_deposit/checkin_date/agreed_rent changes, call `recalc_checkin_month_rs()` from `src/services/rent_schedule.py`; 5 call-sites must stay in sync
 
 ## Sheet column rule (CRITICAL — no exceptions)
 **Never reference Google Sheet columns by numeric index anywhere in the project.**
@@ -128,12 +130,13 @@ Kiran's Excel (offline)
 | `src/api/v2/notices.py` | GET /notices/active — tenants on notice (deposit eligible vs forfeited) |
 | `src/api/v2/rooms.py` | GET /rooms/check — room availability check (free beds, occupants) |
 | `services/room_transfer.py` | Shared execute_room_transfer() — single source of truth for bot + PWA |
+| `src/services/rent_schedule.py` | `first_month_rent_due()` — canonical first-month formula; `prorated_first_month_rent()` — proration helper; `recalc_checkin_month_rs()` — recomputes first-month RS when security_deposit/checkin_date/agreed_rent changes; must be called from all 5 edit paths |
 | `web/app/notices/page.tsx` | PWA Notices page — monthly tenants with formal notice; deposit eligible (refundable) if notice given on any day; late notice (after 5th) = next month cycle + full month rent; forfeited only with zero notice |
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
 | `web/app/onboarding/bookings/page.tsx` | PWA Bookings page — lists pending_review onboarding sessions; "Save & Check In" → instant_checkin approve |
 | `web/app/tenants/pre-register/page.tsx` | PWA Pre-register — form for future tenants with no room yet; books into room 000 placeholder; appears in Bookings until room assigned |
-| `src/api/v2/tenants.py` | POST /tenancies/{id}/cancel-no-show — marks no-show as cancelled + audit log |
+| `src/api/v2/tenants.py` | GET /tenants/list, GET /tenants/{id}/dues (get_tenant_dues — collect payment modal), PATCH /tenancies/{id} (personal/financial fields + recalc_checkin_month_rs), POST /tenancies/{id}/cancel-no-show |
 | `web/app/tenants/[tenancy_id]/edit/page.tsx` | PWA Edit Tenant — personal details, financials, Full/Prorated toggle, notice management |
 | `src/api/v2/finance.py` | Finance endpoints — CSV upload (THOR/HULK), P&L, Excel download, deposit reconciliation, unit economics (admin-only) |
 | `src/services/unit_economics.py` | Unit economics — revenue/bed, cost/bed, EBITDA/bed, avg rent, collection rate, investment yield, payback months, break-even occ, economic occ, revenue leakage (True Revenue only) |

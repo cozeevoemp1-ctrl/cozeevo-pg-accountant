@@ -159,10 +159,23 @@ FOR EACH qualifying tenant:
 
 New arrivals in month M haven't had time to pay yet. They're not "overdue" — they just checked in. Only chase tenants who were already there before the month started.
 
-### 2.4 Applied In (2 places — must be consistent)
+### 2.4 Applied In (5 places — must be consistent)
 
 1. `account_handler.py` → `_report()` function
 2. `account_handler.py` → `_query_dues()` function
+3. `src/api/v2/tenants.py` → `get_tenant_dues()` — collect payment modal
+4. `src/api/v2/kpi.py` → `get_kpi()` overdue KPI tile (count + total amount)
+5. `src/api/v2/kpi.py` → `get_kpi_detail(type="dues")` — dues panel detail list
+
+**First-month tenants (checkin_date.replace(day=1) == current_period):** items 3–5 use a split formula:
+```
+prorated = floor(agreed_rent × days_remaining / days_in_month)
+overflow = max(0, rent_paid - prorated)         # excess rent → credited to deposit
+rent_dues = max(0, prorated - rent_paid)
+dep_due   = max(0, security_deposit - (deposit_paid + overflow) - booking_amount)
+total     = rent_dues + dep_due
+```
+This avoids double-counting when deposit payments are present alongside rent payments.
 
 ---
 
@@ -461,19 +474,28 @@ total_dues = sum(max(0, row.balance) for row in rows)
 # Their overpayment does NOT cancel underpaying tenants in per-row view.
 ```
 
-### 10.3 April first-month balance formula
+### 10.3 First-month balance formula (ALL months)
 
-For April 2026 first-month tenants, `rent_due` already bundles deposit:
+For any first-month tenant, `RentSchedule.rent_due` bundles rent + deposit:
 ```
 rent_due = prorated_rent + security_deposit - booking_amount  (via first_month_rent_due())
 ```
 
-Therefore the balance formula MUST include `deposit_credit`:
+**DO NOT** subtract deposit from the total bundled due and then also compute dep_due — that double-counts.
+
+**Correct approach (as of 2026-05-20):** split rent and deposit completely:
 ```python
-balance = max(0, rent_due - total_paid - prepaid_credit - deposit_credit)
+# detect first-month: checkin_date.replace(day=1) == period
+prorated = prorated_first_month_rent(agreed_rent, checkin_date)
+overflow = max(0, rent_paid - prorated)         # rent overpayment routes to deposit
+rent_dues = max(0, prorated - rent_paid)
+dep_due   = max(0, security_deposit - (deposit_paid + overflow) - booking_amount)
+total     = rent_dues + dep_due
 ```
 
-Without `- deposit_credit`, tenants who paid their deposit show as fully unpaid — dues inflated.
+**Applied in:** `get_tenant_dues()`, `get_kpi()` overdue loop, `get_kpi_detail(type=dues)` — all use `prorated_first_month_rent` from `src/services/rent_schedule.py`.
+
+**RentSchedule auto-recalc:** whenever `security_deposit`, `checkin_date`, or `agreed_rent` changes, `recalc_checkin_month_rs()` in `src/services/rent_schedule.py` must be called to recompute the bundled `rent_due`. It is wired into: `PATCH /tenancies/{id}` (tenants.py), security_deposit bot change (account_handler.py), overpay→deposit (owner_handler.py), checkin_date change (owner_handler.py), room transfer with extra_deposit (room_transfer.py).
 
 ### 10.4 Booking payments — NEVER write to Sheet Cash/UPI
 

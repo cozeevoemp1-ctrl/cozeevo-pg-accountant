@@ -223,11 +223,15 @@ effective_due = rent_due + adjustment  # adjustment is negative for discounts
 
 ## 5. VOID / REFUND
 
-**File:** `src/whatsapp/handlers/account_handler.py:411-499`
+**Files:** `src/whatsapp/handlers/account_handler.py:411-499`, `src/api/v2/payments.py` → `void_payment()`
 
 ### Golden Rule: NEVER delete payment records. Use `is_void = True`.
 
-After voiding, recalculate RentSchedule status from remaining non-void payments.
+After voiding:
+1. Recalculate RentSchedule status from remaining non-void payments.
+2. Write an AuditLog entry (`field="is_void"`, `old_value="false"`, `new_value="true"`, `note="₹X voided"`) — required so the activity feed correctly hides voided payments. Without this, voided payments show as phantom entries in the feed.
+
+The activity feed (`GET /activity/feed`) filters out voided payments via LEFT JOIN on `payments.is_void == False`.
 
 ### Refund
 
