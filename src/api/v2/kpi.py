@@ -18,6 +18,7 @@ from src.database.models import (
     Tenant,
 )
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
+from src.services.rent_schedule import prorated_first_month_rent
 from src.services.reporting import deposits_breakdown
 
 router = APIRouter(prefix="/reporting")
@@ -206,26 +207,12 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
 
         # Overdue tenants — same logic as dues panel: rent_dues + deposit_due per tenant
         period = date(today.year, today.month, 1)
-        next_period = date(period.year + (1 if period.month == 12 else 0), period.month % 12 + 1, 1)
         rent_paid_subq = (
             select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
             .where(
                 Payment.is_void == False,
                 Payment.for_type == PaymentFor.rent,
                 Payment.period_month == period,
-            )
-            .group_by(Payment.tenancy_id)
-            .subquery()
-        )
-        # Period-scoped deposits: paid this calendar month — offsets first-month rent_due
-        # which bundles deposit. Matches the /dues endpoint formula exactly.
-        deposit_paid_period_subq = (
-            select(Payment.tenancy_id, func.sum(Payment.amount).label("dep_paid_period"))
-            .where(
-                Payment.is_void == False,
-                Payment.for_type == PaymentFor.deposit,
-                Payment.payment_date >= period,
-                Payment.payment_date < next_period,
             )
             .group_by(Payment.tenancy_id)
             .subquery()
@@ -241,14 +228,14 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             select(
                 Tenancy.security_deposit,
                 Tenancy.booking_amount,
+                Tenancy.checkin_date,
+                Tenancy.agreed_rent,
                 eff_due_col,
                 func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
-                func.coalesce(deposit_paid_period_subq.c.dep_paid_period, 0).label("dep_paid_period"),
                 func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
             )
             .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
             .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
-            .outerjoin(deposit_paid_period_subq, deposit_paid_period_subq.c.tenancy_id == Tenancy.id)
             .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
             .where(
                 RentSchedule.period_month == period,
@@ -260,12 +247,18 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         for _r in dues_rows:
             _eff = float(_r.effective_due or 0)
             _rent_paid = float(_r.rent_paid or 0)
-            _dep_paid_period = float(_r.dep_paid_period or 0)
             _dep_paid = float(_r.dep_paid or 0)
             _booking = float(_r.booking_amount or 0)
             _dep_agreed = float(_r.security_deposit or 0)
-            _rent_dues = max(0.0, _eff - _rent_paid - _dep_paid_period)
-            _dep_due = max(0.0, _dep_agreed - _dep_paid - _booking)
+            _checkin = _r.checkin_date
+            if _checkin and _checkin.replace(day=1) == period:
+                _prorated = float(prorated_first_month_rent(float(_r.agreed_rent or 0), _checkin))
+                _overflow = max(0.0, _rent_paid - _prorated)
+                _rent_dues = max(0.0, _prorated - _rent_paid)
+                _dep_due = max(0.0, _dep_agreed - (_dep_paid + _overflow) - _booking)
+            else:
+                _rent_dues = max(0.0, _eff - _rent_paid)
+                _dep_due = max(0.0, _dep_agreed - _dep_paid - _booking)
             _total = _rent_dues + _dep_due
             if _total > 0:
                 overdue_tenants += 1
@@ -509,29 +502,13 @@ async def get_kpi_detail(
 
         elif type == "dues":
             period = date(today.year, today.month, 1)
-            next_period = date(period.year + (1 if period.month == 12 else 0), period.month % 12 + 1, 1)
 
-            # Rent credits: rent payments only (booking excluded — booking_amount is
-            # applied directly to deposit_due below; including it here double-deducts).
             rent_paid_subq = (
                 select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
                 .where(
                     Payment.is_void == False,
                     Payment.for_type == PaymentFor.rent,
                     Payment.period_month == period,
-                )
-                .group_by(Payment.tenancy_id)
-                .subquery()
-            )
-            # Period-scoped deposits: paid this calendar month — offsets first-month rent_due
-            # which bundles deposit. Matches the /dues endpoint formula exactly.
-            deposit_paid_period_subq = (
-                select(Payment.tenancy_id, func.sum(Payment.amount).label("dep_paid_period"))
-                .where(
-                    Payment.is_void == False,
-                    Payment.for_type == PaymentFor.deposit,
-                    Payment.payment_date >= period,
-                    Payment.payment_date < next_period,
                 )
                 .group_by(Payment.tenancy_id)
                 .subquery()
@@ -548,12 +525,13 @@ async def get_kpi_detail(
                     Tenancy.id,
                     Tenancy.security_deposit,
                     Tenancy.booking_amount,
+                    Tenancy.checkin_date,
+                    Tenancy.agreed_rent,
                     Tenant.name,
                     Room.room_number,
                     Property.name.label("property_name"),
                     eff_due_col,
                     func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
-                    func.coalesce(deposit_paid_period_subq.c.dep_paid_period, 0).label("dep_paid_period"),
                     func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
@@ -561,7 +539,6 @@ async def get_kpi_detail(
                 .join(Property, Property.id == Room.property_id)
                 .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
                 .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == Tenancy.id)
-                .outerjoin(deposit_paid_period_subq, deposit_paid_period_subq.c.tenancy_id == Tenancy.id)
                 .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
                 .where(
                     RentSchedule.period_month == period,
@@ -572,12 +549,18 @@ async def get_kpi_detail(
             for r in rows:
                 eff = float(r.effective_due or 0)
                 rent_paid = float(r.rent_paid or 0)
-                dep_paid_period = float(r.dep_paid_period or 0)
                 dep_paid = float(r.dep_paid or 0)
                 booking_amt = float(r.booking_amount or 0)
                 dep_agreed = float(r.security_deposit or 0)
-                rent_dues = max(0.0, eff - rent_paid - dep_paid_period)
-                dep_due = max(0.0, dep_agreed - dep_paid - booking_amt)
+                checkin = r.checkin_date
+                if checkin and checkin.replace(day=1) == period:
+                    prorated = float(prorated_first_month_rent(float(r.agreed_rent or 0), checkin))
+                    overflow = max(0.0, rent_paid - prorated)
+                    rent_dues = max(0.0, prorated - rent_paid)
+                    dep_due = max(0.0, dep_agreed - (dep_paid + overflow) - booking_amt)
+                else:
+                    rent_dues = max(0.0, eff - rent_paid)
+                    dep_due = max(0.0, dep_agreed - dep_paid - booking_amt)
                 total_dues = rent_dues + dep_due
                 if total_dues <= 0:
                     continue
