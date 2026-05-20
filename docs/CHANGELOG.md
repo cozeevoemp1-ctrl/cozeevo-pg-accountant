@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.21] — 2026-05-20 — Payment form cleanup + KPI refresh + activity feed month
+
+### Fix — `web/app/payment/new/page.tsx`
+- Removed `for_type='booking'` (Advance), `for_type='maintenance'`, and `for_type='adjustment'` from payment form — all three were orphaned from dues calculations and the Sheet sync. Only **Rent** and **Deposit** remain.
+- Prepayments for next month handled via the existing period month chip selector (no extra type needed).
+
+### Fix — `web/app/tenants/[tenancy_id]/edit/page.tsx`
+- Removed "Add Charge" (surcharge) from Balance Adjustment section — it added to `RentSchedule.adjustment`, not a payment, so money collected this way was invisible in history and never reduced dues.
+- Only "Waive / Write-off" remains.
+
+### Fix — `web/components/home/kpi-grid.tsx`
+- Added `router.refresh()` after QuickCollectModal payment success — KPI tile numbers (Dues pending amount/count) now update immediately without manual page reload.
+
+### Feature — `src/api/v2/kpi.py`
+- Activity feed payment entries now show period month: e.g. `₹14,000 · Cash · rent · Jun '26`. Pulled from `Payment.period_month` via the existing audit log join.
+
+---
+
 ## [1.76.20] — 2026-05-20 — Bookings: phone capture, deposit=rent sync, activity feed, prep reminder fix
 
 ### Fix — `static/onboarding.html`
