@@ -256,6 +256,33 @@ export default function BookingsPage() {
   )
 }
 
+async function manualCheckinApi(token: string, body: {
+  gender: string
+  food_preference: string
+  emergency_contact_name: string
+  emergency_contact_phone: string
+  emergency_contact_relationship: string
+  date_of_birth?: string
+  id_proof_type?: string
+  id_proof_number?: string
+  permanent_address?: string
+  occupation?: string
+  collected_rent_dues: number
+  rent_dues_mode: string
+  collected_deposit_dues: number
+}) {
+  const res = await fetch(`${API_URL}/api/onboarding/${token}/manual-checkin`, {
+    method: "POST",
+    headers: pinHeaders(),
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error((d as { detail?: string }).detail ?? `Error ${res.status}`)
+  }
+  return res.json()
+}
+
 function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cash" | "upi") => void }) {
   return (
     <div className="flex gap-1 mt-1">
@@ -287,6 +314,23 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [resending, setResending] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualSaving, setManualSaving] = useState(false)
+
+  // Manual check-in KYC fields
+  const [mGender, setMGender] = useState("")
+  const [mFood, setMFood] = useState("Veg")
+  const [mEcName, setMEcName] = useState("")
+  const [mEcPhone, setMEcPhone] = useState("")
+  const [mEcRel, setMEcRel] = useState("")
+  const [mDob, setMDob] = useState("")
+  const [mIdType, setMIdType] = useState("")
+  const [mIdNum, setMIdNum] = useState("")
+  const [mAddress, setMAddress] = useState("")
+  const [mOccupation, setMOccupation] = useState("")
+  const [mRentDues, setMRentDues] = useState("")
+  const [mRentMode, setMRentMode] = useState<"cash" | "upi">("cash")
+  const [mDepDues, setMDepDues] = useState("")
   const [err, setErr] = useState("")
 
   // Edit fields
@@ -343,6 +387,15 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!manualOpen) return
+    const rentDue = proRata
+    const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
+    if (rentDue > 0) setMRentDues(String(rentDue))
+    if (depositDue > 0) setMDepDues(String(depositDue))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualOpen])
+
   async function saveEdit() {
     setSaving(true); setErr("")
     try {
@@ -390,6 +443,37 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       setErr(e instanceof Error ? e.message : "Resend failed")
     } finally {
       setResending(false)
+    }
+  }
+
+  async function doManualCheckin() {
+    if (!mGender || !mFood || !mEcName || !mEcPhone || !mEcRel) {
+      setErr("Gender, food preference, and all emergency contact fields are required.")
+      return
+    }
+    setManualSaving(true)
+    setErr("")
+    try {
+      await manualCheckinApi(b.token, {
+        gender: mGender,
+        food_preference: mFood,
+        emergency_contact_name: mEcName,
+        emergency_contact_phone: mEcPhone,
+        emergency_contact_relationship: mEcRel,
+        date_of_birth: mDob || undefined,
+        id_proof_type: mIdType || undefined,
+        id_proof_number: mIdNum || undefined,
+        permanent_address: mAddress || undefined,
+        occupation: mOccupation || undefined,
+        collected_rent_dues: parseFloat(mRentDues) || 0,
+        rent_dues_mode: mRentMode,
+        collected_deposit_dues: parseFloat(mDepDues) || 0,
+      })
+      onReload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Manual check-in failed")
+    } finally {
+      setManualSaving(false)
     }
   }
 
@@ -632,6 +716,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                   Cancel
                 </button>
               )}
+              <button
+                onClick={() => { setManualOpen(v => !v); setEditing(false); setCancelConfirm(false); setErr("") }}
+                className="w-full rounded-pill border border-[#6B7280] py-2.5 text-xs font-semibold text-[#6B7280] active:opacity-70"
+              >
+                {manualOpen ? "▲ Close manual entry" : "Manual check-in ↓"}
+              </button>
             </>
           ) : isPending ? (
             /* Awaiting form: Copy link + Resend + Edit + Cancel */
@@ -659,6 +749,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                   Cancel
                 </button>
               )}
+              <button
+                onClick={() => { setManualOpen(v => !v); setEditing(false); setCancelConfirm(false); setErr("") }}
+                className="w-full rounded-pill border border-[#6B7280] py-2.5 text-xs font-semibold text-[#6B7280] active:opacity-70"
+              >
+                {manualOpen ? "▲ Close manual entry" : "Manual check-in ↓"}
+              </button>
             </>
           ) : (
             /* Form filled: Edit + Cancel + Check In (expand to collect first) */
