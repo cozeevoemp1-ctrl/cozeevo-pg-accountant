@@ -334,6 +334,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [mIdCardPreview, setMIdCardPreview] = useState("")
   const [mIdScanLoading, setMIdScanLoading] = useState(false)
   const [mIdScanMsg, setMIdScanMsg] = useState("")
+  const [mNameMismatch, setMNameMismatch] = useState("")
   const idFileRef = useRef<HTMLInputElement>(null)
   const [err, setErr] = useState("")
 
@@ -518,6 +519,24 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       if (f.address) setMAddress(f.address)
       const filled = [f.aadhaar_number, f.gender, f.dob, f.address].filter(Boolean).length
       setMIdScanMsg(filled > 0 ? "Fields auto-filled — verify before saving" : "Card read but no fields found — fill manually")
+
+      // Name match check — fuzzy word overlap, pure frontend, zero API cost
+      const cardName: string = f.name || ""
+      const bookingName: string = b.tenant_name || ""
+      if (cardName && bookingName) {
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, "").trim()
+        const words = (s: string) => normalize(s).split(/\s+/).filter(w => w.length > 2)
+        const bWords = words(bookingName)
+        const cWords = words(cardName)
+        const hasMatch = cWords.some(w => bWords.includes(w)) || bWords.some(w => cWords.includes(w))
+        if (!hasMatch) {
+          setMNameMismatch(`Name on card "${cardName}" does not match booking name "${bookingName}" — confirm this is the right person`)
+        } else {
+          setMNameMismatch("")
+        }
+      } else {
+        setMNameMismatch("")
+      }
     } catch {
       setMIdScanMsg("Scan failed — fill fields manually")
     } finally {
@@ -1007,6 +1026,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               <p className={`text-[9px] font-medium ${mIdScanMsg.includes("failed") ? "text-status-warn" : "text-[#065F46]"}`}>
                 {mIdScanMsg}
               </p>
+            )}
+            {mNameMismatch && (
+              <div className="rounded-lg bg-[#FEE2E2] border border-[#FECACA] px-3 py-2">
+                <p className="text-[10px] font-bold text-[#991B1B]">Name mismatch</p>
+                <p className="text-[10px] text-[#7F1D1D] mt-0.5">{mNameMismatch}</p>
+              </div>
             )}
           </div>
 
