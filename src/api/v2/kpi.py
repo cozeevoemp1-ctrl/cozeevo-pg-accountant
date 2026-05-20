@@ -851,6 +851,7 @@ async def get_activity_feed(
                 AuditLog.entity_name, AuditLog.old_value, AuditLog.new_value,
                 AuditLog.room_number, AuditLog.note, AuditLog.changed_by,
                 AuditLog.source, AuditLog.created_at,
+                Payment.period_month.label("period_month"),
             )
             .outerjoin(
                 Payment,
@@ -934,11 +935,16 @@ async def get_activity_feed(
                 for_what = "maintenance"
             elif "booking" in note_lower or "advance" in note_lower:
                 for_what = "advance"
+            period_str = ""
+            if r.period_month:
+                period_str = r.period_month.strftime("%b '%y")
             label_parts = [f"₹{amt:,}"]
             if method:
                 label_parts.append(method)
             if for_what:
                 label_parts.append(for_what)
+            if period_str:
+                label_parts.append(period_str)
             label = " · ".join(label_parts)
 
         elif r.field in ("status", "status+checkout_date"):
