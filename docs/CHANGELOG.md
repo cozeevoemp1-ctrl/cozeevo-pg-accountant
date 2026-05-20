@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.9] — 2026-05-20 — Manage Tenants: remove New Onboarding tile
+
+### feat — `web/app/tenants/page.tsx`
+- Removed "New Onboarding" tile (unused flow)
+- Reordered: Check-in / Check-out / Send Reminders / Collection Report / Notices
+- Notices tile spans full width (5 tiles, odd count → last fills row)
+
+---
+
 ## [1.76.8] — 2026-05-20 — prep_reminder: template-based + counts pending sessions
 
 ### Bug fix — `src/scheduler.py` `_prep_reminder`
