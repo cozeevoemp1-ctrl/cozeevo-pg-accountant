@@ -179,58 +179,16 @@ async def get_tenant_dues(
     period_end = date(next_y, next_m, 1)
 
     async with get_session() as session:
-        # Rent paid this period — rent payments only (not booking/deposit).
-        # booking_amount is tracked separately on tenancy and applied directly to
-        # deposit_due below; including it here would double-deduct (RS.rent_due
-        # already nets out booking via first_month_rent_due formula).
-        paid_result = await session.scalar(
+        # Rent-only payments this period (never bundle deposit here — tracked separately).
+        rent_only_paid_result = await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.tenancy_id == tenancy_id,
                 Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period_month),
-                    and_(
-                        Payment.for_type == PaymentFor.deposit,
-                        Payment.period_month == None,
-                        Payment.payment_date >= period_month,
-                        Payment.payment_date < period_end,
-                    ),
-                ),
+                Payment.for_type == PaymentFor.rent,
+                Payment.period_month == period_month,
             )
         )
-        # RentSchedule for this period (has correct rent_due: rent+deposit for first month)
-        rs = await session.scalar(
-            select(RentSchedule).where(
-                RentSchedule.tenancy_id == tenancy_id,
-                RentSchedule.period_month == period_month,
-            )
-        )
-
-    rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
-    paid = float(paid_result) if paid_result is not None else 0.0
-
-    # rent_due from RentSchedule is the source of truth — already set from ops sheet
-    # (fix_april_dues.py locked these to exact sheet balances, advance already factored in)
-    rent_due   = float(rs.rent_due)   if rs else rent
-    adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
-
-    effective_due = rent_due + adjustment
-    not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
-    dues = 0 if not_yet_checked_in else max(effective_due - paid, 0.0)
-    credit = 0.0 if not_yet_checked_in else max(paid - effective_due, 0.0)
-    booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
-
-    # Last payment (any type, not voided) for this tenancy
-    async with get_session() as session:
-        last_payment = await session.scalar(
-            select(Payment)
-            .where(
-                Payment.tenancy_id == tenancy_id,
-                Payment.is_void == False,
-            )
-            .order_by(Payment.payment_date.desc(), Payment.id.desc())
-            .limit(1)
-        )
+        # All deposit payments ever (for deposit_due calculation)
         deposit_paid_result = await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.tenancy_id == tenancy_id,
@@ -238,13 +196,50 @@ async def get_tenant_dues(
                 Payment.for_type == PaymentFor.deposit,
             )
         )
+        # RentSchedule for this period
+        rs = await session.scalar(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy_id,
+                RentSchedule.period_month == period_month,
+            )
+        )
+        last_payment = await session.scalar(
+            select(Payment)
+            .where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
+            .order_by(Payment.payment_date.desc(), Payment.id.desc())
+            .limit(1)
+        )
 
+    rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
+    rent_only_paid = float(rent_only_paid_result) if rent_only_paid_result is not None else 0.0
+    booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
     deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
-    deposit_paid = float(deposit_paid_result) if deposit_paid_result else 0.0
-    # Advance (booking_amount) is the security deposit — apply it directly.
-    # RS.rent_due already nets booking out via first_month_rent_due formula, so
-    # we must NOT re-apply it through rent dues.  Apply it straight to deposit.
-    deposit_due = 0 if not_yet_checked_in else max(0.0, deposit_agreed - deposit_paid - booking_amount)
+    deposit_paid_direct = float(deposit_paid_result) if deposit_paid_result else 0.0
+
+    rent_due   = float(rs.rent_due)   if rs else rent
+    adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
+    not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
+
+    # First-month detection: RS.rent_due bundles prorated+deposit, so we split them
+    # back out for display so rent and deposit show correctly when paid separately.
+    checkin = tenancy.checkin_date
+    is_check_in_month = checkin and checkin.replace(day=1) == period_month
+
+    if is_check_in_month and not not_yet_checked_in:
+        from src.services.rent_schedule import prorated_first_month_rent
+        prorated = float(prorated_first_month_rent(tenancy.agreed_rent, checkin))
+        # Any rent overpay beyond prorated carries over to deposit
+        rent_overflow = max(0.0, rent_only_paid - prorated)
+        effective_deposit_paid = deposit_paid_direct + rent_overflow
+        dues = max(0.0, prorated - rent_only_paid)
+        deposit_due = max(0.0, deposit_agreed - effective_deposit_paid - booking_amount)
+        credit = max(0.0, rent_only_paid - prorated) if rent_only_paid > prorated and deposit_agreed == 0 else 0.0
+    else:
+        # Normal month: RS is the source of truth for rent; deposit tracked separately
+        effective_due = rent_due + adjustment
+        dues = 0.0 if not_yet_checked_in else max(effective_due - rent_only_paid, 0.0)
+        credit = 0.0 if not_yet_checked_in else max(rent_only_paid - effective_due, 0.0)
+        deposit_due = 0.0 if not_yet_checked_in else max(0.0, deposit_agreed - deposit_paid_direct - booking_amount)
 
     return {
         "tenancy_id": tenancy.id,
@@ -262,7 +257,7 @@ async def get_tenant_dues(
         "dues": dues,
         "credit": credit,
         "deposit_due": deposit_due,
-        "deposit_paid": deposit_paid,
+        "deposit_paid": deposit_paid_direct,
         "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
         "security_deposit": float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0,
         "maintenance_fee": float(tenancy.maintenance_fee) if tenancy.maintenance_fee is not None else 0.0,
