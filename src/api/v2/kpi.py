@@ -172,16 +172,29 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         )
         notices_count = _monthly_notices + _daily_leaving
 
-        # Check-ins today — only no_show tenants (pending physical arrival)
-        checkins_today = int(
+        # Check-ins today — no_show Tenancy OR pending OnboardingSession not already
+        # linked to a no_show Tenancy (handles orphaned/cancelled tenancy edge cases).
+        _no_show_today_ids = select(Tenancy.id).where(
+            Tenancy.checkin_date == today,
+            Tenancy.status == TenancyStatus.no_show,
+        )
+        _tenancy_checkins = int(
+            await session.scalar(select(func.count()).select_from(_no_show_today_ids.subquery())) or 0
+        )
+        _session_checkins = int(
             await session.scalar(
-                select(func.count(Tenancy.id))
+                select(func.count(OnboardingSession.id))
                 .where(
-                    Tenancy.checkin_date == today,
-                    Tenancy.status == TenancyStatus.no_show,
+                    OnboardingSession.checkin_date == today,
+                    OnboardingSession.status.in_(["pending_review", "pending_tenant"]),
+                    or_(
+                        OnboardingSession.tenancy_id == None,
+                        OnboardingSession.tenancy_id.notin_(_no_show_today_ids),
+                    ),
                 )
             ) or 0
         )
+        checkins_today = _tenancy_checkins + _session_checkins
 
         # Checkouts today
         checkouts_today = int(
@@ -284,25 +297,59 @@ async def get_kpi_detail(
     today = date.today()
     async with get_session() as session:
         if type == "checkins_today":
-            rows = (await session.execute(
+            # Part 1: no_show tenancies with today's check-in
+            tenancy_rows = (await session.execute(
                 select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkin_date, Tenancy.agreed_rent, Tenancy.stay_type)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
+                .where(Tenancy.checkin_date == today, Tenancy.status == TenancyStatus.no_show)
+                .order_by(Room.room_number)
+            )).all()
+            # Part 2: pending OnboardingSessions with today's check-in not already in Part 1
+            _no_show_ids = select(Tenancy.id).where(
+                Tenancy.checkin_date == today, Tenancy.status == TenancyStatus.no_show
+            )
+            session_rows = (await session.execute(
+                select(
+                    OnboardingSession.tenancy_id,
+                    func.coalesce(Tenant.name, OnboardingSession.tenant_phone).label("name"),
+                    Room.room_number,
+                    OnboardingSession.checkin_date,
+                    OnboardingSession.agreed_rent,
+                    OnboardingSession.stay_type,
+                )
+                .join(Room, Room.id == OnboardingSession.room_id)
+                .outerjoin(Tenant, Tenant.id == OnboardingSession.tenant_id)
                 .where(
-                    Tenancy.checkin_date == today,
-                    Tenancy.status == TenancyStatus.no_show,
+                    OnboardingSession.checkin_date == today,
+                    OnboardingSession.status.in_(["pending_review", "pending_tenant"]),
+                    or_(
+                        OnboardingSession.tenancy_id == None,
+                        OnboardingSession.tenancy_id.notin_(_no_show_ids),
+                    ),
                 )
                 .order_by(Room.room_number)
             )).all()
-            return {"type": type, "items": [
+            items = [
                 {
                     "tenancy_id": r.id, "name": r.name, "room": r.room_number,
                     "detail": f"₹{int(r.agreed_rent or 0):,}/mo",
                     "rent": int(r.agreed_rent or 0),
                     "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
                 }
-                for r in rows
-            ]}
+                for r in tenancy_rows
+            ] + [
+                {
+                    "tenancy_id": r.tenancy_id,
+                    "name": r.name or "Unknown",
+                    "room": r.room_number,
+                    "detail": f"₹{int(r.agreed_rent or 0):,}/mo · pending",
+                    "rent": int(r.agreed_rent or 0),
+                    "stay_type": str(r.stay_type or "monthly"),
+                }
+                for r in session_rows
+            ]
+            return {"type": type, "items": items}
 
         elif type == "checkouts_today":
             rows = (await session.execute(
