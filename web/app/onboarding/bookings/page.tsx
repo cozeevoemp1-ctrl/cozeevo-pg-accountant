@@ -553,10 +553,6 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       setErr("ID type and ID number are required.")
       return
     }
-    if (!mIdCardPreview) {
-      setErr("ID card photo is required.")
-      return
-    }
     setManualSaving(true)
     setErr("")
     try {
@@ -986,7 +982,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           </div>
 
           {/* ID card upload + OCR */}
-          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">ID Card *</p>
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">ID Card (optional)</p>
           <div className="flex flex-col gap-1.5">
             <input
               ref={idFileRef}
