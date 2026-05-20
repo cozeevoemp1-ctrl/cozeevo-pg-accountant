@@ -324,6 +324,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [mEcPhone, setMEcPhone] = useState("")
   const [mEcRel, setMEcRel] = useState("")
   const [mDob, setMDob] = useState("")
+  const [mDobDay, setMDobDay] = useState("")
+  const [mDobMonth, setMDobMonth] = useState("")
+  const [mDobYear, setMDobYear] = useState("")
   const [mIdType, setMIdType] = useState("")
   const [mIdNum, setMIdNum] = useState("")
   const [mAddress, setMAddress] = useState("")
@@ -513,8 +516,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       if (f.gender) setMGender(f.gender.charAt(0).toUpperCase() + f.gender.slice(1))
       if (f.dob) {
         const parts = (f.dob as string).split("/")
-        if (parts.length === 3) setMDob(`${parts[2]}-${parts[1]}-${parts[0]}`)
-        else setMDob(f.dob)
+        if (parts.length === 3) {
+          setMDobDay(parts[0].replace(/^0/, ""))
+          setMDobMonth(parts[1].replace(/^0/, ""))
+          setMDobYear(parts[2])
+        }
       }
       if (f.address) setMAddress(f.address)
       const filled = [f.aadhaar_number, f.gender, f.dob, f.address].filter(Boolean).length
@@ -941,10 +947,25 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                 <option value="Non-Veg">Non-Veg</option>
               </select>
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Date of Birth</label>
-              <input type="date" value={mDob} onChange={e => setMDob(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+              <div className="grid grid-cols-3 gap-1">
+                <select value={mDobDay} onChange={e => { setMDobDay(e.target.value); const d=e.target.value,m=mDobMonth,y=mDobYear; if(d&&m&&y) setMDob(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`) }}
+                  className="text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                  <option value="">Day</option>
+                  {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
+                </select>
+                <select value={mDobMonth} onChange={e => { setMDobMonth(e.target.value); const d=mDobDay,m=e.target.value,y=mDobYear; if(d&&m&&y) setMDob(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`) }}
+                  className="text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                  <option value="">Month</option>
+                  {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+                </select>
+                <select value={mDobYear} onChange={e => { setMDobYear(e.target.value); const d=mDobDay,m=mDobMonth,y=e.target.value; if(d&&m&&y) setMDob(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`) }}
+                  className="text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                  <option value="">Year</option>
+                  {Array.from({length:60},(_,i)=>new Date().getFullYear()-18-i).map(y=><option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
             </div>
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Occupation</label>
