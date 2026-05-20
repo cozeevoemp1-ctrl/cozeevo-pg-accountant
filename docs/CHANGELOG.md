@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.15] — 2026-05-20 — Deploy: zero-downtime flock + stop hook dedup
+
+### Fix — `.claude/settings.json`, `scripts/vps_deploy.sh`
+- **Stop hook fires once per session**: added per-session lockfile (`/tmp/claude-deploy-<hash>.lock`) — subsequent Stop events skip push. Eliminates 5 concurrent builds from rapid session-end commits.
+- **Flock-protected deploy.sh**: `/opt/deploy.sh` now uses `flock -n` — if a build is running, new webhook calls exit immediately instead of stacking. Bootstrap applied on VPS via Hostinger console.
+- Removed dead SSH attempt from stop hook (always timed out; webhook handles deploy).
+
+---
+
+## [1.76.14] — 2026-05-20 — Day-stay bed counting + full-room gate + checkout date in card
+
+### Fix — `src/services/room_occupancy.py`, `src/api/v2/rooms.py`, `src/api/v2/bookings.py`, `src/api/onboarding_router.py`
+- **`beds_occupied(max_occupancy)`** added to `RoomOccupants`: premium sharing_type counts as full max_occupancy, not 1 bed.
+- Fixed `find_overlap_conflict`, `beds_free_on_date`, `count_occupied_beds` — all now use `sa_case(premium → max_occ, else_ → 1)` for day-stays.
+- `quick_book` capacity check and `rooms.py` check updated to use `beds_occupied()` instead of `total_occupied`.
+- Onboarding router propagates `obs.sharing_type` to the created Tenancy on day-stay check-in.
+
+### Fix — DB data
+- Chinchu David (tenant 1007): `gender` corrected to Female.
+- Tenancy 1112 (room 614): `sharing_type` set to `premium` (occupied full room).
+
+### Feature — `web/components/home/kpi-grid.tsx`, `src/api/v2/kpi.py`, `web/lib/api.ts`
+- **Checkout date** shown in tenant detail card tile (between Check-in and Sharing type rows).
+- **Full room gate in quick-book modal**: "Full room" toggle disabled (greyed, cursor-not-allowed) when room already has a tenant (`freeBeds < maxOccupancy`). Warning shown.
+- `max_occupancy` added to KPI detail response; threaded through `KpiDetailItem` → `QuickBookModal`.
+
+---
+
 ## [1.76.13] — 2026-05-20 — Manual check-in: ID card upload + OCR + PDF support
 
 ### Feature — `web/app/onboarding/bookings/page.tsx`, `src/api/onboarding_router.py`
