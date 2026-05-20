@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, createPayment, type KpiDetailItem, type TenantDues } from "@/lib/api";
 import { rupee, rupeeL } from "@/lib/format";
@@ -1100,6 +1101,7 @@ function ExpansionPanel({
 }
 
 export function KpiGrid({ data, initialDetails }: KpiGridProps) {
+  const router = useRouter();
   const [open, setOpen] = useState<TileKey>(null);
   const [items, setItems] = useState<KpiDetailItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1484,7 +1486,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
       <QuickCollectModal
         item={collectingItem}
         onClose={() => setCollectingItem(null)}
-        onSuccess={() => { cache.current.delete("dues"); toggle("dues"); }}
+        onSuccess={() => { cache.current.delete("dues"); toggle("dues"); router.refresh(); }}
       />
     )}
     </>

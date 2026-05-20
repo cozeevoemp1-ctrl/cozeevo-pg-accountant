@@ -29,7 +29,6 @@ const FOR_TYPES: { value: ForType; label: string }[] = [
   { value: "rent", label: "Rent" },
   { value: "deposit", label: "Deposit" },
   { value: "maintenance", label: "Maintenance" },
-  { value: "booking", label: "Advance" },
   { value: "adjustment", label: "Adjustment" },
 ]
 
