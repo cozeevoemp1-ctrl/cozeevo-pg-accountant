@@ -254,8 +254,9 @@ async def _prep_reminder(when: str = "today") -> None:
     receptionist) AND active = TRUE. Today that is Kiran, the partner,
     Prabhakaran, Lakshmi, and Lokesh (7680814628, receptionist).
     """
+    import json as _json
     from datetime import timedelta
-    from src.whatsapp.webhook_handler import _send_whatsapp
+    from src.whatsapp.reminder_sender import send_template
 
     today = date.today()
     if when == "tomorrow":
@@ -270,7 +271,8 @@ async def _prep_reminder(when: str = "today") -> None:
     engine = create_async_engine(_ASYNC_DB_URL, echo=False)
     try:
         async with engine.connect() as conn:
-            checkins = (await conn.execute(text("""
+            # Tenancy-based check-ins (active / no_show)
+            tenancy_checkins = (await conn.execute(text("""
                 SELECT t.name, r.room_number, COALESCE(t.phone, '') AS phone,
                        COALESCE(tn.sharing_type::text, '') AS sharing,
                        COALESCE(tn.notes, '') AS notes
@@ -281,6 +283,37 @@ async def _prep_reminder(when: str = "today") -> None:
                   AND tn.status IN ('active', 'no_show')
                 ORDER BY r.room_number
             """), {"target": target})).fetchall()
+
+            # OnboardingSession-based check-ins (pending form / form filled)
+            # — covers cases where the linked tenancy was cancelled/orphaned
+            obs_checkins_raw = (await conn.execute(text("""
+                SELECT obs.tenant_data, obs.tenant_phone, r.room_number,
+                       COALESCE(obs.sharing_type, '') AS sharing,
+                       COALESCE(obs.special_terms, '') AS notes
+                FROM onboarding_sessions obs
+                JOIN rooms r ON r.id = obs.room_id
+                WHERE obs.checkin_date = :target
+                  AND obs.status IN ('pending_review', 'pending_tenant')
+                  AND (obs.tenancy_id IS NULL OR obs.tenancy_id NOT IN (
+                      SELECT id FROM tenancies
+                      WHERE checkin_date = :target AND status IN ('active', 'no_show')
+                  ))
+                ORDER BY r.room_number
+            """), {"target": target})).fetchall()
+
+            def _obs_name(td, phone):
+                if td:
+                    try:
+                        return _json.loads(td).get("name") or ""
+                    except Exception:
+                        pass
+                return phone or "Unknown"
+
+            obs_checkins = [
+                (_obs_name(r[0], r[1]), r[2], "", r[3], r[4])
+                for r in obs_checkins_raw
+            ]
+            checkins = list(tenancy_checkins) + obs_checkins
 
             checkouts = (await conn.execute(text("""
                 SELECT t.name, r.room_number, COALESCE(t.phone, '') AS phone,
@@ -293,7 +326,6 @@ async def _prep_reminder(when: str = "today") -> None:
                 ORDER BY r.room_number
             """), {"target": target})).fetchall()
 
-            # Day-wise short-stay prebookings — separate table, same target day.
             daywise_in = (await conn.execute(text("""
                 SELECT guest_name, room_number, COALESCE(phone, '') AS phone,
                        COALESCE(stay_period, '') AS period,
@@ -319,8 +351,6 @@ async def _prep_reminder(when: str = "today") -> None:
     finally:
         await engine.dispose()
 
-    # Suppress entirely if nothing is scheduled for this target day
-    # (across tenancies + daywise_stays).
     if not checkins and not checkouts and not daywise_in and not daywise_out:
         logger.info(f"[Scheduler] prep_reminder ({when}) — nothing scheduled, not sending.")
         return
@@ -359,11 +389,15 @@ async def _prep_reminder(when: str = "today") -> None:
             lines.append(f"• Room {rn} — {nm}{ph_part}")
 
     msg = "\n".join(lines)
-    # Recipients: admin / owner / receptionist only — never tenants.
+    # Use approved general_notice template — works without 24h window.
+    # Params: {{name}} = recipient name, {{message}} = prep summary.
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await _send_whatsapp(phone, msg)
+            ok = await send_template(
+                phone, "general_notice",
+                body_params=[name, msg[:900]],
+            )
             if ok:
                 sent += 1
                 logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
