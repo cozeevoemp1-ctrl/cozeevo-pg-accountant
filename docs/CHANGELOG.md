@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.13] — 2026-05-20 — Manual check-in: ID card upload + OCR + PDF support
+
+### Feature — `web/app/onboarding/bookings/page.tsx`, `src/api/onboarding_router.py`
+- **Relationship field**: changed from free-text to dropdown (Parent/Sibling/Spouse/Friend/Colleague/Other)
+- **ID card required**: ID type + ID number now required fields; form blocks submit without them
+- **ID card photo upload**: file input with preview; accepts images + PDFs
+- **OCR auto-fill**: reuses existing `/{token}/extract-id` endpoint (Claude Haiku vision) — fills Aadhaar number, gender, DOB (DD/MM/YYYY → YYYY-MM-DD), address automatically
+- **PDF support**: PDF.js CDN (same version as `static/onboarding.html`) renders page 1 → JPEG canvas → sent to extract-id — same path as tenant onboarding form
+- Removed redundant `/scan-id` multipart endpoint that was added in error (wrong format, duplicate logic)
+
+---
+
 ## [1.76.12] — 2026-05-20 — Rooms: max_occupancy derived universally from room_type
 
 ### Refactor — `src/database/migrate_all.py`
