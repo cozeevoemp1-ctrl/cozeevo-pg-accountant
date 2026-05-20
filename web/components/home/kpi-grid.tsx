@@ -1001,7 +1001,7 @@ function ExpansionPanel({
                 )}
                 {open === "vacant" && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onBook(item.room); }}
+                    onClick={(e) => { e.stopPropagation(); onBook(item); }}
                     className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
                   >
                     Book →
@@ -1473,7 +1473,9 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
 
     {bookingRoom && (
       <QuickBookModal
-        room={bookingRoom}
+        room={bookingRoom.room}
+        freeBeds={bookingRoom.freeBeds}
+        maxOccupancy={bookingRoom.maxOccupancy}
         onClose={() => setBookingRoom(null)}
         onSuccess={() => { cache.current.delete("vacant"); toggle("vacant"); }}
       />
