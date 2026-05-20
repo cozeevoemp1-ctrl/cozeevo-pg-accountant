@@ -17,37 +17,8 @@ const QUICK_ACTIONS = [
         <line x1="15" y1="12" x2="3" y2="12" />
       </svg>
     ),
-    color: "tile-blue",
     textColor: "text-[#00AEED]",
     bg: "bg-tile-blue",
-  },
-  {
-    label: "New Onboarding",
-    href: "/onboarding/new",
-    icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="12" y1="18" x2="12" y2="12" />
-        <line x1="9" y1="15" x2="15" y2="15" />
-      </svg>
-    ),
-    color: "tile-green",
-    textColor: "text-[#22C55E]",
-    bg: "bg-tile-green",
-  },
-  {
-    label: "Send Reminders",
-    href: "/reminders",
-    icon: (
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-    ),
-    color: "tile-yellow",
-    textColor: "text-[#F59E0B]",
-    bg: "bg-tile-yellow",
   },
   {
     label: "New Check-out",
@@ -59,9 +30,20 @@ const QUICK_ACTIONS = [
         <line x1="21" y1="12" x2="9" y2="12" />
       </svg>
     ),
-    color: "tile-orange",
     textColor: "text-[#C25000]",
     bg: "bg-tile-orange",
+  },
+  {
+    label: "Send Reminders",
+    href: "/reminders",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+    ),
+    textColor: "text-[#F59E0B]",
+    bg: "bg-tile-yellow",
   },
   {
     label: "Collection Report",
@@ -73,7 +55,6 @@ const QUICK_ACTIONS = [
         <line x1="6" y1="20" x2="6" y2="14" />
       </svg>
     ),
-    color: "tile-pink",
     textColor: "text-brand-pink",
     bg: "bg-tile-pink",
   },
@@ -87,7 +68,6 @@ const QUICK_ACTIONS = [
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     ),
-    color: "tile-orange",
     textColor: "text-[#C25000]",
     bg: "bg-tile-orange",
   },
@@ -139,11 +119,11 @@ export default function ManageTenantsPage() {
         <section>
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Quick Actions</p>
           <div className="grid grid-cols-2 gap-3">
-            {QUICK_ACTIONS.map((action) => (
+            {QUICK_ACTIONS.map((action, i) => (
               <button
                 key={action.label}
                 onClick={() => router.push(action.href)}
-                className={`${action.bg} rounded-card p-4 flex flex-col items-start gap-2 active:opacity-80 border border-[#F0EDE9]`}
+                className={`${action.bg} rounded-card p-4 flex flex-col items-start gap-2 active:opacity-80 border border-[#F0EDE9] ${i === QUICK_ACTIONS.length - 1 && QUICK_ACTIONS.length % 2 !== 0 ? "col-span-2" : ""}`}
               >
                 <span className={action.textColor}>{action.icon}</span>
                 <span className="text-sm font-bold text-ink leading-tight">{action.label}</span>
