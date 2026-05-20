@@ -65,7 +65,6 @@ export default function EditTenantPage() {
   // Balance adjustment state
   const [adjAmount, setAdjAmount] = useState("")
   const [adjNote, setAdjNote] = useState("")
-  const [adjType, setAdjType] = useState<"waive" | "surcharge">("waive")
   const [adjWarned, setAdjWarned] = useState(false)
   const [clearWarned, setClearWarned] = useState(false)
   const [adjSubmitting, setAdjSubmitting] = useState(false)
@@ -234,13 +233,8 @@ export default function EditTenantPage() {
     }
     setAdjSubmitting(true)
     try {
-      const signedAmt = adjType === "waive" ? -amt : amt
-      const result = await patchAdjustment(tenancyId, signedAmt, adjNote.trim())
-      setAdjSuccess(
-        adjType === "waive"
-          ? `Waived ₹${amt.toLocaleString("en-IN")} — new dues ₹${Math.max(result.effective_due, 0).toLocaleString("en-IN")}`
-          : `Added ₹${amt.toLocaleString("en-IN")} charge — new dues ₹${result.effective_due.toLocaleString("en-IN")}`
-      )
+      const result = await patchAdjustment(tenancyId, -amt, adjNote.trim())
+      setAdjSuccess(`Waived ₹${amt.toLocaleString("en-IN")} — new dues ₹${Math.max(result.effective_due, 0).toLocaleString("en-IN")}`)
       setAdjAmount("")
       setAdjNote("")
       setAdjWarned(false)
@@ -568,24 +562,6 @@ export default function EditTenantPage() {
             </div>
           )}
 
-          {/* Type toggle */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => { setAdjType("waive"); setAdjWarned(false); setAdjError("") }}
-              className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${adjType === "waive" ? "bg-[#D1FAE5] border-[#6EE7B7] text-[#065F46]" : "bg-bg border-[#E0DDD8] text-ink-muted"}`}
-            >
-              Waive / Write-off
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAdjType("surcharge"); setAdjWarned(false); setAdjError("") }}
-              className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${adjType === "surcharge" ? "bg-[#FEF3C7] border-[#FCD34D] text-[#92400E]" : "bg-bg border-[#E0DDD8] text-ink-muted"}`}
-            >
-              Add Charge
-            </button>
-          </div>
-
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Amount (₹)</label>
             <input
@@ -612,15 +588,7 @@ export default function EditTenantPage() {
           {/* Preview */}
           {adjAmount && !isNaN(parseFloat(adjAmount)) && parseFloat(adjAmount) > 0 && original && (
             <div className="rounded-tile bg-[#F5F3F0] px-3 py-2 text-xs text-ink-muted">
-              {(() => {
-                const amt = parseFloat(adjAmount)
-                const signedAdj = adjType === "waive" ? -amt : amt
-                const newEffective = original.rent_due + signedAdj
-                const newDues = Math.max(newEffective - (original.rent_due + original.adjustment - original.dues), 0)
-                return adjType === "waive"
-                  ? `After waive: effective due ₹${Math.max(newEffective, 0).toLocaleString("en-IN")}`
-                  : `After charge: effective due ₹${newEffective.toLocaleString("en-IN")}`
-              })()}
+              {`After waive: effective due ₹${Math.max(original.rent_due - parseFloat(adjAmount), 0).toLocaleString("en-IN")}`}
             </div>
           )}
 
@@ -637,7 +605,7 @@ export default function EditTenantPage() {
                 : "border border-brand-pink text-brand-pink bg-bg"
             }`}
           >
-            {adjSubmitting ? "Saving…" : adjWarned ? "Confirm Adjustment" : adjType === "waive" ? "Waive Dues →" : "Add Charge →"}
+            {adjSubmitting ? "Saving…" : adjWarned ? "Confirm Waive" : "Waive Dues →"}
           </button>
           {original && original.adjustment !== 0 && (
             <button
