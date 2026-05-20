@@ -1334,7 +1334,7 @@ async def manual_checkin(token: str, request: Request, req: ManualCheckinRequest
         logging.getLogger(__name__).error(
             "Manual check-in failed for token %s: %s\n%s", token[:8], e, traceback.format_exc()
         )
-        raise HTTPException(500, f"Manual check-in failed: {type(e).__name__}: {e}")
+        raise HTTPException(500, f"KYC saved but check-in failed — session is now in Bookings for review. Error: {type(e).__name__}: {e}")
 
 
 async def _approve_session_impl(token: str, req: ApproveRequest | None):
