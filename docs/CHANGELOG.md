@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.20] — 2026-05-20 — Bookings: phone capture, deposit=rent sync, activity feed, prep reminder fix
+
+### Fix — `static/onboarding.html`
+- **Root cause**: QR walk-in form had no phone input field — phone was silently submitted from `sessionData.tenant_phone` (empty for QR sessions). Tenant's number was never captured.
+- Added "Mobile Number" field to step 1 (Personal Details). Required, validated (10 digits).
+- Pre-filled + read-only when session already has a phone (receptionist-created sessions via WhatsApp).
+- Form submission now reads from the input field; `obs.tenant_phone` and `tenant_data.phone` both updated on submit.
+
+### Fix — `src/api/onboarding_router.py`
+- Both bookings list endpoints now return `tenant_phone: obs.tenant_phone or td.get("phone", "")` — fallback to `tenant_data.phone` for sessions where obs phone was null but form captured it.
+
+### Fix — `web/app/onboarding/bookings/page.tsx`
+- **Deposit mirrors rent**: Rent field onChange also updates deposit when deposit is empty or equals old rent value. On save, empty deposit defaults to rent.
+- Deposit init was already `b.security_deposit || b.agreed_rent` but didn't sync when rent was typed fresh.
+
+### Fix — `src/api/v2/kpi.py` / `src/api/onboarding_router.py`
+- **Activity feed missing onboarding check-ins**: onboarding approval created payments in DB but never wrote `audit_log` entries. Activity feed reads audit_log only (`field=payment.log`, `field=status`).
+- Added `write_audit_entry` calls after tenancy creation (status=active → check-in event) and after each payment collected at check-in (rent, deposit, advance).
+
+### Fix — `src/scheduler.py`
+- **Root cause**: `_prep_reminder` was calling `send_template(..., "general_notice", body_params=[name, msg])` with 2 params. Actual `general_notice` template has **1 param** (`{{month}}`) — it's a tenant rent reminder, not a general notice. Every send failed with Meta error 132000 silently. Prep reminders were broken since the template approach was introduced.
+- Switched to `_send_whatsapp` (bot free-form text). Staff/admins always interact with the bot so they're within the 24h window.
+
+### Feature — `src/api/v2/reminders.py`
+- Added `POST /api/v2/app/reminders/trigger-prep` (admin/owner only) — manually fires `_prep_reminder` for "today" or "tomorrow". For testing the pipeline.
+
+---
+
 ## [1.76.16] — 2026-05-20 — Dues double-counting fix: first-month tenants
 
 ### Fix — `src/api/v2/kpi.py`
