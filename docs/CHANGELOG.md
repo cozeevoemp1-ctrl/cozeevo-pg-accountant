@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.11] — 2026-05-20 — WhatsApp: always use approved template for onboarding link sends
+
+### Bug fix — `src/api/onboarding_router.py`, `src/api/v2/bookings.py`
+- **Root cause**: resend endpoint and daily-stay new-booking were calling `_send_whatsapp` (freeform) directly — requires a 24-hour open conversation window. First-time tenants (and admins like Prabhakaran) never have one, so Meta accepted the call but silently dropped the message.
+- All three onboarding link send paths now use `cozeevo_checkin_form` template first (room, rate/rent, link), with freeform as a fallback only if the template call throws.
+- Affected: `resend_link()`, daily-stay booking creation in `bookings.py`, admin-edit booking creation in `onboarding_router.py` (already correct, no change).
+
+---
+
 ## [1.76.10] — 2026-05-20 — Pre-book modal: fix form disappearing on interaction
 
 ### Bug fix — `web/components/home/kpi-grid.tsx`

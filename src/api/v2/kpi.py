@@ -486,6 +486,7 @@ async def get_kpi_detail(
                     "room": r.room_number,
                     "detail": " · ".join(detail_parts),
                     "free_beds": free,
+                    "max_occupancy": r.max_occupancy,
                     "gender": gender,
                     "is_staff_room": bool(r.is_staff_room),
                     "upcoming_checkin": upcoming.isoformat() if upcoming else None,
