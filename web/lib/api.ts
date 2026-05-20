@@ -150,7 +150,8 @@ export interface KpiDetailItem {
   room: string;
   detail: string;
   rent?: number;       // occupied items only
-  free_beds?: number;  // vacant items only
+  free_beds?: number;       // vacant items only
+  max_occupancy?: number;  // vacant items only
   gender?: string;     // vacant items: "male" | "female" | "mixed" | "empty" | "unknown"
   stay_type?: string;  // checkins/checkouts: "monthly" | "daily"
   is_checked_out?: boolean;  // checkouts_today: true if already exited
