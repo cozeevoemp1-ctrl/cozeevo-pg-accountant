@@ -389,15 +389,13 @@ async def _prep_reminder(when: str = "today") -> None:
             lines.append(f"• Room {rn} — {nm}{ph_part}")
 
     msg = "\n".join(lines)
-    # Use approved general_notice template — works without 24h window.
-    # Params: {{name}} = recipient name, {{message}} = prep summary.
+    # Send via bot number (free-form text) — staff/admins always within 24h window.
+    # general_notice template was wrong (1-param rent reminder, not general); bot is reliable.
+    from src.whatsapp.webhook_handler import _send_whatsapp
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await send_template(
-                phone, "general_notice",
-                body_params=[name, msg[:900]],
-            )
+            ok = await _send_whatsapp(phone, msg)
             if ok:
                 sent += 1
                 logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
