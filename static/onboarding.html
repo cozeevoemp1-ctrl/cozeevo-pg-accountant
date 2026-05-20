@@ -618,6 +618,11 @@
       <div class="error-msg" id="err-name">Please enter your full name</div>
     </div>
 
+    <div class="field">
+      <label for="tenant-phone" class="required">Mobile Number</label>
+      <input type="tel" id="tenant-phone" placeholder="10-digit mobile number" maxlength="10" autocomplete="tel" inputmode="numeric">
+      <div class="error-msg" id="err-tenant-phone">Enter a valid 10-digit mobile number</div>
+    </div>
 
     <div class="field">
       <label class="required">Gender</label>
@@ -960,6 +965,13 @@
         rules: data.rules || [],
       });
       document.getElementById('main-content').style.display = 'block';
+      // Pre-fill phone if session already has it (receptionist-created sessions)
+      if (data.tenant_phone) {
+        const ph = data.tenant_phone.replace(/\D/g,'').slice(-10);
+        document.getElementById('tenant-phone').value = ph;
+        document.getElementById('tenant-phone').readOnly = true;
+        document.getElementById('tenant-phone').style.background = '#f0f0f0';
+      }
       // Restore in-progress draft if user refreshed/came back.
       restoreDraft();
     } catch (e) {
@@ -1103,7 +1115,9 @@
       const food = document.querySelector('input[name="food"]:checked');
       const selfie = getUploadDataUrl('selfie-preview-wrap');
 
+      const tenantPhone = document.getElementById('tenant-phone').value.replace(/\D/g,'');
       if (!name) { setError('name', 'err-name'); ok = false; }
+      if (tenantPhone.length < 10) { setError('tenant-phone', 'err-tenant-phone'); ok = false; }
       if (!gender) { setGroupError('gender-group', 'err-gender'); ok = false; }
       if (!food) { setGroupError('food-group', 'err-food'); ok = false; }
       const dob = document.getElementById('dob').value;
@@ -1417,7 +1431,7 @@
     const payload = {
       // Step 1 — match API field names exactly (TenantSubmitRequest)
       name: document.getElementById('name').value.trim(),
-      phone: (sessionData && sessionData.tenant_phone) || '',
+      phone: document.getElementById('tenant-phone').value.replace(/\D/g,'').slice(-10) || (sessionData && sessionData.tenant_phone) || '',
       gender: ((document.querySelector('input[name="gender"]:checked') || {}).value || '').toLowerCase(),
       date_of_birth: document.getElementById('dob').value,
       food_preference: ((document.querySelector('input[name="food"]:checked') || {}).value || '').toLowerCase(),
