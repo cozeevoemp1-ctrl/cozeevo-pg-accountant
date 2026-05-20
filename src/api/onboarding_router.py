@@ -1695,6 +1695,41 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     notes="Deposit dues collected at check-in (upi)",
                 ))
 
+            # Audit log — check-in event + payments (makes them visible in activity feed)
+            await session.flush()  # ensure tenancy.id is available
+            from src.services.audit import write_audit_entry as _wae
+            _room_num = str(room.room_number) if room else ""
+            _actor = (req.approved_by_phone or "onboarding_form") if req else "onboarding_form"
+            _source = "pwa" if req else "onboarding"
+            await _wae(session=session, changed_by=_actor, entity_type="tenancy",
+                       entity_id=tenancy.id, field="status", old_value=None,
+                       new_value=tenancy.status.value, entity_name=td.get("name", ""),
+                       room_number=_room_num, source=_source,
+                       note=f"Check-in via onboarding approval — Room {_room_num}")
+            if obs.booking_amount and float(obs.booking_amount) > 0:
+                await _wae(session=session, changed_by=_actor, entity_type="payment",
+                           entity_id=tenancy.id, field="payment.log",
+                           new_value=str(float(obs.booking_amount)),
+                           entity_name=td.get("name", ""), room_number=_room_num,
+                           source=_source,
+                           note=f"Payment Rs.{int(obs.booking_amount):,} "
+                                f"{'upi' if obs.advance_mode == 'upi' else 'cash'} for advance/booking")
+            if req and req.collected_rent_dues > 0:
+                await _wae(session=session, changed_by=_actor, entity_type="payment",
+                           entity_id=tenancy.id, field="payment.log",
+                           new_value=str(float(req.collected_rent_dues)),
+                           entity_name=td.get("name", ""), room_number=_room_num,
+                           source=_source,
+                           note=f"Payment Rs.{int(req.collected_rent_dues):,} "
+                                f"{req.rent_dues_mode} for rent")
+            if req and req.collected_deposit_dues > 0:
+                await _wae(session=session, changed_by=_actor, entity_type="payment",
+                           entity_id=tenancy.id, field="payment.log",
+                           new_value=str(float(req.collected_deposit_dues)),
+                           entity_name=td.get("name", ""), room_number=_room_num,
+                           source=_source,
+                           note=f"Payment Rs.{int(req.collected_deposit_dues):,} upi for deposit")
+
             obs.status = "approved"
             obs.approved_at = datetime.utcnow()
             obs.approved_by_phone = (req.approved_by_phone or "").strip() if req else ""

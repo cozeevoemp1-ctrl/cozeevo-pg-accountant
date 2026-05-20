@@ -181,3 +181,27 @@ async def send_reminders(
             await session.commit()
 
     return {"sent": sent, "failed": failed}
+
+
+@router.post("/trigger-prep")
+async def trigger_prep_reminder(
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    """Manually trigger the prep reminder for 'today' or 'tomorrow'.
+    Admin-only. Useful for testing when the scheduled fire didn't arrive.
+    Body: {"when": "today"} or {"when": "tomorrow"}
+    """
+    if user.role not in ("admin", "owner"):
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    when = body.get("when", "tomorrow")
+    if when not in ("today", "tomorrow"):
+        raise HTTPException(status_code=400, detail="when must be 'today' or 'tomorrow'")
+
+    from src.scheduler import _prep_reminder
+    try:
+        await _prep_reminder(when=when)
+        return {"status": "sent", "when": when}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
