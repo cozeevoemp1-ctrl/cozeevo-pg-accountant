@@ -934,11 +934,16 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             <input
               ref={idFileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/heic"
               className="hidden"
               onChange={e => {
                 const f = e.target.files?.[0]
                 if (!f) return
+                if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
+                  setMIdScanMsg("PDFs not supported — please upload a JPG or PNG photo of the ID card")
+                  e.target.value = ""
+                  return
+                }
                 setMIdCardPreview(URL.createObjectURL(f))
                 scanIdCard(f)
               }}
