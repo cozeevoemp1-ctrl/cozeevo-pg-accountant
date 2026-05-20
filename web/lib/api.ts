@@ -161,6 +161,7 @@ export interface KpiDetailItem {
   is_staff_room?: boolean;  // vacant items: true for staff rooms
   is_overdue?: boolean;   // no_show items: checkin_date has passed
   days_overdue?: number;  // no_show items: days since expected checkin
+  is_pending_session?: boolean;  // checkins_today: session not yet linked to active tenancy → go to Bookings
   // notices tile extras
   expected_checkout_iso?: string | null;
   days_remaining?: number;

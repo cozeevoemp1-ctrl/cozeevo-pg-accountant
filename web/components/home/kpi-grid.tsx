@@ -933,7 +933,9 @@ function ExpansionPanel({
                 )}
                 {open === "checkins_today" && (
                   <Link
-                    href={item.tenancy_id ? `/checkin/new?tenancy_id=${item.tenancy_id}` : "/checkin/new"}
+                    href={item.is_pending_session
+                      ? `/onboarding/bookings?q=${encodeURIComponent(item.name)}`
+                      : item.tenancy_id ? `/checkin/new?tenancy_id=${item.tenancy_id}` : "/checkin/new"}
                     className="ml-2 flex-shrink-0 text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70"
                   >
                     Check-in →
@@ -1042,7 +1044,7 @@ function ExpansionPanel({
             </Link>
           </div>
         )}
-        {(open === "prebooked" || open === "no_show") && (
+        {(open === "prebooked" || open === "no_show" || open === "checkins_today") && (
           <div className="px-3 pb-2 pt-1">
             <Link href="/onboarding/bookings" className="block text-center text-xs font-bold text-brand-pink py-1.5 rounded-xl border border-brand-pink/30 active:opacity-70">
               View all in Bookings →

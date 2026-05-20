@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.7] — 2026-05-20 — checkins_today fix: pending sessions + name from tenant_data
+
+### Bug fix — `src/api/v2/kpi.py`
+- `checkins_today` previously only counted `Tenancy.status == no_show`. Now also counts `OnboardingSession` records with `status in (pending_review, pending_tenant)` and `checkin_date == today` that are NOT already linked to a `no_show` Tenancy — handles orphaned/cancelled tenancy edge cases (Akshat scenario).
+- Detail panel: session rows resolve name from `tenant_data` JSON (`"name"` key), falling back to `tenant_phone`. Added `is_pending_session: true` flag to session items.
+
+### Bug fix — `web/components/home/kpi-grid.tsx`
+- "Check-in →" button in `checkins_today` panel: `is_pending_session` items now link to `/onboarding/bookings?q=name` (Bookings deep-link) instead of broken `/checkin/new?tenancy_id=cancelled_id`.
+- Added "View all in Bookings →" footer to `checkins_today` panel (same as `no_show`).
+
+### `web/lib/api.ts`
+- `KpiDetailItem`: added `is_pending_session?: boolean` field.
+
+---
+
 ## [1.76.6] — 2026-05-19 — Activity log: room display, transfer resolution, filter chips
 
 ### feat — activity log improvements (kpi.py, payments.py, PWA)

@@ -357,6 +357,7 @@ async def get_kpi_detail(
                     "detail": f"₹{int(r.agreed_rent or 0):,}/mo · pending",
                     "rent": int(r.agreed_rent or 0),
                     "stay_type": str(r.stay_type or "monthly"),
+                    "is_pending_session": True,
                 }
                 for r in session_rows
             ]
