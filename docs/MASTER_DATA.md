@@ -65,7 +65,8 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 
 **Total staff rooms: 6** (THOR 5 + HULK 1) — **296 revenue beds**
 
-> **Changed 2026-05-17:** 614 moved to revenue (+2 beds). G16 max_occupancy fixed 2→1 (-1 bed). Net TOTAL_BEDS 295→296.
+> **Changed 2026-05-20:** `max_occupancy` now derived universally from `room_type` in migrations (single=1, double=2, triple=3). No more per-room hardcoding. G16 bug (kept resetting to 2) permanently fixed.
+> **Changed 2026-05-17:** 614 moved to revenue (+2 beds). Net TOTAL_BEDS 295→296.
 > **Changed 2026-05-16:** 107, 114, 618 confirmed revenue (not staff). Migration `run_staff_room_corrections_2026_05_16` locks this permanently so deploys can't revert.
 > **Changed 2026-05-14:** Room 614 → staff. G16+G19 double→single (HULK 150→146).
 > **Changed 2026-05-09:** G20 → revenue (Chandraprakash). 107 → revenue (Samruddhi Thanwar).

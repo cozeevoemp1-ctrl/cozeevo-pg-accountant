@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.12] — 2026-05-20 — Rooms: max_occupancy derived universally from room_type
+
+### Refactor — `src/database/migrate_all.py`
+- **Root cause**: G16 was included in the HULK ground doubles batch `IN ('G15','G16','G17','G18','G19')` in `run_room_master_fix()`, resetting its `max_occupancy` to 2 on every migration run — overwriting any manual DB fixes.
+- Replaced 7 hardcoded room-list UPDATE batches with one universal rule: `single=1, double=2, triple=3` derived from `room_type`. No room-by-room exceptions needed.
+- G16 (single room, 1 tenant) now correctly shows 0 beds free instead of 1.
+
+---
+
 ## [1.76.11] — 2026-05-20 — WhatsApp: always use approved template for onboarding link sends
 
 ### Bug fix — `src/api/onboarding_router.py`, `src/api/v2/bookings.py`

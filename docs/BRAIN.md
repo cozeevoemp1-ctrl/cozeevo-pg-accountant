@@ -567,7 +567,8 @@ unique_hash = SHA-256(date + amount + upi_reference)    # if UPI ref available
 | 702  | THOR | 1 | Staff quarters (permanent) |
 | G12  | HULK | 3 | Staff quarters (permanent) |
 
-> Changed 2026-05-17: 614 → revenue (+2 beds); G16 max_occupancy 2→1 (-1 bed). **296 revenue beds.**
+> Changed 2026-05-20: max_occupancy now derived universally from room_type in migration (single=1, double=2, triple=3). G16 kept resetting to 2 — permanently fixed. **296 revenue beds.**
+> Changed 2026-05-17: 614 → revenue (+2 beds). **296 revenue beds.**
 > Changed 2026-05-16: 107+114+618 confirmed revenue. Migration locks this (deploys can't revert).
 > Changed 2026-05-14: Room 614 → staff (-2 beds). G16+G19 double→single (-2 beds).
 > Changed 2026-05-09: G20 → revenue (Chandraprakash). Room 107 → revenue (Samruddhi Thanwar).
