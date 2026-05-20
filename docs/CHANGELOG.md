@@ -2,6 +2,17 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.10] — 2026-05-20 — Pre-book modal: fix form disappearing on interaction
+
+### Bug fix — `web/components/home/kpi-grid.tsx`
+- **Root cause**: outer wrapper had `onClick={onClose}` with inner card using `stopPropagation`. Clicks could still escape containment in edge cases (backdrop visible on wide screens, form near viewport edge).
+- Moved `onClick={onClose}` to the backdrop `<div>` directly — only the dark overlay dismisses the modal.
+- Removed `onClick={stopPropagation}` from the white card — no longer needed.
+- Added `overflow-y-auto max-h-[90vh]` to both `QuickBookModal` and `QuickCollectModal` — form scrolls on short screens instead of overflowing the viewport.
+- Same fix applied to collect-payment modal.
+
+---
+
 ## [1.76.9] — 2026-05-20 — Manage Tenants: remove New Onboarding tile
 
 ### feat — `web/app/tenants/page.tsx`
