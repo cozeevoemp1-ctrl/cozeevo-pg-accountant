@@ -168,7 +168,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" />
       <div
         className="relative w-full max-w-sm bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl overflow-y-auto max-h-[90vh]"
       >
@@ -346,7 +346,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }}>
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" />
       <div
         className="relative w-full max-w-lg bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl overflow-y-auto max-h-[90vh]"
       >
