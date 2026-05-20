@@ -447,19 +447,29 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                   <div className="col-span-2">
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed occupancy</label>
                     <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
-                      {([false, true] as const).map((val) => (
-                        <button
-                          key={String(val)}
-                          type="button"
-                          onClick={() => setFullRoom(val)}
-                          className={`flex-1 py-2 text-xs font-bold transition-colors ${
-                            fullRoom === val ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
-                          }`}
-                        >
-                          {val ? "Full room" : "Single bed"}
-                        </button>
-                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setFullRoom(false)}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${!fullRoom ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
+                      >
+                        Single bed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => canFullRoom ? setFullRoom(true) : undefined}
+                        disabled={!canFullRoom}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${
+                          !canFullRoom
+                            ? "bg-[#F6F5F0] text-[#C0BAB4] cursor-not-allowed"
+                            : fullRoom ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
+                        }`}
+                      >
+                        Full room
+                      </button>
                     </div>
+                    {!canFullRoom && maxOccupancy > 1 && (
+                      <p className="text-[10px] text-status-warn mt-1">Room already has a tenant — full room not available</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Security deposit (₹)</label>
@@ -572,7 +582,7 @@ interface PanelProps {
   setSelected: (v: TenantDues | null) => void;
   cancellingId: number | null;
   onCancel: (item: KpiDetailItem) => void;
-  onBook: (room: string) => void;
+  onBook: (item: KpiDetailItem) => void;
   onCollect: (item: KpiDetailItem) => void;
 }
 
@@ -1108,7 +1118,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [bookingRoom, setBookingRoom] = useState<string | null>(null);
+  const [bookingRoom, setBookingRoom] = useState<{ room: string; freeBeds: number; maxOccupancy: number } | null>(null);
   const [collectingItem, setCollectingItem] = useState<KpiDetailItem | null>(null);
 
   const cache = useRef<Map<string, KpiDetailItem[]>>(
@@ -1315,7 +1325,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     allItems: items,
     filtered, loading, selected, detailLoading, selectItem, setSelected,
     cancellingId, onCancel,
-    onBook: (room: string) => { close(); setBookingRoom(room); },
+    onBook: (item: KpiDetailItem) => { close(); setBookingRoom({ room: item.room, freeBeds: item.free_beds ?? 1, maxOccupancy: item.max_occupancy ?? 1 }); },
     onCollect: (item: KpiDetailItem) => { setCollectingItem(item); },
   };
 
