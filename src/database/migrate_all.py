@@ -315,10 +315,8 @@ async def run_room_master_fix(conn: AsyncConnection) -> None:
       THOR: G05, G06, 107, 108, 114, 701
       HULK: G12, 702
 
-    max_occupancy corrections:
-      THOR ground: G01,G10=1  G02,G03,G04=2  G07,G08,G09=3
-      THOR floors 1-6: x01,x12=1  x02-x11=2
-      HULK ground: G11,G20=1  G13,G14=3  G15-G19=2
+    max_occupancy: derived from room_type (single=1, double=2, triple=3).
+      room_type is the source of truth — no room-by-room hardcoding.
     """
     print("\n== Room master fix (BRAIN.md §15) ==")
 
@@ -342,81 +340,25 @@ async def run_room_master_fix(conn: AsyncConnection) -> None:
     """))
     print(f"  [ok] HULK staff rooms flagged: {r.rowcount} updated")
 
-    # ── 2. THOR ground floor max_occupancy ────────────────────────────────
+    # ── 2. max_occupancy derived from room_type (universal rule) ──────────
+    # single=1, double=2, triple=3. room_type is the source of truth.
+    # Exclude placeholder room 000.
     r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 1
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
-          AND room_number IN ('G01','G10')
-          AND max_occupancy IS DISTINCT FROM 1
+        UPDATE rooms SET max_occupancy = CASE room_type
+            WHEN 'single' THEN 1
+            WHEN 'double' THEN 2
+            WHEN 'triple' THEN 3
+            ELSE max_occupancy
+        END
+        WHERE room_number != '000'
+          AND max_occupancy IS DISTINCT FROM CASE room_type
+            WHEN 'single' THEN 1
+            WHEN 'double' THEN 2
+            WHEN 'triple' THEN 3
+            ELSE max_occupancy
+          END
     """))
-    print(f"  [ok] THOR ground singles (G01,G10): {r.rowcount} updated")
-
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 2
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
-          AND room_number IN ('G02','G03','G04')
-          AND max_occupancy IS DISTINCT FROM 2
-    """))
-    print(f"  [ok] THOR ground doubles (G02-G04): {r.rowcount} updated")
-
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 3
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
-          AND room_number IN ('G07','G08','G09')
-          AND max_occupancy IS DISTINCT FROM 3
-    """))
-    print(f"  [ok] THOR ground triples (G07-G09): {r.rowcount} updated")
-
-    # ── 3. THOR floors 1-6: x01 and x12 = single, x02-x11 = double ───────
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 1
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
-          AND is_staff_room = FALSE
-          AND (room_number ~ '^[1-6]01$' OR room_number ~ '^[1-6]12$')
-          AND max_occupancy IS DISTINCT FROM 1
-    """))
-    print(f"  [ok] THOR floors 1-6 end-singles (x01,x12): {r.rowcount} updated")
-
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 2
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%THOR%' LIMIT 1)
-          AND is_staff_room = FALSE
-          AND room_number ~ '^[1-6](0[2-9]|1[01])$'
-          AND max_occupancy IS DISTINCT FROM 2
-    """))
-    print(f"  [ok] THOR floors 1-6 doubles (x02-x11): {r.rowcount} updated")
-
-    # ── 4. HULK ground floor max_occupancy ───────────────────────────────
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 1
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
-          AND room_number IN ('G11','G20')
-          AND max_occupancy IS DISTINCT FROM 1
-    """))
-    print(f"  [ok] HULK ground singles (G11,G20): {r.rowcount} updated")
-
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 3
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
-          AND room_number IN ('G13','G14')
-          AND max_occupancy IS DISTINCT FROM 3
-    """))
-    print(f"  [ok] HULK ground triples (G13,G14): {r.rowcount} updated")
-
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 2
-        WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
-          AND room_number IN ('G15','G17','G18','G19')
-          AND max_occupancy IS DISTINCT FROM 2
-    """))
-    print(f"  [ok] HULK ground doubles (G15,G17-G19): {r.rowcount} updated")
-
-    r = await conn.execute(text("""
-        UPDATE rooms SET max_occupancy = 1
-        WHERE room_number = 'G16'
-          AND max_occupancy IS DISTINCT FROM 1
-    """))
-    print(f"  [ok] HULK G16 single (max_occupancy=1): {r.rowcount} updated")
+    print(f"  [ok] max_occupancy synced from room_type: {r.rowcount} updated")
 
     print("  [done] Room master fix complete")
 
