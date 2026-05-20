@@ -391,8 +391,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
     if (!manualOpen) return
     const rentDue = proRata
     const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
-    if (rentDue > 0) setMRentDues(String(rentDue))
-    if (depositDue > 0) setMDepDues(String(depositDue))
+    setMRentDues(rentDue > 0 ? String(rentDue) : "0")
+    setMDepDues(depositDue > 0 ? String(depositDue) : "0")
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manualOpen])
 
