@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.8] — 2026-05-20 — prep_reminder: template-based + counts pending sessions
+
+### Bug fix — `src/scheduler.py` `_prep_reminder`
+- **Root cause 1 — 24h window**: was using `_send_whatsapp` (free-form), which silently fails if admin hasn't messaged the bot in the last 24h. Switched to `send_template(general_notice)` — approved template, no window restriction.
+- **Root cause 2 — missing pending check-ins**: query only counted `status IN ('active','no_show')` tenancies. Added UNION with `onboarding_sessions` where `status IN ('pending_review','pending_tenant')` and `checkin_date = target` — same fix as KPI tile. Akshat and similar PWA-booked tenants now appear in reminders.
+- **Root cause 3 — return value bug**: `_send_whatsapp` returns `None` not bool, so scheduler always logged "0 delivered" even on success. Template sender returns proper bool.
+
+---
+
 ## [1.76.7] — 2026-05-20 — checkins_today fix: pending sessions + name from tenant_data
 
 ### Bug fix — `src/api/v2/kpi.py`
