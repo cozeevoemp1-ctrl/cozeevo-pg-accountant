@@ -681,16 +681,26 @@ async def resend_link(token: str, request: Request):
         if not obs.tenant_phone:
             raise HTTPException(400, "No tenant phone on this session")
 
-        from src.whatsapp.webhook_handler import _send_whatsapp
+        from src.whatsapp.webhook_handler import _send_whatsapp, _send_whatsapp_template
         phone_wa = obs.tenant_phone.strip()
         if not phone_wa.startswith("91"):
             phone_wa = "91" + phone_wa
-        await _send_whatsapp(
-            phone_wa,
-            f"Reminder from *Cozeevo Co-living*\n\n"
-            f"Please complete your registration:\n{onboard_link}\n\n"
-            f"This link is valid for 48 hours."
-        )
+
+        room = await session.get(Room, obs.room_id) if obs.room_id else None
+        room_number = room.room_number if room else "?"
+        rent_str = f"Rs.{int(obs.agreed_rent):,}" if obs.agreed_rent else "?"
+        try:
+            await _send_whatsapp_template(
+                phone_wa, "cozeevo_checkin_form",
+                [str(room_number), rent_str, onboard_link],
+            )
+        except Exception:
+            await _send_whatsapp(
+                phone_wa,
+                f"Reminder from *Cozeevo Co-living*\n\n"
+                f"Please complete your registration:\n{onboard_link}\n\n"
+                f"This link is valid for 48 hours."
+            )
         return {"status": "sent", "token": token, "regenerated": is_expired or obs.status == "expired"}
 
 
