@@ -1297,8 +1297,9 @@ async def manual_checkin(token: str, request: Request, req: ManualCheckinRequest
         if obs.status not in ("pending_tenant", "expired"):
             raise HTTPException(400, f"Manual check-in only allowed for pending_tenant or expired sessions (current: {obs.status})")
 
+        _existing_td = json.loads(obs.tenant_data) if obs.tenant_data else {}
         tenant_data = {
-            "name": obs.tenant_name or "",
+            "name": _existing_td.get("name", "") or _existing_td.get("tenant_name", ""),
             "phone": obs.tenant_phone or "",
             "gender": req.gender,
             "food_preference": req.food_preference,

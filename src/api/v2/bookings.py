@@ -179,18 +179,25 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             if req.stay_type == "daily":
                 assert checkout is not None
                 rate_str = f"Rs.{int(req.daily_rate):,}/night"
-                nights = (checkout - checkin).days
-                msg = (
-                    f"Hello {req.tenant_name.strip()}! Welcome to *Cozeevo Co-living*\n\n"
-                    f"{room_line}\n"
-                    f"Rate: {rate_str}\n"
-                    f"Check-in: {checkin.strftime('%d %b %Y')}\n"
-                    f"Check-out: {checkout.strftime('%d %b %Y')} ({nights} night{'s' if nights != 1 else ''})\n\n"
-                    f"Please complete your registration:\n{onboard_link}\n\n"
-                    "This link is valid for 48 hours."
-                )
-                await _send_whatsapp(phone_wa, msg)
-                whatsapp_sent = True
+                try:
+                    await _send_whatsapp_template(
+                        phone_wa, "cozeevo_checkin_form",
+                        [str(room.room_number), rate_str, onboard_link],
+                    )
+                    whatsapp_sent = True
+                except Exception:
+                    nights = (checkout - checkin).days
+                    msg = (
+                        f"Hello {req.tenant_name.strip()}! Welcome to *Cozeevo Co-living*\n\n"
+                        f"{room_line}\n"
+                        f"Rate: {rate_str}\n"
+                        f"Check-in: {checkin.strftime('%d %b %Y')}\n"
+                        f"Check-out: {checkout.strftime('%d %b %Y')} ({nights} night{'s' if nights != 1 else ''})\n\n"
+                        f"Please complete your registration:\n{onboard_link}\n\n"
+                        "This link is valid for 48 hours."
+                    )
+                    await _send_whatsapp(phone_wa, msg)
+                    whatsapp_sent = True
             else:
                 rent_str = f"Rs.{int(req.monthly_rent):,}"
                 try:
