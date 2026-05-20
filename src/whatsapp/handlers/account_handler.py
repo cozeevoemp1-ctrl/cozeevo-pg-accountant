@@ -926,6 +926,9 @@ async def _do_deposit_change(tenancy_id: int, new_amount: int, tenant_name: str,
     old_amount = int(tenancy.security_deposit or 0)
     tenancy.security_deposit = new_amount
 
+    from src.services.rent_schedule import recalc_checkin_month_rs
+    await recalc_checkin_month_rs(session, tenancy)
+
     # Audit log
     room_number = ""
     if tenancy.room_id:

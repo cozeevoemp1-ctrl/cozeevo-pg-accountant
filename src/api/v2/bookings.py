@@ -140,7 +140,9 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 expires_at=datetime.utcnow() + timedelta(hours=48),
             )
         else:
-            deposit = req.security_deposit if req.security_deposit > 0 else req.monthly_rent
+            if req.security_deposit <= 0:
+                raise HTTPException(status_code=422, detail="security_deposit is required for monthly bookings")
+            deposit = req.security_deposit
             obs = OnboardingSession(
                 token=token,
                 status="pending_tenant",

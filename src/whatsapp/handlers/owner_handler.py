@@ -3169,6 +3169,8 @@ async def resolve_pending_action(
             tenancy = await session.get(Tenancy, tenancy_id)
             if tenancy:
                 tenancy.security_deposit = (tenancy.security_deposit or Decimal("0")) + Decimal(str(extra))
+                from src.services.rent_schedule import recalc_checkin_month_rs
+                await recalc_checkin_month_rs(session, tenancy)
                 # Systemic rule: any tenancy field change → sheet sync.
                 try:
                     import asyncio as _aio
@@ -4966,6 +4968,10 @@ async def _do_update_checkin(
 
     old_checkin = tenancy.checkin_date
     tenancy.checkin_date = new_checkin
+
+    from src.services.rent_schedule import recalc_checkin_month_rs
+    await recalc_checkin_month_rs(session, tenancy)
+
     await session.commit()
 
     # Google Sheets write-back
@@ -5003,9 +5009,7 @@ async def _do_update_checkin(
         f"*Checkin updated — {tenant_name}*\n"
         f"Was: {old_checkin.strftime('%d %b %Y')}\n"
         f"Now: {new_checkin.strftime('%d %b %Y')}\n"
-        f"{gsheets_note}\n\n"
-        "Note: rent schedule rows are not auto-adjusted.\n"
-        "Send *report* to verify dues."
+        f"{gsheets_note}"
     )
 
 

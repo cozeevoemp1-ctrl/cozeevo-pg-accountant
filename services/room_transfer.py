@@ -117,6 +117,8 @@ async def execute_room_transfer(
 
     if extra_deposit and extra_deposit > 0:
         tenancy.security_deposit = (tenancy.security_deposit or Decimal("0")) + Decimal(str(extra_deposit))
+        from src.services.rent_schedule import recalc_checkin_month_rs
+        await recalc_checkin_month_rs(session, tenancy)
 
     session.add(AuditLog(
         changed_by=changed_by,

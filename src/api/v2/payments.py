@@ -203,6 +203,17 @@ async def void_payment(
             raise HTTPException(status_code=409, detail="Already voided")
 
         payment.is_void = True
+        from src.database.models import AuditLog
+        session.add(AuditLog(
+            changed_by=user.actor,
+            entity_type="payment",
+            entity_id=payment_id,
+            field="is_void",
+            old_value="false",
+            new_value="true",
+            source="pwa",
+            note=f"₹{int(payment.amount)} voided",
+        ))
         await session.commit()
 
     logger.info("[PWA] payment voided: id=%s by=%s", payment_id, user.actor)

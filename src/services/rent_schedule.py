@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.database.models import Tenancy
 
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 
 def prorated_first_month_rent(agreed_rent, checkin: date) -> Decimal:
     """Prorated rent for the check-in month (no deposit bundled)."""
@@ -52,3 +54,44 @@ def first_month_rent_due(tenancy: "Tenancy", period_month: date) -> Decimal:
         booking  = Decimal(str(tenancy.booking_amount or 0))
         return max(prorated + deposit - booking, Decimal("0"))
     return rent
+
+
+async def recalc_checkin_month_rs(session: "AsyncSession", tenancy: "Tenancy") -> None:
+    """Recalculate rent_due for the check-in month RentSchedule row.
+
+    Call after any change to agreed_rent, security_deposit, or checkin_date.
+    Refuses to touch months before the current month (historical rows are locked).
+    """
+    from datetime import date as _date
+    from sqlalchemy import select as _select
+    from src.database.models import RentSchedule, RentStatus
+
+    checkin = getattr(tenancy, "checkin_date", None)
+    if not checkin:
+        return
+
+    period = checkin.replace(day=1)
+    today_period = _date.today().replace(day=1)
+    if period < today_period:
+        return  # historical — never rewrite
+
+    rs = await session.scalar(
+        _select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy.id,
+            RentSchedule.period_month == period,
+        )
+    )
+    new_due = first_month_rent_due(tenancy, period)
+    if rs:
+        rs.rent_due = new_due
+        session.add(rs)
+    else:
+        session.add(RentSchedule(
+            tenancy_id=tenancy.id,
+            period_month=period,
+            rent_due=new_due,
+            maintenance_due=0,
+            status=RentStatus.pending,
+            due_date=period,
+            org_id=getattr(tenancy, "org_id", 1),
+        ))

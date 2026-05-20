@@ -855,7 +855,7 @@ async def get_activity_feed(
     user: AppUser = Depends(get_current_user),
 ):
     """Global activity feed — payments, check-ins, check-outs, rent changes, room moves, voids."""
-    from src.database.models import AuditLog, AuthorizedUser
+    from src.database.models import AuditLog, AuthorizedUser, Payment
 
     INCLUDE_FIELDS = {
         "payment.log", "agreed_rent", "status", "status+checkout_date",
@@ -869,7 +869,21 @@ async def get_activity_feed(
                 AuditLog.room_number, AuditLog.note, AuditLog.changed_by,
                 AuditLog.source, AuditLog.created_at,
             )
-            .where(AuditLog.field.in_(INCLUDE_FIELDS))
+            .outerjoin(
+                Payment,
+                and_(
+                    AuditLog.field == "payment.log",
+                    AuditLog.entity_type == "payment",
+                    AuditLog.entity_id == Payment.id,
+                ),
+            )
+            .where(
+                AuditLog.field.in_(INCLUDE_FIELDS),
+                or_(
+                    AuditLog.field != "payment.log",
+                    Payment.is_void == False,
+                ),
+            )
             .order_by(desc(AuditLog.created_at))
             .limit(limit * 3)
         )).all()

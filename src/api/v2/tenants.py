@@ -486,6 +486,12 @@ async def update_tenant(
                     org_id=tenancy.org_id,
                 ))
 
+        # Recalc first-month RS when security_deposit or checkin_date changes
+        # (agreed_rent changes are handled above via prorate_this_month logic)
+        if "security_deposit" in body or "checkin_date" in body:
+            from src.services.rent_schedule import recalc_checkin_month_rs
+            await recalc_checkin_month_rs(session, tenancy)
+
         room_number = room.room_number
         session.add(tenancy)
         session.add(tenant)
