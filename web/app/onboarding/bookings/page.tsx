@@ -331,6 +331,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [mRentDues, setMRentDues] = useState("")
   const [mRentMode, setMRentMode] = useState<"cash" | "upi">("cash")
   const [mDepDues, setMDepDues] = useState("")
+  const [mIdCardPreview, setMIdCardPreview] = useState("")
+  const [mIdScanLoading, setMIdScanLoading] = useState(false)
+  const [mIdScanMsg, setMIdScanMsg] = useState("")
+  const idFileRef = useRef<HTMLInputElement>(null)
   const [err, setErr] = useState("")
 
   // Edit fields
@@ -446,9 +450,42 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
     }
   }
 
+  async function scanIdCard(file: File) {
+    setMIdScanLoading(true)
+    setMIdScanMsg("")
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const res = await fetch(`${API_URL}/api/onboarding/scan-id`, {
+        method: "POST",
+        headers: { "X-Admin-Pin": ADMIN_PIN },
+        body: fd,
+      })
+      if (!res.ok) throw new Error(`${res.status}`)
+      const d = await res.json()
+      if (d.id_type) setMIdType(d.id_type)
+      if (d.id_number) setMIdNum(d.id_number)
+      if (d.dob) setMDob(d.dob)
+      if (d.address) setMAddress(d.address)
+      setMIdScanMsg("Fields auto-filled from ID card — verify before saving")
+    } catch {
+      setMIdScanMsg("Auto-scan failed — fill fields manually")
+    } finally {
+      setMIdScanLoading(false)
+    }
+  }
+
   async function doManualCheckin() {
     if (!mGender || !mFood || !mEcName || !mEcPhone || !mEcRel) {
       setErr("Gender, food preference, and all emergency contact fields are required.")
+      return
+    }
+    if (!mIdType || !mIdNum) {
+      setErr("ID type and ID number are required.")
+      return
+    }
+    if (!mIdCardPreview) {
+      setErr("ID card photo is required.")
       return
     }
     setManualSaving(true)
@@ -866,16 +903,65 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             </div>
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Relation *</label>
-              <input type="text" value={mEcRel} onChange={e => setMEcRel(e.target.value)} placeholder="e.g. Parent"
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+              <select value={mEcRel} onChange={e => setMEcRel(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                <option value="">Select…</option>
+                <option value="Parent">Parent</option>
+                <option value="Sibling">Sibling</option>
+                <option value="Spouse">Spouse</option>
+                <option value="Friend">Friend</option>
+                <option value="Colleague">Colleague</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
           </div>
 
-          {/* ID + address */}
+          {/* ID card upload + OCR */}
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">ID Card *</p>
+          <div className="flex flex-col gap-1.5">
+            <input
+              ref={idFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                setMIdCardPreview(URL.createObjectURL(f))
+                scanIdCard(f)
+              }}
+            />
+            {mIdCardPreview ? (
+              <div className="relative">
+                <img src={mIdCardPreview} alt="ID card" className="w-full rounded-tile border border-[#E0DDD8] max-h-40 object-contain bg-[#F6F5F0]" />
+                <button
+                  onClick={() => idFileRef.current?.click()}
+                  className="absolute top-1 right-1 bg-white rounded-full px-2 py-0.5 text-[9px] font-semibold text-ink-muted border border-[#E0DDD8]"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => idFileRef.current?.click()}
+                className="w-full rounded-tile border-2 border-dashed border-[#E0DDD8] py-4 text-xs text-ink-muted font-semibold active:opacity-70"
+              >
+                Tap to upload ID card photo
+              </button>
+            )}
+            {mIdScanLoading && <p className="text-[9px] text-brand-pink font-medium">Scanning ID card…</p>}
+            {mIdScanMsg && !mIdScanLoading && (
+              <p className={`text-[9px] font-medium ${mIdScanMsg.includes("failed") ? "text-status-warn" : "text-[#065F46]"}`}>
+                {mIdScanMsg}
+              </p>
+            )}
+          </div>
+
+          {/* ID fields (auto-filled from scan, editable) */}
           <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">ID &amp; Address</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Type</label>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Type *</label>
               <select value={mIdType} onChange={e => setMIdType(e.target.value)}
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                 <option value="">Select…</option>
@@ -886,13 +972,13 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               </select>
             </div>
             <div>
-              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Number</label>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Number *</label>
               <input type="text" value={mIdNum} onChange={e => setMIdNum(e.target.value)} placeholder="e.g. 1234 5678 9012"
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
             <div className="col-span-2">
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Permanent Address</label>
-              <input type="text" value={mAddress} onChange={e => setMAddress(e.target.value)} placeholder="City, State"
+              <input type="text" value={mAddress} onChange={e => setMAddress(e.target.value)} placeholder="City, State (auto-filled from ID)"
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
           </div>

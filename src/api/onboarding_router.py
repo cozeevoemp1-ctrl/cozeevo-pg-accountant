@@ -12,7 +12,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select, update
@@ -1280,6 +1280,63 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
         )
         # Surface a readable reason to the admin UI instead of a blank 500
         raise HTTPException(500, f"Approve failed: {type(e).__name__}: {e}")
+
+
+@router.post("/scan-id")
+async def scan_id_card(request: Request, file: UploadFile = File(...)):
+    """
+    Upload an ID card photo (Aadhaar, PAN, Passport, DL).
+    Returns OCR-extracted fields: id_type, id_number, name, dob, address.
+    """
+    _check_admin_pin(request)
+    import asyncio, base64, json as _json
+    import anthropic
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(503, "Vision OCR not configured (ANTHROPIC_API_KEY missing)")
+
+    img_bytes = await file.read()
+    media_type = (
+        file.content_type
+        if file.content_type in ("image/jpeg", "image/png", "image/webp", "image/gif")
+        else "image/jpeg"
+    )
+    img_b64 = base64.standard_b64encode(img_bytes).decode()
+
+    try:
+        claude = anthropic.AsyncAnthropic(api_key=api_key)
+        msg = await asyncio.wait_for(
+            claude.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=500,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                        {"type": "text", "text": (
+                            "This is an Indian government ID card (Aadhaar, PAN, Passport, or Driving License). "
+                            "Extract all visible text fields. "
+                            "For Aadhaar: the number is 12 digits (may be masked like XXXX XXXX 1234). "
+                            "Respond ONLY with this JSON — no markdown, no explanation:\n"
+                            '{"id_type":"Aadhaar|PAN|Passport|Driving License|Other",'
+                            '"id_number":"card number as printed",'
+                            '"name":"full name on the card",'
+                            '"dob":"YYYY-MM-DD or empty string",'
+                            '"address":"full address as one line or empty string"}'
+                        )},
+                    ],
+                }],
+            ),
+            timeout=20,
+        )
+        raw = next(b.text for b in msg.content if hasattr(b, "text")).strip()
+        raw = raw.lstrip("```json").lstrip("```").rstrip("```").strip()
+        return _json.loads(raw)
+    except asyncio.TimeoutError:
+        raise HTTPException(504, "Vision OCR timed out — fill manually")
+    except Exception as e:
+        raise HTTPException(500, f"Vision OCR failed: {type(e).__name__}: {e}")
 
 
 @router.post("/{token}/manual-checkin")
