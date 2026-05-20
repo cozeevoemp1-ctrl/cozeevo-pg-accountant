@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.16] — 2026-05-20 — Dues double-counting fix: first-month tenants
+
+### Fix — `src/api/v2/kpi.py`
+- **Root cause**: `deposit_paid_period_subq` was subtracted from both `rent_dues` (`eff - rent_paid - dep_paid_period`) AND counted in `dep_due` (`dep_agreed - dep_paid - booking`). First-month tenants who paid any deposit showed the deposit credited twice — causing the dues panel (kpi-detail type=dues) and overdue KPI tile to show inflated dues.
+- **Fix**: Removed `deposit_paid_period_subq` entirely from both the overdue KPI and kpi-detail type=dues queries. Added `checkin_date` + `agreed_rent` to SELECTs. Applied same first-month prorated formula as `get_tenant_dues`: detect if `checkin_date.replace(day=1) == period`, compute `prorated_rent` + `rent_overflow` → correct `rent_dues` and `dep_due` separately.
+- Imported `prorated_first_month_rent` from `src.services.rent_schedule`.
+- Non-first-month tenants unchanged: `rent_dues = max(0, eff - rent_paid)`, `dep_due = max(0, dep_agreed - dep_paid - booking)`.
+
+### Context — Navaneeth Kutty investigation (previous session)
+- Lokesh made two voided ₹5,000 payments + valid ₹2,000 deposit. Voided entries were showing in activity feed — fixed with LEFT JOIN filter on `is_void`. Activity feed now clean.
+- RentSchedule had ₹19,419 (wrong) — root cause: `bookings.py` line 143 defaulted `security_deposit` to `agreed_rent` when 0. Fixed: 422 error if `security_deposit <= 0`. RS manually corrected to ₹12,419 via SQL.
+- `recalc_checkin_month_rs()` helper added to `src/services/rent_schedule.py` — wired into 5 endpoints: `tenants.py` (patch), `account_handler.py` (security_deposit change), `owner_handler.py` (overpay→deposit + checkin_date change), `room_transfer.py` (extra_deposit).
+- `get_tenant_dues` in `tenants.py` reworked to separate rent and deposit correctly for first-month tenants.
+
+---
+
 ## [1.76.15] — 2026-05-20 — Deploy: zero-downtime flock + stop hook dedup
 
 ### Fix — `.claude/settings.json`, `scripts/vps_deploy.sh`
