@@ -276,7 +276,8 @@ interface QuickBookModalProps {
   onSuccess: () => void;
 }
 
-function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
+function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: QuickBookModalProps) {
+  const canFullRoom = freeBeds >= maxOccupancy && maxOccupancy > 1;
   const [stayType, setStayType] = useState<"monthly" | "daily">("monthly");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
