@@ -312,14 +312,14 @@ async def get_kpi_detail(
             session_rows = (await session.execute(
                 select(
                     OnboardingSession.tenancy_id,
-                    func.coalesce(Tenant.name, OnboardingSession.tenant_phone).label("name"),
+                    OnboardingSession.tenant_data,
+                    OnboardingSession.tenant_phone,
                     Room.room_number,
                     OnboardingSession.checkin_date,
                     OnboardingSession.agreed_rent,
                     OnboardingSession.stay_type,
                 )
                 .join(Room, Room.id == OnboardingSession.room_id)
-                .outerjoin(Tenant, Tenant.id == OnboardingSession.tenant_id)
                 .where(
                     OnboardingSession.checkin_date == today,
                     OnboardingSession.status.in_(["pending_review", "pending_tenant"]),
@@ -330,6 +330,17 @@ async def get_kpi_detail(
                 )
                 .order_by(Room.room_number)
             )).all()
+
+            def _obs_name(r) -> str:
+                import json as _json
+                if r.tenant_data:
+                    try:
+                        d = _json.loads(r.tenant_data)
+                        return d.get("name") or d.get("full_name") or ""
+                    except Exception:
+                        pass
+                return r.tenant_phone or "Unknown"
+
             items = [
                 {
                     "tenancy_id": r.id, "name": r.name, "room": r.room_number,
@@ -341,7 +352,7 @@ async def get_kpi_detail(
             ] + [
                 {
                     "tenancy_id": r.tenancy_id,
-                    "name": r.name or "Unknown",
+                    "name": _obs_name(r) or "Unknown",
                     "room": r.room_number,
                     "detail": f"₹{int(r.agreed_rent or 0):,}/mo · pending",
                     "rent": int(r.agreed_rent or 0),
