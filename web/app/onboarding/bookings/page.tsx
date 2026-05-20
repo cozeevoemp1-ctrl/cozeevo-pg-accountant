@@ -811,6 +811,122 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           )}
         </div>
       )}
+
+      {/* Manual check-in — KYC entry by staff */}
+      {manualOpen && (isPending || isExpired) && (
+        <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
+          <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">
+            Manual check-in — enter tenant details
+          </p>
+
+          {/* Personal */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Gender *</label>
+              <select value={mGender} onChange={e => setMGender(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                <option value="">Select…</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Food *</label>
+              <select value={mFood} onChange={e => setMFood(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                <option value="Veg">Veg</option>
+                <option value="Non-Veg">Non-Veg</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Date of Birth</label>
+              <input type="date" value={mDob} onChange={e => setMDob(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Occupation</label>
+              <input type="text" value={mOccupation} onChange={e => setMOccupation(e.target.value)} placeholder="e.g. Engineer"
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+          </div>
+
+          {/* Emergency contact */}
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">Emergency contact *</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2">
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Name *</label>
+              <input type="text" value={mEcName} onChange={e => setMEcName(e.target.value)} placeholder="Full name"
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Phone *</label>
+              <input type="tel" value={mEcPhone} onChange={e => setMEcPhone(e.target.value)} placeholder="10 digits"
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Relation *</label>
+              <input type="text" value={mEcRel} onChange={e => setMEcRel(e.target.value)} placeholder="e.g. Parent"
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+          </div>
+
+          {/* ID + address */}
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">ID &amp; Address</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Type</label>
+              <select value={mIdType} onChange={e => setMIdType(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                <option value="">Select…</option>
+                <option value="Aadhaar">Aadhaar</option>
+                <option value="PAN">PAN</option>
+                <option value="Passport">Passport</option>
+                <option value="Driving License">Driving License</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Number</label>
+              <input type="text" value={mIdNum} onChange={e => setMIdNum(e.target.value)} placeholder="e.g. 1234 5678 9012"
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Permanent Address</label>
+              <input type="text" value={mAddress} onChange={e => setMAddress(e.target.value)} placeholder="City, State"
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+            </div>
+          </div>
+
+          {/* Collect at check-in */}
+          <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">Collect at check-in</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
+              <input type="number" inputMode="decimal" value={mRentDues} onChange={e => setMRentDues(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+              <ModeToggle mode={mRentMode} setMode={setMRentMode} />
+            </div>
+            <div>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
+              <input type="number" inputMode="decimal" value={mDepDues} onChange={e => setMDepDues(e.target.value)}
+                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+              <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
+            </div>
+          </div>
+
+          {/* Confirm */}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setManualOpen(false); setErr("") }}
+              className="flex-1 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted">
+              Cancel
+            </button>
+            <button onClick={doManualCheckin} disabled={manualSaving}
+              className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white disabled:opacity-50">
+              {manualSaving ? "Checking in…" : "Check In →"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
