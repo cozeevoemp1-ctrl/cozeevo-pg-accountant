@@ -35,6 +35,7 @@ class QuickBookRequest(BaseModel):
     daily_rate: float = 0.0
     checkout_date: str = ""         # YYYY-MM-DD, required for daily
     booking_amount: float = 0.0     # advance paid at booking
+    sharing_type: str = ""          # "premium" = full room; "" = single bed
     notes: str = ""                 # stored in onboarding_sessions.special_terms
 
 
@@ -116,6 +117,9 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         # Create session — pre-fill name in tenant_data so Bookings page shows it immediately
         token = str(uuid.uuid4())
         if req.stay_type == "daily":
+            _sharing = req.sharing_type.strip().lower() if req.sharing_type else None
+            if _sharing not in ("single", "double", "triple", "premium"):
+                _sharing = None
             obs = OnboardingSession(
                 token=token,
                 status="pending_tenant",
@@ -130,6 +134,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 checkin_date=checkin,
                 checkout_date=checkout,
                 stay_type="daily",
+                sharing_type=_sharing,
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
                 special_terms=req.notes.strip() or None,
                 expires_at=datetime.utcnow() + timedelta(hours=48),

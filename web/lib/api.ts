@@ -966,6 +966,7 @@ export async function quickBook(payload: {
   security_deposit?: number;
   daily_rate?: number;
   checkout_date?: string;
+  sharing_type?: string;
   booking_amount?: number;
   notes?: string;
 }): Promise<QuickBookResult> {

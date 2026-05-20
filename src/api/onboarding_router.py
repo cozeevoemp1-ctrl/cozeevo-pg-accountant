@@ -1202,6 +1202,24 @@ class ApproveRequest(BaseModel):
     overrides: dict = {}
 
 
+class ManualCheckinRequest(BaseModel):
+    # KYC — name and phone come from the session; staff fills the rest
+    gender: str                              # "Male" | "Female" | "Other"
+    food_preference: str                     # "Veg" | "Non-Veg"
+    emergency_contact_name: str
+    emergency_contact_phone: str
+    emergency_contact_relationship: str
+    date_of_birth: str = ""
+    id_proof_type: str = ""
+    id_proof_number: str = ""
+    permanent_address: str = ""
+    occupation: str = ""
+    # Collection at check-in (same fields as ApproveRequest)
+    collected_rent_dues: float = 0
+    rent_dues_mode: str = "cash"             # "cash" | "upi"
+    collected_deposit_dues: float = 0        # always UPI
+
+
 _KYC_FIELD_LABELS = {
     "name": "Name", "phone": "Phone", "gender": "Gender",
     "date_of_birth": "Date of Birth", "email": "Email",
@@ -1252,6 +1270,60 @@ async def approve_session(token: str, request: Request, req: ApproveRequest = No
         )
         # Surface a readable reason to the admin UI instead of a blank 500
         raise HTTPException(500, f"Approve failed: {type(e).__name__}: {e}")
+
+
+@router.post("/{token}/manual-checkin")
+async def manual_checkin(token: str, request: Request, req: ManualCheckinRequest):
+    """
+    Staff-entered KYC + immediate check-in for tenants who won't fill the form.
+    Works for pending_tenant and expired sessions.
+    """
+    _check_admin_pin(request)
+    # Phase 1: patch tenant_data + promote session to pending_review
+    async with get_session() as session:
+        obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
+        if not obs:
+            raise HTTPException(404, "Session not found")
+        if obs.status not in ("pending_tenant", "expired"):
+            raise HTTPException(400, f"Manual check-in only allowed for pending_tenant or expired sessions (current: {obs.status})")
+
+        tenant_data = {
+            "name": obs.tenant_name or "",
+            "phone": obs.tenant_phone or "",
+            "gender": req.gender,
+            "food_preference": req.food_preference,
+            "emergency_contact_name": req.emergency_contact_name,
+            "emergency_contact_phone": req.emergency_contact_phone,
+            "emergency_contact_relationship": req.emergency_contact_relationship,
+            "date_of_birth": req.date_of_birth,
+            "id_proof_type": req.id_proof_type,
+            "id_proof_number": req.id_proof_number,
+            "permanent_address": req.permanent_address,
+            "occupation": req.occupation,
+            "saved_files": {},  # no file uploads for manual entry
+        }
+        obs.tenant_data = json.dumps(tenant_data)
+        obs.status = "pending_review"
+        await session.commit()
+
+    # Phase 2: reuse existing approve logic (opens its own session)
+    approve_req = ApproveRequest(
+        instant_checkin=True,
+        entry_source="manual_entry",
+        collected_rent_dues=req.collected_rent_dues,
+        rent_dues_mode=req.rent_dues_mode,
+        collected_deposit_dues=req.collected_deposit_dues,
+    )
+    try:
+        return await _approve_session_impl(token, approve_req)
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging, traceback
+        logging.getLogger(__name__).error(
+            "Manual check-in failed for token %s: %s\n%s", token[:8], e, traceback.format_exc()
+        )
+        raise HTTPException(500, f"Manual check-in failed: {type(e).__name__}: {e}")
 
 
 async def _approve_session_impl(token: str, req: ApproveRequest | None):
@@ -1421,6 +1493,13 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             num_days = obs.num_days or max(1, (checkout - checkin).days)
             total_paid = float(obs.agreed_rent or 0)  # agreed_rent stores total paid for daily
 
+            from src.database.models import SharingType as _ST
+            _dw_sharing = None
+            if obs.sharing_type and obs.sharing_type in ("single", "double", "triple", "premium"):
+                try:
+                    _dw_sharing = _ST(obs.sharing_type)
+                except ValueError:
+                    pass
             tenancy = Tenancy(
                 tenant_id=tenant.id,
                 room_id=room.id if room else None,
@@ -1433,6 +1512,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 booking_amount=obs.booking_amount or 0,
                 maintenance_fee=obs.maintenance_fee or 0,
                 notes=obs.special_terms or "",
+                sharing_type=_dw_sharing,
                 entered_by="onboarding_form",
             )
             session.add(tenancy)

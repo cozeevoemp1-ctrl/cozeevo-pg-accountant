@@ -282,6 +282,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
   const [checkoutDate, setCheckoutDate] = useState("");
   const [rent, setRent] = useState("");
   const [dailyRate, setDailyRate] = useState("");
+  const [fullRoom, setFullRoom] = useState(false);
   const [advance, setAdvance] = useState("");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
@@ -312,6 +313,7 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
               stay_type: "daily",
               daily_rate: parseFloat(dailyRate),
               checkout_date: checkoutDate,
+              sharing_type: fullRoom ? "premium" : "",
               security_deposit: parseFloat(deposit) || 0,
               booking_amount: parseFloat(advance) || 0,
               notes: notes.trim() || undefined,
@@ -439,6 +441,23 @@ function QuickBookModal({ room, onClose, onSuccess }: QuickBookModalProps) {
                       className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                       required
                     />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed occupancy</label>
+                    <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+                      {([false, true] as const).map((val) => (
+                        <button
+                          key={String(val)}
+                          type="button"
+                          onClick={() => setFullRoom(val)}
+                          className={`flex-1 py-2 text-xs font-bold transition-colors ${
+                            fullRoom === val ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
+                          }`}
+                        >
+                          {val ? "Full room" : "Single bed"}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Security deposit (₹)</label>
