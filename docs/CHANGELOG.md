@@ -14,11 +14,9 @@ All notable changes to PG Accountant will be documented here.
 ## [1.76.10] — 2026-05-20 — Pre-book modal: fix form disappearing on interaction
 
 ### Bug fix — `web/components/home/kpi-grid.tsx`
-- **Root cause**: outer wrapper had `onClick={onClose}` with inner card using `stopPropagation`. Clicks could still escape containment in edge cases (backdrop visible on wide screens, form near viewport edge).
-- Moved `onClick={onClose}` to the backdrop `<div>` directly — only the dark overlay dismisses the modal.
-- Removed `onClick={stopPropagation}` from the white card — no longer needed.
-- Added `overflow-y-auto max-h-[90vh]` to both `QuickBookModal` and `QuickCollectModal` — form scrolls on short screens instead of overflowing the viewport.
-- Same fix applied to collect-payment modal.
+- **Root cause**: outer wrapper had `onClick={onClose}` — any click outside the inner white card (including on the dark backdrop) dismissed the form, causing accidental closure while typing or clicking fields near the edge.
+- Removed all click-to-dismiss from both `QuickBookModal` and `QuickCollectModal`. Only the × button closes the modal.
+- Added `overflow-y-auto max-h-[90vh]` — form scrolls on short screens instead of overflowing the viewport.
 
 ---
 
