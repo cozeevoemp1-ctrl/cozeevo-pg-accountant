@@ -18,7 +18,7 @@ import {
 } from "@/lib/api"
 
 type Method = "UPI" | "CASH"
-type ForType = "rent" | "deposit" | "maintenance" | "booking" | "adjustment"
+type ForType = "rent" | "deposit"
 
 const METHODS: { value: Method; label: string; icon: string }[] = [
   { value: "CASH", label: "Cash", icon: "💵" },
@@ -28,8 +28,6 @@ const METHODS: { value: Method; label: string; icon: string }[] = [
 const FOR_TYPES: { value: ForType; label: string }[] = [
   { value: "rent", label: "Rent" },
   { value: "deposit", label: "Deposit" },
-  { value: "maintenance", label: "Maintenance" },
-  { value: "adjustment", label: "Adjustment" },
 ]
 
 function currentMonth(): string {
