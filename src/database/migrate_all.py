@@ -406,10 +406,17 @@ async def run_room_master_fix(conn: AsyncConnection) -> None:
     r = await conn.execute(text("""
         UPDATE rooms SET max_occupancy = 2
         WHERE property_id = (SELECT id FROM properties WHERE name ILIKE '%HULK%' LIMIT 1)
-          AND room_number IN ('G15','G16','G17','G18','G19')
+          AND room_number IN ('G15','G17','G18','G19')
           AND max_occupancy IS DISTINCT FROM 2
     """))
-    print(f"  [ok] HULK ground doubles (G15-G19): {r.rowcount} updated")
+    print(f"  [ok] HULK ground doubles (G15,G17-G19): {r.rowcount} updated")
+
+    r = await conn.execute(text("""
+        UPDATE rooms SET max_occupancy = 1
+        WHERE room_number = 'G16'
+          AND max_occupancy IS DISTINCT FROM 1
+    """))
+    print(f"  [ok] HULK G16 single (max_occupancy=1): {r.rowcount} updated")
 
     print("  [done] Room master fix complete")
 
