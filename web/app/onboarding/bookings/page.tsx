@@ -450,36 +450,74 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
     }
   }
 
+  async function pdfToJpegDataUrl(file: File): Promise<string> {
+    // Mirror the same PDF.js CDN approach used in static/onboarding.html
+    const win = window as Window & { pdfjsLib?: { GlobalWorkerOptions: { workerSrc: string }; getDocument: (o: object) => { promise: Promise<{ getPage: (n: number) => Promise<{ getViewport: (o: object) => { width: number; height: number }; render: (o: object) => { promise: Promise<void> } }> }> } } }
+    if (!win.pdfjsLib) {
+      await new Promise<void>((res, rej) => {
+        const s = document.createElement("script")
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        s.onload = () => {
+          if (win.pdfjsLib) win.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+          res()
+        }
+        s.onerror = rej
+        document.head.appendChild(s)
+      })
+    }
+    const lib = win.pdfjsLib!
+    const pdfData = new Uint8Array(await file.arrayBuffer())
+    const pdf = await lib.getDocument({ data: pdfData }).promise
+    const page = await pdf.getPage(1)
+    const viewport = page.getViewport({ scale: 2.0 })
+    const canvas = document.createElement("canvas")
+    canvas.width = viewport.width
+    canvas.height = viewport.height
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise
+    return canvas.toDataURL("image/jpeg", 0.92)
+  }
+
   async function scanIdCard(file: File) {
     setMIdScanLoading(true)
     setMIdScanMsg("")
     try {
-      // Read file as base64 — reuses the same extract-id endpoint the tenant form uses
-      const dataUrl: string = await new Promise((res, rej) => {
-        const fr = new FileReader()
-        fr.onload = () => res(fr.result as string)
-        fr.onerror = rej
-        fr.readAsDataURL(file)
-      })
+      let dataUrl: string
+      let mimeForOcr = file.type || "image/jpeg"
+
+      if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+        // Same path as onboarding.html: render PDF page 1 → JPEG → OCR
+        setMIdScanMsg("Converting PDF…")
+        dataUrl = await pdfToJpegDataUrl(file)
+        setMIdCardPreview(dataUrl)   // update preview to the rendered page
+        mimeForOcr = "image/jpeg"
+      } else {
+        dataUrl = await new Promise((res, rej) => {
+          const fr = new FileReader()
+          fr.onload = () => res(fr.result as string)
+          fr.onerror = rej
+          fr.readAsDataURL(file)
+        })
+      }
+
+      setMIdScanMsg("Reading ID details…")
       const httpRes = await fetch(`${API_URL}/api/onboarding/${b.token}/extract-id`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_b64: dataUrl, mime_type: file.type || "image/jpeg" }),
+        body: JSON.stringify({ image_b64: dataUrl, mime_type: mimeForOcr }),
       })
       const d = await httpRes.json()
       const f = d.fields ?? {}
       if (f.aadhaar_number) { setMIdNum(f.aadhaar_number); setMIdType("Aadhaar") }
-      if (f.name && !b.tenant_name) { /* name already on booking — skip */ }
       if (f.gender) setMGender(f.gender.charAt(0).toUpperCase() + f.gender.slice(1))
       if (f.dob) {
-        // extract-id returns DD/MM/YYYY; date input needs YYYY-MM-DD
         const parts = (f.dob as string).split("/")
         if (parts.length === 3) setMDob(`${parts[2]}-${parts[1]}-${parts[0]}`)
         else setMDob(f.dob)
       }
       if (f.address) setMAddress(f.address)
       const filled = [f.aadhaar_number, f.gender, f.dob, f.address].filter(Boolean).length
-      setMIdScanMsg(filled > 0 ? "Fields auto-filled — verify before saving" : "Card read but no fields extracted — fill manually")
+      setMIdScanMsg(filled > 0 ? "Fields auto-filled — verify before saving" : "Card read but no fields found — fill manually")
     } catch {
       setMIdScanMsg("Scan failed — fill fields manually")
     } finally {
@@ -934,17 +972,15 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             <input
               ref={idFileRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/heic"
+              accept="image/*,application/pdf"
               className="hidden"
               onChange={e => {
                 const f = e.target.files?.[0]
                 if (!f) return
-                if (f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")) {
-                  setMIdScanMsg("PDFs not supported — please upload a JPG or PNG photo of the ID card")
-                  e.target.value = ""
-                  return
+                // For images set preview immediately; PDFs get their preview after PDF.js renders
+                if (f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf")) {
+                  setMIdCardPreview(URL.createObjectURL(f))
                 }
-                setMIdCardPreview(URL.createObjectURL(f))
                 scanIdCard(f)
               }}
             />
