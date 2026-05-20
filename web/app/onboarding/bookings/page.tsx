@@ -454,22 +454,34 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
     setMIdScanLoading(true)
     setMIdScanMsg("")
     try {
-      const fd = new FormData()
-      fd.append("file", file)
-      const res = await fetch(`${API_URL}/api/onboarding/scan-id`, {
-        method: "POST",
-        headers: { "X-Admin-Pin": ADMIN_PIN },
-        body: fd,
+      // Read file as base64 — reuses the same extract-id endpoint the tenant form uses
+      const dataUrl: string = await new Promise((res, rej) => {
+        const fr = new FileReader()
+        fr.onload = () => res(fr.result as string)
+        fr.onerror = rej
+        fr.readAsDataURL(file)
       })
-      if (!res.ok) throw new Error(`${res.status}`)
-      const d = await res.json()
-      if (d.id_type) setMIdType(d.id_type)
-      if (d.id_number) setMIdNum(d.id_number)
-      if (d.dob) setMDob(d.dob)
-      if (d.address) setMAddress(d.address)
-      setMIdScanMsg("Fields auto-filled from ID card — verify before saving")
+      const httpRes = await fetch(`${API_URL}/api/onboarding/${b.token}/extract-id`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_b64: dataUrl, mime_type: file.type || "image/jpeg" }),
+      })
+      const d = await httpRes.json()
+      const f = d.fields ?? {}
+      if (f.aadhaar_number) { setMIdNum(f.aadhaar_number); setMIdType("Aadhaar") }
+      if (f.name && !b.tenant_name) { /* name already on booking — skip */ }
+      if (f.gender) setMGender(f.gender.charAt(0).toUpperCase() + f.gender.slice(1))
+      if (f.dob) {
+        // extract-id returns DD/MM/YYYY; date input needs YYYY-MM-DD
+        const parts = (f.dob as string).split("/")
+        if (parts.length === 3) setMDob(`${parts[2]}-${parts[1]}-${parts[0]}`)
+        else setMDob(f.dob)
+      }
+      if (f.address) setMAddress(f.address)
+      const filled = [f.aadhaar_number, f.gender, f.dob, f.address].filter(Boolean).length
+      setMIdScanMsg(filled > 0 ? "Fields auto-filled — verify before saving" : "Card read but no fields extracted — fill manually")
     } catch {
-      setMIdScanMsg("Auto-scan failed — fill fields manually")
+      setMIdScanMsg("Scan failed — fill fields manually")
     } finally {
       setMIdScanLoading(false)
     }
