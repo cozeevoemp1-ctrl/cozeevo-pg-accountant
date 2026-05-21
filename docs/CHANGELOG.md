@@ -2,6 +2,21 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.23] — 2026-05-21 — WhatsApp templates for prep reminders + tenant checkout reminder
+
+### New Meta Templates (PENDING approval, submitted 2026-05-21)
+- **`cozeevo_checkin_prep`** (Utility, 8 params): staff prep alert for check-ins — date, room, name, phone, rent, deposit, advance, dues
+- **`cozeevo_checkout_prep`** (Utility, 5 params): staff prep alert for check-outs — date, room, name, phone, dues pending
+- **`cozeevo_checkout_reminder`** (Utility, 4 params): tenant-facing reminder sent 5 days, 2 days, and day-of checkout — name, room, date, days. Includes instructions to call +91 85488 84455 AND send written WhatsApp message if extending.
+
+### Standard approach established
+- WhatsApp templates must always be created via API (`curl POST graph.facebook.com/v18.0/{WABA_ID}/message_templates`) — not the browser UI. Saved to memory.
+- Positional params `{{1}}`, `{{2}}` etc. required (named params fail on this account).
+
+### Pending (once templates approved)
+- Wire `_prep_reminder` in `scheduler.py` to use `send_template("cozeevo_checkin_prep")` / `("cozeevo_checkout_prep")` per-tenant — one message per person, not bulk summary
+- Add new daily scheduler job for `cozeevo_checkout_reminder` — fires at 9am IST, targets tenants with `expected_checkout` in exactly 5, 2, or 0 days
+
 ## [1.76.22] — 2026-05-21 — Checkout tile + prep reminder permanent fix
 
 ### Fix — `src/scheduler.py` `_prep_reminder`
