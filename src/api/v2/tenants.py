@@ -758,6 +758,12 @@ async def delete_tenant(
 
         await session.execute(text("DELETE FROM tenancies WHERE id = :id"), {"id": tenancy_id})
         if not other:
+            # Null out tenant_id FKs in documents and onboarding_sessions before deleting tenant
+            for tbl in ["documents", "onboarding_sessions"]:
+                await session.execute(
+                    text(f"UPDATE {tbl} SET tenant_id = NULL WHERE tenant_id = :tid"),
+                    {"tid": tenant.id},
+                )
             await session.execute(text("DELETE FROM tenants WHERE id = :id"), {"id": tenant.id})
 
         await session.commit()
