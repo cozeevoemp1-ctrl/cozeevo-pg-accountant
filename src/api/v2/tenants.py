@@ -736,7 +736,7 @@ async def delete_tenant(
             )
         # Nullable FK tables: just NULL them out
         # NOTE: "agreements" excluded — table does not exist in schema
-        for tbl in ["reminders", "onboarding_sessions", "documents"]:
+        for tbl in ["reminders", "onboarding_sessions", "documents", "upi_collection_entries"]:
             await session.execute(
                 text(f"UPDATE {tbl} SET tenancy_id = NULL WHERE tenancy_id = :tid"),
                 {"tid": tenancy_id},
