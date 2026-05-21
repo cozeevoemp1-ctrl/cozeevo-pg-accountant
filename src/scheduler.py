@@ -390,11 +390,15 @@ async def _prep_reminder(when: str = "today") -> None:
     # MUST use send_template (approved Meta template) — free-form _send_whatsapp only works
     # within 24-hour customer-service window, so Lokesh/Kiran/Lakshmi silently miss it
     # when they haven't messaged the bot recently. general_notice bypasses the window.
+    #
+    # Meta error #132018: template params cannot contain newlines or tabs.
+    # Strip formatting to a flat single-line summary for the template param.
+    flat_msg = msg.replace("*", "").replace("\n", " | ").replace("  ", " ").strip()
     from src.whatsapp.reminder_sender import send_template
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await send_template(phone, "general_notice", body_params=[name, msg])
+            ok = await send_template(phone, "general_notice", body_params=[name, flat_msg])
             if ok:
                 sent += 1
                 logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
