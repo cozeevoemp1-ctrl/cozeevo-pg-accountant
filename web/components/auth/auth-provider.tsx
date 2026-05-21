@@ -25,6 +25,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Force SW update check on every app launch — ensures new deploys activate immediately
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) =>
+        regs.forEach((r) => r.update())
+      );
+    }
+  }, []);
+
+  useEffect(() => {
     const client = supabase();
 
     // Load initial session
