@@ -1,6 +1,6 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist, NetworkFirst, ExpirationPlugin } from "serwist";
+import { Serwist, NetworkFirst, NetworkOnly, ExpirationPlugin } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -9,6 +9,15 @@ declare global {
 }
 
 declare const self: WorkerGlobalScope & typeof globalThis;
+
+// Never cache cross-origin API calls — pass them straight to the network.
+// Catches: api.getkozzy.com (FastAPI), *.supabase.co (auth token refresh, DB).
+// Without this, SW strategies in defaultCache can intercept and silently fail
+// DELETE/PATCH/POST requests, producing "Failed to fetch" in the browser.
+const crossOriginNetworkOnly = {
+  matcher: ({ sameOrigin }: { sameOrigin: boolean }) => !sameOrigin,
+  handler: new NetworkOnly(),
+};
 
 // HTML pages use NetworkFirst so post-deploy Server Action IDs always match the live build.
 // defaultCache uses StaleWhileRevalidate for pages (serves old cache instantly after deploy → broken Server Actions).
@@ -30,7 +39,7 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: [pagesNetworkFirst, ...defaultCache],
+  runtimeCaching: [crossOriginNetworkOnly, pagesNetworkFirst, ...defaultCache],
 });
 
 serwist.addEventListeners();

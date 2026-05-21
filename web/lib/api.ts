@@ -7,8 +7,15 @@ import { supabase } from "./supabase";
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com";
 
 async function _authHeaders(token?: string): Promise<Record<string, string>> {
-  const tok = token ?? (await supabase().auth.getSession()).data.session?.access_token;
-  return tok ? { Authorization: `Bearer ${tok}` } : {};
+  if (token) return { Authorization: `Bearer ${token}` };
+  try {
+    const { data: { session } } = await supabase().auth.getSession();
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+  } catch {
+    // getSession() can throw "Failed to fetch" when Supabase auto-refresh network call fails.
+    // Return empty headers — the API will 401, which shows a proper error instead of "Failed to fetch".
+    return {};
+  }
 }
 
 async function _get<T>(path: string, token?: string): Promise<T> {
