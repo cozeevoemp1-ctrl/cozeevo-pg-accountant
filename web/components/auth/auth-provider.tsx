@@ -25,12 +25,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Force SW update check on every app launch — ensures new deploys activate immediately
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistrations().then((regs) =>
-        regs.forEach((r) => r.update())
-      );
-    }
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+
+    // When a new SW takes control, reload so stale fetch handlers are replaced immediately.
+    // Guard prevents infinite reload loop if controller changes again during the reload.
+    let refreshing = false;
+    const handleControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+
+    // Force update check on every app launch — picks up new deploys without user action
+    navigator.serviceWorker.getRegistrations().then((regs) =>
+      regs.forEach((r) => r.update())
+    );
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    };
   }, []);
 
   useEffect(() => {
