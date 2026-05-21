@@ -393,12 +393,14 @@ async def _prep_reminder(when: str = "today") -> None:
     #
     # Meta error #132018: template params cannot contain newlines or tabs.
     # Strip formatting to a flat single-line summary for the template param.
+    # general_notice has 1 param only (confirmed from Meta error #132000).
+    # No newlines allowed in template params (Meta error #132018) — flatten to single line.
     flat_msg = msg.replace("*", "").replace("\n", " | ").replace("  ", " ").strip()
     from src.whatsapp.reminder_sender import send_template
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await send_template(phone, "general_notice", body_params=[name, flat_msg])
+            ok = await send_template(phone, "general_notice", body_params=[flat_msg])
             if ok:
                 sent += 1
                 logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
