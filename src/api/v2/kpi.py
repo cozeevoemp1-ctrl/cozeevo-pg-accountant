@@ -197,11 +197,19 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         )
         checkins_today = _tenancy_checkins + _session_checkins
 
-        # Checkouts today
+        # Checkouts today — either already recorded or notice expected_checkout = today
         checkouts_today = int(
             await session.scalar(
                 select(func.count(Tenancy.id))
-                .where(Tenancy.checkout_date == today)
+                .where(
+                    or_(
+                        Tenancy.checkout_date == today,
+                        and_(
+                            Tenancy.expected_checkout == today,
+                            Tenancy.status == TenancyStatus.active,
+                        ),
+                    )
+                )
             ) or 0
         )
 
@@ -358,10 +366,18 @@ async def get_kpi_detail(
 
         elif type == "checkouts_today":
             rows = (await session.execute(
-                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.stay_type, Tenancy.status)
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.expected_checkout, Tenancy.stay_type, Tenancy.status)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
-                .where(Tenancy.checkout_date == today)
+                .where(
+                    or_(
+                        Tenancy.checkout_date == today,
+                        and_(
+                            Tenancy.expected_checkout == today,
+                            Tenancy.status == TenancyStatus.active,
+                        ),
+                    )
+                )
                 .order_by(Room.room_number)
             )).all()
             return {"type": type, "items": [
