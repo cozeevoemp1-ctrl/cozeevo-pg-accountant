@@ -215,7 +215,7 @@ def start_scheduler() -> AsyncIOScheduler:
     )
 
     scheduler.start()
-    logger.info("[Scheduler] Started — 5 jobs registered (rent reminders disabled 2026-05-13)")
+    logger.info("[Scheduler] Started — jobs registered (prep reminders via send_template)")
     _log_next_runs(scheduler)
     return scheduler
 
@@ -387,13 +387,14 @@ async def _prep_reminder(when: str = "today") -> None:
             lines.append(f"• Room {rn} — {nm}{ph_part}")
 
     msg = "\n".join(lines)
-    # Send via bot number (free-form text) — staff/admins always within 24h window.
-    # general_notice template was wrong (1-param rent reminder, not general); bot is reliable.
-    from src.whatsapp.webhook_handler import _send_whatsapp
+    # MUST use send_template (approved Meta template) — free-form _send_whatsapp only works
+    # within 24-hour customer-service window, so Lokesh/Kiran/Lakshmi silently miss it
+    # when they haven't messaged the bot recently. general_notice bypasses the window.
+    from src.whatsapp.reminder_sender import send_template
     sent = 0
     for phone, name in admin_recipients:
         try:
-            ok = await _send_whatsapp(phone, msg)
+            ok = await send_template(phone, "general_notice", body_params=[name, msg])
             if ok:
                 sent += 1
                 logger.info(f"[Scheduler] prep_reminder ({when}) — sent to {phone} ({name})")
