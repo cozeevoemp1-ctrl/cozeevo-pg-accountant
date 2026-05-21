@@ -20,39 +20,47 @@ from loguru import logger
 load_dotenv()
 
 # ── Security middleware — block external access to /api/* ──────────────────
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request as StarletteRequest
+# Pure ASGI middleware (not BaseHTTPMiddleware) so that error responses from
+# route handlers still flow through CORSMiddleware and get CORS headers.
+# BaseHTTPMiddleware has a known bug where exceptions bypass CORSMiddleware,
+# causing "No Access-Control-Allow-Origin" on DELETE/PATCH/POST error responses.
+from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.responses import Response as StarletteResponse
 
-class LocalOnlyMiddleware(BaseHTTPMiddleware):
-    """
-    Allow /webhook/* from anywhere (Meta Cloud API needs this).
-    Block /api/* and /docs from the public internet — localhost only.
-    This protects against someone finding your ngrok URL and abusing it.
-    """
-    async def dispatch(self, request: StarletteRequest, call_next):
-        path = request.url.path
+class LocalOnlyMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path: str = scope.get("path", "")
 
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
                 or path.startswith("/static") or path.startswith("/media")
-                or path.startswith("/onboard")  # tenant onboarding form (public)
-                or path == "/qr"                # QR walk-in → creates session → redirects to /onboard
-                or path.startswith("/admin/onboarding")  # admin onboarding panel
-                or path.startswith("/api/onboarding")  # all onboarding API endpoints
-                or path.startswith("/admin/checkout")   # admin checkout panel
-                or path.startswith("/checkout")         # tenant checkout confirm page (public)
-                or path.startswith("/api/checkout")     # all checkout API endpoints
-                or path.startswith("/api/sync")  # live source sheet sync (token-protected)
-                or path.startswith("/api/v2/app")):  # Owner PWA API — JWT-protected at endpoint level
-            return await call_next(request)
+                or path.startswith("/onboard")
+                or path == "/qr"
+                or path.startswith("/admin/onboarding")
+                or path.startswith("/api/onboarding")
+                or path.startswith("/admin/checkout")
+                or path.startswith("/checkout")
+                or path.startswith("/api/checkout")
+                or path.startswith("/api/sync")
+                or path.startswith("/api/v2/app")):
+            await self.app(scope, receive, send)
+            return
 
-        # Everything else (/api/*, /docs, /redoc, /openapi.json) — localhost only
-        client_host = request.client.host if request.client else ""
+        client = scope.get("client")
+        client_host = client[0] if client else ""
         is_local = client_host in ("127.0.0.1", "::1", "localhost")
         if not is_local:
-            return StarletteResponse("Forbidden", status_code=403)
+            response = StarletteResponse("Forbidden", status_code=403)
+            await response(scope, receive, send)
+            return
 
-        return await call_next(request)
+        await self.app(scope, receive, send)
 
 
 # ── Lifespan ───────────────────────────────────────────────────────────────
