@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.24] — 2026-05-21 — Hard-delete tenant bug fixed (Load failed)
+
+### Root cause investigation
+- **"Load failed" on iOS Safari** = browser-level block, not a network issue. CORS headers were correct.
+- **Actual error (from VPS logs)**: `ForeignKeyViolationError` on `documents_tenant_id_fkey` when deleting the tenant row — the null-out loop only cleared `tenancy_id` columns but never touched `tenant_id` FKs.
+
+### Backend fixes — `src/api/v2/tenants.py` DELETE endpoint
+1. **`upi_collection_entries.payment_id`** — nulled out *before* the payment delete loop. `payment_id` FKs to `payments` with no `ON DELETE`; deleting payments while UPI entries reference them would 500.
+2. **`upi_collection_entries.tenancy_id`** — added to the null-out loop (was missing entirely).
+3. **`documents.tenant_id`** — nulled out before deleting the tenant row (only done when the tenant has no other tenancies).
+4. **`onboarding_sessions.tenant_id`** — nulled out before deleting the tenant row (same condition).
+
+### UI fix — `web/app/tenants/[tenancy_id]/edit/page.tsx`
+- After successful delete: shows confirmation screen with tenant name + reason (was silent redirect).
+- `router.refresh()` called on delete so home page re-fetches live data instead of serving Next.js cache.
+- Two buttons on success screen: "Back to Home" and "Manage Tenants".
+
 ## [1.76.23] — 2026-05-21 — WhatsApp templates for prep reminders + tenant checkout reminder
 
 ### New Meta Templates (PENDING approval, submitted 2026-05-21)
