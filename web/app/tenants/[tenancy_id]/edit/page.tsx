@@ -61,6 +61,7 @@ export default function EditTenantPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState("")
   const [deleteReason, setDeleteReason] = useState("")
+  const [deleteSuccess, setDeleteSuccess] = useState(false)
 
   // Balance adjustment state
   const [adjAmount, setAdjAmount] = useState("")
@@ -207,7 +208,8 @@ export default function EditTenantPage() {
     setDeleting(true)
     try {
       await deleteTenant(tenancyId, deleteReason.trim(), true)
-      router.push("/tenants")
+      router.refresh()
+      setDeleteSuccess(true)
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Delete failed.")
       setDeleteWarned(false)
@@ -330,6 +332,37 @@ export default function EditTenantPage() {
           className="rounded-pill bg-brand-pink px-8 py-3 text-white font-bold text-sm"
         >
           ← Back to Manage
+        </button>
+      </main>
+    )
+  }
+
+  if (deleteSuccess) {
+    return (
+      <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+          <span className="text-base font-extrabold text-ink">Tenant Deleted</span>
+        </div>
+        <div className="w-20 h-20 rounded-full bg-[#FEE2E2] flex items-center justify-center mt-8">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+          </svg>
+        </div>
+        <div className="text-center">
+          <h1 className="text-xl font-extrabold text-ink">Booking Deleted</h1>
+          <p className="text-sm text-ink-muted mt-1">{original?.name} · {deleteReason}</p>
+        </div>
+        <button
+          onClick={() => router.push("/")}
+          className="rounded-pill bg-brand-pink px-8 py-3 text-white font-bold text-sm"
+        >
+          ← Back to Home
+        </button>
+        <button
+          onClick={() => router.push("/tenants")}
+          className="rounded-pill border border-[#E2DEDD] px-8 py-3 text-sm font-semibold text-ink"
+        >
+          Manage Tenants
         </button>
       </main>
     )

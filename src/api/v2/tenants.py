@@ -720,6 +720,11 @@ async def delete_tenant(
         # (no passive_deletes) would issue UPDATE SET tenancy_id=NULL before the
         # parent delete — but tenancy_id is NOT NULL on all these tables → 500.
         # Raw SQL bypasses ORM cascade entirely.
+        # Null out payment_id in upi_collection_entries BEFORE deleting payments
+        await session.execute(
+            text("UPDATE upi_collection_entries SET payment_id = NULL WHERE tenancy_id = :tid"),
+            {"tid": tenancy_id},
+        )
         for tbl in [
             "checkout_sessions",   # must come before checkout_records (no FK dep)
             "checkout_records",
