@@ -2,6 +2,23 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.22] — 2026-05-21 — Checkout tile + prep reminder permanent fix
+
+### Fix — `src/scheduler.py` `_prep_reminder`
+- **Root cause found**: `_send_whatsapp` (free-form text) only delivers inside Meta's 24h customer-service window. Lokesh and admins who haven't messaged the bot recently were silently missed — Meta returns HTTP 200 but drops delivery.
+- **Permanent fix**: switched to `send_template("general_notice", body_params=[name, msg])` — approved UTILITY template, no 24h window restriction. Confirmed `REMINDER_WHATSAPP_TOKEN` + `REMINDER_WHATSAPP_PHONE_NUMBER_ID` set on VPS → sends from official reminder number.
+- Added clear comment in code explaining WHY this must be `send_template` to prevent future regression.
+- This was the root cause of repeated "reminders not working" reports across multiple sessions.
+
+### Fix — `src/api/v2/kpi.py` `checkouts_today`
+- **Root cause**: `checkout_date` is only set after the checkout form is submitted. Monthly tenants on notice have `expected_checkout` set, not `checkout_date`. Query was missing these.
+- **Fix**: both count query and detail query now use `checkout_date = today OR (expected_checkout = today AND status = active)`.
+- Arun Vasavan (Room 216) now correctly appears in checkouts_today tile.
+
+### Fix — `web/components/home/kpi-grid.tsx` Row 3
+- Check-ins + Check-outs tiles were hidden entirely when both counts were 0 (conditional render).
+- Now always visible — non-interactive div when 0, clickable tile when > 0.
+
 ## [1.76.21] — 2026-05-20 — Payment form cleanup + KPI refresh + activity feed month
 
 ### Fix — `web/app/payment/new/page.tsx`
