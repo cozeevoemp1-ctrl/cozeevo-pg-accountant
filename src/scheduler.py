@@ -127,25 +127,23 @@ def start_scheduler() -> AsyncIOScheduler:
 
     # ── Register jobs ──────────────────────────────────────────────────────────
 
-    # !! RENT REMINDERS DISABLED — Kiran 2026-05-13. Do NOT re-enable without explicit instruction.
-    # !! Use PWA to send manually when needed.
-    # scheduler.add_job(
-    #     _rent_reminder,
-    #     trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
-    #     id="rent_reminder_advance",
-    #     name="Rent Reminder — Day -1 (last day of month)",
-    #     replace_existing=True,
-    #     kwargs={"mode": "advance"},
-    # )
-    # for _day, _id in [(1, "rent_reminder_day1"), (3, "rent_reminder_day3"), (5, "rent_reminder_day5")]:
-    #     scheduler.add_job(
-    #         _rent_reminder,
-    #         trigger=CronTrigger(day=_day, hour=9, minute=0, timezone="Asia/Kolkata"),
-    #         id=_id,
-    #         name=f"Rent Reminder — Day {_day} (overdue tenants)",
-    #         replace_existing=True,
-    #         kwargs={"mode": "overdue_daily"},
-    #     )
+    scheduler.add_job(
+        _rent_reminder,
+        trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
+        id="rent_reminder_advance",
+        name="Rent Reminder — Day -1 (last day of month)",
+        replace_existing=True,
+        kwargs={"mode": "advance"},
+    )
+    for _day, _id in [(1, "rent_reminder_day1"), (3, "rent_reminder_day3"), (5, "rent_reminder_day5")]:
+        scheduler.add_job(
+            _rent_reminder,
+            trigger=CronTrigger(day=_day, hour=9, minute=0, timezone="Asia/Kolkata"),
+            id=_id,
+            name=f"Rent Reminder — Day {_day} (overdue tenants)",
+            replace_existing=True,
+            kwargs={"mode": "overdue_daily"},
+        )
 
     scheduler.add_job(
         _daily_reconciliation,

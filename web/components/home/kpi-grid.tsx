@@ -1381,28 +1381,26 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
         )}
       </div>
 
-      {/* Row 3: Check-ins + Check-outs — conditional */}
-      {(data.checkins_today > 0 || data.checkouts_today > 0) && (
-        <div className="col-span-2 relative">
-          <div className="grid grid-cols-2 gap-3">
-            <IconTile
-              icon="↗️" label="Check-ins today"
-              value={data.checkins_today}
-              color="green" active={open === "checkins_today"}
-              onClick={() => toggle("checkins_today")}
-            />
-            <IconTile
-              icon="↙️" label="Check-outs today"
-              value={data.checkouts_today}
-              color="orange" active={open === "checkouts_today"}
-              onClick={() => toggle("checkouts_today")}
-            />
-          </div>
-          {(open === "checkins_today" || open === "checkouts_today") && (
-            <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
-          )}
+      {/* Row 3: Check-ins + Check-outs — always visible */}
+      <div className="col-span-2 relative">
+        <div className="grid grid-cols-2 gap-3">
+          <IconTile
+            icon="↗️" label="Check-ins today"
+            value={data.checkins_today}
+            color="green" active={open === "checkins_today"}
+            onClick={data.checkins_today > 0 ? () => toggle("checkins_today") : undefined}
+          />
+          <IconTile
+            icon="↙️" label="Check-outs today"
+            value={data.checkouts_today}
+            color="orange" active={open === "checkouts_today"}
+            onClick={data.checkouts_today > 0 ? () => toggle("checkouts_today") : undefined}
+          />
         </div>
-      )}
+        {(open === "checkins_today" || open === "checkouts_today") && (
+          <ExpansionPanel {...panelProps} positionStyle={fullStyle} />
+        )}
+      </div>
 
       {/* Row 4: Awaiting check-in + Pre-booked — conditional */}
       {(data.no_show_count > 0 || data.prebooked_count > 0) && (
