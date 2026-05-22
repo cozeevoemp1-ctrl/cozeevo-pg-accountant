@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.25] — 2026-05-22 — Investigation session (no code changes)
+
+### Duplicate checkout for Chinchu David (room 614) — root cause documented
+- **Symptom**: "Chinchu David / Room 614" appeared twice in the Checkouts tile.
+- **DB state**: Two tenancy records (1112 + 1119), identical room/dates/status=exited, both with a CheckoutRecord, zero payments each.
+- **How it happened**:
+  - May 19 04:05: Session 108 approved → tenancy 1112 created (Chinchu David, room 614, May 19–22, active via onboarding PWA)
+  - May 22: Chinchu David physically checked out → tenancy 1112 marked exited
+  - May 22 16:33: Prabhakaran approved session 127 (new onboarding for same person/room/dates) → tenancy 1119 created as duplicate
+- **Why guards didn't block it** — two holes in `src/services/room_occupancy.py`:
+  1. `get_active_tenancy_by_phone` only checks `status == active` → exited day-stay is invisible to phone dedup
+  2. `find_overlap_conflict` day-stay branch only checks `status == active` → exited day-stay with overlapping dates is invisible to room conflict check
+- **Fix needed** (deferred): For day-stays, overlap detection should include `exited` tenancies within the same date range, not just active ones.
+- **Data action pending** `[Kiran]`: Approve deletion of tenancy 1119 + its CheckoutRecord (zero payments, confirmed duplicate).
+
+### Room occupancy guard audit — all paths confirmed
+- All 5 runtime booking paths use `check_room_bookable` or `find_overlap_conflict` — no unguarded live paths.
+- Excel import scripts (`excel_import.py`, `delta_import.py`) have NO occupancy guard — source of historical "3 in 2-sharing" data.
+- Minor known bug: 3 places use `occ.total_occupied` instead of `occ.beds_occupied(max_occ)` — only affects premium sharing_type rooms (deferred fix).
+
 ## [1.76.24] — 2026-05-21 — Hard-delete tenant bug fixed (Load failed)
 
 ### Root cause investigation
