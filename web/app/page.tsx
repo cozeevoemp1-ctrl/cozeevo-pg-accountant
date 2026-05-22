@@ -51,7 +51,7 @@ export default async function HomePage() {
     <main className="flex flex-col gap-5 px-4 pt-6 pb-32 max-w-lg mx-auto">
       <Greeting session={session} />
 
-      {collection.status === "fulfilled" && (
+      {collection.status === "fulfilled" && session.role === "admin" && (
         <Link href="/collection/breakdown" className="block">
           <OverviewCard data={collection.value} month={monthLabel} />
         </Link>
