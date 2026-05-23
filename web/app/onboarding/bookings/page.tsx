@@ -345,7 +345,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [editRoom, setEditRoom] = useState(b.room || "")
   const [editCheckin, setEditCheckin] = useState(b.checkin_date?.slice(0, 10) || "")
   const [editRent, setEditRent] = useState(String(b.agreed_rent || ""))
-  const [editMaint, setEditMaint] = useState(String(b.maintenance_fee || 5000))
+  const [editMaint, setEditMaint] = useState(String(b.maintenance_fee || (b.stay_type === "daily" ? 0 : 5000)))
   const [editDeposit, setEditDeposit] = useState(String(b.security_deposit || b.agreed_rent || ""))
   const [editPhone, setEditPhone] = useState(b.tenant_phone || "")
   const [editName, setEditName] = useState(b.tenant_name || "")
@@ -411,7 +411,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
         room_number: editRoom || undefined,
         checkin_date: editCheckin || undefined,
         agreed_rent: editRent ? parseFloat(editRent) : undefined,
-        maintenance_fee: editMaint ? parseFloat(editMaint) : undefined,
+        maintenance_fee: b.stay_type === "daily" ? 0 : (editMaint ? parseFloat(editMaint) : undefined),
         security_deposit: editDeposit ? parseFloat(editDeposit) : (editRent ? parseFloat(editRent) : undefined),
         tenant_phone: editPhone || undefined,
         tenant_name: editName || undefined,
