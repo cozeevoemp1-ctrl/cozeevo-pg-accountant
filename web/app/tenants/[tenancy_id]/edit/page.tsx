@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
-import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, TenantDues, PatchTenantBody } from "@/lib/api"
+import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -63,6 +63,9 @@ export default function EditTenantPage() {
   const [deleteReason, setDeleteReason] = useState("")
   const [deleteSuccess, setDeleteSuccess] = useState(false)
 
+  // Previous stays
+  const [prevStays, setPrevStays] = useState<PreviousStay[]>([])
+
   // Balance adjustment state
   const [adjAmount, setAdjAmount] = useState("")
   const [adjNote, setAdjNote] = useState("")
@@ -92,6 +95,7 @@ export default function EditTenantPage() {
       })
       .catch(() => setFetchError("Could not load tenant details"))
       .finally(() => setLoading(false))
+    getPreviousStays(tenancyId).then(setPrevStays).catch(() => {})
   }, [tenancyId])
 
   function buildChanges(): PatchTenantBody {
@@ -574,6 +578,33 @@ export default function EditTenantPage() {
             />
           </div>
         </div>
+
+        {/* Previous stays */}
+        {prevStays.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide px-1">Previous Stays</p>
+            {prevStays.map((s) => (
+              <div key={s.tenancy_id} className="bg-[#F6F5F2] border border-[#E2DEDD] rounded-[16px] px-4 py-3 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-ink">Room {s.room_number} · {s.building_code}</span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.status === "exited" ? "bg-[#E9F5EE] text-[#1A6B3A]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
+                    {s.status === "exited" ? "Checked out" : "Cancelled"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-ink-muted">
+                  {s.checkin_date ?? "—"} → {s.checkout_date ?? "—"} · ₹{s.agreed_rent.toLocaleString("en-IN")}/{s.stay_type === "daily" ? "night" : "mo"}
+                </p>
+                {s.notes ? (
+                  <div className="mt-0.5 border-l-2 border-[#C8C2BC] pl-2.5">
+                    <p className="text-xs text-ink leading-snug">{s.notes}</p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-ink-muted italic">No notes</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Balance Adjustment */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">

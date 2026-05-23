@@ -165,6 +165,44 @@ async def search_tenants(
     ]
 
 
+@router.get("/tenants/{tenancy_id}/previous-stays")
+async def get_previous_stays(
+    tenancy_id: int,
+    user: AppUser = Depends(get_current_user),
+):
+    """Return past (exited/cancelled) tenancies for the same tenant — for the edit page history panel."""
+    async with get_session() as session:
+        tenancy = await session.get(Tenancy, tenancy_id)
+        if not tenancy:
+            raise HTTPException(status_code=404, detail="Tenancy not found")
+        rows = (await session.execute(
+            select(Tenancy, Room, Property)
+            .join(Room, Tenancy.room_id == Room.id)
+            .join(Property, Room.property_id == Property.id)
+            .where(
+                Tenancy.tenant_id == tenancy.tenant_id,
+                Tenancy.id != tenancy_id,
+                Tenancy.status.in_([TenancyStatus.exited, TenancyStatus.cancelled]),
+            )
+            .order_by(Tenancy.checkin_date.desc())
+            .limit(5)
+        )).all()
+    return [
+        {
+            "tenancy_id": t.id,
+            "room_number": r.room_number,
+            "building_code": _building_code(p.name),
+            "checkin_date": t.checkin_date.isoformat() if t.checkin_date else None,
+            "checkout_date": (t.checkout_date or t.expected_checkout).isoformat() if (t.checkout_date or t.expected_checkout) else None,
+            "agreed_rent": float(t.agreed_rent or 0),
+            "stay_type": t.stay_type.value if t.stay_type else "monthly",
+            "notes": t.notes or "",
+            "status": t.status.value,
+        }
+        for t, r, p in rows
+    ]
+
+
 @router.get("/tenants/{tenancy_id}/dues")
 async def get_tenant_dues(
     tenancy_id: int,

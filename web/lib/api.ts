@@ -244,6 +244,22 @@ export function getTenantDues(tenancyId: number): Promise<TenantDues> {
   return _get<TenantDues>(`/api/v2/app/tenants/${tenancyId}/dues`);
 }
 
+export interface PreviousStay {
+  tenancy_id: number;
+  room_number: string;
+  building_code: string;
+  checkin_date: string | null;
+  checkout_date: string | null;
+  agreed_rent: number;
+  stay_type: string;
+  notes: string;
+  status: string;
+}
+
+export function getPreviousStays(tenancyId: number): Promise<PreviousStay[]> {
+  return _get<PreviousStay[]>(`/api/v2/app/tenants/${tenancyId}/previous-stays`);
+}
+
 export interface AdjustmentResult {
   tenancy_id: number;
   period_month: string;
