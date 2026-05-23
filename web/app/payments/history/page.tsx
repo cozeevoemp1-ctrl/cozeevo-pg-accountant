@@ -248,7 +248,7 @@ export default function PaymentHistoryPage() {
               </span>
               {" · "}₹{Math.round(editing.amount).toLocaleString("en-IN")}
               {" · "}{editing.payment_date}
-              {editing.period_month ? ` · ${editing.period_month}` : ""}
+              {editing.period_month ? ` · for ${new Date(editing.period_month + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` : ""}
             </div>
 
             <div>
@@ -355,7 +355,7 @@ function PaymentRow({
           </span>
         </div>
         <p className="text-[11px] text-ink-muted mt-0.5">
-          {payment.payment_date}{payment.period_month ? ` · ${payment.period_month}` : ""}
+          {payment.payment_date}{payment.period_month ? ` · for ${new Date(payment.period_month + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` : ""}
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
         {payment.upi_reference && (
