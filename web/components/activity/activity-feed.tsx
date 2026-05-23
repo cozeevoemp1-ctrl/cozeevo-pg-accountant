@@ -51,12 +51,23 @@ function _dayKey(ts: string): string {
 
 export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    if (filter === "all") return events;
-    if (filter === "rent_change") return events.filter(ev => ev.type === "rent_change" || ev.type === "adjustment");
-    return events.filter(ev => ev.type === filter);
-  }, [events, filter]);
+    let list = events;
+    if (filter !== "all") {
+      if (filter === "rent_change") list = list.filter(ev => ev.type === "rent_change" || ev.type === "adjustment");
+      else list = list.filter(ev => ev.type === filter);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(ev =>
+        ev.label?.toLowerCase().includes(q) ||
+        ev.sublabel?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [events, filter, search]);
 
   const groups = useMemo(() => {
     const g: { key: string; label: string; events: ActivityFeedEvent[] }[] = [];
@@ -73,14 +84,23 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
   }, [filtered]);
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Filter chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
+    <div className="flex flex-col gap-3">
+      {/* Search */}
+      <input
+        type="text"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Search name or room…"
+        className="w-full rounded-pill border border-[#E2DEDD] bg-surface px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted/60"
+      />
+
+      {/* Filter chips — wrap so no scroll arrow */}
+      <div className="flex flex-wrap gap-2">
         {FILTERS.map(f => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
               filter === f.key
                 ? "bg-[#EF1F9C] text-white"
                 : "bg-[#F0EDE9] text-ink-muted"
