@@ -170,6 +170,39 @@ async def get_tenant_dues(
 
     tenancy, tenant, room, prop = result
 
+    # Day-wise stays have no monthly rent cycle — dues are settled at checkout only.
+    if tenancy.stay_type.value == "daily":
+        return {
+            "tenancy_id": tenancy.id,
+            "tenant_id": tenant.id,
+            "name": tenant.name,
+            "phone": tenant.phone,
+            "email": tenant.email or "",
+            "room_number": room.room_number,
+            "building_code": _building_code(prop.name),
+            "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
+            "rent_due": 0.0,
+            "adjustment": 0.0,
+            "adjustment_note": None,
+            "booking_amount": float(tenancy.booking_amount) if tenancy.booking_amount else 0.0,
+            "dues": 0.0,
+            "credit": 0.0,
+            "deposit_due": 0.0,
+            "deposit_paid": 0.0,
+            "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
+            "security_deposit": 0.0,
+            "maintenance_fee": 0.0,
+            "lock_in_months": 0,
+            "notes": tenancy.notes or "",
+            "last_payment_date": None,
+            "last_payment_amount": None,
+            "period_month": date.today().strftime("%Y-%m"),
+            "notice_date": None,
+            "expected_checkout": tenancy.checkout_date.isoformat() if tenancy.checkout_date else None,
+            "stay_type": tenancy.stay_type.value,
+            "sharing_type": tenancy.sharing_type.value if tenancy.sharing_type else None,
+        }
+
     # Current period: first day of current month
     today = date.today()
     period_month = date(today.year, today.month, 1)
