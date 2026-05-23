@@ -526,6 +526,16 @@ export default function EditTenantPage() {
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-medium text-ink-muted mb-1">Advance Paid (₹)</label>
+            <input
+              type="text"
+              readOnly
+              value={original ? String(original.booking_amount ?? 0) : ""}
+              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink-muted outline-none cursor-default"
+            />
+          </div>
         </div>
 
         {/* Stay details */}
