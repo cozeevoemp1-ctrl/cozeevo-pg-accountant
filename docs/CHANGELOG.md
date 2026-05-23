@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.26] — 2026-05-23 — Day-stay checkout fixes
+
+### `src/api/v2/checkout.py`
+- `maintenance_fee` now returns `0.0` for day-stay tenants in checkout prefetch — was returning the stored DB value (5000) causing a spurious deduction in the refund calculation.
+
+### `web/app/onboarding/bookings/page.tsx`
+- `editMaint` state no longer defaults to 5000 for day-wise bookings (was hidden from user but still sent to backend on approval).
+- API payload for daily stays now always sends `maintenance_fee: 0` explicitly.
+
+### DB cleanup
+- Zeroed `maintenance_fee` on 2 affected day-stay tenancies (1117 S K Umar, 1119 Chinchu David duplicate) which had 5000 written by the bug.
+
 ## [1.76.25] — 2026-05-22 — Investigation session (no code changes)
 
 ### Duplicate checkout for Chinchu David (room 614) — root cause documented
