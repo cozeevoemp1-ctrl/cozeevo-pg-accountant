@@ -11,11 +11,19 @@ WRITE = "--write" in sys.argv
 
 
 async def run():
-    from main import app  # noqa — triggers init_db()
-    from src.database.db_manager import get_session
+    import os
+    from dotenv import load_dotenv
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
     from sqlalchemy import text
 
-    async with get_session() as s:
+    load_dotenv()
+    url = os.environ["DATABASE_URL"]
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    engine = create_async_engine(url, echo=False)
+    Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+    async with Session() as s:
         # Verify zero payments
         payment_count = (await s.execute(
             text("SELECT COUNT(*) FROM payments WHERE tenancy_id=1119 AND is_void=false")
@@ -40,6 +48,11 @@ async def run():
         )).fetchall()
         print(f"OnboardingSessions to null: {[r[0] for r in obs]}")
 
+        ref = (await s.execute(
+            text("SELECT id, amount FROM refunds WHERE tenancy_id=1119")
+        )).fetchall()
+        print(f"Refunds to delete: {[(r[0], r[1]) for r in ref]}")
+
         if not WRITE:
             print("\nDRY RUN — pass --write to execute")
             return
@@ -48,6 +61,8 @@ async def run():
         await s.execute(text("DELETE FROM checkout_sessions WHERE tenancy_id=1119"))
         await s.execute(text("UPDATE onboarding_sessions SET tenancy_id=NULL WHERE tenancy_id=1119"))
         await s.execute(text("DELETE FROM payments WHERE tenancy_id=1119"))
+        await s.execute(text("DELETE FROM refunds WHERE tenancy_id=1119"))
+        await s.execute(text("UPDATE documents SET tenancy_id=NULL WHERE tenancy_id=1119"))
         await s.execute(text("DELETE FROM tenancies WHERE id=1119"))
         await s.commit()
         print("Done — tenancy 1119 and all linked records deleted.")
