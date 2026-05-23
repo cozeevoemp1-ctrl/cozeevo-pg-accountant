@@ -119,16 +119,17 @@ function NewCheckoutPage() {
 
   const expectedLastDay = prefetch?.notice_date ? calcLastDay(prefetch.notice_date) : null
 
-  // Day-wise extra nights: if checkoutDate > booked checkout date
+  // Day-wise: recalculate dues based on actual checkout date vs booked checkout date
   const isDaily = prefetch?.stay_type === "daily"
-  const extraNights = (() => {
+  const nightsDiff = (() => {
     if (!isDaily || !prefetch?.booked_checkout_date) return 0
     const booked = new Date(prefetch.booked_checkout_date + "T00:00:00")
     const actual = new Date(checkoutDate + "T00:00:00")
-    return Math.max(0, Math.round((actual.getTime() - booked.getTime()) / (1000 * 60 * 60 * 24)))
+    return Math.round((actual.getTime() - booked.getTime()) / (1000 * 60 * 60 * 24))
   })()
-  const extraCharge = extraNights * (prefetch?.daily_rate ?? 0)
-  const totalPendingDues = (prefetch?.pending_dues ?? 0) + extraCharge
+  // positive = late (extra charge), negative = early (reduce dues, no refund)
+  const nightsAdjustment = nightsDiff * (prefetch?.daily_rate ?? 0)
+  const totalPendingDues = Math.max(0, (prefetch?.pending_dues ?? 0) + nightsAdjustment)
 
   // Derived: refund = max(deposit - maintenance_fee - unpaid_rent - deductions, 0)
   // Forfeited deposits → auto refund = 0 (override available)
@@ -388,16 +389,22 @@ function NewCheckoutPage() {
               <Row label="Booked checkout" value={prefetch.booked_checkout_date ? fmtDate(prefetch.booked_checkout_date) : "—"} />
               <Row label="Checkout time"   value={checkoutTime} />
               <Row label="Daily rate"      value={`${fmtINR(prefetch.daily_rate ?? 0)} / night`} />
-              {extraNights > 0 && (
+              {nightsDiff > 0 && (
                 <>
                   <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
-                    <Row label={`Extra nights (${extraNights})`} value={`+ ${fmtINR(extraCharge)}`} pink />
+                    <Row label={`Extra nights (${nightsDiff})`} value={`+ ${fmtINR(nightsAdjustment)}`} pink />
                   </div>
                   <div className="rounded-tile bg-tile-orange px-3 py-2 text-xs font-medium text-[#7A3300]">
-                    Stayed {extraNights} extra night{extraNights > 1 ? "s" : ""} beyond booked checkout.
-                    ₹{extraCharge.toLocaleString("en-IN")} added to dues.
+                    Stayed {nightsDiff} extra night{nightsDiff > 1 ? "s" : ""} beyond booked checkout.
+                    {fmtINR(nightsAdjustment)} added to dues.
                   </div>
                 </>
+              )}
+              {nightsDiff < 0 && (
+                <div className="rounded-tile bg-[#F0FDF4] px-3 py-2 text-xs font-medium text-[#166534]">
+                  Early checkout by {Math.abs(nightsDiff)} night{Math.abs(nightsDiff) > 1 ? "s" : ""}.
+                  Dues recalculated for actual stay. No refund for unused nights.
+                </div>
               )}
             </div>
           </div>
@@ -508,7 +515,10 @@ function NewCheckoutPage() {
               <Row label="Security deposit"  value={fmtINR(prefetch.security_deposit)} />
               <Row label="Maintenance fee"   value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
               {totalPendingDues > 0 && (
-                <Row label={extraNights > 0 ? `Unpaid rent + ${extraNights} extra night${extraNights > 1 ? "s" : ""}` : "Unpaid rent"} value={`− ${fmtINR(totalPendingDues)}`} />
+                <Row
+                  label={nightsDiff > 0 ? `Unpaid rent + ${nightsDiff} extra night${nightsDiff > 1 ? "s" : ""}` : nightsDiff < 0 ? `Dues (${Math.abs(nightsDiff)} nights early)` : "Unpaid rent"}
+                  value={`− ${fmtINR(totalPendingDues)}`}
+                />
               )}
               {!depositForfeited && deductionsNum > 0 && (
                 <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />

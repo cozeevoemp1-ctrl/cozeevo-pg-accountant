@@ -105,13 +105,15 @@ async def create_checkout(
         if not tenant:
             raise HTTPException(404, "Tenant not found")
 
-        # Store checkout time for day-wise stays
-        if body.checkout_time and tenancy.stay_type.value == "daily":
-            try:
-                h, m = body.checkout_time.split(":")
-                tenancy.checkout_time = dt_time(int(h), int(m))
-            except Exception:
-                pass
+        # Day-wise: update checkout_date to actual date (drives dues calc + DB record)
+        if tenancy.stay_type.value == "daily":
+            tenancy.checkout_date = checkout_date_obj
+            if body.checkout_time:
+                try:
+                    h, m = body.checkout_time.split(":")
+                    tenancy.checkout_time = dt_time(int(h), int(m))
+                except Exception:
+                    pass
 
         # Cancel any existing pending session for this tenancy
         existing = await session.scalar(
