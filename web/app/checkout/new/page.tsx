@@ -104,9 +104,10 @@ function NewCheckoutPage() {
   const [showRefundOverride, setShowRefundOverride] = useState(false)
   const [refundOverrideVal,  setRefundOverrideVal]  = useState("0")
 
-  // Notice / deposit forfeiture
-  // Deposit forfeited ONLY when no notice was given at all.
-  // Late notice (after 5th) = extra month's rent charged, but deposit still refundable.
+  // Day-wise: recalculate dues based on actual checkout date vs booked checkout date
+  const isDaily = prefetch?.stay_type === "daily"
+
+  // Notice / deposit forfeiture — monthly only, day-stays have no notice period
   const depositForfeited = prefetch && !isDaily ? !prefetch.notice_date : false
 
   function calcLastDay(noticeDateISO: string): string {
@@ -118,9 +119,6 @@ function NewCheckoutPage() {
   }
 
   const expectedLastDay = prefetch?.notice_date ? calcLastDay(prefetch.notice_date) : null
-
-  // Day-wise: recalculate dues based on actual checkout date vs booked checkout date
-  const isDaily = prefetch?.stay_type === "daily"
   const nightsDiff = (() => {
     if (!isDaily || !prefetch?.booked_checkout_date) return 0
     const booked = new Date(prefetch.booked_checkout_date + "T00:00:00")
