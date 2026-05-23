@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.29] — 2026-05-23 — Day-stay checkout + returning tenant history
+
+### `src/api/v2/checkout.py`
+- Day-stay: `tenancy.checkout_date` updated to actual checkout date on confirm — DB reflects real stay length.
+- Notice banner + deposit forfeiture logic: completely skipped for day-stay tenants.
+
+### `web/app/checkout/new/page.tsx`
+- Early checkout recalculates dues: `nightsDiff` can be negative (early) — `totalPendingDues = max(0, pending + adjustment)`. No refund for unused nights.
+- Shows green "Early checkout by N nights — dues recalculated" banner for early, orange extra-nights banner for late.
+- Moved `isDaily` declaration before `depositForfeited` — fixed TS2448 build error that caused PWA 500.
+
+### `src/api/v2/tenants.py`
+- New `GET /tenants/{tenancy_id}/previous-stays` — returns up to 5 past (exited/cancelled) tenancies for the same tenant.
+
+### `web/app/tenants/[tenancy_id]/edit/page.tsx`
+- "Previous Stays" panel below Notes — shows room, dates, rate, and notes from each past tenancy. Hidden if first-time tenant.
+
+### `scripts/_delete_duplicate_1119.py`
+- One-off script to delete Chinchu David duplicate tenancy 1119 + checkout record. Run with `--write` to execute.
+
 ## [1.76.28] — 2026-05-23 — Payment history month label + activity feed search
 
 ### `web/app/payments/history/page.tsx`
