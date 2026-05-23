@@ -2,6 +2,18 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.27] — 2026-05-23 — Day-stay dues sync (collect payment + dues pending tile)
+
+### `src/api/v2/tenants.py`
+- `get_tenant_dues` (collect payment): `booking_amount` (advance) now subtracted from total paid — was missing, causing full booked amount to show as due even when advance was paid.
+- `list_tenants` (manage hub): added `all_paid_subq` for day-stays; dues now calculated as `booked_nights × rate − (all_payments + booking_amount)` instead of incorrectly falling back to `daily_rate − 0`.
+
+### `src/api/v2/kpi.py`
+- KPI overdue count: separate query added for day-stay tenancies — were completely invisible in "Dues pending" tile count and amount.
+- KPI detail `type=dues`: day-stay tenants with outstanding dues now appear in the expansion panel.
+
+All three surfaces (collect payment screen, tenant list, dues pending tile) now use the same calculation and are in sync.
+
 ## [1.76.26] — 2026-05-23 — Day-stay checkout fixes
 
 ### `src/api/v2/checkout.py`
