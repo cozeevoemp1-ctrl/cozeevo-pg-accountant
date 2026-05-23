@@ -65,10 +65,18 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
             .group_by(Payment.tenancy_id)
             .subquery()
         )
+        # Day-stay payments have no period_month — sum all non-voided payments per tenancy
+        all_paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("all_paid"))
+            .where(Payment.is_void == False)
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
         rows = (await session.execute(
             select(Tenancy, Tenant, Room, Property,
                    RentSchedule.rent_due, RentSchedule.adjustment,
-                   func.coalesce(paid_subq.c.paid, 0).label("paid"))
+                   func.coalesce(paid_subq.c.paid, 0).label("paid"),
+                   func.coalesce(all_paid_subq.c.all_paid, 0).label("all_paid"))
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
             .join(Property, Room.property_id == Property.id)
@@ -77,16 +85,23 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
                 RentSchedule.period_month == period,
             ))
             .outerjoin(paid_subq, paid_subq.c.tenancy_id == Tenancy.id)
+            .outerjoin(all_paid_subq, all_paid_subq.c.tenancy_id == Tenancy.id)
             .where(Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
             .order_by(Room.room_number)
         )).all()
 
     result = []
-    for tenancy, tenant, room, prop, rent_due, adjustment, paid in rows:
-        rd = float(rent_due or tenancy.agreed_rent or 0)
-        adj = float(adjustment or 0)
-        not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
-        dues = 0 if not_yet_checked_in else max(rd + adj - float(paid), 0.0)
+    for tenancy, tenant, room, prop, rent_due, adjustment, paid, all_paid in rows:
+        if tenancy.stay_type and tenancy.stay_type.value == "daily":
+            _nights = (tenancy.checkout_date - tenancy.checkin_date).days if tenancy.checkin_date and tenancy.checkout_date else 0
+            _owed = _nights * float(tenancy.agreed_rent or 0)
+            _total_paid = float(all_paid) + float(tenancy.booking_amount or 0)
+            dues = max(0.0, _owed - _total_paid)
+        else:
+            rd = float(rent_due or tenancy.agreed_rent or 0)
+            adj = float(adjustment or 0)
+            not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
+            dues = 0 if not_yet_checked_in else max(rd + adj - float(paid), 0.0)
         result.append({
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,
@@ -190,7 +205,9 @@ async def get_tenant_dues(
         checkout = tenancy.checkout_date  # booked end date, updated on extension
         total_nights = (checkout - checkin).days if checkin and checkout else 0
         total_owed = total_nights * daily_rate
-        total_paid_f = float(total_paid_result or 0)
+        # booking_amount is advance paid at booking time — not a Payment record, must add separately
+        booking_amount = float(tenancy.booking_amount or 0)
+        total_paid_f = float(total_paid_result or 0) + booking_amount
         dues = max(0.0, total_owed - total_paid_f)
         credit = max(0.0, total_paid_f - total_owed)
         return {

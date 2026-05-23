@@ -272,6 +272,29 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 overdue_tenants += 1
                 overdue_amount += _total
 
+        # Day-wise stays: no rent_schedule rows — dues = booked_nights × rate - (payments + advance)
+        daily_rows = (await session.execute(
+            select(
+                Tenancy.agreed_rent,
+                Tenancy.checkin_date,
+                Tenancy.checkout_date,
+                Tenancy.booking_amount,
+                func.coalesce(func.sum(Payment.amount), 0).label("total_paid"),
+            )
+            .outerjoin(Payment, and_(Payment.tenancy_id == Tenancy.id, Payment.is_void == False))
+            .where(Tenancy.stay_type == StayType.daily, Tenancy.status == TenancyStatus.active)
+            .group_by(Tenancy.id)
+        )).all()
+        for _dr in daily_rows:
+            _rate = float(_dr.agreed_rent or 0)
+            _nights = (_dr.checkout_date - _dr.checkin_date).days if _dr.checkin_date and _dr.checkout_date else 0
+            _owed = _nights * _rate
+            _paid = float(_dr.total_paid or 0) + float(_dr.booking_amount or 0)
+            _dues = max(0.0, _owed - _paid)
+            if _dues > 0:
+                overdue_tenants += 1
+                overdue_amount += _dues
+
     return KpiResponse(
         occupied_beds=occupied_beds,
         total_beds=total_beds,
@@ -587,6 +610,44 @@ async def get_kpi_detail(
                     "building": (r.property_name or "").split()[-1] if r.property_name else "",
                     "detail": f"₹{total_dues:,}",
                     "dues": total_dues,
+                })
+            # Add day-wise stays with outstanding dues
+            daily_detail_rows = (await session.execute(
+                select(
+                    Tenancy.id,
+                    Tenancy.agreed_rent,
+                    Tenancy.checkin_date,
+                    Tenancy.checkout_date,
+                    Tenancy.booking_amount,
+                    Tenancy.stay_type,
+                    Tenant.name,
+                    Room.room_number,
+                    Property.name.label("property_name"),
+                    func.coalesce(func.sum(Payment.amount), 0).label("total_paid"),
+                )
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .join(Room, Room.id == Tenancy.room_id)
+                .join(Property, Property.id == Room.property_id)
+                .outerjoin(Payment, and_(Payment.tenancy_id == Tenancy.id, Payment.is_void == False))
+                .where(Tenancy.stay_type == StayType.daily, Tenancy.status == TenancyStatus.active)
+                .group_by(Tenancy.id, Tenant.name, Room.room_number, Property.name)
+            )).all()
+            for r in daily_detail_rows:
+                _rate = float(r.agreed_rent or 0)
+                _nights = (r.checkout_date - r.checkin_date).days if r.checkin_date and r.checkout_date else 0
+                _owed = _nights * _rate
+                _paid = float(r.total_paid or 0) + float(r.booking_amount or 0)
+                _dues = max(0.0, _owed - _paid)
+                if _dues <= 0:
+                    continue
+                items.append({
+                    "tenancy_id": r.id,
+                    "name": r.name,
+                    "room": r.room_number,
+                    "building": (r.property_name or "").split()[-1] if r.property_name else "",
+                    "detail": f"₹{int(_dues):,}",
+                    "dues": _dues,
+                    "stay_type": "daily",
                 })
             items.sort(key=lambda x: x["dues"], reverse=True)
             return {"type": type, "items": items}
