@@ -107,7 +107,7 @@ function NewCheckoutPage() {
   // Notice / deposit forfeiture
   // Deposit forfeited ONLY when no notice was given at all.
   // Late notice (after 5th) = extra month's rent charged, but deposit still refundable.
-  const depositForfeited = prefetch ? !prefetch.notice_date : false
+  const depositForfeited = prefetch && !isDaily ? !prefetch.notice_date : false
 
   function calcLastDay(noticeDateISO: string): string {
     const d = new Date(noticeDateISO + "T00:00:00")
@@ -450,8 +450,8 @@ function NewCheckoutPage() {
           </div>
         )}
 
-        {/* Notice status banner */}
-        {prefetch && !loadingPre && (() => {
+        {/* Notice status banner — monthly only, day-stays have no notice period */}
+        {prefetch && !loadingPre && !isDaily && (() => {
           const nd = prefetch.notice_date
           const noticeDay = nd ? new Date(nd + "T00:00:00").getDate() : null
           const lateNotice = nd && noticeDay! > NOTICE_BY_DAY
