@@ -170,8 +170,29 @@ async def get_tenant_dues(
 
     tenancy, tenant, room, prop = result
 
-    # Day-wise stays have no monthly rent cycle — dues are settled at checkout only.
+    # Day-wise stays: dues = booked_nights × daily_rate − total_paid
     if tenancy.stay_type.value == "daily":
+        async with get_session() as session:
+            total_paid_result = await session.scalar(
+                select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                    Payment.tenancy_id == tenancy_id,
+                    Payment.is_void == False,
+                )
+            )
+            last_payment = await session.scalar(
+                select(Payment)
+                .where(Payment.tenancy_id == tenancy_id, Payment.is_void == False)
+                .order_by(Payment.payment_date.desc(), Payment.id.desc())
+                .limit(1)
+            )
+        daily_rate = float(tenancy.agreed_rent or 0)
+        checkin = tenancy.checkin_date
+        checkout = tenancy.checkout_date  # booked end date, updated on extension
+        total_nights = (checkout - checkin).days if checkin and checkout else 0
+        total_owed = total_nights * daily_rate
+        total_paid_f = float(total_paid_result or 0)
+        dues = max(0.0, total_owed - total_paid_f)
+        credit = max(0.0, total_paid_f - total_owed)
         return {
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,
@@ -180,13 +201,13 @@ async def get_tenant_dues(
             "email": tenant.email or "",
             "room_number": room.room_number,
             "building_code": _building_code(prop.name),
-            "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
-            "rent_due": 0.0,
+            "rent": daily_rate,
+            "rent_due": total_owed,
             "adjustment": 0.0,
             "adjustment_note": None,
             "booking_amount": float(tenancy.booking_amount) if tenancy.booking_amount else 0.0,
-            "dues": 0.0,
-            "credit": 0.0,
+            "dues": dues,
+            "credit": credit,
             "deposit_due": 0.0,
             "deposit_paid": 0.0,
             "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
@@ -194,8 +215,8 @@ async def get_tenant_dues(
             "maintenance_fee": 0.0,
             "lock_in_months": 0,
             "notes": tenancy.notes or "",
-            "last_payment_date": None,
-            "last_payment_amount": None,
+            "last_payment_date": last_payment.payment_date.isoformat() if last_payment else None,
+            "last_payment_amount": float(last_payment.amount) if last_payment else None,
             "period_month": date.today().strftime("%Y-%m"),
             "notice_date": None,
             "expected_checkout": tenancy.checkout_date.isoformat() if tenancy.checkout_date else None,
@@ -388,8 +409,6 @@ async def update_tenant(
             tenancy.agreed_rent = body["agreed_rent"]
         if "security_deposit" in body:
             tenancy.security_deposit = body["security_deposit"]
-        if "expected_checkout" in body:
-            tenancy.expected_checkout = body["expected_checkout"]
         if "tenancy_notes" in body:
             tenancy.notes = body["tenancy_notes"]
         if "maintenance_fee" in body:
@@ -401,7 +420,12 @@ async def update_tenant(
             tenancy.notice_date = date.fromisoformat(val) if val else None
         if "expected_checkout" in body:
             val = body["expected_checkout"]
-            tenancy.expected_checkout = date.fromisoformat(val) if val else None
+            new_date = date.fromisoformat(val) if val else None
+            if tenancy.stay_type.value == "daily":
+                # Day-stays: extend the booked end date (checkout_date drives dues + extra-nights calc)
+                tenancy.checkout_date = new_date
+            else:
+                tenancy.expected_checkout = new_date
         if "checkin_date" in body:
             val = body["checkin_date"]
             tenancy.checkin_date = date.fromisoformat(val) if val else None
