@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.28] — 2026-05-23 — Payment history month label + activity feed search
+
+### `web/app/payments/history/page.tsx`
+- `period_month` now displays as "for May 2026" / "for Jun 2026" instead of raw "2026-05" / "2026-06" — in both the payment list and edit modal header.
+
+### `web/components/activity/activity-feed.tsx`
+- Added name/room search input at top — filters events by `label` + `sublabel` (name · room).
+- Filter chips now wrap to two rows instead of horizontal scroll — eliminates the scroll arrow indicator.
+
 ## [1.76.27] — 2026-05-23 — Day-stay dues sync (collect payment + dues pending tile)
 
 ### `src/api/v2/tenants.py`
