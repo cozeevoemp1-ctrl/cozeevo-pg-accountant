@@ -52,7 +52,7 @@ async def checkout_prefetch(
             "phone":               tenant.phone if tenant else "",
             "room_number":         room.room_number if room else "",
             "security_deposit":    float(tenancy.security_deposit or 0),
-            "maintenance_fee":     float(tenancy.maintenance_fee or 0),
+            "maintenance_fee":     0.0 if is_daily else float(tenancy.maintenance_fee or 0),
             "pending_dues":        float(o_rent),
             "notice_date":         tenancy.notice_date.isoformat() if tenancy.notice_date else None,
             "expected_checkout":   tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
