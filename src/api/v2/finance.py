@@ -1335,3 +1335,17 @@ async def get_unmatched_upi(
          "amount": round(float(str(e.amount)), 2), "payer": e.payer_name, "vpa": e.payer_vpa}
         for e in entries
     ]}
+
+
+# ── Three-Statement Model ─────────────────────────────────────────────────────
+
+@router.get("/finance/three-statement")
+async def get_three_statement(
+    month: str = Query(..., description="YYYY-MM"),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    _validate_month(month)
+    from src.reports.three_statement import build_three_statement
+    async with get_session() as session:
+        return await build_three_statement(session, month)
