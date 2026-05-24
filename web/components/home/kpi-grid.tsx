@@ -287,6 +287,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
   const [rent, setRent] = useState("");
   const [dailyRate, setDailyRate] = useState("");
   const [fullRoom, setFullRoom] = useState(false);
+  const [monthlyBedType, setMonthlyBedType] = useState<"regular" | "premium">("regular");
   const [advance, setAdvance] = useState("");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
@@ -332,6 +333,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               maintenance_fee: parseFloat(maintenance) || 0,
               security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
               booking_amount: parseFloat(advance) || 0,
+              sharing_type: monthlyBedType === "premium" ? "premium" : "",
               notes: notes.trim() || undefined,
             }
       );
@@ -446,14 +448,14 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed occupancy</label>
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed type</label>
                     <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
                       <button
                         type="button"
                         onClick={() => setFullRoom(false)}
                         className={`flex-1 py-2 text-xs font-bold transition-colors ${!fullRoom ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
                       >
-                        Single bed
+                        Regular
                       </button>
                       <button
                         type="button"
@@ -465,11 +467,11 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                             : fullRoom ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
                         }`}
                       >
-                        Full room
+                        Premium
                       </button>
                     </div>
                     {!canFullRoom && maxOccupancy > 1 && (
-                      <p className="text-[10px] text-status-warn mt-1">Room already has a tenant — full room not available</p>
+                      <p className="text-[10px] text-status-warn mt-1">Room already has a tenant — premium not available</p>
                     )}
                   </div>
                   <div>
@@ -518,6 +520,25 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       min="0"
                       className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                     />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed type</label>
+                    <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+                      <button
+                        type="button"
+                        onClick={() => setMonthlyBedType("regular")}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${monthlyBedType === "regular" ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
+                      >
+                        Regular
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMonthlyBedType("premium")}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${monthlyBedType === "premium" ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
+                      >
+                        Premium
+                      </button>
+                    </div>
                   </div>
                 </>
               )}

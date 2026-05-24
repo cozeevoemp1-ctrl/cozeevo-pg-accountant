@@ -16,6 +16,7 @@ export default function PreRegisterPage() {
   const [deposit, setDeposit]       = useState("");
   const [advance, setAdvance]       = useState("");
   const [notes, setNotes]           = useState("");
+  const [bedType, setBedType]       = useState<"regular" | "premium">("regular");
   const [depositOverridden, setDepositOverridden] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState("");
@@ -56,6 +57,7 @@ export default function PreRegisterPage() {
         maintenance_fee:  parseFloat(maintenance) || 5000,
         security_deposit: depositNum,
         booking_amount:   parseFloat(advance) || 0,
+        sharing_type:     bedType === "premium" ? "premium" : "",
         notes:            notes.trim() || undefined,
       });
       setDone(result);
@@ -200,6 +202,26 @@ export default function PreRegisterPage() {
               min="0"
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Bed type</label>
+            <div className="mt-1 flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+              <button
+                type="button"
+                onClick={() => setBedType("regular")}
+                className={`flex-1 py-2.5 text-sm font-bold transition-colors ${bedType === "regular" ? "bg-brand-pink text-white" : "bg-surface text-ink-muted"}`}
+              >
+                Regular
+              </button>
+              <button
+                type="button"
+                onClick={() => setBedType("premium")}
+                className={`flex-1 py-2.5 text-sm font-bold transition-colors ${bedType === "premium" ? "bg-brand-pink text-white" : "bg-surface text-ink-muted"}`}
+              >
+                Premium
+              </button>
+            </div>
           </div>
 
           <div>

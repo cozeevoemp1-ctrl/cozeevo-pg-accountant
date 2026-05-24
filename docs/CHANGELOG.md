@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.30] — 2026-05-24 — Bed type selector on monthly booking + pre-register forms
+
+### `web/components/home/kpi-grid.tsx`
+- Monthly tab in QuickBookModal: added "Bed type" toggle (Regular / Premium), sends `sharing_type` to API.
+- Day-wise tab: renamed "Single bed" → "Regular", "Full room" → "Premium", "Bed occupancy" label → "Bed type" — consistent across all booking forms.
+
+### `web/app/tenants/pre-register/page.tsx`
+- Added "Bed type" toggle (Regular / Premium) before Notes field, sends `sharing_type` to API.
+
 ## [1.76.29] — 2026-05-23 — Day-stay checkout + returning tenant history
 
 ### `src/api/v2/checkout.py`
