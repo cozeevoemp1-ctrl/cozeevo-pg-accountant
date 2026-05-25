@@ -1,181 +1,91 @@
 "use client"
 
 /**
- * DateTimePickerInput
- * Tap → bottom sheet: calendar grid + hour pills (scrollable) + minute buttons.
+ * DateTimePickerInput — Option 4
+ * Single connected row: [ DD ▾ | MMM ▾ | YYYY ▾ | 10:30 am ▾ ]
  * value / onChange: "YYYY-MM-DDTHH:MM"
  */
 
-import { useState, useRef } from "react"
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+const YEARS  = [2025, 2026]
 
-const DAY_LABELS  = ["Mo","Tu","We","Th","Fr","Sa","Su"]
-const MONTH_NAMES = ["January","February","March","April","May","June",
-                     "July","August","September","October","November","December"]
-const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-const HOURS   = Array.from({ length: 24 }, (_, i) => i)
-const MINUTES = [0, 15, 30, 45]
+function daysInMonth(month: number, year: number) {
+  return new Date(year, month, 0).getDate()
+}
 
-function fmtHour(h: number) {
-  if (h === 0)  return "12 am"
-  if (h < 12)   return `${h} am`
-  if (h === 12) return "12 pm"
-  return `${h - 12} pm`
+// 12:00 am → 11:45 pm, every 15 min
+const TIME_SLOTS: { label: string; value: string }[] = []
+for (let h = 0; h < 24; h++) {
+  for (const min of [0, 15, 30, 45]) {
+    const period = h < 12 ? "am" : "pm"
+    const h12    = h === 0 ? 12 : h > 12 ? h - 12 : h
+    TIME_SLOTS.push({
+      label: `${h12}:${String(min).padStart(2,"0")} ${period}`,
+      value: `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`,
+    })
+  }
 }
 
 interface Props {
   value:    string   // "YYYY-MM-DDTHH:MM" or ""
   onChange: (v: string) => void
-  placeholder?: string
 }
 
-export function DateTimePickerInput({ value, onChange, placeholder = "Select date & time" }: Props) {
-  const today  = new Date()
+export function DateTimePickerInput({ value, onChange }: Props) {
   const [datePart, timePart] = value ? value.split("T") : ["",""]
-  const parsed = datePart ? new Date(datePart + "T00:00:00") : null
-  const hour   = timePart ? parseInt(timePart.split(":")[0]) : -1
-  const minute = timePart ? parseInt(timePart.split(":")[1]) : -1
+  const parts = datePart ? datePart.split("-").map(Number) : [0,0,0]
+  const y = parts[0], m = parts[1], d = parts[2]
+  const maxDay = (y && m) ? daysInMonth(m, y) : 31
 
-  const [open, setOpen]           = useState(false)
-  const [viewYear, setViewYear]   = useState(parsed?.getFullYear()  ?? today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(parsed?.getMonth()     ?? today.getMonth())
-  const [pickedDate, setPickedDate] = useState(datePart)
-  const [pickedHour, setPickedHour] = useState(hour)
-  const [pickedMin,  setPickedMin]  = useState(minute)
-  const hourRowRef = useRef<HTMLDivElement>(null)
-
-  const offset    = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7
-  const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate()
-  const selParsed = pickedDate ? new Date(pickedDate + "T00:00:00") : null
-  const selDay    = selParsed && selParsed.getFullYear() === viewYear && selParsed.getMonth() === viewMonth
-    ? selParsed.getDate() : null
-
-  function prevMonth() {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
-    else setViewMonth(m => m - 1)
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
-    else setViewMonth(m => m + 1)
-  }
-
-  function pickDay(day: number) {
-    const d = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`
-    setPickedDate(d)
-  }
-
-  function confirm() {
-    if (!pickedDate) return
-    const h = pickedHour >= 0 ? pickedHour : 9
-    const m = pickedMin  >= 0 ? pickedMin  : 0
-    onChange(`${pickedDate}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`)
-    setOpen(false)
-  }
-
-  function openSheet() {
-    // Reset internal state to current value
-    setPickedDate(datePart)
-    setPickedHour(hour)
-    setPickedMin(minute)
-    if (parsed) { setViewYear(parsed.getFullYear()); setViewMonth(parsed.getMonth()) }
-    setOpen(true)
-  }
-
-  // Display string
-  const displayDate = parsed
-    ? `${String(parsed.getDate()).padStart(2,"0")} ${MONTH_SHORT[parsed.getMonth()]} ${parsed.getFullYear()}`
+  // Round timePart to nearest 15-min slot value for matching
+  const timeVal = timePart
+    ? (() => {
+        const [hh, mm] = timePart.split(":").map(Number)
+        const rounded  = Math.round(mm / 15) * 15
+        const finalMin = rounded === 60 ? 0 : rounded
+        const finalHr  = rounded === 60 ? hh + 1 : hh
+        return `${String(finalHr % 24).padStart(2,"0")}:${String(finalMin).padStart(2,"0")}`
+      })()
     : ""
-  const displayTime = hour >= 0 && minute >= 0
-    ? `${fmtHour(hour).replace(" ","")} : ${String(minute).padStart(2,"0")}`
-    : ""
-  const display = displayDate ? `${displayDate}  ${displayTime}` : ""
 
-  const canConfirm = !!pickedDate
+  function emitDate(year: number, month: number, day: number) {
+    if (!year || !month || !day) return
+    const safe = Math.min(day, daysInMonth(month, year))
+    const date  = `${year}-${String(month).padStart(2,"0")}-${String(safe).padStart(2,"0")}`
+    onChange(timePart ? `${date}T${timePart}` : `${date}T09:00`)
+  }
+
+  function emitTime(tv: string) {
+    const date = datePart || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}-${String(new Date().getDate()).padStart(2,"0")}`
+    onChange(`${date}T${tv}`)
+  }
+
+  const sel = "h-full bg-transparent text-sm text-ink appearance-none focus:outline-none px-2 cursor-pointer"
+  const div = <div className="self-stretch w-px bg-[#E0DDD8] flex-shrink-0" />
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={openSheet}
-        className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-left flex items-center active:border-brand-pink"
-      >
-        <span className={display ? "text-ink" : "text-ink-muted"}>{display || placeholder}</span>
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="relative bg-surface rounded-t-2xl px-4 pt-4 pb-8 max-h-[90vh] overflow-y-auto">
-            <div className="w-10 h-1 bg-[#D9D9D9] rounded-full mx-auto mb-4" />
-
-            {/* Month nav */}
-            <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={prevMonth}
-                className="w-9 h-9 rounded-full active:bg-[#F0EDE9] flex items-center justify-center text-xl text-ink-muted font-bold">‹</button>
-              <span className="text-base font-extrabold text-ink">{MONTH_NAMES[viewMonth]} {viewYear}</span>
-              <button type="button" onClick={nextMonth}
-                className="w-9 h-9 rounded-full active:bg-[#F0EDE9] flex items-center justify-center text-xl text-ink-muted font-bold">›</button>
-            </div>
-
-            {/* Day headers */}
-            <div className="grid grid-cols-7 mb-1">
-              {DAY_LABELS.map(d => (
-                <div key={d} className="text-center text-[11px] font-semibold text-ink-muted py-1">{d}</div>
-              ))}
-            </div>
-
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-y-1 mb-5">
-              {Array.from({ length: offset }, (_, i) => <div key={"e"+i} />)}
-              {Array.from({ length: totalDays }, (_, i) => {
-                const day = i + 1
-                const isSel = day === selDay
-                const isToday = viewYear === today.getFullYear() && viewMonth === today.getMonth() && day === today.getDate()
-                return (
-                  <button key={day} type="button" onClick={() => pickDay(day)}
-                    className={`mx-auto w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors
-                      ${isSel   ? "bg-brand-pink text-white font-bold"
-                      : isToday ? "border-2 border-brand-pink text-brand-pink font-semibold"
-                      : "text-ink active:bg-[#F0EDE9]"}`}>
-                    {day}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Hour pills — horizontal scroll */}
-            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide mb-2">Hour</p>
-            <div ref={hourRowRef} className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-4">
-              {HOURS.map(h => (
-                <button key={h} type="button" onClick={() => setPickedHour(h)}
-                  className={`flex-shrink-0 px-3.5 py-2 rounded-pill text-xs font-semibold transition-colors
-                    ${pickedHour === h ? "bg-brand-pink text-white" : "bg-[#F0EDE9] text-ink active:opacity-70"}`}>
-                  {fmtHour(h)}
-                </button>
-              ))}
-            </div>
-
-            {/* Minute slots */}
-            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide mb-2">Minute</p>
-            <div className="grid grid-cols-4 gap-2 mb-5">
-              {MINUTES.map(m => (
-                <button key={m} type="button" onClick={() => setPickedMin(m)}
-                  className={`py-2.5 rounded-xl text-sm font-bold transition-colors
-                    ${pickedMin === m ? "bg-brand-pink text-white" : "bg-[#F0EDE9] text-ink active:opacity-70"}`}>
-                  :{String(m).padStart(2,"0")}
-                </button>
-              ))}
-            </div>
-
-            {/* Confirm */}
-            <button type="button" onClick={confirm} disabled={!canConfirm}
-              className="w-full py-3 rounded-xl bg-brand-pink text-white text-sm font-bold disabled:opacity-40 active:opacity-80">
-              {pickedDate
-                ? `Confirm — ${String(new Date(pickedDate+"T00:00:00").getDate()).padStart(2,"0")} ${MONTH_SHORT[new Date(pickedDate+"T00:00:00").getMonth()]}${pickedHour >= 0 ? `, ${fmtHour(pickedHour)}` : ""}`
-                : "Select a date first"}
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    <div className="mt-1 flex h-[46px] rounded-lg border border-[#E0DDD8] bg-surface overflow-hidden focus-within:border-brand-pink transition-colors">
+      <select value={d || ""} onChange={e => emitDate(y, m, +e.target.value)} className={sel + " w-[56px]"}>
+        <option value="">DD</option>
+        {Array.from({length: maxDay}, (_,i) => i+1).map(n => (
+          <option key={n} value={n}>{String(n).padStart(2,"0")}</option>
+        ))}
+      </select>
+      {div}
+      <select value={m || ""} onChange={e => emitDate(y, +e.target.value, d)} className={sel + " w-[62px]"}>
+        <option value="">Mon</option>
+        {MONTHS.map((name, i) => <option key={name} value={i+1}>{name}</option>)}
+      </select>
+      {div}
+      <select value={y || ""} onChange={e => emitDate(+e.target.value, m, d)} className={sel + " w-[68px]"}>
+        <option value="">Year</option>
+        {YEARS.map(yr => <option key={yr} value={yr}>{yr}</option>)}
+      </select>
+      {div}
+      <select value={timeVal} onChange={e => emitTime(e.target.value)} className={sel + " flex-1"}>
+        <option value="">Time</option>
+        {TIME_SLOTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+      </select>
+    </div>
   )
 }

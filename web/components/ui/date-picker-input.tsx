@@ -1,116 +1,55 @@
 "use client"
 
 /**
- * DatePickerInput
- * Shows as a tappable field. Tap → bottom sheet with calendar grid.
+ * DatePickerInput — Option 4
+ * Single connected row: [ DD ▾ | MMM ▾ | YYYY ▾ ]
  * value / onChange: "YYYY-MM-DD"
  */
 
-import { useState } from "react"
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+const YEARS  = [2025, 2026]
 
-const DAY_LABELS  = ["Mo","Tu","We","Th","Fr","Sa","Su"]
-const MONTH_NAMES = ["January","February","March","April","May","June",
-                     "July","August","September","October","November","December"]
-const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+function daysInMonth(month: number, year: number) {
+  return new Date(year, month, 0).getDate()
+}
 
 interface Props {
   value:    string
   onChange: (v: string) => void
-  placeholder?: string
 }
 
-export function DatePickerInput({ value, onChange, placeholder = "Select date" }: Props) {
-  const today    = new Date()
-  const parsed   = value ? new Date(value + "T00:00:00") : null
+export function DatePickerInput({ value, onChange }: Props) {
+  const parts = value ? value.split("-").map(Number) : [0, 0, 0]
+  const y = parts[0], m = parts[1], d = parts[2]
+  const maxDay = (y && m) ? daysInMonth(m, y) : 31
 
-  const [open, setOpen]         = useState(false)
-  const [viewYear, setViewYear] = useState(parsed?.getFullYear()  ?? today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(parsed?.getMonth() ?? today.getMonth())
-
-  const offset   = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7
-  const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate()
-  const selDay   = parsed && parsed.getFullYear() === viewYear && parsed.getMonth() === viewMonth
-    ? parsed.getDate() : null
-
-  function prevMonth() {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
-    else setViewMonth(m => m - 1)
-  }
-  function nextMonth() {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
-    else setViewMonth(m => m + 1)
-  }
-  function pick(day: number) {
-    onChange(`${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`)
-    setOpen(false)
+  function emit(year: number, month: number, day: number) {
+    if (!year || !month || !day) return
+    const safe = Math.min(day, daysInMonth(month, year))
+    onChange(`${year}-${String(month).padStart(2,"0")}-${String(safe).padStart(2,"0")}`)
   }
 
-  const display = parsed
-    ? `${String(parsed.getDate()).padStart(2,"0")} ${MONTH_SHORT[parsed.getMonth()]} ${parsed.getFullYear()}`
-    : ""
+  const sel = "h-full bg-transparent text-sm text-ink appearance-none focus:outline-none px-3 cursor-pointer"
+  const div = <div className="self-stretch w-px bg-[#E0DDD8] flex-shrink-0" />
 
   return (
-    <>
-      {/* Field trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-left flex items-center active:border-brand-pink"
-      >
-        <span className={display ? "text-ink" : "text-ink-muted"}>{display || placeholder}</span>
-      </button>
-
-      {/* Bottom sheet overlay */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="relative bg-surface rounded-t-2xl px-4 pt-4 pb-8">
-            {/* Handle */}
-            <div className="w-10 h-1 bg-[#D9D9D9] rounded-full mx-auto mb-4" />
-
-            {/* Month nav */}
-            <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={prevMonth}
-                className="w-9 h-9 rounded-full active:bg-[#F0EDE9] flex items-center justify-center text-xl text-ink-muted font-bold">
-                ‹
-              </button>
-              <span className="text-base font-extrabold text-ink">
-                {MONTH_NAMES[viewMonth]} {viewYear}
-              </span>
-              <button type="button" onClick={nextMonth}
-                className="w-9 h-9 rounded-full active:bg-[#F0EDE9] flex items-center justify-center text-xl text-ink-muted font-bold">
-                ›
-              </button>
-            </div>
-
-            {/* Day-of-week headers */}
-            <div className="grid grid-cols-7 mb-1">
-              {DAY_LABELS.map(d => (
-                <div key={d} className="text-center text-[11px] font-semibold text-ink-muted py-1">{d}</div>
-              ))}
-            </div>
-
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-y-1">
-              {Array.from({ length: offset }, (_, i) => <div key={"e"+i} />)}
-              {Array.from({ length: totalDays }, (_, i) => {
-                const day = i + 1
-                const isSel = day === selDay
-                const isToday = viewYear === today.getFullYear() && viewMonth === today.getMonth() && day === today.getDate()
-                return (
-                  <button key={day} type="button" onClick={() => pick(day)}
-                    className={`mx-auto w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors
-                      ${isSel    ? "bg-brand-pink text-white font-bold"
-                      : isToday  ? "border-2 border-brand-pink text-brand-pink font-semibold"
-                      : "text-ink active:bg-[#F0EDE9]"}`}>
-                    {day}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <div className="mt-1 flex h-[46px] rounded-lg border border-[#E0DDD8] bg-surface overflow-hidden focus-within:border-brand-pink transition-colors">
+      <select value={d || ""} onChange={e => emit(y, m, +e.target.value)} className={sel + " w-[64px]"}>
+        <option value="">DD</option>
+        {Array.from({length: maxDay}, (_,i) => i+1).map(n => (
+          <option key={n} value={n}>{String(n).padStart(2,"0")}</option>
+        ))}
+      </select>
+      {div}
+      <select value={m || ""} onChange={e => emit(y, +e.target.value, d)} className={sel + " flex-1"}>
+        <option value="">Month</option>
+        {MONTHS.map((name, i) => <option key={name} value={i+1}>{name}</option>)}
+      </select>
+      {div}
+      <select value={y || ""} onChange={e => emit(+e.target.value, m, d)} className={sel + " w-[76px]"}>
+        <option value="">Year</option>
+        {YEARS.map(yr => <option key={yr} value={yr}>{yr}</option>)}
+      </select>
+    </div>
   )
 }
