@@ -8,10 +8,11 @@ import {
   deleteOperationalLog,
   type OperationalLogEntry,
   type OperationalLogCategory,
-  type CreateOperationalLogBody,
 } from "@/lib/api"
+import { Card } from "@/components/ui/card"
+import Link from "next/link"
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── static config ─────────────────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<OperationalLogCategory, string> = {
   power_outage:       "Power Outage",
@@ -34,19 +35,47 @@ const ALL_CATEGORIES: OperationalLogCategory[] = [
   "garbage_collection",
 ]
 
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—"
-  const d = new Date(iso)
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+interface Field {
+  key:      string
+  label:    string
+  type:     "datetime-local" | "date" | "number"
+  required: boolean
+  hint?:    string
 }
+
+const FIELDS: Record<OperationalLogCategory, Field[]> = {
+  power_outage: [
+    { key: "outage_start", label: "Outage date & time",    type: "datetime-local", required: true },
+    { key: "outage_end",   label: "Restored date & time",  type: "datetime-local", required: false, hint: "Leave blank if not yet restored" },
+  ],
+  hp_gas: [
+    { key: "booking_date",   label: "Booking date",    type: "date",   required: true },
+    { key: "received_date",  label: "Received date",   type: "date",   required: true },
+    { key: "cylinder_count", label: "No. of cylinders", type: "number", required: true },
+  ],
+  water_tanker: [
+    { key: "received_at", label: "Received date & time", type: "datetime-local", required: true },
+  ],
+  garbage_collection: [
+    { key: "informed_date",  label: "Informed date",           type: "date", required: true },
+    { key: "collected_date", label: "Collected date",          type: "date", required: false, hint: "Leave blank if not yet collected" },
+    { key: "completed_date", label: "Service completed date",  type: "date", required: false },
+  ],
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 function fmtDateTime(iso: string | null | undefined): string {
   if (!iso) return "—"
-  const d = new Date(iso)
-  return d.toLocaleString("en-IN", {
+  return new Date(iso).toLocaleString("en-IN", {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   })
+}
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }
 
 function renderDetails(category: OperationalLogCategory, details: Record<string, string | number | null>): string[] {
@@ -71,37 +100,8 @@ function renderDetails(category: OperationalLogCategory, details: Record<string,
         details.completed_date ? `Completed: ${fmtDate(details.completed_date as string)}` : "",
       ].filter(Boolean)
     default:
-      return Object.entries(details).map(([k, v]) => `${k}: ${v}`)
+      return []
   }
-}
-
-// ── form field definitions ────────────────────────────────────────────────────
-
-interface Field {
-  key: string
-  label: string
-  type: "datetime-local" | "date" | "number" | "text"
-  required: boolean
-}
-
-const FIELDS: Record<OperationalLogCategory, Field[]> = {
-  power_outage: [
-    { key: "outage_start", label: "Outage date & time",  type: "datetime-local", required: true },
-    { key: "outage_end",   label: "Restored date & time (if known)", type: "datetime-local", required: false },
-  ],
-  hp_gas: [
-    { key: "booking_date",   label: "Booking date",   type: "date",   required: true },
-    { key: "received_date",  label: "Received date",  type: "date",   required: true },
-    { key: "cylinder_count", label: "No. of cylinders", type: "number", required: true },
-  ],
-  water_tanker: [
-    { key: "received_at", label: "Received date & time", type: "datetime-local", required: true },
-  ],
-  garbage_collection: [
-    { key: "informed_date",  label: "Informed date",  type: "date", required: true },
-    { key: "collected_date", label: "Collected date", type: "date", required: false },
-    { key: "completed_date", label: "Service completed date", type: "date", required: false },
-  ],
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
@@ -109,78 +109,60 @@ const FIELDS: Record<OperationalLogCategory, Field[]> = {
 export default function OperationsPage() {
   const router = useRouter()
 
-  const [logs, setLogs]           = useState<OperationalLogEntry[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [fetchError, setFetchError] = useState("")
-  const [filter, setFilter]       = useState<OperationalLogCategory | "">("")
-
-  // add modal
-  const [showModal, setShowModal] = useState(false)
-  const [selCategory, setSelCategory] = useState<OperationalLogCategory>("power_outage")
+  // form state
+  const [category, setCategory]     = useState<OperationalLogCategory>("power_outage")
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
-  const [notes, setNotes]         = useState("")
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState("")
+  const [notes, setNotes]           = useState("")
+  const [saving, setSaving]         = useState(false)
+  const [saveError, setSaveError]   = useState("")
+  const [saved, setSaved]           = useState(false)
 
-  // delete confirm
-  const [deleteId, setDeleteId]   = useState<number | null>(null)
-  const [deleting, setDeleting]   = useState(false)
+  // logs list
+  const [logs, setLogs]             = useState<OperationalLogEntry[]>([])
+  const [logsLoading, setLogsLoading] = useState(true)
+  const [deleteId, setDeleteId]     = useState<number | null>(null)
+  const [deleting, setDeleting]     = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setFetchError("")
+  const loadLogs = useCallback(async () => {
+    setLogsLoading(true)
     try {
-      const cat = filter || undefined
-      const res = await getOperationalLogs(cat as OperationalLogCategory | undefined, 100)
+      const res = await getOperationalLogs(undefined, 50)
       setLogs(res.logs)
-    } catch {
-      setFetchError("Could not load logs")
     } finally {
-      setLoading(false)
+      setLogsLoading(false)
     }
-  }, [filter])
+  }, [])
 
-  useEffect(() => { load() }, [load])
-
-  function openModal() {
-    setSelCategory("power_outage")
-    setFieldValues({})
-    setNotes("")
-    setSaveError("")
-    setShowModal(true)
-  }
+  useEffect(() => { loadLogs() }, [loadLogs])
 
   function onCategoryChange(cat: OperationalLogCategory) {
-    setSelCategory(cat)
+    setCategory(cat)
     setFieldValues({})
+    setSaveError("")
   }
 
-  async function handleSave() {
-    setSaving(true)
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
     setSaveError("")
     const details: Record<string, string | number | null> = {}
-    for (const f of FIELDS[selCategory]) {
+    for (const f of FIELDS[category]) {
       const val = fieldValues[f.key] ?? ""
       if (f.required && !val) {
         setSaveError(`"${f.label}" is required`)
-        setSaving(false)
         return
       }
-      if (val) {
-        details[f.key] = f.type === "number" ? Number(val) : val
-      }
+      if (val) details[f.key] = f.type === "number" ? Number(val) : val
     }
-    const body: CreateOperationalLogBody = {
-      category: selCategory,
-      details,
-      notes: notes.trim() || undefined,
-    }
+    setSaving(true)
     try {
-      const entry = await createOperationalLog(body)
+      const entry = await createOperationalLog({ category, details, notes: notes.trim() || undefined })
       setLogs(prev => [entry, ...prev])
-      setShowModal(false)
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Failed to save")
+      setFieldValues({})
+      setNotes("")
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save")
     } finally {
       setSaving(false)
     }
@@ -192,182 +174,194 @@ export default function OperationsPage() {
     try {
       await deleteOperationalLog(deleteId)
       setLogs(prev => prev.filter(l => l.id !== deleteId))
-      setDeleteId(null)
-    } catch {
-      // ignore — just close
-      setDeleteId(null)
     } finally {
       setDeleting(false)
+      setDeleteId(null)
     }
   }
 
-  // ── render ──────────────────────────────────────────────────────────────────
+  const fields = FIELDS[category]
 
   return (
-    <main className="min-h-screen bg-bg">
+    <main className="flex flex-col gap-4 px-4 pt-6 pb-24 max-w-lg mx-auto">
+
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+      <div className="flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold flex-shrink-0"
-          aria-label="Back"
+          className="w-9 h-9 rounded-full bg-[#F0EDE9] flex items-center justify-center text-ink-muted flex-shrink-0"
         >←</button>
-        <div className="flex-1">
+        <div>
           <p className="text-xs text-ink-muted font-medium">Cozeevo</p>
           <h1 className="text-lg font-extrabold text-ink leading-tight">Operations Log</h1>
         </div>
-        <button
-          onClick={openModal}
-          className="rounded-pill bg-brand-pink px-4 py-2 text-white text-xs font-bold active:opacity-80"
-        >
-          + Log
-        </button>
       </div>
 
-      {/* Category filter tabs */}
-      <div className="flex gap-2 px-4 pt-3 pb-1 overflow-x-auto no-scrollbar">
-        <button
-          onClick={() => setFilter("")}
-          className={`flex-shrink-0 rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors ${
-            filter === "" ? "bg-brand-pink text-white" : "bg-surface border border-[#F0EDE9] text-ink-muted"
-          }`}
-        >All</button>
-        {ALL_CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`flex-shrink-0 rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filter === cat ? "bg-brand-pink text-white" : "bg-surface border border-[#F0EDE9] text-ink-muted"
-            }`}
-          >
-            {CATEGORY_ICONS[cat]} {CATEGORY_LABELS[cat]}
-          </button>
-        ))}
-      </div>
+      {/* Log form */}
+      <Card className="p-5">
+        <p className="text-xs text-ink-muted mb-4 leading-relaxed">
+          Select a category and fill in the details to log an operational event.
+        </p>
+        <form onSubmit={handleSave} className="flex flex-col gap-4">
 
-      {/* Log list */}
-      <div className="px-4 pt-3 pb-32 flex flex-col gap-2 max-w-lg mx-auto">
-        {loading && (
-          <div className="flex flex-col gap-2 mt-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-surface rounded-card border border-[#F0EDE9] p-4">
-                <div className="h-3.5 w-32 bg-[#F0EDE9] rounded-full animate-pulse mb-2" />
-                <div className="h-2.5 w-48 bg-[#F0EDE9] rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && fetchError && (
-          <div className="bg-surface rounded-card border border-[#F0EDE9] p-6 text-center mt-4">
-            <p className="text-sm text-status-warn">{fetchError}</p>
-            <button onClick={load} className="mt-3 text-xs text-brand-pink font-semibold">Retry</button>
-          </div>
-        )}
-
-        {!loading && !fetchError && logs.length === 0 && (
-          <div className="bg-surface rounded-card border border-[#F0EDE9] p-8 flex flex-col items-center gap-2 mt-4">
-            <p className="text-sm font-semibold text-ink">No logs yet</p>
-            <p className="text-xs text-ink-muted">Tap + Log to record an event</p>
-          </div>
-        )}
-
-        {!loading && !fetchError && logs.map(log => {
-          const lines = renderDetails(log.category as OperationalLogCategory, log.details)
-          return (
-            <div key={log.id} className="bg-surface rounded-card border border-[#F0EDE9] p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-base">{CATEGORY_ICONS[log.category as OperationalLogCategory]}</span>
-                    <span className="text-sm font-bold text-ink">
-                      {CATEGORY_LABELS[log.category as OperationalLogCategory]}
-                    </span>
-                  </div>
-                  {lines.map((line, i) => (
-                    <p key={i} className="text-xs text-ink-muted mt-0.5">{line}</p>
-                  ))}
-                  {log.notes && (
-                    <p className="text-xs text-ink-muted mt-1 italic">{log.notes}</p>
-                  )}
-                  <p className="text-xs text-ink-muted mt-1 opacity-60">
-                    {fmtDateTime(log.created_at)}
-                    {log.logged_by ? ` · ${log.logged_by}` : ""}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setDeleteId(log.id)}
-                  className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-ink-muted text-xs hover:bg-[#F0EDE9] active:opacity-70"
-                  aria-label="Delete"
-                >✕</button>
-              </div>
+          {/* Category dropdown */}
+          <div>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Category *</label>
+            <div className="mt-1 relative">
+              <select
+                value={category}
+                onChange={e => onCategoryChange(e.target.value as OperationalLogCategory)}
+                className="w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 pr-8 text-sm text-ink appearance-none focus:outline-none focus:border-brand-pink"
+              >
+                {ALL_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>
+                    {CATEGORY_ICONS[cat]}  {CATEGORY_LABELS[cat]}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted text-xs">▼</span>
             </div>
-          )
-        })}
-      </div>
+          </div>
 
-      {/* Add Log Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowModal(false)} />
-          <div className="relative bg-surface rounded-t-2xl px-5 pt-5 pb-8 max-h-[90vh] overflow-y-auto">
-            {/* drag handle */}
-            <div className="w-10 h-1 bg-[#D9D9D9] rounded-full mx-auto mb-4" />
-            <h2 className="text-base font-extrabold text-ink mb-4">Log Event</h2>
-
-            {/* Category select */}
-            <label className="block text-xs font-semibold text-ink-muted mb-1">Category</label>
-            <select
-              value={selCategory}
-              onChange={e => onCategoryChange(e.target.value as OperationalLogCategory)}
-              className="w-full rounded-card border border-[#F0EDE9] bg-bg px-3 py-2.5 text-sm text-ink mb-4 focus:outline-none focus:ring-2 focus:ring-brand-pink"
-            >
-              {ALL_CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{CATEGORY_ICONS[cat]} {CATEGORY_LABELS[cat]}</option>
+          {/* Dynamic fields — 2-col when there are pairs, single otherwise */}
+          {fields.length === 2 && fields[0].type !== "number" && fields[1].type !== "number" ? (
+            // two date/datetime fields → 2-col grid
+            <div className="grid grid-cols-2 gap-3">
+              {fields.map(f => (
+                <div key={f.key}>
+                  <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                    {f.label}{f.required && " *"}
+                  </label>
+                  <input
+                    type={f.type}
+                    value={fieldValues[f.key] ?? ""}
+                    onChange={e => setFieldValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-2 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
+                  />
+                  {f.hint && <p className="mt-0.5 text-[10px] text-ink-muted">{f.hint}</p>}
+                </div>
               ))}
-            </select>
-
-            {/* Dynamic fields */}
-            {FIELDS[selCategory].map(f => (
-              <div key={f.key} className="mb-3">
-                <label className="block text-xs font-semibold text-ink-muted mb-1">
-                  {f.label}{f.required && <span className="text-status-warn ml-1">*</span>}
+            </div>
+          ) : fields.length === 3 && category === "hp_gas" ? (
+            // HP Gas: booking + received in 2-col, cylinders full width
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                {fields.slice(0, 2).map(f => (
+                  <div key={f.key}>
+                    <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                      {f.label}{f.required && " *"}
+                    </label>
+                    <input
+                      type={f.type}
+                      value={fieldValues[f.key] ?? ""}
+                      onChange={e => setFieldValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                  No. of cylinders *
+                </label>
+                <input
+                  type="number"
+                  value={fieldValues["cylinder_count"] ?? ""}
+                  onChange={e => setFieldValues(prev => ({ ...prev, cylinder_count: e.target.value }))}
+                  onWheel={e => e.currentTarget.blur()}
+                  placeholder="e.g. 2"
+                  min="1"
+                  className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+                />
+              </div>
+            </>
+          ) : (
+            // Garbage collection (3 date fields) and Water Tanker (1 field) — all full width
+            fields.map(f => (
+              <div key={f.key}>
+                <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                  {f.label}{f.required && " *"}
                 </label>
                 <input
                   type={f.type}
                   value={fieldValues[f.key] ?? ""}
                   onChange={e => setFieldValues(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  className="w-full rounded-card border border-[#F0EDE9] bg-bg px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-pink"
+                  className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
                 />
+                {f.hint && <p className="mt-0.5 text-[10px] text-ink-muted">{f.hint}</p>}
+              </div>
+            ))
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Any additional details…"
+              rows={2}
+              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink resize-none"
+            />
+          </div>
+
+          {saveError && <p className="text-xs text-status-due font-medium">{saveError}</p>}
+          {saved    && <p className="text-xs text-status-paid font-semibold">Saved successfully</p>}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-3 rounded-xl bg-brand-pink text-white text-sm font-bold disabled:opacity-50 active:opacity-80"
+          >
+            {saving ? "Saving…" : "Save log"}
+          </button>
+        </form>
+      </Card>
+
+      {/* Recent logs */}
+      <div>
+        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Recent logs</h2>
+        {logsLoading && (
+          <div className="flex flex-col gap-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-surface border border-[#F0EDE9] rounded-card p-4">
+                <div className="h-3 w-32 bg-[#F0EDE9] rounded-full animate-pulse mb-2" />
+                <div className="h-2.5 w-48 bg-[#F0EDE9] rounded-full animate-pulse" />
               </div>
             ))}
-
-            {/* Notes */}
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-ink-muted mb-1">Notes (optional)</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={2}
-                placeholder="Any additional details..."
-                className="w-full rounded-card border border-[#F0EDE9] bg-bg px-3 py-2.5 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-brand-pink"
-              />
-            </div>
-
-            {saveError && (
-              <p className="text-xs text-status-warn mb-3">{saveError}</p>
-            )}
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full rounded-pill bg-brand-pink py-3 text-white font-bold text-sm active:opacity-80 disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save Log"}
-            </button>
           </div>
-        </div>
-      )}
+        )}
+        {!logsLoading && logs.length === 0 && (
+          <Card className="p-6 text-center">
+            <p className="text-sm text-ink-muted">No logs yet — use the form above to add one.</p>
+          </Card>
+        )}
+        {!logsLoading && logs.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {logs.map(log => {
+              const lines = renderDetails(log.category as OperationalLogCategory, log.details)
+              return (
+                <div key={log.id} className="bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 flex items-start gap-3">
+                  <span className="text-xl mt-0.5 flex-shrink-0">{CATEGORY_ICONS[log.category as OperationalLogCategory]}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-ink">{CATEGORY_LABELS[log.category as OperationalLogCategory]}</p>
+                    {lines.map((line, i) => <p key={i} className="text-xs text-ink-muted mt-0.5">{line}</p>)}
+                    {log.notes && <p className="text-xs text-ink-muted mt-1 italic">{log.notes}</p>}
+                    <p className="text-[10px] text-ink-muted mt-1 opacity-60">
+                      {fmtDateTime(log.created_at)}{log.logged_by ? ` · ${log.logged_by}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setDeleteId(log.id)}
+                    className="flex-shrink-0 text-ink-muted text-xs px-2 py-1 rounded active:opacity-60"
+                    aria-label="Delete"
+                  >✕</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Delete confirm */}
       {deleteId != null && (
@@ -385,9 +379,7 @@ export default function OperationsPage() {
                 onClick={handleDelete}
                 disabled={deleting}
                 className="flex-1 rounded-pill bg-status-warn py-2.5 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
+              >{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         </div>
