@@ -149,8 +149,6 @@ app.include_router(whatsapp_router)
 from src.whatsapp.chat_api import router as chat_router
 app.include_router(chat_router)
 
-from src.api.reminder_router import router as reminder_router
-app.include_router(reminder_router)
 
 from src.api.onboarding_router import router as onboarding_router, _check_admin_pin, _rate_check
 app.include_router(onboarding_router)
