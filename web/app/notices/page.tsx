@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { getActiveNotices, patchTenant, NoticeItem } from "@/lib/api"
 import { TenantSearch } from "@/components/forms/tenant-search"
+import { DatePickerInput } from "@/components/ui/date-picker-input"
 
 const NOTICE_BY_DAY = 5
 
@@ -435,12 +436,7 @@ export default function NoticesPage() {
               <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
                 Checkout Date (Last Day)
               </label>
-              <input
-                type="date"
-                value={editDate}
-                onChange={e => setEditDate(e.target.value)}
-                className="w-full rounded-xl border border-[#E5E1DC] bg-surface px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
-              />
+              <DatePickerInput value={editDate} onChange={setEditDate} />
               <p className="text-[10px] text-ink-muted mt-0.5">
                 Notice given: {editItem?.notice_date ? new Date(editItem.notice_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
               </p>

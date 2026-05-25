@@ -14,6 +14,7 @@ import {
   CheckinPreview,
 } from "@/lib/api"
 import { ReceiptScanner, ReceiptScanResult } from "@/components/forms/receipt-scanner"
+import { DatePickerInput } from "@/components/ui/date-picker-input"
 
 type Method = "CASH" | "UPI" | "BANK" | "OTHER"
 
@@ -269,12 +270,7 @@ function NewCheckinPage() {
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               Actual Check-in Date
             </p>
-            <input
-              type="date"
-              value={actualDate}
-              onChange={(e) => setActualDate(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
-            />
+            <DatePickerInput value={actualDate} onChange={setActualDate} />
             {preview?.stay_type === "daily" && (
               <div className="mt-3">
                 <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">

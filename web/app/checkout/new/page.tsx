@@ -13,6 +13,7 @@ import {
   CheckoutPrefetch,
   CheckoutCreateResponse,
 } from "@/lib/api"
+import { DatePickerInput } from "@/components/ui/date-picker-input"
 
 const NOTICE_BY_DAY = 5
 
@@ -351,12 +352,7 @@ function NewCheckoutPage() {
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               Checkout Date
             </p>
-            <input
-              type="date"
-              value={checkoutDate}
-              onChange={(e) => setCheckoutDate(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
-            />
+            <DatePickerInput value={checkoutDate} onChange={setCheckoutDate} />
             {isDaily && (
               <div className="mt-3">
                 <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { updateBookingSession, cancelBookingSession } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
+import { DatePickerInput } from "@/components/ui/date-picker-input"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
 const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
@@ -695,13 +696,17 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             ].map(({ label, val, set, type, placeholder }) => (
               <div key={label} className={label === "Name" || label === "Check-in" ? "col-span-2" : ""}>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
-                <input
-                  type={type}
-                  value={val}
-                  onChange={(e) => set(e.target.value)}
-                  placeholder={placeholder}
-                  className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
-                />
+                {type === "date" ? (
+                  <DatePickerInput value={val} onChange={set} />
+                ) : (
+                  <input
+                    type={type}
+                    value={val}
+                    onChange={(e) => set(e.target.value)}
+                    placeholder={placeholder}
+                    className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                  />
+                )}
               </div>
             ))}
           </div>

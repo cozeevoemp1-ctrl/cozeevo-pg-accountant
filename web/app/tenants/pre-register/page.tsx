@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { quickBook } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 export default function PreRegisterPage() {
   const router = useRouter();
@@ -140,12 +141,7 @@ export default function PreRegisterPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Check-in date *</label>
-              <input
-                type="date"
-                value={checkinDate}
-                onChange={e => setCheckinDate(e.target.value)}
-                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
-              />
+              <DatePickerInput value={checkinDate} onChange={setCheckinDate} />
             </div>
             <div>
               <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Monthly rent (₹)</label>

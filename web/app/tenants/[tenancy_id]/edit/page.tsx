@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
+import { DatePickerInput } from "@/components/ui/date-picker-input"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -548,12 +549,7 @@ export default function EditTenantPage() {
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Check-in Date</label>
-            <input
-              type="date"
-              value={checkinDate}
-              onChange={(e) => setCheckinDate(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
-            />
+            <DatePickerInput value={checkinDate} onChange={setCheckinDate} />
           </div>
 
           <div>
@@ -710,12 +706,7 @@ export default function EditTenantPage() {
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Notice date</label>
-            <input
-              type="date"
-              value={noticeDate}
-              onChange={(e) => setNoticeDate(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
-            />
+            <DatePickerInput value={noticeDate} onChange={setNoticeDate} />
             {noticeDate && (
               <p className="text-[10px] text-ink-muted mt-1 px-1">
                 {new Date(noticeDate).getDate() <= 5
@@ -727,12 +718,7 @@ export default function EditTenantPage() {
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Expected checkout</label>
-            <input
-              type="date"
-              value={expectedCheckout}
-              onChange={(e) => setExpectedCheckout(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
-            />
+            <DatePickerInput value={expectedCheckout} onChange={setExpectedCheckout} />
           </div>
 
           {noticeDate && (
