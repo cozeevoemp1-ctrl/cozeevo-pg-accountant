@@ -199,17 +199,22 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Remove any stale tenant reminder jobs that may be persisted in the DB job store.
-    for _stale_id in ["rent_reminder_advance", "rent_reminder_day1", "rent_reminder_day3",
-                      "rent_reminder_day5", "rent_reminder_early", "rent_reminder_late"]:
-        try:
-            scheduler.remove_job(_stale_id)
-            logger.info("[Scheduler] Removed stale tenant reminder job: %s", _stale_id)
-        except Exception:
-            pass  # already gone
-
     scheduler.start()
     logger.info("[Scheduler] Started — tenant reminder jobs permanently disabled")
+
+    # Remove any stale tenant reminder jobs that may be persisted in the DB job store.
+    # Must run AFTER start() so the jobstore is connected.
+    _STALE_REMINDER_IDS = [
+        "rent_reminder_advance", "rent_reminder_early", "rent_reminder_late",
+        "rent_reminder_day1",    "rent_reminder_day2",  "rent_reminder_day3",
+        "rent_reminder_day4",    "rent_reminder_day5",
+    ]
+    for _stale_id in _STALE_REMINDER_IDS:
+        try:
+            scheduler.remove_job(_stale_id)
+            logger.info("[Scheduler] Purged stale tenant reminder job: %s", _stale_id)
+        except Exception:
+            pass  # already absent
     _log_next_runs(scheduler)
     return scheduler
 
