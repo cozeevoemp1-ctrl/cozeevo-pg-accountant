@@ -84,6 +84,33 @@ async def create_operation(
     return _serialize(log)
 
 
+@router.patch("/{log_id}")
+async def patch_operation(
+    log_id: int,
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    if user.role not in _STAFF_ROLES:
+        raise HTTPException(403, "Staff only")
+    async with get_session() as session:
+        result = await session.execute(
+            select(OperationalLog).where(OperationalLog.id == log_id)
+        )
+        log = result.scalars().first()
+        if not log:
+            raise HTTPException(404, "Log entry not found")
+        if "details" in body and isinstance(body["details"], dict):
+            # Merge — allows partial updates (e.g. just filling in outage_end)
+            merged = dict(log.details or {})
+            merged.update({k: v for k, v in body["details"].items() if v not in (None, "")})
+            log.details = merged
+        if "notes" in body:
+            log.notes = (body["notes"] or "").strip() or None
+        await session.commit()
+        await session.refresh(log)
+    return _serialize(log)
+
+
 @router.delete("/{log_id}")
 async def delete_operation(
     log_id: int,

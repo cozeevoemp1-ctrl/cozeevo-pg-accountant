@@ -402,7 +402,7 @@ async def upload_bank_csv(
             await session.flush()
 
             new_count = 0
-            for txn_date, desc, txn_type, amount in rows:
+            for txn_date, desc, txn_type, amount, running_balance in rows:
                 # Normalise description FIRST, then hash — so stored value always
                 # matches the hash. This is the canonical dedup key.
                 norm_desc = (desc or "").strip()
@@ -423,6 +423,7 @@ async def upload_bank_csv(
                         sub_category=sub,
                         unique_hash=uhash,
                         account_name=account_name,
+                        balance=running_balance,
                     )
                     .on_conflict_do_nothing(index_elements=["unique_hash"])
                     .returning(BankTransaction.id)

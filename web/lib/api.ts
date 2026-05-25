@@ -1031,6 +1031,15 @@ export function createOperationalLog(body: CreateOperationalLogBody): Promise<Op
   return _post("/api/v2/app/operations", body)
 }
 
+export async function patchOperationalLog(id: number, body: { details?: Record<string, string | number | null>; notes?: string }): Promise<OperationalLogEntry> {
+  const headers = { ...(await _authHeaders()), "Content-Type": "application/json" }
+  const res = await fetch(`${BASE_URL}/api/v2/app/operations/${id}`, {
+    method: "PATCH", headers, body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`PATCH /operations/${id} → ${res.status}`)
+  return res.json()
+}
+
 export async function deleteOperationalLog(id: number): Promise<void> {
   const headers = await _authHeaders()
   const res = await fetch(`${BASE_URL}/api/v2/app/operations/${id}`, { method: "DELETE", headers })

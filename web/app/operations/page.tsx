@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   getOperationalLogs,
   createOperationalLog,
+  patchOperationalLog,
   deleteOperationalLog,
   type OperationalLogEntry,
   type OperationalLogCategory,
@@ -130,6 +131,10 @@ export default function OperationsPage() {
   const [deleteId, setDeleteId]     = useState<number | null>(null)
   const [deleting, setDeleting]     = useState(false)
   const [filter, setFilter]         = useState<OperationalLogCategory | "all">("all")
+  const [editId, setEditId]         = useState<number | null>(null)
+  const [editValues, setEditValues] = useState<Record<string, string>>({})
+  const [editNotes, setEditNotes]   = useState("")
+  const [editSaving, setEditSaving] = useState(false)
 
   const loadLogs = useCallback(async () => {
     setLogsLoading(true)
@@ -173,6 +178,34 @@ export default function OperationsPage() {
       setSaveError(err instanceof Error ? err.message : "Failed to save")
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openEdit(log: OperationalLogEntry) {
+    const pre: Record<string, string> = {}
+    for (const [k, v] of Object.entries(log.details || {})) {
+      pre[k] = v != null ? String(v) : ""
+    }
+    setEditValues(pre)
+    setEditNotes(log.notes || "")
+    setEditId(log.id)
+  }
+
+  async function handleEditSave(log: OperationalLogEntry) {
+    setEditSaving(true)
+    try {
+      const details: Record<string, string | number | null> = {}
+      for (const f of FIELDS[log.category as OperationalLogCategory]) {
+        const v = editValues[f.key] ?? ""
+        if (v) details[f.key] = f.type === "number" ? Number(v) : v
+      }
+      const updated = await patchOperationalLog(log.id, { details, notes: editNotes })
+      setLogs(prev => prev.map(l => l.id === updated.id ? updated : l))
+      setEditId(null)
+    } catch {
+      // keep form open on error
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -367,19 +400,66 @@ export default function OperationsPage() {
               {visible.map(log => {
                 const lines = renderDetails(log.category as OperationalLogCategory, log.details)
                 return (
-                  <div key={log.id} className="bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 flex items-start gap-3">
-                    <span className="text-xl mt-0.5 flex-shrink-0">{CATEGORY_ICONS[log.category as OperationalLogCategory]}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-ink">{CATEGORY_LABELS[log.category as OperationalLogCategory]}</p>
-                      {lines.map((line, i) => <p key={i} className="text-xs text-ink-muted mt-0.5">{line}</p>)}
-                      {log.notes && <p className="text-xs text-ink-muted mt-1 italic">{log.notes}</p>}
-                      <p className="text-[10px] text-ink-muted mt-1 opacity-60">
-                        {fmtDateTime(log.created_at)}{log.logged_by ? ` · ${log.logged_by}` : ""}
-                      </p>
+                  <div key={log.id} className="bg-surface border border-[#F0EDE9] rounded-card px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl mt-0.5 flex-shrink-0">{CATEGORY_ICONS[log.category as OperationalLogCategory]}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-ink">{CATEGORY_LABELS[log.category as OperationalLogCategory]}</p>
+                        {lines.map((line, i) => <p key={i} className="text-xs text-ink-muted mt-0.5">{line}</p>)}
+                        {log.notes && <p className="text-xs text-ink-muted mt-1 italic">{log.notes}</p>}
+                        <p className="text-[10px] text-ink-muted mt-1 opacity-60">
+                          {fmtDateTime(log.created_at)}{log.logged_by ? ` · ${log.logged_by}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => editId === log.id ? setEditId(null) : openEdit(log)}
+                          className="text-xs px-2 py-1 rounded text-brand-pink font-semibold active:opacity-60">
+                          {editId === log.id ? "Cancel" : "Edit"}
+                        </button>
+                        <button onClick={() => setDeleteId(log.id)}
+                          className="text-ink-muted text-xs px-2 py-1 rounded active:opacity-60">✕</button>
+                      </div>
                     </div>
-                    <button onClick={() => setDeleteId(log.id)}
-                      className="flex-shrink-0 text-ink-muted text-xs px-2 py-1 rounded active:opacity-60"
-                      aria-label="Delete">✕</button>
+
+                    {/* Inline edit form */}
+                    {editId === log.id && (
+                      <div className="mt-3 pt-3 border-t border-[#F0EDE9] flex flex-col gap-3">
+                        {FIELDS[log.category as OperationalLogCategory].map(f => (
+                          <div key={f.key}>
+                            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                              {f.label}
+                            </label>
+                            {f.type === "datetime" ? (
+                              <DateTimePickerInput
+                                value={editValues[f.key] ?? ""}
+                                onChange={v => setEditValues(prev => ({ ...prev, [f.key]: v }))}
+                              />
+                            ) : f.type === "date" ? (
+                              <DatePickerInput
+                                value={editValues[f.key] ?? ""}
+                                onChange={v => setEditValues(prev => ({ ...prev, [f.key]: v }))}
+                              />
+                            ) : (
+                              <input type="number"
+                                value={editValues[f.key] ?? ""}
+                                onChange={e => setEditValues(prev => ({ ...prev, [f.key]: e.target.value }))}
+                                onWheel={e => e.currentTarget.blur()}
+                                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink"
+                              />
+                            )}
+                          </div>
+                        ))}
+                        <div>
+                          <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notes</label>
+                          <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={2}
+                            className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand-pink resize-none" />
+                        </div>
+                        <button onClick={() => handleEditSave(log)} disabled={editSaving}
+                          className="w-full py-2.5 rounded-xl bg-brand-pink text-white text-sm font-bold disabled:opacity-50 active:opacity-80">
+                          {editSaving ? "Saving…" : "Save changes"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
