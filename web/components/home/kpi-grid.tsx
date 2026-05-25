@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, createPayment, type KpiDetailItem, type TenantDues } from "@/lib/api";
 import { rupee, rupeeL } from "@/lib/format";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import type { KpiResponse } from "@/lib/api";
 
 interface KpiGridProps {
@@ -415,25 +416,13 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Check-in date</label>
-                <input
-                  type="date"
-                  value={checkinDate}
-                  onChange={(e) => setCheckinDate(e.target.value)}
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
-                  required
-                />
+                <DatePickerInput value={checkinDate} onChange={setCheckinDate} />
               </div>
               {stayType === "daily" ? (
                 <>
                   <div>
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Check-out date</label>
-                    <input
-                      type="date"
-                      value={checkoutDate}
-                      onChange={(e) => setCheckoutDate(e.target.value)}
-                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
-                      required
-                    />
+                    <DatePickerInput value={checkoutDate} onChange={setCheckoutDate} />
                   </div>
                   <div>
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Daily rate (₹/night)</label>
