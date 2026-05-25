@@ -66,73 +66,66 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Quick links */}
-      <div className="flex gap-2">
-        <Link href="/checkouts" className="flex-1 bg-surface border border-[#F0EDE9] rounded-card px-3 py-2.5 flex items-center gap-2 active:opacity-70">
-          <span className="text-base">🚪</span>
-          <div>
-            <p className="text-xs font-bold text-ink">Checkouts</p>
+      {/* ── Tenants ───────────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Tenants</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <Link href="/checkouts" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+            <span className="text-lg">🚪</span>
+            <p className="text-xs font-bold text-ink leading-tight">Checkouts</p>
             <p className="text-[10px] text-ink-muted">This month</p>
-          </div>
-        </Link>
-        <Link href="/notices" className="flex-1 bg-surface border border-[#F0EDE9] rounded-card px-3 py-2.5 flex items-center gap-2 active:opacity-70">
-          <span className="text-base">📋</span>
-          <div>
-            <p className="text-xs font-bold text-ink">Notices</p>
+          </Link>
+          <Link href="/notices" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+            <span className="text-lg">📋</span>
+            <p className="text-xs font-bold text-ink leading-tight">Notices</p>
             <p className="text-[10px] text-ink-muted">On notice</p>
-          </div>
-        </Link>
-        <Link href="/onboarding/bookings" className="flex-1 bg-surface border border-[#F0EDE9] rounded-card px-3 py-2.5 flex items-center gap-2 active:opacity-70">
-          <span className="text-base">🏷️</span>
-          <div>
-            <p className="text-xs font-bold text-ink">Bookings</p>
-            <p className="text-[10px] text-ink-muted">Ready to check in</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* Activity feed link */}
-      <Link href="/activity" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
-        <span className="text-base">📝</span>
-        <div className="flex-1">
-          <p className="text-xs font-bold text-ink">Activity log</p>
-          <p className="text-[10px] text-ink-muted">Payments · check-ins · rent changes</p>
+          </Link>
+          <Link href="/onboarding/bookings" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+            <span className="text-lg">🏷️</span>
+            <p className="text-xs font-bold text-ink leading-tight">Bookings</p>
+            <p className="text-[10px] text-ink-muted">Check-ins</p>
+          </Link>
         </div>
-        <span className="text-ink-muted text-sm">›</span>
-      </Link>
-
-      {/* Operations log */}
-      <Link href="/operations" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
-        <span className="text-base">⚡</span>
-        <div className="flex-1">
-          <p className="text-xs font-bold text-ink">Operations log</p>
-          <p className="text-[10px] text-ink-muted">Power · gas · water · garbage</p>
-        </div>
-        <span className="text-ink-muted text-sm">›</span>
-      </Link>
-
-      {/* Pre-register */}
-      <Link href="/tenants/pre-register" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
-        <span className="text-base">📝</span>
-        <div className="flex-1">
-          <p className="text-xs font-bold text-ink">Pre-register tenant</p>
-          <p className="text-[10px] text-ink-muted">Future joiner — no room yet</p>
-        </div>
-        <span className="text-ink-muted text-sm">›</span>
-      </Link>
-
-      {/* Admin-only: Finance link */}
-      {session.role === "admin" && (
-        <Link href="/finance" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
-          <span className="text-base">📊</span>
+        <Link href="/tenants/pre-register" className="mt-2 flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
+          <span className="text-base">➕</span>
           <div className="flex-1">
-            <p className="text-xs font-bold text-ink">Finance & P&L</p>
-            <p className="text-[10px] text-ink-muted">Upload statements · Download Excel</p>
+            <p className="text-xs font-bold text-ink">Pre-register tenant</p>
+            <p className="text-[10px] text-ink-muted">Future joiner — no room yet</p>
           </div>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-tile-pink text-brand-pink uppercase">
-            Owner
-          </span>
+          <span className="text-ink-muted text-sm">›</span>
         </Link>
+      </section>
+
+      {/* ── Operations ────────────────────────────────────────────── */}
+      <section>
+        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Operations</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/activity" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+            <span className="text-lg">📝</span>
+            <p className="text-xs font-bold text-ink leading-tight">Activity log</p>
+            <p className="text-[10px] text-ink-muted">Payments · check-ins</p>
+          </Link>
+          <Link href="/operations" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+            <span className="text-lg">⚡</span>
+            <p className="text-xs font-bold text-ink leading-tight">Operations log</p>
+            <p className="text-[10px] text-ink-muted">Power · gas · water</p>
+          </Link>
+        </div>
+      </section>
+
+      {/* ── Finance (admin only) ───────────────────────────────────── */}
+      {session.role === "admin" && (
+        <section>
+          <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Finance</h2>
+          <Link href="/finance" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
+            <span className="text-base">📊</span>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-ink">Finance & P&L</p>
+              <p className="text-[10px] text-ink-muted">Upload statements · Download Excel</p>
+            </div>
+            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-tile-pink text-brand-pink uppercase">Owner</span>
+          </Link>
+        </section>
       )}
 
       <section>
