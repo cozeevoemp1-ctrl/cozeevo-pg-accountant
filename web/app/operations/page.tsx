@@ -10,6 +10,8 @@ import {
   type OperationalLogCategory,
 } from "@/lib/api"
 import { Card } from "@/components/ui/card"
+import { DateSelect } from "@/components/ui/date-select"
+import { DateTimeSelect } from "@/components/ui/datetime-select"
 import Link from "next/link"
 
 // ── static config ─────────────────────────────────────────────────────────────
@@ -38,28 +40,30 @@ const ALL_CATEGORIES: OperationalLogCategory[] = [
 interface Field {
   key:      string
   label:    string
-  type:     "datetime-local" | "date" | "number"
+  type:     "datetime" | "date" | "number"
   required: boolean
   hint?:    string
+  placeholder?: string
 }
 
 const FIELDS: Record<OperationalLogCategory, Field[]> = {
   power_outage: [
-    { key: "outage_start", label: "Outage date & time",    type: "datetime-local", required: true },
-    { key: "outage_end",   label: "Restored date & time",  type: "datetime-local", required: false, hint: "Leave blank if not yet restored" },
+    { key: "outage_start", label: "Outage date & time",   type: "datetime", required: true },
+    { key: "outage_end",   label: "Restored date & time", type: "datetime", required: false, hint: "Leave blank if not yet restored" },
   ],
   hp_gas: [
-    { key: "booking_date",   label: "Booking date",    type: "date",   required: true },
-    { key: "received_date",  label: "Received date",   type: "date",   required: true },
-    { key: "cylinder_count", label: "No. of cylinders", type: "number", required: true },
+    { key: "booking_date",   label: "Booking date",     type: "date",   required: true },
+    { key: "received_date",  label: "Received date",    type: "date",   required: true },
+    { key: "cylinder_count", label: "No. of cylinders", type: "number", required: true, placeholder: "e.g. 2" },
   ],
   water_tanker: [
-    { key: "received_at", label: "Received date & time", type: "datetime-local", required: true },
+    { key: "received_at", label: "Received date & time", type: "datetime", required: true },
+    { key: "litres",      label: "Litres filled",        type: "number",   required: false, placeholder: "e.g. 5000" },
   ],
   garbage_collection: [
-    { key: "informed_date",  label: "Informed date",           type: "date", required: true },
-    { key: "collected_date", label: "Collected date",          type: "date", required: false, hint: "Leave blank if not yet collected" },
-    { key: "completed_date", label: "Service completed date",  type: "date", required: false },
+    { key: "informed_date",  label: "Informed date",          type: "date", required: true },
+    { key: "collected_date", label: "Collected date",         type: "date", required: false, hint: "Leave blank if not yet collected" },
+    { key: "completed_date", label: "Service completed date", type: "date", required: false },
   ],
 }
 
@@ -92,7 +96,10 @@ function renderDetails(category: OperationalLogCategory, details: Record<string,
         `Cylinders: ${details.cylinder_count}`,
       ]
     case "water_tanker":
-      return [`Received: ${fmtDateTime(details.received_at as string)}`]
+      return [
+        `Received: ${fmtDateTime(details.received_at as string)}`,
+        details.litres ? `Litres: ${details.litres}` : "",
+      ].filter(Boolean)
     case "garbage_collection":
       return [
         `Informed: ${fmtDate(details.informed_date as string)}`,
@@ -151,7 +158,7 @@ export default function OperationsPage() {
         setSaveError(`"${f.label}" is required`)
         return
       }
-      if (val) details[f.key] = f.type === "number" ? Number(val) : val
+      if (val) details[f.key] = f.type === "number" ? Number(val) : val as string
     }
     setSaving(true)
     try {
@@ -223,75 +230,36 @@ export default function OperationsPage() {
             </div>
           </div>
 
-          {/* Dynamic fields — 2-col when there are pairs, single otherwise */}
-          {fields.length === 2 && fields[0].type !== "number" && fields[1].type !== "number" ? (
-            // two date/datetime fields → 2-col grid
-            <div className="grid grid-cols-2 gap-3">
-              {fields.map(f => (
-                <div key={f.key}>
-                  <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                    {f.label}{f.required && " *"}
-                  </label>
-                  <input
-                    type={f.type}
-                    value={fieldValues[f.key] ?? ""}
-                    onChange={e => setFieldValues(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-2 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
-                  />
-                  {f.hint && <p className="mt-0.5 text-[10px] text-ink-muted">{f.hint}</p>}
-                </div>
-              ))}
-            </div>
-          ) : fields.length === 3 && category === "hp_gas" ? (
-            // HP Gas: booking + received in 2-col, cylinders full width
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                {fields.slice(0, 2).map(f => (
-                  <div key={f.key}>
-                    <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                      {f.label}{f.required && " *"}
-                    </label>
-                    <input
-                      type={f.type}
-                      value={fieldValues[f.key] ?? ""}
-                      onChange={e => setFieldValues(prev => ({ ...prev, [f.key]: e.target.value }))}
-                      className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                  No. of cylinders *
-                </label>
+          {/* Dynamic fields */}
+          {fields.map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
+                {f.label}{f.required && " *"}
+              </label>
+              {f.type === "datetime" ? (
+                <DateTimeSelect
+                  value={fieldValues[f.key] ?? ""}
+                  onChange={v => setFieldValues(prev => ({ ...prev, [f.key]: v }))}
+                />
+              ) : f.type === "date" ? (
+                <DateSelect
+                  value={fieldValues[f.key] ?? ""}
+                  onChange={v => setFieldValues(prev => ({ ...prev, [f.key]: v }))}
+                />
+              ) : (
                 <input
                   type="number"
-                  value={fieldValues["cylinder_count"] ?? ""}
-                  onChange={e => setFieldValues(prev => ({ ...prev, cylinder_count: e.target.value }))}
-                  onWheel={e => e.currentTarget.blur()}
-                  placeholder="e.g. 2"
-                  min="1"
-                  className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
-                />
-              </div>
-            </>
-          ) : (
-            // Garbage collection (3 date fields) and Water Tanker (1 field) — all full width
-            fields.map(f => (
-              <div key={f.key}>
-                <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                  {f.label}{f.required && " *"}
-                </label>
-                <input
-                  type={f.type}
                   value={fieldValues[f.key] ?? ""}
                   onChange={e => setFieldValues(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink appearance-none"
+                  onWheel={e => e.currentTarget.blur()}
+                  placeholder={f.placeholder}
+                  min="0"
+                  className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
                 />
-                {f.hint && <p className="mt-0.5 text-[10px] text-ink-muted">{f.hint}</p>}
-              </div>
-            ))
-          )}
+              )}
+              {f.hint && <p className="mt-0.5 text-[10px] text-ink-muted">{f.hint}</p>}
+            </div>
+          ))}
 
           {/* Notes */}
           <div>
