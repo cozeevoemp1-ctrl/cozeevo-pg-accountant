@@ -10,8 +10,8 @@ import {
   type OperationalLogCategory,
 } from "@/lib/api"
 import { Card } from "@/components/ui/card"
-import { DateSelect } from "@/components/ui/date-select"
-import { DateTimeSelect } from "@/components/ui/datetime-select"
+import { DatePickerInput } from "@/components/ui/date-picker-input"
+import { DateTimePickerInput } from "@/components/ui/datetime-picker-input"
 import Link from "next/link"
 
 // ── static config ─────────────────────────────────────────────────────────────
@@ -237,12 +237,12 @@ export default function OperationsPage() {
                 {f.label}{f.required && " *"}
               </label>
               {f.type === "datetime" ? (
-                <DateTimeSelect
+                <DateTimePickerInput
                   value={fieldValues[f.key] ?? ""}
                   onChange={v => setFieldValues(prev => ({ ...prev, [f.key]: v }))}
                 />
               ) : f.type === "date" ? (
-                <DateSelect
+                <DatePickerInput
                   value={fieldValues[f.key] ?? ""}
                   onChange={v => setFieldValues(prev => ({ ...prev, [f.key]: v }))}
                 />
