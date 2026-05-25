@@ -6,6 +6,8 @@
  * value / onChange: "YYYY-MM-DDTHH:MM"
  */
 
+import { useState } from "react"
+
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 const YEARS  = [2025, 2026]
 
@@ -13,7 +15,6 @@ function daysInMonth(month: number, year: number) {
   return new Date(year, month, 0).getDate()
 }
 
-// 12:00 am → 11:45 pm, every 15 min
 const TIME_SLOTS: { label: string; value: string }[] = []
 for (let h = 0; h < 24; h++) {
   for (const min of [0, 15, 30, 45]) {
@@ -27,37 +28,26 @@ for (let h = 0; h < 24; h++) {
 }
 
 interface Props {
-  value:    string   // "YYYY-MM-DDTHH:MM" or ""
+  value:    string
   onChange: (v: string) => void
 }
 
 export function DateTimePickerInput({ value, onChange }: Props) {
   const [datePart, timePart] = value ? value.split("T") : ["",""]
   const parts = datePart ? datePart.split("-").map(Number) : [0,0,0]
-  const y = parts[0], m = parts[1], d = parts[2]
-  const maxDay = (y && m) ? daysInMonth(m, y) : 31
 
-  // Round timePart to nearest 15-min slot value for matching
-  const timeVal = timePart
-    ? (() => {
-        const [hh, mm] = timePart.split(":").map(Number)
-        const rounded  = Math.round(mm / 15) * 15
-        const finalMin = rounded === 60 ? 0 : rounded
-        const finalHr  = rounded === 60 ? hh + 1 : hh
-        return `${String(finalHr % 24).padStart(2,"0")}:${String(finalMin).padStart(2,"0")}`
-      })()
-    : ""
+  const [selY, setSelY] = useState(parts[0] || 0)
+  const [selM, setSelM] = useState(parts[1] || 0)
+  const [selD, setSelD] = useState(parts[2] || 0)
+  const [selT, setSelT] = useState(timePart || "")
 
-  function emitDate(year: number, month: number, day: number) {
-    if (!year || !month || !day) return
-    const safe = Math.min(day, daysInMonth(month, year))
-    const date  = `${year}-${String(month).padStart(2,"0")}-${String(safe).padStart(2,"0")}`
-    onChange(timePart ? `${date}T${timePart}` : `${date}T09:00`)
-  }
+  const maxDay = (selY && selM) ? daysInMonth(selM, selY) : 31
 
-  function emitTime(tv: string) {
-    const date = datePart || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}-${String(new Date().getDate()).padStart(2,"0")}`
-    onChange(`${date}T${tv}`)
+  function emitAll(y: number, m: number, d: number, t: string) {
+    if (!y || !m || !d) return
+    const safe = Math.min(d, daysInMonth(m, y))
+    const date  = `${y}-${String(m).padStart(2,"0")}-${String(safe).padStart(2,"0")}`
+    onChange(`${date}T${t || "09:00"}`)
   }
 
   const sel = "h-full bg-transparent text-sm text-ink appearance-none focus:outline-none px-2 cursor-pointer"
@@ -65,24 +55,40 @@ export function DateTimePickerInput({ value, onChange }: Props) {
 
   return (
     <div className="mt-1 flex h-[46px] rounded-lg border border-[#E0DDD8] bg-surface overflow-hidden focus-within:border-brand-pink transition-colors">
-      <select value={d || ""} onChange={e => emitDate(y, m, +e.target.value)} className={sel + " w-[56px]"}>
+      <select
+        value={selD || ""}
+        onChange={e => { const v = +e.target.value; setSelD(v); emitAll(selY, selM, v, selT) }}
+        className={sel + " w-[56px]"}
+      >
         <option value="">DD</option>
         {Array.from({length: maxDay}, (_,i) => i+1).map(n => (
           <option key={n} value={n}>{String(n).padStart(2,"0")}</option>
         ))}
       </select>
       {div}
-      <select value={m || ""} onChange={e => emitDate(y, +e.target.value, d)} className={sel + " w-[62px]"}>
+      <select
+        value={selM || ""}
+        onChange={e => { const v = +e.target.value; setSelM(v); emitAll(selY, v, selD, selT) }}
+        className={sel + " w-[60px]"}
+      >
         <option value="">Mon</option>
         {MONTHS.map((name, i) => <option key={name} value={i+1}>{name}</option>)}
       </select>
       {div}
-      <select value={y || ""} onChange={e => emitDate(+e.target.value, m, d)} className={sel + " w-[68px]"}>
+      <select
+        value={selY || ""}
+        onChange={e => { const v = +e.target.value; setSelY(v); emitAll(v, selM, selD, selT) }}
+        className={sel + " w-[68px]"}
+      >
         <option value="">Year</option>
         {YEARS.map(yr => <option key={yr} value={yr}>{yr}</option>)}
       </select>
       {div}
-      <select value={timeVal} onChange={e => emitTime(e.target.value)} className={sel + " flex-1"}>
+      <select
+        value={selT}
+        onChange={e => { const v = e.target.value; setSelT(v); emitAll(selY, selM, selD, v) }}
+        className={sel + " flex-1 min-w-0"}
+      >
         <option value="">Time</option>
         {TIME_SLOTS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
       </select>
