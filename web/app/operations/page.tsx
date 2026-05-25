@@ -129,11 +129,12 @@ export default function OperationsPage() {
   const [logsLoading, setLogsLoading] = useState(true)
   const [deleteId, setDeleteId]     = useState<number | null>(null)
   const [deleting, setDeleting]     = useState(false)
+  const [filter, setFilter]         = useState<OperationalLogCategory | "all">("all")
 
   const loadLogs = useCallback(async () => {
     setLogsLoading(true)
     try {
-      const res = await getOperationalLogs(undefined, 50)
+      const res = await getOperationalLogs(undefined, 200)
       setLogs(res.logs)
     } finally {
       setLogsLoading(false)
@@ -286,12 +287,64 @@ export default function OperationsPage() {
         </form>
       </Card>
 
-      {/* Recent logs */}
+      {/* Summary cards */}
+      {!logsLoading && logs.length > 0 && (() => {
+        const now   = new Date()
+        const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`
+        return (
+          <div>
+            <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">This month</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {ALL_CATEGORIES.map(cat => {
+                const catLogs   = logs.filter(l => l.category === cat)
+                const thisMonth = catLogs.filter(l => l.created_at?.startsWith(month))
+                const last      = catLogs[0]
+                const lastDate  = last ? fmtDate(last.created_at) : "Never"
+                // category-specific extra
+                let extra = ""
+                if (cat === "hp_gas" && thisMonth.length) {
+                  const total = thisMonth.reduce((s, l) => s + (Number(l.details.cylinder_count) || 0), 0)
+                  if (total) extra = `${total} cylinders`
+                }
+                if (cat === "water_tanker" && thisMonth.length) {
+                  const total = thisMonth.reduce((s, l) => s + (Number(l.details.litres) || 0), 0)
+                  if (total) extra = `${total.toLocaleString()} L`
+                }
+                return (
+                  <div key={cat} className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-base">{CATEGORY_ICONS[cat]}</span>
+                      <span className="text-xs font-semibold text-ink-muted">{CATEGORY_LABELS[cat]}</span>
+                    </div>
+                    <p className="text-2xl font-extrabold text-ink">{thisMonth.length}</p>
+                    {extra && <p className="text-xs text-brand-pink font-semibold">{extra}</p>}
+                    <p className="text-[10px] text-ink-muted mt-0.5">Last: {lastDate}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Filter tabs + log list */}
       <div>
-        <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Recent logs</h2>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-3">
+          {([["all","All"]] as [string,string][])
+            .concat(ALL_CATEGORIES.map(c => [c, CATEGORY_ICONS[c] + " " + CATEGORY_LABELS[c]]))
+            .map(([val, label]) => (
+              <button key={val} type="button"
+                onClick={() => setFilter(val as OperationalLogCategory | "all")}
+                className={`flex-shrink-0 rounded-pill px-3 py-1.5 text-xs font-semibold transition-colors
+                  ${filter === val ? "bg-brand-pink text-white" : "bg-surface border border-[#F0EDE9] text-ink-muted"}`}>
+                {label}
+              </button>
+            ))}
+        </div>
+
         {logsLoading && (
           <div className="flex flex-col gap-2">
-            {[1, 2, 3].map(i => (
+            {[1,2,3].map(i => (
               <div key={i} className="bg-surface border border-[#F0EDE9] rounded-card p-4">
                 <div className="h-3 w-32 bg-[#F0EDE9] rounded-full animate-pulse mb-2" />
                 <div className="h-2.5 w-48 bg-[#F0EDE9] rounded-full animate-pulse" />
@@ -299,36 +352,40 @@ export default function OperationsPage() {
             ))}
           </div>
         )}
-        {!logsLoading && logs.length === 0 && (
-          <Card className="p-6 text-center">
-            <p className="text-sm text-ink-muted">No logs yet — use the form above to add one.</p>
-          </Card>
-        )}
-        {!logsLoading && logs.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {logs.map(log => {
-              const lines = renderDetails(log.category as OperationalLogCategory, log.details)
-              return (
-                <div key={log.id} className="bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 flex items-start gap-3">
-                  <span className="text-xl mt-0.5 flex-shrink-0">{CATEGORY_ICONS[log.category as OperationalLogCategory]}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-ink">{CATEGORY_LABELS[log.category as OperationalLogCategory]}</p>
-                    {lines.map((line, i) => <p key={i} className="text-xs text-ink-muted mt-0.5">{line}</p>)}
-                    {log.notes && <p className="text-xs text-ink-muted mt-1 italic">{log.notes}</p>}
-                    <p className="text-[10px] text-ink-muted mt-1 opacity-60">
-                      {fmtDateTime(log.created_at)}{log.logged_by ? ` · ${log.logged_by}` : ""}
-                    </p>
+
+        {!logsLoading && (() => {
+          const visible = filter === "all" ? logs : logs.filter(l => l.category === filter)
+          if (visible.length === 0) return (
+            <Card className="p-6 text-center">
+              <p className="text-sm text-ink-muted">
+                {logs.length === 0 ? "No logs yet — use the form above to add one." : "No logs for this category."}
+              </p>
+            </Card>
+          )
+          return (
+            <div className="flex flex-col gap-2">
+              {visible.map(log => {
+                const lines = renderDetails(log.category as OperationalLogCategory, log.details)
+                return (
+                  <div key={log.id} className="bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 flex items-start gap-3">
+                    <span className="text-xl mt-0.5 flex-shrink-0">{CATEGORY_ICONS[log.category as OperationalLogCategory]}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-ink">{CATEGORY_LABELS[log.category as OperationalLogCategory]}</p>
+                      {lines.map((line, i) => <p key={i} className="text-xs text-ink-muted mt-0.5">{line}</p>)}
+                      {log.notes && <p className="text-xs text-ink-muted mt-1 italic">{log.notes}</p>}
+                      <p className="text-[10px] text-ink-muted mt-1 opacity-60">
+                        {fmtDateTime(log.created_at)}{log.logged_by ? ` · ${log.logged_by}` : ""}
+                      </p>
+                    </div>
+                    <button onClick={() => setDeleteId(log.id)}
+                      className="flex-shrink-0 text-ink-muted text-xs px-2 py-1 rounded active:opacity-60"
+                      aria-label="Delete">✕</button>
                   </div>
-                  <button
-                    onClick={() => setDeleteId(log.id)}
-                    className="flex-shrink-0 text-ink-muted text-xs px-2 py-1 rounded active:opacity-60"
-                    aria-label="Delete"
-                  >✕</button>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Delete confirm */}
