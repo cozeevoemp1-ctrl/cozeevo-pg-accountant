@@ -137,6 +137,12 @@ async def _process_message_inner(
         await session.commit()
         return OutboundReply(reply="", intent="BLOCKED", role="blocked", skip=True)
 
+    # HARD RULE: no bot responses to tenants — bot is for staff/admin only.
+    if ctx.role == "tenant":
+        await _log(session, phone, message, "tenant", "TENANT_SILENCED", None)
+        await session.commit()
+        return OutboundReply(reply="", intent="TENANT_SILENCED", role="tenant", skip=True)
+
     # ── 1b. Load chat context for this phone ──────────────────────────────
     try:
         chat_context = await _load_chat_context(phone, session)
