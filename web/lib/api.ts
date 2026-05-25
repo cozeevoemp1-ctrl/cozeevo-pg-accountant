@@ -997,6 +997,46 @@ export async function quickBook(payload: {
   return _post("/api/v2/app/bookings/quick-book", payload);
 }
 
+// ── Operational Logs ──────────────────────────────────────────────────────────
+
+export type OperationalLogCategory =
+  | "power_outage"
+  | "hp_gas"
+  | "water_tanker"
+  | "garbage_collection"
+
+export interface OperationalLogEntry {
+  id:         number
+  category:   OperationalLogCategory
+  details:    Record<string, string | number | null>
+  notes:      string | null
+  logged_by:  string | null
+  created_at: string
+}
+
+export interface CreateOperationalLogBody {
+  category: OperationalLogCategory
+  details:  Record<string, string | number | null>
+  notes?:   string
+}
+
+export function getOperationalLogs(category?: OperationalLogCategory, limit = 50): Promise<{ logs: OperationalLogEntry[]; count: number }> {
+  const q = new URLSearchParams()
+  if (category) q.set("category", category)
+  q.set("limit", String(limit))
+  return _get(`/api/v2/app/operations?${q.toString()}`)
+}
+
+export function createOperationalLog(body: CreateOperationalLogBody): Promise<OperationalLogEntry> {
+  return _post("/api/v2/app/operations", body)
+}
+
+export async function deleteOperationalLog(id: number): Promise<void> {
+  const headers = await _authHeaders()
+  const res = await fetch(`${BASE_URL}/api/v2/app/operations/${id}`, { method: "DELETE", headers })
+  if (!res.ok) throw new Error(`DELETE /operations/${id} → ${res.status}`)
+}
+
 const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
 
 export async function updateBookingSession(token: string, payload: {

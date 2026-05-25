@@ -22,6 +22,7 @@ from src.api.v2.finance import router as finance_router
 from src.api.v2.blacklist import router as blacklist_router
 from src.api.v2.analytics import router as analytics_router
 from src.api.v2.bookings import router as bookings_router
+from src.api.v2.operations import router as operations_router
 from src.database.field_registry import fields_for_pwa
 
 router = APIRouter(prefix="/api/v2/app", tags=["app"])
@@ -43,6 +44,7 @@ router.include_router(finance_router)
 router.include_router(blacklist_router)
 router.include_router(analytics_router)
 router.include_router(bookings_router)
+router.include_router(operations_router)
 
 
 @router.get("/health")

@@ -1269,6 +1269,7 @@ class BankTransaction(Base):
     unique_hash   = Column(String(64), nullable=True)       # SHA-256 dedup fingerprint
     created_at    = Column(DateTime, default=datetime.utcnow)
     account_name  = Column(String(20), default="THOR")   # copied from upload
+    balance       = Column(Numeric(14, 2), nullable=True)  # running balance from statement
     reconciled_checkout_id = Column(Integer, ForeignKey("checkout_records.id"), nullable=True)
 
     upload = relationship("BankUpload", back_populates="transactions")
@@ -1494,6 +1495,34 @@ class CashCount(Base):
     counted_by  = Column(String(100), nullable=False)
     notes       = Column(Text, nullable=True)
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class OperationalLogCategory(str, enum.Enum):
+    power_outage        = "power_outage"
+    hp_gas              = "hp_gas"
+    water_tanker        = "water_tanker"
+    garbage_collection  = "garbage_collection"
+
+
+class OperationalLog(Base):
+    """
+    L3 — Structured operational event log.
+    Tracks power outages, gas deliveries, water tankers, and garbage collection.
+    Details are stored as JSONB — schema varies by category.
+    """
+    __tablename__ = "operational_logs"
+
+    id         = Column(Integer, primary_key=True)
+    category   = Column(String(30), nullable=False)   # OperationalLogCategory value
+    details    = Column(JSONB, nullable=False, default=dict)
+    notes      = Column(Text, nullable=True)
+    logged_by  = Column(String(100), nullable=True)   # name of user who logged
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_operational_logs_category",   "category"),
+        Index("ix_operational_logs_created_at", "created_at"),
+    )
 
 
 class UpiCollectionEntry(Base):

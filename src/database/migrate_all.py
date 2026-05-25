@@ -235,6 +235,23 @@ CREATE_TABLES: list[str] = [
     """
     CREATE INDEX IF NOT EXISTS ix_daywise_room ON daywise_stays(room_number)
     """,
+    # ── Operational event log (added 2026-05-25) ─────────────────────────────
+    """
+    CREATE TABLE IF NOT EXISTS operational_logs (
+        id         SERIAL PRIMARY KEY,
+        category   VARCHAR(30) NOT NULL,
+        details    JSONB NOT NULL DEFAULT '{}',
+        notes      TEXT,
+        logged_by  VARCHAR(100),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_operational_logs_category   ON operational_logs(category)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS ix_operational_logs_created_at ON operational_logs(created_at DESC)
+    """,
 ]
 
 
@@ -1273,6 +1290,14 @@ async def run_payment_unique_hash_2026_04_25(conn) -> None:
     print("  [ok] payments.unique_hash column + partial unique index ready")
 
 
+async def run_add_bank_txn_balance_2026_05_24(conn) -> None:
+    await conn.execute(text("""
+        ALTER TABLE bank_transactions
+        ADD COLUMN IF NOT EXISTS balance NUMERIC(14,2)
+    """))
+    print("  [migration] bank_transactions.balance column added (nullable)")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1606,6 +1631,9 @@ async def main(args: argparse.Namespace) -> None:
     # Staff KYC fields — own transaction
     async with engine.begin() as conn2:
         await run_add_staff_kyc_fields_2026_04_26(conn2)
+    # Running balance column on bank_transactions
+    async with engine.begin() as conn2:
+        await run_add_bank_txn_balance_2026_05_24(conn2)
     if args.seed:
         async with engine.begin() as conn2:
             await run_seed(conn2)
