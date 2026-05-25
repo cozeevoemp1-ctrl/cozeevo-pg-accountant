@@ -76,6 +76,7 @@ async def send_template(
     language_code: str = "en",
     body_params: Optional[list[str]] = None,
     param_names: Optional[list[str]] = None,
+    _allow_tenant_templates: bool = False,
 ) -> bool:
     """
     Send an approved Message Template via the official reminder number.
@@ -91,6 +92,13 @@ async def send_template(
     Returns:
         True if sent successfully, False otherwise.
     """
+    # HARD BLOCK: tenant-facing templates are disabled until explicitly re-enabled by Kiran.
+    _TENANT_TEMPLATES = {"rent_reminder", "general_notice", "rent_overdue", "checkout_reminder"}
+    if template_name in _TENANT_TEMPLATES and not _allow_tenant_templates:
+        logger.warning("[Reminder] BLOCKED: tenant template '%s' to %s — tenant reminders are disabled",
+                       template_name, to_number)
+        return False
+
     token, phone_id = _get_reminder_creds()
     if not (token and phone_id):
         logger.error("[Reminder] No WhatsApp credentials available — cannot send template")

@@ -126,24 +126,9 @@ def start_scheduler() -> AsyncIOScheduler:
     scheduler.add_jobstore(jobstores["default"], "default")
 
     # ── Register jobs ──────────────────────────────────────────────────────────
-
-    scheduler.add_job(
-        _rent_reminder,
-        trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
-        id="rent_reminder_advance",
-        name="Rent Reminder — Day -1 (last day of month)",
-        replace_existing=True,
-        kwargs={"mode": "advance"},
-    )
-    for _day, _id in [(1, "rent_reminder_day1"), (3, "rent_reminder_day3"), (5, "rent_reminder_day5")]:
-        scheduler.add_job(
-            _rent_reminder,
-            trigger=CronTrigger(day=_day, hour=9, minute=0, timezone="Asia/Kolkata"),
-            id=_id,
-            name=f"Rent Reminder — Day {_day} (overdue tenants)",
-            replace_existing=True,
-            kwargs={"mode": "overdue_daily"},
-        )
+    # NOTE: Tenant-facing rent reminder jobs (rent_reminder_advance, rent_reminder_day1/3/5)
+    # are PERMANENTLY DISABLED. No automated messages to tenants. Admin use /reminders in
+    # PWA only when manually deciding to send. Stale jobs are removed from DB on startup below.
 
     scheduler.add_job(
         _daily_reconciliation,
@@ -214,8 +199,17 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Remove any stale tenant reminder jobs that may be persisted in the DB job store.
+    for _stale_id in ["rent_reminder_advance", "rent_reminder_day1", "rent_reminder_day3",
+                      "rent_reminder_day5", "rent_reminder_early", "rent_reminder_late"]:
+        try:
+            scheduler.remove_job(_stale_id)
+            logger.info("[Scheduler] Removed stale tenant reminder job: %s", _stale_id)
+        except Exception:
+            pass  # already gone
+
     scheduler.start()
-    logger.info("[Scheduler] Started — jobs registered (prep reminders via send_template)")
+    logger.info("[Scheduler] Started — tenant reminder jobs permanently disabled")
     _log_next_runs(scheduler)
     return scheduler
 
