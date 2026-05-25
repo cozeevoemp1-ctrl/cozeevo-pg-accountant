@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.31] — 2026-05-25 — Hard block all tenant communications
+
+### `src/scheduler.py`
+- Removed `rent_reminder_advance`, `rent_reminder_day1/3/5` job registrations permanently.
+- On startup (after `scheduler.start()`): purges stale reminder jobs from APScheduler DB job store — `rent_reminder_advance/early/late/day1/2/3/4/5`.
+
+### `src/whatsapp/reminder_sender.py`
+- Hard block: `_BLOCKED_FOR_TENANTS` set — `rent_reminder`, `general_notice`, `rent_overdue`, `checkout_reminder`, `cozeevo_payment_received`, `cozeevo_checkin_welcome`, `cozeevo_booking_confirmation`, `cozeevo_checkout_confirmation`, `checkout_review`, `hello_world` all return `False` immediately.
+- Only `cozeevo_checkout_reminder` is permitted for tenant sends (currently PENDING Meta approval).
+- Removed `_allow_tenant_templates` escape hatch param.
+
+### `src/whatsapp/chat_api.py`
+- `_process_message_inner`: if `ctx.role == "tenant"`, immediately return `TENANT_SILENCED` skip=True — zero response to any tenant message, ever.
+
+### `src/api/reminder_router.py` — DELETED
+- Removed entire file (`/send-bulk`, `/send-custom`, `/trigger-rent` endpoints).
+- Removed router mount from `main.py`.
+
+### Meta templates deleted by Kiran
+- `rent_reminder` — deleted from Meta Business Manager.
+- `general_notice` — deleted from Meta Business Manager.
+
+---
+
 ## [1.76.30] — 2026-05-24 — Bed type selector on monthly booking + pre-register forms
 
 ### `web/components/home/kpi-grid.tsx`
