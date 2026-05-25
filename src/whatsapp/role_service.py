@@ -2,9 +2,12 @@
 Role detection + rate limiting for incoming WhatsApp messages.
 
 Every inbound message goes through this gate:
-  1. Rate limit check  → BLOCKED if exceeded
-  2. Role lookup       → admin / owner / receptionist / tenant / lead
-  3. Return CallerContext (role + tenant/staff record if found)
+  1. Hardcoded allowlist check → BLOCKED immediately if not on list
+  2. Role lookup from hardcoded map
+  3. Return CallerContext
+
+Only phones in _HARDCODED_ROLES can use the bot. Everyone else (tenants,
+leads, unknown numbers) is silently blocked — no response.
 """
 from __future__ import annotations
 
@@ -28,6 +31,17 @@ RATE_DAY_LIMIT      = 50    # max messages per day
 
 ADMIN_PHONE = os.getenv("ADMIN_PHONE", "")
 
+# ── Hardcoded allowlist — ONLY these phones can use the bot ──────────────────
+# Format: normalized_phone → (name, role)
+# Roles: "admin" | "owner" | "receptionist"
+# To add/remove someone: edit this dict and redeploy.
+_HARDCODED_ROLES: dict[str, tuple[str, str]] = {
+    "7845952289": ("Kiran",       "admin"),
+    "7358341775": ("Lakshmi",     "owner"),
+    "9444296681": ("Prabhakaran", "owner"),
+    "7680814628": ("Lokesh",      "receptionist"),
+}
+
 
 @dataclass
 class CallerContext:
@@ -41,47 +55,18 @@ class CallerContext:
 
 async def get_caller_context(phone: str, session: AsyncSession) -> CallerContext:
     """
-    Full gate check: rate limit → role → return context.
-    This is called on every inbound message before any processing.
+    Gate check: hardcoded allowlist only.
+    Phones not in _HARDCODED_ROLES are silently blocked — no response sent.
     """
-    # Normalize phone
     phone = _normalize(phone)
 
-    # 1. Check authorized_users FIRST (admin/owner bypass rate limiting)
-    result = await session.execute(
-        select(AuthorizedUser).where(
-            AuthorizedUser.phone == phone,
-            AuthorizedUser.active == True,
-        )
-    )
-    auth_user = result.scalars().first()
-    if auth_user:
-        return CallerContext(
-            phone=phone,
-            role=auth_user.role.value,
-            name=auth_user.name or "",
-            auth_user_id=auth_user.id,
-        )
+    entry = _HARDCODED_ROLES.get(phone)
+    if entry:
+        name, role = entry
+        return CallerContext(phone=phone, role=role, name=name)
 
-    # 2. Rate limit check (only for non-admin/owner — admins are exempt)
-    if await _is_rate_limited(phone, session):
-        return CallerContext(phone=phone, role="blocked", name="", is_blocked=True)
-
-    # 3. Check tenants table (end_user / tenant)
-    result = await session.execute(
-        select(Tenant).where(Tenant.phone == phone)
-    )
-    tenant = result.scalars().first()
-    if tenant:
-        return CallerContext(
-            phone=phone,
-            role="tenant",
-            name=tenant.name,
-            tenant_id=tenant.id,
-        )
-
-    # 4. Unknown → lead
-    return CallerContext(phone=phone, role="lead", name="")
+    # Not on the allowlist — block silently (tenants, leads, anyone else)
+    return CallerContext(phone=phone, role="blocked", name="", is_blocked=True)
 
 
 async def _is_rate_limited(phone: str, session: AsyncSession) -> bool:

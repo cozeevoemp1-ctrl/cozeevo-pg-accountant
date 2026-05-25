@@ -8,9 +8,9 @@ flat if/elif chain. This is the only place that knows which worker
 handles what; all workers remain unaware of each other.
 
 Routing rules (3 tiers):
-  admin        → full access (financial + operational + L0 master data)
-  owner        → financial + operational (no L0 master data changes)
-  receptionist → payment logging + expense management + individual queries (no financial reports / P&L)
+  admin        → operational (financial queries blocked — use Kozzy app)
+  owner        → operational (financial queries blocked — use Kozzy app)
+  receptionist → operational queries only (no financial access)
   tenant       → TenantWorker   (tenant_handler)
   lead / unknown → LeadWorker  (lead_handler)
 """
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.whatsapp.handlers.account_handler import handle_account, FINANCIAL_INTENTS
+from src.whatsapp.handlers.account_handler import FINANCIAL_INTENTS
 from src.whatsapp.handlers.owner_handler import handle_owner
 from src.whatsapp.handlers.tenant_handler import handle_tenant
 from src.whatsapp.handlers.lead_handler import handle_lead
@@ -26,19 +26,10 @@ from src.whatsapp.role_service import CallerContext
 
 OWNER_ROLES: frozenset[str] = frozenset({"admin", "owner"})
 
-# Intents the receptionist role is BLOCKED from.
-# Financial summaries and bank features restricted; receptionists can manage expenses.
-RECEPTIONIST_BLOCKED: frozenset[str] = frozenset({
-    "REPORT",            # monthly financial report / P&L
-    "BANK_REPORT",       # bank statement analysis
-    "BANK_DEPOSIT_MATCH",# bank deposit matching
-    "ADD_REFUND",        # process refunds
-    "QUERY_REFUNDS",     # list refunds
-    "VOID_PAYMENT",      # void/reverse payments
-    "RENT_CHANGE",       # change permanent rent
-    "RENT_DISCOUNT",     # one-time discount/surcharge
-    "QUERY_UNIT_ECONOMICS", # financial KPIs — owner only
-})
+_FINANCE_BLOCKED_MSG = (
+    "Finance queries are not available via WhatsApp.\n"
+    "Please use the Kozzy app to view payments, reports, dues, and expenses."
+)
 
 
 async def route(
@@ -53,17 +44,12 @@ async def route(
 
     if ctx.role in OWNER_ROLES:
         if intent in FINANCIAL_INTENTS:
-            return await handle_account(intent, entities, ctx, session)
+            return _FINANCE_BLOCKED_MSG
         else:
             return await handle_owner(intent, entities, ctx, session)
     elif ctx.role == "receptionist":
-        if intent in RECEPTIONIST_BLOCKED:
-            return (
-                "Sorry, that action requires owner-level access.\n"
-                "Type *help* to see what you can do."
-            )
         if intent in FINANCIAL_INTENTS:
-            return await handle_account(intent, entities, ctx, session)
+            return _FINANCE_BLOCKED_MSG
         else:
             return await handle_owner(intent, entities, ctx, session)
     elif ctx.role == "tenant":
