@@ -76,7 +76,6 @@ async def send_template(
     language_code: str = "en",
     body_params: Optional[list[str]] = None,
     param_names: Optional[list[str]] = None,
-    _allow_tenant_templates: bool = False,
 ) -> bool:
     """
     Send an approved Message Template via the official reminder number.
@@ -92,10 +91,23 @@ async def send_template(
     Returns:
         True if sent successfully, False otherwise.
     """
-    # HARD BLOCK: tenant-facing templates are disabled until explicitly re-enabled by Kiran.
-    _TENANT_TEMPLATES = {"rent_reminder", "general_notice", "rent_overdue", "checkout_reminder"}
-    if template_name in _TENANT_TEMPLATES and not _allow_tenant_templates:
-        logger.warning("[Reminder] BLOCKED: tenant template '%s' to %s — tenant reminders are disabled",
+    # HARD RULE: only cozeevo_checkout_reminder may ever be sent to a tenant.
+    # All other templates either go to staff only (checkin_prep, checkout_prep)
+    # or are permanently blocked (rent_reminder, general_notice, payment_received, etc.).
+    # cozeevo_checkin_prep and cozeevo_checkout_prep go to staff phones — callers are
+    # responsible for only passing staff numbers to those.
+    _BLOCKED_FOR_TENANTS = {
+        "rent_reminder", "general_notice", "rent_overdue",
+        "checkout_reminder",   # old name — replaced by cozeevo_checkout_reminder
+        "cozeevo_payment_received",
+        "cozeevo_checkin_welcome",
+        "cozeevo_booking_confirmation",
+        "cozeevo_checkout_confirmation",
+        "checkout_review",
+        "hello_world",
+    }
+    if template_name in _BLOCKED_FOR_TENANTS:
+        logger.warning("[Reminder] BLOCKED: template '%s' to %s is not allowed",
                        template_name, to_number)
         return False
 
