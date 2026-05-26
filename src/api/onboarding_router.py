@@ -1641,16 +1641,35 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     sharing_default = SharingType(effective_sharing)
                 except ValueError:
                     sharing_default = None
-            tenancy = Tenancy(
-                tenant_id=tenant.id, room_id=room.id if room else None, checkin_date=checkin,
-                agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
-                booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
-                lock_in_months=obs.lock_in_months or 0,
-                sharing_type=sharing_default,
-                entered_by=(req.entry_source or "onboarding_form") if req else "onboarding_form",
-                status=TenancyStatus.active if (req and req.instant_checkin) or checkin <= date.today() else TenancyStatus.no_show,
-            )
-            session.add(tenancy)
+            _target_status = TenancyStatus.active if (req and req.instant_checkin) or checkin <= date.today() else TenancyStatus.no_show
+            _pre_tenancy = None
+            if obs.tenancy_id:
+                _pre_tenancy = await session.get(Tenancy, obs.tenancy_id)
+            if _pre_tenancy and _pre_tenancy.status == TenancyStatus.no_show:
+                # Reuse the tenancy created at pre-booking time (advance was already recorded)
+                _pre_tenancy.tenant_id = tenant.id
+                _pre_tenancy.room_id = room.id if room else _pre_tenancy.room_id
+                _pre_tenancy.checkin_date = checkin
+                _pre_tenancy.agreed_rent = obs.agreed_rent or 0
+                _pre_tenancy.security_deposit = obs.security_deposit or 0
+                _pre_tenancy.booking_amount = obs.booking_amount or 0
+                _pre_tenancy.maintenance_fee = obs.maintenance_fee or 0
+                _pre_tenancy.sharing_type = sharing_default
+                _pre_tenancy.lock_in_months = obs.lock_in_months or 0
+                _pre_tenancy.entered_by = (req.entry_source or "onboarding_form") if req else "onboarding_form"
+                _pre_tenancy.status = _target_status
+                tenancy = _pre_tenancy
+            else:
+                tenancy = Tenancy(
+                    tenant_id=tenant.id, room_id=room.id if room else None, checkin_date=checkin,
+                    agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
+                    booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
+                    lock_in_months=obs.lock_in_months or 0,
+                    sharing_type=sharing_default,
+                    entered_by=(req.entry_source or "onboarding_form") if req else "onboarding_form",
+                    status=_target_status,
+                )
+                session.add(tenancy)
             await session.flush()
 
             # RentSchedule — first-month rent prorated by default on check-in
@@ -1675,10 +1694,18 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 return PaymentMode.upi if field_mode == "upi" else PaymentMode.cash
 
             # Auto-record advance (booking_amount) as a booking payment so it appears
-            # in payment history. It is NOT counted in rent paid_result (dues query
-            # excludes booking type) — it is accounted for directly in deposit_due via
-            # tenancy.booking_amount on the tenants dues endpoint.
+            # in payment history. Skipped if already recorded at pre-booking time
+            # (quick_book creates the payment immediately when booking_amount > 0).
+            _existing_bk_pmt = None
             if obs.booking_amount and float(obs.booking_amount) > 0:
+                _existing_bk_pmt = await session.scalar(
+                    select(Payment).where(
+                        Payment.tenancy_id == tenancy.id,
+                        Payment.for_type == PaymentFor.booking,
+                        Payment.is_void == False,
+                    )
+                )
+            if obs.booking_amount and float(obs.booking_amount) > 0 and not _existing_bk_pmt:
                 session.add(Payment(
                     tenancy_id=tenancy.id, amount=obs.booking_amount,
                     payment_date=checkin,
@@ -1714,7 +1741,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                        new_value=tenancy.status.value, entity_name=td.get("name", ""),
                        room_number=_room_num, source=_source,
                        note=f"Check-in via onboarding approval — Room {_room_num}")
-            if obs.booking_amount and float(obs.booking_amount) > 0:
+            if obs.booking_amount and float(obs.booking_amount) > 0 and not _existing_bk_pmt:
                 await _wae(session=session, changed_by=_actor, entity_type="payment",
                            entity_id=tenancy.id, field="payment.log",
                            new_value=str(float(obs.booking_amount)),

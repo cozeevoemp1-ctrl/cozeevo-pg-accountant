@@ -992,6 +992,7 @@ export async function quickBook(payload: {
   checkout_date?: string;
   sharing_type?: string;
   booking_amount?: number;
+  advance_mode?: string;
   notes?: string;
 }): Promise<QuickBookResult> {
   return _post("/api/v2/app/bookings/quick-book", payload);

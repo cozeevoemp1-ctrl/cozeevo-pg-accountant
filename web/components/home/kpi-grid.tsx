@@ -290,6 +290,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
   const [fullRoom, setFullRoom] = useState(false);
   const [monthlyBedType, setMonthlyBedType] = useState<"regular" | "premium">("regular");
   const [advance, setAdvance] = useState("");
+  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("cash");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
   const [notes, setNotes] = useState("");
@@ -322,6 +323,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               sharing_type: fullRoom ? "premium" : "",
               security_deposit: parseFloat(deposit) || 0,
               booking_amount: parseFloat(advance) || 0,
+              advance_mode: parseFloat(advance) > 0 ? advanceMode : undefined,
               notes: notes.trim() || undefined,
             }
           : {
@@ -334,6 +336,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               maintenance_fee: parseFloat(maintenance) || 0,
               security_deposit: parseFloat(deposit) || parseFloat(rent) || 0,
               booking_amount: parseFloat(advance) || 0,
+              advance_mode: parseFloat(advance) > 0 ? advanceMode : undefined,
               sharing_type: monthlyBedType === "premium" ? "premium" : "",
               notes: notes.trim() || undefined,
             }
@@ -542,6 +545,17 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                   min="0"
                   className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                 />
+                {parseFloat(advance) > 0 && (
+                  <div className="mt-2 flex rounded-pill overflow-hidden border border-[#E0DDD8] h-8">
+                    {(["cash", "upi"] as const).map(m => (
+                      <button key={m} type="button"
+                        onClick={() => setAdvanceMode(m)}
+                        className={`flex-1 text-xs font-semibold transition-colors ${advanceMode === m ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}>
+                        {m === "cash" ? "Cash" : "UPI"}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Notes (admin only)</label>

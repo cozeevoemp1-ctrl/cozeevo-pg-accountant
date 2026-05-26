@@ -18,7 +18,10 @@ from sqlalchemy import select
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import OnboardingSession, Room, Property
+from src.database.models import (
+    OnboardingSession, Room, Property,
+    Tenant, Tenancy, Payment, TenancyStatus, StayType, PaymentMode, PaymentFor,
+)
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -35,6 +38,7 @@ class QuickBookRequest(BaseModel):
     daily_rate: float = 0.0
     checkout_date: str = ""         # YYYY-MM-DD, required for daily
     booking_amount: float = 0.0     # advance paid at booking
+    advance_mode: str = ""          # "cash" | "upi" — how advance was collected
     sharing_type: str = ""          # "premium" = full room; "" = single bed
     notes: str = ""                 # stored in onboarding_sessions.special_terms
 
@@ -131,6 +135,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 maintenance_fee=Decimal("0"),
                 security_deposit=Decimal(str(req.security_deposit)),
                 booking_amount=Decimal(str(req.booking_amount)),
+                advance_mode=req.advance_mode or "",
                 checkin_date=checkin,
                 checkout_date=checkout,
                 stay_type="daily",
@@ -153,6 +158,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 maintenance_fee=Decimal(str(req.maintenance_fee)),
                 security_deposit=Decimal(str(deposit)),
                 booking_amount=Decimal(str(req.booking_amount)),
+                advance_mode=req.advance_mode or "",
                 checkin_date=checkin,
                 stay_type="monthly",
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
@@ -161,6 +167,65 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             )
         session.add(obs)
         await session.flush()
+
+        # If advance was collected at booking, create Tenant + no_show Tenancy + Payment immediately
+        # so it appears in payment history and activity log before check-in.
+        if req.booking_amount > 0:
+            from sqlalchemy import func as _func
+            from src.services.room_occupancy import _normalize_phone as _np
+            _norm10 = _np(phone)
+            tenant = await session.scalar(
+                select(Tenant).where(
+                    _func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm10
+                )
+            )
+            if not tenant:
+                tenant = Tenant(name=req.tenant_name.strip(), phone=phone)
+                session.add(tenant)
+                await session.flush()
+
+            _stay = StayType.daily if req.stay_type == "daily" else StayType.monthly
+            tenancy = Tenancy(
+                tenant_id=tenant.id,
+                room_id=room.id,
+                stay_type=_stay,
+                status=TenancyStatus.no_show,
+                checkin_date=checkin,
+                checkout_date=checkout,
+                agreed_rent=req.monthly_rent if req.stay_type == "monthly" else 0,
+                security_deposit=req.security_deposit,
+                booking_amount=Decimal(str(req.booking_amount)),
+                maintenance_fee=req.maintenance_fee if req.stay_type == "monthly" else 0,
+                entered_by="quick_book",
+            )
+            session.add(tenancy)
+            await session.flush()
+
+            _mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
+            session.add(Payment(
+                tenancy_id=tenancy.id,
+                amount=Decimal(str(req.booking_amount)),
+                payment_date=checkin,
+                payment_mode=_mode,
+                for_type=PaymentFor.booking,
+                notes=f"Advance collected at pre-booking ({req.advance_mode or 'cash'})",
+            ))
+
+            from src.services.audit import write_audit_entry as _wae
+            await _wae(
+                session=session,
+                changed_by=user.actor or str(user.user_id),
+                entity_type="payment", entity_id=tenancy.id,
+                field="payment.log",
+                new_value=str(float(req.booking_amount)),
+                entity_name=req.tenant_name.strip(),
+                room_number=room.room_number,
+                source="pwa",
+                note=f"Advance ₹{int(req.booking_amount):,} {'upi' if req.advance_mode == 'upi' else 'cash'} — pre-booking",
+            )
+
+            obs.tenant_id = tenant.id
+            obs.tenancy_id = tenancy.id
 
         # Building name for WhatsApp message
         building = ""
