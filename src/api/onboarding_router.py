@@ -64,7 +64,7 @@ class CreateSessionRequest(BaseModel):
     security_deposit: float = 0
     maintenance_fee: float = 0
     booking_amount: float = 0
-    advance_mode: str = ""
+    advance_mode: str = "upi"
     checkin_date: str  # ISO YYYY-MM-DD
     stay_type: str = "monthly"
     lock_in_months: int = 0

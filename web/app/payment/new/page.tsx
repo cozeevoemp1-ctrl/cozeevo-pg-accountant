@@ -277,11 +277,20 @@ export default function NewPaymentPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-xs text-ink-muted font-medium">Outstanding this month</p>
-                  <p className={`text-lg font-extrabold mt-0.5 ${totalOutstanding > 0 ? "text-status-warn" : "text-status-paid"}`}>
-                    {totalOutstanding > 0 ? `₹${totalOutstanding.toLocaleString("en-IN")} due` : "Fully paid ✓"}
-                  </p>
+                  {totalOutstanding > 0 ? (
+                    <p className="text-lg font-extrabold mt-0.5 text-status-warn">
+                      ₹{totalOutstanding.toLocaleString("en-IN")} due
+                    </p>
+                  ) : dues.adjustment < 0 ? (
+                    <div className="mt-0.5">
+                      <p className="text-sm font-semibold text-ink-muted line-through">₹{dues.rent_due.toLocaleString("en-IN")}</p>
+                      <p className="text-base font-extrabold text-status-paid">Waived ✓</p>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-extrabold mt-0.5 text-status-paid">Fully paid ✓</p>
+                  )}
                 </div>
-                {dues.last_payment_date && (
+                {dues.last_payment_date && dues.adjustment >= 0 && (
                   <div className="text-right">
                     <p className="text-xs text-ink-muted">Last paid</p>
                     <p className="text-xs font-semibold text-ink">₹{(dues.last_payment_amount ?? 0).toLocaleString("en-IN")}</p>

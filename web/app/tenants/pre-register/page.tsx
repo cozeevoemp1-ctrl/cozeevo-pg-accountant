@@ -16,7 +16,7 @@ export default function PreRegisterPage() {
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit]       = useState("");
   const [advance, setAdvance]       = useState("");
-  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("cash");
+  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("upi");
   const [notes, setNotes]           = useState("");
   const [bedType, setBedType]       = useState<"regular" | "premium">("regular");
   const [depositOverridden, setDepositOverridden] = useState(false);

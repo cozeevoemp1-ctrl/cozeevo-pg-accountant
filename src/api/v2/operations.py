@@ -25,7 +25,7 @@ from src.database.models import OperationalLog, OperationalLogCategory
 router = APIRouter(prefix="/operations", tags=["operations"])
 
 VALID_CATEGORIES = {c.value for c in OperationalLogCategory}
-_STAFF_ROLES = {"admin", "power_user", "key_user"}
+_STAFF_ROLES = {"admin", "power_user", "key_user", "staff"}
 
 
 @router.get("")

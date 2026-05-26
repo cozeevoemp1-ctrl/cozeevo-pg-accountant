@@ -296,7 +296,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
   const [fullRoom, setFullRoom] = useState(false);
   const [monthlyBedType, setMonthlyBedType] = useState<"regular" | "premium">("regular");
   const [advance, setAdvance] = useState("");
-  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("cash");
+  const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("upi");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
   const [notes, setNotes] = useState("");

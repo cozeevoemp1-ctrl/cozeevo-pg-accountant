@@ -38,7 +38,7 @@ class QuickBookRequest(BaseModel):
     daily_rate: float = 0.0
     checkout_date: str = ""         # YYYY-MM-DD, required for daily
     booking_amount: float = 0.0     # advance paid at booking
-    advance_mode: str = ""          # "cash" | "upi" — how advance was collected
+    advance_mode: str = "upi"       # "cash" | "upi" — how advance was collected
     sharing_type: str = ""          # "premium" = full room; "" = single bed
     notes: str = ""                 # stored in onboarding_sessions.special_terms
 
