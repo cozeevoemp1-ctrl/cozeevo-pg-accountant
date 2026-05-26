@@ -26,6 +26,8 @@ interface Booking {
   security_deposit?: number
   booking_amount?: number
   daily_rate?: number
+  num_days?: number
+  checkout_date?: string
   stay_type?: string
   tenancy_id?: number
   expires_at?: string
@@ -68,6 +70,7 @@ export default function BookingsPage() {
   const [error, setError] = useState("")
   const [filter, setFilter] = useState(searchParams.get("q") ?? "")
   const [statusFilter, setStatusFilter] = useState<"all" | "pending_review" | "pending_tenant" | "expired">("all")
+  const [stayFilter, setStayFilter]     = useState<"all" | "monthly" | "daily">("all")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,10 +136,11 @@ export default function BookingsPage() {
     (b.tenant_name || "").toLowerCase().includes(q) ||
     (b.room || "").toLowerCase().includes(q)
 
-  const statusMatch = (b: Booking) => statusFilter === "all" || b.status === statusFilter
-  const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b))
-  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b))
-  const expired  = bookings.filter((b) => b.status === "expired"        && match(b) && statusMatch(b))
+  const statusMatch  = (b: Booking) => statusFilter === "all" || b.status === statusFilter
+  const stayMatch    = (b: Booking) => stayFilter === "all" || b.stay_type === stayFilter
+  const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b) && stayMatch(b))
+  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b) && stayMatch(b))
+  const expired  = bookings.filter((b) => b.status === "expired"        && match(b) && statusMatch(b) && stayMatch(b))
 
   return (
     <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -162,22 +166,48 @@ export default function BookingsPage() {
 
         {/* Totals summary + filter chips */}
         {!loading && bookings.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { label: "All", count: bookings.length, key: "all" as const, color: "bg-[#F6F5F0] text-ink border-[#E0DDD8]", activeColor: "bg-ink text-white border-ink" },
-              { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, key: "pending_review" as const, color: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]", activeColor: "bg-[#065F46] text-white border-[#065F46]" },
-              { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, key: "pending_tenant" as const, color: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]", activeColor: "bg-[#92400E] text-white border-[#92400E]" },
-              { label: "Expired", count: bookings.filter(b => b.status === "expired").length, key: "expired" as const, color: "bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]", activeColor: "bg-[#991B1B] text-white border-[#991B1B]" },
-            ].filter(s => s.count > 0 || s.key === "all").map(s => (
-              <button
-                key={s.key}
-                onClick={() => setStatusFilter(s.key)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${statusFilter === s.key ? s.activeColor : s.color}`}
-              >
-                <span className="text-base font-extrabold leading-none">{s.count}</span>
-                <span className="font-medium opacity-90">{s.label}</span>
-              </button>
-            ))}
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label: "All", count: bookings.length, key: "all" as const, color: "bg-[#F6F5F0] text-ink border-[#E0DDD8]", activeColor: "bg-ink text-white border-ink" },
+                { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, key: "pending_review" as const, color: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]", activeColor: "bg-[#065F46] text-white border-[#065F46]" },
+                { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, key: "pending_tenant" as const, color: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]", activeColor: "bg-[#92400E] text-white border-[#92400E]" },
+                { label: "Expired", count: bookings.filter(b => b.status === "expired").length, key: "expired" as const, color: "bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]", activeColor: "bg-[#991B1B] text-white border-[#991B1B]" },
+              ].filter(s => s.count > 0 || s.key === "all").map(s => (
+                <button
+                  key={s.key}
+                  onClick={() => setStatusFilter(s.key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${statusFilter === s.key ? s.activeColor : s.color}`}
+                >
+                  <span className="text-base font-extrabold leading-none">{s.count}</span>
+                  <span className="font-medium opacity-90">{s.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Stay type filter */}
+            <div className="flex gap-2">
+              {[
+                { label: "All types", key: "all" as const },
+                { label: "Monthly", key: "monthly" as const },
+                { label: "Day stay", key: "daily" as const },
+              ].map(s => (
+                <button
+                  key={s.key}
+                  onClick={() => setStayFilter(s.key)}
+                  className={`px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-colors ${
+                    stayFilter === s.key
+                      ? s.key === "daily"
+                        ? "bg-[#92400E] text-white border-[#92400E]"
+                        : "bg-ink text-white border-ink"
+                      : s.key === "daily"
+                        ? "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]"
+                        : "bg-[#F6F5F0] text-ink border-[#E0DDD8]"
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -345,6 +375,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   // Edit fields
   const [editRoom, setEditRoom] = useState(b.room || "")
   const [editCheckin, setEditCheckin] = useState(b.checkin_date?.slice(0, 10) || "")
+  const [editCheckout, setEditCheckout] = useState(b.checkout_date?.slice(0, 10) || "")
   const [editRent, setEditRent] = useState(String(b.agreed_rent || ""))
   const [editMaint, setEditMaint] = useState(String(b.maintenance_fee || (b.stay_type === "daily" ? 0 : 5000)))
   const [editDeposit, setEditDeposit] = useState(String(b.security_deposit || b.agreed_rent || ""))
@@ -385,8 +416,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           .catch(() => {})
       })
     } else {
-      // Advance (booking_amount) deducted from deposit, not rent
-      const rentDue = proRata
+      // Day-stay: prepaid — collect (daily_rate × num_days) minus advance already paid
+      // Monthly: advance deducted from deposit, prorated rent due
+      const rentDue = b.stay_type === "daily"
+        ? Math.max(0, (b.daily_rate || 0) * (b.num_days || 0) - (b.booking_amount || 0))
+        : proRata
       const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
       if (rentDue > 0) { const v = String(rentDue); setCollectRentDues(v); defaultRentDues.current = v }
       if (depositDue > 0) { const v = String(depositDue); setCollectDepositDues(v); defaultDepositDues.current = v }
@@ -398,7 +432,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
 
   useEffect(() => {
     if (!manualOpen) return
-    const rentDue = proRata
+    const rentDue = b.stay_type === "daily"
+      ? Math.max(0, (b.daily_rate || 0) * (b.num_days || 0) - (b.booking_amount || 0))
+      : proRata
     const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
     setMRentDues(rentDue > 0 ? String(rentDue) : "0")
     setMDepDues(depositDue > 0 ? String(depositDue) : "0")
@@ -411,6 +447,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       await updateBookingSession(b.token, {
         room_number: editRoom || undefined,
         checkin_date: editCheckin || undefined,
+        checkout_date: b.stay_type === "daily" ? (editCheckout || undefined) : undefined,
         agreed_rent: editRent ? parseFloat(editRent) : undefined,
         maintenance_fee: b.stay_type === "daily" ? 0 : (editMaint ? parseFloat(editMaint) : undefined),
         security_deposit: editDeposit ? parseFloat(editDeposit) : (editRent ? parseFloat(editRent) : undefined),
@@ -600,6 +637,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           {checkinToday && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">Today!</span>
           )}
+          {b.stay_type === "daily" && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">Day stay</span>
+          )}
           {b.is_qr && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#EDE9FE] text-[#5B21B6]">QR</span>
           )}
@@ -690,11 +730,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               { label: "Phone", val: editPhone, set: setEditPhone, type: "tel", placeholder: "10 digits" },
               { label: "Room", val: editRoom, set: setEditRoom, type: "text", placeholder: "e.g. 416" },
               { label: "Check-in", val: editCheckin, set: setEditCheckin, type: "date", placeholder: "" },
+              ...(b.stay_type === "daily" ? [{ label: "Check-out", val: editCheckout, set: setEditCheckout, type: "date", placeholder: "" }] : []),
               { label: "Rent (₹)", val: editRent, set: (v: string) => { setEditRent(v); if (!editDeposit || editDeposit === editRent) setEditDeposit(v) }, type: "number", placeholder: "" },
               ...(b.stay_type !== "daily" ? [{ label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" }] : []),
               { label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" },
             ].map(({ label, val, set, type, placeholder }) => (
-              <div key={label} className={label === "Name" || label === "Check-in" ? "col-span-2" : ""}>
+              <div key={label} className={label === "Name" || label === "Check-in" || label === "Check-out" ? "col-span-2" : ""}>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
                 {type === "date" ? (
                   <DatePickerInput value={val} onChange={set} />
@@ -731,11 +772,19 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           {/* Reference info — display only */}
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
-              <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">1st Month Rent</p>
-              <p className="text-xs font-bold text-ink mt-0.5">
-                {proRata ? `₹${proRata.toLocaleString("en-IN")}` : "—"}
+              <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">
+                {b.stay_type === "daily" ? "Total stay" : "1st Month Rent"}
               </p>
-              <p className="text-[9px] text-ink-muted">Reference only</p>
+              <p className="text-xs font-bold text-ink mt-0.5">
+                {b.stay_type === "daily"
+                  ? (b.daily_rate && b.num_days ? `₹${((b.daily_rate) * (b.num_days)).toLocaleString("en-IN")}` : "—")
+                  : (proRata ? `₹${proRata.toLocaleString("en-IN")}` : "—")}
+              </p>
+              <p className="text-[9px] text-ink-muted">
+                {b.stay_type === "daily" && b.daily_rate && b.num_days
+                  ? `₹${b.daily_rate.toLocaleString("en-IN")}/day × ${b.num_days} days`
+                  : "Reference only"}
+              </p>
             </div>
             <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
               <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Advance Paid</p>
@@ -760,7 +809,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
             <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
+                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">
+                  {b.stay_type === "daily" ? "Stay amount (₹)" : "Rent (₹)"}
+                </label>
                 <input type="number" inputMode="decimal" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
                   onBlur={() => { if (collectRentDues === "" && defaultRentDues.current) setCollectRentDues(defaultRentDues.current) }}
                   className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"

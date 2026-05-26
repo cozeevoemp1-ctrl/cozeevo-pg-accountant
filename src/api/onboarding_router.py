@@ -566,6 +566,8 @@ async def list_pending(request: Request):
                 "security_deposit": float(obs.security_deposit or 0),
                 "booking_amount": float(obs.booking_amount or 0),
                 "daily_rate": float(obs.daily_rate or 0) if hasattr(obs, "daily_rate") else 0,
+                "num_days": obs.num_days or 0,
+                "checkout_date": obs.checkout_date.isoformat() if obs.checkout_date else "",
                 "stay_type": obs.stay_type or "monthly",
                 "tenancy_id": obs.tenancy_id,
                 "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
@@ -581,6 +583,7 @@ async def list_pending(request: Request):
 class UpdateSessionRequest(BaseModel):
     agreed_rent: Optional[float] = None
     checkin_date: Optional[str] = None   # YYYY-MM-DD
+    checkout_date: Optional[str] = None  # YYYY-MM-DD (day-stay only)
     room_number: Optional[str] = None
     maintenance_fee: Optional[float] = None
     security_deposit: Optional[float] = None
@@ -606,6 +609,8 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
             obs.agreed_rent = Decimal(str(req.agreed_rent))
         if req.checkin_date is not None:
             obs.checkin_date = date.fromisoformat(req.checkin_date)
+        if req.checkout_date is not None:
+            obs.checkout_date = date.fromisoformat(req.checkout_date)
         if req.room_number is not None:
             room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
             if not room:

@@ -1051,6 +1051,7 @@ const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
 export async function updateBookingSession(token: string, payload: {
   agreed_rent?: number;
   checkin_date?: string;
+  checkout_date?: string;
   room_number?: string;
   maintenance_fee?: number;
   security_deposit?: number;
