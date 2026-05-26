@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.32] — 2026-05-26 — Day-stay booking UX + collection calculation fixes
+
+### `web/app/onboarding/bookings/page.tsx`
+- Added "Day stay" amber badge on booking cards (distinguishes from monthly)
+- Added stay-type filter chips: All types / Monthly / Day stay
+- Added Check-out date picker in edit panel for day-stay bookings
+- Fixed collection calculation: prepaid = `daily_rate × num_days − advance_paid` (was using prorated monthly rent = 0 for day-stays)
+- Reference tile relabelled "Total stay" with `₹X/day × N days` breakdown for day-stay
+- Stay amount field label changed to "Stay amount (₹)" for day-stay
+- Day-stay pre-fill now skips tenancy dues API (was hitting cancelled tenancy and returning wrong amount); always calculates from session fields
+- Monthly booking pre-fill continues to use tenancy dues API as before
+
+### `web/lib/api.ts`
+- `updateBookingSession` payload now accepts `checkout_date` for day-stay edit
+
+### `src/api/onboarding_router.py`
+- `UpdateSessionRequest` + PATCH handler now accept and persist `checkout_date`
+- Pending sessions response now includes `checkout_date` and `num_days`
+- `num_days` derived from `checkout_date − checkin_date` when `num_days = 0` (fixes Abhinav Sarkar case)
+
+### Data ops
+- Abhinav Sarkar (room 413, tenancy 1121): cancelled accidental check-in + reset onboarding session to `pending_review`
+
+---
+
 ## [1.76.31] — 2026-05-25 — Hard block all tenant communications
 
 ### `src/scheduler.py`
