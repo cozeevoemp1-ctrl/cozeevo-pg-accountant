@@ -281,6 +281,12 @@ interface QuickBookModalProps {
 function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: QuickBookModalProps) {
   const canFullRoom = freeBeds >= maxOccupancy && maxOccupancy > 1;
   const [stayType, setStayType] = useState<"monthly" | "daily">("monthly");
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [checkinDate, setCheckinDate] = useState("");

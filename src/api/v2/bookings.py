@@ -202,20 +202,22 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             await session.flush()
 
             _mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
-            session.add(Payment(
+            _pmt = Payment(
                 tenancy_id=tenancy.id,
                 amount=Decimal(str(req.booking_amount)),
                 payment_date=checkin,
                 payment_mode=_mode,
                 for_type=PaymentFor.booking,
                 notes=f"Advance collected at pre-booking ({req.advance_mode or 'cash'})",
-            ))
+            )
+            session.add(_pmt)
+            await session.flush()  # need _pmt.id for audit entry
 
             from src.services.audit import write_audit_entry as _wae
             await _wae(
                 session=session,
                 changed_by=user.actor or str(user.user_id),
-                entity_type="payment", entity_id=tenancy.id,
+                entity_type="payment", entity_id=_pmt.id,
                 field="payment.log",
                 new_value=str(float(req.booking_amount)),
                 entity_name=req.tenant_name.strip(),

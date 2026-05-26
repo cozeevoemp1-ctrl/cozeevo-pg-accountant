@@ -915,46 +915,46 @@ async def get_activity_feed(
     user: AppUser = Depends(get_current_user),
 ):
     """Global activity feed — payments, check-ins, check-outs, rent changes, room moves, voids."""
-    from src.database.models import AuditLog, AuthorizedUser, Payment
+    from src.database.models import AuditLog, AuthorizedUser, Payment, Tenancy, Tenant
 
-    INCLUDE_FIELDS = {
-        "payment.log", "agreed_rent", "status", "status+checkout_date",
+    NON_PAYMENT_FIELDS = {
+        "agreed_rent", "status", "status+checkout_date",
         "room_id", "is_void", "adjustment", "rent_schedule_one_off",
     }
     async with get_session() as session:
-        rows = (await session.execute(
+        # Non-payment audit events (check-ins, rent changes, room moves, voids, adjustments)
+        audit_rows = (await session.execute(
             select(
                 AuditLog.id, AuditLog.entity_type, AuditLog.field,
                 AuditLog.entity_name, AuditLog.old_value, AuditLog.new_value,
                 AuditLog.room_number, AuditLog.note, AuditLog.changed_by,
                 AuditLog.source, AuditLog.created_at,
-                Payment.period_month.label("period_month"),
             )
-            .outerjoin(
-                Payment,
-                and_(
-                    AuditLog.field == "payment.log",
-                    AuditLog.entity_type == "payment",
-                    AuditLog.entity_id == Payment.id,
-                ),
-            )
-            .where(
-                AuditLog.field.in_(INCLUDE_FIELDS),
-                or_(
-                    AuditLog.field != "payment.log",
-                    Payment.is_void == False,
-                ),
-            )
+            .where(AuditLog.field.in_(NON_PAYMENT_FIELDS))
             .order_by(desc(AuditLog.created_at))
             .limit(limit * 3)
         )).all()
 
-        # Build phone→name and UUID→name maps from authorized_users
+        # All payments directly from payments table — source of truth for payment activity
+        payment_rows = (await session.execute(
+            select(
+                Payment.id, Payment.amount, Payment.payment_mode, Payment.for_type,
+                Payment.payment_date, Payment.notes, Payment.period_month,
+                Tenant.name.label("tenant_name"),
+                Room.room_number.label("pmt_room"),
+            )
+            .join(Tenancy, Payment.tenancy_id == Tenancy.id)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Tenancy.room_id == Room.id)
+            .where(Payment.is_void == False)
+            .order_by(desc(Payment.payment_date), desc(Payment.id))
+            .limit(limit * 3)
+        )).all()
+
         staff_rows = (await session.execute(
             select(AuthorizedUser.phone, AuthorizedUser.name, AuthorizedUser.supabase_auth_id)
         )).all()
 
-        # Build room ID → room_number map (WhatsApp bot stores int IDs; PWA stores room number strings)
         room_id_rows = (await session.execute(
             select(Room.id, Room.room_number)
         )).all()
@@ -968,7 +968,6 @@ async def get_activity_feed(
             phone_to_name[s.phone] = s.name
         if s.supabase_auth_id and s.name:
             uuid_to_name[s.supabase_auth_id] = s.name
-            # Old entries were stored truncated to 30 chars — index that prefix too
             uuid_to_name[s.supabase_auth_id[:30]] = s.name
 
     def _resolve_name(changed_by: str) -> str:
@@ -986,45 +985,59 @@ async def get_activity_feed(
             return cb.replace("_", " ").title()
         return cb
 
-    events = []
-    for r in rows:
+    raw_events = []
+
+    # --- Payment events from payments table (direct source) ---
+    for r in payment_rows:
+        mode_str = r.payment_mode.value if hasattr(r.payment_mode, "value") else str(r.payment_mode or "")
+        method = "UPI" if "upi" in mode_str.lower() else "Cash" if "cash" in mode_str.lower() else "Transfer" if "transfer" in mode_str.lower() else ""
+        for_type_str = r.for_type.value if hasattr(r.for_type, "value") else str(r.for_type or "")
+        for_what = ""
+        if for_type_str == "rent":
+            for_what = "rent"
+        elif for_type_str == "deposit":
+            for_what = "deposit"
+        elif for_type_str == "maintenance":
+            for_what = "maintenance"
+        elif for_type_str in ("booking", "advance"):
+            for_what = "advance"
+        amt = int(float(r.amount or 0))
+        period_str = r.period_month.strftime("%b '%y") if r.period_month else ""
+        label_parts = [f"₹{amt:,}"]
+        if method:
+            label_parts.append(method)
+        if for_what:
+            label_parts.append(for_what)
+        if period_str:
+            label_parts.append(period_str)
+        label = " · ".join(label_parts)
+        sublabel = (r.tenant_name or "") + (f" · Room {r.pmt_room}" if r.pmt_room else "")
+        # Use payment_date as timestamp (date → midnight UTC)
+        ts = datetime.combine(r.payment_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+        raw_events.append({
+            "_sort_ts": ts,
+            "id": f"pmt_{r.id}",
+            "type": "payment",
+            "label": label,
+            "sublabel": sublabel,
+            "detail": "",
+            "entity_name": r.tenant_name or "",
+            "room_number": str(r.pmt_room or ""),
+            "changed_by": "",
+            "source": "",
+            "ts": ts.isoformat(),
+        })
+
+    # --- Non-payment audit events ---
+    for r in audit_rows:
         ev_type = "other"
         label = ""
-        detail = ""  # old→new or note context shown below sublabel
+        detail = ""
         sublabel = r.entity_name or ""
         if r.room_number:
             sublabel += f" · Room {r.room_number}"
 
-        if r.field == "payment.log":
-            ev_type = "payment"
-            try:
-                amt = int(float(r.new_value or 0))
-            except (ValueError, TypeError):
-                amt = 0
-            note_lower = (r.note or "").lower()
-            method = "UPI" if "upi" in note_lower else "Cash" if "cash" in note_lower else "Transfer" if "transfer" in note_lower else ""
-            for_what = ""
-            if "for rent" in note_lower or "for may" in note_lower or "for april" in note_lower or "for june" in note_lower:
-                for_what = "rent"
-            elif "deposit" in note_lower:
-                for_what = "deposit"
-            elif "maintenance" in note_lower:
-                for_what = "maintenance"
-            elif "booking" in note_lower or "advance" in note_lower:
-                for_what = "advance"
-            period_str = ""
-            if r.period_month:
-                period_str = r.period_month.strftime("%b '%y")
-            label_parts = [f"₹{amt:,}"]
-            if method:
-                label_parts.append(method)
-            if for_what:
-                label_parts.append(for_what)
-            if period_str:
-                label_parts.append(period_str)
-            label = " · ".join(label_parts)
-
-        elif r.field in ("status", "status+checkout_date"):
+        if r.field in ("status", "status+checkout_date"):
             new_val = (r.new_value or "").lower()
             if new_val == "active":
                 ev_type = "checkin"
@@ -1083,8 +1096,8 @@ async def get_activity_feed(
             ts = ts.replace(tzinfo=timezone.utc)
 
         by_name = _resolve_name(r.changed_by or "")
-
-        events.append({
+        raw_events.append({
+            "_sort_ts": ts,
             "id": r.id,
             "type": ev_type,
             "label": label,
@@ -1097,6 +1110,12 @@ async def get_activity_feed(
             "ts": ts.isoformat() if ts else "",
         })
 
+    # Sort merged events by timestamp descending, trim to limit
+    raw_events.sort(key=lambda e: e["_sort_ts"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    events = []
+    for ev in raw_events:
+        ev.pop("_sort_ts")
+        events.append(ev)
         if len(events) >= limit:
             break
 
