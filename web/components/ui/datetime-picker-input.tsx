@@ -71,7 +71,7 @@ export function DateTimePickerInput({ value, onChange }: Props) {
   }, [])
 
   function emitDate(y: number, m: number, d: number, h: string, min: string, p: "AM"|"PM") {
-    if (!d || !h || !min) return
+    if (!d) return  // only date is required; time defaults to 12:00 if not yet entered
     const ds = `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`
     const ts = to24(+h || 12, +min || 0, p)
     onChange(`${ds}T${ts}`)
@@ -122,10 +122,10 @@ export function DateTimePickerInput({ value, onChange }: Props) {
         {/* Time: HH : MM AM/PM */}
         <div className="flex items-center gap-0.5 px-2" onClick={e => e.stopPropagation()}>
           <input
-            type="number" min={1} max={12}
+            type="text" inputMode="numeric" maxLength={2}
             value={hour}
             onChange={e => {
-              const v = e.target.value.slice(-2)
+              const v = e.target.value.replace(/\D/g,"").slice(0,2)
               setHour(v)
               emitDate(selYear, selMonth, selDay, v, minute, period)
             }}
@@ -134,10 +134,10 @@ export function DateTimePickerInput({ value, onChange }: Props) {
           />
           <span className="text-ink-muted text-sm font-bold">:</span>
           <input
-            type="number" min={0} max={59}
+            type="text" inputMode="numeric" maxLength={2}
             value={minute}
             onChange={e => {
-              const v = e.target.value.slice(-2).padStart(2,"0")
+              const v = e.target.value.replace(/\D/g,"").slice(0,2)
               setMinute(v)
               emitDate(selYear, selMonth, selDay, hour, v, period)
             }}
