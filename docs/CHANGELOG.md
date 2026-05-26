@@ -2,6 +2,16 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.34] — 2026-05-26 — Opex benchmarking report (Babai PG comparison)
+
+### New script: `scripts/export_opex_comparison.py`
+- Imports OPEX data from `pnl_builder.py` — no duplication
+- Generates `data/reports/Opex_Comparison_2026_05.xlsx` with 3 tabs:
+  - **Comparison** — Babai PG vs Cozeevo Apr'26, side-by-side per-bed and per-occ-bed with diff column
+  - **Fixed vs Variable** — cost split with break-even calculation
+  - **Profit Scenarios** — occupancy 65%–100%, current (91%) highlighted
+- Key findings: our recurring ops ₹2,846/bed vs Babai ₹3,582/bed (20% leaner); break-even ~205 beds (69% occ); ceiling ~₹1.2–1.4 Cr/year; rent (₹22.14L fixed) is the structural constraint
+
 ## [1.76.33] — 2026-05-26 — Operational event log + consistent date pickers
 
 ### New feature: Operational Event Log (`/operations`)
