@@ -71,6 +71,7 @@ export default function BookingsPage() {
   const [filter, setFilter] = useState(searchParams.get("q") ?? "")
   const [statusFilter, setStatusFilter] = useState<"all" | "pending_review" | "pending_tenant" | "expired">("all")
   const [stayFilter, setStayFilter]     = useState<"all" | "monthly" | "daily">("all")
+  const [monthFilter, setMonthFilter]   = useState<string>("all") // "all" or "YYYY-MM"
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -136,11 +137,16 @@ export default function BookingsPage() {
     (b.tenant_name || "").toLowerCase().includes(q) ||
     (b.room || "").toLowerCase().includes(q)
 
-  const statusMatch  = (b: Booking) => statusFilter === "all" || b.status === statusFilter
-  const stayMatch    = (b: Booking) => stayFilter === "all" || b.stay_type === stayFilter
-  const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b) && stayMatch(b))
-  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b) && stayMatch(b))
-  const expired  = bookings.filter((b) => b.status === "expired"        && match(b) && statusMatch(b) && stayMatch(b))
+  const statusMatch = (b: Booking) => statusFilter === "all" || b.status === statusFilter
+  const stayMatch   = (b: Booking) => stayFilter === "all" || b.stay_type === stayFilter
+  const monthMatch  = (b: Booking) => monthFilter === "all" || (b.checkin_date ?? "").startsWith(monthFilter)
+
+  // distinct months from all bookings, sorted ascending
+  const distinctMonths = Array.from(new Set(bookings.map(b => (b.checkin_date ?? "").slice(0, 7)).filter(Boolean))).sort()
+
+  const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
+  const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
+  const expired  = bookings.filter((b) => b.status === "expired"        && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
 
   return (
     <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -208,6 +214,28 @@ export default function BookingsPage() {
                 </button>
               ))}
             </div>
+          {/* Month filter */}
+          {distinctMonths.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+              <button
+                onClick={() => setMonthFilter("all")}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-colors ${monthFilter === "all" ? "bg-ink text-white border-ink" : "bg-[#F6F5F0] text-ink border-[#E0DDD8]"}`}
+              >
+                All months
+              </button>
+              {distinctMonths.map(m => {
+                const [y, mo] = m.split("-")
+                const label = new Date(+y, +mo - 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+                return (
+                  <button key={m} onClick={() => setMonthFilter(m)}
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-colors ${monthFilter === m ? "bg-brand-pink text-white border-brand-pink" : "bg-[#FCE2EE] text-brand-pink border-[#F9A8D4]"}`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           </div>
         )}
 
