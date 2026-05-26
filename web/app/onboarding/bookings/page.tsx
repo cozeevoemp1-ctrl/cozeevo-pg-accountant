@@ -396,7 +396,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   useEffect(() => {
     if (prefillDone.current || b.status !== "pending_review") return
 
-    if (b.tenancy_id) {
+    if (b.tenancy_id && b.stay_type !== "daily") {
+      // Monthly: fetch live dues from the active tenancy
       supabase().auth.getSession().then(({ data }) => {
         const token = data.session?.access_token
         if (!token) return
@@ -416,8 +417,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
           .catch(() => {})
       })
     } else {
-      // Day-stay: prepaid — collect (daily_rate × num_days) minus advance already paid
-      // Monthly: advance deducted from deposit, prorated rent due
+      // Day-stay: always calculate from session — prepaid = daily_rate × num_days − advance
+      // Monthly (no tenancy yet): advance deducted from deposit, prorated rent due
       const rentDue = b.stay_type === "daily"
         ? Math.max(0, (b.daily_rate || 0) * (b.num_days || 0) - (b.booking_amount || 0))
         : proRata
