@@ -566,8 +566,11 @@ async def list_pending(request: Request):
                 "security_deposit": float(obs.security_deposit or 0),
                 "booking_amount": float(obs.booking_amount or 0),
                 "daily_rate": float(obs.daily_rate or 0) if hasattr(obs, "daily_rate") else 0,
-                "num_days": obs.num_days or 0,
                 "checkout_date": obs.checkout_date.isoformat() if obs.checkout_date else "",
+                "num_days": obs.num_days or (
+                    (obs.checkout_date - obs.checkin_date).days
+                    if obs.checkout_date and obs.checkin_date else 0
+                ),
                 "stay_type": obs.stay_type or "monthly",
                 "tenancy_id": obs.tenancy_id,
                 "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
