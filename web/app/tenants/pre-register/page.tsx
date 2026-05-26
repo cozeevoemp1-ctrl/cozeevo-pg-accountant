@@ -59,7 +59,7 @@ export default function PreRegisterPage() {
         maintenance_fee:  parseFloat(maintenance) || 5000,
         security_deposit: depositNum,
         booking_amount:   parseFloat(advance) || 0,
-        advance_mode:     parseFloat(advance) > 0 ? advanceMode : undefined,
+        advance_mode:     advanceMode,
         sharing_type:     bedType === "premium" ? "premium" : "",
         notes:            notes.trim() || undefined,
       });
@@ -200,17 +200,15 @@ export default function PreRegisterPage() {
               min="0"
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
-            {parseFloat(advance) > 0 && (
-              <div className="mt-2 flex rounded-lg overflow-hidden border border-[#E0DDD8] h-[42px]">
-                {(["cash", "upi"] as const).map(m => (
-                  <button key={m} type="button"
-                    onClick={() => setAdvanceMode(m)}
-                    className={`flex-1 text-sm font-bold transition-colors ${advanceMode === m ? "bg-brand-pink text-white" : "bg-surface text-ink-muted"}`}>
-                    {m === "cash" ? "Cash" : "UPI"}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="mt-2 flex rounded-lg overflow-hidden border border-[#E0DDD8] h-[42px]">
+              {(["cash", "upi"] as const).map(m => (
+                <button key={m} type="button"
+                  onClick={() => setAdvanceMode(m)}
+                  className={`flex-1 text-sm font-bold transition-colors ${advanceMode === m ? "bg-brand-pink text-white" : "bg-surface text-ink-muted"}`}>
+                  {m === "cash" ? "Cash" : "UPI"}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
