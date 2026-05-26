@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.33] — 2026-05-26 — Operational event log + consistent date pickers
+
+### New feature: Operational Event Log (`/operations`)
+- New `operational_logs` DB table (JSONB details column, category enum)
+- `src/api/v2/operations.py` — GET / POST / PATCH / DELETE endpoints
+- PATCH does merge-update: fill in `outage_end` days later without overwriting `outage_start`
+- PWA `/operations` page: category form (Power Outage / HP Gas / Water Tanker / Garbage Collection), dynamic fields per category, filter tabs, monthly summaries (count + last date + cylinder/litre totals)
+- Each log card has inline Edit form (pre-populated, saves via PATCH) and ✕ delete with confirm
+- `web/lib/api.ts`: `getOperationalLogs`, `createOperationalLog`, `patchOperationalLog`, `deleteOperationalLog`
+- Home page reorganised into 3 labelled sections: Tenants / Operations / Finance
+
+### UI: DatePickerInput rolled out to all date fields
+- Replaced all `<input type="date">` native pickers with `DatePickerInput` (DD | MMM | YYYY connected-row dropdowns)
+- `web/components/ui/date-picker-input.tsx` + `datetime-picker-input.tsx` — Option 4 with internal useState fix (each segment shows immediately, parent only called when all filled)
+- Updated pages: Pre-register, Check-in, Checkout, Notices, Edit Tenant (3 fields), Bookings edit panel, Pre-book modal (kpi-grid check-in + day-wise checkout)
+
+---
+
 ## [1.76.32] — 2026-05-26 — Day-stay booking UX + collection calculation fixes
 
 ### `web/app/onboarding/bookings/page.tsx`
