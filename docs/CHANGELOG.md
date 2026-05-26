@@ -2,6 +2,28 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.35] — 2026-05-26 — Activity feed consistency + QuickBookModal fixes
+
+### Fix: Activity feed now shows ALL payments (not just audit-logged ones)
+- `src/api/v2/kpi.py` — `GET /activity/feed` rewritten: queries payments table directly instead of via `AuditLog.payment.log`; non-payment events (check-ins, rent changes, room moves, voids, adjustments) still come from AuditLog. Merged and sorted by timestamp descending.
+- Root cause: payments created by scripts, backfills, or Excel imports never had AuditLog entries → invisible in activity feed.
+- Old bug: `bookings.py` audit entries used `entity_id=tenancy.id` instead of `payment.id`, so the join in the feed query failed and filtered them out.
+
+### Fix: `bookings.py` advance payment audit entry
+- `src/api/v2/bookings.py` — flush after adding the Payment object to get `_pmt.id`; pass `entity_id=_pmt.id` to audit entry (not `tenancy.id`).
+
+### Fix: `onboarding_router.py` check-in payment audit
+- Removed redundant `payment.log` audit entries at check-in (payments now surface via direct table query).
+- Save payment objects to `_pmt_booking` / `_pmt_rent` / `_pmt_deposit` variables before flush; kept for future use.
+
+### Fix: Abhinav (tenancy 1122) booking advance corrected to UPI
+- `scripts/_fix_abhinav_booking_pmt.py` — updated `payment_mode=UPI` and note for the ₹5,000 booking advance (was incorrectly set to cash).
+
+### Fix: QuickBookModal ESC key to close
+- `web/components/home/kpi-grid.tsx` — added `useEffect` keydown listener: `Escape` calls `onClose()`.
+
+---
+
 ## [1.76.34] — 2026-05-26 — Opex benchmarking report (Babai PG comparison)
 
 ### New script: `scripts/export_opex_comparison.py`
