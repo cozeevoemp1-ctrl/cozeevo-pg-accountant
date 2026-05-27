@@ -475,7 +475,7 @@ class Payment(Base):
     tenancy_id          = Column(Integer, ForeignKey("tenancies.id"), nullable=False)
     amount              = Column(Numeric(12, 2), nullable=False)
     payment_date        = Column(Date, nullable=False)
-    payment_mode        = Column(Enum(PaymentMode), nullable=False)
+    payment_mode        = Column(Enum(PaymentMode), nullable=True)
     upi_reference       = Column(String(100))
     for_type            = Column(Enum(PaymentFor), nullable=False, default=PaymentFor.rent)
     period_month        = Column(Date)      # which month rent this is for (NULL for deposit/booking)

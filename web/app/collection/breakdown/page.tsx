@@ -147,7 +147,7 @@ export default async function CollectionBreakdownPage({
           total={totalCashReceived}
           totalLabel="Total rent settled"
           totalColor="text-brand-blue"
-          note="All payments received this month by method (rent, deposits, advances)."
+          note="Cash and UPI rent payments received this month."
         />
       )}
 

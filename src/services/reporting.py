@@ -228,8 +228,8 @@ async def collection_summary(
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
     # ── Payment method breakdown — matches sheet cash/UPI columns ────────────
-    # Rent: filter by period_month (excludes old-period catch-ups received this month).
-    # Deposits: filter by payment_date (period_month=None for all deposits).
+    # Rent only, filtered by period_month. Matches Google Sheet FEB Cash / FEB UPI columns.
+    # Deposits and bookings are excluded — they use payment_mode=NULL for imported months.
     method_rows = (
         await session.execute(
             select(
@@ -238,13 +238,9 @@ async def collection_summary(
             )
             .where(
                 Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent,
-                         Payment.period_month == from_date),
-                    and_(Payment.for_type == PaymentFor.deposit,
-                         extract("year",  Payment.payment_date) == from_date.year,
-                         extract("month", Payment.payment_date) == from_date.month),
-                ),
+                Payment.payment_mode.is_not(None),
+                Payment.for_type == PaymentFor.rent,
+                Payment.period_month == from_date,
             )
             .group_by(Payment.payment_mode)
         )

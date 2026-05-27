@@ -1298,6 +1298,20 @@ async def run_add_bank_txn_balance_2026_05_24(conn) -> None:
     print("  [migration] bank_transactions.balance column added (nullable)")
 
 
+async def run_payments_mode_nullable_2026_05_27(conn) -> None:
+    """Make payments.payment_mode nullable.
+
+    Excel-imported historical payments (deposits, booking advances) have no known
+    payment mode — they were incorrectly defaulted to 'cash'. Setting NULL means
+    'unassigned / not tracked'. The HOW IT WAS PAID display only sums non-NULL rows.
+    """
+    await conn.execute(text("""
+        ALTER TABLE payments
+        ALTER COLUMN payment_mode DROP NOT NULL
+    """))
+    print("  [migration] payments.payment_mode is now nullable (unassigned imports)")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1634,6 +1648,9 @@ async def main(args: argparse.Namespace) -> None:
     # Running balance column on bank_transactions
     async with engine.begin() as conn2:
         await run_add_bank_txn_balance_2026_05_24(conn2)
+    # Make payments.payment_mode nullable (historical imports have no known mode)
+    async with engine.begin() as conn2:
+        await run_payments_mode_nullable_2026_05_27(conn2)
     if args.seed:
         async with engine.begin() as conn2:
             await run_seed(conn2)
