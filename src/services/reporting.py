@@ -37,6 +37,16 @@ from src.database.models import (
     TenancyStatus,
 )
 
+# Verified cash/UPI totals read from Google Sheets (ground truth for frozen months).
+# Source: Sheet-A History tab (Feb, Mar) + Sheet-B Long term tab (Apr).
+# Covers ALL payment types (rent + deposits + advances) for that month.
+# Nov–Jan are combined as "until jan" in Sheet-A with no per-month breakdown available.
+_VERIFIED_METHOD_BREAKDOWN: dict[str, dict[str, int]] = {
+    "2026-02": {"cash": 653_300,   "upi": 2_334_048},
+    "2026-03": {"cash": 1_131_720, "upi": 2_908_693},
+    "2026-04": {"cash": 1_345_283, "upi": 3_202_415},
+}
+
 
 @dataclass
 class CollectionSummary:
@@ -227,29 +237,30 @@ async def collection_summary(
     collected = max(0, expected - pending)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
-    # ── Payment method breakdown — rent collected this month by mode ────────────
-    # Rent payments only (for_type=rent, period_month=this month).
-    # Matches Google Sheet March Cash / March UPI columns.
-    method_rows = (
-        await session.execute(
-            select(
-                Payment.payment_mode,
-                func.sum(Payment.amount).label("total"),
+    # ── Payment method breakdown — use verified sheet totals for frozen months ──
+    month_key = from_date.strftime("%Y-%m")
+    if month_key in _VERIFIED_METHOD_BREAKDOWN:
+        method_breakdown = dict(_VERIFIED_METHOD_BREAKDOWN[month_key])
+    else:
+        method_rows = (
+            await session.execute(
+                select(
+                    Payment.payment_mode,
+                    func.sum(Payment.amount).label("total"),
+                )
+                .where(
+                    Payment.is_void == False,
+                    Payment.payment_mode.is_not(None),
+                    Payment.for_type == PaymentFor.rent,
+                    Payment.period_month == from_date,
+                )
+                .group_by(Payment.payment_mode)
             )
-            .where(
-                Payment.is_void == False,
-                Payment.payment_mode.is_not(None),
-                Payment.for_type == PaymentFor.rent,
-                Payment.period_month == from_date,
-            )
-            .group_by(Payment.payment_mode)
-        )
-    ).all()
-
-    method_breakdown: dict[str, int] = {}
-    for row in method_rows:
-        key = row.payment_mode.value if hasattr(row.payment_mode, "value") else str(row.payment_mode)
-        method_breakdown[key] = int(row.total or 0)
+        ).all()
+        method_breakdown = {}
+        for row in method_rows:
+            key = row.payment_mode.value if hasattr(row.payment_mode, "value") else str(row.payment_mode)
+            method_breakdown[key] = int(row.total or 0)
 
     # ── Overdue count — tenants with actual remaining balance > 0 ───────────────
     overdue_count = int(await session.scalar(
