@@ -141,8 +141,11 @@ export default function BookingsPage() {
   const stayMatch   = (b: Booking) => stayFilter === "all" || b.stay_type === stayFilter
   const monthMatch  = (b: Booking) => monthFilter === "all" || (b.checkin_date ?? "").startsWith(monthFilter)
 
-  // distinct months from all bookings, sorted ascending
-  const distinctMonths = Array.from(new Set(bookings.map(b => (b.checkin_date ?? "").slice(0, 7)).filter(Boolean))).sort()
+  // distinct months from bookings — current month onwards only (frozen past months excluded)
+  const currentYM = new Date().toISOString().slice(0, 7)
+  const distinctMonths = Array.from(new Set(bookings.map(b => (b.checkin_date ?? "").slice(0, 7)).filter(Boolean)))
+    .filter(m => m >= currentYM)
+    .sort()
 
   const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
   const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
