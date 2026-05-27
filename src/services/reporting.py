@@ -227,9 +227,10 @@ async def collection_summary(
     collected = max(0, expected - pending)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
-    # ── Payment method breakdown — matches sheet cash/UPI columns ────────────
-    # Rent only, filtered by period_month. Matches Google Sheet FEB Cash / FEB UPI columns.
-    # Deposits and bookings are excluded — they use payment_mode=NULL for imported months.
+    # ── Payment method breakdown — all money received this month ────────────────
+    # Filtered by payment_date (when money was actually received), not period_month.
+    # Includes rent, deposits, booking advances. NULL-mode (imported history without
+    # known split) surfaces as "not_assigned" so nothing is silently excluded.
     method_rows = (
         await session.execute(
             select(
@@ -238,9 +239,8 @@ async def collection_summary(
             )
             .where(
                 Payment.is_void == False,
-                Payment.payment_mode.is_not(None),
-                Payment.for_type == PaymentFor.rent,
-                Payment.period_month == from_date,
+                extract("year",  Payment.payment_date) == from_date.year,
+                extract("month", Payment.payment_date) == from_date.month,
             )
             .group_by(Payment.payment_mode)
         )
@@ -248,7 +248,12 @@ async def collection_summary(
 
     method_breakdown: dict[str, int] = {}
     for row in method_rows:
-        key = row.payment_mode.value if hasattr(row.payment_mode, "value") else str(row.payment_mode or "other")
+        if row.payment_mode is None:
+            key = "not_assigned"
+        elif hasattr(row.payment_mode, "value"):
+            key = row.payment_mode.value
+        else:
+            key = str(row.payment_mode)
         method_breakdown[key] = int(row.total or 0)
 
     # ── Overdue count — tenants with actual remaining balance > 0 ───────────────

@@ -32,6 +32,7 @@ const METHOD_LABELS: Record<string, string> = {
   upi: "UPI",
   bank_transfer: "Bank transfer",
   cheque: "Cheque",
+  not_assigned: "Not assigned (imported)",
 };
 
 export default async function CollectionBreakdownPage({
@@ -147,7 +148,7 @@ export default async function CollectionBreakdownPage({
           total={totalCashReceived}
           totalLabel="Total rent settled"
           totalColor="text-brand-blue"
-          note="Cash and UPI rent payments received this month."
+          note="All money received this month (rent + deposits + advances). 'Not assigned' = imported historical payments without cash/UPI tag."
         />
       )}
 
