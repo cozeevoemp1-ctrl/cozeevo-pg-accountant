@@ -599,7 +599,7 @@ interface PanelProps {
   showStaff: boolean; toggleStaff: () => void;
   noticeSortDir: "asc" | "desc"; setNoticeSortDir: (v: "asc" | "desc") => void;
   noticeMonthFilter: string; setNoticeMonthFilter: (v: string) => void;
-  noticeTypeFilter: "all" | "full_room" | "single" | "male" | "female"; setNoticeTypeFilter: (v: "all" | "full_room" | "single" | "male" | "female") => void;
+  noticeTypeFilters: Set<string>; toggleNoticeTypeFilter: (v: string) => void; clearNoticeTypeFilters: () => void;
   noticeNoReplacement: boolean; setNoticeNoReplacement: (v: boolean) => void;
   noticeMonths: string[];
   allItems: KpiDetailItem[];
@@ -632,7 +632,7 @@ function ExpansionPanel({
   showStaff, toggleStaff,
   noticeSortDir, setNoticeSortDir,
   noticeMonthFilter, setNoticeMonthFilter,
-  noticeTypeFilter, setNoticeTypeFilter,
+  noticeTypeFilters, toggleNoticeTypeFilter, clearNoticeTypeFilters,
   noticeNoReplacement, setNoticeNoReplacement,
   noticeMonths,
   allItems,
@@ -845,34 +845,27 @@ function ExpansionPanel({
               ))}
             </div>
           </div>
-          {/* Type chips */}
+          {/* Type chips — all independent toggles, stack with each other */}
           <div className="flex gap-1 flex-wrap">
-            {(["all", "full_room", "single", "male", "female"] as const).map(f => {
-              const labels: Record<string, string> = { all: "All", full_room: "Full room", single: "Single room", male: "Male", female: "Female" }
-              const activeColors: Record<string, string> = {
-                all: "bg-brand-pink text-white border-brand-pink",
-                full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
-                single: "bg-[#F0FDF4] text-[#166534] border-[#86EFAC]",
-                male: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
-                female: "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
-              }
-              return (
-                <button
-                  key={f}
-                  onClick={() => setNoticeTypeFilter(f)}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilter === f ? activeColors[f] : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
-                >
-                  {labels[f]}
-                </button>
-              )
-            })}
-            {/* No replacement — independent toggle, stacks with other filters */}
+            <button
+              onClick={clearNoticeTypeFilters}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilters.size === 0 && !noticeNoReplacement ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
+            >All</button>
+            {([
+              { key: "full_room", label: "Full room",    active: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]" },
+              { key: "single",    label: "Single room",  active: "bg-[#F0FDF4] text-[#166534] border-[#86EFAC]" },
+              { key: "male",      label: "Male",         active: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]" },
+              { key: "female",    label: "Female",       active: "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]" },
+            ] as const).map(({ key, label, active }) => (
+              <button key={key} onClick={() => toggleNoticeTypeFilter(key)}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilters.has(key) ? active : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}>
+                {label}
+              </button>
+            ))}
             <button
               onClick={() => setNoticeNoReplacement(!noticeNoReplacement)}
               className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeNoReplacement ? "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
-            >
-              No replacement
-            </button>
+            >No replacement</button>
           </div>
         </div>
       )}
@@ -1173,8 +1166,11 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [showStaff, setShowStaff] = useState(false);
   const [noticeSortDir, setNoticeSortDir] = useState<"asc" | "desc">("asc");
   const [noticeMonthFilter, setNoticeMonthFilter] = useState<string>("all");
-  const [noticeTypeFilter, setNoticeTypeFilter] = useState<"all" | "full_room" | "single" | "male" | "female">("all");
+  const [noticeTypeFilters, setNoticeTypeFilters] = useState(new Set<string>());
   const [noticeNoReplacement, setNoticeNoReplacement] = useState(false);
+
+  const toggleNoticeTypeFilter = (v: string) => setNoticeTypeFilters(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
+  const clearNoticeTypeFilters = () => setNoticeTypeFilters(new Set());
 
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1257,7 +1253,8 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     setShowStaff(false);
     setNoticeSortDir("asc");
     setNoticeMonthFilter("all");
-    setNoticeTypeFilter("all");
+    setNoticeTypeFilters(new Set());
+    setNoticeNoReplacement(false);
     setSelected(null);
   }
 
@@ -1312,10 +1309,16 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
       return [...items]
         .filter(it => {
           if (noticeMonthFilter !== "all" && it.expected_checkout_iso?.slice(0, 7) !== noticeMonthFilter) return false;
-          if (noticeTypeFilter === "full_room" && !it.is_full_exit) return false;
-          if (noticeTypeFilter === "single" && !it.is_single_room) return false;
-          if (noticeTypeFilter === "male" && it.gender !== "male") return false;
-          if (noticeTypeFilter === "female" && it.gender !== "female") return false;
+          if (noticeTypeFilters.size > 0) {
+            const pass = [...noticeTypeFilters].some(type => {
+              if (type === "full_room") return !!it.is_full_exit;
+              if (type === "single") return !!it.is_single_room;
+              if (type === "male") return it.gender === "male";
+              if (type === "female") return it.gender === "female";
+              return false;
+            });
+            if (!pass) return false;
+          }
           if (noticeNoReplacement && (it.prebookings ?? []).length > 0) return false;
           if (q && !it.name.toLowerCase().includes(q) && !it.room.toLowerCase().includes(q)) return false;
           return true;
@@ -1382,7 +1385,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
     showStaff, toggleStaff,
     noticeSortDir, setNoticeSortDir,
     noticeMonthFilter, setNoticeMonthFilter: (v: string) => setNoticeMonthFilter(v),
-    noticeTypeFilter, setNoticeTypeFilter,
+    noticeTypeFilters, toggleNoticeTypeFilter, clearNoticeTypeFilters,
     noticeNoReplacement, setNoticeNoReplacement,
     noticeMonths,
     allItems: items,
