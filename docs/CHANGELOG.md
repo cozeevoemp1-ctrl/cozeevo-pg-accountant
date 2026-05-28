@@ -2,6 +2,39 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.36] — 2026-05-28 — Pre-booking into occupied rooms + notices UX
+
+### feat: Pre-book into occupied rooms (capacity-aware)
+- `src/api/v2/bookings.py` — `quick_book` now allows booking into a full room if enough beds free on the requested check-in date (current tenants with `checkout_date < checkin_date`). Counts both `active` + `no_show` tenants. Blocks if room still full on that date with a clear "free from X date" message.
+- `src/api/v2/rooms.py` — `/rooms/check` now accepts optional `checkin_date` param; returns `beds_free_on_date`, `earliest_free_date`, `current_tenants`. Counts `active + no_show` (was active-only — missed pre-booked beds).
+- `web/lib/api.ts` — `RoomCheckResult` interface + `checkRoomAvailability()` function added.
+- `web/app/tenants/pre-register/page.tsx` — live room availability check with debounce (600ms); green/amber border; blocks submit if room unavailable on checkin date.
+
+### fix: expires_at bypass for pending_review sessions
+- `src/api/v2/kpi.py` — 3 OnboardingSession queries now bypass `expires_at` for `status=pending_review` (form-filled sessions never expire). Fixes: prebooking chips invisible for sessions > 48h old; vacant panel upcoming_checkin missing these sessions.
+
+### feat: Show pre-bookings on "On notice" panel
+- `src/api/v2/kpi.py` — notices items now include `prebookings: [{name, checkin_date}]` array.
+- `web/components/home/kpi-grid.tsx` — "Booked from X Jun" chip on notice rows with a pending incoming tenant.
+
+### feat: Room 000 no-shows in Bookings page
+- `src/api/onboarding_router.py` — `/admin/pending` now appends Room 000 no-show tenancies (old bot pre-bookings without onboarding sessions) with `source: "tenancy"` marker.
+- `web/app/onboarding/bookings/page.tsx` — Room 000 entries show "TBD" room + "Edit tenant profile →" action instead of check-in button.
+
+### fix: Double-booking prevention
+- `src/api/v2/bookings.py` — `quick_book` now blocks if phone already has a `no_show` tenancy (was only blocking `active`). Error message improved for active tenancy conflict.
+
+### fix: no_show tenants counted in capacity check
+- `src/api/v2/bookings.py` + `src/api/v2/rooms.py` — capacity check for future check-in now includes `no_show` status (was `active` only); prevents double-booking a pre-booked bed.
+
+### feat: Bookings page — cleaner filter UI
+- `web/app/onboarding/bookings/page.tsx` — 3-row chip mess replaced with Checkouts-style single card: search input + rounded-full pill filters (status + stay type + month).
+
+### feat: Notices panel — "No replacement" independent filter
+- `web/components/home/kpi-grid.tsx` — "No replacement" added as independent toggle filter (not in the radio group with Male/Female). Stacks with month + gender + type filters simultaneously.
+
+---
+
 ## [1.76.35] — 2026-05-26 — Activity feed consistency + QuickBookModal fixes
 
 ### Fix: Activity feed now shows ALL payments (not just audit-logged ones)
