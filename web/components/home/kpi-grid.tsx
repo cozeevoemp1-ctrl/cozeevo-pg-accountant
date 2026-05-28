@@ -599,7 +599,7 @@ interface PanelProps {
   showStaff: boolean; toggleStaff: () => void;
   noticeSortDir: "asc" | "desc"; setNoticeSortDir: (v: "asc" | "desc") => void;
   noticeMonthFilter: string; setNoticeMonthFilter: (v: string) => void;
-  noticeTypeFilter: "all" | "full_room" | "premium" | "male" | "female"; setNoticeTypeFilter: (v: "all" | "full_room" | "premium" | "male" | "female") => void;
+  noticeTypeFilter: "all" | "full_room" | "premium" | "male" | "female" | "no_replacement"; setNoticeTypeFilter: (v: "all" | "full_room" | "premium" | "male" | "female" | "no_replacement") => void;
   noticeMonths: string[];
   allItems: KpiDetailItem[];
   // data
@@ -845,14 +845,15 @@ function ExpansionPanel({
           </div>
           {/* Type chips */}
           <div className="flex gap-1 flex-wrap">
-            {(["all", "full_room", "premium", "male", "female"] as const).map(f => {
-              const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female" }
+            {(["all", "full_room", "premium", "male", "female", "no_replacement"] as const).map(f => {
+              const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female", no_replacement: "No replacement" }
               const activeColors: Record<string, string> = {
                 all: "bg-brand-pink text-white border-brand-pink",
                 full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
                 premium: "bg-[#F3E8FF] text-[#7C3AED] border-[#D8B4FE]",
                 male: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
                 female: "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
+                no_replacement: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]",
               }
               return (
                 <button
@@ -960,11 +961,6 @@ function ExpansionPanel({
                         </span>
                       );
                     })()}
-                    {open === "notices" && item.prebookings && item.prebookings.length === 0 && (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
-                        No replacement
-                      </span>
-                    )}
                     {open === "vacant" && item.is_staff_room && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#EEF2FF] text-[#4338CA]">
                         Staff
@@ -1169,7 +1165,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [showStaff, setShowStaff] = useState(false);
   const [noticeSortDir, setNoticeSortDir] = useState<"asc" | "desc">("asc");
   const [noticeMonthFilter, setNoticeMonthFilter] = useState<string>("all");
-  const [noticeTypeFilter, setNoticeTypeFilter] = useState<"all" | "full_room" | "premium" | "male" | "female">("all");
+  const [noticeTypeFilter, setNoticeTypeFilter] = useState<"all" | "full_room" | "premium" | "male" | "female" | "no_replacement">("all");
 
   const [selected, setSelected] = useState<TenantDues | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1311,6 +1307,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
           if (noticeTypeFilter === "premium" && it.sharing_type !== "premium") return false;
           if (noticeTypeFilter === "male" && it.gender !== "male") return false;
           if (noticeTypeFilter === "female" && it.gender !== "female") return false;
+          if (noticeTypeFilter === "no_replacement" && (it.prebookings ?? []).length > 0) return false;
           if (q && !it.name.toLowerCase().includes(q) && !it.room.toLowerCase().includes(q)) return false;
           return true;
         })
