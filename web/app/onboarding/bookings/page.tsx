@@ -16,6 +16,7 @@ function pinHeaders() {
 interface Booking {
   token: string
   status: string
+  source?: string
   room: string
   tenant_phone: string
   tenant_name: string
@@ -165,82 +166,59 @@ export default function BookingsPage() {
       </div>
 
       <div className="px-4 pt-4 pb-32 max-w-lg mx-auto flex flex-col gap-3">
-        <input
-          type="text"
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          placeholder="Name or room…"
-          className="w-full rounded-xl border border-[#E5E1DC] bg-bg px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
-        />
-
-        {/* Totals summary + filter chips */}
-        {!loading && bookings.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { label: "All", count: bookings.length, key: "all" as const, color: "bg-[#F6F5F0] text-ink border-[#E0DDD8]", activeColor: "bg-ink text-white border-ink" },
-                { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, key: "pending_review" as const, color: "bg-[#D1FAE5] text-[#065F46] border-[#6EE7B7]", activeColor: "bg-[#065F46] text-white border-[#065F46]" },
-                { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, key: "pending_tenant" as const, color: "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]", activeColor: "bg-[#92400E] text-white border-[#92400E]" },
-                { label: "Expired", count: bookings.filter(b => b.status === "expired").length, key: "expired" as const, color: "bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]", activeColor: "bg-[#991B1B] text-white border-[#991B1B]" },
-              ].filter(s => s.count > 0 || s.key === "all").map(s => (
-                <button
-                  key={s.key}
-                  onClick={() => setStatusFilter(s.key)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${statusFilter === s.key ? s.activeColor : s.color}`}
-                >
-                  <span className="text-base font-extrabold leading-none">{s.count}</span>
-                  <span className="font-medium opacity-90">{s.label}</span>
-                </button>
-              ))}
-            </div>
-            {/* Stay type filter */}
-            <div className="flex gap-2">
-              {[
-                { label: "All types", key: "all" as const },
-                { label: "Monthly", key: "monthly" as const },
-                { label: "Day stay", key: "daily" as const },
-              ].map(s => (
-                <button
-                  key={s.key}
-                  onClick={() => setStayFilter(s.key)}
-                  className={`px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-colors ${
-                    stayFilter === s.key
-                      ? s.key === "daily"
-                        ? "bg-[#92400E] text-white border-[#92400E]"
-                        : "bg-ink text-white border-ink"
-                      : s.key === "daily"
-                        ? "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]"
-                        : "bg-[#F6F5F0] text-ink border-[#E0DDD8]"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          {/* Month filter */}
-          {distinctMonths.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-              <button
-                onClick={() => setMonthFilter("all")}
-                className={`flex-shrink-0 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-colors ${monthFilter === "all" ? "bg-ink text-white border-ink" : "bg-[#F6F5F0] text-ink border-[#E0DDD8]"}`}
-              >
-                All months
-              </button>
-              {distinctMonths.map(m => {
-                const [y, mo] = m.split("-")
-                const label = new Date(+y, +mo - 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
-                return (
-                  <button key={m} onClick={() => setMonthFilter(m)}
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-colors ${monthFilter === m ? "bg-brand-pink text-white border-brand-pink" : "bg-[#FCE2EE] text-brand-pink border-[#F9A8D4]"}`}
-                  >
-                    {label}
+        {/* Search + filters */}
+        <div className="bg-surface rounded-card border border-[#F0EDE9] px-3 pt-3 pb-2 flex flex-col gap-2">
+          <input
+            type="text"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Name or room…"
+            className="w-full rounded-xl border border-[#E5E1DC] bg-bg px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
+          />
+          {!loading && bookings.length > 0 && (
+            <>
+              <div className="flex gap-1.5 flex-wrap">
+                {([
+                  { label: "All", count: bookings.length, key: "all" as const },
+                  { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, key: "pending_review" as const },
+                  { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, key: "pending_tenant" as const },
+                  { label: "Expired", count: bookings.filter(b => b.status === "expired").length, key: "expired" as const },
+                ] as const).filter(s => s.count > 0 || s.key === "all").map(s => (
+                  <button key={s.key} onClick={() => setStatusFilter(s.key)}
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${statusFilter === s.key ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
+                    {s.count > 0 && s.key !== "all" ? `${s.count} ` : s.key === "all" ? `${s.count} ` : ""}{s.label}
                   </button>
-                )
-              })}
-            </div>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {(["all", "monthly", "daily"] as const).map(f => (
+                  <button key={f} onClick={() => setStayFilter(f)}
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${stayFilter === f ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
+                    {f === "all" ? "All types" : f === "monthly" ? "Monthly" : "Day stay"}
+                  </button>
+                ))}
+              </div>
+              {distinctMonths.length > 1 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+                  <button onClick={() => setMonthFilter("all")}
+                    className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors ${monthFilter === "all" ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
+                    All months
+                  </button>
+                  {distinctMonths.map(m => {
+                    const [y, mo] = m.split("-")
+                    const label = new Date(+y, +mo - 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+                    return (
+                      <button key={m} onClick={() => setMonthFilter(m)}
+                        className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors ${monthFilter === m ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
-          </div>
-        )}
+        </div>
 
         {error && (
           <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-4 py-3 text-xs text-status-warn font-medium">
@@ -691,7 +669,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
           <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Room</p>
-          <p className="text-xs font-bold text-ink mt-0.5">{b.room || "TBD"}</p>
+          <p className="text-xs font-bold text-ink mt-0.5">{b.room === "000" ? "TBD" : (b.room || "TBD")}</p>
         </div>
         <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
           <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Check-in</p>
@@ -951,6 +929,17 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               >
                 {manualOpen ? "▲ Close manual entry" : "Manual check-in ↓"}
               </button>
+            </>
+          ) : b.source === "tenancy" ? (
+            /* Room 000 no-show (old bot pre-booking) — needs room assignment before check-in */
+            <>
+              <p className="w-full text-[10px] text-ink-muted font-medium -mt-1">No room assigned yet — assign a room in the tenant profile to check in.</p>
+              {b.tenancy_id && (
+                <a href={`/tenants/${b.tenancy_id}/edit`}
+                  className="flex-1 text-center rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                  Edit tenant profile →
+                </a>
+              )}
             </>
           ) : (
             /* Form filled: Edit + Cancel + Check In (expand to collect first) */

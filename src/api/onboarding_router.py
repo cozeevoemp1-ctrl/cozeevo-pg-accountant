@@ -578,6 +578,40 @@ async def list_pending(request: Request):
                 "is_qr": (obs.created_by_phone or "") == "qr_scan",
                 "notes": obs.special_terms or "",
             })
+        # Also include Room 000 no-show tenancies (old bot-created pre-bookings with no onboarding session)
+        room000 = await session.scalar(select(Room).where(Room.room_number == "000"))
+        if room000:
+            tenancy_rows = (await session.execute(
+                select(Tenancy, Tenant)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .where(Tenancy.room_id == room000.id, Tenancy.status == TenancyStatus.no_show)
+                .order_by(Tenancy.checkin_date)
+            )).all()
+            for tenancy, tenant in tenancy_rows:
+                items.append({
+                    "token": f"tenancy:{tenancy.id}",
+                    "status": "pending_review",
+                    "source": "tenancy",
+                    "room": "000",
+                    "tenant_phone": tenant.phone or "",
+                    "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else "",
+                    "created_at": tenancy.created_at.isoformat() if tenancy.created_at else "",
+                    "tenant_name": tenant.name or "",
+                    "agreed_rent": float(tenancy.agreed_rent or 0),
+                    "maintenance_fee": float(tenancy.maintenance_fee or 0),
+                    "security_deposit": float(tenancy.security_deposit or 0),
+                    "booking_amount": float(tenancy.booking_amount or 0),
+                    "daily_rate": 0,
+                    "checkout_date": "",
+                    "num_days": 0,
+                    "stay_type": tenancy.stay_type.value if tenancy.stay_type else "monthly",
+                    "tenancy_id": tenancy.id,
+                    "expires_at": "",
+                    "expired_ago": "",
+                    "is_qr": False,
+                    "notes": tenancy.notes or "",
+                })
+
         return {"sessions": items}
 
 
