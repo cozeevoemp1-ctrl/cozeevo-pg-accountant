@@ -176,6 +176,7 @@ export interface KpiDetailItem {
   beds_freed?: number;
   sharing_type?: string | null;
   is_full_exit?: boolean;
+  is_single_room?: boolean;
   room_active_count?: number;
   room_notice_count?: number;
   prebookings?: { name: string; checkin_date: string }[];

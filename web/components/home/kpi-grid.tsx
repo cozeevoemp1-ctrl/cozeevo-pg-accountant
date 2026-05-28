@@ -599,7 +599,7 @@ interface PanelProps {
   showStaff: boolean; toggleStaff: () => void;
   noticeSortDir: "asc" | "desc"; setNoticeSortDir: (v: "asc" | "desc") => void;
   noticeMonthFilter: string; setNoticeMonthFilter: (v: string) => void;
-  noticeTypeFilter: "all" | "full_room" | "premium" | "male" | "female"; setNoticeTypeFilter: (v: "all" | "full_room" | "premium" | "male" | "female") => void;
+  noticeTypeFilter: "all" | "full_room" | "single" | "male" | "female"; setNoticeTypeFilter: (v: "all" | "full_room" | "single" | "male" | "female") => void;
   noticeNoReplacement: boolean; setNoticeNoReplacement: (v: boolean) => void;
   noticeMonths: string[];
   allItems: KpiDetailItem[];
@@ -847,12 +847,12 @@ function ExpansionPanel({
           </div>
           {/* Type chips */}
           <div className="flex gap-1 flex-wrap">
-            {(["all", "full_room", "premium", "male", "female"] as const).map(f => {
-              const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female" }
+            {(["all", "full_room", "single", "male", "female"] as const).map(f => {
+              const labels: Record<string, string> = { all: "All", full_room: "Full room", single: "Single room", male: "Male", female: "Female" }
               const activeColors: Record<string, string> = {
                 all: "bg-brand-pink text-white border-brand-pink",
                 full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
-                premium: "bg-[#F3E8FF] text-[#7C3AED] border-[#D8B4FE]",
+                single: "bg-[#F0FDF4] text-[#166534] border-[#86EFAC]",
                 male: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
                 female: "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
               }
@@ -1173,7 +1173,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
   const [showStaff, setShowStaff] = useState(false);
   const [noticeSortDir, setNoticeSortDir] = useState<"asc" | "desc">("asc");
   const [noticeMonthFilter, setNoticeMonthFilter] = useState<string>("all");
-  const [noticeTypeFilter, setNoticeTypeFilter] = useState<"all" | "full_room" | "premium" | "male" | "female">("all");
+  const [noticeTypeFilter, setNoticeTypeFilter] = useState<"all" | "full_room" | "single" | "male" | "female">("all");
   const [noticeNoReplacement, setNoticeNoReplacement] = useState(false);
 
   const [selected, setSelected] = useState<TenantDues | null>(null);
@@ -1313,7 +1313,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
         .filter(it => {
           if (noticeMonthFilter !== "all" && it.expected_checkout_iso?.slice(0, 7) !== noticeMonthFilter) return false;
           if (noticeTypeFilter === "full_room" && !it.is_full_exit) return false;
-          if (noticeTypeFilter === "premium" && it.sharing_type !== "premium") return false;
+          if (noticeTypeFilter === "single" && !it.is_single_room) return false;
           if (noticeTypeFilter === "male" && it.gender !== "male") return false;
           if (noticeTypeFilter === "female" && it.gender !== "female") return false;
           if (noticeNoReplacement && (it.prebookings ?? []).length > 0) return false;

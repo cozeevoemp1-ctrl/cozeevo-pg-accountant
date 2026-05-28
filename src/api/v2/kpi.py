@@ -826,6 +826,7 @@ async def get_kpi_detail(
                     "beds_freed": beds_freed,
                     "sharing_type": r.sharing_type.value if r.sharing_type else None,
                     "is_full_exit": room_notice_count >= room_active_count > 0,
+                    "is_single_room": int(r.max_occupancy or 1) == 1,
                     "room_active_count": room_active_count,
                     "room_notice_count": room_notice_count,
                     "prebookings": [],
