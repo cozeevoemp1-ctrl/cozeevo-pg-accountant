@@ -124,6 +124,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 .where(
                     OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
                     or_(
+                        OnboardingSession.status == "pending_review",
                         OnboardingSession.expires_at == None,
                         OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
@@ -700,6 +701,7 @@ async def get_kpi_detail(
                 .where(
                     OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
                     or_(
+                        OnboardingSession.status == "pending_review",
                         OnboardingSession.expires_at == None,
                         OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
@@ -879,7 +881,10 @@ async def get_kpi_detail(
                     .where(
                         OnboardingSession.room_id.in_(list(notice_room_ids)),
                         OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
+                        # pending_review = form filled by tenant — never expire these
+                        # pending_tenant = link sent only — respect expires_at
                         or_(
+                            OnboardingSession.status == "pending_review",
                             OnboardingSession.expires_at == None,
                             OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
                         ),
