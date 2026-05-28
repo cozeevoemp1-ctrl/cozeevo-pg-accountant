@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.37] — 2026-05-28 — Notices panel multi-select type filters
+
+### feat: Multi-select type filters on notices panel
+- `web/components/home/kpi-grid.tsx` — `noticeTypeFilter` (single enum) replaced with `noticeTypeFilters` (Set<string>). Chips now toggle independently: Female + Single room, Male + Full room, or any combination all work simultaneously.
+- Filter logic uses OR within selected types: if any active type matches the item, it passes. "No replacement" still stacks as AND on top.
+- `clearNoticeTypeFilters()` / `toggleNoticeTypeFilter()` helper functions added. `resetFilters()` now also clears `noticeNoReplacement`.
+- `PanelProps` interface updated to remove old `noticeTypeFilter / setNoticeTypeFilter` and expose the three new props.
+
+### fix: "All" button in type chips now also clears "No replacement"
+- Previously clearing type chips left "No replacement" active; "All" now visually un-highlights only when both `noticeTypeFilters.size === 0` AND `!noticeNoReplacement`.
+
+---
+
 ## [1.76.36] — 2026-05-28 — Pre-booking into occupied rooms + notices UX
 
 ### feat: Pre-book into occupied rooms (capacity-aware)
