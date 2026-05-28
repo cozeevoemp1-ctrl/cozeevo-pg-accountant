@@ -960,6 +960,11 @@ function ExpansionPanel({
                         </span>
                       );
                     })()}
+                    {open === "notices" && item.prebookings && item.prebookings.length === 0 && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
+                        No replacement
+                      </span>
+                    )}
                     {open === "vacant" && item.is_staff_room && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#EEF2FF] text-[#4338CA]">
                         Staff
