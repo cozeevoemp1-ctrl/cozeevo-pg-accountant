@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.38] — 2026-05-28 — Checkout refund maintenance_fee fix + Venkatha DB correction
+
+### fix: Bot checkout missing maintenance_fee deduction
+- `src/whatsapp/handlers/owner_handler.py` — `_build_checkout_summary` now subtracts `tenancy.maintenance_fee` from refund. Was: `deposit - dues - deductions`. Now: `deposit - maintenance - dues - deductions`. Bot and PWA are now consistent.
+
+### fix: PWA checkout notice banner showing wrong "to return" amount
+- `web/app/checkout/new/page.tsx` — On-time notice card "X to return" text now subtracts `maintenance_fee`. Was showing full deposit as returnable, misleading the person doing checkout.
+
+### data: Venkatha Supramanian (Room 311) refund corrected
+- `checkout_records id=37` — `deposit_refunded_amount` set to ₹22,000 (was ₹0), `deposit_refund_date = 2026-05-28`. Correct refund = ₹27,000 deposit − ₹5,000 maintenance.
+
+---
+
 ## [1.76.37] — 2026-05-28 — Notices panel multi-select type filters
 
 ### feat: Multi-select type filters on notices panel
