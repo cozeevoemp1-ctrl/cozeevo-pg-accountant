@@ -110,7 +110,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 # A bed is free if the current tenant's checkout_date < checkin_date.
                 active_checkouts = (await session.execute(
                     select(Tenancy.checkout_date)
-                    .where(Tenancy.room_id == room.id, Tenancy.status == TenancyStatus.active)
+                    .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
                 )).scalars().all()
                 beds_still_occupied = sum(
                     1 for co in active_checkouts

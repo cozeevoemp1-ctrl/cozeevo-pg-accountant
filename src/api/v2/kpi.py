@@ -498,6 +498,11 @@ async def get_kpi_detail(
                         OnboardingSession.room_id.in_(vacant_room_ids),
                         OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
                         OnboardingSession.checkin_date > today,
+                        or_(
+                            OnboardingSession.status == "pending_review",
+                            OnboardingSession.expires_at == None,
+                            OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
+                        ),
                     )
                     .group_by(OnboardingSession.room_id)
                 )).all()

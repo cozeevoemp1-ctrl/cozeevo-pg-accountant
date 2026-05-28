@@ -50,7 +50,7 @@ async def check_room_availability(
             ten_rows = (await session.execute(
                 select(Tenancy.checkout_date, Tenant.name)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
-                .where(Tenancy.room_id == db_room.id, Tenancy.status == TenancyStatus.active)
+                .where(Tenancy.room_id == db_room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
             )).all()
             max_occ_inner = int(db_room.max_occupancy or 1)
             still_occupied = sum(1 for t in ten_rows if t.checkout_date is None or t.checkout_date >= checkin)
