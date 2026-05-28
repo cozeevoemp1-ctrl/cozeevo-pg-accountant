@@ -178,6 +178,7 @@ export interface KpiDetailItem {
   is_full_exit?: boolean;
   room_active_count?: number;
   room_notice_count?: number;
+  prebookings?: { name: string; checkin_date: string }[];
 }
 export interface KpiDetail { type: string; items: KpiDetailItem[]; }
 
@@ -185,6 +186,23 @@ export function getKpiDetail(type: string, opts?: { includeStaff?: boolean }, to
   const params = new URLSearchParams({ type });
   if (opts?.includeStaff) params.set("include_staff", "true");
   return _get(`/api/v2/app/reporting/kpi-detail?${params}`, token);
+}
+
+export interface RoomCheckResult {
+  room_number: string;
+  max_occupancy: number;
+  free_beds: number;
+  is_available: boolean;
+  occupants: { name: string; tenancy_id: number }[];
+  beds_free_on_date?: number;
+  earliest_free_date?: string | null;
+  current_tenants?: { name: string; checkout_date: string | null }[];
+}
+
+export function checkRoomAvailability(room: string, checkinDate?: string): Promise<RoomCheckResult> {
+  const params = new URLSearchParams({ room });
+  if (checkinDate) params.set("checkin_date", checkinDate);
+  return _get(`/api/v2/app/rooms/check?${params}`);
 }
 
 export function createPayment(body: PaymentCreate): Promise<PaymentResponse> {

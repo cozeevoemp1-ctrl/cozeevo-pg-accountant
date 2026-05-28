@@ -106,7 +106,27 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             occ = await get_room_occupants(session, room)
             max_occ = room.max_occupancy or 1
             if occ.beds_occupied(max_occ) >= max_occ:
-                raise HTTPException(409, f"Room {room.room_number} is full ({occ.beds_occupied(max_occ)}/{max_occ} beds)")
+                # Allow pre-booking if enough beds will be free on the requested checkin_date.
+                # A bed is free if the current tenant's checkout_date < checkin_date.
+                active_checkouts = (await session.execute(
+                    select(Tenancy.checkout_date)
+                    .where(Tenancy.room_id == room.id, Tenancy.status == TenancyStatus.active)
+                )).scalars().all()
+                beds_still_occupied = sum(
+                    1 for co in active_checkouts
+                    if co is None or co >= checkin
+                )
+                if beds_still_occupied >= max_occ:
+                    checkouts = [co for co in active_checkouts if co is not None]
+                    if checkouts:
+                        free_from = min(checkouts) + timedelta(days=1)
+                        detail = (
+                            f"Room {room.room_number} is fully booked until {min(checkouts).strftime('%d %b %Y')}. "
+                            f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
+                        )
+                    else:
+                        detail = f"Room {room.room_number} is full with no checkout dates set — cannot pre-book."
+                    raise HTTPException(409, detail)
 
         # Cancel old pending sessions for the same phone
         old = await session.execute(

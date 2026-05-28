@@ -950,6 +950,16 @@ function ExpansionPanel({
                         {item.deposit_eligible ? "Refundable" : "Forfeited"}
                       </span>
                     )}
+                    {open === "notices" && item.prebookings && item.prebookings.length > 0 && (() => {
+                      // checkin_date comes as "1 Jun 2026" — strip the year for the chip
+                      const raw = item.prebookings[0].checkin_date;
+                      const short = raw.replace(/\s+\d{4}$/, "");
+                      return (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#EEF2FF] text-[#4338CA]">
+                          Booked from {short}
+                        </span>
+                      );
+                    })()}
                     {open === "vacant" && item.is_staff_room && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-[#EEF2FF] text-[#4338CA]">
                         Staff
@@ -1069,6 +1079,17 @@ function ExpansionPanel({
                               <div className="flex justify-between items-center">
                                 <span className="text-[11px] text-ink-muted">Deposit due</span>
                                 <span className="text-[11px] font-semibold text-ink-muted">{rupee(selected.deposit_due)}</span>
+                              </div>
+                            )}
+                            {item.prebookings && item.prebookings.length > 0 && (
+                              <div className="flex flex-col gap-1 pt-1 border-t border-[#E0DDD8]">
+                                <span className="text-[10px] font-semibold text-[#4338CA] uppercase tracking-wide">Pre-booked next</span>
+                                {item.prebookings.map((pb, pi) => (
+                                  <div key={pi} className="flex items-center justify-between">
+                                    <span className="text-[11px] font-medium text-ink">{pb.name}</span>
+                                    <span className="text-[10px] text-ink-muted">from {pb.checkin_date}</span>
+                                  </div>
+                                ))}
                               </div>
                             )}
                             <div className="flex gap-2 pt-1">

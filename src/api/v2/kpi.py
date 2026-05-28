@@ -757,6 +757,7 @@ async def get_kpi_detail(
         elif type == "notices":
             from collections import defaultdict
             from datetime import date as _date
+            import json as _json
             today = _date.today()
 
             rows = (await session.execute(
@@ -796,6 +797,9 @@ async def get_kpi_detail(
                 room_notice[r.room_id] += 1
 
             items = []
+            # Track (room_id, expected_checkout) per item for prebooking lookup
+            item_room_info: list[tuple[int | None, object]] = []
+
             for r in rows:
                 is_premium = r.sharing_type is not None and r.sharing_type.value == "premium"
                 beds_freed = r.max_occupancy if is_premium else 1
@@ -817,12 +821,15 @@ async def get_kpi_detail(
                     "is_full_exit": room_notice_count >= room_active_count > 0,
                     "room_active_count": room_active_count,
                     "room_notice_count": room_notice_count,
+                    "prebookings": [],
                 })
+                item_room_info.append((r.room_id, eco))
+
             # Day-stay tenants checking out within 30 days
             daily_rows = (await session.execute(
                 select(
                     Tenancy.id, Tenant.name, Tenant.gender, Room.room_number,
-                    Tenancy.checkout_date,
+                    Room.id.label("room_id"), Tenancy.checkout_date,
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
@@ -855,7 +862,40 @@ async def get_kpi_detail(
                     "room_active_count": 1,
                     "room_notice_count": 1,
                     "stay_type": "daily",
+                    "prebookings": [],
                 })
+                item_room_info.append((r.room_id, co))
+
+            # Attach prebookings: pending OnboardingSessions for these rooms with checkin > checkout
+            notice_room_ids = {rid for rid, _ in item_room_info if rid is not None}
+            if notice_room_ids:
+                session_rows2 = (await session.execute(
+                    select(
+                        OnboardingSession.room_id,
+                        OnboardingSession.checkin_date,
+                        OnboardingSession.tenant_data,
+                        OnboardingSession.tenant_phone,
+                    )
+                    .where(
+                        OnboardingSession.room_id.in_(list(notice_room_ids)),
+                        OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
+                        or_(
+                            OnboardingSession.expires_at == None,
+                            OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
+                        ),
+                    )
+                )).all()
+                for sr in session_rows2:
+                    td = _json.loads(sr.tenant_data) if sr.tenant_data else {}
+                    pb_name = td.get("name") or sr.tenant_phone or "—"
+                    ci = sr.checkin_date
+                    for i, (rid, eco) in enumerate(item_room_info):
+                        if rid == sr.room_id and (eco is None or ci is None or ci > eco):
+                            items[i]["prebookings"].append({
+                                "name": pb_name,
+                                "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
+                            })
+
             return {"type": type, "items": items}
 
     return {"type": type, "items": []}
