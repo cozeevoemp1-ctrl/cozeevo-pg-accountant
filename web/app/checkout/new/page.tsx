@@ -488,7 +488,7 @@ function NewCheckoutPage() {
                     Notice on {fmtDate(nd)} — Deposit Refundable
                   </p>
                   <p className="text-xs font-semibold mt-0.5">
-                    {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.pending_dues))} to return
+                    {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues))} to return
                   </p>
                   {expectedLastDay && (
                     <p className="text-[10px] mt-0.5 opacity-80">Last day: {fmtDate(expectedLastDay)}</p>

@@ -374,10 +374,11 @@ async def _build_checkout_summary(action_data: dict, phone: str, session: "Async
             f"({timing}) — deposit refundable"
         )
 
+    maintenance = int(tenancy.maintenance_fee or 0) if tenancy else 0
     if deposit_forfeited:
         refund = 0
     else:
-        refund = max(0, deposit - pending_dues - deductions)
+        refund = max(0, deposit - maintenance - pending_dues - deductions)
 
     action_data.update({
         "auto_deposit": deposit,
