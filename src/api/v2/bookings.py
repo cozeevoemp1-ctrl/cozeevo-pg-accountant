@@ -14,7 +14,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -88,12 +88,29 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         if bl:
             raise HTTPException(403, f"This person is on the Cozeevo blacklist: {bl['reason']}")
 
-        # Active tenancy check
+        # Active tenancy check (blocks current residents)
         from src.services.room_occupancy import get_active_tenancy_by_phone
         existing = await get_active_tenancy_by_phone(session, phone)
         if existing:
             _et, _etn, _er = existing
-            raise HTTPException(409, f"Phone {phone} already has an active tenancy in Room {_er.room_number}")
+            raise HTTPException(409, f"This person is currently staying in Room {_er.room_number} — cannot pre-book an existing resident.")
+
+        # No-show tenancy check (blocks already pre-booked tenants)
+        existing_noshow = (await session.execute(
+            select(Tenancy, Room)
+            .join(Room, Room.id == Tenancy.room_id)
+            .join(Tenant, Tenant.id == Tenancy.tenant_id)
+            .where(
+                Tenancy.status == TenancyStatus.no_show,
+                func.right(
+                    func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10
+                ) == phone[-10:],
+            )
+        )).first()
+        if existing_noshow:
+            _ns_ten, _ns_room = existing_noshow
+            ci = _ns_ten.checkin_date.strftime("%d %b %Y") if _ns_ten.checkin_date else "unknown"
+            raise HTTPException(409, f"This person is already pre-booked in Room {_ns_room.room_number} (check-in {ci}).")
 
         # Find room
         room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
