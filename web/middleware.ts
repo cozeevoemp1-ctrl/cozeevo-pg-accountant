@@ -46,7 +46,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Finance routes → admin only
-  if (pathname.startsWith("/finance")) {
+  const adminOnlyPaths = ["/finance", "/collection", "/payments/history"];
+  if (adminOnlyPaths.some(p => pathname.startsWith(p))) {
     const role = user.user_metadata?.role as string | undefined;
     if (role !== "admin") {
       const homeUrl = request.nextUrl.clone();
