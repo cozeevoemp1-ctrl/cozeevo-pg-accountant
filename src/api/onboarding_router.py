@@ -213,18 +213,34 @@ async def create_session(req: CreateSessionRequest, request: Request):
             if room.property_id:
                 prop = await session.get(Property, room.property_id)
                 building = prop.name if prop else ""
-            # Capacity check at session-create time — warn receptionist before sending link
+            # Capacity check — allow future booking if checkin is after existing checkout dates
             from src.services.room_occupancy import get_room_occupants
             occ = await get_room_occupants(session, room)
-            if occ.total_occupied >= (room.max_occupancy or 1):
-                occ_names = [t.name for t, _ in occ.tenancies] + [d.tenant.name for d in occ.daywise]
-                raise HTTPException(
-                    409,
-                    f"Room {room.room_number} is full "
-                    f"({occ.total_occupied}/{room.max_occupancy} beds — "
-                    f"{', '.join(occ_names)}). "
-                    "Checkout an existing tenant or choose a different room."
-                )
+            max_occ = room.max_occupancy or 1
+            if occ.total_occupied >= max_occ:
+                checkin_d = date.fromisoformat(req.checkin_date)
+                active_checkouts = (await session.execute(
+                    select(Tenancy.checkout_date)
+                    .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
+                )).scalars().all()
+                beds_still_occupied = sum(1 for co in active_checkouts if co is None or co >= checkin_d)
+                if beds_still_occupied >= max_occ:
+                    checkouts = [co for co in active_checkouts if co is not None]
+                    if checkouts:
+                        free_from = min(checkouts) + timedelta(days=1)
+                        raise HTTPException(
+                            409,
+                            f"Room {room.room_number} is fully booked until {min(checkouts).strftime('%d %b %Y')}. "
+                            f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
+                        )
+                    else:
+                        occ_names = [t.name for t, _ in occ.tenancies] + [d.tenant.name for d in occ.daywise]
+                        raise HTTPException(
+                            409,
+                            f"Room {room.room_number} is full "
+                            f"({occ.total_occupied}/{max_occ} beds — {', '.join(occ_names)}). "
+                            "Checkout an existing tenant or choose a different room."
+                        )
 
         token = str(uuid.uuid4())
         obs = OnboardingSession(
@@ -652,6 +668,39 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
             room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
             if not room:
                 raise HTTPException(404, f"Room {req.room_number} not found")
+            if room.room_number != "000":
+                from src.services.room_occupancy import get_room_occupants
+                occ = await get_room_occupants(session, room)
+                max_occ = room.max_occupancy or 1
+                if occ.total_occupied >= max_occ:
+                    # Allow if checkin date is after current tenants' checkout dates
+                    checkin = req.checkin_date if req.checkin_date else obs.checkin_date
+                    if checkin:
+                        checkin_d = date.fromisoformat(checkin) if isinstance(checkin, str) else checkin
+                        active_checkouts = (await session.execute(
+                            select(Tenancy.checkout_date)
+                            .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
+                        )).scalars().all()
+                        beds_still_occupied = sum(1 for co in active_checkouts if co is None or co >= checkin_d)
+                        if beds_still_occupied >= max_occ:
+                            checkouts = [co for co in active_checkouts if co is not None]
+                            if checkouts:
+                                free_from = min(checkouts) + timedelta(days=1)
+                                raise HTTPException(
+                                    409,
+                                    f"Room {room.room_number} is fully booked until {min(checkouts).strftime('%d %b %Y')}. "
+                                    f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
+                                )
+                            else:
+                                raise HTTPException(409, f"Room {room.room_number} is full with no checkout dates set.")
+                    else:
+                        occ_names = [t.name for t, _ in occ.tenancies] + [d.tenant.name for d in occ.daywise]
+                        raise HTTPException(
+                            409,
+                            f"Room {room.room_number} is full "
+                            f"({occ.total_occupied}/{max_occ} beds — {', '.join(occ_names)}). "
+                            "Set a check-in date after current tenants check out."
+                        )
             obs.room_id = room.id
         if req.maintenance_fee is not None:
             obs.maintenance_fee = Decimal(str(req.maintenance_fee))

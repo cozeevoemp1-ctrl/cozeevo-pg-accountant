@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.39] — 2026-05-29 — Booking occupancy guard fix + duplicate booking cleanup
+
+### fix: Room occupancy check now allows future bookings (consistent with quick-book)
+- `src/api/onboarding_router.py` — `/create` endpoint was hard-blocking on full rooms. Now uses same future-booking logic as `bookings.py`: allowed if check-in date is after existing tenants' checkout dates. Blocks only if `beds_still_occupied >= max_occ` on the requested checkin date.
+- `src/api/onboarding_router.py` — `PATCH /admin/{token}` (Edit button on Bookings page) had **zero** occupancy check — you could assign any room regardless of capacity. Added same future-booking guard. Room 000 skipped (placeholder).
+
+### data: Duplicate booking cleanup — Niranjan, Nikita, S Narendh
+- 3 tenants had both a `no_show` tenancy in room 000 (bot-created) AND a `pending_review` onboarding session with a real room assigned (314/314/517). Both were showing in the Bookings page as separate entries.
+- Room-000 tenancies (ids 1124/1125/1126) set to `status=cancelled` — removed from Bookings page.
+- `booking_amount` zeroed on the 3 matching sessions — prevents double-recording the ₹2,000 advance on check-in approval.
+- The ₹2,000 advance payments (ids 20964/20965/20966) remain on the cancelled tenancies. **After Jun 1 check-in**, re-link these payment records to the new tenancy IDs.
+
+---
+
 ## [1.76.38] — 2026-05-28 — Checkout refund maintenance_fee fix + Venkatha DB correction
 
 ### fix: Bot checkout missing maintenance_fee deduction
