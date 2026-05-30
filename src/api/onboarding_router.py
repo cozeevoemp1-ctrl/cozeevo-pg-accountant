@@ -669,38 +669,16 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
             if not room:
                 raise HTTPException(404, f"Room {req.room_number} not found")
             if room.room_number != "000":
-                from src.services.room_occupancy import get_room_occupants
-                occ = await get_room_occupants(session, room)
-                max_occ = room.max_occupancy or 1
-                if occ.total_occupied >= max_occ:
-                    # Allow if checkin date is after current tenants' checkout dates
-                    checkin = req.checkin_date if req.checkin_date else obs.checkin_date
-                    if checkin:
-                        checkin_d = date.fromisoformat(checkin) if isinstance(checkin, str) else checkin
-                        active_checkouts = (await session.execute(
-                            select(Tenancy.checkout_date)
-                            .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
-                        )).scalars().all()
-                        beds_still_occupied = sum(1 for co in active_checkouts if co is None or co >= checkin_d)
-                        if beds_still_occupied >= max_occ:
-                            checkouts = [co for co in active_checkouts if co is not None]
-                            if checkouts:
-                                free_from = min(checkouts) + timedelta(days=1)
-                                raise HTTPException(
-                                    409,
-                                    f"Room {room.room_number} is fully booked until {min(checkouts).strftime('%d %b %Y')}. "
-                                    f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
-                                )
-                            else:
-                                raise HTTPException(409, f"Room {room.room_number} is full with no checkout dates set.")
-                    else:
-                        occ_names = [t.name for t, _ in occ.tenancies] + [d.tenant.name for d in occ.daywise]
-                        raise HTTPException(
-                            409,
-                            f"Room {room.room_number} is full "
-                            f"({occ.total_occupied}/{max_occ} beds — {', '.join(occ_names)}). "
-                            "Set a check-in date after current tenants check out."
-                        )
+                from src.services.room_occupancy import check_room_bookable
+                checkin = req.checkin_date if req.checkin_date else obs.checkin_date
+                checkin_d = date.fromisoformat(checkin) if isinstance(checkin, str) else checkin
+                _, _err = await check_room_bookable(
+                    session, room.room_number, checkin_d or date.today(), None,
+                    property_id=room.property_id,
+                    exclude_tenancy_id=obs.tenancy_id,
+                )
+                if _err:
+                    raise HTTPException(409, _err)
             obs.room_id = room.id
         if req.maintenance_fee is not None:
             obs.maintenance_fee = Decimal(str(req.maintenance_fee))
