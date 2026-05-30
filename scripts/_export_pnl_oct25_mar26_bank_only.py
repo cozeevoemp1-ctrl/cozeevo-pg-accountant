@@ -2,8 +2,8 @@
 One-off: P&L Oct'25–Mar'26, bank only.
   - Cash income line excluded
   - Property Rent (Cash) excluded from OPEX
-  - Security Deposits TOTAL column = net held at period end (received - refunded)
-  - Deposits Refunded TOTAL = YTD reference (kept for visibility)
+  - ₹5L opening account deposit (in Oct + repaid Nov) excluded — nets to 0, cleaner without
+  - Security Deposits TOTAL column = closing balance of last month (stock metric)
 Output: data/reports/PnL_Oct25_Mar26_BankOnly.xlsx
 DO NOT modify pnl_builder.py — this script patches in-memory only.
 """
@@ -34,7 +34,16 @@ pb.OPEX = {
     if "Cash paid" not in k
 }
 
-pb.CAPITAL_CONTRIBUTIONS = {k: v[KEEP] for k, v in pb.CAPITAL_CONTRIBUTIONS.items()}
+# Exclude ₹5L startup deposit (in Oct) and its repayment (out Nov) — they net to 0
+_EXCLUDE_CAPITAL = {
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)",
+    "Owner startup — repaid via NEFT Nov (₹50K + ₹4.5L to Bharathi)",
+}
+pb.CAPITAL_CONTRIBUTIONS = {
+    k: v[KEEP]
+    for k, v in pb.CAPITAL_CONTRIBUTIONS.items()
+    if k not in _EXCLUDE_CAPITAL
+}
 pb.EXCLUDED              = {k: v[KEEP] for k, v in pb.EXCLUDED.items()}
 pb.DEPOSITS              = {k: v[KEEP] for k, v in pb.DEPOSITS.items()}
 
