@@ -82,6 +82,9 @@ python -m src.database.excel_import --write           # Excel → DB
 # DB migration
 python -m src.database.migrate_all
 
+# Audit logs — run after EVERY bank CSV import (P&L classification)
+python scripts/_generate_audit_logs.py   # → docs/DEPOSIT_REFUND_AUDIT.md + docs/SALARY_PAYMENT_AUDIT.md
+
 # VPS deploy
 cd /opt/pg-accountant && git pull && systemctl restart pg-accountant
 ```

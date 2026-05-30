@@ -82,8 +82,8 @@ OPEX = {
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
     "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  239753],  # Apr +875 Chandra cash (egg trays). Jan +1086 Origin veg; Feb +792 Amazon food; Apr +756 Ratnadeep. 2026-05-17
     "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  364161,   61904],  # Mar +8190 Chandra cash (diesel 6370+cans 1820). Jan +500 Shell India; Apr +326 volipi.l. 2026-05-17
-    "Staff & Labour":                                             [0, 1000, 135435, 116714, 234295,  217341,  193617],  # Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-13
-    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,    1850,   23399,   39319],  # Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). 2026-05-17
+    "Staff & Labour":                                             [0, 1000, 135435, 116714, 171295,  217341,  193617],  # Feb -63000 (9342205440 gas pipeline welding reclassified to Maintenance; confirmed Kiran 2026-05-30). Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-30
+    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,   64850,   23399,   39319],  # Feb +63000 (9342205440 gas pipeline welding; was Staff & Labour; confirmed Kiran 2026-05-30). Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). Updated 2026-05-30
     "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
     # Shopping & Supplies — small operational purchases (akhil setup, misc UPI, nursery decor, CHANDRASEKHAR ops advance etc.)
@@ -259,25 +259,33 @@ def _write_pnl_tab(
     sec_dep_collected   = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
     maint_fee_collected = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
     sec_dep_neg         = [-v for v in sec_dep_collected]
+    # TOTAL col for deposits = closing balance of last month (a stock/balance figure, not a sum).
+    # Each monthly column = balance of deposits held from active tenants at that month-end.
+    # Summing across months would double-count — use last month's value as the period-end balance.
+    dep_refunded     = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
+    dep_refunded_neg = [-v for v in dep_refunded]
+    closing_sec_dep  = sec_dep_neg[-1]   # last month's balance = period-end closing balance
+    closing_maint    = maint_fee_collected[-1]
+
     ws.append(["  Less: Security Deposits held (active tenants — must return at exit)", "−"]
-              + sec_dep_neg + [sum(sec_dep_neg)])
+              + sec_dep_neg + [closing_sec_dep])
     ws[ws.max_row][0].font = Font(italic=True)
 
     ws.append(["     └ Maintenance Fee retained from same tenants (non-refundable — yours to keep)", "(kept)"]
-              + list(maint_fee_collected) + [sum(maint_fee_collected)])
+              + list(maint_fee_collected) + [closing_maint])
     ws[ws.max_row][0].font = Font(italic=True, color="375623")
     for c in ws[ws.max_row][1:]:
         if isinstance(c.value, (int, float)):
             c.font = Font(italic=True, color="375623")
 
-    dep_refunded     = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
-    dep_refunded_neg = [-v for v in dep_refunded]
     ws.append(["  Less: Deposits Refunded to Exited Tenants (already paid back)", "−"]
               + dep_refunded_neg + [sum(dep_refunded_neg)])
     ws[ws.max_row][0].font = Font(italic=True)
 
     true_rev_row = [r + s + d for r, s, d in zip(rev_row, sec_dep_neg, dep_refunded_neg)]
-    ws.append(["True Rent Revenue (excl. all deposit pass-throughs)", "="] + true_rev_row + [sum(true_rev_row)])
+    # TOTAL col: use closing balances for deposits (not cumulative sum) to match TOTAL column arithmetic
+    true_rev_total = sum(rev_row) + closing_sec_dep + closing_maint + sum(dep_refunded_neg)
+    ws.append(["True Rent Revenue (excl. all deposit pass-throughs)", "="] + true_rev_row + [true_rev_total])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="375623")
     ws.append([])
@@ -317,13 +325,14 @@ def _write_pnl_tab(
 
     # ── 4. EBITDA ──────────────────────────────────────────────────────────────
     op_profit_row = [r - o for r, o in zip(true_rev_row, opex_row)]
-    ws.append(["NET OPERATING PROFIT (True Revenue − All Opex incl. Furniture & Supplies)", "="] + op_profit_row + [sum(op_profit_row)])
+    op_profit_total = true_rev_total - sum(opex_row)
+    ws.append(["NET OPERATING PROFIT (True Revenue − All Opex incl. Furniture & Supplies)", "="] + op_profit_row + [op_profit_total])
     for c in ws[ws.max_row]:
         c.font = bold
 
     op_margin_row = [f"{(p/r*100):.1f}%" if r else "-" for p, r in zip(op_profit_row, true_rev_row)]
     ws.append(["Operating Margin %", ""] + op_margin_row
-              + [f"{(sum(op_profit_row)/sum(true_rev_row)*100):.1f}%" if sum(true_rev_row) else "-"])
+              + [f"{(op_profit_total/true_rev_total*100):.1f}%" if true_rev_total else "-"])
     ws.append([])
 
     # ── 5. ADJUSTED PROFIT (after deducting borrowed money) ───────────────────
@@ -336,13 +345,14 @@ def _write_pnl_tab(
             c.font = Font(italic=True, color="9C0006")
 
     adjusted_row = [p - b for p, b in zip(op_profit_row, borrowed_row)]
+    adjusted_total = op_profit_total - sum(borrowed_row)
     ws.append(["ADJUSTED NET PROFIT (after repaying all owner loans)", "="]
-              + adjusted_row + [sum(adjusted_row)])
+              + adjusted_row + [adjusted_total])
     for c in ws[ws.max_row]:
-        c.font = Font(bold=True, color="375623" if sum(adjusted_row) >= 0 else "9C0006")
+        c.font = Font(bold=True, color="375623" if adjusted_total >= 0 else "9C0006")
         if isinstance(c.value, (int, float)):
-            c.fill = PatternFill(start_color="E2EFDA" if sum(adjusted_row) >= 0 else "FCE4D6",
-                                 end_color="E2EFDA" if sum(adjusted_row) >= 0 else "FCE4D6",
+            c.fill = PatternFill(start_color="E2EFDA" if adjusted_total >= 0 else "FCE4D6",
+                                 end_color="E2EFDA" if adjusted_total >= 0 else "FCE4D6",
                                  fill_type="solid")
     ws.append([])
 

@@ -2,6 +2,33 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.41] — 2026-05-30 — Permanent audit logs + P&L deposit TOTAL fix
+
+### fix: Security Deposits TOTAL column now shows closing balance, not sum
+- `src/reports/pnl_builder.py` — `_write_pnl_tab()`: "Less: Security Deposits held" TOTAL column was summing all months (double-counting same tenant's deposit across multiple months). Fixed to `sec_dep_neg[-1]` = closing balance of last month (Mar'26 = −₹5,26,550). Security deposits are a stock metric (balance at a point in time), not a flow metric.
+- True Revenue TOTAL, Net Operating Profit TOTAL, Adjusted Net Profit TOTAL, and Operating Margin % all recalculated using the corrected deposit closing balance.
+- Maintenance Fee TOTAL similarly uses `maint_fee_collected[-1]` (last month's closing balance).
+
+### fix: Cancelled 51 duplicate refund records in refunds table
+- Rajdeep B (room G10): 35 duplicate pending refund entries of ₹5,000 — all cancelled.
+- Aishwarya (room 601): 16 duplicate pending refund entries of ₹10,000 — all cancelled.
+- Root cause: bot creates a new refund record on each "initiate refund" command without checking for existing pending refund. Fix pending (see P1 queue).
+
+### feat: Permanent deposit refund audit log
+- `scripts/_generate_audit_logs.py` — new script; queries `bank_transactions` for Tenant Deposit Refund + Staff & Labour categories; merges CASH_SALARY_ROWS (petty cash payments not in bank); outputs two permanent audit files.
+- `docs/DEPOSIT_REFUND_AUDIT.md` — 72 deposit refund transactions, ₹5,26,424 total. Named from UPI description parsing via REFUND_DESC_MAP.
+- `docs/SALARY_PAYMENT_AUDIT.md` — 129 salary/staff payment rows, ₹8,35,402 total (bank ₹7,71,932 + cash ₹63,470). Cash rows: Dec ₹500 + Jan ₹790 + Feb ₹580 petty wages; Mar ₹29,000 Lokesh+Volipi cash salary; Mar ₹32,600 Vivek/Ravi/Saurav/Cook/helpers cash labour (from image, changelog v1.75.43).
+- Rule: run after every bank CSV import. Added to CLAUDE.md commands section.
+
+### feat: FY Oct'25–Mar'26 bank-only P&L export
+- `scripts/_export_pnl_oct25_mar26_bank_only.py` — patches pnl_builder in-memory (does not modify pnl_builder.py); excludes Cash income line + Property Rent (Cash) from OPEX; slices to 6 months; deposit TOTAL handled correctly by pnl_builder (closing balance). Output: `data/reports/PnL_Oct25_Mar26_BankOnly.xlsx`.
+
+### memory: rules_audit_logs.md created
+- Rule to run `_generate_audit_logs.py` after every bank CSV import saved to memory.
+- Cash salary identity: Volipi = Lokesh's mother; Mar cash = Lokesh + Volipi ₹29K.
+
+---
+
 ## [1.76.40] — 2026-05-30 — Checkin blocker fix: edit session excluded own no_show tenancy
 
 ### fix: "Room 102 is full" blocking valid check-in (onboarding edit endpoint)
