@@ -2,6 +2,15 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.40] — 2026-05-30 — Checkin blocker fix: edit session excluded own no_show tenancy
+
+### fix: "Room 102 is full" blocking valid check-in (onboarding edit endpoint)
+- `src/api/onboarding_router.py` — `PATCH /admin/{token}` (edit session) was counting the session's own pre-booked `no_show` tenancy as an occupant during the room capacity check. For a 2-bed room with 1 active + 1 no_show (same person), this returned 2/2 full and blocked check-in.
+- Fix: replaced manual `get_room_occupants` call with `check_room_bookable(..., exclude_tenancy_id=obs.tenancy_id)` — same pattern already used by the approve endpoint. The session's own no_show slot is now excluded from the count.
+- This also simplifies the code: dropped 32 lines of duplicate manual occupancy logic; now shares the canonical `check_room_bookable` helper which also validates staff rooms + inactive rooms.
+
+---
+
 ## [1.76.39] — 2026-05-29 — Booking occupancy guard fix + duplicate booking cleanup
 
 ### fix: Room occupancy check now allows future bookings (consistent with quick-book)
