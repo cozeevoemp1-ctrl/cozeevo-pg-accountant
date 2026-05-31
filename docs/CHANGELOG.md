@@ -2,6 +2,38 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.42] — 2026-05-31 — Booking overlap self-block fix + day stay fixes
+
+### fix: Overlapping booking false-positive (permanent fix)
+- `src/services/room_occupancy.py` — `find_overlap_conflict` + `check_room_bookable`: added `exclude_tenant_id` param. A tenant's own `no_show` in the same room never blocks their own check-in, regardless of whether `obs.tenancy_id` is linked.
+- `src/api/onboarding_router.py` — all 3 call sites (create, PATCH, approve) now pass `exclude_tenant_id`. Removed per-site workarounds.
+- Root cause: `obs.tenancy_id=None` when tenancy was created outside the onboarding flow (bot or manual). The old `exclude_tenancy_id=obs.tenancy_id` did nothing when None.
+
+### fix: Approve reuses existing no_show tenancy when obs.tenancy_id unlinked
+- `src/api/onboarding_router.py` approve path: before creating a new Tenancy, looks up existing no_show for same tenant+room. Prevents duplicate tenancy creation.
+
+### fix: Day stay — num_days and daily_rate bugs across all endpoints
+- **CREATE**: auto-calculates `num_days` from `checkout_date − checkin_date` if not provided; `daily_rate` falls back to `agreed_rent` for day stays.
+- **PATCH**: syncs `daily_rate = agreed_rent` when rate is edited; recalculates `num_days` from dates.
+- **APPROVE**: falls back to `agreed_rent / num_days` if `daily_rate = 0` — never creates ₹0/day tenancy.
+
+### fix: Bookings page day stay edit form
+- Deposit field hidden for day stays
+- Rate field label changed to "Rate (₹/day)"
+- Pink hint: "Total: ₹X × N days = ₹Y" shown live as user edits rate/dates
+
+### fix: Bookings page prorated hint
+- Prorated first-month hint now reacts to `editCheckin`/`editRent` changes (was frozen at original `b` values)
+
+### fix: Check-in error shown inside card
+- `saveAndCheckin` now re-throws so `BookingCard` can catch and show the error inline, directly above the "Save & Check In" button. Previously error was shown at top of page (invisible when scrolled).
+
+### data: Chandra Sagar (tenancy 1080) — voided stale duplicate
+- Stale no_show tenancy 1080 (June 1 checkin) voided; replaced by active tenancy 1141 (May 31 checkin)
+- ₹290 cash rent waived (payment 21032 voided + RS adjustment −290) — "waived on checkin, 1-day discount"
+
+---
+
 ## [1.76.41] — 2026-05-30 — Permanent audit logs + P&L deposit TOTAL fix
 
 ### fix: Security Deposits TOTAL column now shows closing balance, not sum
