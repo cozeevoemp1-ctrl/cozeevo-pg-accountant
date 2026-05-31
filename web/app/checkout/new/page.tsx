@@ -100,6 +100,9 @@ function NewCheckoutPage() {
   // Day-wise checkout time
   const [checkoutTime, setCheckoutTime] = useState(nowTime())
 
+  // Manual forfeit toggle — for emergency early exits where notice exists but deposit is kept
+  const [manualForfeit, setManualForfeit] = useState(false)
+
   // Manual refund override (for anomalies when deposit is forfeited)
   const [refundOverride,     setRefundOverride]     = useState<number | null>(null)
   const [showRefundOverride, setShowRefundOverride] = useState(false)
@@ -109,7 +112,8 @@ function NewCheckoutPage() {
   const isDaily = prefetch?.stay_type === "daily"
 
   // Notice / deposit forfeiture — monthly only, day-stays have no notice period
-  const depositForfeited = prefetch && !isDaily ? !prefetch.notice_date : false
+  // Auto-forfeited if no notice; or manually forfeited for emergency early exits
+  const depositForfeited = prefetch && !isDaily ? (!prefetch.notice_date || manualForfeit) : false
 
   function calcLastDay(noticeDateISO: string): string {
     const d = new Date(noticeDateISO + "T00:00:00")
@@ -478,23 +482,39 @@ function NewCheckoutPage() {
               </div>
             )
           }
-          // On-time notice — deposit refundable
+          // On-time notice — deposit refundable (with optional emergency forfeit toggle)
           return (
-            <div className="rounded-card p-3 border bg-tile-green border-[#C4EDD4] text-[#146B2E]">
-              <div className="flex items-start gap-2">
-                <span className="text-base flex-shrink-0 mt-0.5">✓</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold">
-                    Notice on {fmtDate(nd)} — Deposit Refundable
-                  </p>
-                  <p className="text-xs font-semibold mt-0.5">
-                    {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues))} to return
-                  </p>
-                  {expectedLastDay && (
-                    <p className="text-[10px] mt-0.5 opacity-80">Last day: {fmtDate(expectedLastDay)}</p>
-                  )}
+            <div className="flex flex-col gap-2">
+              <div className="rounded-card p-3 border bg-tile-green border-[#C4EDD4] text-[#146B2E]">
+                <div className="flex items-start gap-2">
+                  <span className="text-base flex-shrink-0 mt-0.5">✓</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold">
+                      Notice on {fmtDate(nd)} — Deposit Refundable
+                    </p>
+                    <p className="text-xs font-semibold mt-0.5">
+                      {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues))} to return
+                    </p>
+                    {expectedLastDay && (
+                      <p className="text-[10px] mt-0.5 opacity-80">Last day: {fmtDate(expectedLastDay)}</p>
+                    )}
+                  </div>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => { setManualForfeit(v => !v); setRefundOverride(null) }}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-card border-2 text-xs font-semibold transition-colors ${
+                  manualForfeit
+                    ? "border-status-warn bg-[#FFF0F0] text-status-warn"
+                    : "border-[#E2DEDD] bg-surface text-ink-muted"
+                }`}
+              >
+                <span>Emergency exit — forfeit deposit</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${manualForfeit ? "bg-status-warn text-white" : "bg-[#E2DEDD] text-ink-muted"}`}>
+                  {manualForfeit ? "ON" : "OFF"}
+                </span>
+              </button>
             </div>
           )
         })()}
