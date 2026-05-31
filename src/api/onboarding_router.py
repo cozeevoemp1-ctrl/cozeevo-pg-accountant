@@ -672,10 +672,32 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
                 from src.services.room_occupancy import check_room_bookable
                 checkin = req.checkin_date if req.checkin_date else obs.checkin_date
                 checkin_d = date.fromisoformat(checkin) if isinstance(checkin, str) else checkin
+                # If obs.tenancy_id is not linked yet, find the existing no_show
+                # tenancy for this tenant+room so it isn't counted as an occupant.
+                _patch_exclude_id = obs.tenancy_id
+                if not _patch_exclude_id and obs.tenant_phone:
+                    import re as _reph
+                    from sqlalchemy import func as _func
+                    _digits = _reph.sub(r"\D", "", obs.tenant_phone)[-10:]
+                    _existing_tenant = (await session.execute(
+                        select(Tenant.id)
+                        .where(_func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _digits)
+                    )).scalars().first()
+                    if _existing_tenant:
+                        _existing_ns = (await session.execute(
+                            select(Tenancy.id)
+                            .where(
+                                Tenancy.tenant_id == _existing_tenant,
+                                Tenancy.room_id == room.id,
+                                Tenancy.status == TenancyStatus.no_show,
+                            )
+                        )).scalars().first()
+                        if _existing_ns:
+                            _patch_exclude_id = _existing_ns
                 _, _err = await check_room_bookable(
                     session, room.room_number, checkin_d or date.today(), None,
                     property_id=room.property_id,
-                    exclude_tenancy_id=obs.tenancy_id,
+                    exclude_tenancy_id=_patch_exclude_id,
                 )
                 if _err:
                     raise HTTPException(409, _err)
