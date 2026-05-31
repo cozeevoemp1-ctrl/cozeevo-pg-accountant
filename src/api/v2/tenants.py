@@ -305,6 +305,14 @@ async def get_tenant_dues(
                 Payment.for_type == PaymentFor.deposit,
             )
         )
+        # Advance/booking payments recorded via payment form
+        booking_paid_result = await session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.tenancy_id == tenancy_id,
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.booking,
+            )
+        )
         # RentSchedule for this period
         rs = await session.scalar(
             select(RentSchedule).where(
@@ -321,9 +329,12 @@ async def get_tenant_dues(
 
     rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
     rent_only_paid = float(rent_only_paid_result) if rent_only_paid_result is not None else 0.0
-    booking_amount = float(tenancy.booking_amount) if tenancy.booking_amount else 0.0
     deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
     deposit_paid_direct = float(deposit_paid_result) if deposit_paid_result else 0.0
+    booking_paid_via_pmts = float(booking_paid_result) if booking_paid_result else 0.0
+    # Use payment records if they exist; fall back to tenancy.booking_amount for
+    # Excel-imported tenants who have no corresponding Payment record.
+    booking_amount = booking_paid_via_pmts if booking_paid_via_pmts > 0 else (float(tenancy.booking_amount) if tenancy.booking_amount else 0.0)
 
     rent_due   = float(rs.rent_due)   if rs else rent
     adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
