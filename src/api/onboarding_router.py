@@ -651,10 +651,16 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
 
         if req.agreed_rent is not None:
             obs.agreed_rent = Decimal(str(req.agreed_rent))
+            # For day stays, agreed_rent IS the daily rate
+            if obs.stay_type == "daily":
+                obs.daily_rate = Decimal(str(req.agreed_rent))
         if req.checkin_date is not None:
             obs.checkin_date = date.fromisoformat(req.checkin_date)
         if req.checkout_date is not None:
             obs.checkout_date = date.fromisoformat(req.checkout_date)
+        # Recalculate num_days whenever checkin or checkout changes for day stays
+        if obs.stay_type == "daily" and obs.checkin_date and obs.checkout_date:
+            obs.num_days = (obs.checkout_date - obs.checkin_date).days
         if req.room_number is not None:
             room = await session.scalar(select(Room).where(Room.room_number.ilike(req.room_number)))
             if not room:
