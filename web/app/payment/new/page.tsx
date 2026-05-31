@@ -282,13 +282,8 @@ export default function NewPaymentPage() {
                     <p className="text-lg font-extrabold mt-0.5 text-status-warn">
                       ₹{totalOutstanding.toLocaleString("en-IN")} due
                     </p>
-                  ) : dues.adjustment < 0 ? (
-                    <div className="mt-0.5">
-                      <p className="text-sm font-semibold text-ink-muted line-through">₹{dues.rent_due.toLocaleString("en-IN")}</p>
-                      <p className="text-base font-extrabold text-status-paid">Waived ✓</p>
-                    </div>
                   ) : (
-                    <p className="text-lg font-extrabold mt-0.5 text-status-paid">Fully paid ✓</p>
+                    <p className="text-lg font-extrabold mt-0.5 text-status-paid">No dues ✓</p>
                   )}
                 </div>
                 {dues.last_payment_date && dues.adjustment >= 0 && (
