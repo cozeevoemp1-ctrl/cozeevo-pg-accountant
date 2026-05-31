@@ -125,8 +125,6 @@ export default function BookingsPage() {
         throw new Error((d as { detail?: string }).detail ?? `Error ${res.status}`)
       }
       await load()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Check-in failed")
     } finally {
       setCheckingIn(null)
     }
@@ -339,7 +337,7 @@ function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cas
 function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   b: Booking
   checkingIn: string | null
-  onCheckin: (token: string, collection?: { collected_rent_dues: number; rent_dues_mode: string; collected_deposit_dues: number }) => void
+  onCheckin: (token: string, collection?: { collected_rent_dues: number; rent_dues_mode: string; collected_deposit_dues: number }) => Promise<void> | void
   onReload: () => void
 }) {
   const isPending = b.status === "pending_tenant"
@@ -351,6 +349,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [editing, setEditing] = useState(false)
   const [cancelConfirm, setCancelConfirm] = useState(false)
   const [checkInConfirm, setCheckInConfirm] = useState(false)
+  const [checkinErr, setCheckinErr] = useState("")
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [resending, setResending] = useState(false)
@@ -970,30 +969,40 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
                 </button>
               )}
               {expanded ? (
-                checkInConfirm ? (
-                  <button
-                    onClick={() => {
-                      setCheckInConfirm(false)
-                      onCheckin(b.token, {
-                        collected_rent_dues: parseFloat(collectRentDues) || 0,
-                        rent_dues_mode: rentDuesMode,
-                        collected_deposit_dues: parseFloat(collectDepositDues) || 0,
-                      })
-                    }}
-                    disabled={checkingIn === b.token}
-                    className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
-                  >
-                    {checkingIn === b.token ? "Checking in…" : "Confirm check in?"}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setCheckInConfirm(true)}
-                    disabled={checkingIn === b.token}
-                    className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
-                  >
-                    Save & Check In
-                  </button>
-                )
+                <>
+                  {checkinErr && (
+                    <p className="text-[11px] text-red-500 font-medium text-center -mb-1">{checkinErr}</p>
+                  )}
+                  {checkInConfirm ? (
+                    <button
+                      onClick={async () => {
+                        setCheckInConfirm(false)
+                        setCheckinErr("")
+                        try {
+                          await onCheckin(b.token, {
+                            collected_rent_dues: parseFloat(collectRentDues) || 0,
+                            rent_dues_mode: rentDuesMode,
+                            collected_deposit_dues: parseFloat(collectDepositDues) || 0,
+                          })
+                        } catch (e) {
+                          setCheckinErr(e instanceof Error ? e.message : "Check-in failed")
+                        }
+                      }}
+                      disabled={checkingIn === b.token}
+                      className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+                    >
+                      {checkingIn === b.token ? "Checking in…" : "Confirm check in?"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setCheckInConfirm(true); setCheckinErr("") }}
+                      disabled={checkingIn === b.token}
+                      className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
+                    >
+                      Save & Check In
+                    </button>
+                  )}
+                </>
               ) : (
                 <button
                   onClick={() => setExpanded(true)}

@@ -1706,6 +1706,16 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             _pre_tenancy = None
             if obs.tenancy_id:
                 _pre_tenancy = await session.get(Tenancy, obs.tenancy_id)
+            # Fallback: obs.tenancy_id may be unlinked if tenancy was created outside
+            # the onboarding flow. Find the existing no_show for this tenant+room.
+            if _pre_tenancy is None and tenant and room:
+                _pre_tenancy = await session.scalar(
+                    select(Tenancy).where(
+                        Tenancy.tenant_id == tenant.id,
+                        Tenancy.room_id == room.id,
+                        Tenancy.status == TenancyStatus.no_show,
+                    )
+                )
             if _pre_tenancy and _pre_tenancy.status in (TenancyStatus.no_show, TenancyStatus.active):
                 # Reuse the tenancy created at pre-booking time (advance was already recorded)
                 _pre_tenancy.tenant_id = tenant.id
