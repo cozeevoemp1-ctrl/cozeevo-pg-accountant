@@ -1706,7 +1706,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             _pre_tenancy = None
             if obs.tenancy_id:
                 _pre_tenancy = await session.get(Tenancy, obs.tenancy_id)
-            if _pre_tenancy and _pre_tenancy.status == TenancyStatus.no_show:
+            if _pre_tenancy and _pre_tenancy.status in (TenancyStatus.no_show, TenancyStatus.active):
                 # Reuse the tenancy created at pre-booking time (advance was already recorded)
                 _pre_tenancy.tenant_id = tenant.id
                 _pre_tenancy.room_id = room.id if room else _pre_tenancy.room_id

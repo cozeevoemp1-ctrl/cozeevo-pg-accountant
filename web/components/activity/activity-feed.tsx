@@ -70,8 +70,9 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
   }, [events, filter, search]);
 
   const groups = useMemo(() => {
+    const sorted = [...filtered].sort((a, b) => b.ts.localeCompare(a.ts));
     const g: { key: string; label: string; events: ActivityFeedEvent[] }[] = [];
-    for (const ev of filtered) {
+    for (const ev of sorted) {
       const key = _dayKey(ev.ts);
       const last = g[g.length - 1];
       if (last && last.key === key) {
