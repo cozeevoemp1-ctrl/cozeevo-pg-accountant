@@ -357,7 +357,7 @@ export default function NewPaymentPage() {
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment For</p>
           <div className="flex gap-2 flex-wrap">
             {FOR_TYPES.map((f) => (
-              <button key={f.value} type="button" onClick={() => setForType(f.value)}
+              <button key={f.value} type="button" onClick={() => { setForType(f.value); if (f.value === "deposit" || f.value === "booking") setMethod("UPI") }}
                 className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${forType === f.value ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink border-[#E2DEDD]"}`}>
                 {f.label}
               </button>
