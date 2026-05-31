@@ -1733,18 +1733,28 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 session.add(tenancy)
             await session.flush()
 
-            # RentSchedule — first-month rent prorated by default on check-in
-            # date (canonical helper handles the rule).
+            # RentSchedule — upsert so reused no_show tenancies don't crash on
+            # the unique constraint (pre-booking already inserted RS rows).
             from src.services.rent_schedule import first_month_rent_due
             period = checkin.replace(day=1)
             current_month = date.today().replace(day=1)
             while period <= current_month:
-                session.add(RentSchedule(
-                    tenancy_id=tenancy.id, period_month=period,
-                    rent_due=first_month_rent_due(tenancy, period),
-                    maintenance_due=0,
-                    status=RentStatus.pending, due_date=period,
-                ))
+                new_rent_due = first_month_rent_due(tenancy, period)
+                existing_rs = await session.scalar(
+                    select(RentSchedule).where(
+                        RentSchedule.tenancy_id == tenancy.id,
+                        RentSchedule.period_month == period,
+                    )
+                )
+                if existing_rs:
+                    existing_rs.rent_due = new_rent_due
+                else:
+                    session.add(RentSchedule(
+                        tenancy_id=tenancy.id, period_month=period,
+                        rent_due=new_rent_due,
+                        maintenance_due=0,
+                        status=RentStatus.pending, due_date=period,
+                    ))
                 if period.month == 12:
                     period = date(period.year + 1, 1, 1)
                 else:
