@@ -250,8 +250,11 @@ async def create_session(req: CreateSessionRequest, request: Request):
             stay_type=req.stay_type,
             lock_in_months=req.lock_in_months,
             checkout_date=date.fromisoformat(req.checkout_date) if req.checkout_date else None,
-            num_days=req.num_days,
-            daily_rate=Decimal(str(req.daily_rate)) if req.daily_rate else 0,
+            num_days=(req.num_days or (
+                (date.fromisoformat(req.checkout_date) - date.fromisoformat(req.checkin_date)).days
+                if req.stay_type == "daily" and req.checkout_date else 0
+            )),
+            daily_rate=Decimal(str(req.daily_rate if req.daily_rate else req.agreed_rent)) if req.stay_type == "daily" else (Decimal(str(req.daily_rate)) if req.daily_rate else 0),
             special_terms=req.special_terms,
             expires_at=datetime.utcnow() + timedelta(hours=48),
             future_rent=Decimal(str(req.future_rent)) if req.future_rent else None,
@@ -1594,7 +1597,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 checkin_date=checkin,
                 checkout_date=checkout,
                 expected_checkout=checkout,
-                agreed_rent=obs.daily_rate or 0,        # per-day rate
+                agreed_rent=obs.daily_rate or (obs.agreed_rent / num_days if num_days else obs.agreed_rent) or 0,  # per-day rate; fallback: total/days
                 booking_amount=obs.booking_amount or 0,
                 maintenance_fee=obs.maintenance_fee or 0,
                 notes=obs.special_terms or "",
