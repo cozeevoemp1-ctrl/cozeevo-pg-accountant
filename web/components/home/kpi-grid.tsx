@@ -117,8 +117,9 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [cashAmt, setCashAmt] = useState("");
-  const [upiAmt,  setUpiAmt]  = useState("");
+  const [cashAmt,    setCashAmt]    = useState("");
+  const [upiAmt,     setUpiAmt]     = useState("");
+  const [depositAmt, setDepositAmt] = useState("");
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState(false);
@@ -128,6 +129,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     if (!item.tenancy_id) return;
     getTenantDues(item.tenancy_id).then((d) => {
       setFullDues(d);
+      const depDue = Math.max(0, d.deposit_due ?? 0);
+      if (depDue > 0) setDepositAmt(String(depDue));
     }).catch(() => {});
   }, [item.tenancy_id]);
 
@@ -139,32 +142,16 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!fullDues) { setError("Could not load tenant info — try again"); return; }
-    const ca = parseFloat(cashAmt) || 0;
-    const ua = parseFloat(upiAmt)  || 0;
-    if (ca <= 0 && ua <= 0) { setError("Enter at least one amount"); return; }
+    const ca = parseFloat(cashAmt)    || 0;
+    const ua = parseFloat(upiAmt)     || 0;
+    const da = parseFloat(depositAmt) || 0;
+    if (ca <= 0 && ua <= 0 && da <= 0) { setError("Enter at least one amount"); return; }
     setSaving(true); setError("");
-    const rentDue    = Math.max(0, fullDues.dues        ?? 0);
-    const depositDue = Math.max(0, fullDues.deposit_due ?? 0);
     const pm = currentMonth();
     try {
-      // Cash → fills rent first
-      if (ca > 0) {
-        const cashRent = Math.min(ca, rentDue);
-        const cashDep  = ca - cashRent;
-        if (cashRent > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: cashRent, method: "CASH", for_type: "rent",    period_month: pm });
-        if (cashDep  > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: cashDep,  method: "CASH", for_type: "deposit", period_month: pm });
-      }
-      // UPI → fills remaining rent, then deposit
-      if (ua > 0) {
-        const rentPaidByCash = Math.min(parseFloat(cashAmt) || 0, rentDue);
-        const rentLeft = Math.max(0, rentDue - rentPaidByCash);
-        const upiRent = Math.min(ua, rentLeft);
-        const upiDep  = Math.min(ua - upiRent, depositDue);
-        const upiOther = ua - upiRent - upiDep;
-        if (upiRent  > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: upiRent,  method: "UPI", for_type: "rent",    period_month: pm });
-        if (upiDep   > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: upiDep,   method: "UPI", for_type: "deposit", period_month: pm });
-        if (upiOther > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: upiOther, method: "UPI", for_type: "rent",    period_month: pm });
-      }
+      if (ca > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ca, method: "CASH", for_type: "rent",    period_month: pm });
+      if (ua > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ua, method: "UPI",  for_type: "rent",    period_month: pm });
+      if (da > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: "UPI",  for_type: "deposit", period_month: pm });
       setSuccess(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
     } catch (err) {
@@ -177,7 +164,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   const rentDue    = fullDues ? Math.max(0, fullDues.dues        ?? 0) : (item.dues ?? 0);
   const depositDue = fullDues ? Math.max(0, fullDues.deposit_due ?? 0) : 0;
   const totalDue   = rentDue + depositDue;
-  const totalCollect = (parseFloat(cashAmt) || 0) + (parseFloat(upiAmt) || 0);
+  const totalCollect = (parseFloat(cashAmt) || 0) + (parseFloat(upiAmt) || 0) + (parseFloat(depositAmt) || 0);
   const remaining  = Math.max(0, totalDue - totalCollect);
 
   return (
@@ -242,6 +229,23 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                 className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
               />
             </div>
+
+            {/* Deposit box — only if unpaid deposit exists */}
+            {depositDue > 0 && (
+              <div>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
+                  Deposit (₹) · <span className="text-status-due">{rupee(depositDue)} unpaid</span>
+                </label>
+                <input
+                  type="number" inputMode="numeric"
+                  value={depositAmt} onChange={(e) => setDepositAmt(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  placeholder="0" min="0"
+                  className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                />
+                <p className="text-[10px] text-[#00AEED] font-bold mt-1">Always recorded as UPI</p>
+              </div>
+            )}
 
             {/* Summary */}
             {fullDues && (
