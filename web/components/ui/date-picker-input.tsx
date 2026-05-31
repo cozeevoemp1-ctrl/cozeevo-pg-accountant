@@ -5,6 +5,8 @@
  * - Tap to open calendar popup
  * - Tap month/year header → year grid for fast selection
  * value / onChange: "YYYY-MM-DD"
+ *
+ * Uses fixed positioning so it escapes overflow:hidden/auto parent containers (modals).
  */
 
 import { useState, useRef, useEffect } from "react"
@@ -35,16 +37,35 @@ export function DatePickerInput({ value, onChange }: Props) {
   const [yearMode,  setYearMode] = useState(false)
   const [viewYear,  setViewYear] = useState(selYear)
   const [viewMonth, setViewMonth] = useState(selMonth)
+  const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({})
 
-  const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const popupRef   = useRef<HTMLDivElement>(null)
 
+  // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        popupRef.current   && !popupRef.current.contains(e.target as Node)
+      ) setOpen(false)
     }
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
   }, [])
+
+  // Recalculate fixed position whenever open
+  useEffect(() => {
+    if (!open || !triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const popupH = 320 // approximate calendar height
+    if (spaceBelow >= popupH || spaceBelow >= 220) {
+      setPopupStyle({ top: rect.bottom + 6, left: rect.left, width: Math.max(rect.width, 280) })
+    } else {
+      setPopupStyle({ bottom: window.innerHeight - rect.top + 6, left: rect.left, width: Math.max(rect.width, 280) })
+    }
+  }, [open])
 
   function pickDay(d: number) {
     setSelYear(viewYear); setSelMonth(viewMonth); setSelDay(d)
@@ -73,9 +94,10 @@ export function DatePickerInput({ value, onChange }: Props) {
   const yearRange = Array.from({length: 11}, (_,i) => viewYear - 5 + i)
 
   return (
-    <div ref={ref} className="relative mt-1">
+    <div className="relative mt-1">
       {/* Trigger */}
       <div
+        ref={triggerRef}
         onClick={() => { setOpen(o => !o); setYearMode(false) }}
         className="flex h-[46px] rounded-lg border border-[#E0DDD8] bg-surface items-center px-3 cursor-pointer select-none transition-colors hover:border-brand-pink"
       >
@@ -83,9 +105,13 @@ export function DatePickerInput({ value, onChange }: Props) {
         <span className="ml-auto text-ink-muted text-base">📅</span>
       </div>
 
-      {/* Calendar popup */}
+      {/* Calendar popup — fixed so it escapes overflow:hidden/auto modals */}
       {open && (
-        <div className="absolute z-50 mt-1 left-0 w-[280px] bg-white rounded-xl border border-[#E0DDD8] shadow-lg p-3">
+        <div
+          ref={popupRef}
+          className="fixed z-[9999] bg-white rounded-xl border border-[#E0DDD8] shadow-xl p-3"
+          style={popupStyle}
+        >
           {yearMode ? (
             <>
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2 text-center">Select Year</p>
