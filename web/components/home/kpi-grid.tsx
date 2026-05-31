@@ -117,9 +117,10 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [cashAmt,    setCashAmt]    = useState("");
-  const [upiAmt,     setUpiAmt]     = useState("");
-  const [depositAmt, setDepositAmt] = useState("");
+  const [cashAmt,      setCashAmt]      = useState("");
+  const [upiAmt,       setUpiAmt]       = useState("");
+  const [depositAmt,   setDepositAmt]   = useState("");
+  const [depositMethod, setDepositMethod] = useState<PayMethod>("UPI");
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState(false);
@@ -151,7 +152,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     try {
       if (ca > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ca, method: "CASH", for_type: "rent",    period_month: pm });
       if (ua > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ua, method: "UPI",  for_type: "rent",    period_month: pm });
-      if (da > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: "UPI",  for_type: "deposit", period_month: pm });
+      if (da > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: depositMethod, for_type: "deposit", period_month: pm });
       setSuccess(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
     } catch (err) {
@@ -243,7 +244,14 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                   placeholder="0" min="0"
                   className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
                 />
-                <p className="text-[10px] text-[#00AEED] font-bold mt-1">Always recorded as UPI</p>
+                <div className="flex gap-1.5 mt-1.5">
+                  {(["CASH", "UPI"] as PayMethod[]).map((m) => (
+                    <button key={m} type="button" onClick={() => setDepositMethod(m)}
+                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${
+                        depositMethod === m ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                      }`}>{m === "CASH" ? "Cash" : "UPI"}</button>
+                  ))}
+                </div>
               </div>
             )}
 
