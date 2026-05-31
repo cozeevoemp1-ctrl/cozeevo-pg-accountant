@@ -191,6 +191,7 @@ async def find_overlap_conflict(
     start_date: _date,
     end_date: Optional[_date],
     exclude_tenancy_id: Optional[int] = None,
+    exclude_tenant_id: Optional[int] = None,
 ) -> Optional[str]:
     """Return a conflicting occupant's name if `room_id` is FULL during
     [start_date, end_date], else None.
@@ -199,6 +200,13 @@ async def find_overlap_conflict(
     total beds consumed by overlapping occupants reaches max_occupancy —
     a 3-sharing room with 2 tenants can still accept a third.
     Premium sharing_type consumes all beds in the room.
+
+    exclude_tenancy_id: skip a specific tenancy row (used when re-checking
+        a booking that already has a tenancy linked via obs.tenancy_id).
+    exclude_tenant_id: skip any no_show tenancy for this tenant in this room.
+        Used when obs.tenancy_id is not set but a pre-existing no_show exists
+        for the same tenant — prevents the tenant from blocking themselves.
+        Active tenancies for the same tenant are still treated as conflicts.
     """
     far_future = _date(9999, 12, 31)
     period_end = end_date or far_future
@@ -225,6 +233,15 @@ async def find_overlap_conflict(
     )
     if exclude_tenancy_id:
         q = q.where(Tenancy.id != exclude_tenancy_id)
+    # A tenant cannot conflict with their own no_show in the same room —
+    # that's the same booking being edited/approved, not a double-booking.
+    if exclude_tenant_id:
+        q = q.where(
+            or_(
+                Tenancy.tenant_id != exclude_tenant_id,
+                Tenancy.status != TenancyStatus.no_show,
+            )
+        )
 
     beds_used = 0
     conflict_names: list[str] = []
@@ -265,6 +282,7 @@ async def check_room_bookable(
     end_date: Optional[_date],
     property_id: Optional[int] = None,
     exclude_tenancy_id: Optional[int] = None,
+    exclude_tenant_id: Optional[int] = None,
 ) -> tuple[Optional[Room], Optional[str]]:
     """Gate-keeper for every new booking (long-term or day-wise).
 
@@ -310,7 +328,9 @@ async def check_room_bookable(
         return room, f"Room {rn} has staff member '{staff_here}' — whole room blocked for bookings."
 
     conflict = await find_overlap_conflict(
-        session, room.id, start_date, end_date, exclude_tenancy_id=exclude_tenancy_id
+        session, room.id, start_date, end_date,
+        exclude_tenancy_id=exclude_tenancy_id,
+        exclude_tenant_id=exclude_tenant_id,
     )
     if conflict:
         return room, f"Room {rn} already has an overlapping booking: {conflict}."

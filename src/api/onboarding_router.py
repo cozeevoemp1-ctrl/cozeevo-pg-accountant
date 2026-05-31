@@ -213,34 +213,25 @@ async def create_session(req: CreateSessionRequest, request: Request):
             if room.property_id:
                 prop = await session.get(Property, room.property_id)
                 building = prop.name if prop else ""
-            # Capacity check — allow future booking if checkin is after existing checkout dates
-            from src.services.room_occupancy import get_room_occupants
-            occ = await get_room_occupants(session, room)
-            max_occ = room.max_occupancy or 1
-            if occ.total_occupied >= max_occ:
-                checkin_d = date.fromisoformat(req.checkin_date)
-                active_checkouts = (await session.execute(
-                    select(Tenancy.checkout_date)
-                    .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
-                )).scalars().all()
-                beds_still_occupied = sum(1 for co in active_checkouts if co is None or co >= checkin_d)
-                if beds_still_occupied >= max_occ:
-                    checkouts = [co for co in active_checkouts if co is not None]
-                    if checkouts:
-                        free_from = min(checkouts) + timedelta(days=1)
-                        raise HTTPException(
-                            409,
-                            f"Room {room.room_number} is fully booked until {min(checkouts).strftime('%d %b %Y')}. "
-                            f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
-                        )
-                    else:
-                        occ_names = [t.name for t, _ in occ.tenancies] + [d.tenant.name for d in occ.daywise]
-                        raise HTTPException(
-                            409,
-                            f"Room {room.room_number} is full "
-                            f"({occ.total_occupied}/{max_occ} beds — {', '.join(occ_names)}). "
-                            "Checkout an existing tenant or choose a different room."
-                        )
+            # Capacity check via unified helper — excludes any existing no_show
+            # for this same tenant so re-booking them doesn't block themselves.
+            from src.services.room_occupancy import check_room_bookable
+            from sqlalchemy import func as _func
+            import re as _re_create
+            _create_digits = _re_create.sub(r"\D", "", req.tenant_phone or "")[-10:]
+            _create_tenant_id = (await session.execute(
+                select(Tenant.id)
+                .where(_func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _create_digits)
+            )).scalars().first() if _create_digits else None
+            checkin_d = date.fromisoformat(req.checkin_date)
+            checkout_d = date.fromisoformat(req.checkout_date) if req.checkout_date else None
+            _, _create_err = await check_room_bookable(
+                session, room.room_number, checkin_d, checkout_d,
+                property_id=room.property_id,
+                exclude_tenant_id=_create_tenant_id,
+            )
+            if _create_err:
+                raise HTTPException(409, _create_err)
 
         token = str(uuid.uuid4())
         obs = OnboardingSession(
@@ -670,34 +661,20 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
                 raise HTTPException(404, f"Room {req.room_number} not found")
             if room.room_number != "000":
                 from src.services.room_occupancy import check_room_bookable
+                from sqlalchemy import func as _func
                 checkin = req.checkin_date if req.checkin_date else obs.checkin_date
                 checkin_d = date.fromisoformat(checkin) if isinstance(checkin, str) else checkin
-                # If obs.tenancy_id is not linked yet, find the existing no_show
-                # tenancy for this tenant+room so it isn't counted as an occupant.
-                _patch_exclude_id = obs.tenancy_id
-                if not _patch_exclude_id and obs.tenant_phone:
-                    import re as _reph
-                    from sqlalchemy import func as _func
-                    _digits = _reph.sub(r"\D", "", obs.tenant_phone)[-10:]
-                    _existing_tenant = (await session.execute(
-                        select(Tenant.id)
-                        .where(_func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _digits)
-                    )).scalars().first()
-                    if _existing_tenant:
-                        _existing_ns = (await session.execute(
-                            select(Tenancy.id)
-                            .where(
-                                Tenancy.tenant_id == _existing_tenant,
-                                Tenancy.room_id == room.id,
-                                Tenancy.status == TenancyStatus.no_show,
-                            )
-                        )).scalars().first()
-                        if _existing_ns:
-                            _patch_exclude_id = _existing_ns
+                _patch_phone = obs.tenant_phone or ""
+                _patch_digits = _re.sub(r"\D", "", _patch_phone)[-10:]
+                _patch_tenant_id = (await session.execute(
+                    select(Tenant.id)
+                    .where(_func.right(_func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _patch_digits)
+                )).scalars().first() if _patch_digits else None
                 _, _err = await check_room_bookable(
                     session, room.room_number, checkin_d or date.today(), None,
                     property_id=room.property_id,
-                    exclude_tenancy_id=_patch_exclude_id,
+                    exclude_tenancy_id=obs.tenancy_id,
+                    exclude_tenant_id=_patch_tenant_id,
                 )
                 if _err:
                     raise HTTPException(409, _err)
@@ -1569,24 +1546,11 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             _guard_checkout = None
             if is_daily:
                 _guard_checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
-            # If obs.tenancy_id is not set, look for an existing no_show tenancy for this
-            # tenant in this room so we don't count their own booking as an occupant.
-            _exclude_id = obs.tenancy_id
-            if not _exclude_id and tenant and tenant.id:
-                _existing_ns = (await session.execute(
-                    select(Tenancy.id)
-                    .where(
-                        Tenancy.tenant_id == tenant.id,
-                        Tenancy.room_id == room.id,
-                        Tenancy.status == TenancyStatus.no_show,
-                    )
-                )).scalars().first()
-                if _existing_ns:
-                    _exclude_id = _existing_ns
             _, _guard_err = await check_room_bookable(
                 session, room.room_number, checkin, _guard_checkout,
                 property_id=room.property_id,
-                exclude_tenancy_id=_exclude_id,  # don't count this session's own no_show tenancy
+                exclude_tenancy_id=obs.tenancy_id,
+                exclude_tenant_id=tenant.id if tenant else None,
             )
             if _guard_err:
                 raise HTTPException(409, _guard_err)
