@@ -706,7 +706,20 @@ export default function EditTenantPage() {
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Notice date</label>
-            <DatePickerInput value={noticeDate} onChange={setNoticeDate} />
+            <DatePickerInput value={noticeDate} onChange={(v) => {
+              setNoticeDate(v)
+              if (v) {
+                const d = new Date(v)
+                const onTime = d.getDate() <= 5
+                // Auto-calculate last day: on-time → end of this month, late → end of next month
+                const yr = d.getFullYear(), mo = d.getMonth()
+                const lastDay = onTime
+                  ? new Date(yr, mo + 1, 0)          // last day of notice month
+                  : new Date(yr, mo + 2, 0)           // last day of next month
+                const fmt = `${lastDay.getFullYear()}-${String(lastDay.getMonth()+1).padStart(2,'0')}-${String(lastDay.getDate()).padStart(2,'0')}`
+                setExpectedCheckout(fmt)
+              }
+            }} />
             {noticeDate && (
               <p className="text-[10px] text-ink-muted mt-1 px-1">
                 {new Date(noticeDate).getDate() <= 5
