@@ -183,6 +183,7 @@ async def get_previous_stays(
                 Tenancy.tenant_id == tenancy.tenant_id,
                 Tenancy.id != tenancy_id,
                 Tenancy.status.in_([TenancyStatus.exited, TenancyStatus.cancelled]),
+                Room.room_number != "000",
             )
             .order_by(Tenancy.checkin_date.desc())
             .limit(5)

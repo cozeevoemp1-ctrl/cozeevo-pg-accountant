@@ -26,7 +26,7 @@ import calendar as _cal
 from dataclasses import dataclass, field
 from datetime import date
 
-from sqlalchemy import and_, extract, func, or_, select
+from sqlalchemy import and_, case, extract, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import (
@@ -91,13 +91,32 @@ async def collection_summary(
         1,
     )
 
-    # ── Expected = agreed rent (no deposits) + maintenance for active tenants ────
-    # Uses Tenancy.agreed_rent so first-month deposit is never baked into expected.
+    # ── Expected = effective rent obligation (no deposits) for active tenants ──
+    # Check-in month: RS.rent_due = prorated + deposit - booking_amount, so
+    # prorated = RS.rent_due - deposit + booking_amount. Apply adjustment on top.
+    # Normal month: agreed_rent + adjustment.
+    _is_checkin_month = (
+        (extract("year",  Tenancy.checkin_date) == from_date.year) &
+        (extract("month", Tenancy.checkin_date) == from_date.month)
+    )
+    _effective_rent = case(
+        (
+            _is_checkin_month,
+            func.greatest(
+                RentSchedule.rent_due
+                - Tenancy.security_deposit
+                + Tenancy.booking_amount
+                + func.coalesce(RentSchedule.adjustment, 0),
+                0,
+            ),
+        ),
+        else_=func.greatest(
+            Tenancy.agreed_rent + func.coalesce(RentSchedule.adjustment, 0), 0
+        ),
+    )
     _exp_row = (await session.execute(
         select(
-            func.coalesce(
-                func.sum(Tenancy.agreed_rent + func.coalesce(RentSchedule.adjustment, 0)), 0
-            ).label("rent_exp"),
+            func.coalesce(func.sum(_effective_rent), 0).label("rent_exp"),
             func.coalesce(func.sum(RentSchedule.maintenance_due), 0).label("maint_exp"),
         )
         .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
@@ -251,8 +270,8 @@ async def collection_summary(
                 .where(
                     Payment.is_void == False,
                     Payment.payment_mode.is_not(None),
-                    Payment.for_type == PaymentFor.rent,
-                    Payment.period_month == from_date,
+                    Payment.payment_date >= from_date,
+                    Payment.payment_date <= to_date,
                 )
                 .group_by(Payment.payment_mode)
             )
