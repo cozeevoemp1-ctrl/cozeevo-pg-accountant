@@ -391,8 +391,13 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   const [editPhone, setEditPhone] = useState(b.tenant_phone || "")
   const [editName, setEditName] = useState(b.tenant_name || "")
 
-  // Collection at check-in
-  const proRata = b.agreed_rent && b.checkin_date ? proratedRent(b.agreed_rent, b.checkin_date) : 0
+  // Collection at check-in — recomputes when user edits checkin date or rent
+  const proRata = (editRent ? parseFloat(editRent) : b.agreed_rent) && (editCheckin || b.checkin_date)
+    ? proratedRent(
+        editRent ? parseFloat(editRent) : (b.agreed_rent || 0),
+        editCheckin || b.checkin_date || ""
+      )
+    : 0
   const [collectRentDues, setCollectRentDues] = useState("")
   const [rentDuesMode, setRentDuesMode] = useState<"cash" | "upi">("cash")
   const [collectDepositDues, setCollectDepositDues] = useState("")
@@ -761,6 +766,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               </div>
             ))}
           </div>
+          {b.stay_type !== "daily" && editCheckin && new Date(editCheckin).getDate() !== 1 && proRata > 0 && (
+            <p className="text-[10px] text-brand-pink font-semibold -mt-1">
+              1st month rent: ₹{proRata.toLocaleString("en-IN")} (prorated from {new Date(editCheckin).getDate()} {new Date(editCheckin).toLocaleString("en-IN", { month: "short" })})
+            </p>
+          )}
           <div className="flex gap-2 pt-1">
             <button onClick={() => { setEditing(false); setErr("") }}
               className="flex-1 rounded-pill border border-[#E2DEDD] py-2 text-xs font-semibold text-ink-muted">

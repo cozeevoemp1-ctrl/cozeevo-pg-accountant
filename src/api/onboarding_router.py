@@ -1547,10 +1547,24 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             _guard_checkout = None
             if is_daily:
                 _guard_checkout = obs.checkout_date or (checkin + timedelta(days=obs.num_days or 1))
+            # If obs.tenancy_id is not set, look for an existing no_show tenancy for this
+            # tenant in this room so we don't count their own booking as an occupant.
+            _exclude_id = obs.tenancy_id
+            if not _exclude_id and tenant and tenant.id:
+                _existing_ns = (await session.execute(
+                    select(Tenancy.id)
+                    .where(
+                        Tenancy.tenant_id == tenant.id,
+                        Tenancy.room_id == room.id,
+                        Tenancy.status == TenancyStatus.no_show,
+                    )
+                )).scalars().first()
+                if _existing_ns:
+                    _exclude_id = _existing_ns
             _, _guard_err = await check_room_bookable(
                 session, room.room_number, checkin, _guard_checkout,
                 property_id=room.property_id,
-                exclude_tenancy_id=obs.tenancy_id,  # don't count this session's own no_show tenancy
+                exclude_tenancy_id=_exclude_id,  # don't count this session's own no_show tenancy
             )
             if _guard_err:
                 raise HTTPException(409, _guard_err)
