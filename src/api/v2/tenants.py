@@ -348,12 +348,13 @@ async def get_tenant_dues(
     if is_check_in_month and not not_yet_checked_in:
         from src.services.rent_schedule import prorated_first_month_rent
         prorated = float(prorated_first_month_rent(tenancy.agreed_rent, checkin))
-        # Any rent overpay beyond prorated carries over to deposit
-        rent_overflow = max(0.0, rent_only_paid - prorated)
+        effective_prorated = max(0.0, prorated + adjustment)  # apply waiver/adjustment
+        # Any rent overpay beyond effective prorated carries over to deposit
+        rent_overflow = max(0.0, rent_only_paid - effective_prorated)
         effective_deposit_paid = deposit_paid_direct + rent_overflow
-        dues = max(0.0, prorated - rent_only_paid)
+        dues = max(0.0, effective_prorated - rent_only_paid)
         deposit_due = max(0.0, deposit_agreed - effective_deposit_paid - booking_amount)
-        credit = max(0.0, rent_only_paid - prorated) if rent_only_paid > prorated and deposit_agreed == 0 else 0.0
+        credit = max(0.0, rent_only_paid - effective_prorated) if rent_only_paid > effective_prorated and deposit_agreed == 0 else 0.0
     else:
         # Normal month: RS is the source of truth for rent; deposit tracked separately
         effective_due = rent_due + adjustment
