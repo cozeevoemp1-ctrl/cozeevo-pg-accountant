@@ -745,9 +745,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               { label: "Room", val: editRoom, set: setEditRoom, type: "text", placeholder: "e.g. 416" },
               { label: "Check-in", val: editCheckin, set: setEditCheckin, type: "date", placeholder: "" },
               ...(b.stay_type === "daily" ? [{ label: "Check-out", val: editCheckout, set: setEditCheckout, type: "date", placeholder: "" }] : []),
-              { label: "Rent (₹)", val: editRent, set: (v: string) => { setEditRent(v); if (!editDeposit || editDeposit === editRent) setEditDeposit(v) }, type: "number", placeholder: "" },
+              { label: b.stay_type === "daily" ? "Rate (₹/day)" : "Rent (₹)", val: editRent, set: (v: string) => { setEditRent(v); if (b.stay_type !== "daily" && (!editDeposit || editDeposit === editRent)) setEditDeposit(v) }, type: "number", placeholder: "" },
               ...(b.stay_type !== "daily" ? [{ label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" }] : []),
-              { label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" },
+              ...(b.stay_type !== "daily" ? [{ label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" }] : []),
             ].map(({ label, val, set, type, placeholder }) => (
               <div key={label} className={label === "Name" || label === "Check-in" || label === "Check-out" ? "col-span-2" : ""}>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
@@ -765,6 +765,15 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
               </div>
             ))}
           </div>
+          {b.stay_type === "daily" && editCheckin && editCheckout && editRent && (() => {
+            const days = Math.round((new Date(editCheckout).getTime() - new Date(editCheckin).getTime()) / 86400000)
+            const total = days * parseFloat(editRent)
+            return days > 0 ? (
+              <p className="text-[10px] text-brand-pink font-semibold -mt-1">
+                Total: ₹{parseFloat(editRent).toLocaleString("en-IN")} × {days} days = ₹{total.toLocaleString("en-IN")}
+              </p>
+            ) : null
+          })()}
           {b.stay_type !== "daily" && editCheckin && new Date(editCheckin).getDate() !== 1 && proRata > 0 && (
             <p className="text-[10px] text-brand-pink font-semibold -mt-1">
               1st month rent: ₹{proRata.toLocaleString("en-IN")} (prorated from {new Date(editCheckin).getDate()} {new Date(editCheckin).toLocaleString("en-IN", { month: "short" })})
