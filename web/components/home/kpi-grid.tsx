@@ -117,11 +117,10 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [rentAmt, setRentAmt] = useState(String(item.dues ?? ""));
-  const [depositAmt, setDepositAmt] = useState("");
-  const [rentMethod, setRentMethod] = useState<PayMethod>("CASH");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [cashAmt, setCashAmt] = useState("");
+  const [upiAmt,  setUpiAmt]  = useState("");
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState("");
   const [success, setSuccess] = useState(false);
   const [fullDues, setFullDues] = useState<import("@/lib/api").TenantDues | null>(null);
 
@@ -129,10 +128,6 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     if (!item.tenancy_id) return;
     getTenantDues(item.tenancy_id).then((d) => {
       setFullDues(d);
-      const depDue = Math.max(0, d.deposit_due ?? 0);
-      const rentOnly = Math.max(0, d.dues ?? 0);
-      if (depDue > 0) setDepositAmt(String(depDue));
-      setRentAmt(String(rentOnly));
     }).catch(() => {});
   }, [item.tenancy_id]);
 
@@ -144,16 +139,31 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!fullDues) { setError("Could not load tenant info — try again"); return; }
-    const ra = parseFloat(rentAmt) || 0;
-    const da = parseFloat(depositAmt) || 0;
-    if (ra <= 0 && da <= 0) { setError("Enter at least one amount"); return; }
+    const ca = parseFloat(cashAmt) || 0;
+    const ua = parseFloat(upiAmt)  || 0;
+    if (ca <= 0 && ua <= 0) { setError("Enter at least one amount"); return; }
     setSaving(true); setError("");
+    const rentDue    = Math.max(0, fullDues.dues        ?? 0);
+    const depositDue = Math.max(0, fullDues.deposit_due ?? 0);
+    const pm = currentMonth();
     try {
-      if (ra > 0) {
-        await createPayment({ tenant_id: fullDues.tenant_id, amount: ra, method: rentMethod, for_type: "rent", period_month: currentMonth() });
+      // Cash → fills rent first
+      if (ca > 0) {
+        const cashRent = Math.min(ca, rentDue);
+        const cashDep  = ca - cashRent;
+        if (cashRent > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: cashRent, method: "CASH", for_type: "rent",    period_month: pm });
+        if (cashDep  > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: cashDep,  method: "CASH", for_type: "deposit", period_month: pm });
       }
-      if (da > 0) {
-        await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: "UPI", for_type: "deposit", period_month: currentMonth() });
+      // UPI → fills remaining rent, then deposit
+      if (ua > 0) {
+        const rentPaidByCash = Math.min(parseFloat(cashAmt) || 0, rentDue);
+        const rentLeft = Math.max(0, rentDue - rentPaidByCash);
+        const upiRent = Math.min(ua, rentLeft);
+        const upiDep  = Math.min(ua - upiRent, depositDue);
+        const upiOther = ua - upiRent - upiDep;
+        if (upiRent  > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: upiRent,  method: "UPI", for_type: "rent",    period_month: pm });
+        if (upiDep   > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: upiDep,   method: "UPI", for_type: "deposit", period_month: pm });
+        if (upiOther > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: upiOther, method: "UPI", for_type: "rent",    period_month: pm });
       }
       setSuccess(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
@@ -164,16 +174,16 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     }
   }
 
+  const rentDue    = fullDues ? Math.max(0, fullDues.dues        ?? 0) : (item.dues ?? 0);
   const depositDue = fullDues ? Math.max(0, fullDues.deposit_due ?? 0) : 0;
-  const rentDue = fullDues ? Math.max(0, fullDues.dues ?? 0) : (item.dues ?? 0);
-  const totalCollect = (parseFloat(rentAmt) || 0) + (parseFloat(depositAmt) || 0);
+  const totalDue   = rentDue + depositDue;
+  const totalCollect = (parseFloat(cashAmt) || 0) + (parseFloat(upiAmt) || 0);
+  const remaining  = Math.max(0, totalDue - totalCollect);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }}>
       <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative w-full max-w-sm bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl overflow-y-auto max-h-[90vh]"
-      >
+      <div className="relative w-full max-w-sm bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl overflow-y-auto max-h-[90vh]">
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-base font-extrabold text-ink">Collect payment</p>
@@ -192,60 +202,55 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
               <div className="rounded-tile bg-[#FFF0F0] border border-status-warn px-3 py-2 text-xs text-status-warn font-medium">{error}</div>
             )}
 
-            {/* Rent dues field — always shown */}
-            {rentDue > 0 && (
-              <div>
-                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
-                  Rent dues (₹) · <span className="text-status-due">{rupee(rentDue)} outstanding</span>
-                </label>
-                <input
-                  type="number"
-                  value={rentAmt}
-                  onChange={(e) => setRentAmt(e.target.value)}
-                  onWheel={(e) => e.currentTarget.blur()}
-                  min="0"
-                  className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
-                  autoFocus
-                />
-                <div className="flex gap-1.5 mt-1.5">
-                  {COLLECT_METHODS.map((m) => (
-                    <button key={m.value} type="button" onClick={() => setRentMethod(m.value)}
-                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${
-                        rentMethod === m.value ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
-                      }`}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
+            {/* Outstanding summary */}
+            {fullDues && totalDue > 0 && (
+              <div className="rounded-lg bg-[#FFF5F0] border border-[#FFD8C0] px-3 py-2">
+                <p className="text-xs font-semibold text-status-due">
+                  {rupee(totalDue)} outstanding
+                  {rentDue > 0 && depositDue > 0 && (
+                    <span className="font-normal text-ink-muted"> · Rent {rupee(rentDue)} + Deposit {rupee(depositDue)}</span>
+                  )}
+                </p>
               </div>
             )}
 
-            {/* Deposit dues field — only shown if unpaid deposit exists */}
-            {depositDue > 0 && (
-              <div>
-                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
-                  Deposit (₹) · <span className="text-status-due">{rupee(depositDue)} unpaid</span>
-                </label>
-                <input
-                  type="number"
-                  value={depositAmt}
-                  onChange={(e) => setDepositAmt(e.target.value)}
-                  onWheel={(e) => e.currentTarget.blur()}
-                  min="0"
-                  className="w-full text-lg font-bold rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
-                />
-                <p className="text-[10px] text-[#00AEED] font-bold mt-1">Always recorded as UPI</p>
-              </div>
-            )}
+            {/* Cash box */}
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
+                💵 Cash (₹)
+              </label>
+              <input
+                type="number" inputMode="numeric"
+                value={cashAmt} onChange={(e) => setCashAmt(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                placeholder="0" min="0"
+                className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                autoFocus
+              />
+            </div>
 
-            {/* Summary: outstanding / collecting / remaining */}
+            {/* UPI box */}
+            <div>
+              <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">
+                📱 UPI (₹)
+              </label>
+              <input
+                type="number" inputMode="numeric"
+                value={upiAmt} onChange={(e) => setUpiAmt(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                placeholder="0" min="0"
+                className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+              />
+            </div>
+
+            {/* Summary */}
             {fullDues && (
-              <div className="rounded-tile bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-1">
+              <div className="rounded-lg bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-1.5">
                 {[
-                  { label: "Total outstanding", value: rentDue + depositDue, muted: true },
-                  { label: "Collecting now",     value: totalCollect,         muted: false },
-                  { label: "Remaining after",    value: Math.max(0, (rentDue + depositDue) - totalCollect), muted: true, warn: (rentDue + depositDue) - totalCollect > 0 },
-                ].map(({ label, value, muted, warn }) => (
+                  { label: "Total outstanding", value: totalDue,      warn: false, muted: true },
+                  { label: "Collecting now",     value: totalCollect,  warn: false, muted: false },
+                  { label: "Remaining after",    value: remaining,     warn: remaining > 0, muted: true },
+                ].map(({ label, value, warn, muted }) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-[11px] text-ink-muted">{label}</span>
                     <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
@@ -256,11 +261,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={saving || !fullDues}
-              className="w-full rounded-pill bg-brand-pink py-3 text-sm font-bold text-white active:opacity-70 disabled:opacity-50"
-            >
+            <button type="submit" disabled={saving || !fullDues}
+              className="w-full rounded-pill bg-brand-pink py-3 text-sm font-bold text-white active:opacity-70 disabled:opacity-50">
               {saving ? "Saving…" : totalCollect > 0 ? `Collect ${rupee(totalCollect)}` : "Collect"}
             </button>
           </form>
