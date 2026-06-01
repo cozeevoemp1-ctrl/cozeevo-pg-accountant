@@ -34,7 +34,11 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 Room.room_number != "000",
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.stay_type == StayType.monthly,
-                or_(Tenancy.notice_date.isnot(None), Tenancy.expected_checkout.isnot(None)),
+                or_(
+                    Tenancy.notice_date.isnot(None),
+                    # Lock-in exits: expected_checkout set but no notice — show if within 60 days past or future
+                    Tenancy.expected_checkout.between(today - timedelta(days=30), today + timedelta(days=60)),
+                ),
             )
         )).all()
 
