@@ -134,10 +134,13 @@ async def run(write: bool):
             GROUP BY p.tenancy_id, p.payment_mode
         """))
         for row in advance_q:
+            if row.payment_mode is None:
+                continue
             tid = row.tenancy_id
             if tid not in existing_pmts:
                 existing_pmts[tid] = {'cash': 0.0, 'upi': 0.0}
-            existing_pmts[tid][row.payment_mode] += float(row.total)
+            mode_key = row.payment_mode if row.payment_mode in ('cash', 'upi') else 'upi'
+            existing_pmts[tid][mode_key] += float(row.total)
 
         for rec in sheet_data:
             phone = rec['phone_db']

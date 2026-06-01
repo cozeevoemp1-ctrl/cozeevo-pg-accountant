@@ -172,7 +172,7 @@ T_NOTES = _T["T_NOTES"]
 T_EVENT = _T["T_EVENT"]
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers (legacy default)
-TOTAL_BEDS = 296  # updated 2026-05-17; G16 max_occupancy fixed to 1
+TOTAL_BEDS = 298  # updated 2026-05-31; 108→revenue
 
 
 def _locate_monthly_header(all_vals: list[list]) -> tuple[int, int]:

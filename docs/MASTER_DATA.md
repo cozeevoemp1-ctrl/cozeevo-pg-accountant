@@ -39,7 +39,7 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 |---|---|---|---|---|---|
 | Cozeevo THOR | G + 1-6 + 7 | 12 (x01-x12) | 701, 702 | G01-G10 | **84** |
 | Cozeevo HULK | G + 1-6 | 12 (x13-x24) | none | G11-G20 | **82** |
-| **Total** | | | | | **166** (7 staff, 159 revenue) |
+| **Total** | | | | | **166** (5 staff, 161 revenue) |
 
 ### Room Numbering Convention
 - THOR: `{floor}{01-12}` — e.g. 101, 212, 312, 601
@@ -58,12 +58,11 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 |---|---|---|---|
 | G05 | THOR | 3 | Staff quarters (permanent) |
 | G06 | THOR | 2 | Staff quarters (permanent) |
-| 108 | THOR | 2 | Staff quarters (permanent) |
 | 701 | THOR | 1 | Staff quarters (permanent) |
 | 702 | THOR | 1 | Staff quarters (permanent) |
 | G12 | HULK | 3 | Staff quarters (permanent) |
 
-**Total staff rooms: 6** (THOR 5 + HULK 1) — **296 revenue beds**
+**Total staff rooms: 5** (THOR 4 + HULK 1) — **298 revenue beds**
 
 > **Changed 2026-05-20:** `max_occupancy` now derived universally from `room_type` in migrations (single=1, double=2, triple=3). No more per-room hardcoding. G16 bug (kept resetting to 2) permanently fixed.
 > **Changed 2026-05-17:** 614 moved to revenue (+2 beds). Net TOTAL_BEDS 295→296.
@@ -78,16 +77,16 @@ L3 — DERIVED / REPORTS (calculated, never stored)
 
 | Property | Revenue Rooms | Single (1 bed) | Double (2 bed) | Triple (3 bed) | Total Beds |
 |---|---|---|---|---|---|
-| THOR | 79 | 14 | 62 | 3 | **147** |
+| THOR | 80 | 14 | 63 | 3 | **149** |
 | HULK | 81 | 15 | 64 | 2 | **149** |
-| **Total** | **160** | **29** | **126** | **5** | **296** |
+| **Total** | **161** | **29** | **127** | **5** | **298** |
 
 ### Bed Count Formula
 ```
 Total Revenue Beds = SUM(max_occupancy) for all non-staff rooms
                    = (single rooms x 1) + (double rooms x 2) + (triple rooms x 3)
-                   = 29 + 252 + 15
-                   = 296
+                   = 29 + 254 + 15
+                   = 298
 ```
 
 ### Corner Room Rule (applies to BOTH buildings)
@@ -154,7 +153,7 @@ Reporting format:
 | Floor | Rooms | Count | Sharing Types |
 |---|---|---|---|
 | G | G01-G10 | 10 | G01=1, G02-G04=2, **G05=staff**, **G06=staff**, G07-G09=3, G10=1 |
-| 1 | 101-112 | 12 | 101=1, 102-106=2, 107=2, **108=staff**, 109-111=2, 112=1 |
+| 1 | 101-112 | 12 | 101=1, 102-111=2, 112=1 |
 | 2 | 201-212 | 12 | 201=1, 202-211=2, 212=1 |
 | 3 | 301-312 | 12 | 301=1, 302-311=2, 312=1 |
 | 4 | 401-412 | 12 | 401=1, 402-411=2, 412=1 |
@@ -184,3 +183,4 @@ Reporting format:
 - 2026-05-14: G16 double→single (-1 bed, 297→296). Room 614 → staff (-2 beds, 296→294). G19 double→single (-1 bed, 294→293). Staff rooms: 6 → 7 (THOR 5 + HULK 2).
 - 2026-05-16: 107, 114, 618 confirmed revenue (not staff). TOTAL_BEDS 293→295. Staff rooms: 7 → 7 (no net change — these were wrongly flipped by migrate_all). Migration run_staff_room_corrections_2026_05_16 locks this permanently.
 - 2026-05-17: Room 614 → revenue (+2 beds). G16 max_occupancy corrected 2→1 (-1 bed). Net TOTAL_BEDS 295→296. Staff rooms: 7 → 6 (THOR 5 + HULK 1).
+- 2026-05-31: Room 108 (THOR) → revenue (+2 beds). TOTAL_BEDS 296→298. Staff rooms: 6 → 5 (THOR 4 + HULK 1).

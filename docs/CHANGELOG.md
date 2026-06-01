@@ -2,6 +2,69 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.44] — 2026-06-01 — expected_checkout propagation across all layers + lock-in exits visible
+
+### Root cause (same bug in 6 places)
+Tenants with a committed exit date (`expected_checkout`) but no formal notice (`notice_date = NULL`) were
+invisible to the overlap check, availability check, notices panel, and leaving tile. Every check only looked at
+`checkout_date` (set at actual checkout) or `notice_date`, ignoring `expected_checkout` (set at booking time
+for lock-in tenants). Fixed in all 6 locations — permanent.
+
+### fix: Overlap check uses expected_checkout when checkout_date unset
+- `src/services/room_occupancy.py` — `find_overlap_conflict` now uses `COALESCE(checkout_date, expected_checkout)` as bed end date
+- Pre-booking after a planned lock-in exit now works — the bed is correctly shown as free after `expected_checkout`
+- Commit: `7df4d3b`
+
+### fix: /rooms/check uses expected_checkout as fallback
+- `src/api/v2/rooms.py` — pre-register form availability check uses `expected_checkout` when `checkout_date` is NULL
+- Was: form showed "fully booked with no checkout dates set" even when tenant had planned exit
+- Commit: `b8affa2`
+
+### fix: Bookings pre-register submit uses expected_checkout
+- `src/api/v2/bookings.py` — capacity check on booking creation also uses `expected_checkout`
+- Same bug was in find_overlap_conflict AND the inline capacity check in bookings.py — both fixed
+- Commit: `0fbf666`
+
+### fix: Notices panel shows lock-in exits (tenants with expected_checkout, no notice_date)
+- `src/api/v2/notices.py` — query changed from `notice_date IS NOT NULL` to `notice_date IS NOT NULL OR expected_checkout BETWEEN (today−30d, today+60d)`
+- `or_` imported; `notice_date.isoformat()` guarded for NULL
+- Lock-in tenants (2-month stay, expected_checkout at booking) now appear in leaving panel automatically
+- Window: 30 days past → 60 days future (prevents flooding with all historical exits)
+- Commit: `f1ccd6e`, `09f9d18`
+
+### fix: KPI leaving tile counts lock-in exits
+- `src/api/v2/kpi.py` — both the count (line 156) and detail list (line 783) fixed with same `or_()` pattern
+- "X leaving" tile and the leaving panel list are now consistent
+- Commit: `a408592`
+
+### fix: Clearing notice_date auto-clears expected_checkout (permanent backend fix)
+- `src/api/v2/tenants.py:488` — PATCH `/tenancies/{id}`: when `notice_date` is set to null, `expected_checkout` is also cleared
+- This is the permanent fix — covers ALL callers (PWA, bot, direct API)
+- Bot `cancel_notice` handler already cleared both (unchanged)
+- Commit: `f67d434`
+
+### fix: Frontend "Remove notice" also clears expected_checkout
+- `web/app/notices/page.tsx:156` — "Remove notice" button sends `{ notice_date: null, expected_checkout: null }`
+- Commit: `9a0416a`
+
+### fix: Edit tenant notice date picker auto-clears expected_checkout
+- `web/app/tenants/[tenancy_id]/edit/page.tsx` — clearing notice date in DatePickerInput now also clears expectedCheckout state
+- Commit: `e536a1e`
+
+### fix: Block direct check-in when pending booking session exists
+- `src/api/v2/...` — if tenant has a `pending_review` session, cannot create a second tenancy via direct check-in; must use Bookings page
+- Commit: `9599975`
+
+### fix: Day-stay badge in occupied beds panel; payment history across all tenancies
+- Occupied beds panel: shows `/day` badge for day-stay tenants
+- Payment history: now searches across active + exited + cancelled tenancies
+- Tenant search includes exited/cancelled in payment history lookup
+- Commits: `4c1d7fe`, `30076ea`, `a5bfe5f`, `8131693`, `5f5947c`
+
+### fix: Room 108 (THOR) → revenue (+2 beds, TOTAL_BEDS 296→298)
+- `src/database/migrate_all.py` — migration `run_room_108_revenue_2026_05_31`
+- All 5 TOTAL_BEDS constants updated; docs updated (MASTER_DATA, BRAIN, BUSINESS_LOGIC, REPORTING, SHEET_LOGIC)
+
 ## [1.76.42] — 2026-05-31 — Booking overlap self-block fix + day stay fixes
 
 ### fix: Overlapping booking false-positive (permanent fix)

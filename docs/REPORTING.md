@@ -184,16 +184,17 @@ This avoids double-counting when deposit payments are present alongside rent pay
 ### 3.1 Capacity (Canonical — verified from DB 2026-04-08)
 
 ```
-THOR: 147 beds (79 revenue rooms)
+THOR: 149 beds (80 revenue rooms)
 HULK: 149 beds (81 revenue rooms)
-Total: 296 beds  ← updated 2026-05-17; 614→revenue, G16 max_occ fixed to 1
+Total: 298 beds  ← updated 2026-05-31; 108→revenue
 
-Staff rooms EXCLUDED (6 rooms, updated 2026-05-17):
-  THOR: G05(3), G06(2), 108(2), 701(1), 702(1)
+Staff rooms EXCLUDED (5 rooms, updated 2026-05-31):
+  THOR: G05(3), G06(2), 701(1), 702(1)
   HULK: G12(3)
-  — 114 and 618 moved to revenue 2026-04-26
-  — G20 → revenue 2026-05-09 (Chandraprakash); 107 → revenue 2026-05-09 (Samruddhi Thanwar)
+  — 108 → revenue 2026-05-31
   — 614 → revenue 2026-05-17 (available for booking)
+  — G20 → revenue 2026-05-09 (Chandraprakash); 107 → revenue 2026-05-09 (Samruddhi Thanwar)
+  — 114 and 618 moved to revenue 2026-04-26
 ```
 
 ### 3.2 Formula
@@ -618,8 +619,8 @@ Unit economics = per-bed breakdown of revenue, cost, and profit. All figures use
 
 | Constant | Value | Where Used |
 |---|---|---|
-| TOTAL_REVENUE_BEDS | 296 | DB-verified 2026-05-17; 614→revenue, G16 max_occ=1 |
-| THOR_BEDS | 145 | Property occupancy |
+| TOTAL_REVENUE_BEDS | 298 | DB-verified 2026-05-31; 108→revenue |
+| THOR_BEDS | 149 | Property occupancy |
 | HULK_BEDS | 149 (⚠ section 12 says 146 — verify DB) | Property occupancy |
 | NOTICE_BY_DAY | 5 | Deposit eligibility |
 | OVERPAYMENT_NOISE_RS | 10 | Payment processing |

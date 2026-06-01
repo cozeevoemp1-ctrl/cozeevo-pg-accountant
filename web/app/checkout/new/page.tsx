@@ -120,7 +120,8 @@ function NewCheckoutPage() {
     const eligible = d.getDate() <= NOTICE_BY_DAY
     const y = d.getFullYear()
     const m = eligible ? d.getMonth() : d.getMonth() + 1
-    return new Date(y, m + 1, 0).toISOString().slice(0, 10)
+    const ld = new Date(y, m + 1, 0) // last day of target month (local)
+    return `${ld.getFullYear()}-${String(ld.getMonth()+1).padStart(2,"0")}-${String(ld.getDate()).padStart(2,"0")}`
   }
 
   const expectedLastDay = prefetch?.notice_date ? calcLastDay(prefetch.notice_date) : null

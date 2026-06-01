@@ -145,7 +145,7 @@ Occupancy % = beds / 296 * 100
 ```
 Filter by BLOCK column (col 17) = THOR or HULK
 Same formula per building
-TOTAL_BEDS = 296 (THOR 147 + HULK 149)  -- updated 2026-05-17; 614→revenue, G16 max_occ=1
+TOTAL_BEDS = 298 (THOR 149 + HULK 149)  -- updated 2026-05-31; 108→revenue
 ```
 
 ### Verified March 2026

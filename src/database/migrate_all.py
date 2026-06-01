@@ -1570,6 +1570,20 @@ async def run_add_supabase_auth_id_2026_05_19(conn: AsyncConnection) -> None:
     print("  [ok] supabase_auth_id added and populated")
 
 
+async def run_room_108_revenue_2026_05_31(conn: AsyncConnection) -> None:
+    """
+    Room 108 (THOR) changed from staff → revenue quarters per owner confirmation 2026-05-31.
+    Adds 2 beds. TOTAL_BEDS 296 → 298. Staff rooms: 6 → 5.
+    """
+    print("\n-- Room 108 revenue (2026-05-31) --")
+    r = await conn.execute(text("""
+        UPDATE rooms SET is_staff_room = FALSE
+        WHERE room_number = '108'
+          AND is_staff_room IS DISTINCT FROM FALSE
+    """))
+    print(f"  [ok] Room 108 set to non-staff: {r.rowcount} updated")
+
+
 async def run_staff_room_corrections_2026_05_16(conn: AsyncConnection) -> None:
     """
     Earlier migrations re-applied is_staff_room=TRUE on every deploy for rooms that
@@ -1635,6 +1649,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_checkout_session_other_comments_2026_05_16(conn)
             await run_staff_room_corrections_2026_05_16(conn)
             await run_add_supabase_auth_id_2026_05_19(conn)
+            await run_room_108_revenue_2026_05_31(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)
