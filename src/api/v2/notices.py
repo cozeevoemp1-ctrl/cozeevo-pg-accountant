@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -34,7 +34,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 Room.room_number != "000",
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.stay_type == StayType.monthly,
-                Tenancy.notice_date.isnot(None),
+                or_(Tenancy.notice_date.isnot(None), Tenancy.expected_checkout.isnot(None)),
             )
         )).all()
 
@@ -58,7 +58,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
         room_notice_checkouts: dict[int, list[date]] = defaultdict(list)
         for tenancy, tenant, room in notice_rows:
             room_notice_counts[room.id] += 1
-            ec = tenancy.expected_checkout or calc_notice_last_day(tenancy.notice_date)
+            ec = tenancy.expected_checkout or (calc_notice_last_day(tenancy.notice_date) if tenancy.notice_date else today)
             tenancy_expected[tenancy.id] = ec
             room_notice_checkouts[room.id].append(ec)
 
@@ -85,10 +85,10 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "phone":              tenant.phone,
                 "room_number":        room.room_number,
                 "gender":             tenant.gender,
-                "notice_date":        nd.isoformat(),
+                "notice_date":        nd.isoformat() if nd else None,
                 "expected_checkout":  expected_checkout.isoformat(),
-                "deposit_eligible":   True,   # notice given → always eligible; only forfeited with no notice
-                "has_notice":         True,
+                "deposit_eligible":   True,
+                "has_notice":         nd is not None,
                 "security_deposit":   float(tenancy.security_deposit or 0),
                 "maintenance_fee":    float(tenancy.maintenance_fee or 0),
                 "agreed_rent":        float(tenancy.agreed_rent or 0),
