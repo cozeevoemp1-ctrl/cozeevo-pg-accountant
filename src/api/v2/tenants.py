@@ -486,6 +486,9 @@ async def update_tenant(
         if "notice_date" in body:
             val = body["notice_date"]
             tenancy.notice_date = date.fromisoformat(val) if val else None
+            # Clearing notice also clears the planned exit date — they're one action
+            if not val:
+                tenancy.expected_checkout = None
         if "expected_checkout" in body:
             val = body["expected_checkout"]
             new_date = date.fromisoformat(val) if val else None
