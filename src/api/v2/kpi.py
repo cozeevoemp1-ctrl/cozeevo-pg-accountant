@@ -153,7 +153,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                     Room.room_number != "000",
                     Tenancy.status == TenancyStatus.active,
                     Tenancy.stay_type == StayType.monthly,
-                    Tenancy.notice_date != None,
+                    or_(Tenancy.notice_date != None, Tenancy.expected_checkout.between(date.today() - timedelta(days=30), date.today() + timedelta(days=60))),
                 )
             ) or 0
         )
@@ -780,7 +780,7 @@ async def get_kpi_detail(
                     Room.room_number != "000",
                     Tenancy.status == TenancyStatus.active,
                     Tenancy.stay_type == StayType.monthly,
-                    Tenancy.notice_date != None,
+                    or_(Tenancy.notice_date != None, Tenancy.expected_checkout.between(date.today() - timedelta(days=30), date.today() + timedelta(days=60))),
                 )
                 .order_by(Tenancy.expected_checkout.asc().nulls_last())
             )).all()
