@@ -48,18 +48,21 @@ async def check_room_availability(
 
         if checkin:
             ten_rows = (await session.execute(
-                select(Tenancy.checkout_date, Tenant.name)
+                select(Tenancy.checkout_date, Tenancy.expected_checkout, Tenant.name)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .where(Tenancy.room_id == db_room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
             )).all()
             max_occ_inner = int(db_room.max_occupancy or 1)
-            still_occupied = sum(1 for t in ten_rows if t.checkout_date is None or t.checkout_date >= checkin)
+            # Use checkout_date if set, else expected_checkout as the effective bed-end date
+            def _effective_end(t) -> date | None:
+                return t.checkout_date or t.expected_checkout
+            still_occupied = sum(1 for t in ten_rows if _effective_end(t) is None or _effective_end(t) >= checkin)
             beds_free_on_date = max(max_occ_inner - still_occupied, 0)
-            checkouts = [t.checkout_date for t in ten_rows if t.checkout_date is not None]
+            checkouts = [_effective_end(t) for t in ten_rows if _effective_end(t) is not None]
             if checkouts:
                 earliest_free_date = (min(checkouts) + timedelta(days=1)).isoformat()
             current_tenants = [
-                {"name": t.name, "checkout_date": t.checkout_date.isoformat() if t.checkout_date else None}
+                {"name": t.name, "checkout_date": (_effective_end(t)).isoformat() if _effective_end(t) else None}
                 for t in ten_rows
             ]
 
