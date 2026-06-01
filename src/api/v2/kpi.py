@@ -533,7 +533,7 @@ async def get_kpi_detail(
 
         elif type == "occupied":
             rows = (await session.execute(
-                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.agreed_rent)
+                select(Tenancy.id, Tenant.name, Room.room_number, Tenancy.agreed_rent, Tenancy.stay_type)
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(Room.is_staff_room == False, Room.room_number != "000", Tenancy.status == TenancyStatus.active)
@@ -541,7 +541,8 @@ async def get_kpi_detail(
             )).all()
             return {"type": type, "items": [
                 {"tenancy_id": r.id, "name": r.name, "room": r.room_number,
-                 "detail": f"₹{int(r.agreed_rent or 0):,}/" + ("day" if getattr(r, "stay_type", None) and (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type)) == "daily" else "mo"), "rent": int(r.agreed_rent or 0)}
+                 "detail": f"₹{int(r.agreed_rent or 0):,}/" + ("day" if r.stay_type and (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type)) == "daily" else "mo"),
+                 "rent": int(r.agreed_rent or 0), "stay_type": r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")}
                 for r in rows
             ]}
 
