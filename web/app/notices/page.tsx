@@ -153,7 +153,7 @@ export default function NoticesPage() {
     setEditSaving(true)
     setEditError("")
     try {
-      await patchTenant(editItem.tenancy_id, { notice_date: null })
+      await patchTenant(editItem.tenancy_id, { notice_date: null, expected_checkout: null })
       setEditItem(null)
       await load()
     } catch (e: unknown) {
