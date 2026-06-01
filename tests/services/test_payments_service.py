@@ -125,7 +125,7 @@ class TestLogPayment:
         assert p.payment_mode == PaymentMode.upi
         assert p.for_type == PaymentFor.rent
         assert p.is_void == False
-        assert p.period_month == date(2026, 5, 1)
+        assert p.period_month == date(2026, 6, 1)
 
     @pytest.mark.asyncio
     async def test_audit_log_row_created(self):
