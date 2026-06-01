@@ -125,20 +125,18 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             if occ.beds_occupied(max_occ) >= max_occ:
                 # Allow pre-booking if enough beds will be free on the requested checkin_date.
                 # A bed is free if the current tenant's checkout_date < checkin_date.
-                active_checkouts = (await session.execute(
-                    select(Tenancy.checkout_date)
+                active_rows = (await session.execute(
+                    select(Tenancy.checkout_date, Tenancy.expected_checkout)
                     .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
-                )).scalars().all()
-                beds_still_occupied = sum(
-                    1 for co in active_checkouts
-                    if co is None or co >= checkin
-                )
+                )).all()
+                def _eff(row): return row.checkout_date or row.expected_checkout
+                beds_still_occupied = sum(1 for row in active_rows if _eff(row) is None or _eff(row) >= checkin)
                 if beds_still_occupied >= max_occ:
-                    checkouts = [co for co in active_checkouts if co is not None]
-                    if checkouts:
-                        free_from = min(checkouts) + timedelta(days=1)
+                    ends = [_eff(row) for row in active_rows if _eff(row) is not None]
+                    if ends:
+                        free_from = min(ends) + timedelta(days=1)
                         detail = (
-                            f"Room {room.room_number} is fully booked until {min(checkouts).strftime('%d %b %Y')}. "
+                            f"Room {room.room_number} is fully booked until {min(ends).strftime('%d %b %Y')}. "
                             f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
                         )
                     else:
