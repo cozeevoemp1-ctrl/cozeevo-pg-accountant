@@ -223,8 +223,15 @@ async def find_overlap_conflict(
     # Long-term overlap — include no_show tenancies too. A no-show with
     # checkin_date in the future locks the bed FROM that date onward, so
     # a day-stay ending after the no-show's checkin would overbook.
+    from sqlalchemy import func as _sa_func
     q = (
-        select(Tenant.name, Tenancy.checkin_date, Tenancy.checkout_date, Tenancy.status, Tenancy.sharing_type)
+        select(
+            Tenant.name, Tenancy.checkin_date,
+            # Use checkout_date if set; fall back to expected_checkout so that
+            # tenants with a planned exit date don't block future bookings.
+            _sa_func.coalesce(Tenancy.checkout_date, Tenancy.expected_checkout).label("effective_end"),
+            Tenancy.status, Tenancy.sharing_type,
+        )
         .join(Tenant, Tenant.id == Tenancy.tenant_id)
         .where(
             Tenancy.room_id == room_id,
@@ -245,9 +252,9 @@ async def find_overlap_conflict(
 
     beds_used = 0
     conflict_names: list[str] = []
-    for name, checkin, checkout, status, sharing_type in (await session.execute(q)).all():
+    for name, checkin, effective_end, status, sharing_type in (await session.execute(q)).all():
         existing_start = checkin or _date.min
-        existing_end = checkout or far_future
+        existing_end = effective_end or far_future
         if start_date < existing_end and period_end > existing_start:
             label = f"{name} (booking)" if status == TenancyStatus.no_show else name
             conflict_names.append(label)
