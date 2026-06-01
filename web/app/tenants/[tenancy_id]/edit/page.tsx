@@ -718,6 +718,9 @@ export default function EditTenantPage() {
                   : new Date(yr, mo + 2, 0)           // last day of next month
                 const fmt = `${lastDay.getFullYear()}-${String(lastDay.getMonth()+1).padStart(2,'0')}-${String(lastDay.getDate()).padStart(2,'0')}`
                 setExpectedCheckout(fmt)
+              } else {
+                // Clearing notice date also clears expected checkout
+                setExpectedCheckout("")
               }
             }} />
             {noticeDate && (
