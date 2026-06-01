@@ -83,7 +83,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -111,7 +111,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -142,7 +142,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -169,7 +169,7 @@ class TestLogPayment:
             amount=8000,
             method="cash",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -190,7 +190,7 @@ class TestLogPayment:
             amount=5000,
             method="cash",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -220,7 +220,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -240,7 +240,7 @@ class TestLogPayment:
             amount=8000,
             method="cash",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -262,7 +262,7 @@ class TestLogPayment:
             amount=5000,
             method="cash",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -307,7 +307,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
             room_number="101",
@@ -335,7 +335,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-05",
+            period_month="2026-06",
             recorded_by="kiran@cozeevo",
             session=session,
         )
