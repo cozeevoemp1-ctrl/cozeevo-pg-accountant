@@ -142,7 +142,7 @@ async def search_tenants(
             .join(Room, Tenancy.room_id == Room.id)
             .join(Property, Room.property_id == Property.id)
             .where(
-                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show, TenancyStatus.exited, TenancyStatus.cancelled]),
                 match_clause,
             )
             .order_by(Tenant.name)

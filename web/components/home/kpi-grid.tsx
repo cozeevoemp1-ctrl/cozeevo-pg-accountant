@@ -957,6 +957,11 @@ function ExpansionPanel({
                     <p className="text-[10px] text-ink-muted">Room {item.room}</p>
                   </div>
                   <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                    {open === "occupied" && item.stay_type === "daily" && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">
+                        Day stay
+                      </span>
+                    )}
                     {open === "notices" && item.deposit_eligible !== undefined && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${
                         item.deposit_eligible
