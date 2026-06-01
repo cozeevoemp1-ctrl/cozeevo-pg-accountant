@@ -244,6 +244,26 @@ async def record_physical_checkin(
 
     tenancy, tenant, room = result
 
+    # Block direct check-in if there's a pending onboarding session for this tenancy.
+    # The receptionist must use the Bookings page "Save & Check In" instead,
+    # so payment collection and session closure happen atomically.
+    async with get_session() as session:
+        from src.database.models import OnboardingSession
+        pending_session = await session.scalar(
+            select(OnboardingSession).where(
+                OnboardingSession.tenancy_id == tenancy.id,
+                OnboardingSession.status.in_(["pending_review", "pending_tenant"]),
+            )
+        )
+    if pending_session:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"There is already a pending booking for {tenant.name} — "
+                "use the Bookings page 'Save & Check In' to complete check-in."
+            ),
+        )
+
     preview      = _calc_preview(tenancy, actual_date, prorate=body.prorate)
     date_changed = preview["date_changed"]
     is_daily     = tenancy.stay_type == StayType.daily
