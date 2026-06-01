@@ -138,15 +138,42 @@ async def list_payments(
     async with get_session() as session:
         # Resolve tenant_id → tenancy_id
         if tenant_id and not tenancy_id:
-            tenancy = await session.scalar(
-                select(Tenancy).where(
-                    Tenancy.tenant_id == tenant_id,
-                    Tenancy.status == TenancyStatus.active,
-                )
-            )
-            if tenancy is None:
+            # Search across ALL tenancies for this tenant (active, exited, cancelled)
+            # so advance/deposit payments on cancelled tenancies still show in history.
+            tenancy_ids = (await session.execute(
+                select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
+            )).scalars().all()
+            if not tenancy_ids:
                 return []
-            tenancy_id = tenancy.id
+            # Filter payments by all tenancy_ids instead of one
+            q_result = (await session.execute(
+                (select(
+                    Payment,
+                    Tenant.name.label("tenant_name"),
+                    Room.room_number.label("room_number"),
+                )
+                .join(Tenancy, Tenancy.id == Payment.tenancy_id)
+                .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                .outerjoin(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Payment.is_void == False,
+                    Payment.tenancy_id.in_(tenancy_ids),
+                )
+                .order_by(desc(Payment.payment_date), desc(Payment.id))
+                .limit(limit))
+            )).all()
+            return [
+                PaymentListItem(
+                    id=p.id, tenancy_id=p.tenancy_id, amount=float(p.amount),
+                    payment_mode=p.payment_mode.value if p.payment_mode else "cash",
+                    for_type=p.for_type.value if p.for_type else "rent",
+                    period_month=p.period_month.strftime("%Y-%m") if p.period_month else None,
+                    payment_date=p.payment_date.strftime("%Y-%m-%d"),
+                    notes=p.notes, is_void=p.is_void, receipt_url=p.receipt_url,
+                    upi_reference=p.upi_reference, tenant_name=row[1], room_number=row[2],
+                )
+                for p, *row in q_result
+            ]
 
         # Build query — always join tenant+room for display names
         q = (
