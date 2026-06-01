@@ -78,9 +78,9 @@ function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => 
           { label: "Check-in", value: fmtDate(dues.checkin_date) },
           ...(dues.expected_checkout ? [{ label: "Check-out", value: fmtDate(dues.expected_checkout) }] : []),
           { label: "Sharing type", value: dues.sharing_type ? dues.sharing_type.charAt(0).toUpperCase() + dues.sharing_type.slice(1) : "—" },
-          { label: "Agreed rent", value: rupee(dues.rent) + "/mo" },
+          { label: "Agreed rent", value: rupee(dues.rent) + (dues.stay_type === "daily" ? "/day" : "/mo") },
           { label: "Security deposit", value: rupee(dues.security_deposit) },
-          { label: "Maintenance", value: dues.maintenance_fee > 0 ? rupee(dues.maintenance_fee) + "/mo" : "—" },
+          { label: "Maintenance", value: dues.stay_type === "daily" ? "—" : (dues.maintenance_fee > 0 ? rupee(dues.maintenance_fee) + "/mo" : "—") },
         ].map(({ label, value }) => (
           <div key={label} className="flex justify-between py-1.5">
             <span className="text-xs text-ink-muted">{label}</span>

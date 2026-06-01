@@ -253,6 +253,7 @@ export interface TenantDues {
   notice_date: string | null;
   expected_checkout: string | null;
   sharing_type: string | null;
+  stay_type: string;
 }
 
 export function searchTenants(q: string): Promise<TenantSearchResult[]> {
