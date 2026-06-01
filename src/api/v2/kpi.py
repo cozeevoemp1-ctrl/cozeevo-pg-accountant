@@ -369,7 +369,7 @@ async def get_kpi_detail(
             items = [
                 {
                     "tenancy_id": r.id, "name": r.name, "room": r.room_number,
-                    "detail": f"₹{int(r.agreed_rent or 0):,}/mo",
+                    "detail": f"₹{int(r.agreed_rent or 0):,}/" + ("day" if getattr(r, "stay_type", None) and (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type)) == "daily" else "mo"),
                     "rent": int(r.agreed_rent or 0),
                     "stay_type": (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type or "monthly")),
                 }
@@ -541,7 +541,7 @@ async def get_kpi_detail(
             )).all()
             return {"type": type, "items": [
                 {"tenancy_id": r.id, "name": r.name, "room": r.room_number,
-                 "detail": f"₹{int(r.agreed_rent or 0):,}/mo", "rent": int(r.agreed_rent or 0)}
+                 "detail": f"₹{int(r.agreed_rent or 0):,}/" + ("day" if getattr(r, "stay_type", None) and (r.stay_type.value if hasattr(r.stay_type, "value") else str(r.stay_type)) == "daily" else "mo"), "rent": int(r.agreed_rent or 0)}
                 for r in rows
             ]}
 
