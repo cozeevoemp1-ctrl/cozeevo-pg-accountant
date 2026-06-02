@@ -247,6 +247,21 @@ async def resolve_confirm_checkin_arrival(
             f"No change."
         )
 
+    # Capacity check — block if room is full at actual arrival date
+    from src.database.models import Room
+    from src.services.room_occupancy import check_room_bookable
+    _room = await session.get(Room, tenancy.room_id)
+    if _room:
+        today = date.today()
+        _, _cap_err = await check_room_bookable(
+            session, _room.room_number, today, None,
+            property_id=_room.property_id,
+            exclude_tenancy_id=tenancy.id,
+            exclude_tenant_id=tenancy.tenant_id,
+        )
+        if _cap_err:
+            return f"Cannot check in *{action_data['tenant_name']}*: {_cap_err}"
+
     today = date.today()
     old_checkin = tenancy.checkin_date
     old_status = "no_show"
