@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.48] — 2026-06-02 — June reconciliation + reporting fixes
+
+### fix: HOW IT WAS PAID uses period_month for rent
+- Rent/maintenance in "How it was paid" now uses `period_month` — advance payments (e.g. May 31 for June) correctly appear in June totals
+- Deposits/bookings still use `payment_date` (no period_month on these)
+- Files: `src/services/reporting.py`
+
+### fix: Chandra Sagar phantom ₹28,000 booking payment voided
+- Payment id=21041 was auto-created at onboarding approval with future date June 8 — money was never collected
+- Deposit already held from original tenancy — `booking_amount=₹28,000` on tenancy 1144 offsets deposit in first-month formula
+- At check-in June 8: owes ₹21,467 prorated rent only (23/30 days × ₹28,000)
+- AuditLog written: `system:void-phantom-booking-2026-06-02`
+
+### fix: Omkar Deodher duplicate tenant merged
+- Root cause: May 11 script stored phone as `7888016785`; existing tenant had `+917888016785` — literal match missed
+- Tenancy 1064 cancelled; 6 payments (₹38,500) moved to tenancy 1108; tenant 981 merged into 1029
+- Permanent fix: PATCH `/tenants/{id}` phone update uses SQL `RIGHT(regexp_replace(phone,'\D','','g'),10)` normalization
+- Files: `src/api/v2/tenants.py`
+
+### June cash/UPI reconciliation findings
+- Sheet Cash ₹5,39,000 vs App ₹5,35,500 — ₹3,500 gap (name mismatches in sheet)
+- Sheet UPI ₹3,14,150 vs App ₹2,07,600 rent UPI — remaining gap = Nikita + Niraj Singh (room 314, ₹23,000) not in DB at all; needs Lokesh to confirm who they are
+
 ## [1.76.47] — 2026-06-02 — Overbooking guards + tenant search fix
 
 ### fix: No replacement filter — includes no_show tenancies as replacements
