@@ -907,26 +907,6 @@ async def get_kpi_detail(
                                 "name": pb_name,
                                 "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
                             })
-                # Also attach no_show tenancies (approved bookings awaiting check-in) as prebookings
-                no_show_rows = (await session.execute(
-                    select(
-                        Tenancy.room_id,
-                        Tenancy.checkin_date,
-                        Tenancy.name,
-                    )
-                    .where(
-                        Tenancy.room_id.in_(list(notice_room_ids)),
-                        Tenancy.status == TenancyStatus.no_show,
-                    )
-                )).all()
-                for nr in no_show_rows:
-                    ci = nr.checkin_date
-                    for i, (rid, eco) in enumerate(item_room_info):
-                        if rid == nr.room_id and (eco is None or ci is None or ci >= eco):
-                            items[i]["prebookings"].append({
-                                "name": nr.name or "—",
-                                "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
-                            })
 
             return {"type": type, "items": items}
 
