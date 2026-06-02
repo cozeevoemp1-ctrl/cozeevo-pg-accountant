@@ -460,12 +460,16 @@ async def update_tenant(
         if "name" in body:
             tenant.name = body["name"]
         if "phone" in body:
-            new_phone = body["phone"]
-            if new_phone and new_phone != tenant.phone:
+            from src.services.room_occupancy import canonical_phone as _canon_phone, _normalize_phone as _norm_phone
+            from sqlalchemy import func as _func
+            new_phone = _canon_phone(body["phone"]) if body["phone"] else body["phone"]
+            last10 = _norm_phone(new_phone or "")
+            if new_phone and last10 and last10 != _norm_phone(tenant.phone or ""):
+                # Normalize both sides via RIGHT(digits, 10) so +91XXXXXXXXXX == XXXXXXXXXX
                 conflict = await session.scalar(
                     select(Tenant.id).where(
-                        Tenant.phone == new_phone,
                         Tenant.id != tenant.id,
+                        _func.right(_func.regexp_replace(Tenant.phone, r"\D", "", "g"), 10) == last10,
                     )
                 )
                 if conflict:
