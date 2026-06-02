@@ -2,6 +2,24 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.45] — 2026-06-02 — Activity feed: sort fix + daily subtotals
+
+### fix: Activity feed default filter + sort order
+- Default filter changed from "All" to "Payments"
+- Sort uses ISO string comparison (newest first); grouping uses Map (no duplicate day sections)
+- `_dayLabel` fixed for future dates — `diff > 1 && diff < 7` prevents future booking dates showing as weekday names
+- Root cause: booking/advance payments had `payment_date` = tenant check-in date (future), not collection date
+- API fix: activity feed now sorts and timestamps payments by `Payment.created_at` (when recorded) not `payment_date`
+- Files: `web/components/activity/activity-feed.tsx`, `src/api/v2/kpi.py`
+- Commits: `6c0fa6b`, `1a571a7`, `d7ae479`, `6fc6550`
+
+### feat: Activity feed daily UPI + Cash subtotals
+- Each day group header shows inline subtotals: `UPI ₹X · Cash ₹Y`
+- Parses amount and mode from event label string; only shows modes with > 0
+- Font: `text-sm font-semibold text-ink` (matches payment row amounts)
+- Files: `web/components/activity/activity-feed.tsx`
+- Commits: `3556dbc`, `e6cda2f`
+
 ## [1.76.44] — 2026-06-01 — expected_checkout propagation across all layers + lock-in exits visible
 
 ### Root cause (same bug in 6 places)
