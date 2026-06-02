@@ -261,8 +261,9 @@ async def collection_summary(
     if month_key in _VERIFIED_METHOD_BREAKDOWN:
         method_breakdown = dict(_VERIFIED_METHOD_BREAKDOWN[month_key])
     else:
-        # All money physically received in this calendar month — all types, by payment_date.
-        # This is "everything collected", matching what the receptionist records day by day.
+        # "How it was paid" = everything collected FOR this month:
+        # - rent/maintenance: use period_month (catches advance payments like "paid May 31 for June")
+        # - deposits/bookings: use payment_date (no period_month on these)
         method_rows = (
             await session.execute(
                 select(
@@ -272,8 +273,17 @@ async def collection_summary(
                 .where(
                     Payment.is_void == False,
                     Payment.payment_mode.is_not(None),
-                    Payment.payment_date >= from_date,
-                    Payment.payment_date <= to_date,
+                    or_(
+                        and_(
+                            Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
+                            Payment.period_month == from_date,
+                        ),
+                        and_(
+                            Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
+                            Payment.payment_date >= from_date,
+                            Payment.payment_date <= to_date,
+                        ),
+                    ),
                 )
                 .group_by(Payment.payment_mode)
             )
