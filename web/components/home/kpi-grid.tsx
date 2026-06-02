@@ -932,6 +932,56 @@ function ExpansionPanel({
         </div>
       )}
 
+      {/* Pipeline section — shown above list when No Replacement is active */}
+      {open === "notices" && noticeNoReplacement && pipelineItems && pipelineItems.length > 0 && (() => {
+        const noShowItems = pipelineItems.filter(p => (p as KpiDetailItem & { _pipeline_type?: string })._pipeline_type === "no_show");
+        const prebookedItems = pipelineItems.filter(p => (p as KpiDetailItem & { _pipeline_type?: string })._pipeline_type === "prebooked");
+        return (
+          <div className="px-3 pb-2 border-b-2 border-brand-pink/20">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] font-bold text-[#4338CA] uppercase tracking-wide">Pipeline · {pipelineItems.length} incoming</span>
+              <Link href="/onboarding/bookings" className="text-[10px] font-bold text-brand-pink active:opacity-70">View all →</Link>
+            </div>
+            {noShowItems.length > 0 && (
+              <div className="mb-1.5">
+                <p className="text-[10px] font-semibold text-ink-muted mb-1">Awaiting check-in ({noShowItems.length})</p>
+                <div className="flex flex-col gap-1">
+                  {noShowItems.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[11px] font-semibold text-ink">{p.name}</span>
+                        <span className="text-[10px] text-ink-muted ml-1.5">Rm {p.room} · {p.detail}</span>
+                      </div>
+                      <Link href={`/onboarding/bookings?q=${encodeURIComponent(p.name)}`} className="text-[10px] font-bold text-white bg-brand-pink px-2 py-0.5 rounded-full active:opacity-70 ml-2 flex-shrink-0">
+                        Check In →
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {prebookedItems.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-ink-muted mb-1">Pre-booked ({prebookedItems.length})</p>
+                <div className="flex flex-col gap-1">
+                  {prebookedItems.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[11px] font-semibold text-ink">{p.name}</span>
+                        <span className="text-[10px] text-ink-muted ml-1.5">Rm {p.room} · {p.detail}</span>
+                      </div>
+                      <Link href={`/onboarding/bookings?q=${encodeURIComponent(p.name)}`} className="text-[10px] font-bold text-brand-pink border border-brand-pink/40 px-2 py-0.5 rounded-full active:opacity-70 ml-2 flex-shrink-0">
+                        Review →
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Scrollable list */}
       <div ref={scrollRef} className="overflow-y-auto px-3" style={{ maxHeight: "256px", overscrollBehavior: "contain" }}>
         {loading ? (
@@ -1141,54 +1191,6 @@ function ExpansionPanel({
             ))}
           </div>
         )}
-        {open === "notices" && noticeNoReplacement && pipelineItems && pipelineItems.length > 0 && (() => {
-          const noShowItems = pipelineItems.filter(p => (p as KpiDetailItem & { _pipeline_type?: string })._pipeline_type === "no_show");
-          const prebookedItems = pipelineItems.filter(p => (p as KpiDetailItem & { _pipeline_type?: string })._pipeline_type === "prebooked");
-          return (
-            <div className="mt-3 border-t-2 border-brand-pink/20 pt-3 pb-2">
-              <div className="flex items-center justify-between px-1 mb-2">
-                <span className="text-[10px] font-bold text-[#4338CA] uppercase tracking-wide">Pipeline · {pipelineItems.length} incoming</span>
-                <Link href="/onboarding/bookings" className="text-[10px] font-bold text-brand-pink active:opacity-70">View all →</Link>
-              </div>
-              {noShowItems.length > 0 && (
-                <>
-                  <p className="text-[10px] font-semibold text-ink-muted px-1 mb-1">Awaiting check-in ({noShowItems.length})</p>
-                  <div className="flex flex-col divide-y divide-[#F0EDE9] mb-2">
-                    {noShowItems.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between py-2 px-1">
-                        <div>
-                          <p className="text-xs font-semibold text-ink">{p.name}</p>
-                          <p className="text-[10px] text-ink-muted">Room {p.room} · {p.detail}</p>
-                        </div>
-                        <Link href={`/onboarding/bookings?q=${encodeURIComponent(p.name)}`} className="text-[10px] font-bold text-white bg-brand-pink px-2.5 py-1 rounded-full active:opacity-70 ml-2 flex-shrink-0">
-                          Check In →
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              {prebookedItems.length > 0 && (
-                <>
-                  <p className="text-[10px] font-semibold text-ink-muted px-1 mb-1">Pre-booked ({prebookedItems.length})</p>
-                  <div className="flex flex-col divide-y divide-[#F0EDE9]">
-                    {prebookedItems.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between py-2 px-1">
-                        <div>
-                          <p className="text-xs font-semibold text-ink">{p.name}</p>
-                          <p className="text-[10px] text-ink-muted">Room {p.room} · {p.detail}</p>
-                        </div>
-                        <Link href={`/onboarding/bookings?q=${encodeURIComponent(p.name)}`} className="text-[10px] font-bold text-brand-pink border border-brand-pink/40 px-2.5 py-1 rounded-full active:opacity-70 ml-2 flex-shrink-0">
-                          Review →
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })()}
         {open === "checkouts_today" && (
           <div className="px-3 pb-2 pt-1">
             <Link href="/checkouts" className="block text-center text-xs font-bold text-brand-pink py-1.5 rounded-xl border border-brand-pink/30 active:opacity-70">
