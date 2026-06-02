@@ -2,6 +2,29 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.47] — 2026-06-02 — Overbooking guards + tenant search fix
+
+### fix: No replacement filter — includes no_show tenancies as replacements
+- `assigned` set prevents one replacement tagging multiple beds in shared rooms (1:1 per-bed matching)
+- no_show tenancies (awaiting check-in) now count as replacements alongside pending OnboardingSessions
+- Files: `src/api/v2/kpi.py`
+
+### fix: Check-in capacity guard — all 3 paths now validated
+- **PWA `/checkin/new`**: was flipping no_show → active with no capacity check — now calls `check_room_bookable` before activating
+- **Bot arrival confirmation** (`resolvers/onboarding.py`): same gap — now calls `check_room_bookable` before activating
+- Root cause of room 522 overbooking: Akshay added via script (bypassed guards) → checked in via unguarded endpoint
+- Files: `src/api/v2/checkin.py`, `src/whatsapp/handlers/resolvers/onboarding.py`
+
+### fix: Tenant search excludes exited/cancelled tenants by default
+- `/tenants/search` now defaults to `active_only=true` — only active + no_show returned
+- `payments/history` explicitly passes `active_only=false` to find old tenants
+- Root cause: commit `5f5947c` added exited/cancelled to support payment history but applied globally
+- Files: `src/api/v2/tenants.py`, `web/lib/api.ts`, `web/components/forms/tenant-search.tsx`, `web/app/payments/history/page.tsx`
+
+### feat: On Notice card subtitle + No replacement filter (v1.76.46)
+- "19 incoming · net -29" subtitle on On Notice KPI tile
+- Files: `web/components/ui/icon-tile.tsx`, `web/components/home/kpi-grid.tsx`
+
 ## [1.76.46] — 2026-06-02 — Notices card: incoming subtitle + No replacement filter fix
 
 ### feat: On Notice card subtitle
