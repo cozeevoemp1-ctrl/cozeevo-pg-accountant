@@ -876,14 +876,11 @@ async def get_kpi_detail(
                 item_room_info.append((r.room_id, co))
 
             # Attach prebookings: pending OnboardingSessions + no_show Tenancies
-            # Uses 1:1 per-bed matching — one replacement per freed bed, not per room.
-            # Prevents shared-room over-matching (e.g. room with 2 leavers + 1 replacement
-            # should show 1 "has replacement" and 1 "no replacement", not both tagged).
+            # Uses per-bed assignment — one replacement per freed bed slot.
+            # `assigned` set prevents one replacement tagging multiple notice items in shared rooms.
             notice_room_ids = {rid for rid, _ in item_room_info if rid is not None}
             if notice_room_ids:
-                # Collect all incoming replacements per room
-                from collections import defaultdict as _dd
-                room_replacements = _dd(list)
+                assigned = set()  # notice item indices already matched to a replacement
 
                 session_rows2 = (await session.execute(
                     select(
@@ -906,16 +903,22 @@ async def get_kpi_detail(
                     td = _json.loads(sr.tenant_data) if sr.tenant_data else {}
                     pb_name = td.get("name") or sr.tenant_phone or "—"
                     ci = sr.checkin_date
-                    room_replacements[sr.room_id].append({
-                        "name": pb_name,
-                        "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
-                        "checkin_raw": ci,
-                    })
+                    for i, (rid, eco) in enumerate(item_room_info):
+                        if i in assigned or rid != sr.room_id:
+                            continue
+                        if ci is None or eco is None or ci >= eco:
+                            items[i]["prebookings"].append({
+                                "name": pb_name,
+                                "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
+                            })
+                            assigned.add(i)
+                            break
 
                 # Also include no_show tenancies (approved, room assigned, awaiting arrival)
                 no_show_rows = (await session.execute(
-                    select(Tenancy.room_id, Tenancy.checkin_date, Tenancy.name)
+                    select(Tenancy.room_id, Tenancy.checkin_date, Tenant.name)
                     .join(Room, Room.id == Tenancy.room_id)
+                    .join(Tenant, Tenant.id == Tenancy.tenant_id)
                     .where(
                         Tenancy.room_id.in_(list(notice_room_ids)),
                         Tenancy.status == TenancyStatus.no_show,
@@ -924,32 +927,18 @@ async def get_kpi_detail(
                 )).all()
                 for nr in no_show_rows:
                     ci = nr.checkin_date
-                    if ci is not None:
-                        room_replacements[nr.room_id].append({
-                            "name": nr.name or "—",
-                            "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
-                            "checkin_raw": ci,
-                        })
-
-                # 1:1 match: group notice items by room, assign one replacement per bed slot
-                room_to_indices = _dd(list)
-                for i, (rid, _eco) in enumerate(item_room_info):
-                    if rid is not None:
-                        room_to_indices[rid].append(i)
-
-                for rid, indices in room_to_indices.items():
-                    replacements = room_replacements.get(rid, [])
-                    for slot, ni in enumerate(indices):
-                        if slot >= len(replacements):
-                            break
-                        pb = replacements[slot]
-                        eco = item_room_info[ni][1]
-                        ci = pb["checkin_raw"]
-                        if eco is None or ci is None or ci >= eco:
-                            items[ni]["prebookings"].append({
-                                "name": pb["name"],
-                                "checkin_date": pb["checkin_date"],
+                    if ci is None:
+                        continue
+                    for i, (rid, eco) in enumerate(item_room_info):
+                        if i in assigned or rid != nr.room_id:
+                            continue
+                        if eco is None or ci >= eco:
+                            items[i]["prebookings"].append({
+                                "name": nr.name or "—",
+                                "checkin_date": ci.strftime("%-d %b %Y") if ci else "—",
                             })
+                            assigned.add(i)
+                            break
 
             return {"type": type, "items": items}
 
