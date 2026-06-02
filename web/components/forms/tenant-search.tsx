@@ -8,9 +8,10 @@ interface TenantSearchProps {
   defaultValue?: string
   defaultTenant?: TenantSearchResult
   placeholder?: string
+  activeOnly?: boolean
 }
 
-export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, placeholder = "Search by name or room..." }: TenantSearchProps) {
+export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, placeholder = "Search by name or room...", activeOnly = true }: TenantSearchProps) {
   const [query, setQuery] = useState(defaultTenant ? `${defaultTenant.name} — Room ${defaultTenant.room_number}` : defaultValue)
   const [results, setResults] = useState<TenantSearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -23,7 +24,7 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
     if (q.trim().length < 1) { setResults([]); setOpen(false); return }
     setLoading(true)
     try {
-      const data = await searchTenants(q.trim())
+      const data = await searchTenants(q.trim(), activeOnly)
       setResults(data)
       setOpen(data.length > 0)
     } catch {

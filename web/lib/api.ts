@@ -256,8 +256,9 @@ export interface TenantDues {
   stay_type: string;
 }
 
-export function searchTenants(q: string): Promise<TenantSearchResult[]> {
-  return _get<TenantSearchResult[]>(`/api/v2/app/tenants/search?q=${encodeURIComponent(q)}`);
+export function searchTenants(q: string, activeOnly = true): Promise<TenantSearchResult[]> {
+  const params = new URLSearchParams({ q, active_only: String(activeOnly) });
+  return _get<TenantSearchResult[]>(`/api/v2/app/tenants/search?${params}`);
 }
 
 export function getTenantDues(tenancyId: number): Promise<TenantDues> {

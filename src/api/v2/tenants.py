@@ -119,6 +119,7 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
 @router.get("/tenants/search")
 async def search_tenants(
     q: str = Query(default=None),
+    active_only: bool = Query(default=True),
     user: AppUser = Depends(get_current_user),
 ):
     if not q or not q.strip():
@@ -135,6 +136,12 @@ async def search_tenants(
             func.lower(Tenant.phone).contains(term),
         )
 
+    statuses = (
+        [TenancyStatus.active, TenancyStatus.no_show]
+        if active_only
+        else [TenancyStatus.active, TenancyStatus.no_show, TenancyStatus.exited, TenancyStatus.cancelled]
+    )
+
     async with get_session() as session:
         stmt = (
             select(Tenancy, Tenant, Room, Property)
@@ -142,7 +149,7 @@ async def search_tenants(
             .join(Room, Tenancy.room_id == Room.id)
             .join(Property, Room.property_id == Property.id)
             .where(
-                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show, TenancyStatus.exited, TenancyStatus.cancelled]),
+                Tenancy.status.in_(statuses),
                 match_clause,
             )
             .order_by(Tenant.name)

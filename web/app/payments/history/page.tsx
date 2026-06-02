@@ -183,6 +183,7 @@ export default function PaymentHistoryPage() {
             <TenantSearch
               onSelect={handleTenantSelect}
               placeholder="Filter by tenant…"
+              activeOnly={false}
             />
           </div>
         )}
