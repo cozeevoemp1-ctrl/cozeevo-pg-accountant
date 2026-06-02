@@ -70,18 +70,24 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
   }, [events, filter, search]);
 
   const groups = useMemo(() => {
-    const sorted = [...filtered].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
-    const g: { key: string; label: string; events: ActivityFeedEvent[] }[] = [];
+    const sorted = [...filtered].sort((a, b) => {
+      const ta = a.ts || "";
+      const tb = b.ts || "";
+      if (tb > ta) return 1;
+      if (tb < ta) return -1;
+      return 0;
+    });
+    const map = new Map<string, { key: string; label: string; events: ActivityFeedEvent[] }>();
+    const order: string[] = [];
     for (const ev of sorted) {
       const key = _dayKey(ev.ts);
-      const last = g[g.length - 1];
-      if (last && last.key === key) {
-        last.events.push(ev);
-      } else {
-        g.push({ key, label: _dayLabel(ev.ts), events: [ev] });
+      if (!map.has(key)) {
+        map.set(key, { key, label: _dayLabel(ev.ts), events: [] });
+        order.push(key);
       }
+      map.get(key)!.events.push(ev);
     }
-    return g;
+    return order.map(k => map.get(k)!);
   }, [filtered]);
 
   return (
