@@ -2,6 +2,20 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.46] — 2026-06-02 — Notices card: incoming subtitle + No replacement filter fix
+
+### feat: On Notice card subtitle
+- Shows "19 incoming · net -29" below "48 leaving" on the On Notice KPI tile
+- Incoming = no_show_count + prebooked_count; net = incoming − leaving
+- Files: `web/components/ui/icon-tile.tsx` (subtitle prop), `web/components/home/kpi-grid.tsx`
+- Commits: `73f5aa2`, `fac7eb7`
+
+### fix: No replacement filter accuracy (reverted bad approach)
+- Attempted to count no_show tenancies as replacements in backend — broke filter (showed 0) due to shared-room over-matching
+- Reverted backend to original OnboardingSession-only prebookings
+- Filter correctly shows beds with no pending pre-booking (OnboardingSession pending_tenant/pending_review)
+- Files: `src/api/v2/kpi.py`
+
 ## [1.76.45] — 2026-06-02 — Activity feed: sort fix + daily subtotals
 
 ### fix: Activity feed default filter + sort order
