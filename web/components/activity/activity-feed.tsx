@@ -147,9 +147,9 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
             <div className="flex items-baseline justify-between mb-2">
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{group.label}</p>
               {summary && (
-                <p className="text-[11px] text-ink-muted font-medium">
+                <p className="text-sm font-semibold text-ink">
                   {summary.upi > 0 && <span>UPI {_inr(summary.upi)}</span>}
-                  {summary.upi > 0 && summary.cash > 0 && <span className="mx-1.5 opacity-40">·</span>}
+                  {summary.upi > 0 && summary.cash > 0 && <span className="mx-1.5 text-ink-muted opacity-40">·</span>}
                   {summary.cash > 0 && <span>Cash {_inr(summary.cash)}</span>}
                 </p>
               )}
