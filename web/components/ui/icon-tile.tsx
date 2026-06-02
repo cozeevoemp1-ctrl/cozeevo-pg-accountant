@@ -5,6 +5,7 @@ interface IconTileProps {
   icon: ReactNode;
   label: string;
   value: string | number;
+  subtitle?: string;
   color?: "green" | "pink" | "blue" | "orange";
   className?: string;
   active?: boolean;
@@ -19,7 +20,7 @@ const COLOR_MAP = {
 };
 
 export function IconTile({
-  icon, label, value, color = "blue", className, active, onClick,
+  icon, label, value, subtitle, color = "blue", className, active, onClick,
 }: IconTileProps) {
   const Tag = onClick ? "button" : "div";
   return (
@@ -39,6 +40,7 @@ export function IconTile({
       </div>
       <div className="text-xs font-medium opacity-70">{label}</div>
       <div className="text-lg font-bold leading-tight">{value}</div>
+      {subtitle && <div className="text-[10px] font-medium opacity-60 leading-tight">{subtitle}</div>}
     </Tag>
   );
 }
