@@ -274,8 +274,20 @@ async def record_physical_checkin(
         tenant  = await session.get(Tenant, tenancy.tenant_id)
         room    = await session.get(Room,   tenancy.room_id)
 
-        # Activate no-show tenants on physical arrival
+        # Activate no-show tenants on physical arrival — re-validate capacity first
         if tenancy.status == TenancyStatus.no_show:
+            from src.services.room_occupancy import check_room_bookable
+            _, _cap_err = await check_room_bookable(
+                session, room.room_number, actual_date, None,
+                property_id=room.property_id,
+                exclude_tenancy_id=tenancy.id,
+                exclude_tenant_id=tenancy.tenant_id,
+            )
+            if _cap_err:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Cannot check in: {_cap_err}",
+                )
             tenancy.status = TenancyStatus.active
 
         # Update check-in date if it changed
