@@ -50,7 +50,7 @@ function _dayKey(ts: string): string {
 }
 
 export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>("payment");
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
@@ -70,7 +70,7 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
   }, [events, filter, search]);
 
   const groups = useMemo(() => {
-    const sorted = [...filtered].sort((a, b) => b.ts.localeCompare(a.ts));
+    const sorted = [...filtered].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
     const g: { key: string; label: string; events: ActivityFeedEvent[] }[] = [];
     for (const ev of sorted) {
       const key = _dayKey(ev.ts);
