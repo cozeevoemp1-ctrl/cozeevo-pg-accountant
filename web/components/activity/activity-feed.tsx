@@ -36,7 +36,7 @@ function _dayLabel(ts: string): string {
   const diff  = Math.round((today.getTime() - day.getTime()) / 86400000);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
-  if (diff < 7)  return d.toLocaleDateString("en-IN", { weekday: "long" });
+  if (diff > 1 && diff < 7) return d.toLocaleDateString("en-IN", { weekday: "long" });
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
