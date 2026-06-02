@@ -49,6 +49,24 @@ function _dayKey(ts: string): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+function _daySummary(evs: ActivityFeedEvent[]): { upi: number; cash: number } | null {
+  let upi = 0, cash = 0, found = false;
+  for (const ev of evs) {
+    if (ev.type !== "payment") continue;
+    const parts = ev.label.split(" · ");
+    const amt = parseInt((parts[0] || "").replace(/[₹,]/g, ""), 10);
+    if (!amt || isNaN(amt)) continue;
+    const mode = (parts[1] || "").toLowerCase();
+    if (mode === "upi") { upi += amt; found = true; }
+    else if (mode === "cash") { cash += amt; found = true; }
+  }
+  return found ? { upi, cash } : null;
+}
+
+function _inr(n: number): string {
+  return "₹" + n.toLocaleString("en-IN");
+}
+
 export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
   const [filter, setFilter] = useState<FilterKey>("payment");
   const [search, setSearch] = useState("");
@@ -122,9 +140,20 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
       {groups.length === 0 ? (
         <p className="text-sm text-ink-muted text-center mt-8">No activity</p>
       ) : (
-        groups.map((group) => (
+        groups.map((group) => {
+          const summary = _daySummary(group.events);
+          return (
           <section key={group.key}>
-            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">{group.label}</p>
+            <div className="flex items-baseline justify-between mb-2">
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{group.label}</p>
+              {summary && (
+                <p className="text-[11px] text-ink-muted font-medium">
+                  {summary.upi > 0 && <span>UPI {_inr(summary.upi)}</span>}
+                  {summary.upi > 0 && summary.cash > 0 && <span className="mx-1.5 opacity-40">·</span>}
+                  {summary.cash > 0 && <span>Cash {_inr(summary.cash)}</span>}
+                </p>
+              )}
+            </div>
             <div className="bg-surface rounded-card border border-[#F0EDE9] divide-y divide-[#F0EDE9]">
               {group.events.map((ev) => {
                 const cfg = TYPE_CONFIG[ev.type] ?? TYPE_CONFIG.other;
@@ -153,7 +182,8 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
               })}
             </div>
           </section>
-        ))
+          );
+        })
       )}
     </div>
   );
