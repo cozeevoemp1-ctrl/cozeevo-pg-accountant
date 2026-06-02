@@ -992,6 +992,7 @@ async def get_activity_feed(
             select(
                 Payment.id, Payment.amount, Payment.payment_mode, Payment.for_type,
                 Payment.payment_date, Payment.notes, Payment.period_month,
+                Payment.created_at.label("pmt_created_at"),
                 Tenant.name.label("tenant_name"),
                 Room.room_number.label("pmt_room"),
             )
@@ -999,7 +1000,7 @@ async def get_activity_feed(
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
             .where(Payment.is_void == False)
-            .order_by(desc(Payment.payment_date), desc(Payment.id))
+            .order_by(desc(Payment.created_at), desc(Payment.id))
             .limit(limit * 3)
         )).all()
 
@@ -1064,8 +1065,12 @@ async def get_activity_feed(
             label_parts.append(period_str)
         label = " · ".join(label_parts)
         sublabel = (r.tenant_name or "") + (f" · Room {r.pmt_room}" if r.pmt_room else "")
-        # Use payment_date as timestamp (date → midnight UTC)
-        ts = datetime.combine(r.payment_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+        # Use created_at (when recorded) not payment_date (tenant's check-in/due date)
+        ts = r.pmt_created_at
+        if ts and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if not ts:
+            ts = datetime.combine(r.payment_date, datetime.min.time()).replace(tzinfo=timezone.utc)
         raw_events.append({
             "_sort_ts": ts,
             "id": f"pmt_{r.id}",
