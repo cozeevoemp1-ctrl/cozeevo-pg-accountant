@@ -22,7 +22,7 @@ from src.database.db_manager import get_session
 from src.database.models import (
     OnboardingSession, Room, Property, Tenant, Tenancy, TenancyStatus, StayType,
     RentSchedule, RentStatus, Payment, PaymentMode, PaymentFor, AuthorizedUser,
-    RentRevision,
+    RentRevision, AuditLog,
 )
 from src.services.pdf_generator import HOUSE_RULES
 
@@ -721,8 +721,42 @@ async def cancel_session(token: str, request: Request):
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
             raise HTTPException(404, "Session not found")
-        if obs.status in ("approved", "cancelled"):
-            raise HTTPException(400, f"Cannot cancel — status is {obs.status}")
+        if obs.status == "cancelled":
+            raise HTTPException(400, "Session already cancelled")
+
+        # If session was already approved, also cancel the linked tenancy
+        if obs.tenancy_id:
+            tenancy = await session.get(Tenancy, obs.tenancy_id)
+            if tenancy and tenancy.status in (TenancyStatus.no_show, TenancyStatus.active):
+                old_status = tenancy.status.value
+
+                # Void all pending RS rows for this tenancy
+                rs_rows = (await session.execute(
+                    select(RentSchedule).where(
+                        RentSchedule.tenancy_id == tenancy.id,
+                        RentSchedule.status == RentStatus.pending,
+                    )
+                )).scalars().all()
+                for rs in rs_rows:
+                    rs.status = RentStatus.na
+
+                await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
+                tenancy.status = TenancyStatus.cancelled
+
+                tenant_name = obs.tenant_data and json.loads(obs.tenant_data).get("name", str(tenancy.id)) or str(tenancy.id)
+                rs_note = f"; voided {len(rs_rows)} RS row(s)" if rs_rows else ""
+                session.add(AuditLog(
+                    changed_by="admin",
+                    entity_type="tenancy",
+                    entity_id=tenancy.id,
+                    entity_name=tenant_name,
+                    field="status",
+                    old_value=old_status,
+                    new_value="cancelled",
+                    source="dashboard",
+                    note=f"Cancelled via onboarding session {token}{rs_note}",
+                ))
+
         obs.status = "cancelled"
         await session.commit()
         return {"status": "cancelled", "token": token}

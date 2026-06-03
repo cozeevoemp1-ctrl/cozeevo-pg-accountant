@@ -837,7 +837,16 @@ async def delete_tenant(
                 detail=f"Cannot delete — {len(payments)} payment record(s) exist. Use force delete to void them first.",
             )
 
+        rs_count = await session.scalar(
+            select(func.count()).select_from(RentSchedule).where(RentSchedule.tenancy_id == tenancy_id)
+        )
+
         # Write audit trail before deleting so there's a permanent record
+        note_parts = [f"Tenant deleted — {reason.strip()}"]
+        if payments:
+            note_parts.append(f"voided {len(payments)} payment(s)")
+        if rs_count:
+            note_parts.append(f"deleted {rs_count} RS row(s)")
         session.add(AuditLog(
             changed_by=user.actor,
             entity_type="tenancy",
@@ -848,7 +857,7 @@ async def delete_tenant(
             new_value=None,
             room_number=None,
             source="pwa",
-            note=f"Tenant deleted — {reason.strip()}" + (f" (voided {len(payments)} payment(s))" if payments else ""),
+            note="; ".join(note_parts),
             org_id=tenancy.org_id,
         ))
         await session.flush()  # write audit log before cascade delete
@@ -918,7 +927,8 @@ async def delete_tenant(
 
 @router.post("/tenancies/{tenancy_id}/cancel-no-show")
 async def cancel_no_show(tenancy_id: int, user: AppUser = Depends(get_current_user)):
-    """Cancel a no-show booking — set status to cancelled, checkout_date to today."""
+    """Cancel a no-show booking — set status to cancelled, void RS rows, sync onboarding session."""
+    from src.database.models import OnboardingSession, RentSchedule, RentStatus
     today = date.today()
     async with get_session() as session:
         row = (await session.execute(
@@ -933,11 +943,29 @@ async def cancel_no_show(tenancy_id: int, user: AppUser = Depends(get_current_us
         if tenancy.status != TenancyStatus.no_show:
             raise HTTPException(status_code=400, detail=f"Tenancy status is '{tenancy.status.value}', expected 'no_show'")
 
+        # Void all pending RS rows — cancelled tenancy has no rent obligation
+        rs_rows = (await session.execute(
+            select(RentSchedule).where(
+                RentSchedule.tenancy_id == tenancy_id,
+                RentSchedule.status == RentStatus.pending,
+            )
+        )).scalars().all()
+        for rs in rs_rows:
+            rs.status = RentStatus.na
+
+        await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
         await session.execute(
             text("UPDATE tenancies SET status='cancelled', checkout_date=:today WHERE id=:id"),
             {"today": today, "id": tenancy_id},
         )
 
+        # Sync linked onboarding session so Bookings page reflects the cancellation
+        await session.execute(
+            text("UPDATE onboarding_sessions SET status='cancelled' WHERE tenancy_id=:tid AND status='approved'"),
+            {"tid": tenancy_id},
+        )
+
+        rs_note = f"; voided {len(rs_rows)} RS row(s)" if rs_rows else ""
         audit = AuditLog(
             changed_by=user.actor,
             entity_type="tenancy",
@@ -948,7 +976,7 @@ async def cancel_no_show(tenancy_id: int, user: AppUser = Depends(get_current_us
             new_value="cancelled",
             room_number=room.room_number if room else None,
             source="dashboard",
-            note="Booking cancelled: tenant did not check in (no-show)",
+            note=f"Booking cancelled: tenant did not check in (no-show){rs_note}",
         )
         session.add(audit)
         await session.commit()
