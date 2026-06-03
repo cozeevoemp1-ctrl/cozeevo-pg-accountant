@@ -126,10 +126,11 @@ async def search_tenants(
         raise HTTPException(status_code=400, detail="q must not be empty")
 
     term = q.strip().lower()
-    # Numeric query → exact room match only (skip name/phone to avoid phone-number hits)
-    if term.isdigit():
-        match_clause = func.lower(Room.room_number) == term
+    if term.isdigit() and len(term) <= 5:
+        # Short numeric → room number substring (e.g. "111" finds room 111)
+        match_clause = func.lower(Room.room_number).contains(term)
     else:
+        # Name, room substring, or phone
         match_clause = or_(
             func.lower(Tenant.name).contains(term),
             func.lower(Room.room_number).contains(term),

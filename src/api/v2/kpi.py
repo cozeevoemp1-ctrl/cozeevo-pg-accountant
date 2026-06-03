@@ -248,7 +248,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
             .where(
                 RentSchedule.period_month == period,
-                Tenancy.status == TenancyStatus.active,
+                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
             )
         )).all()
         overdue_tenants = 0
