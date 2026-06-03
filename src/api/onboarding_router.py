@@ -1740,6 +1740,22 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 _pre_tenancy.status = _target_status
                 tenancy = _pre_tenancy
             else:
+                # Final guard: block if tenant already has an active/no_show tenancy
+                # (catches cases where _pre_tenancy was missed due to active-status fallback)
+                if tenant:
+                    _any_active = await session.scalar(
+                        select(Tenancy).where(
+                            Tenancy.tenant_id == tenant.id,
+                            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                        ).limit(1)
+                    )
+                    if _any_active and _any_active.id != (obs.tenancy_id or -1):
+                        raise HTTPException(
+                            409,
+                            f"{tenant.name} already has an active tenancy in Room "
+                            f"{_any_active.room_id}. Cannot create duplicate — cancel the "
+                            "existing tenancy first or use room transfer."
+                        )
                 tenancy = Tenancy(
                     tenant_id=tenant.id, room_id=room.id if room else None, checkin_date=checkin,
                     agreed_rent=obs.agreed_rent or 0, security_deposit=obs.security_deposit or 0,
