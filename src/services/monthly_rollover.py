@@ -104,8 +104,11 @@ async def generate_rent_schedule_for_month(year: int, month: int) -> dict:
                 stats["skipped_exited"] += 1
                 continue
 
-            # Skip if tenancy ended before this period starts
-            if tn.expected_checkout and tn.expected_checkout < period:
+            # Skip if tenancy ended before this period starts.
+            # But active tenants always carry forward — expected_checkout in the past
+            # means they overstayed their notice; they're still in the room paying rent.
+            if (tn.expected_checkout and tn.expected_checkout < period
+                    and tn.status != TenancyStatus.active):
                 stats["skipped_exited"] += 1
                 continue
 
