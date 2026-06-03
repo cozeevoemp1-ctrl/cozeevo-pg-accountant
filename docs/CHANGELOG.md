@@ -2,6 +2,31 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.49] — 2026-06-03 — Data integrity audit + cancel flow fixes
+
+### fix: cancel_session (onboarding) now cancels linked tenancy
+- Approved sessions could not be cancelled at all (blocked with 400) — now allowed
+- If `obs.tenancy_id` is set, also sets tenancy status=cancelled, voids pending RS rows, writes audit log
+- Prevents ghost no_show tenancies blocking rooms after admin cancels a booking
+- Files: `src/api/onboarding_router.py`
+
+### fix: cancel_no_show voids RS rows + syncs onboarding session
+- Cancelling a no_show tenancy now voids all pending rent_schedule rows (status → na)
+- Linked onboarding_session is set to cancelled so Bookings page stays consistent
+- Audit note now includes RS row count
+- Files: `src/api/v2/tenants.py`
+
+### fix: delete_tenancy audit log includes RS row count
+- Hard-deletes cascade to rent_schedule; audit note now records how many RS rows were removed
+- Files: `src/api/v2/tenants.py`
+
+### audit: full data integrity review
+- Confirmed all 4 tenancy activation paths call `check_room_bookable` ✅
+- Confirmed cancelled tenancies excluded from all search/list endpoints ✅
+- Confirmed voided payments excluded from all reporting ✅
+- Confirmed notices/KPI/checkouts/rooms endpoints all filter status correctly ✅
+- Identified and fixed: cancel flows left orphaned RS rows and inconsistent session state
+
 ## [1.76.48] — 2026-06-02 — June reconciliation + reporting fixes
 
 ### fix: HOW IT WAS PAID uses period_month for rent
