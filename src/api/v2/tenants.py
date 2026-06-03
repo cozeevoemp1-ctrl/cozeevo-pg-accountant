@@ -139,7 +139,8 @@ async def search_tenants(
     statuses = (
         [TenancyStatus.active, TenancyStatus.no_show]
         if active_only
-        else [TenancyStatus.active, TenancyStatus.no_show, TenancyStatus.exited, TenancyStatus.cancelled]
+        else [TenancyStatus.active, TenancyStatus.no_show, TenancyStatus.exited]
+        # cancelled excluded everywhere — cancelled = erroneous booking, nothing useful to show
     )
 
     async with get_session() as session:
