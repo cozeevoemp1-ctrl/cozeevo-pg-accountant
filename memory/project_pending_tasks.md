@@ -6,12 +6,17 @@ type: project
 
 ## Active / Next Up
 
-### Home page KPI boxes — FIXED (2026-06-07)
-- **Issue:** Complex exists() subqueries in KPI endpoint were breaking the API
-- **Fix:** Simplified prebooked_form query to count pending_review in non-staff, non-000 rooms
-- **Deployed:** Commit e8b7493 → VPS running
-- **Status:** Home page KPI boxes should now display (API responding to auth requests)
-- **TODO:** Verify the prebooked_form count is reasonable (currently ~25 valid pending_review sessions expected after filtering phantom QR bookings)
+### Home page & Notices page filters — FIXED (2026-06-07)
+- **Issue 1:** KPI API was broken due to syntax errors in exists() subqueries
+  - **Fix:** Simplified prebooked_form query to count pending_review in non-staff, non-000 rooms
+  - **Deployed:** Commit e8b7493 → VPS running
+  - **Status:** Home page KPI boxes now display ✓
+
+- **Issue 2:** "No replacement" filter wasn't working (showed all tenants)
+  - **Root cause:** Notices API didn't return prebookings array; filter relied on empty array
+  - **Fix:** Query pending_review sessions per room in notices endpoint, attach to each leaving tenant
+  - **Deployed:** Commit d993e19 → VPS running
+  - **Status:** "No replacement" filter should now correctly show only beds without replacements ✓
 
 ### CI/CD — auto-deploy WORKING ✓ (2026-05-16)
 - Run #9 passed (green) — commit bd25c14
