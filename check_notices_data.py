@@ -104,16 +104,30 @@ async def main():
                         if ci and checkout:
                             # Current logic from kpi.py: ci >= eco
                             if ci >= checkout:
-                                print(f"✅ MATCH: {room_num} ({tenant['name']}) | Checkout {checkout} → Booking checkin {ci} (status: {b['status']})")
+                                print(f"[MATCH] {room_num} ({tenant['name']}) | Checkout {checkout} -> Booking {ci} ({b['status']})")
                                 matched += 1
                             else:
-                                print(f"❌ NO MATCH (too early): {room_num} ({tenant['name']}) | Checkout {checkout} → Booking checkin {ci} ({(checkout - ci).days} days BEFORE)")
+                                diff = (checkout - ci).days
+                                print(f"[NOMATCH] {room_num} ({tenant['name']}) | Checkout {checkout} -> Booking {ci} ({diff} days BEFORE)")
                                 unmatched_bookings += 1
 
+        # Find bookings NOT in rooms with leaving tenants
+        leaving_room_ids = set(leaving_by_room.keys())
+        orphan_bookings = [b for b in bookings_list if b[5] not in leaving_room_ids]
+
+        print(f"\n=== BOOKINGS IN ROOMS WITH NO LEAVING TENANTS ===")
+        print(f"Count: {len(orphan_bookings)}")
+        for bid, phone, checkin, status, room_num, room_id in orphan_bookings:
+            print(f"  Room {room_num}: {phone} | Check-in {checkin} ({status})")
+
         print(f"\n=== SUMMARY ===")
-        print(f"Matched (ci >= checkout): {matched}")
-        print(f"Unmatched (ci < checkout): {unmatched_bookings}")
-        print(f"Total notices with leaving tenants: {len(leaving_list)}")
-        print(f"Total bookings in those rooms: {len(bookings_list)}")
+        print(f"Matched replacements (ci >= checkout): {matched}")
+        print(f"Unmatched (too early): {unmatched_bookings}")
+        print(f"Bookings in rooms with NO leaving tenant: {len(orphan_bookings)}")
+        print(f"")
+        print(f"Total leaving tenants: {len(leaving_list)}")
+        print(f"Total bookings: {len(bookings_list)}")
+        print(f"  - In rooms with leavers: {len(bookings_list) - len(orphan_bookings)}")
+        print(f"  - In rooms with NO leavers: {len(orphan_bookings)}")
 
 asyncio.run(main())
