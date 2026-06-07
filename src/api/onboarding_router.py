@@ -1931,6 +1931,10 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     org_id=1,
                 ))
 
+            # Commit DB changes NOW before slow operations (GSheets, PDF, WhatsApp)
+            # so the check-in is immediately saved even if these operations hang
+            await session.commit()
+
             # GSheets TENANTS + monthly tab (retry 3x)
             gsheet_kwargs = dict(
                 room_number=room.room_number if room else "TBD", name=td["name"], phone=phone_sheet,

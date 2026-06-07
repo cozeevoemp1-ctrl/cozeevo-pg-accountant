@@ -1,13 +1,12 @@
 import os
 import asyncio
-import json
 
 os.environ['TEST_MODE'] = '1'
 
 async def main():
     from src.database.db_manager import get_session, init_db
     from src.database.models import OnboardingSession, Tenancy, Tenant, Room, TenancyStatus, StayType
-    from sqlalchemy import select, func
+    from sqlalchemy import select, func, or_
     from datetime import date, timedelta
     from dotenv import load_dotenv
 
@@ -18,7 +17,7 @@ async def main():
     async with get_session() as session:
         today = date.today()
 
-        # Get all leaving tenants (on notice or expected checkout within 30 days)
+        # Get all MONTHLY leaving tenants (on notice or expected checkout in next 60 days)
         leaving = await session.execute(
             select(
                 Tenancy.id,
@@ -27,7 +26,6 @@ async def main():
                 Room.room_number,
                 Tenancy.expected_checkout,
                 Tenancy.notice_date,
-                Tenancy.status,
             )
             .join(Tenant, Tenant.id == Tenancy.tenant_id)
             .join(Room, Room.id == Tenancy.room_id)
@@ -36,13 +34,17 @@ async def main():
                 Room.room_number != "000",
                 Tenancy.status == TenancyStatus.active,
                 Tenancy.stay_type == StayType.monthly,
+                or_(
+                    Tenancy.notice_date != None,
+                    Tenancy.expected_checkout.between(today - timedelta(days=30), today + timedelta(days=60))
+                ),
             )
             .order_by(Tenancy.expected_checkout)
         )
         leaving_list = leaving.all()
-        print(f"=== {len(leaving_list)} LEAVING TENANTS ===\n")
+        print(f"=== {len(leaving_list)} LEAVING TENANTS (same query as notices page) ===\n")
 
-        # Get all bookings with actual rooms assigned
+        # Get all bookings with actual rooms (pending_review + pending_tenant)
         bookings = await session.execute(
             select(
                 OnboardingSession.id,
@@ -50,6 +52,7 @@ async def main():
                 OnboardingSession.checkin_date,
                 OnboardingSession.status,
                 Room.room_number,
+                OnboardingSession.room_id,
             )
             .outerjoin(Room, Room.id == OnboardingSession.room_id)
             .where(
@@ -58,49 +61,59 @@ async def main():
             )
         )
         bookings_list = bookings.all()
-        print(f"=== {len(bookings_list)} BOOKINGS WITH ROOMS ASSIGNED ===\n")
+        print(f"=== {len(bookings_list)} BOOKINGS WITH ROOMS ===\n")
 
-        # Create a map of room_id -> leaving tenant
+        # Build maps
         leaving_by_room = {}
-        for tenancy_id, room_id, name, room_num, checkout, notice, status in leaving_list:
-            leaving_by_room[room_id] = (name, room_num, checkout)
+        for tid, room_id, name, room_num, checkout, notice in leaving_list:
+            if room_id not in leaving_by_room:
+                leaving_by_room[room_id] = []
+            leaving_by_room[room_id].append({
+                'name': name,
+                'room_num': room_num,
+                'checkout': checkout,
+                'notice_date': notice,
+            })
 
-        # Create a map of room_id -> bookings in that room
         bookings_by_room = {}
-        for bid, phone, checkin, bstatus, room_num in bookings_list:
-            # Get room_id from room_number
-            room_result = await session.scalar(
-                select(Room.id).where(Room.room_number == room_num)
-            )
-            if room_result and room_result in leaving_by_room:
-                if room_result not in bookings_by_room:
-                    bookings_by_room[room_result] = []
-                bookings_by_room[room_result].append({
+        for bid, phone, checkin, status, room_num, room_id in bookings_list:
+            if room_id and room_id in leaving_by_room:
+                if room_id not in bookings_by_room:
+                    bookings_by_room[room_id] = []
+                bookings_by_room[room_id].append({
                     'phone': phone,
-                    'checkin': checkin.isoformat() if checkin else None,
-                    'status': bstatus,
-                    'room': room_num,
+                    'checkin': checkin,
+                    'status': status,
                 })
 
-        # Show the mismatches
-        print("=== ROOMS WITH LEAVING TENANTS ===")
-        for room_id, (leaving_name, room_num, checkout) in leaving_by_room.items():
-            bookings_in_room = bookings_by_room.get(room_id, [])
-            print(f"\n{room_num}: {leaving_name}")
-            print(f"  Expected checkout: {checkout.isoformat() if checkout else '?'}")
-            if bookings_in_room:
-                print(f"  ✅ Bookings in this room:")
-                for b in bookings_in_room:
-                    print(f"     - {b['phone']} | Check-in: {b['checkin']} | Status: {b['status']}")
-                    # Check if dates match
-                    if b['checkin'] and checkout:
+        # Analysis
+        print("=== MATCHING ANALYSIS ===\n")
+        matched = 0
+        unmatched_bookings = 0
+
+        for room_id, leaving_tenants in leaving_by_room.items():
+            for tenant in leaving_tenants:
+                bookings = bookings_by_room.get(room_id, [])
+                room_num = tenant['room_num']
+                checkout = tenant['checkout']
+
+                if bookings:
+                    # Check each booking
+                    for b in bookings:
                         ci = b['checkin']
-                        co = checkout.isoformat()
-                        if ci >= co:
-                            print(f"       ✓ Check-in AFTER checkout (valid replacement)")
-                        else:
-                            print(f"       ✗ Check-in BEFORE checkout ({(date.fromisoformat(co) - date.fromisoformat(ci)).days} days early)")
-            else:
-                print(f"  ❌ NO BOOKING IN THIS ROOM")
+                        if ci and checkout:
+                            # Current logic from kpi.py: ci >= eco
+                            if ci >= checkout:
+                                print(f"✅ MATCH: {room_num} ({tenant['name']}) | Checkout {checkout} → Booking checkin {ci} (status: {b['status']})")
+                                matched += 1
+                            else:
+                                print(f"❌ NO MATCH (too early): {room_num} ({tenant['name']}) | Checkout {checkout} → Booking checkin {ci} ({(checkout - ci).days} days BEFORE)")
+                                unmatched_bookings += 1
+
+        print(f"\n=== SUMMARY ===")
+        print(f"Matched (ci >= checkout): {matched}")
+        print(f"Unmatched (ci < checkout): {unmatched_bookings}")
+        print(f"Total notices with leaving tenants: {len(leaving_list)}")
+        print(f"Total bookings in those rooms: {len(bookings_list)}")
 
 asyncio.run(main())
