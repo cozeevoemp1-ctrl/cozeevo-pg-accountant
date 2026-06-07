@@ -1874,19 +1874,6 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 )
                 session.add(_pmt_booking)
 
-            # Validate minimum collection for monthly check-ins
-            if obs.stay_type != "daily" and req and req.instant_checkin:
-                total_collected = (req.collected_rent_dues or 0) + (req.collected_deposit_dues or 0) + (obs.booking_amount or 0)
-                # Need at least 1st month prorated rent OR full deposit
-                first_month_rent = prorated_first_month_rent(float(obs.agreed_rent or 0), obs.checkin_date)
-                min_required = min(first_month_rent, float(obs.security_deposit or 0))
-                if min_required > 0 and total_collected < min_required:
-                    raise HTTPException(
-                        422,
-                        f"Must collect at least ₹{int(min_required)} (either 1st-month rent ₹{int(first_month_rent)} or deposit ₹{int(obs.security_deposit or 0)}) at check-in. "
-                        f"Collected: ₹{int(total_collected)}. Re-enter collection amounts on bookings page."
-                    )
-
             # Additional dues collected at check-in by receptionist
             _pmt_rent = None
             if req and req.collected_rent_dues > 0:
