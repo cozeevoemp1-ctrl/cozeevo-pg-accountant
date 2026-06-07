@@ -309,6 +309,10 @@ async def check_room_bookable(
     if not rn:
         return None, "Room number is empty."
 
+    # Room 000 is placeholder only — block all bookings
+    if rn == "000":
+        return None, "Room 000 is a placeholder (unassigned) — cannot book tenants here. Assign to a real room first."
+
     q = select(Room).where(Room.room_number == rn)
     if property_id is not None:
         q = q.where(Room.property_id == property_id)
