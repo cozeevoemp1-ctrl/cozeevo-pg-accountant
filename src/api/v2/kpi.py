@@ -118,11 +118,38 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
 
         # Pre-booked: pending_tenant (link sent) + pending_review (form filled, awaiting approval)
         # + no_show tenants in room 000 (pre-booked via old bot flow)
+        # Count only valid replacements: pending_review in rooms with leaving tenants
         prebooked_form = (
             await session.scalar(
                 select(func.count(OnboardingSession.id))
+                .join(Room, Room.id == OnboardingSession.room_id)
                 .where(
-                    OnboardingSession.status == "pending_review",  # Only form-filled (not QR scans awaiting form)
+                    OnboardingSession.status == "pending_review",
+                    OnboardingSession.room_id.isnot(None),
+                    # Room has a leaving tenant (notice or expected checkout)
+                    or_(
+                        exists(
+                            select(1).from_(Tenancy)
+                            .where(
+                                Tenancy.room_id == Room.id,
+                                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.exited]),
+                                or_(
+                                    Tenancy.notice_date != None,
+                                    Tenancy.expected_checkout.between(date.today() - timedelta(days=30), date.today() + timedelta(days=60))
+                                )
+                            )
+                        ),
+                        exists(
+                            select(1).from_(Tenancy)
+                            .where(
+                                Tenancy.room_id == Room.id,
+                                Tenancy.status == TenancyStatus.active,
+                                Tenancy.stay_type == StayType.daily,
+                                Tenancy.checkout_date >= date.today(),
+                                Tenancy.checkout_date <= date.today() + timedelta(days=30)
+                            )
+                        )
+                    )
                 )
             ) or 0
         )
