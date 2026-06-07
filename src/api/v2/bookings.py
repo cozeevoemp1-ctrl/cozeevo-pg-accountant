@@ -220,11 +220,13 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 await session.flush()
 
             _stay = StayType.daily if req.stay_type == "daily" else StayType.monthly
+            # Status: if checkin is today or in past → active; otherwise → no_show
+            _target_status = TenancyStatus.active if checkin <= date.today() else TenancyStatus.no_show
             tenancy = Tenancy(
                 tenant_id=tenant.id,
                 room_id=room.id,
                 stay_type=_stay,
-                status=TenancyStatus.no_show,
+                status=_target_status,
                 checkin_date=checkin,
                 checkout_date=checkout,
                 agreed_rent=req.monthly_rent if req.stay_type == "monthly" else 0,
