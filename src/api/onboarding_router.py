@@ -25,6 +25,7 @@ from src.database.models import (
     RentRevision, AuditLog,
 )
 from src.services.pdf_generator import HOUSE_RULES
+from src.services.rent_schedule import prorated_first_month_rent
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
