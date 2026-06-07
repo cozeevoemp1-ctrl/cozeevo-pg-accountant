@@ -409,38 +409,17 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
   useEffect(() => {
     if (prefillDone.current || b.status !== "pending_review") return
 
-    if (b.tenancy_id && b.stay_type !== "daily") {
-      // Monthly: fetch live dues from the active tenancy
-      supabase().auth.getSession().then(({ data }) => {
-        const token = data.session?.access_token
-        if (!token) return
-        fetch(`${API_URL}/api/v2/app/tenants/${b.tenancy_id}/dues`, {
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        })
-          .then((r) => r.ok ? r.json() : null)
-          .then((d) => {
-            if (!d) return
-            const rentDue = d.dues ?? 0
-            const depDue = d.deposit_due ?? 0
-            if (rentDue > 0) { const v = String(Math.round(rentDue)); setCollectRentDues(v); defaultRentDues.current = v }
-            if (depDue > 0) { const v = String(Math.round(depDue)); setCollectDepositDues(v); defaultDepositDues.current = v }
-            setTotalDues(rentDue + depDue)
-            prefillDone.current = true
-          })
-          .catch(() => {})
-      })
-    } else {
-      // Day-stay: always calculate from session — prepaid = daily_rate × num_days − advance
-      // Monthly (no tenancy yet): advance deducted from deposit, prorated rent due
-      const rentDue = b.stay_type === "daily"
-        ? Math.max(0, (b.daily_rate || 0) * (b.num_days || 0) - (b.booking_amount || 0))
-        : proRata
-      const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
-      if (rentDue > 0) { const v = String(rentDue); setCollectRentDues(v); defaultRentDues.current = v }
-      if (depositDue > 0) { const v = String(depositDue); setCollectDepositDues(v); defaultDepositDues.current = v }
-      setTotalDues(rentDue + depositDue)
-      prefillDone.current = true
-    }
+    // For pending_review, always calculate from booking agreement (not live tenancy dues)
+    // Day-stay: prepaid = daily_rate × num_days − advance
+    // Monthly: advance deducted from both rent and deposit
+    const rentDue = b.stay_type === "daily"
+      ? Math.max(0, (b.daily_rate || 0) * (b.num_days || 0) - (b.booking_amount || 0))
+      : proRata
+    const depositDue = Math.max(0, (b.security_deposit || 0) - (b.booking_amount || 0))
+    if (rentDue > 0) { const v = String(rentDue); setCollectRentDues(v); defaultRentDues.current = v }
+    if (depositDue > 0) { const v = String(depositDue); setCollectDepositDues(v); defaultDepositDues.current = v }
+    setTotalDues(rentDue + depositDue)
+    prefillDone.current = true
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
