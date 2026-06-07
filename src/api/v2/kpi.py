@@ -935,7 +935,7 @@ async def get_kpi_detail(
                     )
                     .where(
                         OnboardingSession.room_id.in_(list(notice_room_ids)),
-                        OnboardingSession.status == "pending_review",
+                        OnboardingSession.status.in_(["pending_review", "pending_tenant"]),
                     )
                 )).all()
                 for sr in session_rows2:
