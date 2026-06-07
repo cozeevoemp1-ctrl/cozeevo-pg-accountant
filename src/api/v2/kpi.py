@@ -179,6 +179,44 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         )
         notices_count = _monthly_notices + _daily_leaving
 
+        # Incoming REPLACEMENTS (only in rooms with leaving tenants) — for accurate "net" calculation
+        # Get room IDs of leaving tenants
+        _leaving_room_ids = select(Tenancy.room_id.distinct()).where(
+            Tenancy.status == TenancyStatus.active,
+            or_(
+                and_(
+                    Tenancy.stay_type == StayType.monthly,
+                    or_(Tenancy.notice_date != None, Tenancy.expected_checkout.between(date.today() - timedelta(days=30), date.today() + timedelta(days=60))),
+                ),
+                and_(
+                    Tenancy.stay_type == StayType.daily,
+                    Tenancy.checkout_date.isnot(None),
+                    Tenancy.checkout_date >= date.today(),
+                    Tenancy.checkout_date <= date.today() + timedelta(days=30),
+                ),
+            )
+        )
+        # Count pending_review + no_show ONLY in those rooms
+        _notices_pending_review = int(
+            await session.scalar(
+                select(func.count(OnboardingSession.id))
+                .where(
+                    OnboardingSession.status == "pending_review",
+                    OnboardingSession.room_id.in_(_leaving_room_ids),
+                )
+            ) or 0
+        )
+        _notices_no_show = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .where(
+                    Tenancy.status == TenancyStatus.no_show,
+                    Tenancy.room_id.in_(_leaving_room_ids),
+                )
+            ) or 0
+        )
+        notices_incoming = _notices_pending_review + _notices_no_show
+
         # Check-ins today — no_show Tenancy OR pending OnboardingSession not already
         # linked to a no_show Tenancy (handles orphaned/cancelled tenancy edge cases).
         _no_show_today_ids = select(Tenancy.id).where(
@@ -310,6 +348,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         no_show_count=no_show_count,
         prebooked_count=prebooked_count,
         notices_count=notices_count,
+        notices_incoming=notices_incoming,
         checkins_today=checkins_today,
         checkouts_today=checkouts_today,
         overdue_tenants=overdue_tenants,

@@ -1539,7 +1539,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
 
       {/* On notice — full width */}
       {data.notices_count > 0 && (() => {
-        const incoming = data.no_show_count + data.prebooked_count;
+        const incoming = data.notices_incoming;
         const net = incoming - data.notices_count;
         const subtitle = incoming > 0
           ? `${incoming} incoming · net ${net >= 0 ? "+" : ""}${net}`

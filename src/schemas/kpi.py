@@ -12,6 +12,7 @@ class KpiResponse(BaseModel):
     no_show_count: int
     prebooked_count: int
     notices_count: int
+    notices_incoming: int  # replacements specifically for leaving tenants' rooms
     checkins_today: int
     checkouts_today: int
     overdue_tenants: int
