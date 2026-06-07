@@ -1860,7 +1860,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             if obs.stay_type != "daily" and req and req.instant_checkin:
                 total_collected = (req.collected_rent_dues or 0) + (req.collected_deposit_dues or 0) + (obs.booking_amount or 0)
                 # Need at least 1st month prorated rent OR full deposit
-                first_month_rent = proratedRent(float(obs.agreed_rent or 0), obs.checkin_date)
+                first_month_rent = prorated_first_month_rent(float(obs.agreed_rent or 0), obs.checkin_date)
                 min_required = min(first_month_rent, float(obs.security_deposit or 0))
                 if min_required > 0 and total_collected < min_required:
                     raise HTTPException(

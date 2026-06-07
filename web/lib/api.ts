@@ -527,6 +527,7 @@ export interface NoticeItem {
   room_notice_count: number;
   is_full_exit: boolean;
   stay_type?: string;               // "daily" for day-stay, undefined/absent for monthly
+  prebookings?: Array<{ name: string; checkin_date: string }>;  // replacement bookings for this room
 }
 
 export function getActiveNotices(): Promise<NoticeItem[]> {

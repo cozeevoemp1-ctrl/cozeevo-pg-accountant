@@ -539,6 +539,21 @@ function NoticeCard({
         />
       </div>
 
+      {/* Replacements */}
+      {item.prebookings && item.prebookings.length > 0 && (
+        <div className="bg-[#ECFDF5] border border-[#A7F3D0] rounded-lg px-3 py-2 mt-1">
+          <p className="text-[10px] font-bold text-[#047857] mb-1.5">Replacement Booked</p>
+          <div className="flex flex-col gap-1">
+            {item.prebookings.map((pb, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px]">
+                <span className="text-ink font-semibold">{pb.name}</span>
+                <span className="text-ink-muted">Check-in {fmtDate(pb.checkin_date)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* CTAs */}
       <div className="flex gap-2 mt-1">
         <button
