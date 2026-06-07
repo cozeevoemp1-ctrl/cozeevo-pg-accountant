@@ -2,6 +2,30 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.50] — 2026-06-07 — KPI & notices filter fixes + duplicate payment discovery
+
+### fix: Home page KPI boxes (API was broken)
+- Complex exists() subqueries were breaking the prebooked_form calculation
+- Simplified to count pending_review sessions in non-staff, non-000 rooms
+- Restored KPI endpoint functionality
+
+### fix: "No replacement" filter on Notices page
+- Filter was checking wrong field (deposit_eligible, which is about notice timing, not replacements)
+- Removed incorrect condition; now only checks if `prebookings` array is empty
+- Prebookings now only include fully signed (pending_review) bookings, not phantom QR scans (pending_tenant)
+
+### fix: "incoming" count now only includes actual replacements
+- Was counting ALL pending_review + no_show globally (including vacant rooms)
+- Now counts only those in ROOMS WITH LEAVING TENANTS
+- Added `notices_incoming` to KPI response for accurate "net" calculation
+- Fixes discrepancy: 37 leaving with 20 global incoming but only ~5 actual replacements in those rooms
+
+### data-integrity: Duplicate payments from sheet load identified
+- Jagpreet Singh (Room 023) has ₹13,500 UPI deposit recorded twice (bot + sheet reload)
+- Root cause: "May sheet reload" violated the "never sync Sheet→DB" rule
+- Scope unknown — need to scan entire payment table for sheet-reload duplicates
+- Action: Void duplicates (is_void=True + audit log) in next session
+
 ## [1.76.49] — 2026-06-03 — Data integrity audit + cancel flow fixes
 
 ### fix: cancel_session (onboarding) now cancels linked tenancy

@@ -6,6 +6,12 @@ type: project
 
 ## Active / Next Up
 
+### Data integrity — IDENTIFIED (2026-06-07)
+- **Duplicate payments from "May sheet reload"** — Jagpreet Singh (Room 023) has duplicate UPI deposit + others
+- **Root cause:** Sheet data was loaded into DB, creating duplicates of bot-recorded payments
+- **Action needed:** Void "May sheet reload" payment entries (is_void=True + audit log), scan other tenants for same issue
+- **Affected:** Unknown scope — need to check full payment table for sheet-reload duplicates
+
 ### Home page & Notices page filters — FIXED (2026-06-07)
 - **Issue 1:** KPI API was broken due to syntax errors in exists() subqueries
   - **Fix:** Simplified prebooked_form query to count pending_review in non-staff, non-000 rooms
