@@ -9,6 +9,9 @@ import { RecentCheckins } from "@/components/home/recent-checkins";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 
+// Always fetch fresh data — no caching
+export const revalidate = 0;
+
 function _monthLabel(d: Date): string {
   return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 }
