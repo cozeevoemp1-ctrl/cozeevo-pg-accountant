@@ -2,6 +2,40 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.52] — 2026-06-07 — Quick_book status fix + check-in performance + data refresh
+
+### fix: quick_book now sets correct tenancy status based on checkin_date
+- Was always creating status=no_show, even for past/today checkins
+- Now matches approval logic: active if checkin <= today, else no_show
+- Fixes issue where past-dated advance bookings appeared active without completing onboarding
+- Files: `src/api/v2/bookings.py` line 227
+
+### fix: Remove minimum collection validation at check-in
+- Was blocking check-in if tenant didn't pay at least 1st-month rent OR deposit
+- Now allows any payment amount; remainder becomes dues (as intended)
+- Files: `src/api/onboarding_router.py` lines 1877-1888
+
+### fix: Check-in performance bottleneck (10s → <1s)
+- GSheets add_tenant, PDF generation, and WhatsApp sends were blocking response
+- Moved session.commit() to BEFORE slow operations
+- DB changes now saved immediately; extra operations run in background
+- Files: `src/api/onboarding_router.py` line 1937
+
+### fix: proratedRent NameError in approve endpoint
+- Line 1863 called undefined proratedRent(); corrected to prorated_first_month_rent()
+- Moved import from function scope to module level for availability in approve()
+- Files: `src/api/onboarding_router.py` lines 28 + 1880
+
+### fix: Home page data refresh
+- Added `export const revalidate = 0` to disable caching
+- Home page now always fetches fresh KPI/occupancy data on navigation
+- Files: `web/app/page.tsx` line 12
+
+### data: Devamsh (Room 523) reverted to no_show
+- Was incorrectly active (past checkin_date but never completed onboarding)
+- Reverted until proper check-in through Bookings page
+- Will move to active when formally checked in with agreed date
+
 ## [1.76.51] — 2026-06-07 — Bookings page scroll fix + cash dashboard diagnostics
 
 ### fix: Bookings page stays in place after canceling
