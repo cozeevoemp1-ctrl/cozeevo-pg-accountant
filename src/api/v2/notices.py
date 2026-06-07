@@ -69,12 +69,10 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
         # Prebookings per room (pending_review with room assigned, non-staff, non-000)
         prebooking_rows = (await session.execute(
             select(OnboardingSession.room_id, OnboardingSession.full_name, OnboardingSession.phone)
+            .join(Room, Room.id == OnboardingSession.room_id)
             .where(
                 OnboardingSession.status == "pending_review",
                 OnboardingSession.room_id.isnot(None),
-            )
-            .join(Room, Room.id == OnboardingSession.room_id)
-            .where(
                 Room.is_staff_room == False,
                 Room.room_number != "000",
             )
