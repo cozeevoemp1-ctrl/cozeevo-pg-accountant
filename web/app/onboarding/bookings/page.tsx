@@ -247,6 +247,7 @@ export default function BookingsPage() {
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
                     onReload={load}
+                    onCancelled={() => setBookings(bk => bk.filter(x => x.token !== b.token))}
                   />
                 ))}
               </>
@@ -265,6 +266,7 @@ export default function BookingsPage() {
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
                     onReload={load}
+                    onCancelled={() => setBookings(bk => bk.filter(x => x.token !== b.token))}
                   />
                 ))}
               </>
@@ -283,6 +285,7 @@ export default function BookingsPage() {
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
                     onReload={load}
+                    onCancelled={() => setBookings(bk => bk.filter(x => x.token !== b.token))}
                   />
                 ))}
               </>
@@ -334,11 +337,12 @@ function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cas
   )
 }
 
-function BookingCard({ b, checkingIn, onCheckin, onReload }: {
+function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
   b: Booking
   checkingIn: string | null
   onCheckin: (token: string, collection?: { collected_rent_dues: number; rent_dues_mode: string; collected_deposit_dues: number }) => Promise<void> | void
   onReload: () => void
+  onCancelled?: () => void
 }) {
   const isPending = b.status === "pending_tenant"
   const isExpired = b.status === "expired"
@@ -460,7 +464,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload }: {
     setCancelling(true); setErr("")
     try {
       await cancelBookingSession(b.token)
-      onReload()
+      onCancelled?.()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Cancel failed")
       setCancelling(false)

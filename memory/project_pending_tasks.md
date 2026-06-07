@@ -6,6 +6,17 @@ type: project
 
 ## Active / Next Up
 
+### Bookings page scroll fix — DONE (2026-06-07)
+- ✅ Cancel booking now removes just the card from state instead of full page reload
+- ✅ Scroll position preserved after cancel
+- Files: `web/app/onboarding/bookings/page.tsx`
+
+### Cash dashboard discrepancy — IDENTIFIED (2026-06-07)
+- **Dashboard shows:** ₹18,86,464 (from Payment table, payment_mode=cash + for_type=rent)
+- **Sheet shows:** ₹1,858,700 (~10× lower, roughly ₹1.86L)
+- **Diagnosis needed:** Check if sheet has hidden rows, filters applied, or incorrect formula scope
+- **Next:** Unhide all rows on sheet, remove all filters, verify actual June cash column sum
+
 ### Data integrity — IDENTIFIED (2026-06-07)
 - **Duplicate payments from "May sheet reload"** — Jagpreet Singh (Room 023) has duplicate UPI deposit + others
 - **Root cause:** Sheet data was loaded into DB, creating duplicates of bot-recorded payments

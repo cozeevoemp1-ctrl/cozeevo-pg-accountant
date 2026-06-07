@@ -2,6 +2,19 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.51] — 2026-06-07 — Bookings page scroll fix + cash dashboard diagnostics
+
+### fix: Bookings page stays in place after canceling
+- Cancel booking was calling full page reload (onReload), which scrolled to top
+- Now removes just the cancelled card from local state, preserving scroll position
+- Files: `web/app/onboarding/bookings/page.tsx`
+
+### diagnostic: Cash dashboard discrepancy identified
+- Dashboard shows ₹18,86,464 (from Payment table, payment_mode=cash + for_type=rent)
+- Sheet shows ₹1,858,700 — ~10× lower (roughly ₹1.86L vs ₹18.86L)
+- Root causes to check: hidden rows on sheet, filtered view, or sheet formula scope issue
+- Next: unhide all sheet rows, remove filters, verify complete column sum
+
 ## [1.76.50] — 2026-06-07 — KPI & notices filter fixes + duplicate payment discovery
 
 ### fix: Home page KPI boxes (API was broken)
