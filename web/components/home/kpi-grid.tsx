@@ -1339,8 +1339,6 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
             if (!pass) return false;
           }
           if (noticeNoReplacement && (it.prebookings ?? []).length > 0) return false;
-          // Also exclude if deposit_eligible (has replacement — shows as "Refundable")
-          if (noticeNoReplacement && it.deposit_eligible) return false;
           if (q && !it.name.toLowerCase().includes(q) && !it.room.toLowerCase().includes(q)) return false;
           return true;
         })
