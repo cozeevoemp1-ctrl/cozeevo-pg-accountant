@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import case, func, literal_column, select, desc, or_, and_
+from sqlalchemy import case, func, literal_column, select, desc, or_, and_, exists
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
