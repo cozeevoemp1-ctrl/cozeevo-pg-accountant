@@ -2,6 +2,22 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [1.76.53] — 2026-06-07 — Notices page API fix + replacement badge diagnostics
+
+### fix: Notices page client-side error
+- API endpoint `/api/v2/app/notices/active` was failing due to querying non-existent `OnboardingSession.full_name` field
+- Now correctly selects `tenant_data` (JSON) and parses name from it
+- Also updated prebookings to include `checkin_date` for frontend display
+- Updated status filter to include both `pending_review` AND `pending_tenant` bookings (was pending_review only)
+- Files: `src/api/v2/notices.py` lines 69-85
+
+### diagnostic: Bookings & replacement badge reconciliation
+- Bookings page shows 16 total (pending_review + expired statuses only)
+- Database actual counts: 10 pending_review + 5 pending_tenant + 0 expired = 15 total pending
+- Of 15 pending: ~5 are replacements (check-in >= leaving tenant's expected_checkout), ~8 are new bookings to empty rooms
+- Discrepancy likely due to timing (new booking added after diagnostic ran) or filter difference
+- 2 room 000 bookings still in DB (IDs 155, 165) inflating counts — decision pending on cancel vs assign
+
 ## [1.76.52] — 2026-06-07 — Quick_book status fix + check-in performance + data refresh
 
 ### fix: quick_book now sets correct tenancy status based on checkin_date

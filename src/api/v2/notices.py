@@ -3,6 +3,7 @@ GET /api/v2/app/notices/active  — active monthly tenants who have given formal
 """
 from __future__ import annotations
 
+import json as _json
 import logging
 from collections import defaultdict
 from datetime import date, timedelta
@@ -66,12 +67,12 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
             tenancy_expected[tenancy.id] = ec
             room_notice_checkouts[room.id].append(ec)
 
-        # Prebookings per room (pending_review with room assigned, non-staff, non-000)
+        # Prebookings per room (pending_review + pending_tenant with room assigned, non-staff, non-000)
         prebooking_rows = (await session.execute(
-            select(OnboardingSession.room_id, OnboardingSession.full_name, OnboardingSession.phone)
+            select(OnboardingSession.room_id, OnboardingSession.tenant_data, OnboardingSession.tenant_phone, OnboardingSession.checkin_date)
             .join(Room, Room.id == OnboardingSession.room_id)
             .where(
-                OnboardingSession.status == "pending_review",
+                OnboardingSession.status.in_(["pending_review", "pending_tenant"]),
                 OnboardingSession.room_id.isnot(None),
                 Room.is_staff_room == False,
                 Room.room_number != "000",
@@ -79,9 +80,12 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
         )).all()
         room_prebookings: dict[int, list] = defaultdict(list)
         for pb in prebooking_rows:
+            td = _json.loads(pb.tenant_data) if pb.tenant_data else {}
+            pb_name = td.get("name") or pb.tenant_phone or "—"
+            ci = pb.checkin_date
             room_prebookings[pb.room_id].append({
-                "name": pb.full_name,
-                "phone": pb.phone,
+                "name": pb_name,
+                "checkin_date": ci.isoformat() if ci else "—",
             })
 
         results = []

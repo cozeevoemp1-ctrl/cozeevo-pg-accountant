@@ -6,6 +6,26 @@ type: project
 
 ## Active / Next Up
 
+### Notices page API — FIXED (2026-06-07)
+- ✅ Fixed `src/api/v2/notices.py` — was querying non-existent `OnboardingSession.full_name` field
+- ✅ Now correctly parses tenant_data JSON and includes checkin_date in prebookings response
+- ✅ API includes both pending_review and pending_tenant bookings (was pending_review only)
+- **Next:** Test page in browser to confirm error resolved
+
+### Bookings page — replacement badge & count reconciliation (2026-06-07)
+- **Data summary:**
+  - UI shows: 16 bookings total
+  - DB shows: 10 pending_review + 5 pending_tenant + 0 expired = 15 total pending
+  - Discrepancy likely due to timing (new booking added after diagnostic) or filter difference
+- **Room 000 bookings issue:**
+  - 2 active room 000 bookings still in DB (IDs 155, 165): one pending_review, one pending_tenant
+  - Inflating counts when user asks "why 21 bookings"
+  - **Action needed:** Decide whether to cancel or assign to actual rooms
+- **Replacement badge status:**
+  - ~5 are actual replacements (check-in >= leaving tenant's expected_checkout)
+  - ~8 are new bookings to empty rooms (correctly don't show badge)
+  - Logic is correct; just need to clean up room 000 bookings
+
 ### Bookings page scroll fix — DONE (2026-06-07)
 - ✅ Cancel booking now removes just the card from state instead of full page reload
 - ✅ Scroll position preserved after cancel
