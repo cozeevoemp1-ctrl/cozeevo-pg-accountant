@@ -12,7 +12,7 @@ from sqlalchemy import select, func, or_
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import Tenancy, TenancyStatus, StayType, Tenant, Room
+from src.database.models import Tenancy, TenancyStatus, StayType, Tenant, Room, OnboardingSession
 from services.property_logic import calc_notice_last_day
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,26 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
             tenancy_expected[tenancy.id] = ec
             room_notice_checkouts[room.id].append(ec)
 
+        # Prebookings per room (pending_review with room assigned, non-staff, non-000)
+        prebooking_rows = (await session.execute(
+            select(OnboardingSession.room_id, OnboardingSession.full_name, OnboardingSession.phone)
+            .where(
+                OnboardingSession.status == "pending_review",
+                OnboardingSession.room_id.isnot(None),
+            )
+            .join(Room, Room.id == OnboardingSession.room_id)
+            .where(
+                Room.is_staff_room == False,
+                Room.room_number != "000",
+            )
+        )).all()
+        room_prebookings: dict[int, list] = defaultdict(list)
+        for pb in prebooking_rows:
+            room_prebookings[pb.room_id].append({
+                "name": pb.full_name,
+                "phone": pb.phone,
+            })
+
         results = []
         for tenancy, tenant, room in notice_rows:
             nd = tenancy.notice_date
@@ -103,6 +123,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "room_active_count":  room_active_count,
                 "room_notice_count":  room_notice_count,
                 "is_full_exit":       is_full_exit,
+                "prebookings":        room_prebookings.get(room.id, []),
             })
 
         results.sort(key=lambda x: (x["expected_checkout"], x["tenant_name"]))
@@ -147,6 +168,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "room_active_count": 1,
                 "room_notice_count": 1,
                 "is_full_exit":      False,
+                "prebookings":       room_prebookings.get(room.id, []),
             })
 
         return results

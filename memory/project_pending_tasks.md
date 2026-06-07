@@ -6,6 +6,13 @@ type: project
 
 ## Active / Next Up
 
+### Home page KPI boxes — FIXED (2026-06-07)
+- **Issue:** Complex exists() subqueries in KPI endpoint were breaking the API
+- **Fix:** Simplified prebooked_form query to count pending_review in non-staff, non-000 rooms
+- **Deployed:** Commit e8b7493 → VPS running
+- **Status:** Home page KPI boxes should now display (API responding to auth requests)
+- **TODO:** Verify the prebooked_form count is reasonable (currently ~25 valid pending_review sessions expected after filtering phantom QR bookings)
+
 ### CI/CD — auto-deploy WORKING ✓ (2026-05-16)
 - Run #9 passed (green) — commit bd25c14
 - Push to master → SSH → git pull → migrate_all → `systemctl restart pg-accountant` — fully automated
