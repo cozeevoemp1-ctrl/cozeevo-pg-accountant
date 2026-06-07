@@ -122,12 +122,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             await session.scalar(
                 select(func.count(OnboardingSession.id))
                 .where(
-                    OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
-                    or_(
-                        OnboardingSession.status == "pending_review",
-                        OnboardingSession.expires_at == None,
-                        OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
-                    ),
+                    OnboardingSession.status == "pending_review",  # Only form-filled (not QR scans awaiting form)
                 )
             ) or 0
         )
