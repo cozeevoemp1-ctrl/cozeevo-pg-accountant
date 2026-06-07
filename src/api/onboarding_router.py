@@ -563,6 +563,19 @@ async def list_pending(request: Request):
                 delta = now - obs.expires_at
                 hours = int(delta.total_seconds() // 3600)
                 expired_ago = f"{hours}h ago" if hours < 24 else f"{hours // 24}d ago"
+
+            # Check if room has active tenants (for replacement badge)
+            is_replacement = False
+            current_occupants = []
+            if obs.room_id:
+                occ_result = await session.execute(
+                    select(Tenant.name, Tenancy.status)
+                    .join(Tenant, Tenant.id == Tenancy.tenant_id)
+                    .where(Tenancy.room_id == obs.room_id, Tenancy.status == TenancyStatus.active)
+                )
+                current_occupants = [row[0] for row in occ_result.all()]
+                is_replacement = len(current_occupants) > 0
+
             items.append({
                 "token": obs.token,
                 "status": effective_status,
@@ -587,6 +600,8 @@ async def list_pending(request: Request):
                 "expired_ago": expired_ago,
                 "is_qr": (obs.created_by_phone or "") == "qr_scan",
                 "notes": obs.special_terms or "",
+                "is_replacement": is_replacement,
+                "current_occupants": current_occupants,
             })
         # Also include Room 000 no-show tenancies (old bot-created pre-bookings with no onboarding session)
         room000 = await session.scalar(select(Room).where(Room.room_number == "000"))
@@ -620,6 +635,8 @@ async def list_pending(request: Request):
                     "expired_ago": "",
                     "is_qr": False,
                     "notes": tenancy.notes or "",
+                    "is_replacement": False,
+                    "current_occupants": [],
                 })
 
         return {"sessions": items}

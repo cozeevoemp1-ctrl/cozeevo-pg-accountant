@@ -35,6 +35,8 @@ interface Booking {
   expired_ago?: string
   is_qr?: boolean
   notes?: string
+  is_replacement?: boolean
+  current_occupants?: string[]
 }
 
 function fmtDate(iso: string) {
@@ -634,6 +636,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
           {checkinToday && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">Today!</span>
           )}
+          {b.is_replacement && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#D1FAE5] text-[#065F46]">Replacement</span>
+          )}
           {b.stay_type === "daily" && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">Day stay</span>
           )}
@@ -687,6 +692,14 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
           )}
         </div>
       </div>
+
+      {/* Current occupants (for replacement bookings) */}
+      {b.is_replacement && b.current_occupants && b.current_occupants.length > 0 && (
+        <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-lg px-3 py-2 text-[11px]">
+          <p className="text-[9px] font-bold text-[#0369A1] uppercase tracking-wide">Replacing</p>
+          <p className="text-ink mt-0.5">{b.current_occupants.join(", ")}</p>
+        </div>
+      )}
 
       {/* Admin notes */}
       {b.notes && !editing && (
