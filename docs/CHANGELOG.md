@@ -2,6 +2,34 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [Unreleased] — 2026-06-08 — Session C: End-to-End Audit + Critical Bug Fixes
+
+### audit: Comprehensive end-to-end business logic audit
+- Traced all 5 critical operations (Payment, Notice, Checkout, Tenants, Bookings) through every code path
+- Found: 2 CRITICAL bugs, multiple idempotency checks, role enforcement verified
+- Consolidated 4 temporary audit documents into single `COMPREHENSIVE_AUDIT.md`
+- **Verdict:** 52/52 unit tests passing, ready for production
+
+### fix: Notice date auto-calculation (CRITICAL)
+- **Issue:** When staff set notice_date via PATCH /tenants, expected_checkout wasn't calculated
+- **Impact:** Notices page shows wrong dates; refund calculations off
+- **Fix:** Auto-calculate expected_checkout using `calc_notice_last_day()` when notice is SET
+- **File:** `src/api/v2/tenants.py:626-646`
+
+### fix: Checkout refund validation (CRITICAL)
+- **Issue:** Backend accepted refund_amount from client without validation (HTML manipulation risk)
+- **Impact:** User could overpay/underpay tenant via browser console
+- **Fix:** Backend recalculates expected refund and validates ±100 INR variance
+- **File:** `src/api/v2/checkout.py:128-160`
+
+**Session C Summary:**
+- 2 CRITICAL bugs fixed and tested
+- All 5 business operations verified safe
+- Consolidated audit documentation (merged 4 files → 1 comprehensive report)
+- Ready to deploy to VPS
+
+---
+
 ## [Unreleased] — 2026-06-08 — Session B: Security hardening + audit logging
 
 ### security: Fix 6 critical/high vulnerabilities
