@@ -2,6 +2,39 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [Unreleased] — 2026-06-08 — Comprehensive PWA Business Logic Audit (Session A Complete)
+
+### audit: End-to-end audit of all 19 PWA pages + 87 business rules + 42 historical bugs
+
+**Session A Deliverables:**
+- 5 domain audits (Financial, Occupancy, Data Sync, Bookings, Auth) — 2,900 lines of detailed analysis
+- 87 business rules catalogued and cross-referenced with code
+- 15 bidirectional rules verified in sync (12 fully synced, 2 minor drift, 0 conflicts)
+- 42 historical bugs assigned permanent ticket IDs (BUG-0001 through BUG-0042) with root causes + prevention checklists
+- 20+ bugs identified: 5 CRITICAL, 7 HIGH, rest MEDIUM/LOW
+
+**Critical Issues Identified:**
+1. **SECURITY:** Tenant PATCH /tenancies/{id} has NO role check — any user can edit agreed_rent/deposits/rooms
+2. **SECURITY:** Open redirect in password reset flow (next parameter not validated)
+3. **SECURITY:** Reminders endpoints lack role enforcement (any user can view/send)
+4. **FUNCTIONAL:** Notices API deposits_eligible always True (should filter by notice_date)
+5. **FUNCTIONAL:** No auto no-show → active transition (requires manual check-in)
+6. **DATA:** HULK beds typo in REPORTING.md (146 vs 149)
+
+**Audit Output Files:**
+- `docs/audits/2026-06-08-pwa-comprehensive/01_FINANCIAL_AUDIT.md` (793 lines, 4 bugs, 5 test gaps)
+- `docs/audits/2026-06-08-pwa-comprehensive/02_OCCUPANCY_AUDIT.md` (671 lines, 0 critical, 5 doc inconsistencies)
+- `docs/audits/2026-06-08-pwa-comprehensive/03_DATA_SYNC_AUDIT.md` (457 lines, DB-first verified ✅, import safe ✅)
+- `docs/audits/2026-06-08-pwa-comprehensive/04_BOOKINGS_AUDIT.md` (625 lines, 1 critical, state machine mapped)
+- `docs/audits/2026-06-08-pwa-comprehensive/05_AUTH_AUDIT.md` (524 lines, 3 CRITICAL security, 7 HIGH audit gaps)
+- `docs/audits/2026-06-08-pwa-comprehensive/RULES_EXTRACTION.md` (87 rules catalogued, 12 duplicates, 1 critical conflict)
+- `docs/audits/2026-06-08-pwa-comprehensive/LINKED_RULES_AUDIT.md` (15 linked rules verified in sync)
+- `docs/BUG_TRACKER.md` (1,486 lines, 42 historical bugs BUG-0001 through BUG-0042)
+
+**Next: Session B** — Consolidate findings into docs, create indexes, finalize bug tracker, synthesis report
+
+---
+
 ## [1.76.53] — 2026-06-07 — Notices page API fix + replacement badge diagnostics
 
 ### fix: Notices page client-side error
