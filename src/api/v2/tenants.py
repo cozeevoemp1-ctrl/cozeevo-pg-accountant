@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 
@@ -121,6 +121,7 @@ async def search_tenants(
     q: str = Query(default=None),
     active_only: bool = Query(default=True),
     user: AppUser = Depends(get_current_user),
+    response: Response = Response(),
 ):
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="q must not be empty")

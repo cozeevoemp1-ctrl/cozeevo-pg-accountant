@@ -125,6 +125,39 @@ async def create_checkout(
         if existing:
             existing.status = CheckoutSessionStatus.cancelled
 
+        # Validate refund_amount: backend recalculates and validates against client value
+        # Refund formula: deposit - maintenance - dues - deductions, but only if notice given
+        is_daily = tenancy.stay_type.value == "daily"
+        has_notice = tenancy.notice_date is not None
+        maintenance_due = Decimal("0") if is_daily else Decimal(str(tenancy.maintenance_fee or 0))
+        pending_dues_dec = Decimal(str(body.pending_dues))
+        deductions_dec = Decimal(str(body.deductions))
+        security_deposit_dec = Decimal(str(body.security_deposit))
+
+        # If no notice or forfeited: refund must be 0
+        if not has_notice:
+            if body.refund_amount > 0:
+                raise HTTPException(
+                    422,
+                    f"Deposit forfeited (no notice given). Refund must be 0, not {body.refund_amount}.",
+                )
+            expected_refund = Decimal("0")
+        else:
+            # Notice given: calculate expected refund
+            expected_refund = max(
+                security_deposit_dec - maintenance_due - pending_dues_dec - deductions_dec,
+                Decimal("0"),
+            )
+            # Allow ±100 variance for rounding/calculation differences
+            client_refund = Decimal(str(body.refund_amount))
+            if abs(client_refund - expected_refund) > Decimal("100"):
+                raise HTTPException(
+                    422,
+                    f"Refund amount mismatch: expected ~{float(expected_refund)}, got {body.refund_amount}. "
+                    f"Check: deposit={float(security_deposit_dec)}, maintenance={float(maintenance_due)}, "
+                    f"dues={float(pending_dues_dec)}, deductions={float(deductions_dec)}",
+                )
+
         cs = CheckoutSession(
             token                 = str(uuid.uuid4()),
             status                = CheckoutSessionStatus.confirmed.value,
@@ -138,9 +171,9 @@ async def create_checkout(
             room_condition_ok     = body.room_condition_ok,
             damage_notes          = body.damage_notes or None,
             other_comments        = body.comments or None,
-            security_deposit      = Decimal(str(body.security_deposit)),
-            pending_dues          = Decimal(str(body.pending_dues)),
-            deductions            = Decimal(str(body.deductions)),
+            security_deposit      = security_deposit_dec,
+            pending_dues          = pending_dues_dec,
+            deductions            = deductions_dec,
             deduction_reason      = body.deduction_reason or None,
             refund_amount         = Decimal(str(body.refund_amount)),
             refund_mode           = body.refund_mode or None,
