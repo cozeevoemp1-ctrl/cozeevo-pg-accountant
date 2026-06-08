@@ -14,7 +14,7 @@ from sqlalchemy import desc, select, text
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from sqlalchemy.orm import aliased
-from src.database.models import Payment, PaymentFor, PaymentMode, Room, StayType, Tenancy, TenancyStatus, Tenant
+from src.database.models import Payment, PaymentFor, PaymentMode, Room, StayType, Tenancy, TenancyStatus, Tenant, AuditLog
 from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise_sheet_sync, update_payment as gsheets_update
 from src.schemas.payments import PaymentCreate, PaymentEdit, PaymentListItem, PaymentResponse
 from src.services.payments import _resolve_payment_mode, log_payment
@@ -264,19 +264,77 @@ async def edit_payment(
         if payment.is_void:
             raise HTTPException(status_code=409, detail="Cannot edit a voided payment")
 
+        # Fetch tenancy + tenant for audit log
+        tenancy = await session.get(Tenancy, payment.tenancy_id) if payment.tenancy_id else None
+        tenant = None
+        if tenancy:
+            tenant = await session.get(Tenant, tenancy.tenant_id)
+
         changed = []
         if body.method is not None:
+            old_method = payment.payment_mode.value if payment.payment_mode else "cash"
             payment.payment_mode = _METHOD_MAP.get(body.method, PaymentMode.cash)
             changed.append(f"method→{body.method}")
+            # Log to AuditLog
+            session.add(AuditLog(
+                changed_by=user.actor,
+                entity_type="payment",
+                entity_id=payment_id,
+                entity_name=f"Payment {payment_id}",
+                field="payment_mode",
+                old_value=old_method,
+                new_value=body.method,
+                source="pwa",
+                org_id=tenancy.org_id if tenancy else None,
+            ))
         if body.amount is not None:
+            old_amount = str(float(payment.amount))
             payment.amount = body.amount
             changed.append(f"amount→{body.amount}")
+            # Log to AuditLog
+            session.add(AuditLog(
+                changed_by=user.actor,
+                entity_type="payment",
+                entity_id=payment_id,
+                entity_name=f"Payment {payment_id}",
+                field="amount",
+                old_value=old_amount,
+                new_value=str(body.amount),
+                source="pwa",
+                org_id=tenancy.org_id if tenancy else None,
+            ))
         if body.notes is not None:
+            old_notes = payment.notes
             payment.notes = body.notes
             changed.append("notes updated")
+            # Log to AuditLog
+            session.add(AuditLog(
+                changed_by=user.actor,
+                entity_type="payment",
+                entity_id=payment_id,
+                entity_name=f"Payment {payment_id}",
+                field="notes",
+                old_value=old_notes,
+                new_value=body.notes,
+                source="pwa",
+                org_id=tenancy.org_id if tenancy else None,
+            ))
         if body.for_type is not None:
+            old_for_type = payment.for_type.value if payment.for_type else "rent"
             payment.for_type = PaymentFor(body.for_type)  # type: ignore[assignment]
             changed.append(f"for_type→{body.for_type}")
+            # Log to AuditLog
+            session.add(AuditLog(
+                changed_by=user.actor,
+                entity_type="payment",
+                entity_id=payment_id,
+                entity_name=f"Payment {payment_id}",
+                field="for_type",
+                old_value=old_for_type,
+                new_value=body.for_type,
+                source="pwa",
+                org_id=tenancy.org_id if tenancy else None,
+            ))
 
         await session.commit()
         await session.refresh(payment)

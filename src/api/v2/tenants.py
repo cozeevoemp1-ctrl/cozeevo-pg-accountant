@@ -461,12 +461,26 @@ async def update_tenant(
                 )
                 session.add(revision)
 
-        # Tenant fields
+        # Tenant fields — log changes for audit trail
         if "name" in body:
+            old_name = tenant.name
             tenant.name = body["name"]
+            if old_name != body["name"]:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenant",
+                    entity_id=tenant.id,
+                    entity_name=tenant.name,
+                    field="name",
+                    old_value=old_name,
+                    new_value=body["name"],
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "phone" in body:
             from src.services.room_occupancy import canonical_phone as _canon_phone, _normalize_phone as _norm_phone
             from sqlalchemy import func as _func
+            old_phone = tenant.phone
             new_phone = _canon_phone(body["phone"]) if body["phone"] else body["phone"]
             last10 = _norm_phone(new_phone or "")
             if new_phone and last10 and last10 != _norm_phone(tenant.phone or ""):
@@ -483,29 +497,149 @@ async def update_tenant(
                         detail=f"Phone {new_phone} is already registered to another tenant.",
                     )
             tenant.phone = new_phone
+            if old_phone != new_phone:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenant",
+                    entity_id=tenant.id,
+                    entity_name=tenant.name,
+                    field="phone",
+                    old_value=old_phone,
+                    new_value=new_phone,
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "email" in body:
+            old_email = tenant.email
             tenant.email = body["email"]
+            if old_email != body["email"]:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenant",
+                    entity_id=tenant.id,
+                    entity_name=tenant.name,
+                    field="email",
+                    old_value=old_email,
+                    new_value=body["email"],
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "tenant_notes" in body:
+            old_notes = tenant.notes
             tenant.notes = body["tenant_notes"]
+            if old_notes != body["tenant_notes"]:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenant",
+                    entity_id=tenant.id,
+                    entity_name=tenant.name,
+                    field="tenant_notes",
+                    old_value=old_notes,
+                    new_value=body["tenant_notes"],
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
 
-        # Tenancy fields
+        # Tenancy fields — log changes for audit trail
         if "agreed_rent" in body:
+            # RentRevision already logged above; also add AuditLog for the field change itself
+            old_rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
             tenancy.agreed_rent = body["agreed_rent"]
+            if old_rent != float(body["agreed_rent"]):
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="agreed_rent",
+                    old_value=str(old_rent),
+                    new_value=str(body["agreed_rent"]),
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "security_deposit" in body:
+            old_deposit = float(tenancy.security_deposit) if tenancy.security_deposit is not None else 0.0
             tenancy.security_deposit = body["security_deposit"]
+            if old_deposit != float(body["security_deposit"]):
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="security_deposit",
+                    old_value=str(old_deposit),
+                    new_value=str(body["security_deposit"]),
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "tenancy_notes" in body:
+            old_notes = tenancy.notes
             tenancy.notes = body["tenancy_notes"]
+            if old_notes != body["tenancy_notes"]:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="tenancy_notes",
+                    old_value=old_notes,
+                    new_value=body["tenancy_notes"],
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "maintenance_fee" in body:
+            old_fee = float(tenancy.maintenance_fee) if tenancy.maintenance_fee is not None else 0.0
             tenancy.maintenance_fee = body["maintenance_fee"]
+            if old_fee != float(body["maintenance_fee"]):
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="maintenance_fee",
+                    old_value=str(old_fee),
+                    new_value=str(body["maintenance_fee"]),
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "lock_in_months" in body:
+            old_lock = tenancy.lock_in_months
             tenancy.lock_in_months = body["lock_in_months"]
+            if old_lock != body["lock_in_months"]:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="lock_in_months",
+                    old_value=str(old_lock),
+                    new_value=str(body["lock_in_months"]),
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "notice_date" in body:
+            old_notice = tenancy.notice_date.isoformat() if tenancy.notice_date else None
             val = body["notice_date"]
             tenancy.notice_date = date.fromisoformat(val) if val else None
+            # Log notice date change
+            new_notice = tenancy.notice_date.isoformat() if tenancy.notice_date else None
+            if old_notice != new_notice:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="notice_date",
+                    old_value=old_notice,
+                    new_value=new_notice,
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
             # Clearing notice also clears the planned exit date — they're one action
             if not val:
                 tenancy.expected_checkout = None
         if "expected_checkout" in body:
+            old_checkout = tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None
             val = body["expected_checkout"]
             new_date = date.fromisoformat(val) if val else None
             if tenancy.stay_type.value == "daily":
@@ -513,9 +647,38 @@ async def update_tenant(
                 tenancy.checkout_date = new_date
             else:
                 tenancy.expected_checkout = new_date
+            # Log expected_checkout change
+            new_checkout = tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None
+            if old_checkout != new_checkout:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="expected_checkout",
+                    old_value=old_checkout,
+                    new_value=new_checkout,
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
         if "checkin_date" in body:
+            old_checkin = tenancy.checkin_date.isoformat() if tenancy.checkin_date else None
             val = body["checkin_date"]
             tenancy.checkin_date = date.fromisoformat(val) if val else None
+            # Log checkin_date change
+            new_checkin = tenancy.checkin_date.isoformat() if tenancy.checkin_date else None
+            if old_checkin != new_checkin:
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="checkin_date",
+                    old_value=old_checkin,
+                    new_value=new_checkin,
+                    source="pwa",
+                    org_id=tenancy.org_id,
+                ))
 
         # Room reassignment
         if "room_number" in body:
