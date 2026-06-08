@@ -114,7 +114,8 @@ export default function PreRegisterPage() {
     if (!name.trim())    { setError("Name is required"); return; }
     if (!phone.trim())   { setError("Phone is required"); return; }
     if (!checkinDate)    { setError("Expected move-in date is required"); return; }
-    if (roomInput.trim() && roomStatus && !roomStatus.ok) {
+    if (!roomInput.trim()) { setError("Room number is required. Select a specific room."); return; }
+    if (roomStatus && !roomStatus.ok) {
       setError("Room is not available for the selected check-in date — fix the room or date first.");
       return;
     }
@@ -122,7 +123,7 @@ export default function PreRegisterPage() {
     setLoading(true);
     try {
       const result = await quickBook({
-        room_number:      targetRoom,
+        room_number:      roomInput.trim().toUpperCase(),
         tenant_name:      name.trim(),
         tenant_phone:     phone.trim(),
         checkin_date:     checkinDate,
@@ -161,9 +162,7 @@ export default function PreRegisterPage() {
             <p className="text-xs font-mono break-all text-ink">{done.form_url}</p>
           )}
           <p className="text-xs text-ink-muted">
-            {targetRoom !== "000"
-              ? `Pre-booked into Room ${targetRoom}. Approve check-in when they arrive.`
-              : "Appears in Bookings as pending. Assign a room when they check in."}
+            Pre-booked into Room {roomInput.trim().toUpperCase()}. Approve check-in when they arrive.
           </p>
           <div className="flex gap-2 mt-2">
             <Link href="/onboarding/bookings" className="flex-1 text-center text-sm font-semibold text-brand-pink py-2 border border-brand-pink rounded-lg">

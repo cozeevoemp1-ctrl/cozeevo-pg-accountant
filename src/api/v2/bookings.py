@@ -117,8 +117,11 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         if not room:
             raise HTTPException(404, f"Room {req.room_number} not found")
 
-        # Capacity check (skip for room 000 — placeholder for future/unassigned tenants)
-        if room.room_number != "000":
+        # Reject room 000 (placeholder) — must assign a real room at booking time
+        if room.room_number == "000":
+            raise HTTPException(422, "Room 000 is a placeholder. Please select a specific room for this booking.")
+
+        # Capacity check
             from src.services.room_occupancy import get_room_occupants
             occ = await get_room_occupants(session, room)
             max_occ = room.max_occupancy or 1
