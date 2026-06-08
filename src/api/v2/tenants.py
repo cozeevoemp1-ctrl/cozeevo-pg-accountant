@@ -160,6 +160,11 @@ async def search_tenants(
         )
         rows = (await session.execute(stmt)).all()
 
+    # DEBUG: Log exactly what query returned
+    logger.info(f"[search_tenants] Query for q={q!r} active_only={active_only} returned {len(rows)} rows")
+    for i, (tenancy, tenant, room, prop) in enumerate(rows):
+        logger.info(f"  Row {i}: Tenancy {tenancy.id}, Tenant {tenant.name} ({tenant.id}), Room {room.room_number}, Status {tenancy.status.value}")
+
     result = [
         {
             "tenancy_id": tenancy.id,
@@ -173,6 +178,8 @@ async def search_tenants(
         }
         for tenancy, tenant, room, prop in rows
     ]
+
+    logger.info(f"[search_tenants] Returning {len(result)} results to client")
 
     # Prevent browser caching of search results (avoid duplicate displays on client)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
