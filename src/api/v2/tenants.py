@@ -160,7 +160,7 @@ async def search_tenants(
         )
         rows = (await session.execute(stmt)).all()
 
-    return [
+    result = [
         {
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,
@@ -173,6 +173,13 @@ async def search_tenants(
         }
         for tenancy, tenant, room, prop in rows
     ]
+
+    # Prevent browser caching of search results (avoid duplicate displays on client)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    return result
 
 
 @router.get("/tenants/{tenancy_id}/previous-stays")
