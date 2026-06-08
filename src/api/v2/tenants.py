@@ -159,19 +159,23 @@ async def search_tenants(
         )
         rows = (await session.execute(stmt)).all()
 
-    return [
-        {
-            "tenancy_id": tenancy.id,
-            "tenant_id": tenant.id,
-            "name": tenant.name,
-            "phone": tenant.phone,
-            "room_number": room.room_number,
-            "building_code": _building_code(prop.name),
-            "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
-            "status": tenancy.status.value,
-        }
-        for tenancy, tenant, room, prop in rows
-    ]
+    # Deduplicate by tenancy_id (in case JOIN creates duplicate rows)
+    seen_ids = set()
+    result = []
+    for tenancy, tenant, room, prop in rows:
+        if tenancy.id not in seen_ids:
+            seen_ids.add(tenancy.id)
+            result.append({
+                "tenancy_id": tenancy.id,
+                "tenant_id": tenant.id,
+                "name": tenant.name,
+                "phone": tenant.phone,
+                "room_number": room.room_number,
+                "building_code": _building_code(prop.name),
+                "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
+                "status": tenancy.status.value,
+            })
+    return result
 
 
 @router.get("/tenants/{tenancy_id}/previous-stays")
