@@ -158,6 +158,7 @@ async def search_tenants(
             .limit(10)
         )
         rows = (await session.execute(stmt)).all()
+        logger.info(f"[search_tenants] query returned {len(rows)} raw rows for q={q!r}")
 
     # Deduplicate by tenancy_id (in case JOIN creates duplicate rows)
     seen_ids = set()
@@ -175,6 +176,7 @@ async def search_tenants(
                 "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
                 "status": tenancy.status.value,
             })
+    logger.info(f"[search_tenants] after dedup: {len(result)} unique results from {len(rows)} rows; tenancy_ids={sorted(seen_ids)}")
     return result
 
 
