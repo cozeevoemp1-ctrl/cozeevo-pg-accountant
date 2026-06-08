@@ -145,8 +145,11 @@ async def search_tenants(
     )
 
     async with get_session() as session:
+        # Use DISTINCT ON to eliminate duplicate rows from JOIN
+        # The Property join can create cartesian products; DISTINCT ON(Tenancy.id) keeps first occurrence only
         stmt = (
             select(Tenancy, Tenant, Room, Property)
+            .distinct(Tenancy.id)
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
             .join(Property, Room.property_id == Property.id)
@@ -154,29 +157,25 @@ async def search_tenants(
                 Tenancy.status.in_(statuses),
                 match_clause,
             )
-            .order_by(Tenant.name)
+            .order_by(Tenancy.id, Tenant.name)
             .limit(10)
         )
         rows = (await session.execute(stmt)).all()
-        logger.info(f"[search_tenants] query returned {len(rows)} raw rows for q={q!r}")
+        logger.info(f"[search_tenants] query returned {len(rows)} rows for q={q!r} (DISTINCT applied)")
 
-    # Deduplicate by tenancy_id (in case JOIN creates duplicate rows)
-    seen_ids = set()
-    result = []
-    for tenancy, tenant, room, prop in rows:
-        if tenancy.id not in seen_ids:
-            seen_ids.add(tenancy.id)
-            result.append({
-                "tenancy_id": tenancy.id,
-                "tenant_id": tenant.id,
-                "name": tenant.name,
-                "phone": tenant.phone,
-                "room_number": room.room_number,
-                "building_code": _building_code(prop.name),
-                "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
-                "status": tenancy.status.value,
-            })
-    logger.info(f"[search_tenants] after dedup: {len(result)} unique results from {len(rows)} rows; tenancy_ids={sorted(seen_ids)}")
+    result = [
+        {
+            "tenancy_id": tenancy.id,
+            "tenant_id": tenant.id,
+            "name": tenant.name,
+            "phone": tenant.phone,
+            "room_number": room.room_number,
+            "building_code": _building_code(prop.name),
+            "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
+            "status": tenancy.status.value,
+        }
+        for tenancy, tenant, room, prop in rows
+    ]
     return result
 
 
