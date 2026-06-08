@@ -68,6 +68,21 @@ class LocalOnlyMiddleware:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # Check if VPS needs to git pull (deployment fix)
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            current_commit = result.stdout.strip()[:7]
+            logger.info(f"✓ Current git commit: {current_commit}")
+    except Exception as e:
+        logger.warning(f"Could not check git commit: {e}")
+
     db_url = os.getenv("DATABASE_URL", "sqlite:///./data/pg_accountant.db")
     from src.database.db_manager import init_db
     await init_db(db_url)
