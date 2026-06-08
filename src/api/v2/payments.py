@@ -164,13 +164,13 @@ async def list_payments(
             )).all()
             return [
                 PaymentListItem(
-                    id=p.id, tenancy_id=p.tenancy_id, amount=float(p.amount),
-                    payment_mode=p.payment_mode.value if p.payment_mode else "cash",
+                    payment_id=p.id, amount=float(p.amount),
+                    method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
                     for_type=p.for_type.value if p.for_type else "rent",
                     period_month=p.period_month.strftime("%Y-%m") if p.period_month else None,
                     payment_date=p.payment_date.strftime("%Y-%m-%d"),
                     notes=p.notes, is_void=p.is_void, receipt_url=p.receipt_url,
-                    upi_reference=p.upi_reference, tenant_name=row[1], room_number=row[2],
+                    upi_reference=p.upi_reference, tenant_name=row[0], room_number=row[1],
                 )
                 for p, *row in q_result
             ]
@@ -193,24 +193,28 @@ async def list_payments(
         q = q.order_by(desc(Payment.payment_date), desc(Payment.id)).limit(limit)
         rows = (await session.execute(q)).all()
 
+    # Deduplicate by payment_id (in case JOIN creates duplicate rows)
+    seen_ids = set()
     result = []
     for row in rows:
         p = row[0]
-        pm = p.period_month.strftime("%Y-%m") if p.period_month else None
-        result.append(PaymentListItem(
-            payment_id=p.id,
-            amount=float(p.amount),
-            method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
-            for_type=p.for_type.value if p.for_type else "rent",
-            period_month=pm,
-            payment_date=p.payment_date.strftime("%Y-%m-%d"),
-            notes=p.notes,
-            is_void=p.is_void,
-            receipt_url=p.receipt_url,
-            upi_reference=p.upi_reference,
-            tenant_name=row[1],
-            room_number=row[2],
-        ))
+        if p.id not in seen_ids:
+            seen_ids.add(p.id)
+            pm = p.period_month.strftime("%Y-%m") if p.period_month else None
+            result.append(PaymentListItem(
+                payment_id=p.id,
+                amount=float(p.amount),
+                method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
+                for_type=p.for_type.value if p.for_type else "rent",
+                period_month=pm,
+                payment_date=p.payment_date.strftime("%Y-%m-%d"),
+                notes=p.notes,
+                is_void=p.is_void,
+                receipt_url=p.receipt_url,
+                upi_reference=p.upi_reference,
+                tenant_name=row[1],
+                room_number=row[2],
+            ))
     return result
 
 
