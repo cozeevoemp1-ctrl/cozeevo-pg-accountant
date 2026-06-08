@@ -2,6 +2,26 @@
 
 All notable changes to PG Accountant will be documented here.
 
+## [Unreleased] — 2026-06-08 — Session B: Security hardening + audit logging
+
+### security: Fix 6 critical/high vulnerabilities
+- **CRITICAL:** Add role checks to `PATCH /tenants/{id}` — prevents any user from editing rent/deposit
+- **CRITICAL:** Add role checks to `GET/POST /reminders` endpoints — prevents tenant privacy leak
+- **CRITICAL:** Validate `next` parameter in password reset `/auth/callback` — prevents open redirect
+- Add role checks to `PATCH /tenants/{id}/adjustment` and `POST /cancel-no-show`
+- Fix `deposits_eligible` logic in notices API (now correctly checks for notice_date)
+
+**Impact:** Closes vectors for financial manipulation, privacy leaks, and session hijacking.
+
+### audit: Add comprehensive logging for critical operations
+- **Tenant updates:** name, phone, email, notice_date, expected_checkout, checkin_date, agreed_rent, security_deposit, maintenance_fee, lock_in_months
+- **Payment edits:** amount, payment_mode, for_type, notes
+- All changes logged with changed_by, old_value, new_value, timestamp
+
+**Impact:** Closes audit gaps identified in Session A comprehensive security review.
+
+---
+
 ## [Unreleased] — 2026-06-08 — Comprehensive PWA Business Logic Audit (Session A Complete)
 
 ### audit: End-to-end audit of all 19 PWA pages + 87 business rules + 42 historical bugs
