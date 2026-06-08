@@ -3,10 +3,18 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+// Allowed redirect paths after password reset
+const ALLOWED_NEXT_PATHS = ["/auth/update-password", "/", "/finance", "/notices"];
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/auth/update-password";
+  let next = searchParams.get("next") ?? "/auth/update-password";
+
+  // Validate next parameter: must be one of allowed paths (prevent open redirect)
+  if (!ALLOWED_NEXT_PATHS.includes(next)) {
+    next = "/auth/update-password";
+  }
 
   if (code) {
     const cookieStore = await cookies();

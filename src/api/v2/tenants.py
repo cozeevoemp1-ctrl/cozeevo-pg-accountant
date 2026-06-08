@@ -409,6 +409,9 @@ async def update_tenant(
     body: dict,
     user: AppUser = Depends(get_current_user),
 ):
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Only admin and staff can edit tenants")
+
     async with get_session() as session:
         row = await session.execute(
             select(Tenancy, Tenant)
@@ -699,6 +702,9 @@ async def patch_adjustment(
     Negative amount = waive/concession (dues go down).
     Pass amount=0 to clear a prior adjustment.
     """
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Only admin and staff can adjust rent")
+
     amount = body.get("amount")
     note = (body.get("note") or "").strip()
     if amount is None:
@@ -929,6 +935,9 @@ async def delete_tenant(
 @router.post("/tenancies/{tenancy_id}/cancel-no-show")
 async def cancel_no_show(tenancy_id: int, user: AppUser = Depends(get_current_user)):
     """Cancel a no-show booking — set status to cancelled, void RS rows, sync onboarding session."""
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Only admin and staff can cancel bookings")
+
     from src.database.models import OnboardingSession, RentSchedule, RentStatus
     today = date.today()
     async with get_session() as session:

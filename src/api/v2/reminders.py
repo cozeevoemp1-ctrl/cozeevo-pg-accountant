@@ -90,6 +90,9 @@ async def _get_overdue_rows(session):
 
 @router.get("/overdue")
 async def get_overdue(user: AppUser = Depends(get_current_user)):
+    if user.role not in ("admin", "staff", "power_user", "key_user"):
+        raise HTTPException(status_code=403, detail="Only staff can view overdue reminders")
+
     async with get_session() as session:
         rows, period = await _get_overdue_rows(session)
 
@@ -137,6 +140,9 @@ async def send_reminders(
     body: dict,
     user: AppUser = Depends(get_current_user),
 ):
+    if user.role not in ("admin", "staff", "power_user", "key_user"):
+        raise HTTPException(status_code=403, detail="Only staff can send reminders")
+
     send_all: bool = body.get("send_all", False)
     tenancy_id: int | None = body.get("tenancy_id")
 

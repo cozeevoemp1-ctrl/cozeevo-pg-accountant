@@ -113,7 +113,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "gender":             tenant.gender,
                 "notice_date":        nd.isoformat() if nd else None,
                 "expected_checkout":  expected_checkout.isoformat(),
-                "deposit_eligible":   True,
+                "deposit_eligible":   nd is not None,
                 "has_notice":         nd is not None,
                 "security_deposit":   float(tenancy.security_deposit or 0),
                 "maintenance_fee":    float(tenancy.maintenance_fee or 0),
