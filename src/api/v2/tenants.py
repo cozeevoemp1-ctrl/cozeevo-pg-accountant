@@ -145,36 +145,42 @@ async def search_tenants(
     )
 
     async with get_session() as session:
-        # Use DISTINCT ON to eliminate duplicate rows from JOIN
-        # The Property join can create cartesian products; DISTINCT ON(Tenancy.id) keeps first occurrence only
-        stmt = (
-            select(Tenancy, Tenant, Room, Property)
-            .distinct(Tenancy.id)
-            .join(Tenant, Tenancy.tenant_id == Tenant.id)
-            .join(Room, Tenancy.room_id == Room.id)
-            .join(Property, Room.property_id == Property.id)
-            .where(
-                Tenancy.status.in_(statuses),
-                match_clause,
+        # Build raw SQL with PostgreSQL DISTINCT ON to eliminate JOIN duplicates
+        status_list = [s.value for s in statuses]
+        stmt = text("""
+            SELECT DISTINCT ON (t.id)
+                t.id, t.tenant_id, t.room_id, t.status, t.agreed_rent,
+                tn.name, tn.phone,
+                r.room_number,
+                p.id as prop_id, p.name as prop_name
+            FROM tenancies t
+            JOIN tenants tn ON tn.id = t.tenant_id
+            JOIN rooms r ON r.id = t.room_id
+            JOIN properties p ON p.id = r.property_id
+            WHERE t.status = ANY(:statuses)
+            AND (
+                LOWER(tn.name) LIKE :term
+                OR LOWER(r.room_number) LIKE :term
+                OR LOWER(tn.phone) LIKE :term
             )
-            .order_by(Tenancy.id, Tenant.name)
-            .limit(10)
-        )
+            ORDER BY t.id, tn.name
+            LIMIT 10
+        """).bindparams(statuses=status_list, term=f"%{term}%")
         rows = (await session.execute(stmt)).all()
-        logger.info(f"[search_tenants] query returned {len(rows)} rows for q={q!r} (DISTINCT applied)")
+        logger.info(f"[search_tenants] raw SQL with DISTINCT ON returned {len(rows)} rows")
 
     result = [
         {
-            "tenancy_id": tenancy.id,
-            "tenant_id": tenant.id,
-            "name": tenant.name,
-            "phone": tenant.phone,
-            "room_number": room.room_number,
-            "building_code": _building_code(prop.name),
-            "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
-            "status": tenancy.status.value,
+            "tenancy_id": row.id,
+            "tenant_id": row.tenant_id,
+            "name": row.name,
+            "phone": row.phone,
+            "room_number": row.room_number,
+            "building_code": _building_code(row.prop_name),
+            "rent": float(row.agreed_rent) if row.agreed_rent is not None else 0.0,
+            "status": row.status,
         }
-        for tenancy, tenant, room, prop in rows
+        for row in rows
     ]
     return result
 
