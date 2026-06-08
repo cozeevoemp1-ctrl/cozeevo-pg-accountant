@@ -635,8 +635,13 @@ async def update_tenant(
                     source="pwa",
                     org_id=tenancy.org_id,
                 ))
-            # Clearing notice also clears the planned exit date — they're one action
-            if not val:
+            # Auto-calculate expected_checkout from notice_date
+            if val:
+                # Notice given: use calc_notice_last_day to determine month-end
+                from services.property_logic import calc_notice_last_day
+                tenancy.expected_checkout = calc_notice_last_day(tenancy.notice_date)
+            else:
+                # Clearing notice also clears the planned exit date — they're one action
                 tenancy.expected_checkout = None
         if "expected_checkout" in body:
             old_checkout = tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None
