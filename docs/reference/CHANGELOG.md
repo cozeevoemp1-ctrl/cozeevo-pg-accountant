@@ -22,10 +22,18 @@ All notable changes to PG Accountant will be documented here.
 - **Fix:** Backend recalculates expected refund and validates ±100 INR variance
 - **File:** `src/api/v2/checkout.py:128-160`
 
+### docs: Reorganize 24 docs into 4 folders + comprehensive index
+- Moved 24 scattered .md files into organized folders: architecture/, business/, operations/, reference/
+- Created INDEX.md as single entry point for all documentation
+- Removed 4 redundant/obsolete audit reports from Session A
+- Clear navigation: each folder has 5-8 files, all indexed
+
 **Session C Summary:**
 - 2 CRITICAL bugs fixed and tested
 - All 5 business operations verified safe
 - Consolidated audit documentation (merged 4 files → 1 comprehensive report)
+- Reorganized all project documentation into clean folder structure
+- All 52 unit tests passing
 - Ready to deploy to VPS
 
 ---

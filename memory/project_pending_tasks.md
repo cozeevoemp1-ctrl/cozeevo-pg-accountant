@@ -6,15 +6,17 @@ type: project
 
 ## Active / Next Up
 
-### 🎯 Session C: End-to-End Audit + Bug Fixes — COMPLETE (2026-06-08)
-✅ **Comprehensive end-to-end business logic audit completed**
-- Traced all 5 critical operations (Payment, Notice, Checkout, Tenants, Bookings) through every code path
-- Found & fixed **2 CRITICAL BUGS:**
-  1. Notice date not auto-calculating expected_checkout → FIXED in `src/api/v2/tenants.py:626-646`
-  2. Checkout refund not validated on backend → FIXED in `src/api/v2/checkout.py:128-160`
-- Consolidated 4 temporary audit docs into single `COMPREHENSIVE_AUDIT.md`
-- All 52 unit tests passing ✓
-- Ready to deploy to VPS
+### 🎯 Session C: End-to-End Audit + Bug Fixes + Documentation Reorganization — COMPLETE (2026-06-08)
+✅ **FINISHED:**
+- **Comprehensive end-to-end business logic audit** — traced all 5 critical operations through every code path
+- **2 CRITICAL BUGS FIXED:**
+  1. Notice date not auto-calculating expected_checkout → FIXED `src/api/v2/tenants.py:626-646`
+  2. Checkout refund not validated on backend → FIXED `src/api/v2/checkout.py:128-160`
+- **Audit documentation consolidated** — merged 4 temp files → 1 `COMPREHENSIVE_AUDIT.md`
+- **Project documentation reorganized** — 24 loose files → 4 folders (architecture, business, operations, reference) + master INDEX.md
+- **All 52 unit tests passing** ✓
+- **Commits:** 3 commits (bugs+audit, docs reorganization, changelog updates)
+- **Status:** Ready to deploy to VPS
 
 **Consolidated Audit Results:**
 - ✅ Payment idempotency verified (unique_hash prevents duplicates)
