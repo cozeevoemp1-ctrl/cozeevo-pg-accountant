@@ -20,6 +20,16 @@ All notable changes to PG Accountant will be documented here.
 
 **Impact:** Closes audit gaps identified in Session A comprehensive security review.
 
+### refactor: Consolidate phone normalization
+- Use `_normalize_phone()` helper everywhere instead of inline regex
+- Ensures Python re.sub vs PostgreSQL regex_replace consistency
+
+**Session B Summary:**
+- 6 security vulnerabilities fixed (0 CRITICAL/HIGH remaining in fixed areas)
+- 15 fields now have complete audit trail
+- 2 CRITICAL/HIGH items documented for Session C (auto no-show transition, room 000 UX)
+- VPS deployment: all changes tested and passing unit tests
+
 ---
 
 ## [Unreleased] — 2026-06-08 — Comprehensive PWA Business Logic Audit (Session A Complete)
