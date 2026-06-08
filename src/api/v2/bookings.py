@@ -22,6 +22,7 @@ from src.database.models import (
     OnboardingSession, Room, Property,
     Tenant, Tenancy, Payment, TenancyStatus, StayType, PaymentMode, PaymentFor,
 )
+from src.services.room_occupancy import _normalize_phone
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -48,10 +49,9 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
     if user.role not in ("admin", "staff"):
         raise HTTPException(403, "Admin or staff only")
 
-    phone_digits = re.sub(r"\D", "", req.tenant_phone)
-    if len(phone_digits) < 10:
-        raise HTTPException(400, f"Phone must be at least 10 digits (got {len(phone_digits)})")
-    phone = phone_digits[-10:]
+    phone = _normalize_phone(req.tenant_phone)
+    if not phone or len(phone) < 10:
+        raise HTTPException(400, f"Phone must be at least 10 digits (got {len(phone) if phone else 0})")
 
     if not req.tenant_name.strip():
         raise HTTPException(400, "Tenant name is required")
