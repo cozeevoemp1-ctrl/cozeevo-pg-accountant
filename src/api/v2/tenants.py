@@ -145,44 +145,33 @@ async def search_tenants(
     )
 
     async with get_session() as session:
-        # Build raw SQL with PostgreSQL DISTINCT ON to eliminate JOIN duplicates
-        status_list = [s.value for s in statuses]
-        stmt = text("""
-            SELECT DISTINCT ON (t.id)
-                t.id, t.tenant_id, t.room_id, t.status, t.agreed_rent,
-                tn.name, tn.phone,
-                r.room_number,
-                p.id as prop_id, p.name as prop_name
-            FROM tenancies t
-            JOIN tenants tn ON tn.id = t.tenant_id
-            JOIN rooms r ON r.id = t.room_id
-            JOIN properties p ON p.id = r.property_id
-            WHERE t.status = ANY(:statuses)
-            AND (
-                LOWER(tn.name) LIKE :term
-                OR LOWER(r.room_number) LIKE :term
-                OR LOWER(tn.phone) LIKE :term
+        stmt = (
+            select(Tenancy, Tenant, Room, Property)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .join(Room, Tenancy.room_id == Room.id)
+            .join(Property, Room.property_id == Property.id)
+            .where(
+                Tenancy.status.in_(statuses),
+                match_clause,
             )
-            ORDER BY t.id, tn.name
-            LIMIT 10
-        """).bindparams(statuses=status_list, term=f"%{term}%")
+            .order_by(Tenant.name)
+            .limit(10)
+        )
         rows = (await session.execute(stmt)).all()
-        logger.info(f"[search_tenants] raw SQL with DISTINCT ON returned {len(rows)} rows")
 
-    result = [
+    return [
         {
-            "tenancy_id": row.id,
-            "tenant_id": row.tenant_id,
-            "name": row.name,
-            "phone": row.phone,
-            "room_number": row.room_number,
-            "building_code": _building_code(row.prop_name),
-            "rent": float(row.agreed_rent) if row.agreed_rent is not None else 0.0,
-            "status": row.status,
+            "tenancy_id": tenancy.id,
+            "tenant_id": tenant.id,
+            "name": tenant.name,
+            "phone": tenant.phone,
+            "room_number": room.room_number,
+            "building_code": _building_code(prop.name),
+            "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
+            "status": tenancy.status.value,
         }
-        for row in rows
+        for tenancy, tenant, room, prop in rows
     ]
-    return result
 
 
 @router.get("/tenants/{tenancy_id}/previous-stays")
