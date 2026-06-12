@@ -84,6 +84,7 @@ export interface KpiResponse {
   no_show_count: number;
   prebooked_count: number;
   notices_count: number;
+  notices_incoming: number;
   checkins_today: number;
   checkouts_today: number;
   overdue_tenants: number;
