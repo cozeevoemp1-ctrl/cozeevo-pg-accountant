@@ -1,0 +1,46 @@
+# Changelog
+
+## Session D — 2026-06-13 — Critical Bug Fixes: Data Consistency
+
+### Issues Fixed
+
+**1. PWA Build Failure (TypeScript Schema Mismatch)**
+- **Problem:** KPI endpoint returned `notices_incoming` field but TypeScript schema didn't define it
+- **Impact:** PWA build failed on VPS; pages (Notices, Bookings, Pre-Register) crashed with "client-side exception"
+- **Root Cause:** Session C audit fix added field to backend but forgot to update schema
+- **Fix:** Added `notices_incoming: number;` to `KpiResponse` interface in `web/lib/api.ts`
+- **Commit:** c7b4e21
+
+**2. Occupancy Calculation Divergence (Data Consistency)**
+- **Problem:** KPI tile and Finance chart showed different occupancy % for the same date
+  - KPI: 276 beds occupied → 92.6%
+  - Chart: 279 beds occupied → different %
+- **Root Cause:** Two separate endpoint implementations calculating occupied beds differently
+  - KPI endpoint: counted active + no_shows (checkin_date <= today)
+  - Analytics endpoint: counted active only (no no_shows)
+- **Temporary Fix:** Updated analytics.py to match KPI logic (added no_show calculation)
+- **Permanent Fix:** Extracted canonical occupancy service (`src/services/occupancy.py`)
+  - `get_total_revenue_beds()` — single calculation, both endpoints use it
+  - `get_occupied_beds(session, target_date)` — active + no_shows, both endpoints use it
+  - `get_occupancy_pct(session, target_date)` — percentage, both endpoints use it
+  - Both `kpi.py` and `analytics.py` now call the service instead of duplicating code
+  - Removes 154 lines of duplicated calculation code
+  - Guarantees no future divergence (one source of truth)
+- **Commits:** 5e57c44, 5d3acff, baa2d97
+
+### Verification
+- ✅ All 52 unit tests passing
+- ✅ KPI tile occupancy matches Finance chart occupancy
+- ✅ Notices/Bookings/Pre-Register pages load without errors
+- ✅ No divergence possible going forward (canonical service)
+
+### Key Lesson
+**Schema Sync:** When backend returns a new field, always update TypeScript schema in the same commit. Use a canonical service for calculations that appear in multiple endpoints.
+
+---
+
+## Session C — 2026-06-08 — Comprehensive Audit + Bug Fixes
+
+(See earlier sessions for full details)
+
+---

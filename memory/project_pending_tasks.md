@@ -6,6 +6,16 @@ type: project
 
 ## Active / Next Up
 
+### 🎯 Session D: Critical Bug Fixes — Data Consistency — COMPLETE (2026-06-13)
+✅ **FINISHED:**
+- **TypeScript schema missing field** — KPI endpoint returned `notices_incoming`, schema didn't have it → fixed
+- **Occupancy divergence** — KPI tile and Finance chart showed different numbers for same date
+  - Root cause: two separate implementations (KPI vs Analytics) calculating occupied beds differently
+  - Permanent fix: Created `src/services/occupancy.py` — canonical occupancy service, both endpoints now use it
+  - Removes 154 lines of duplicated code, guarantees no future divergence
+- **All tests passing** — 52/52 ✓
+- **Commits:** 4 total (c7b4e21, 5e57c44, 5d3acff, baa2d97)
+
 ### 🎯 Session C: End-to-End Audit + Bug Fixes + Documentation Reorganization — COMPLETE (2026-06-08)
 ✅ **FINISHED:**
 - **Comprehensive end-to-end business logic audit** — traced all 5 critical operations through every code path
