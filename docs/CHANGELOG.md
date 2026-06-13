@@ -1,6 +1,78 @@
 # Changelog
 
-## Session D — 2026-06-13 — Critical Bug Fixes: Data Consistency + Booking Cleanup
+## Session D — 2026-06-13 — Bug Fixes: Data Consistency + Day-stay Enhancement + Payment Records
+
+### Summary
+- ✅ 6 critical bugs fixed from earlier in session (auto-checkin, pending bookings, day-stay fields, refund logic, cancel endpoint, home page perf)
+- ✅ Day-stay daily_rate now fully editable in tenant edit page
+- ✅ Advance payments voided for cancelled Room 108 bookings
+- ✅ Jitendra Kochale deposit payment recorded (₹10,500, settled with booking advance)
+- ✅ All 52 unit tests passing, PWA builds successfully
+- ✅ Deployed to VPS
+
+### Bugs Fixed (6 Critical Issues)
+
+**Bug 1: Auto-checkin by Date Removed**
+- **Problem:** Bookings with today's check-in date auto-checked-in without admin approval (Room 208 example)
+- **Root Cause:** Two endpoints had logic: `if checkin_date <= today() then status=active`
+- **Files:** `src/api/v2/bookings.py:227`, `src/api/onboarding_router.py:1766`
+- **Fix:** Removed date-based auto-checkin; now requires explicit `instant_checkin=true` flag
+- **Verification:** Manual check-in now required; no auto-transitions
+- **Commit:** bb4bbab
+
+**Bug 2: Pending Tenant Bookings Hidden**
+- **Problem:** Bookings page showed 24 of 32 bookings (missing pre-booked tenants)
+- **Root Cause:** Filter on line 86-88 excluded `pending_tenant` status
+- **Files:** `web/app/onboarding/bookings/page.tsx`
+- **Fix:** Show all three statuses (pending_tenant + pending_review + expired) in UI
+- **Verification:** 8 pre-booked bookings now visible
+- **Commit:** 835708e
+
+**Bug 3: Day-stay Bookings Show Monthly Fields**
+- **Problem:** Room 208 (day-stay) showed "Agreed Rent (₹/mo): 0" instead of "Daily Rate (₹/night): 1200"
+- **Root Cause:** editRent initialized from agreed_rent (0) instead of daily_rate
+- **Files:** `web/app/onboarding/bookings/page.tsx`, `web/app/tenants/[tenancy_id]/edit/page.tsx`
+- **Fix:** Initialize from correct field based on stay_type; hide monthly fields for day-stays in tenant edit
+- **Verification:** Correct daily rate displays in edit form
+- **Commits:** 6431c15, fa13731
+
+**Bug 4: Checkout Form Refund Calculation Wrong**
+- **Problem:** Shows ₹1,000 refund for forfeited deposits (no notice) when should be ₹0
+- **Root Cause:** `depositForfeited` logic didn't account for day-stays having no deposits
+- **Files:** `web/app/checkout/new/page.tsx`
+- **Fix:** Set `depositForfeited=true` for all day-stays (no deposits to refund)
+- **Verification:** Checkout shows correct refund amounts
+- **Commit:** dd3dd27
+
+**Bug 5: Cancel Booking Endpoint Crashes**
+- **Problem:** "Failed to fetch" when clicking Cancel; API crashes with `NameError: name 'text' is not defined`
+- **Root Cause:** `src/api/onboarding_router.py:761` used `text()` but never imported it
+- **Files:** `src/api/onboarding_router.py:18`
+- **Fix:** Added `text` to import: `from sqlalchemy import select, update, text`
+- **Prevention:** Created `feedback_import_management.md` (SQLAlchemy import checklist)
+- **Commit:** 4a66830
+
+**Bug 6: Home Page 6-Second Load Time**
+- **Problem:** Home page took 6+ seconds due to KPI endpoint doing 7+ sequential DB queries
+- **Status:** Identified but not fully fixed (architectural issue)
+- **Attempted:** Parallelized with `asyncio.gather()` → broke other endpoints (async session limitations)
+- **Current:** REVERTED (commit 081547b); marked as deferred
+- **Next:** Needs query caching, database indexes, or optimization (not parallelization)
+
+### Features Added
+
+**Day-stay Daily Rate Now Editable in Tenant Edit Page**
+- **Before:** Could only edit daily_rate via Bookings page; tenant edit showed warning + hid fields
+- **After:** Shows editable "Daily Rate (₹/night)" field; same save flow as monthly rent
+- **Implementation:**
+  - Added explicit `daily_rate` field to `TenantDues` API response (both day-stay and monthly)
+  - Updated `web/lib/api.ts:TenantDues` interface
+  - Frontend: conditional rendering based on `stay_type` (daily vs monthly)
+  - Backend: daily_rate updates go through `agreed_rent` field (stores per-night rate for day-stays)
+  - Changes logged as RentRevision + AuditLog entries
+- **Scope:** Day-stays can now be fully edited from either Bookings or Tenants pages
+- **Files:** `src/api/v2/tenants.py`, `web/lib/api.ts`, `web/app/tenants/[tenancy_id]/edit/page.tsx`
+- **Commits:** 3247945, 9816eef
 
 ### Data Cleanup
 **Advance Payments Voided**
