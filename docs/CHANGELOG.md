@@ -11,6 +11,17 @@
 - **Method:** Used void_payment logic with AuditLog entry (source=admin, note="Cancelled booking advance voided")
 - **Verification:** Both payments marked `is_void=true` in database
 
+### Features Added
+**Day-stay Daily Rate Now Editable in Tenant Edit Page**
+- **Problem:** Day-stay bookings could only edit daily_rate via Bookings page; tenant edit page showed warning + hid fields
+- **Solution:** 
+  - Added explicit `daily_rate` field to `TenantDues` API response
+  - Tenant edit page now shows editable Daily Rate field for day-stays
+  - Same form logic as monthly rent: changes create RentRevision + AuditLog entries
+  - Accepts same validation (must be > 0) and workflows
+- **Scope:** Day-stays can now be fully edited from either Bookings or Tenants pages
+- **Backwards compat:** Monthly bookings unchanged; daily_rate=0 for monthly (explicit in response)
+
 ### Issues Fixed
 
 **1. PWA Build Failure (TypeScript Schema Mismatch)**
