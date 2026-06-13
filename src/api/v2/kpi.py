@@ -28,78 +28,70 @@ activity_router = APIRouter(prefix="/activity")
 
 @router.get("/kpi", response_model=KpiResponse)
 async def get_kpi(user: AppUser = Depends(get_current_user)):
-    import asyncio
     today = date.today()
     async with get_session() as session:
-        # Batch all count queries in parallel to avoid sequential round-trips to DB
-        async def _count_active():
-            return int(
-                await session.scalar(
-                    select(func.count(Tenancy.id))
-                    .join(Room, Room.id == Tenancy.room_id)
-                    .where(
-                        Room.is_staff_room == False,
-                        Room.room_number != "000",
-                        Tenancy.status == TenancyStatus.active,
-                    )
-                ) or 0
-            )
+        # Use canonical occupancy calculations
+        total_beds = await get_total_revenue_beds(session)
+        occupied_beds = await get_occupied_beds(session, today)
+        vacant_beds = max(total_beds - occupied_beds, 0)
+        occ_pct = await get_occupancy_pct(session, today)
 
-        async def _count_noshow():
-            return int(
-                await session.scalar(
-                    select(func.count(Tenancy.id))
-                    .join(Room, Room.id == Tenancy.room_id)
-                    .where(
-                        Room.is_staff_room == False,
-                        Room.room_number != "000",
-                        Tenancy.status == TenancyStatus.no_show,
-                    )
-                ) or 0
-            )
+        # Active tenants (people, not beds)
+        active_tenants = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "000",
+                    Tenancy.status == TenancyStatus.active,
+                )
+            ) or 0
+        )
 
-        async def _count_prebooked_form():
-            return int(
-                await session.scalar(
-                    select(func.count(OnboardingSession.id))
-                    .where(
-                        OnboardingSession.status == "pending_review",
-                        OnboardingSession.room_id.isnot(None),
-                        ~OnboardingSession.room_id.in_(
-                            select(Room.id).where(
-                                or_(
-                                    Room.room_number == "000",
-                                    Room.is_staff_room == True
-                                )
+        # No-show tenants (booked but not yet checked in)
+        no_show_count = int(
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.is_staff_room == False,
+                    Room.room_number != "000",
+                    Tenancy.status == TenancyStatus.no_show,
+                )
+            ) or 0
+        )
+
+        # Pre-booked: pending_tenant (link sent) + pending_review (form filled, awaiting approval)
+        # + no_show tenants in room 000 (pre-booked via old bot flow)
+        # Count pending_review sessions with valid rooms (non-null, non-000)
+        prebooked_form = (
+            await session.scalar(
+                select(func.count(OnboardingSession.id))
+                .where(
+                    OnboardingSession.status == "pending_review",
+                    OnboardingSession.room_id.isnot(None),
+                    ~OnboardingSession.room_id.in_(
+                        select(Room.id).where(
+                            or_(
+                                Room.room_number == "000",
+                                Room.is_staff_room == True
                             )
                         )
                     )
-                ) or 0
-            )
-
-        async def _count_prebooked_room000():
-            return int(
-                await session.scalar(
-                    select(func.count(Tenancy.id))
-                    .join(Room, Room.id == Tenancy.room_id)
-                    .where(
-                        Room.room_number == "000",
-                        Tenancy.status == TenancyStatus.no_show,
-                    )
-                ) or 0
-            )
-
-        # Use canonical occupancy + run all counts in parallel
-        total_beds, occupied_beds, occ_pct, active_tenants, no_show_count, prebooked_form, prebooked_room000 = await asyncio.gather(
-            get_total_revenue_beds(session),
-            get_occupied_beds(session, today),
-            get_occupancy_pct(session, today),
-            _count_active(),
-            _count_noshow(),
-            _count_prebooked_form(),
-            _count_prebooked_room000(),
+                )
+            ) or 0
         )
-        vacant_beds = max(total_beds - occupied_beds, 0)
+        prebooked_room000 = (
+            await session.scalar(
+                select(func.count(Tenancy.id))
+                .join(Room, Room.id == Tenancy.room_id)
+                .where(
+                    Room.room_number == "000",
+                    Tenancy.status == TenancyStatus.no_show,
+                )
+            ) or 0
+        )
         prebooked_count = prebooked_form + prebooked_room000
 
         # Monthly tenants with formal notice + day-stay checking out within 30 days
