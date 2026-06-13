@@ -11,6 +11,16 @@
 - **Method:** Used void_payment logic with AuditLog entry (source=admin, note="Cancelled booking advance voided")
 - **Verification:** Both payments marked `is_void=true` in database
 
+### Payment Records Added
+**Jitendra Kochale - Deposit Payment Recorded**
+- **When:** April 2026 (₹10,500 UPI)
+- **Record:** Payment ID 21361 (deposit for_type)
+- **Settlement:** Booking advance (₹2,000) covers remaining shortfall
+  - Deposit owed: ₹12,500
+  - Paid: ₹10,500
+  - Advance applied: ₹2,000
+  - **Due: ₹0 (SETTLED)**
+
 ### Features Added
 **Day-stay Daily Rate Now Editable in Tenant Edit Page**
 - **Problem:** Day-stay bookings could only edit daily_rate via Bookings page; tenant edit page showed warning + hid fields
