@@ -1763,7 +1763,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     sharing_default = SharingType(effective_sharing)
                 except ValueError:
                     sharing_default = None
-            _target_status = TenancyStatus.active if (req and req.instant_checkin) or checkin <= date.today() else TenancyStatus.no_show
+            # Only auto-checkin if explicitly requested (instant_checkin flag), not based on date
+            _target_status = TenancyStatus.active if (req and req.instant_checkin) else TenancyStatus.no_show
             _pre_tenancy = None
             if obs.tenancy_id:
                 _pre_tenancy = await session.get(Tenancy, obs.tenancy_id)
