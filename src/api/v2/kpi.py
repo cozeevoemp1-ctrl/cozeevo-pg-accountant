@@ -18,6 +18,7 @@ from src.database.models import (
     Tenant,
 )
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
+from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
 from src.services.rent_schedule import prorated_first_month_rent
 from src.services.reporting import deposits_breakdown
 
@@ -29,66 +30,11 @@ activity_router = APIRouter(prefix="/activity")
 async def get_kpi(user: AppUser = Depends(get_current_user)):
     today = date.today()
     async with get_session() as session:
-        # Total revenue beds (exclude UNASSIGNED placeholder room)
-        total_beds = int(
-            await session.scalar(
-                select(func.coalesce(func.sum(Room.max_occupancy), 0))
-                .where(Room.is_staff_room == False, Room.room_number != "000")
-            ) or 0
-        )
-
-        # Occupied beds — per-room sum capped at max_occupancy so overcrowded
-        # rooms don't pull vacant_beds below the true available count.
-        per_room_occ = (
-            select(
-                func.least(
-                    func.sum(
-                        case(
-                            (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                            else_=literal_column("1"),
-                        )
-                    ),
-                    Room.max_occupancy,
-                ).label("capped_occ")
-            )
-            .select_from(Tenancy)
-            .join(Room, Room.id == Tenancy.room_id)
-            .where(
-                Room.is_staff_room == False,
-                Room.room_number != "000",
-                Tenancy.status == TenancyStatus.active,
-            )
-            .group_by(Room.id, Room.max_occupancy)
-            .subquery()
-        )
-        occupied_raw = await session.scalar(
-            select(func.coalesce(func.sum(per_room_occ.c.capped_occ), 0))
-        )
-        occupied_beds = int(occupied_raw or 0)
-
-        # No-shows whose checkin_date <= today are holding a bed (same as Sheet logic).
-        # Future no-shows (checkin_date > today) do NOT occupy a bed tonight.
-        noshow_beds = int(
-            await session.scalar(
-                select(func.coalesce(func.sum(
-                    case(
-                        (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                        else_=literal_column("1"),
-                    )
-                ), 0))
-                .select_from(Tenancy)
-                .join(Room, Room.id == Tenancy.room_id)
-                .where(
-                    Room.is_staff_room == False,
-                    Room.room_number != "000",
-                    Tenancy.status == TenancyStatus.no_show,
-                    Tenancy.checkin_date <= today,
-                )
-            ) or 0
-        )
-        occupied_beds += noshow_beds
+        # Use canonical occupancy calculations
+        total_beds = await get_total_revenue_beds(session)
+        occupied_beds = await get_occupied_beds(session, today)
         vacant_beds = max(total_beds - occupied_beds, 0)
-        occ_pct = round(occupied_beds / total_beds * 100, 1) if total_beds > 0 else 0.0
+        occ_pct = await get_occupancy_pct(session, today)
 
         # Active tenants (people, not beds)
         active_tenants = int(

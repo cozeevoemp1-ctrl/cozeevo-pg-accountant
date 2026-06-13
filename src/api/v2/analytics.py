@@ -12,6 +12,7 @@ from sqlalchemy import case, func, literal_column, select, and_, or_, text
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import Room, Tenancy, TenancyStatus, StayType
+from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
 
 router = APIRouter(prefix="/analytics")
 
@@ -98,54 +99,10 @@ def _present_at(target: date):
 async def _live_month_stats(session, target: date, total_beds: int) -> tuple[int, float, int]:
     """Return (occ_beds, fill_pct, avg_rent_per_bed) computed from DB for `target` date.
 
-    Must match KPI calculation: active + no_show (with checkin_date <= target).
+    Uses canonical occupancy service to ensure consistency with KPI endpoint.
     """
-    per_room = (
-        select(
-            func.least(
-                func.sum(
-                    case(
-                        (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                        else_=literal_column("1"),
-                    )
-                ),
-                Room.max_occupancy,
-            ).label("capped")
-        )
-        .select_from(Tenancy)
-        .join(Room, Room.id == Tenancy.room_id)
-        .where(
-            Room.is_staff_room == False,
-            Room.room_number != "000",
-            _present_at(target),
-        )
-        .group_by(Room.id, Room.max_occupancy)
-        .subquery()
-    )
-    beds = int(
-        await session.scalar(select(func.coalesce(func.sum(per_room.c.capped), 0))) or 0
-    )
-
-    # Add no_show beds (checkin_date <= target) to match KPI calculation
-    noshow_beds = int(
-        await session.scalar(
-            select(func.coalesce(func.sum(
-                case(
-                    (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                    else_=literal_column("1"),
-                )
-            ), 0))
-            .select_from(Tenancy)
-            .join(Room, Room.id == Tenancy.room_id)
-            .where(
-                Room.is_staff_room == False,
-                Room.room_number != "000",
-                Tenancy.status == TenancyStatus.no_show,
-                Tenancy.checkin_date <= target,
-            )
-        ) or 0
-    )
-    beds += noshow_beds
+    # Use canonical occupancy calculation
+    beds = await get_occupied_beds(session, target)
     pct = round(beds / total_beds * 100, 1) if total_beds else 0.0
 
     # avg rent per BED: SUM(agreed_rent) / SUM(beds_used) for monthly tenants
@@ -201,54 +158,9 @@ async def get_occupancy(
             ) or 0
         )
 
-        # Today's live occupancy (active + no_shows — must match KPI endpoint)
-        per_room_now = (
-            select(
-                func.least(
-                    func.sum(
-                        case(
-                            (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                            else_=literal_column("1"),
-                        )
-                    ),
-                    Room.max_occupancy,
-                ).label("capped")
-            )
-            .select_from(Tenancy)
-            .join(Room, Room.id == Tenancy.room_id)
-            .where(
-                Room.is_staff_room == False,
-                Room.room_number != "000",
-                Tenancy.status == TenancyStatus.active,
-            )
-            .group_by(Room.id, Room.max_occupancy)
-            .subquery()
-        )
-        today_beds = int(
-            await session.scalar(select(func.coalesce(func.sum(per_room_now.c.capped), 0))) or 0
-        )
-
-        # Add no_show beds (checkin_date <= today) to match KPI calculation
-        noshow_beds_now = int(
-            await session.scalar(
-                select(func.coalesce(func.sum(
-                    case(
-                        (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                        else_=literal_column("1"),
-                    )
-                ), 0))
-                .select_from(Tenancy)
-                .join(Room, Room.id == Tenancy.room_id)
-                .where(
-                    Room.is_staff_room == False,
-                    Room.room_number != "000",
-                    Tenancy.status == TenancyStatus.no_show,
-                    Tenancy.checkin_date <= today,
-                )
-            ) or 0
-        )
-        today_beds += noshow_beds_now
-        today_pct = round(today_beds / total_beds * 100, 1) if total_beds else 0.0
+        # Today's live occupancy — use canonical calculation to match KPI endpoint
+        today_beds = await get_occupied_beds(session, today)
+        today_pct = await get_occupancy_pct(session, today)
 
         # Current month avg rent per bed (KPI card)
         cur_rent_row = (await session.execute(
