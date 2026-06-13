@@ -388,9 +388,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
   const [editRoom, setEditRoom] = useState(b.room || "")
   const [editCheckin, setEditCheckin] = useState(b.checkin_date?.slice(0, 10) || "")
   const [editCheckout, setEditCheckout] = useState(b.checkout_date?.slice(0, 10) || "")
-  const [editRent, setEditRent] = useState(String(b.agreed_rent || ""))
+  const [editRent, setEditRent] = useState(String(b.stay_type === "daily" ? (b.daily_rate || "") : (b.agreed_rent || "")))
   const [editMaint, setEditMaint] = useState(String(b.maintenance_fee || (b.stay_type === "daily" ? 0 : 5000)))
-  const [editDeposit, setEditDeposit] = useState(String(b.security_deposit || b.agreed_rent || ""))
+  const [editDeposit, setEditDeposit] = useState(String(b.security_deposit || (b.stay_type === "daily" ? "" : (b.agreed_rent || ""))))
   const [editPhone, setEditPhone] = useState(b.tenant_phone || "")
   const [editName, setEditName] = useState(b.tenant_name || "")
 
@@ -731,7 +731,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
       {/* Inline edit panel */}
       {editing && (
         <div className="flex flex-col gap-2 border-t border-[#F0EDE9] pt-3">
-          <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Edit booking</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Edit booking</p>
+            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-pill ${b.stay_type === "daily" ? "bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]" : "bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0]"}`}>
+              {b.stay_type === "daily" ? "Day stay" : "Monthly"}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             {[
               { label: "Name", val: editName, set: setEditName, type: "text", placeholder: "Full name" },
