@@ -96,7 +96,10 @@ def _present_at(target: date):
 
 
 async def _live_month_stats(session, target: date, total_beds: int) -> tuple[int, float, int]:
-    """Return (occ_beds, fill_pct, avg_rent_per_bed) computed from DB for `target` date."""
+    """Return (occ_beds, fill_pct, avg_rent_per_bed) computed from DB for `target` date.
+
+    Must match KPI calculation: active + no_show (with checkin_date <= target).
+    """
     per_room = (
         select(
             func.least(
@@ -122,6 +125,27 @@ async def _live_month_stats(session, target: date, total_beds: int) -> tuple[int
     beds = int(
         await session.scalar(select(func.coalesce(func.sum(per_room.c.capped), 0))) or 0
     )
+
+    # Add no_show beds (checkin_date <= target) to match KPI calculation
+    noshow_beds = int(
+        await session.scalar(
+            select(func.coalesce(func.sum(
+                case(
+                    (Tenancy.sharing_type == "premium", Room.max_occupancy),
+                    else_=literal_column("1"),
+                )
+            ), 0))
+            .select_from(Tenancy)
+            .join(Room, Room.id == Tenancy.room_id)
+            .where(
+                Room.is_staff_room == False,
+                Room.room_number != "000",
+                Tenancy.status == TenancyStatus.no_show,
+                Tenancy.checkin_date <= target,
+            )
+        ) or 0
+    )
+    beds += noshow_beds
     pct = round(beds / total_beds * 100, 1) if total_beds else 0.0
 
     # avg rent per BED: SUM(agreed_rent) / SUM(beds_used) for monthly tenants
