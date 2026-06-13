@@ -4,7 +4,31 @@ description: Master to-do list for PG Accountant project — updated each sessio
 type: project
 ---
 
+## Pending from Session D
+
+### 🔴 Home Page Load Time (6 seconds) — DEFERRED, NEEDS ARCHITECTURAL FIX
+- **Problem:** KPI endpoint does 7+ sequential DB queries
+- **Attempted:** Parallelized with `asyncio.gather()` → broke other endpoints (concurrent session operations not safe in SQLAlchemy AsyncSession)
+- **Reverted:** Commit 081547b
+- **Next approaches:** Query caching, database indexes, or query optimization (not parallelization)
+- **Impact:** Home page works correctly but loads slow; not critical but should be optimized
+
 ## Active / Next Up
+
+### 🎯 Session D Continued: Day-Stay Enhancement + Data Records — COMPLETE (2026-06-13)
+✅ **FINISHED:**
+- **Day-stay daily_rate now editable in tenant edit page** — users can update daily rates directly from Tenants page (was Bookings-only before)
+  - Added explicit `daily_rate` field to API response
+  - Frontend shows "Daily Rate (₹/night)" for day-stays, "Agreed Rent (₹/mo)" for monthly
+  - Changes logged as RentRevision + AuditLog like monthly rent changes
+  - Commits: 3247945, 9816eef
+- **Advance payments voided** — Room 108 cancelled bookings (Lokesh + Kiran): ₹4,000 in advances voided with audit logs
+  - Payment 21359 (Lokesh, ₹2,000) → voided
+  - Payment 21358 (Kiran Kumar, ₹2,000) → voided
+- **Jitendra Kochale deposit recorded** — ₹10,500 April UPI deposit payment added
+  - Status: SETTLED (₹12,500 due - ₹10,500 paid - ₹2,000 booking advance = ₹0)
+- **All 52 tests passing** ✓
+- **VPS deployed** ✓
 
 ### 🎯 Session D: Critical Bug Fixes — Data Consistency — COMPLETE (2026-06-13)
 ✅ **FINISHED:**
