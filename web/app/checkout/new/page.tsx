@@ -113,7 +113,8 @@ function NewCheckoutPage() {
 
   // Notice / deposit forfeiture — monthly only, day-stays have no notice period
   // Auto-forfeited if no notice; or manually forfeited for emergency early exits
-  const depositForfeited = prefetch && !isDaily ? (!prefetch.notice_date || manualForfeit) : false
+  const hasNotice = prefetch?.notice_date && prefetch.notice_date.trim() !== ""
+  const depositForfeited = prefetch && !isDaily ? (!hasNotice || manualForfeit) : false
 
   function calcLastDay(noticeDateISO: string): string {
     const d = new Date(noticeDateISO + "T00:00:00")
