@@ -82,10 +82,8 @@ export default function BookingsPage() {
       const res = await fetch(`${API_URL}/api/onboarding/admin/pending`, { headers: pinHeaders() })
       if (!res.ok) throw new Error(`Load failed: ${res.status}`)
       const d = await res.json()
-      // Show only pending_review (form filled) and expired. Hide pending_tenant (QR scans awaiting form).
-      const all = (d.sessions as Booking[]).filter(
-        (s) => s.status === "pending_review" || s.status === "expired"
-      )
+      // Show all bookings: pending_tenant (awaiting form), pending_review (form filled), and expired
+      const all = (d.sessions as Booking[])
       // Sort: check-in today first, then pending_review → pending_tenant → expired, then by date
       const statusOrder: Record<string, number> = { pending_review: 0, pending_tenant: 1, expired: 2 }
       all.sort((a, b) => {
