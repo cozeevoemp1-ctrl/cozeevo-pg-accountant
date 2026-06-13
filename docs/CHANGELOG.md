@@ -1,6 +1,15 @@
 # Changelog
 
-## Session D — 2026-06-13 — Critical Bug Fixes: Data Consistency
+## Session D — 2026-06-13 — Critical Bug Fixes: Data Consistency + Booking Cleanup
+
+### Data Cleanup
+**Advance Payments Voided**
+- **Reason:** Cancelled bookings for Room 108 (Lokesh + Kiran) after manual cancellation
+- **Voided:** 2 advance payments totalling ₹4,000
+  - Payment 21359 (Lokesh): ₹2,000 booking advance → voided with audit log
+  - Payment 21358 (Kiran Kumar): ₹2,000 booking advance → voided with audit log
+- **Method:** Used void_payment logic with AuditLog entry (source=admin, note="Cancelled booking advance voided")
+- **Verification:** Both payments marked `is_void=true` in database
 
 ### Issues Fixed
 
