@@ -459,8 +459,22 @@ export default function EditTenantPage() {
 
         {/* Financial */}
         <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
-          <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Financials</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Financials</p>
+            {original?.stay_type === "daily" && (
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]">
+                Day stay
+              </span>
+            )}
+          </div>
+          {original?.stay_type === "daily" && (
+            <p className="text-xs text-status-warn bg-[#FFF5F5] border border-[#FECACA] rounded-lg p-3">
+              Day-stay bookings use Daily Rate (₹/night), not monthly rent. Edit via Bookings page.
+            </p>
+          )}
 
+          {original?.stay_type !== "daily" && (
+            <>
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Agreed Rent (₹/mo)</label>
             <input
@@ -531,6 +545,8 @@ export default function EditTenantPage() {
               className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
+            </>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-ink-muted mb-1">Advance Paid (₹)</label>
