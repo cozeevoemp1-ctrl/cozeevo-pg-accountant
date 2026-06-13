@@ -15,7 +15,7 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update
+from sqlalchemy import select, update, text
 from typing import Optional
 
 from src.database.db_manager import get_session
