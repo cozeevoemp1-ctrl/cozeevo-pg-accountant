@@ -111,10 +111,11 @@ function NewCheckoutPage() {
   // Day-wise: recalculate dues based on actual checkout date vs booked checkout date
   const isDaily = prefetch?.stay_type === "daily"
 
-  // Notice / deposit forfeiture — monthly only, day-stays have no notice period
+  // Notice / deposit forfeiture — monthly only, day-stays have no deposits/notice period
   // Auto-forfeited if no notice; or manually forfeited for emergency early exits
+  // Day-stay bookings: no deposit, so always refund = 0
   const hasNotice = prefetch?.notice_date && prefetch.notice_date.trim() !== ""
-  const depositForfeited = prefetch && !isDaily ? (!hasNotice || manualForfeit) : false
+  const depositForfeited = isDaily ? true : (prefetch && !hasNotice) || manualForfeit
 
   function calcLastDay(noticeDateISO: string): string {
     const d = new Date(noticeDateISO + "T00:00:00")
