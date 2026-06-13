@@ -302,6 +302,7 @@ async def get_tenant_dues(
             "expected_checkout": tenancy.checkout_date.isoformat() if tenancy.checkout_date else None,
             "stay_type": tenancy.stay_type.value,
             "sharing_type": tenancy.sharing_type.value if tenancy.sharing_type else None,
+            "daily_rate": daily_rate,
         }
 
     # Current period: first day of current month
@@ -415,6 +416,8 @@ async def get_tenant_dues(
         "notice_date": tenancy.notice_date.isoformat() if tenancy.notice_date else None,
         "expected_checkout": tenancy.expected_checkout.isoformat() if tenancy.expected_checkout else None,
         "sharing_type": tenancy.sharing_type.value if tenancy.sharing_type else None,
+        "stay_type": tenancy.stay_type.value,
+        "daily_rate": 0.0,
     }
 
 

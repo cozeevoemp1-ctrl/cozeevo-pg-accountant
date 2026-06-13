@@ -255,6 +255,7 @@ export interface TenantDues {
   expected_checkout: string | null;
   sharing_type: string | null;
   stay_type: string;
+  daily_rate: number;
 }
 
 export function searchTenants(q: string, activeOnly = true): Promise<TenantSearchResult[]> {

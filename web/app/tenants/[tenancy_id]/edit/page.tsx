@@ -26,6 +26,7 @@ export default function EditTenantPage() {
   const [email, setEmail] = useState("")
   const [roomNumber, setRoomNumber] = useState("")
   const [agreedRent, setAgreedRent] = useState("")
+  const [dailyRate, setDailyRate] = useState("")
   const [securityDeposit, setSecurityDeposit] = useState("")
   const [maintenanceFee, setMaintenanceFee] = useState("")
   const [lockIn, setLockIn] = useState("")
@@ -86,6 +87,7 @@ export default function EditTenantPage() {
         setEmail(d.email || "")
         setRoomNumber(d.room_number)
         setAgreedRent(String(d.rent))
+        setDailyRate(String(d.daily_rate || 0))
         setSecurityDeposit(String(d.security_deposit))
         setMaintenanceFee(String(d.maintenance_fee))
         setLockIn(String(d.lock_in_months))
@@ -106,8 +108,16 @@ export default function EditTenantPage() {
     if (phone.trim() && phone.trim() !== original.phone) changes.phone = phone.trim()
     if (roomNumber.trim() && roomNumber.trim() !== original.room_number) changes.room_number = roomNumber.trim()
     if (email.trim()) changes.email = email.trim()
-    if (agreedRent && Number(agreedRent) !== original.rent)
-      changes.agreed_rent = Number(agreedRent)
+    // Handle rent/daily_rate based on stay_type
+    if (original.stay_type === "daily") {
+      // Day-stay: update daily_rate via agreed_rent field
+      if (dailyRate && Number(dailyRate) !== original.daily_rate)
+        changes.agreed_rent = Number(dailyRate)
+    } else {
+      // Monthly: update agreed_rent
+      if (agreedRent && Number(agreedRent) !== original.rent)
+        changes.agreed_rent = Number(agreedRent)
+    }
     if (securityDeposit && Number(securityDeposit) !== original.security_deposit)
       changes.security_deposit = Number(securityDeposit)
     if (maintenanceFee && Number(maintenanceFee) !== original.maintenance_fee)
@@ -149,7 +159,8 @@ export default function EditTenantPage() {
       }
     }
     if (changes.agreed_rent !== undefined) {
-      fields.push({ label: "Agreed Rent", value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
+      const label = original?.stay_type === "daily" ? "Daily Rate (₹/night)" : "Agreed Rent (₹/mo)"
+      fields.push({ label, value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
       if (proratedInfo) {
         const monthName = new Date().toLocaleString("en-IN", { month: "short" })
         const thisMonthAmt = prorateChoice === "prorated"
@@ -467,29 +478,34 @@ export default function EditTenantPage() {
               </span>
             )}
           </div>
-          {original?.stay_type === "daily" && (
-            <p className="text-xs text-status-warn bg-[#FFF5F5] border border-[#FECACA] rounded-lg p-3">
-              Day-stay bookings use Daily Rate (₹/night), not monthly rent. Edit via Bookings page.
-            </p>
-          )}
-
-          {original?.stay_type !== "daily" && (
+          {original?.stay_type === "daily" ? (
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1">Daily Rate (₹/night)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={dailyRate}
+                onChange={(e) => setDailyRate(e.target.value)}
+                className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              />
+            </div>
+          ) : (
             <>
-          <div>
-            <label className="block text-xs font-medium text-ink-muted mb-1">Agreed Rent (₹/mo)</label>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={agreedRent}
-              onChange={(e) => setAgreedRent(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
-            />
-            {rentChanged && (
-              <p className="text-xs text-status-warn mt-1.5 px-1">
-                Rent change will be logged in revision history
-              </p>
-            )}
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-ink-muted mb-1">Agreed Rent (₹/mo)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={agreedRent}
+                  onChange={(e) => setAgreedRent(e.target.value)}
+                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+                />
+                {rentChanged && (
+                  <p className="text-xs text-status-warn mt-1.5 px-1">
+                    Rent change will be logged in revision history
+                  </p>
+                )}
+              </div>
 
           {/* Proration toggle — shown whenever rent or room changes */}
           {proratedInfo && (
