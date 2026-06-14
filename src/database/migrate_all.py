@@ -1313,19 +1313,29 @@ async def run_payments_mode_nullable_2026_05_27(conn) -> None:
 
 
 async def run_payments_void_not_null_2026_06_14(conn) -> None:
-    """Make payments.is_void NOT NULL with server default false.
+    """Harden payments columns that raw-SQL inserts left NULL.
 
-    Raw-SQL insert paths that omit is_void left it NULL. Every
-    `WHERE is_void = false` filter (history, dues, P&L, sheet sync) silently
-    drops NULL rows under SQL three-valued logic, so those payments vanish from
-    the app while still existing in the DB. Backfill NULL->false, then enforce
-    the default + NOT NULL so it can never recur.
+    Raw insert paths (manual add/edit payment commands, reload scripts) omit
+    columns that only had Python-side ORM defaults, so they landed NULL:
+      • is_void   — every `WHERE is_void = false` filter (history, dues, P&L,
+                    sheet sync) silently drops NULL rows under SQL 3-valued
+                    logic, so the payment vanishes from the app.
+      • created_at — the sheet sync compares created_at across a tenant's
+                    payments; a NULL falls back to a `date` and crashes the
+                    whole month sync with "can't compare datetime to date".
+    Backfill, then add server defaults so neither can recur regardless of
+    which insert path is used.
     """
     await conn.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
+    # is_void
     await conn.execute(text("UPDATE payments SET is_void = false WHERE is_void IS NULL"))
     await conn.execute(text("ALTER TABLE payments ALTER COLUMN is_void SET DEFAULT false"))
     await conn.execute(text("ALTER TABLE payments ALTER COLUMN is_void SET NOT NULL"))
-    print("  [migration] payments.is_void backfilled NULL->false, now DEFAULT false NOT NULL")
+    # created_at — backfill NULL to the payment date (midnight) for sane ordering
+    await conn.execute(text(
+        "UPDATE payments SET created_at = payment_date::timestamp WHERE created_at IS NULL"))
+    await conn.execute(text("ALTER TABLE payments ALTER COLUMN created_at SET DEFAULT now()"))
+    print("  [migration] payments.is_void + created_at backfilled and given server defaults")
 
 
 async def run_enable_rls_all_tables(conn) -> None:

@@ -15,7 +15,7 @@ import argparse
 import asyncio
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
 
@@ -206,11 +206,18 @@ async def main(args):
             else:
                 # Pre-payment (paid before period_month) — count toward balance only
                 prepaid_map[p.tenancy_id] = prepaid_map.get(p.tenancy_id, Decimal("0")) + p.amount
-            # Most recent by created_at, fallback to payment_date
+            # Most recent by created_at, fallback to payment_date. Normalize to a
+            # (datetime, id) tuple so a NULL created_at (raw-inserted rows fall
+            # back to a `date`) never gets compared against a real `datetime` —
+            # that raised "can't compare datetime to date" and killed the sync.
+            def _ts(pmt):
+                ca = getattr(pmt, "created_at", None)
+                if ca is not None:
+                    return (ca, pmt.id)
+                pd = pmt.payment_date or date.min
+                return (datetime.combine(pd, time.min), pmt.id)
             _prev = latest_pay_per_t.get(p.tenancy_id)
-            _p_ts = getattr(p, "created_at", None) or p.payment_date
-            _prev_ts = (getattr(_prev, "created_at", None) or _prev.payment_date) if _prev else None
-            if _prev is None or (_p_ts and _prev_ts and _p_ts > _prev_ts):
+            if _prev is None or _ts(p) > _ts(_prev):
                 latest_pay_per_t[p.tenancy_id] = p
 
         # Resolve received_by_staff_id → Staff.name in one bulk query.

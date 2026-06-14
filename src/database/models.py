@@ -483,7 +483,7 @@ class Payment(Base):
     notes               = Column(Text)
     is_void             = Column(Boolean, nullable=False, default=False, server_default="false")
     receipt_url         = Column(String(500), nullable=True)   # relative path to receipt image/PDF
-    created_at          = Column(DateTime, default=datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.utcnow, server_default=func.now())
     org_id              = Column(Integer, nullable=False, default=1, server_default="1")
     unique_hash         = Column(String(64), nullable=True)    # dedup key — set by bot on insert
 
