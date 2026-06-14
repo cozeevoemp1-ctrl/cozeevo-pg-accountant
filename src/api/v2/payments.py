@@ -262,6 +262,9 @@ async def edit_payment(
         raise HTTPException(status_code=403, detail="admin or staff only")
 
     async with get_session() as session:
+        # Bypass freeze trigger for edits (voids already bypass via DELETE)
+        await session.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
+
         payment = await session.get(Payment, payment_id)
         if payment is None:
             raise HTTPException(status_code=404, detail=f"Payment {payment_id} not found")
