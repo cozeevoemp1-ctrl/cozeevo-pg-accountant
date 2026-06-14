@@ -129,77 +129,50 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
 async def list_payments(
     tenancy_id: Optional[int] = Query(None),
     tenant_id: Optional[int] = Query(None),
-    limit: int = Query(default=30, le=100),
+    limit: int = Query(default=100, le=100),
     user: AppUser = Depends(get_current_user),
 ):
     if user.role not in ("admin", "staff"):
         raise HTTPException(status_code=403, detail="admin or staff only")
 
     async with get_session() as session:
-        # Resolve tenant_id → tenancy_id
-        if tenant_id and not tenancy_id:
-            # Search across ALL tenancies for this tenant (active, exited, cancelled)
-            # so advance/deposit payments on cancelled tenancies still show in history.
+        # Resolve tenant_id → tenancy_ids
+        tenancy_ids = []
+        if tenant_id:
             tenancy_ids = (await session.execute(
                 select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
             )).scalars().all()
             if not tenancy_ids:
                 return []
-            # Filter payments by all tenancy_ids instead of one
-            q_result = (await session.execute(
-                (select(
-                    Payment,
-                    Tenant.name.label("tenant_name"),
-                    Room.room_number.label("room_number"),
-                )
-                .join(Tenancy, Tenancy.id == Payment.tenancy_id)
-                .join(Tenant, Tenant.id == Tenancy.tenant_id)
-                .outerjoin(Room, Room.id == Tenancy.room_id)
-                .where(
-                    Payment.is_void == False,
-                    Payment.tenancy_id.in_(tenancy_ids),
-                )
-                .order_by(desc(Payment.payment_date), desc(Payment.id))
-                .limit(limit))
-            )).all()
-            return [
-                PaymentListItem(
-                    payment_id=p.id, amount=float(p.amount),
-                    method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
-                    for_type=p.for_type.value if p.for_type else "rent",
-                    period_month=p.period_month.strftime("%Y-%m") if p.period_month else None,
-                    payment_date=p.payment_date.strftime("%Y-%m-%d"),
-                    notes=p.notes, is_void=p.is_void, receipt_url=p.receipt_url,
-                    upi_reference=p.upi_reference, tenant_name=row[0], room_number=row[1],
-                )
-                for p, *row in q_result
-            ]
+        elif tenancy_id:
+            tenancy_ids = [tenancy_id]
+        else:
+            return []
 
-        # Build query — always join tenant+room for display names
+        # Simple query: just get payments
         q = (
-            select(
-                Payment,
-                Tenant.name.label("tenant_name"),
-                Room.room_number.label("room_number"),
+            select(Payment)
+            .where(
+                Payment.is_void == False,
+                Payment.tenancy_id.in_(tenancy_ids),
             )
-            .join(Tenancy, Tenancy.id == Payment.tenancy_id)
-            .join(Tenant, Tenant.id == Tenancy.tenant_id)
-            .outerjoin(Room, Room.id == Tenancy.room_id)
-            .where(Payment.is_void == False)
+            .order_by(desc(Payment.payment_date), desc(Payment.id))
+            .limit(limit)
         )
-        if tenancy_id:
-            q = q.where(Payment.tenancy_id == tenancy_id)
+        payments = (await session.execute(q)).scalars().all()
 
-        q = q.order_by(desc(Payment.payment_date), desc(Payment.id)).limit(limit)
-        rows = (await session.execute(q)).all()
+        # Enrich with tenant/room names (separate query, no JOIN failures)
+        result = []
+        for p in payments:
+            tenancy = await session.get(Tenancy, p.tenancy_id)
+            tenant_name = None
+            room_number = None
+            if tenancy:
+                tenant = await session.get(Tenant, tenancy.tenant_id)
+                tenant_name = tenant.name if tenant else None
+                room = await session.get(Room, tenancy.room_id)
+                room_number = room.room_number if room else None
 
-    # Deduplicate by payment_id (in case JOIN creates duplicate rows)
-    seen_ids = set()
-    result = []
-    for row in rows:
-        p = row[0]
-        if p.id not in seen_ids:
-            seen_ids.add(p.id)
             pm = p.period_month.strftime("%Y-%m") if p.period_month else None
             result.append(PaymentListItem(
                 payment_id=p.id,
@@ -212,10 +185,10 @@ async def list_payments(
                 is_void=p.is_void,
                 receipt_url=p.receipt_url,
                 upi_reference=p.upi_reference,
-                tenant_name=row.tenant_name,
-                room_number=row.room_number,
+                tenant_name=tenant_name,
+                room_number=room_number,
             ))
-    return result
+        return result
 
 
 @router.delete("/payments/{payment_id}", status_code=204)
