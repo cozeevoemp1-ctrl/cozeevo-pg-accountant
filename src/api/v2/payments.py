@@ -125,36 +125,11 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         )
 
 
-@router.get("/payments/debug")
-async def debug_payments(
-    tenancy_id: Optional[int] = Query(None),
-    user: AppUser = Depends(get_current_user),
-):
-    """Debug endpoint — returns raw payment count"""
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="admin or staff only")
-
-    async with get_session() as session:
-        q = select(Payment).where(Payment.is_void == False)
-        if tenancy_id:
-            q = q.where(Payment.tenancy_id == tenancy_id)
-
-        count = (await session.execute(select(func.count()).select_from(Payment).where(Payment.is_void == False, Payment.tenancy_id == tenancy_id if tenancy_id else True))).scalar()
-        payments = (await session.execute(q.limit(100))).scalars().all()
-
-        return {
-            "tenancy_id": tenancy_id,
-            "total_count": count,
-            "returned": len(payments),
-            "payments": [{"id": p.id, "amount": float(p.amount), "period": str(p.period_month)} for p in payments]
-        }
-
-
 @router.get("/payments", response_model=List[PaymentListItem])
 async def list_payments(
     tenancy_id: Optional[int] = Query(None),
     tenant_id: Optional[int] = Query(None),
-    limit: int = Query(default=100, le=100),
+    limit: int = Query(default=1000, le=1000),
     user: AppUser = Depends(get_current_user),
 ):
     if user.role not in ("admin", "staff"):
@@ -174,46 +149,45 @@ async def list_payments(
         else:
             return []
 
-        # Simple query: just get payments
-        q = (
-            select(Payment)
-            .where(
-                Payment.is_void == False,
-                Payment.tenancy_id.in_(tenancy_ids),
-            )
-            .order_by(desc(Payment.payment_date), desc(Payment.id))
-            .limit(limit)
+        # Raw SQL query to avoid ORM issues
+        from sqlalchemy.sql import text as sql_text
+        query_str = """
+        SELECT p.id, p.tenancy_id, p.amount, p.payment_mode, p.for_type,
+               p.period_month, p.payment_date, p.notes, p.is_void, p.receipt_url, p.upi_reference,
+               t.name as tenant_name, r.room_number
+        FROM payments p
+        JOIN tenancies tn ON p.tenancy_id = tn.id
+        JOIN tenants t ON tn.tenant_id = t.id
+        LEFT JOIN rooms r ON tn.room_id = r.id
+        WHERE p.is_void = false AND p.tenancy_id = ANY(:tenancy_ids)
+        ORDER BY p.payment_date DESC, p.id DESC
+        LIMIT :limit
+        """
+
+        result = await session.execute(
+            sql_text(query_str),
+            {"tenancy_ids": tenancy_ids, "limit": limit}
         )
-        payments = (await session.execute(q)).scalars().all()
+        rows = result.all()
 
-        # Enrich with tenant/room names (separate query, no JOIN failures)
-        result = []
-        for p in payments:
-            tenancy = await session.get(Tenancy, p.tenancy_id)
-            tenant_name = None
-            room_number = None
-            if tenancy:
-                tenant = await session.get(Tenant, tenancy.tenant_id)
-                tenant_name = tenant.name if tenant else None
-                room = await session.get(Room, tenancy.room_id)
-                room_number = room.room_number if room else None
-
-            pm = p.period_month.strftime("%Y-%m") if p.period_month else None
-            result.append(PaymentListItem(
-                payment_id=p.id,
-                amount=float(p.amount),
-                method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
-                for_type=p.for_type.value if p.for_type else "rent",
+        payments = []
+        for row in rows:
+            pm = row[5].strftime("%Y-%m") if row[5] else None
+            payments.append(PaymentListItem(
+                payment_id=row[0],
+                amount=float(row[2]),
+                method=row[3].upper() if row[3] else "CASH",
+                for_type=row[4] if row[4] else "rent",
                 period_month=pm,
-                payment_date=p.payment_date.strftime("%Y-%m-%d"),
-                notes=p.notes,
-                is_void=p.is_void,
-                receipt_url=p.receipt_url,
-                upi_reference=p.upi_reference,
-                tenant_name=tenant_name,
-                room_number=room_number,
+                payment_date=row[6].strftime("%Y-%m-%d"),
+                notes=row[7],
+                is_void=row[8],
+                receipt_url=row[9],
+                upi_reference=row[10],
+                tenant_name=row[11],
+                room_number=row[12],
             ))
-        return result
+        return payments
 
 
 @router.delete("/payments/{payment_id}", status_code=204)
