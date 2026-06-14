@@ -149,43 +149,50 @@ async def list_payments(
         else:
             return []
 
-        # Raw SQL query to avoid ORM issues
-        from sqlalchemy.sql import text as sql_text
-        query_str = """
-        SELECT p.id, p.tenancy_id, p.amount, p.payment_mode, p.for_type,
-               p.period_month, p.payment_date, p.notes, p.is_void, p.receipt_url, p.upi_reference,
-               t.name as tenant_name, r.room_number
-        FROM payments p
-        JOIN tenancies tn ON p.tenancy_id = tn.id
-        JOIN tenants t ON tn.tenant_id = t.id
-        LEFT JOIN rooms r ON tn.room_id = r.id
-        WHERE p.is_void = false AND p.tenancy_id = ANY(:tenancy_ids)
-        ORDER BY p.payment_date DESC, p.id DESC
-        LIMIT :limit
-        """
-
-        result = await session.execute(
-            sql_text(query_str),
-            {"tenancy_ids": tenancy_ids, "limit": limit}
+        # Query payments with joins
+        q = (
+            select(
+                Payment.id,
+                Payment.amount,
+                Payment.payment_mode,
+                Payment.for_type,
+                Payment.period_month,
+                Payment.payment_date,
+                Payment.notes,
+                Payment.receipt_url,
+                Payment.upi_reference,
+                Tenant.name,
+                Room.room_number,
+            )
+            .join(Tenancy, Payment.tenancy_id == Tenancy.id)
+            .join(Tenant, Tenancy.tenant_id == Tenant.id)
+            .outerjoin(Room, Tenancy.room_id == Room.id)
+            .where(
+                Payment.is_void == False,
+                Payment.tenancy_id.in_(tenancy_ids),
+            )
+            .order_by(desc(Payment.payment_date), desc(Payment.id))
+            .limit(limit)
         )
-        rows = result.all()
+
+        rows = (await session.execute(q)).all()
 
         payments = []
         for row in rows:
-            pm = row[5].strftime("%Y-%m") if row[5] else None
+            pm = row[4].strftime("%Y-%m") if row[4] else None
             payments.append(PaymentListItem(
                 payment_id=row[0],
-                amount=float(row[2]),
-                method=row[3].upper() if row[3] else "CASH",
-                for_type=row[4] if row[4] else "rent",
+                amount=float(row[1]),
+                method=row[2].upper() if row[2] else "CASH",
+                for_type=row[3] if row[3] else "rent",
                 period_month=pm,
-                payment_date=row[6].strftime("%Y-%m-%d"),
-                notes=row[7],
-                is_void=row[8],
-                receipt_url=row[9],
-                upi_reference=row[10],
-                tenant_name=row[11],
-                room_number=row[12],
+                payment_date=row[5].strftime("%Y-%m-%d"),
+                notes=row[6],
+                receipt_url=row[7],
+                upi_reference=row[8],
+                tenant_name=row[9],
+                room_number=row[10],
+                is_void=False,
             ))
         return payments
 
