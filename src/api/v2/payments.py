@@ -129,72 +129,59 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
 async def list_payments(
     tenancy_id: Optional[int] = Query(None),
     tenant_id: Optional[int] = Query(None),
-    limit: int = Query(default=1000, le=1000),
     user: AppUser = Depends(get_current_user),
 ):
     if user.role not in ("admin", "staff"):
         raise HTTPException(status_code=403, detail="admin or staff only")
 
     async with get_session() as session:
-        # Resolve tenant_id → tenancy_ids
-        tenancy_ids = []
+        # Get target tenancy IDs
         if tenant_id:
             tenancy_ids = (await session.execute(
                 select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
             )).scalars().all()
-            if not tenancy_ids:
-                return []
         elif tenancy_id:
             tenancy_ids = [tenancy_id]
         else:
             return []
 
-        # Query payments with joins
-        q = (
-            select(
-                Payment.id,
-                Payment.amount,
-                Payment.payment_mode,
-                Payment.for_type,
-                Payment.period_month,
-                Payment.payment_date,
-                Payment.notes,
-                Payment.receipt_url,
-                Payment.upi_reference,
-                Tenant.name,
-                Room.room_number,
-            )
-            .join(Tenancy, Payment.tenancy_id == Tenancy.id)
-            .join(Tenant, Tenancy.tenant_id == Tenant.id)
-            .outerjoin(Room, Tenancy.room_id == Room.id)
-            .where(
-                Payment.is_void == False,
-                Payment.tenancy_id.in_(tenancy_ids),
-            )
+        # Get all payments (no limit, no filtering beyond tenancy)
+        payments_data = await session.execute(
+            select(Payment)
+            .where(Payment.tenancy_id.in_(tenancy_ids), Payment.is_void == False)
             .order_by(desc(Payment.payment_date), desc(Payment.id))
-            .limit(limit)
         )
+        all_payments = payments_data.scalars().all()
 
-        rows = (await session.execute(q)).all()
+        # Build response
+        result = []
+        for p in all_payments:
+            # Get tenant/room info
+            tn = await session.get(Tenancy, p.tenancy_id)
+            tenant_name = None
+            room_number = None
+            if tn:
+                t = await session.get(Tenant, tn.tenant_id)
+                tenant_name = t.name if t else None
+                r = await session.get(Room, tn.room_id)
+                room_number = r.room_number if r else None
 
-        payments = []
-        for row in rows:
-            pm = row[4].strftime("%Y-%m") if row[4] else None
-            payments.append(PaymentListItem(
-                payment_id=row[0],
-                amount=float(row[1]),
-                method=row[2].upper() if row[2] else "CASH",
-                for_type=row[3] if row[3] else "rent",
+            pm = p.period_month.strftime("%Y-%m") if p.period_month else None
+            result.append(PaymentListItem(
+                payment_id=p.id,
+                amount=float(p.amount),
+                method=p.payment_mode.value.upper() if p.payment_mode else "CASH",
+                for_type=p.for_type.value if p.for_type else "rent",
                 period_month=pm,
-                payment_date=row[5].strftime("%Y-%m-%d"),
-                notes=row[6],
-                receipt_url=row[7],
-                upi_reference=row[8],
-                tenant_name=row[9],
-                room_number=row[10],
-                is_void=False,
+                payment_date=p.payment_date.strftime("%Y-%m-%d"),
+                notes=p.notes,
+                is_void=p.is_void,
+                receipt_url=p.receipt_url,
+                upi_reference=p.upi_reference,
+                tenant_name=tenant_name,
+                room_number=room_number,
             ))
-        return payments
+        return result
 
 
 @router.delete("/payments/{payment_id}", status_code=204)
