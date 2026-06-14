@@ -129,29 +129,45 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
 async def list_payments(
     tenancy_id: Optional[int] = Query(None),
     tenant_id: Optional[int] = Query(None),
+    limit: int = Query(default=30, le=200),
     user: AppUser = Depends(get_current_user),
 ):
     if user.role not in ("admin", "staff"):
         raise HTTPException(status_code=403, detail="admin or staff only")
 
     async with get_session() as session:
-        # Get target tenancy IDs
+        # Resolve which tenancies to include.
+        #   tenant_id  → all of that tenant's tenancies
+        #   tenancy_id → expand to ALL tenancies of the same tenant, so payments
+        #                made before a room transfer / re-checkin still show in
+        #                one person's history
+        #   neither    → recent payments across ALL tenants (default page view)
+        tenancy_ids: Optional[list[int]] = None
         if tenant_id:
             tenancy_ids = (await session.execute(
                 select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
             )).scalars().all()
+            if not tenancy_ids:
+                return []
         elif tenancy_id:
-            tenancy_ids = [tenancy_id]
-        else:
-            return []
+            owner = await session.scalar(
+                select(Tenancy.tenant_id).where(Tenancy.id == tenancy_id)
+            )
+            if owner is not None:
+                tenancy_ids = (await session.execute(
+                    select(Tenancy.id).where(Tenancy.tenant_id == owner)
+                )).scalars().all()
+            else:
+                tenancy_ids = [tenancy_id]
 
-        # Get all payments (no limit, no filtering beyond tenancy)
-        payments_data = await session.execute(
-            select(Payment)
-            .where(Payment.tenancy_id.in_(tenancy_ids), Payment.is_void == False)
-            .order_by(desc(Payment.payment_date), desc(Payment.id))
-        )
-        all_payments = payments_data.scalars().all()
+        # NULL-safe void filter: is_void IS NOT TRUE matches both False and NULL,
+        # so a stray NULL row never silently disappears from history again.
+        q = select(Payment).where(Payment.is_void.isnot(True))
+        if tenancy_ids is not None:
+            q = q.where(Payment.tenancy_id.in_(tenancy_ids))
+        q = q.order_by(desc(Payment.payment_date), desc(Payment.id)).limit(limit)
+
+        all_payments = (await session.execute(q)).scalars().all()
 
         # Build response
         result = []

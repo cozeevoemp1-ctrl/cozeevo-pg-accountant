@@ -1312,6 +1312,22 @@ async def run_payments_mode_nullable_2026_05_27(conn) -> None:
     print("  [migration] payments.payment_mode is now nullable (unassigned imports)")
 
 
+async def run_payments_void_not_null_2026_06_14(conn) -> None:
+    """Make payments.is_void NOT NULL with server default false.
+
+    Raw-SQL insert paths that omit is_void left it NULL. Every
+    `WHERE is_void = false` filter (history, dues, P&L, sheet sync) silently
+    drops NULL rows under SQL three-valued logic, so those payments vanish from
+    the app while still existing in the DB. Backfill NULL->false, then enforce
+    the default + NOT NULL so it can never recur.
+    """
+    await conn.execute(text("SET LOCAL app.allow_historical_write = 'true'"))
+    await conn.execute(text("UPDATE payments SET is_void = false WHERE is_void IS NULL"))
+    await conn.execute(text("ALTER TABLE payments ALTER COLUMN is_void SET DEFAULT false"))
+    await conn.execute(text("ALTER TABLE payments ALTER COLUMN is_void SET NOT NULL"))
+    print("  [migration] payments.is_void backfilled NULL->false, now DEFAULT false NOT NULL")
+
+
 async def run_enable_rls_all_tables(conn) -> None:
     """Enable RLS on ALL application tables. Idempotent — safe to run every migration.
     Uses pg_tables to discover all public-schema tables dynamically,
@@ -1666,6 +1682,9 @@ async def main(args: argparse.Namespace) -> None:
     # Make payments.payment_mode nullable (historical imports have no known mode)
     async with engine.begin() as conn2:
         await run_payments_mode_nullable_2026_05_27(conn2)
+    # Backfill + enforce NOT NULL on payments.is_void (raw inserts left it NULL)
+    async with engine.begin() as conn2:
+        await run_payments_void_not_null_2026_06_14(conn2)
     if args.seed:
         async with engine.begin() as conn2:
             await run_seed(conn2)

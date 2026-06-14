@@ -481,7 +481,7 @@ class Payment(Base):
     period_month        = Column(Date)      # which month rent this is for (NULL for deposit/booking)
     received_by_staff_id = Column(Integer, ForeignKey("staff.id"), nullable=True)
     notes               = Column(Text)
-    is_void             = Column(Boolean, default=False)
+    is_void             = Column(Boolean, nullable=False, default=False, server_default="false")
     receipt_url         = Column(String(500), nullable=True)   # relative path to receipt image/PDF
     created_at          = Column(DateTime, default=datetime.utcnow)
     org_id              = Column(Integer, nullable=False, default=1, server_default="1")
