@@ -9,7 +9,7 @@ from datetime import date, datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import desc, select, text
+from sqlalchemy import desc, select, text, func
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
@@ -123,6 +123,31 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
             new_balance=float(result.new_balance),
             receipt_sent=False,
         )
+
+
+@router.get("/payments/debug")
+async def debug_payments(
+    tenancy_id: Optional[int] = Query(None),
+    user: AppUser = Depends(get_current_user),
+):
+    """Debug endpoint — returns raw payment count"""
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="admin or staff only")
+
+    async with get_session() as session:
+        q = select(Payment).where(Payment.is_void == False)
+        if tenancy_id:
+            q = q.where(Payment.tenancy_id == tenancy_id)
+
+        count = (await session.execute(select(func.count()).select_from(Payment).where(Payment.is_void == False, Payment.tenancy_id == tenancy_id if tenancy_id else True))).scalar()
+        payments = (await session.execute(q.limit(100))).scalars().all()
+
+        return {
+            "tenancy_id": tenancy_id,
+            "total_count": count,
+            "returned": len(payments),
+            "payments": [{"id": p.id, "amount": float(p.amount), "period": str(p.period_month)} for p in payments]
+        }
 
 
 @router.get("/payments", response_model=List[PaymentListItem])
