@@ -212,8 +212,8 @@ async def list_payments(
                 is_void=p.is_void,
                 receipt_url=p.receipt_url,
                 upi_reference=p.upi_reference,
-                tenant_name=row[1],
-                room_number=row[2],
+                tenant_name=row.tenant_name,
+                room_number=row.room_number,
             ))
     return result
 
