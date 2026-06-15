@@ -251,7 +251,10 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .outerjoin(booking_paid_subq, booking_paid_subq.c.tenancy_id == Tenancy.id)
             .where(
                 RentSchedule.period_month == period,
-                Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
+                # Active only — must match the dues-list panel (kpi-detail type=dues).
+                # no_show = pre-booked, not checked in; their first-month dues are not
+                # "pending" yet and were inflating the KPI tile above the list total.
+                Tenancy.status == TenancyStatus.active,
             )
         )).all()
         overdue_tenants = 0
