@@ -241,6 +241,7 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 Tenancy.checkin_date,
                 Tenancy.agreed_rent,
                 eff_due_col,
+                func.coalesce(RentSchedule.adjustment, 0).label("adjustment"),
                 func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
                 func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
                 func.coalesce(booking_paid_subq.c.booking_paid, 0).label("booking_paid"),
@@ -269,6 +270,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             _checkin = _r.checkin_date
             if _checkin and _checkin.replace(day=1) == period:
                 _prorated = float(prorated_first_month_rent(float(_r.agreed_rent or 0), _checkin))
+                # Apply waiver/adjustment to first-month rent (matches get_tenant_dues).
+                _prorated = max(0.0, _prorated + float(_r.adjustment or 0))
                 _overflow = max(0.0, _rent_paid - _prorated)
                 _rent_dues = max(0.0, _prorated - _rent_paid)
                 _dep_due = max(0.0, _dep_agreed - (_dep_paid + _overflow) - _booking)
@@ -598,6 +601,7 @@ async def get_kpi_detail(
                     Room.room_number,
                     Property.name.label("property_name"),
                     eff_due_col,
+                    func.coalesce(RentSchedule.adjustment, 0).label("adjustment"),
                     func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
                     func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
                     func.coalesce(booking_paid_subq.c.booking_paid, 0).label("booking_paid"),
@@ -625,6 +629,8 @@ async def get_kpi_detail(
                 checkin = r.checkin_date
                 if checkin and checkin.replace(day=1) == period:
                     prorated = float(prorated_first_month_rent(float(r.agreed_rent or 0), checkin))
+                    # Apply waiver/adjustment to first-month rent (matches get_tenant_dues).
+                    prorated = max(0.0, prorated + float(r.adjustment or 0))
                     overflow = max(0.0, rent_paid - prorated)
                     rent_dues = max(0.0, prorated - rent_paid)
                     dep_due = max(0.0, dep_agreed - (dep_paid + overflow) - booking_amt)
