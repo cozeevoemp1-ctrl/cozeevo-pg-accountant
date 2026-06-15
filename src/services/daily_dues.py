@@ -44,9 +44,10 @@ def daily_dues(
 ) -> Tuple[float, float, float]:
     """Return (owed, dues, credit) for a day-stay tenancy.
 
-    total_paid_history MUST be the sum of NON-VOID Payment rows for the
-    tenancy (which already includes the booking advance). Do NOT pass or add
-    tenancy.booking_amount — see module docstring.
+    total_paid_history MUST be the sum of NON-VOID *stay* Payment rows —
+    i.e. EXCLUDING advance (booking) and deposit payments. Advance/deposit
+    go toward the security deposit and are held separately, never netted
+    against the stay rent. Never pass tenancy.booking_amount.
     """
     owed = daily_owed(checkin, checkout, daily_rate)
     paid = float(total_paid_history or 0)

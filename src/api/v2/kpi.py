@@ -277,7 +277,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 overdue_tenants += 1
                 overdue_amount += _total
 
-        # Day-wise stays: no rent_schedule rows — dues = booked_nights × rate - (payments + advance)
+        # Day-wise stays: dues = nights × rate − STAY payments. Advance + deposit go
+        # toward the held security deposit, so they're excluded from the stay sum.
         daily_rows = (await session.execute(
             select(
                 Tenancy.agreed_rent,
@@ -286,7 +287,11 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 Tenancy.booking_amount,
                 func.coalesce(func.sum(Payment.amount), 0).label("total_paid"),
             )
-            .outerjoin(Payment, and_(Payment.tenancy_id == Tenancy.id, Payment.is_void == False))
+            .outerjoin(Payment, and_(
+                Payment.tenancy_id == Tenancy.id, Payment.is_void == False,
+                or_(Payment.for_type.is_(None),
+                    Payment.for_type.notin_([PaymentFor.booking, PaymentFor.deposit])),
+            ))
             .where(Tenancy.stay_type == StayType.daily, Tenancy.status == TenancyStatus.active)
             .group_by(Tenancy.id)
         )).all()
@@ -651,7 +656,11 @@ async def get_kpi_detail(
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
                 .join(Property, Property.id == Room.property_id)
-                .outerjoin(Payment, and_(Payment.tenancy_id == Tenancy.id, Payment.is_void == False))
+                .outerjoin(Payment, and_(
+                    Payment.tenancy_id == Tenancy.id, Payment.is_void == False,
+                    or_(Payment.for_type.is_(None),
+                        Payment.for_type.notin_([PaymentFor.booking, PaymentFor.deposit])),
+                ))
                 .where(Tenancy.stay_type == StayType.daily, Tenancy.status == TenancyStatus.active)
                 .group_by(Tenancy.id, Tenant.name, Room.room_number, Property.name)
             )).all()

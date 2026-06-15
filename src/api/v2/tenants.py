@@ -66,10 +66,15 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
             .group_by(Payment.tenancy_id)
             .subquery()
         )
-        # Day-stay payments have no period_month — sum all non-voided payments per tenancy
+        # Day-stay: advance + deposit go toward the security deposit (held separately),
+        # NOT the stay. Sum only stay payments so they don't reduce stay dues.
         all_paid_subq = (
             select(Payment.tenancy_id, func.sum(Payment.amount).label("all_paid"))
-            .where(Payment.is_void == False)
+            .where(
+                Payment.is_void == False,
+                or_(Payment.for_type.is_(None),
+                    Payment.for_type.notin_([PaymentFor.booking, PaymentFor.deposit])),
+            )
             .group_by(Payment.tenancy_id)
             .subquery()
         )
@@ -94,7 +99,7 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
     result = []
     for tenancy, tenant, room, prop, rent_due, adjustment, paid, all_paid in rows:
         if tenancy.stay_type and tenancy.stay_type.value == "daily":
-            # all_paid = sum of non-void payments (already includes booking advance).
+            # all_paid = STAY payments only (advance/deposit excluded — held as deposit).
             _, dues, _ = daily_dues(
                 tenancy.checkin_date, tenancy.checkout_date, tenancy.agreed_rent, all_paid
             )
@@ -252,10 +257,21 @@ async def get_tenant_dues(
     # Day-wise stays: dues = booked_nights × daily_rate − total_paid
     if tenancy.stay_type.value == "daily":
         async with get_session() as session:
+            # Stay payments only — advance + deposit go toward the held deposit, not the stay.
             total_paid_result = await session.scalar(
                 select(func.coalesce(func.sum(Payment.amount), 0)).where(
                     Payment.tenancy_id == tenancy_id,
                     Payment.is_void == False,
+                    or_(Payment.for_type.is_(None),
+                        Payment.for_type.notin_([PaymentFor.booking, PaymentFor.deposit])),
+                )
+            )
+            # Advance + deposit payments = deposit held for this day-stay.
+            deposit_held_result = await session.scalar(
+                select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                    Payment.tenancy_id == tenancy_id,
+                    Payment.is_void == False,
+                    Payment.for_type.in_([PaymentFor.booking, PaymentFor.deposit]),
                 )
             )
             last_payment = await session.scalar(
@@ -267,7 +283,8 @@ async def get_tenant_dues(
         daily_rate = float(tenancy.agreed_rent or 0)
         checkin = tenancy.checkin_date
         checkout = tenancy.checkout_date  # booked end date, updated on extension
-        # total_paid_result = sum of non-void payments (already includes booking advance).
+        deposit_held = float(deposit_held_result or 0)
+        # total_paid_result = STAY payments only (excludes advance/deposit, which are held).
         total_owed, dues, credit = daily_dues(checkin, checkout, daily_rate, total_paid_result)
         return {
             "tenancy_id": tenancy.id,
@@ -285,9 +302,9 @@ async def get_tenant_dues(
             "dues": dues,
             "credit": credit,
             "deposit_due": 0.0,
-            "deposit_paid": 0.0,
+            "deposit_paid": deposit_held,
             "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
-            "security_deposit": 0.0,
+            "security_deposit": deposit_held,
             "maintenance_fee": 0.0,
             "lock_in_months": 0,
             "notes": tenancy.notes or "",
