@@ -553,6 +553,16 @@ async def list_pending(request: Request):
         sessions = result.scalars().all()
         items = []
         for obs in sessions:
+            # Skip sessions whose linked tenancy is no longer a live booking:
+            # active  = tenant already checked in (was stuck in Bookings),
+            # cancelled/exited = superseded or gone. A still-pending booking has
+            # either no tenancy yet or a no_show tenancy, which we keep showing.
+            if obs.tenancy_id:
+                _tcy = await session.get(Tenancy, obs.tenancy_id)
+                if _tcy and _tcy.status in (
+                    TenancyStatus.active, TenancyStatus.cancelled, TenancyStatus.exited
+                ):
+                    continue
             room = await session.get(Room, obs.room_id) if obs.room_id else None
             td = json.loads(obs.tenant_data) if obs.tenant_data else {}
             # Lazily compute effective status

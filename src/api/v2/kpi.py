@@ -193,7 +193,12 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 select(func.count(Tenancy.id))
                 .where(
                     or_(
-                        Tenancy.checkout_date == today,
+                        # A real checkout today = exited; an active tenant leaving
+                        # today also counts. Cancelled / no_show NEVER count.
+                        and_(
+                            Tenancy.checkout_date == today,
+                            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.exited]),
+                        ),
                         and_(
                             Tenancy.expected_checkout == today,
                             Tenancy.status == TenancyStatus.active,
@@ -385,7 +390,12 @@ async def get_kpi_detail(
                 .join(Room, Room.id == Tenancy.room_id)
                 .where(
                     or_(
-                        Tenancy.checkout_date == today,
+                        # A real checkout today = exited; an active tenant leaving
+                        # today also counts. Cancelled / no_show NEVER count.
+                        and_(
+                            Tenancy.checkout_date == today,
+                            Tenancy.status.in_([TenancyStatus.active, TenancyStatus.exited]),
+                        ),
                         and_(
                             Tenancy.expected_checkout == today,
                             Tenancy.status == TenancyStatus.active,
