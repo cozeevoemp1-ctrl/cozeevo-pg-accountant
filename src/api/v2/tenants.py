@@ -95,7 +95,10 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
         if tenancy.stay_type and tenancy.stay_type.value == "daily":
             _nights = (tenancy.checkout_date - tenancy.checkin_date).days if tenancy.checkin_date and tenancy.checkout_date else 0
             _owed = _nights * float(tenancy.agreed_rent or 0)
-            _total_paid = float(all_paid) + float(tenancy.booking_amount or 0)
+            # Only history payments are real. The booking advance is already a Payment
+            # row (for_type=booking) inside all_paid — do NOT add tenancy.booking_amount
+            # again or the advance gets double-counted (understates dues).
+            _total_paid = float(all_paid)
             dues = max(0.0, _owed - _total_paid)
         else:
             rd = float(rent_due or tenancy.agreed_rent or 0)
@@ -268,9 +271,10 @@ async def get_tenant_dues(
         checkout = tenancy.checkout_date  # booked end date, updated on extension
         total_nights = (checkout - checkin).days if checkin and checkout else 0
         total_owed = total_nights * daily_rate
-        # booking_amount is advance paid at booking time — not a Payment record, must add separately
-        booking_amount = float(tenancy.booking_amount or 0)
-        total_paid_f = float(total_paid_result or 0) + booking_amount
+        # Only history payments are real. The booking advance is already recorded as a
+        # Payment row (for_type=booking) and is inside total_paid_result — do NOT add
+        # tenancy.booking_amount again or the advance gets double-counted.
+        total_paid_f = float(total_paid_result or 0)
         dues = max(0.0, total_owed - total_paid_f)
         credit = max(0.0, total_paid_f - total_owed)
         return {
