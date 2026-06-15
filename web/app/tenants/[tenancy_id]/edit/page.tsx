@@ -479,16 +479,28 @@ export default function EditTenantPage() {
             )}
           </div>
           {original?.stay_type === "daily" ? (
-            <div>
-              <label className="block text-xs font-medium text-ink-muted mb-1">Daily Rate (₹/night)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={dailyRate}
-                onChange={(e) => setDailyRate(e.target.value)}
-                className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-xs font-medium text-ink-muted mb-1">Daily Rate (₹/night)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={dailyRate}
+                  onChange={(e) => setDailyRate(e.target.value)}
+                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-ink-muted mb-1">Security Deposit (₹)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={securityDeposit}
+                  onChange={(e) => setSecurityDeposit(e.target.value)}
+                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+                />
+              </div>
+            </>
           ) : (
             <>
               <div>
