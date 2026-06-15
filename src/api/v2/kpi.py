@@ -284,7 +284,9 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             _rate = float(_dr.agreed_rent or 0)
             _nights = (_dr.checkout_date - _dr.checkin_date).days if _dr.checkin_date and _dr.checkout_date else 0
             _owed = _nights * _rate
-            _paid = float(_dr.total_paid or 0) + float(_dr.booking_amount or 0)
+            # Only history payments are real. The booking advance is already a Payment
+            # row inside total_paid — do NOT add booking_amount again (double-counts).
+            _paid = float(_dr.total_paid or 0)
             _dues = max(0.0, _owed - _paid)
             if _dues > 0:
                 overdue_tenants += 1
@@ -643,7 +645,8 @@ async def get_kpi_detail(
                 _rate = float(r.agreed_rent or 0)
                 _nights = (r.checkout_date - r.checkin_date).days if r.checkin_date and r.checkout_date else 0
                 _owed = _nights * _rate
-                _paid = float(r.total_paid or 0) + float(r.booking_amount or 0)
+                # Only history payments are real — booking advance is already in total_paid.
+                _paid = float(r.total_paid or 0)
                 _dues = max(0.0, _owed - _paid)
                 if _dues <= 0:
                     continue
