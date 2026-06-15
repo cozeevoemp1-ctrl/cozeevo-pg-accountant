@@ -4,6 +4,18 @@ description: Master to-do list for PG Accountant project — updated each sessio
 type: project
 ---
 
+## Pending from Session E (2026-06-14)
+
+### ⏳ Live Playwright verification — BLOCKED on PWA login password
+- Backend fixes done + deployed, but Kiran asked to verify on https://app.getkozzy.com/payments/history with Playwright.
+- Blocked: have email `cozeevoemp1@gmail.com`, no password. Resume by asking Kiran for the password, then: login → /payments/history → confirm Sachin Kumar Yadav (Rm 409) shows all 6 payments + ₹500 deposit pending → check G20/Chandraprakash → edit a payment and confirm it tallies into dues/sheet end-to-end.
+
+### ✅ Done this session
+- is_void NULL + created_at NULL root-caused and hardened (server_default + backfill + migration); list_payments + sync_sheet_from_db made NULL-safe.
+- Sachin Rm 409 deposit 21397 → ₹4,750 (deposit_due now ₹500).
+- April/May/June sheet tabs resynced.
+- "failed to fetch" ruled out (deploy restart window; endpoints + CORS healthy).
+
 ## Pending from Session D
 
 ### 🔴 Home Page Load Time (6 seconds) — DEFERRED, NEEDS ARCHITECTURAL FIX
