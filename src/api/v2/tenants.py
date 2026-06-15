@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 
 from src.api.v2.auth import AppUser, get_current_user
+from src.services.daily_dues import daily_dues
 from src.database.db_manager import get_session
 from src.database.models import (
     AuditLog,
@@ -93,13 +94,10 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
     result = []
     for tenancy, tenant, room, prop, rent_due, adjustment, paid, all_paid in rows:
         if tenancy.stay_type and tenancy.stay_type.value == "daily":
-            _nights = (tenancy.checkout_date - tenancy.checkin_date).days if tenancy.checkin_date and tenancy.checkout_date else 0
-            _owed = _nights * float(tenancy.agreed_rent or 0)
-            # Only history payments are real. The booking advance is already a Payment
-            # row (for_type=booking) inside all_paid — do NOT add tenancy.booking_amount
-            # again or the advance gets double-counted (understates dues).
-            _total_paid = float(all_paid)
-            dues = max(0.0, _owed - _total_paid)
+            # all_paid = sum of non-void payments (already includes booking advance).
+            _, dues, _ = daily_dues(
+                tenancy.checkin_date, tenancy.checkout_date, tenancy.agreed_rent, all_paid
+            )
         else:
             rd = float(rent_due or tenancy.agreed_rent or 0)
             adj = float(adjustment or 0)
@@ -269,14 +267,8 @@ async def get_tenant_dues(
         daily_rate = float(tenancy.agreed_rent or 0)
         checkin = tenancy.checkin_date
         checkout = tenancy.checkout_date  # booked end date, updated on extension
-        total_nights = (checkout - checkin).days if checkin and checkout else 0
-        total_owed = total_nights * daily_rate
-        # Only history payments are real. The booking advance is already recorded as a
-        # Payment row (for_type=booking) and is inside total_paid_result — do NOT add
-        # tenancy.booking_amount again or the advance gets double-counted.
-        total_paid_f = float(total_paid_result or 0)
-        dues = max(0.0, total_owed - total_paid_f)
-        credit = max(0.0, total_paid_f - total_owed)
+        # total_paid_result = sum of non-void payments (already includes booking advance).
+        total_owed, dues, credit = daily_dues(checkin, checkout, daily_rate, total_paid_result)
         return {
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,

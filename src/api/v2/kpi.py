@@ -20,6 +20,7 @@ from src.database.models import (
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
 from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
 from src.services.rent_schedule import prorated_first_month_rent
+from src.services.daily_dues import daily_dues
 from src.services.reporting import deposits_breakdown
 
 router = APIRouter(prefix="/reporting")
@@ -281,13 +282,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .group_by(Tenancy.id)
         )).all()
         for _dr in daily_rows:
-            _rate = float(_dr.agreed_rent or 0)
-            _nights = (_dr.checkout_date - _dr.checkin_date).days if _dr.checkin_date and _dr.checkout_date else 0
-            _owed = _nights * _rate
-            # Only history payments are real. The booking advance is already a Payment
-            # row inside total_paid — do NOT add booking_amount again (double-counts).
-            _paid = float(_dr.total_paid or 0)
-            _dues = max(0.0, _owed - _paid)
+            # total_paid = sum of non-void payments (already includes booking advance).
+            _, _dues, _ = daily_dues(_dr.checkin_date, _dr.checkout_date, _dr.agreed_rent, _dr.total_paid)
             if _dues > 0:
                 overdue_tenants += 1
                 overdue_amount += _dues
@@ -642,12 +638,8 @@ async def get_kpi_detail(
                 .group_by(Tenancy.id, Tenant.name, Room.room_number, Property.name)
             )).all()
             for r in daily_detail_rows:
-                _rate = float(r.agreed_rent or 0)
-                _nights = (r.checkout_date - r.checkin_date).days if r.checkin_date and r.checkout_date else 0
-                _owed = _nights * _rate
-                # Only history payments are real — booking advance is already in total_paid.
-                _paid = float(r.total_paid or 0)
-                _dues = max(0.0, _owed - _paid)
+                # total_paid = sum of non-void payments (already includes booking advance).
+                _, _dues, _ = daily_dues(r.checkin_date, r.checkout_date, r.agreed_rent, r.total_paid)
                 if _dues <= 0:
                     continue
                 items.append({
