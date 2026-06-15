@@ -17,6 +17,19 @@ from datetime import date
 from typing import Optional, Tuple
 
 
+def booking_credit(booking_paid_rows, booking_amount_field) -> float:
+    """Advance credited toward what a tenant owes (rent/deposit).
+
+    Only history is real: prefer the booking (advance) Payment rows. Fall back
+    to the legacy tenancy.booking_amount field ONLY for Excel-imported tenants
+    that have no Payment row. Using the field when a Payment row exists is what
+    caused deposits to wrongly show as due (field=0 but a ₹5000 advance row
+    existed). Mirror of get_tenant_dues' logic so every endpoint agrees.
+    """
+    rows = float(booking_paid_rows or 0)
+    return rows if rows > 0 else float(booking_amount_field or 0)
+
+
 def daily_owed(checkin: Optional[date], checkout: Optional[date], daily_rate) -> float:
     """Total stay cost = booked nights × per-day rate."""
     nights = (checkout - checkin).days if checkin and checkout else 0

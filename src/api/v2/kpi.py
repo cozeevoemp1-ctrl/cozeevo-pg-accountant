@@ -20,7 +20,7 @@ from src.database.models import (
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
 from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
 from src.services.rent_schedule import prorated_first_month_rent
-from src.services.daily_dues import daily_dues
+from src.services.daily_dues import daily_dues, booking_credit
 from src.services.reporting import deposits_breakdown
 
 router = APIRouter(prefix="/reporting")
@@ -227,6 +227,12 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             .group_by(Payment.tenancy_id)
             .subquery()
         )
+        booking_paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("booking_paid"))
+            .where(Payment.is_void == False, Payment.for_type == PaymentFor.booking)
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
         eff_due_col = (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)).label("effective_due")
         dues_rows = (await session.execute(
             select(
@@ -237,10 +243,12 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
                 eff_due_col,
                 func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
                 func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
+                func.coalesce(booking_paid_subq.c.booking_paid, 0).label("booking_paid"),
             )
             .join(Tenancy, Tenancy.id == RentSchedule.tenancy_id)
             .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == RentSchedule.tenancy_id)
             .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
+            .outerjoin(booking_paid_subq, booking_paid_subq.c.tenancy_id == Tenancy.id)
             .where(
                 RentSchedule.period_month == period,
                 Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]),
@@ -252,7 +260,8 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
             _eff = float(_r.effective_due or 0)
             _rent_paid = float(_r.rent_paid or 0)
             _dep_paid = float(_r.dep_paid or 0)
-            _booking = float(_r.booking_amount or 0)
+            # Advance credit: history booking rows first, field fallback.
+            _booking = booking_credit(_r.booking_paid, _r.booking_amount)
             _dep_agreed = float(_r.security_deposit or 0)
             _checkin = _r.checkin_date
             if _checkin and _checkin.replace(day=1) == period:
@@ -563,6 +572,12 @@ async def get_kpi_detail(
                 .group_by(Payment.tenancy_id)
                 .subquery()
             )
+            booking_paid_subq = (
+                select(Payment.tenancy_id, func.sum(Payment.amount).label("booking_paid"))
+                .where(Payment.is_void == False, Payment.for_type == PaymentFor.booking)
+                .group_by(Payment.tenancy_id)
+                .subquery()
+            )
             eff_due_col = (RentSchedule.rent_due + func.coalesce(RentSchedule.adjustment, 0)).label("effective_due")
             rows = (await session.execute(
                 select(
@@ -577,6 +592,7 @@ async def get_kpi_detail(
                     eff_due_col,
                     func.coalesce(rent_paid_subq.c.paid, 0).label("rent_paid"),
                     func.coalesce(deposit_paid_subq.c.dep_paid, 0).label("dep_paid"),
+                    func.coalesce(booking_paid_subq.c.booking_paid, 0).label("booking_paid"),
                 )
                 .join(Tenant, Tenant.id == Tenancy.tenant_id)
                 .join(Room, Room.id == Tenancy.room_id)
@@ -584,6 +600,7 @@ async def get_kpi_detail(
                 .join(RentSchedule, RentSchedule.tenancy_id == Tenancy.id)
                 .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == Tenancy.id)
                 .outerjoin(deposit_paid_subq, deposit_paid_subq.c.tenancy_id == Tenancy.id)
+                .outerjoin(booking_paid_subq, booking_paid_subq.c.tenancy_id == Tenancy.id)
                 .where(
                     RentSchedule.period_month == period,
                     Tenancy.status == TenancyStatus.active,
@@ -594,7 +611,8 @@ async def get_kpi_detail(
                 eff = float(r.effective_due or 0)
                 rent_paid = float(r.rent_paid or 0)
                 dep_paid = float(r.dep_paid or 0)
-                booking_amt = float(r.booking_amount or 0)
+                # Advance credit: history booking rows first, field fallback.
+                booking_amt = booking_credit(r.booking_paid, r.booking_amount)
                 dep_agreed = float(r.security_deposit or 0)
                 checkin = r.checkin_date
                 if checkin and checkin.replace(day=1) == period:

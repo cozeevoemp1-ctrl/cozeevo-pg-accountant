@@ -18,6 +18,7 @@ from src.database.models import (
     Room, Tenancy, TenancyStatus, Vacation,
 )
 import json
+from src.services.daily_dues import booking_credit
 from src.whatsapp.role_service import CallerContext
 from src.whatsapp.handlers._shared import BOT_NAME, time_greeting, is_first_time_today, bot_intro, parse_target_month
 from src.whatsapp.intent_detector import _extract_date_entity as _parse_date
@@ -170,8 +171,23 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
     deposit_line = None
     if tenancy.security_deposit and tenancy.security_deposit > 0:
         _dep = int(tenancy.security_deposit)
-        _dep_paid = int(tenancy.booking_amount or 0)
-        _dep_remaining = _dep - _dep_paid
+        # Deposit paid = deposit payments + advance (history rows first, field fallback).
+        _dep_pay_rows = await session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.tenancy_id == tenancy.id,
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.deposit,
+            )
+        )
+        _booking_rows = await session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.tenancy_id == tenancy.id,
+                Payment.is_void == False,
+                Payment.for_type == PaymentFor.booking,
+            )
+        )
+        _dep_paid = int(float(_dep_pay_rows or 0) + booking_credit(_booking_rows, tenancy.booking_amount))
+        _dep_remaining = max(0, _dep - _dep_paid)
         if _dep_remaining > 0:
             deposit_line = f"Deposit: Rs.{_dep:,} (Paid: Rs.{_dep_paid:,} | Due: Rs.{_dep_remaining:,})"
         else:

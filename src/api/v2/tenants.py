@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 
 from src.api.v2.auth import AppUser, get_current_user
-from src.services.daily_dues import daily_dues
+from src.services.daily_dues import daily_dues, booking_credit
 from src.database.db_manager import get_session
 from src.database.models import (
     AuditLog,
@@ -354,9 +354,8 @@ async def get_tenant_dues(
     deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
     deposit_paid_direct = float(deposit_paid_result) if deposit_paid_result else 0.0
     booking_paid_via_pmts = float(booking_paid_result) if booking_paid_result else 0.0
-    # Use payment records if they exist; fall back to tenancy.booking_amount for
-    # Excel-imported tenants who have no corresponding Payment record.
-    booking_amount = booking_paid_via_pmts if booking_paid_via_pmts > 0 else (float(tenancy.booking_amount) if tenancy.booking_amount else 0.0)
+    # Advance credited toward deposit/rent — history rows first, field fallback.
+    booking_amount = booking_credit(booking_paid_via_pmts, tenancy.booking_amount)
 
     rent_due   = float(rs.rent_due)   if rs else rent
     adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
