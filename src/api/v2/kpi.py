@@ -435,6 +435,10 @@ async def get_kpi_detail(
         elif type == "vacant":
             # Count occupied BEDS per room (premium tenant = max_occupancy beds, else 1)
             # so that premium-occupied rooms don't appear as having free beds.
+            # Held beds (no-show whose check-in date has arrived but not yet checked in)
+            # count as occupied too — must match get_occupied_beds(), else the room-list
+            # "beds free" total disagrees with the "Vacant beds" KPI tile. Future no-shows
+            # (checkin > today) stay free and are surfaced via upcoming_map ("Until X").
             occ_subq = (
                 select(
                     Tenancy.room_id,
@@ -446,7 +450,15 @@ async def get_kpi_detail(
                     ).label("occ"),
                 )
                 .join(Room, Room.id == Tenancy.room_id)
-                .where(Tenancy.status == TenancyStatus.active)
+                .where(
+                    or_(
+                        Tenancy.status == TenancyStatus.active,
+                        and_(
+                            Tenancy.status == TenancyStatus.no_show,
+                            Tenancy.checkin_date <= today,
+                        ),
+                    )
+                )
                 .group_by(Tenancy.room_id)
                 .subquery()
             )
