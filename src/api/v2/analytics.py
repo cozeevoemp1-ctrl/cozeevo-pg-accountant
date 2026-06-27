@@ -12,7 +12,9 @@ from sqlalchemy import case, func, literal_column, select, and_, or_, text
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import Room, Tenancy, TenancyStatus, StayType
-from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
+from src.services.occupancy import (
+    get_total_revenue_beds, get_occupied_beds, get_occupied_beds_asof, get_occupancy_pct,
+)
 
 router = APIRouter(prefix="/analytics")
 
@@ -101,8 +103,9 @@ async def _live_month_stats(session, target: date, total_beds: int) -> tuple[int
 
     Uses canonical occupancy service to ensure consistency with KPI endpoint.
     """
-    # Use canonical occupancy calculation
-    beds = await get_occupied_beds(session, target)
+    # Point-in-time occupancy for the given month-end (correct for past months;
+    # get_occupied_beds ignores the date and would return today's count for all).
+    beds = await get_occupied_beds_asof(session, target)
     pct = round(beds / total_beds * 100, 1) if total_beds else 0.0
 
     # avg rent per BED: SUM(agreed_rent) / SUM(beds_used) for monthly tenants
