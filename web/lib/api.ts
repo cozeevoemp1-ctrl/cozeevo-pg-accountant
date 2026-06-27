@@ -781,8 +781,13 @@ export async function getDepositReconciliation(month?: string): Promise<{ rows: 
 
 async function _downloadExcel(path: string, filename: string): Promise<void> {
   const headers = await _authHeaders();
+  if (!headers.Authorization) throw new Error("not signed in (no token) — reload & retry");
   const res = await fetch(`${BASE_URL}${path}`, { headers });
-  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json())?.detail ?? ""; } catch { /* not json */ }
+    throw new Error(`server ${res.status}${detail ? ` — ${detail}` : ""}`);
+  }
   const blob = await res.blob();
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);

@@ -15,13 +15,16 @@ export default function FinancePage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [lastUpload, setLastUpload] = useState<FinanceUploadResult | null>(null)
   const [pnlState, setPnlState] = useState<"idle" | "loading" | "error">("idle")
+  const [pnlError, setPnlError] = useState("")
 
   async function handleGeneratePnl() {
     setPnlState("loading")
+    setPnlError("")
     try {
       await downloadPnlExcel()
       setPnlState("idle")
-    } catch {
+    } catch (e: unknown) {
+      setPnlError(e instanceof Error ? e.message : "unknown error")
       setPnlState("error")
     }
   }
@@ -69,7 +72,7 @@ export default function FinancePage() {
           <span>{pnlState === "loading" ? "Generating…" : "Generate P&L (Oct'25 → May'26)"}</span>
         </button>
         {pnlState === "error" && (
-          <p className="text-[10px] text-status-warn text-center">Could not generate — try again</p>
+          <p className="text-[10px] text-status-warn text-center">Could not generate — {pnlError || "try again"}</p>
         )}
         <p className="text-[10px] text-ink-muted text-center">
           Full Excel: income, deposits, expenses, reconciliation — the verified accountant figures.
