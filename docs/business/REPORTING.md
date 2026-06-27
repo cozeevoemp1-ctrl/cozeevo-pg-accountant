@@ -55,10 +55,19 @@ Bank data cannot split these — they will be grouped as "Food & Kitchen" until 
 | 3 | HULK — UPI settlements | `bank_transactions` WHERE account_name='HULK' | HULK building bank account |
 | 4 | THOR → HULK reclassification | Explicit −₹5L row in THOR column | Internal transfer — shown for transparency, net zero |
 | 5 | HULK ← THOR reclassification | Explicit +₹5L row in HULK column | Mirrors row 4 |
-| 6 | Cash (physical, not deposited) | `payments` WHERE payment_mode='cash' AND for_type='rent' AND is_void=false | Supplement only — cash NOT in bank |
-| | **Total Gross Inflows** | Sum of rows 1–6 | |
-| | **Less: Security Deposits (refundable)** | `tenancies.security_deposit` WHERE status='active' AND check-in month = target month | Must return at exit — excluded from revenue |
-| | **True Rent Revenue** | Gross Inflows − Security Deposits | Operating income base |
+| 6 | Cash (physical) — ALL cash collected | `payments` WHERE payment_mode='cash' AND is_void=false (rent + deposit + booking) + offline cash (e.g. Bala uncle) | NOT in bank |
+| | **Total Gross Inflows** | Sum of rows 1–6 | EVERYTHING in: rent + deposit + booking, bank + cash |
+| | **Less: Security Deposits (refundable, RECEIVED that month)** | refundable deposits collected that month (cash + UPI) | We owe these back |
+| | **True Rent Revenue** | Gross Inflows − deposits received − deposits refunded | Operating income base |
+
+**Updated 2026-06-27 (Kiran-confirmed) — supersedes the old "by check-in month" basis:**
+- **Gross Inflows = EVERYTHING** (rent + deposit + booking, both bank and cash). The bank lines already
+  include deposit/booking paid by UPI (the bank can't separate them), so the cash line must include
+  deposit + booking cash too. Then subtract the deposit we owe back ("everything in, subtract what we owe").
+- **"Less: Security Deposits" is a monthly FLOW** (that month's collection). The TOTAL column **SUMS** the
+  months (was wrongly showing only the last month — fixed in `pnl_builder.py`).
+- No opening/closing bank-balance rows in the P&L tab (reconciliation tab only). THOR+HULK combined per category.
+- See `memory/sop_pnl.md` (P&L STRUCTURE & CLASSIFICATION RULES) for the full procedure + classification gotchas.
 
 Maintenance fees (non-refundable) are retained income and stay in Gross Inflows. Do NOT deduct them.
 
@@ -199,11 +208,23 @@ Staff rooms EXCLUDED (5 rooms, updated 2026-05-31):
 
 ### 3.2 Formula
 
+**TODAY (current occupancy)** — `get_occupied_beds(session, today)`:
 ```
 occupied_beds = COUNT(Tenancy WHERE status IN [active, no_show] AND Room.is_staff_room = False)
+                (per-room capped at max_occupancy; premium = max_occupancy beds)
 vacant_beds = TOTAL_REVENUE_BEDS - occupied_beds
 occupancy_pct = ROUND(occupied_beds / TOTAL_REVENUE_BEDS * 100, 1)
 ```
+
+**PAST months (historical / monthly chart)** — `get_occupied_beds_asof(session, date)` (added 2026-06-27):
+```
+present at date = checkin_date <= date AND (checkout_date IS NULL OR checkout_date >= date)
+                  status IN [active, exited, no_show]  ← INCLUDE since-exited
+                  per-room capped at max_occupancy; premium = max_occupancy beds
+```
+⚠️ NEVER use `get_occupied_beds` for a past date — it filters only current `status='active'` with no date
+bound, so it returns TODAY's count for every month (made May & June both show 291/97.7%). Frozen
+VERIFIED_MONTHS (Nov'25–Apr'26) are unaffected. See [[rules_financial]] §0a.
 
 ### 3.3 Property-Level
 
