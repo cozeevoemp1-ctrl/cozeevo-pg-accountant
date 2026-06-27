@@ -69,11 +69,18 @@ def read_yes_bank_csv(
     """
     Parse a Yes Bank CSV/Excel bank statement.
 
-    Supports two layouts:
-      • THOR (Yes Bank web export): header starts with 'Transaction Date';
-        cols 0=date, 2=desc, 4=withdrawal, 5=deposit, 6=running balance ('INR X')
-      • HULK (Yes Bank app export): header row contains 'Txn Date';
-        cols 1=date, 3=desc, 5=withdrawal, 6=deposit, 7=balance ('?X')
+    Columns are mapped by HEADER NAME (not fixed position) so every Yes Bank
+    export layout is handled, including:
+      • THOR (full export): Transaction Date, Value Date, Description,
+        Reference Number, Withdrawals, Deposits, Running Balance
+      • HULK (collection account): Transaction Date, Value Date, Description,
+        Reference Number, Deposits, Running Balance   ← NO Withdrawals column
+      • legacy app export with a 'Txn Date' header
+
+    CRITICAL: HULK's header also starts with 'Transaction Date' but has only a
+    Deposits column. Mapping by name (never by index) prevents the deposits
+    column from being misread as withdrawals — which would book every tenant
+    collection as an expense.
 
     Returns list of (txn_date, description, txn_type, amount, balance) where
     txn_type is 'income' or 'expense' and balance is the running balance or None.
@@ -86,46 +93,57 @@ def read_yes_bank_csv(
         if close_after:
             f.close()
 
-    # Detect layout by scanning for the header row
+    # Find the header row and parse its column names
     header_idx = None
-    layout = "thor"
+    header_cols: list[str] = []
     for i, line in enumerate(lines):
-        if line.startswith("Transaction Date"):
+        low = line.lower()
+        if ("transaction date" in low or "txn date" in low) and (
+            "description" in low or "value date" in low
+        ):
+            header_cols = next(_csv.reader([line]))
             header_idx = i
-            layout = "thor"
-            break
-        if "Txn Date" in line and "Value Date" in line:
-            header_idx = i
-            layout = "hulk"
             break
 
     if header_idx is None:
+        return out
+
+    # Map column name → index (normalised, first match wins)
+    idx = {(name or "").strip().lower(): j for j, name in enumerate(header_cols)}
+
+    def col(*names: str) -> int | None:
+        for n in names:
+            if n in idx:
+                return idx[n]
+        return None
+
+    date_i = col("transaction date", "txn date", "date")
+    desc_i = col("description", "narration", "particulars")
+    wd_i   = col("withdrawals", "withdrawal", "debit", "dr", "debit amount")
+    dep_i  = col("deposits", "deposit", "credit", "cr", "credit amount")
+    bal_i  = col("running balance", "balance", "closing balance")
+
+    # Must have a date and at least one money column to be parseable
+    if date_i is None or (wd_i is None and dep_i is None):
         return out
 
     data_lines = lines[header_idx + 1:]
     reader = _csv.reader(data_lines)
 
     for row in reader:
-        if len(row) < 4:
+        if not row or len(row) <= date_i:
             continue
         try:
-            if layout == "thor":
-                dt = parse_date(row[0])
-                desc = row[2].strip() if len(row) > 2 else ""
-                wd   = parse_amt(row[4]) if len(row) > 4 else 0.0
-                dep  = parse_amt(row[5]) if len(row) > 5 else 0.0
-                bal  = parse_balance(row[6]) if len(row) > 6 else None
-            else:  # hulk
-                dt = parse_date(row[1])
-                desc = row[3].strip() if len(row) > 3 else ""
-                wd   = parse_amt(row[5]) if len(row) > 5 else 0.0
-                dep  = parse_amt(row[6]) if len(row) > 6 else 0.0
-                bal  = parse_balance(row[7]) if len(row) > 7 else None
+            dt = parse_date(row[date_i])
+            if not dt:
+                continue
+            desc = row[desc_i].strip() if desc_i is not None and len(row) > desc_i else ""
+            wd   = parse_amt(row[wd_i]) if wd_i is not None and len(row) > wd_i else 0.0
+            dep  = parse_amt(row[dep_i]) if dep_i is not None and len(row) > dep_i else 0.0
+            bal  = parse_balance(row[bal_i]) if bal_i is not None and len(row) > bal_i else None
         except (IndexError, ValueError):
             continue
 
-        if not dt:
-            continue
         if wd > 0:
             out.append((dt, desc, "expense", wd, bal))
         if dep > 0:
