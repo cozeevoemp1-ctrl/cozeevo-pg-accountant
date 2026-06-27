@@ -35,7 +35,7 @@ INCOME = {
     # Direct NEFT: [0, 723007, 1350547, 1083628, 420690, 385691, 226807]  # Mar: +160600 Chandra cash reclassified to bank (2026-05-12)
     "THOR — Bank Income (UPI + NEFT)":                     [0, 723007, 1350547, 1259224, 2512287, 2900966, 3061538, 1121748],
     "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000, 0],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283, 2099079],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May. Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283, 2484085],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May. Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
     # HULK building (acct ...0881) — live from Mar 2026; UPI + cheque merged
     # UPI batch: [0, 0, 0, 0, 0, 0, 247719]
     # Cheque/other: [0, 0, 0, 0, 0, 71550, 0]
@@ -132,8 +132,8 @@ DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638, 184200
 DEPOSITS = {
     # Pure refundable security only (combined total was ₹33,83,875 but included maintenance ₹10,68,700)
     # True refundable = combined − maintenance = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
-    "Security Deposits — refundable (must return to active tenants)": [0, 140000, 266500, 455500, 353000, 526550, 573625, 424250],
-    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000, 192000],
+    "Security Deposits — refundable (must return to active tenants)": [0, 140000, 266500, 455500, 353000, 526550, 573625, 744534],
+    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000, 0],
 }
 
 # Monthly bank balances — from Yes Bank statements (verified)
@@ -221,17 +221,13 @@ def _write_pnl_tab(
     ws.append(["INCOME", ""])
     ws[ws.max_row][0].font = bold
 
-    # ── THOR group ────────────────────────────────────────────────────────────
-    _acct_row("THOR acct ...0961 — Opening Balance",
-              [BANK_BALANCE_THOR[m][0] for m in MONTHS], acct_fill)
+    # ── THOR group (bank balances live only on the reconciliation tab) ────────
     row = _get("THOR — Bank Income (UPI + NEFT)")
     if row:
-        ws.append(["  THOR — Bank Income (UPI + NEFT)", "+"] + row + [sum(row)])
+        ws.append(["THOR — Bank Income (UPI + NEFT)", "+"] + row + [sum(row)])
     row = _get("THOR — transferred to HULK acct (reclassification)")
     if any(row):
         ws.append(["  THOR — transferred to HULK acct (reclassification)", "−"] + row + [sum(row)])
-    _acct_row("THOR acct ...0961 — Closing Balance",
-              [BANK_BALANCE_THOR[m][1] for m in MONTHS], close_fill)
 
     ws.append([])
 
@@ -261,13 +257,12 @@ def _write_pnl_tab(
     sec_dep_collected   = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
     maint_fee_collected = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
     sec_dep_neg         = [-v for v in sec_dep_collected]
-    # TOTAL col for deposits = closing balance of last month (a stock/balance figure, not a sum).
-    # Each monthly column = balance of deposits held from active tenants at that month-end.
-    # Summing across months would double-count — use last month's value as the period-end balance.
+    # Each monthly column = deposits COLLECTED that month (a flow, not a stock).
+    # TOTAL col = SUM of the monthly flows = total deposits collected/held over the period.
     dep_refunded     = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
     dep_refunded_neg = [-v for v in dep_refunded]
-    closing_sec_dep  = sec_dep_neg[-1]   # last month's balance = period-end closing balance
-    closing_maint    = maint_fee_collected[-1]
+    closing_sec_dep  = sum(sec_dep_neg)        # total refundable deposits collected
+    closing_maint    = sum(maint_fee_collected)
 
     ws.append(["  Less: Security Deposits held (active tenants — must return at exit)", "−"]
               + sec_dep_neg + [closing_sec_dep])
@@ -285,8 +280,8 @@ def _write_pnl_tab(
     ws[ws.max_row][0].font = Font(italic=True)
 
     true_rev_row = [r + s + d for r, s, d in zip(rev_row, sec_dep_neg, dep_refunded_neg)]
-    # TOTAL col: use closing balances for deposits (not cumulative sum) to match TOTAL column arithmetic
-    true_rev_total = sum(rev_row) + closing_sec_dep + closing_maint + sum(dep_refunded_neg)
+    # TOTAL col = sum of the monthly True Revenue figures
+    true_rev_total = sum(true_rev_row)
     ws.append(["True Rent Revenue (excl. all deposit pass-throughs)", "="] + true_rev_row + [true_rev_total])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="375623")
