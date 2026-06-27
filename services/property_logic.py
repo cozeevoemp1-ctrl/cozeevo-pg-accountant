@@ -25,10 +25,11 @@ NOTICE_BY_DAY: int = 5
 """
 Cutoff day-of-month for the notice period calculation.
 
-  notice_date.day <= NOTICE_BY_DAY  → can vacate end of THIS month; deposit refundable
-  notice_date.day >  NOTICE_BY_DAY  → must stay till end of NEXT month; deposit still refundable
+  notice_date.day <= NOTICE_BY_DAY  → can vacate end of THIS month; deposit REFUNDABLE
+  notice_date.day >  NOTICE_BY_DAY  → must stay till end of NEXT month; deposit FORFEITED
 
-Deposit is only forfeited if NO notice is given at all (tenant walks out without notice).
+Deposit is forfeited when EITHER no notice is given at all OR notice is given late
+(after the cutoff day). Only on-time notice (on/before the cutoff) keeps the deposit refundable.
 """
 
 OVERPAYMENT_NOISE_RS: int = 10
@@ -117,13 +118,18 @@ def calc_payment_status(
 
 # ── Notice / checkout ─────────────────────────────────────────────────────────
 
-def is_deposit_eligible(_notice_date: date, _notice_by_day: int = NOTICE_BY_DAY) -> bool:
+def is_deposit_eligible(notice_date: date | None, notice_by_day: int = NOTICE_BY_DAY) -> bool:
     """
-    True if deposit is refundable. Deposit is always refundable when notice is given.
-    Only forfeited when NO notice is given at all.
-    The notice_by_day cutoff only affects the last day (this month vs next month).
+    True if the security deposit is refundable.
+
+    Refundable ONLY when notice is given on or before `notice_by_day` of the month.
+    Forfeited when EITHER:
+      - no notice is given at all (notice_date is None), OR
+      - notice is given after the cutoff day (late notice).
     """
-    return True  # notice was given → always eligible
+    if notice_date is None:
+        return False
+    return notice_date.day <= notice_by_day
 
 
 def calc_notice_last_day(notice_date: date, notice_by_day: int = NOTICE_BY_DAY) -> date:

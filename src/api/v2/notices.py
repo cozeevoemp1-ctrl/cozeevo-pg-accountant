@@ -14,7 +14,7 @@ from sqlalchemy import select, func, or_
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import Tenancy, TenancyStatus, StayType, Tenant, Room, OnboardingSession
-from services.property_logic import calc_notice_last_day
+from services.property_logic import calc_notice_last_day, is_deposit_eligible
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -113,7 +113,7 @@ async def get_active_notices(user: AppUser = Depends(get_current_user)):
                 "gender":             tenant.gender,
                 "notice_date":        nd.isoformat() if nd else None,
                 "expected_checkout":  expected_checkout.isoformat(),
-                "deposit_eligible":   nd is not None,
+                "deposit_eligible":   is_deposit_eligible(nd),
                 "has_notice":         nd is not None,
                 "security_deposit":   float(tenancy.security_deposit or 0),
                 "maintenance_fee":    float(tenancy.maintenance_fee or 0),

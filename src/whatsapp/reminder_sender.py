@@ -44,7 +44,7 @@ TEMPLATE_PARAM_NAMES = {
     "general_notice":             ["month"],
     "checkout_confirmation":      ["name", "room", "date", "refund", "link"],
     "cozeevo_notice_confirmation": ["name", "room", "checkout_date"],
-    "power_maintenance_notice":   ["date"],
+    "power_disruption_notice":    [],   # no params — manual one-off grid-disruption notice; NEVER send without Kiran's permission
 }
 
 

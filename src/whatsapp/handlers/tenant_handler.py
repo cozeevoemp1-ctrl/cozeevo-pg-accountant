@@ -388,8 +388,8 @@ async def _checkout_notice(entities: dict, ctx: CallerContext, session: AsyncSes
         deposit_msg = (
             f"⚠️ *Notice received after the {_NOTICE_BY_DAY}th of the month.*\n\n"
             f"As per PG rules, notice given after the {_NOTICE_BY_DAY}th applies to the "
-            f"*next month's cycle* — one full month's rent will be charged.\n\n"
-            f"Your deposit is *still refundable* once all dues are cleared.\n"
+            f"*next month's cycle* — one full month's rent will be charged and the "
+            f"*security deposit is forfeited*.\n"
             f"Your last day will be: *{last_date.strftime('%d %b %Y')}*"
         )
         closing = "The PG office has been notified. Please ensure rent is paid for the full notice month."

@@ -349,7 +349,7 @@ Only applies when tenant stays PAST their agreed checkout date. Charged on top o
 | Checkout scenario | Charge | Deposit |
 |-------------------|--------|---------|
 | Notice by 5th → leave end of month | Full month | Refunded (minus damages/dues) |
-| Notice after 5th → leave end of NEXT month | Full month (next month) | Refunded (minus damages/dues) |
+| Notice after 5th → leave end of NEXT month | Full month (next month) | **Forfeited** |
 | No notice at all | Full month charged | **Forfeited** |
 | Leaves before agreed checkout (sudden exit) | Full month charged, **no refund** for unused days | Forfeited |
 | Stays past agreed checkout (overstay) | Full month + prorated extra days | Held until settlement |
@@ -362,13 +362,20 @@ Only applies when tenant stays PAST their agreed checkout date. Charged on top o
 
 ### 7.1 Notice Period Rule
 
+**Single source of truth: `is_deposit_eligible()` + `calc_notice_last_day()` in `services/property_logic.py`.**
+This is the canonical statement — supersedes the 2026-04-28 notice-management spec where they differ.
+
 ```
 NOTICE_BY_DAY = 5
 
-IF notice given by 5th of month → deposit refundable, stay ends last day of that month
-IF notice given after 5th       → next month's cycle applies (one full month rent required), deposit still refundable
-IF no notice at all             → deposit forfeited
+IF notice given by 5th of month → deposit REFUNDABLE,  stay ends last day of THIS month
+IF notice given after 5th       → deposit FORFEITED,    next month's cycle applies (one full month rent required), stay ends last day of NEXT month
+IF no notice at all             → deposit FORFEITED
 ```
+
+Only on-time notice (on/before the 5th) keeps the deposit refundable. A late notice forfeits
+the deposit *and* requires the next month's full rent. The rental agreement
+(`src/services/pdf_generator.py` HOUSE_RULES) states this verbatim.
 
 ### 7.2 Settlement Formula
 

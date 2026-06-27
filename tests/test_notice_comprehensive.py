@@ -229,6 +229,10 @@ class TestDepositEligibility:
     def test_deposit_eligible_5th_december(self):
         assert is_deposit_eligible(date(2026, 12, 5)) is True
 
+    def test_deposit_forfeited_when_no_notice(self):
+        # No notice at all → deposit forfeited
+        assert is_deposit_eligible(None) is False
+
 
 # ============================================================================
 # 5. FUTURE MONTH NOTICE REFERENCES (10 tests)

@@ -126,20 +126,26 @@ async def create_checkout(
             existing.status = CheckoutSessionStatus.cancelled
 
         # Validate refund_amount: backend recalculates and validates against client value
-        # Refund formula: deposit - maintenance - dues - deductions, but only if notice given
+        # Refund formula: deposit - maintenance - dues - deductions, but only if deposit eligible.
+        # Deposit is forfeited when NO notice OR late notice (after NOTICE_BY_DAY) — see property_logic.
+        from services.property_logic import is_deposit_eligible, NOTICE_BY_DAY
         is_daily = tenancy.stay_type.value == "daily"
-        has_notice = tenancy.notice_date is not None
+        deposit_eligible = False if is_daily else is_deposit_eligible(tenancy.notice_date)
         maintenance_due = Decimal("0") if is_daily else Decimal(str(tenancy.maintenance_fee or 0))
         pending_dues_dec = Decimal(str(body.pending_dues))
         deductions_dec = Decimal(str(body.deductions))
         security_deposit_dec = Decimal(str(body.security_deposit))
 
-        # If no notice or forfeited: refund must be 0
-        if not has_notice:
+        # If no notice or late notice: deposit forfeited → refund must be 0
+        if not deposit_eligible:
             if body.refund_amount > 0:
+                reason = (
+                    "no notice given" if tenancy.notice_date is None
+                    else f"late notice — after {NOTICE_BY_DAY}th"
+                )
                 raise HTTPException(
                     422,
-                    f"Deposit forfeited (no notice given). Refund must be 0, not {body.refund_amount}.",
+                    f"Deposit forfeited ({reason}). Refund must be 0, not {body.refund_amount}.",
                 )
             expected_refund = Decimal("0")
         else:

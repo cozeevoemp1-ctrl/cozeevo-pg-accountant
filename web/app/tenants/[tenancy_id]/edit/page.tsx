@@ -284,7 +284,8 @@ export default function EditTenantPage() {
 
   const DELETE_REASONS = ["Cancelled booking", "Wrong booking", "Double booking", "Other"]
 
-  const depositEligible = noticeDate ? true : null
+  // Deposit refundable only with on-time notice (on/before 5th); late notice forfeits it.
+  const depositEligible = noticeDate ? new Date(noticeDate + "T00:00:00").getDate() <= 5 : null
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
   const roomChanged = original && roomNumber.trim() && roomNumber.trim().toUpperCase() !== original.room_number.toUpperCase()
 
@@ -771,7 +772,7 @@ export default function EditTenantPage() {
               <p className="text-[10px] text-ink-muted mt-1 px-1">
                 {new Date(noticeDate).getDate() <= 5
                   ? "Given on/before 5th — exits end of this month, deposit refundable"
-                  : "Given after 5th — next month's cycle applies, full month rent required, deposit refundable"}
+                  : "Given after 5th — next month's cycle applies, full month rent required, deposit forfeited"}
               </p>
             )}
           </div>

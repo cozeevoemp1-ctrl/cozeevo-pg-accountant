@@ -264,7 +264,7 @@ Separate from void -- for exiting tenants. Recorded in Refund table with status 
 ### 6.3 Checkout & Notice Rules
 
 - Notice by 5th of month → deposit refundable, leave end of that month
-- Notice after 5th → next month's cycle applies (one full month rent required), deposit **still refundable**
+- Notice after 5th → next month's cycle applies (one full month rent required), deposit **forfeited**
 - No notice at all → deposit **forfeited**
 - Early exit (before agreed date) → full month charged, **no refund**
 - Overstay (past agreed date) → prorated extra days charged

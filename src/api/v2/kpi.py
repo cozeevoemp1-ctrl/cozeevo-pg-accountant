@@ -22,6 +22,7 @@ from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, ge
 from src.services.rent_schedule import prorated_first_month_rent
 from src.services.daily_dues import daily_dues, booking_credit
 from src.services.reporting import deposits_breakdown
+from services.property_logic import is_deposit_eligible
 
 router = APIRouter(prefix="/reporting")
 activity_router = APIRouter(prefix="/activity")
@@ -863,7 +864,7 @@ async def get_kpi_detail(
                     "name": r.name,
                     "room": r.room_number,
                     "detail": eco.strftime("%-d %b") if eco else "—",
-                    "deposit_eligible": True,
+                    "deposit_eligible": is_deposit_eligible(r.notice_date),
                     "gender": r.gender,
                     "expected_checkout_iso": eco.isoformat() if eco else None,
                     "days_remaining": days_remaining,
