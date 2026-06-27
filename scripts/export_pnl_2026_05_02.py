@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.reports.pnl_builder import build_pnl_workbook
 
-OUT = Path(__file__).parent.parent / "data" / "reports" / "PnL_Accrual_2026_05_03.xlsx"
+OUT = Path(__file__).parent.parent / "data" / "reports" / "PnL_Accrual_2026_06_27.xlsx"
 
 if __name__ == "__main__":
     OUT.parent.mkdir(parents=True, exist_ok=True)

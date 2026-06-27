@@ -80,25 +80,25 @@ OPEX = {
     "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520, 62900],
     "IT & Software":                                              [0, 0, 3480,     12068,     934,    1128,    2348, 876],  # Jan +948 office phone; Feb +934 mobile recharge; Mar +1128 paybil/payair; Apr +2348. Updated 2026-05-13
     "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
-    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  239753, 216158],  # Apr +875 Chandra cash (egg trays). Jan +1086 Origin veg; Feb +792 Amazon food; Apr +756 Ratnadeep. 2026-05-17
-    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  364161,   61904, 88623],  # Mar +8190 Chandra cash (diesel 6370+cans 1820). Jan +500 Shell India; Apr +326 volipi.l. 2026-05-17
-    "Staff & Labour":                                             [0, 1000, 135435, 116714, 171295,  217341,  193617, 68065],  # Feb -63000 (9342205440 gas pipeline welding reclassified to Maintenance; confirmed Kiran 2026-05-30). Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-30
-    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,   64850,   23399,   39319, 13600],  # Feb +63000 (9342205440 gas pipeline welding; was Staff & Labour; confirmed Kiran 2026-05-30). Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). Updated 2026-05-30
-    "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315, 0],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
+    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  239753, 278418],  # Apr +875 Chandra cash (egg trays). Jan +1086 Origin veg; Feb +792 Amazon food; Apr +756 Ratnadeep. 2026-05-17
+    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  364161,   61904, 134118],  # Mar +8190 Chandra cash (diesel 6370+cans 1820). Jan +500 Shell India; Apr +326 volipi.l. 2026-05-17
+    "Staff & Labour":                                             [0, 1000, 135435, 116714, 171295,  217341,  193617, 76258],  # Feb -63000 (9342205440 gas pipeline welding reclassified to Maintenance; confirmed Kiran 2026-05-30). Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-30
+    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,   64850,   23399,   39319, 18600],  # Feb +63000 (9342205440 gas pipeline welding; was Staff & Labour; confirmed Kiran 2026-05-30). Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). Updated 2026-05-30
+    "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315, 564],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
     "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500, 3500],
     # Shopping & Supplies — small operational purchases (akhil setup, misc UPI, nursery decor, CHANDRASEKHAR ops advance etc.)
     # Updated 2026-05-13: reclassified all items from Operational Expenses; Nov nursery; Dec: Chandra 70K+akhil 28.7K+cash 1.7K; Jan: akhil+Q531; Feb: SV251+paytm+ME+Global+paytmqr; Mar: 9902+volipi.l 444+balaji; Apr: volipi.l mirrors
-    "Shopping & Supplies":                                        [0, 3048, 136960,  18323,   7662,    7770,   10258, 9648],
+    "Shopping & Supplies":                                        [0, 3048, 136960,  18323,   7662,    7770,   10258, 11817],
     # Furniture & Supplies — ALL furniture, equipment, Amazon purchases from PG bank (2026-05-13: CAPEX folded into OPEX per Kiran)
     # Old CAPEX (F&F + Capital Inv) + chairs ₹47K + atta machine ₹21K + kitchen vessels ₹37.5K + Amazon all months
     # Nov: F&F 125021 + CCTV/8-Ball 82000. Dec: F&F 167741 + CCTV 100000 + Amazon 19014. Jan: F&F 203815 + Amazon 8414 (4707+3707 cash-counter). Feb: F&F 1185597 + Amazon 2174. Mar: F&F 10761 + Amazon 3237. Apr: F&F 12363 + chairs 47000 + atta 21060 + kitchen 37500 + Amazon 30756
-    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  53998,  148679, 560],  # Mar +40000: fire stove (shalu UPI Mar 15, id 1655 — was in EXCLUDED/Non-Op, reclassified to ops 2026-05-17)
+    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  53998,  148679, 35860],  # Mar +40000: fire stove (shalu UPI Mar 15, id 1655 — was in EXCLUDED/Non-Op, reclassified to ops 2026-05-17)
     "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003, 0],  # Apr +1003 Naukri job posting. Updated 2026-05-13
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   6000,    6000,    3000, 0],  # Feb +3000 Chandra (Pradeep police); Mar +3000 Chandra (police). Jan Jitendra BBMP+Agreement. 2026-05-17
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   6000,    6000,    3000, 6500],  # Feb +3000 Chandra (Pradeep police); Mar +3000 Chandra (police). Jan Jitendra BBMP+Agreement. 2026-05-17
     "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100, 0],
-    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0, 122551],  # Chandra cash now in proper categories (Fuel/Govt/Maintenance/Food). Mar+Apr = 0.
+    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0, 34687],  # Chandra cash now in proper categories (Fuel/Govt/Maintenance/Food). Mar+Apr = 0.
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
-    "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328, 169216],
+    "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328, 0],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
     # Detail: data/reports/SBI_0167_Reimbursement.xlsx
     "Partner Reimbursable (Personal Acct SBI 0167)":            [0,     0,     0, 41899,  18264,     750,    6928, 0],
@@ -108,7 +108,7 @@ OPEX = {
 
 EXCLUDED = {
     # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
-    "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163, 184200],  # Updated 2026-05-12
+    "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163, 275800],  # Updated 2026-05-12
     # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
     # Feb: Sri Lakshmi Chandrasekar ₹6L (id 1885)
     # Mar: Sravani ₹7.5L (id 1714) + Sri Lakshmi ₹6L (id 1623) + Bharathi ₹2L (id 1652) = ₹15.5L

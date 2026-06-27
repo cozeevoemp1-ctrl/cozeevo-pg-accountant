@@ -39,7 +39,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Property Rent",        "Other Rent Payments",          ["jan rent","feb rent","mar rent","rent pay"]),
 
     # ── ELECTRICITY ───────────────────────────────────────────────────────────
-    ("Electricity",          "BESCOM Bill",                  ["bescom","besco","eb bill","eb payment"," eb "]),
+    ("Electricity",          "BESCOM Bill",                  ["bescom","besco","bescl","billdeskcm","eb bill","eb payment"," eb "]),
 
     # ── WATER ─────────────────────────────────────────────────────────────────
     ("Water",                "BWSSB (Govt Supply)",          ["bwssb","bwssb bill","bwssb payment"]),
@@ -94,7 +94,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Furniture & Supplies", "Chairs & Study Tables",        ["q962933392"]),
     ("Furniture & Supplies", "Kitchen Equipment / Vessels",  ["9844532900"]),
     ("Furniture & Supplies", "Wooden Stove / Kitchen Items (shalu.pravi)", ["shalu.pravi"]),
-    ("Furniture & Supplies", "Other Furniture / Supplies",   ["furniture","refurbish","3d bo","laughing bud"]),
+    ("Furniture & Supplies", "Other Furniture / Supplies",   ["furniture","refurbish","3d bo","laughing bud","fans","ceiling fan"]),
 
     # ── FOOD & GROCERIES ──────────────────────────────────────────────────────
     ("Food & Groceries",     "Grocery - Virani Trading",     ["virani"]),
@@ -127,6 +127,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Fuel & Diesel",        "Diesel Vendor (7411535239)",   ["7411535239"]),
     ("Fuel & Diesel",        "Petrol / Fuel",                ["petrol","fuel"]),
     ("Fuel & Diesel",        "Diesel (8951297583)",           ["8951297583"]),
+    ("Fuel & Diesel",        "Diesel Vendor (9036425538)",    ["9036425538"]),
     ("Fuel & Diesel",        "Bus Tickets (PayBus)",         ["paybus8261"]),
     ("Fuel & Diesel",        "Travel / Bus (Paytm)",         ["travel1paytm","paytm bus: "]),
     ("Fuel & Diesel",        "Petrol / Shell India",         ["shell india"]),
@@ -251,7 +252,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Maintenance & Repairs","Key Maker (9148809732)",        ["9148809732"]),
     ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith","seals"]),
     ("Maintenance & Repairs","Fridge Delivery / Appliance",  ["fridge delivery","fridge"]),
-    ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain"]),
+    ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain","stabilizer","stabiliser"]),
 
     # ── BANK CHARGES ──────────────────────────────────────────────────────────
     ("Bank Charges",         "Debit Card Fee",               ["debit card replacement","card replace"]),
