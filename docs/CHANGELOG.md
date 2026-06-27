@@ -1,5 +1,24 @@
 # Changelog
 
+## Session J — 2026-06-27 — May P&L build, HULK parser fix, reclassification, occupancy point-in-time
+
+### Summary
+- 🐛 **HULK bank parser booked all collections as expense.** HULK's CSV header starts with `Transaction Date` (same as THOR) but has only a **Deposits** column. The position-based parser read it as THOR layout → Deposits became Withdrawals → ₹14.18L of May collections misfiled as expense (May Rent Income showed ₹12.99L vs real ₹25.13L). Fixed `read_yes_bank_csv` to map columns by **header name**; regression tests added. Re-imported HULK May (reconciles exactly to statement: +₹12,11,100).
+- ✅ **Full P&L built Oct'25 → May'26** in `pnl_builder.py` (canonical). May figures Kiran-confirmed: cash rent paid ₹15,32,000, staff ₹76,258 (bank only, no accrual), internet ₹0 (prepaid bulk), water ₹62,900, cash income ₹20,99,079 (app ₹20.36L + Bala uncle ₹63K). True Rent Revenue ₹40,04,315, **Net Operating Profit ₹10,11,846**.
+- ✅ **P&L structure changes (Kiran):** Gross Inflows = everything (rent + deposit + booking); deposit subtracted below ("everything in, subtract what we owe"). "Less: Security Deposits" is a monthly flow — **TOTAL now SUMS** (was showing only last month — bug). Removed opening/closing bank-balance rows from the P&L tab. THOR+HULK combined per category (no HULK lump).
+- ✅ **Reclassification:** ₹91,600 of deposit refunds were hiding in "Other Expenses" (paid to tenants' personal UPI). Cross-referenced payees vs tenants table → reclassified to Deposit Refunds (now ₹2,75,800, matches expectation). BESCOM→Electricity, diesel vendor→Fuel, fans→Furniture, stabilizer→Maintenance. Other Expenses ₹1,22,551 → ₹34,687. Classifier rules added to `pnl_classify.py`; DB transactions reclassified.
+- ✅ **App: "Generate P&L" button** → `/finance/pnl/excel` (same `pnl_builder` = byte-identical to offline export). **Upload now auto-detects tenant refunds** (`_detect_tenant_refunds`: payee phone matches a tenant → Deposit Refund). UploadCard wired back into Finance page.
+- ✅ **Occupancy point-in-time fix:** `get_occupied_beds()` filters only `status='active'` with no date bound → every live month showed today's count (May & June both 291/97.7%). Added `get_occupied_beds_asof()` (counts who was present on the date, incl. since-exited, capped per room). Now May 287/96.3%, June 290/97.3%.
+- ✅ **Chandra Sagar (Room 503)** premium tenant mistagged `double` → showed phantom free bed. Set `sharing_type='premium'`; vacant count 8→7. Root cause: no sharing-type field in booking/edit forms.
+- 📊 **May unit economics:** rent ₹7,572/occupied bed, non-rent OPEX ₹3,056/bed, total ₹10,627/bed (avg 282 occupied beds, 96.3% at month-end).
+- Commits: `5a5be3a` (upload card), `78d7369` (parser), `0d05855` (May column), `c45e34f` (structure), `c3bb3a1` (reclassify), `d124524` (generate button + refund detect), `c95810c` (occupancy). SOP updated with all P&L rules.
+
+### Open (optional next builds)
+- Sharing-type selector in booking/edit forms (root-cause fix for premium phantom beds).
+- Live P&L generator + `pnl_monthly_adjustments` table so new months self-serve (only 3 manual cash figures needed).
+- Roll P&L balance-sheet section to May 31 (needs Kiran's May 31 cash-in-hand count).
+- Identify remaining ₹23K "Other Expenses" payees (vinod ₹14.4K, acme ₹5K, charasmatic ₹3.75K).
+
 ## Session I — 2026-06-27 — Late-notice deposit forfeiture (policy regression fix)
 
 ### Summary
