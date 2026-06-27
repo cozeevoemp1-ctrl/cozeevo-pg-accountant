@@ -105,6 +105,50 @@ async def _auto_reconcile(session):
         logger.exception("_auto_reconcile failed — upload committed without reconciliation")
 
 
+async def _detect_tenant_refunds(session) -> int:
+    """
+    Reclassify bank debits paid to a TENANT's own UPI/phone as 'Tenant Deposit Refund'.
+
+    Deposit refunds are usually sent to the tenant's personal number, so the
+    'refund' keyword never matches and they land in 'Other Expenses'. This pass
+    extracts the 'To:<payee>' number from each Other-Expenses debit and, if it
+    matches an existing tenant phone (last 10 digits), tags it as a refund.
+    Idempotent — only touches 'Other Expenses' rows.
+    """
+    try:
+        phones = (await session.execute(select(Tenant.phone))).all()
+        tset = set()
+        for (ph,) in phones:
+            d = _re.sub(r"\D", "", ph or "")
+            if len(d) >= 10:
+                tset.add(d[-10:])
+        if not tset:
+            return 0
+
+        txns = (await session.scalars(
+            select(BankTransaction).where(
+                BankTransaction.txn_type == "expense",
+                BankTransaction.category == "Other Expenses",
+            )
+        )).all()
+        n = 0
+        for t in txns:
+            m = _re.search(r"To:([^/]+)", t.description or "")
+            if not m:
+                continue
+            digits = _re.sub(r"\D", "", m.group(1))
+            if len(digits) >= 10 and digits[-10:] in tset:
+                t.category = "Tenant Deposit Refund"
+                t.sub_category = "auto: paid to tenant (refund)"
+                n += 1
+        if n:
+            await session.flush()
+        return n
+    except Exception:
+        logger.exception("_detect_tenant_refunds failed — upload kept")
+        return 0
+
+
 def _validate_month(m: str, param: str = "month"):
     if not _re.fullmatch(r"\d{4}-\d{2}", m):
         raise HTTPException(status_code=400, detail=f"{param} must be YYYY-MM")
@@ -439,12 +483,14 @@ async def upload_bank_csv(
             total_new += new_count
 
         await _auto_reconcile(session)
+        refunds_found = await _detect_tenant_refunds(session)
         await session.commit()
 
     return {
         "months_affected": sorted(months_affected),
         "new_count": total_new,
         "duplicate_count": total_dup,
+        "refunds_reclassified": refunds_found,
     }
 
 
