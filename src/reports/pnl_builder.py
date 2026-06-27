@@ -27,39 +27,39 @@ from src.utils.inr_format import INR_NUMBER_FORMAT
 # ── Verified income figures (bank statement primary source) ───────────────────
 # THOR = original building (Yes Bank acct 124563400000961)
 # HULK = second building (Yes Bank acct 124563400000881, live from Mar 2026)
-MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26"]
+MONTHS = ["Oct'25", "Nov'25", "Dec'25", "Jan'26", "Feb'26", "Mar'26", "Apr'26", "May'26"]
 
 INCOME = {
     # THOR building (acct ...0961) — UPI batch + direct NEFT merged
     # UPI batch: [0, 0, 0, 175596, 2091597, 2515275, 2834731]
     # Direct NEFT: [0, 723007, 1350547, 1083628, 420690, 385691, 226807]  # Mar: +160600 Chandra cash reclassified to bank (2026-05-12)
-    "THOR — Bank Income (UPI + NEFT)":                     [0, 723007, 1350547, 1259224, 2512287, 2900966, 3061538],
-    "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000],
-    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May. Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
+    "THOR — Bank Income (UPI + NEFT)":                     [0, 723007, 1350547, 1259224, 2512287, 2900966, 3061538, 1121748],
+    "THOR — transferred to HULK acct (reclassification)": [0,      0,        0,       0,       0,       0, -500000, 0],
+    "Cash (physical — both buildings combined)":           [0,      0,        0,  300572,  653300, 1094220, 1336283, 2099079],  # Bala uncle REMOVED from Jan (−25K), Feb (−3K), Apr (−23K net) — all moved to May. Mar: Chandra ₹1.60L moved to UPI (2026-05-12). Apr −19,500: dues reconciliation 2026-05-16 (Tanishka/Veena.T/Sachin/Preesha shared-room fix)
     # HULK building (acct ...0881) — live from Mar 2026; UPI + cheque merged
     # UPI batch: [0, 0, 0, 0, 0, 0, 247719]
     # Cheque/other: [0, 0, 0, 0, 0, 71550, 0]
-    "HULK — Bank Income (UPI + cheque)":                   [0,      0,        0,       0,       0,   71550,  247719],
-    "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000],
+    "HULK — Bank Income (UPI + cheque)":                   [0,      0,        0,       0,       0,   71550,  247719, 1418816],
+    "HULK — received from THOR acct (reclassification)":   [0,      0,        0,       0,       0,       0,  500000, 0],
 }
 
 CAPITAL_CONTRIBUTIONS = {
-    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000,      0, 0,     0,     0,   0,    0],
-    "Owner startup — repaid via NEFT Nov (₹50K + ₹4.5L to Bharathi)": [0, -500000, 0, 0, 0, 0, 0],
-    "Kiran top-up transfer (Jan 2026)":                   [     0,      0, 0, 90000,     0,   0,    0],
+    "Owner startup — Lakshmi SBI to Yes Bank (Oct 2025)": [500000,      0, 0,     0,     0,   0,    0, 0],
+    "Owner startup — repaid via NEFT Nov (₹50K + ₹4.5L to Bharathi)": [0, -500000, 0, 0, 0, 0, 0, 0],
+    "Kiran top-up transfer (Jan 2026)":                   [     0,      0, 0, 90000,     0,   0,    0, 0],
     # Partner personal advances (reimbursable — company owes Lakshmi this back)
     # Dec: ₹74,768 BESCOM via partner UPI 7358341775-2@ybl (moved to Electricity expense)
     # Jan–Apr: personal SBI 0167 payments matching OPEX Partner Reimbursable line
-    "Partner advance — Lakshmi (personal UPI + SBI 0167, reimbursable)": [0, 0, 74768, 41899, 18264, 750, 6928],
+    "Partner advance — Lakshmi (personal UPI + SBI 0167, reimbursable)": [0, 0, 74768, 41899, 18264, 750, 6928, 0],
     # Chandra personal cash for PG operations — confirmed from handwritten notebook (2026-05-17)
     # Feb: Pradeep police ₹3,000
     # Mar: Police ₹3,000 + Diesel ₹6,370 + Cans ₹1,820 + Carpenter ₹1,000 + Generator ₹500 = ₹12,690
     # Apr: Dilip plumber ₹1,000 + Dilip brother ₹500 + Electrician Krishna ₹500+200+200 + Egg trays ₹875 = ₹3,275
-    "Chandra advance — confirmed cash (police/diesel/plumber/carpenter/electrician)": [0, 0, 0, 0, 3000, 12690, 3275],
+    "Chandra advance — confirmed cash (police/diesel/plumber/carpenter/electrician)": [0, 0, 0, 0, 3000, 12690, 3275, 0],
     # Jitendra personal cash for PG ops (Jan 3 2026) — confirmed from handwritten notebook (2026-05-17)
     # BBMP ₹5,000 + Agreement ₹600 = ₹5,600 (personal funds; police ₹3K was from PG collections — excluded)
     # Matching OPEX: Govt & Regulatory Jan already includes BBMP+Agreement (₹99,673 total)
-    "Jitendra advance — personal cash (BBMP Rs.5K + agreement Rs.600, Jan 3 2026)": [0, 0, 0, 5600, 0, 0, 0],
+    "Jitendra advance — personal cash (BBMP Rs.5K + agreement Rs.600, Jan 3 2026)": [0, 0, 0, 5600, 0, 0, 0, 0],
     # Kiran PhonePe/cash for PG ops — company owes Kiran back (equity injection)
     # Nov: PhonePe — Sachin C porter, Jaya Thyagaraj, somanath, VENKATA SAI ALUMINIUM, SAMPATH R, D BABULAL, Dinesh K R, C A Enterprises, Rafeeq, MAURYA AGENCIES, RAM KHILADI, SADAF MOHAMMAD, Mr V AKIL ₹10,669 (Other Expense)
     # Dec: PhonePe — WorkIndia ₹2,773, SLN Packaging ₹760, BIPLAB SINGHA ×2 ₹15,000, Zepto ₹135, Printout ₹663, Shashikala S ₹200
@@ -70,45 +70,45 @@ CAPITAL_CONTRIBUTIONS = {
     #      Cash  — WorkIndia sub ₹2,773 (Dec charge/Jan sub), plants porter ₹857, 3 wifi recharges ₹3,000, 2 gas cylinders ₹8,000, ₹200 lost, invertor return ₹560
     # Feb: PhonePe — Zepto ₹654
     # Ignored (personal): 9444448314 Dec ₹5,000 + Apr ₹5,000
-    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 51517, 32045, 654, 0, 0],
+    "Kiran advance — PhonePe/cash for PG ops": [0, 39001, 51517, 32045, 654, 0, 0, 0],
 }
 
 OPEX = {
-    "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 1532000, 1290000, 1449100],  # Feb+Apr Kiran confirmed; Mar corrected to 12,90,000 (Kiran 2026-05-12)
-    "Property Rent — Bank UPI/RTGS paid":                                  [0, 0, 0, 0,  600000,  605140,  600000],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
-    "Electricity":                                                [0, 0, 74768,   131554,  134538,   96617,  140659],  # Dec: BESCOM via BBPSBP@ybl
-    "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520],
-    "IT & Software":                                              [0, 0, 3480,     12068,     934,    1128,    2348],  # Jan +948 office phone; Feb +934 mobile recharge; Mar +1128 paybil/payair; Apr +2348. Updated 2026-05-13
-    "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
-    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  239753],  # Apr +875 Chandra cash (egg trays). Jan +1086 Origin veg; Feb +792 Amazon food; Apr +756 Ratnadeep. 2026-05-17
-    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  364161,   61904],  # Mar +8190 Chandra cash (diesel 6370+cans 1820). Jan +500 Shell India; Apr +326 volipi.l. 2026-05-17
-    "Staff & Labour":                                             [0, 1000, 135435, 116714, 171295,  217341,  193617],  # Feb -63000 (9342205440 gas pipeline welding reclassified to Maintenance; confirmed Kiran 2026-05-30). Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-30
-    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,   64850,   23399,   39319],  # Feb +63000 (9342205440 gas pipeline welding; was Staff & Labour; confirmed Kiran 2026-05-30). Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). Updated 2026-05-30
-    "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
-    "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500],
+    "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)": [0, 0, 0, 0, 1532000, 1290000, 1449100, 1532000],  # Feb+Apr Kiran confirmed; Mar corrected to 12,90,000 (Kiran 2026-05-12)
+    "Property Rent — Bank UPI/RTGS paid":                                  [0, 0, 0, 0,  600000,  605140,  600000, 600000],  # Feb+Apr+Mar confirmed by Kiran (2026-05-12)
+    "Electricity":                                                [0, 0, 74768,   131554,  134538,   96617,  140659, 196371],  # Dec: BESCOM via BBPSBP@ybl
+    "Water (bank tankers + Manoj cash; Mar bill paid Apr)":       [0, 0, 0,            0,       0,    8000,   84520, 62900],
+    "IT & Software":                                              [0, 0, 3480,     12068,     934,    1128,    2348, 876],  # Jan +948 office phone; Feb +934 mobile recharge; Mar +1128 paybil/payair; Apr +2348. Updated 2026-05-13
+    "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)": [0, 0, 43946, 70730, 113168, 0, 0, 0],  # Dec +3000 wifi dongles (Kiran cash)
+    "Food & Groceries":                                           [0, 33632, 113787, 217504,  115595,  240294,  239753, 216158],  # Apr +875 Chandra cash (egg trays). Jan +1086 Origin veg; Feb +792 Amazon food; Apr +756 Ratnadeep. 2026-05-17
+    "Fuel & Diesel":                                              [0, 0, 1200,      9599,  105866,  364161,   61904, 88623],  # Mar +8190 Chandra cash (diesel 6370+cans 1820). Jan +500 Shell India; Apr +326 volipi.l. 2026-05-17
+    "Staff & Labour":                                             [0, 1000, 135435, 116714, 171295,  217341,  193617, 68065],  # Feb -63000 (9342205440 gas pipeline welding reclassified to Maintenance; confirmed Kiran 2026-05-30). Jan +790 petty wages; Feb +580 petty wages; Mar +29000 volipi.l salary. Updated 2026-05-30
+    "Maintenance & Repairs":                                      [0, 0, 1400,     22450,   64850,   23399,   39319, 13600],  # Feb +63000 (9342205440 gas pipeline welding; was Staff & Labour; confirmed Kiran 2026-05-30). Mar +1500 Chandra (carpenter 1000+generator 500); Apr +2400 Chandra (plumbers 1500+elec 900). Updated 2026-05-30
+    "Cleaning Supplies":                                          [0, 0, 5674,       1880,    1200,   11272,   18315, 0],  # Jan +480 Hinglaj packaging; Apr +340 kastig soda. Updated 2026-05-13
+    "Waste Disposal (Pavan Rs.3.5K/mo)":                         [0, 0, 0,          3000,    3500,    3500,    3500, 3500],
     # Shopping & Supplies — small operational purchases (akhil setup, misc UPI, nursery decor, CHANDRASEKHAR ops advance etc.)
     # Updated 2026-05-13: reclassified all items from Operational Expenses; Nov nursery; Dec: Chandra 70K+akhil 28.7K+cash 1.7K; Jan: akhil+Q531; Feb: SV251+paytm+ME+Global+paytmqr; Mar: 9902+volipi.l 444+balaji; Apr: volipi.l mirrors
-    "Shopping & Supplies":                                        [0, 3048, 136960,  18323,   7662,    7770,   10258],
+    "Shopping & Supplies":                                        [0, 3048, 136960,  18323,   7662,    7770,   10258, 9648],
     # Furniture & Supplies — ALL furniture, equipment, Amazon purchases from PG bank (2026-05-13: CAPEX folded into OPEX per Kiran)
     # Old CAPEX (F&F + Capital Inv) + chairs ₹47K + atta machine ₹21K + kitchen vessels ₹37.5K + Amazon all months
     # Nov: F&F 125021 + CCTV/8-Ball 82000. Dec: F&F 167741 + CCTV 100000 + Amazon 19014. Jan: F&F 203815 + Amazon 8414 (4707+3707 cash-counter). Feb: F&F 1185597 + Amazon 2174. Mar: F&F 10761 + Amazon 3237. Apr: F&F 12363 + chairs 47000 + atta 21060 + kitchen 37500 + Amazon 30756
-    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  53998,  148679],  # Mar +40000: fire stove (shalu UPI Mar 15, id 1655 — was in EXCLUDED/Non-Op, reclassified to ops 2026-05-17)
-    "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003],  # Apr +1003 Naukri job posting. Updated 2026-05-13
-    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   6000,    6000,    3000],  # Feb +3000 Chandra (Pradeep police); Mar +3000 Chandra (police). Jan Jitendra BBMP+Agreement. 2026-05-17
-    "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100],
-    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0],  # Chandra cash now in proper categories (Fuel/Govt/Maintenance/Food). Mar+Apr = 0.
+    "Furniture & Supplies":                                       [0, 207021, 286755, 212229, 1187771,  53998,  148679, 560],  # Mar +40000: fire stove (shalu UPI Mar 15, id 1655 — was in EXCLUDED/Non-Op, reclassified to ops 2026-05-17)
+    "Marketing":                                                  [0, 0, 81273,     35595,   7620,   27700,    1003, 0],  # Apr +1003 Naukri job posting. Updated 2026-05-13
+    "Govt & Regulatory (incl Police Rs.3K accrual Jan+)":        [0, 0,  6948,     99673,   6000,    6000,    3000, 0],  # Feb +3000 Chandra (Pradeep police); Mar +3000 Chandra (police). Jan Jitendra BBMP+Agreement. 2026-05-17
+    "Bank Charges":                                               [0, 0, 0,           149,      0,       0,     100, 0],
+    "Other Expenses":                                             [0, 15987, 2781,     700,       0,       0,       0, 122551],  # Chandra cash now in proper categories (Fuel/Govt/Maintenance/Food). Mar+Apr = 0.
     # HULK building operational expenses (bank withdrawals — Apr ₹4,328)
-    "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328],
+    "HULK — Operational Expenses":                               [0,     0,     0,     0,      0,       0,    4328, 169216],
     # Partner personal SBI (0167) payments for PG business — reimbursable from company account
     # Detail: data/reports/SBI_0167_Reimbursement.xlsx
-    "Partner Reimbursable (Personal Acct SBI 0167)":            [0,     0,     0, 41899,  18264,     750,    6928],
+    "Partner Reimbursable (Personal Acct SBI 0167)":            [0,     0,     0, 41899,  18264,     750,    6928, 0],
 }
 # NOTE: CAPEX removed 2026-05-13 per Kiran — all furniture/equipment spent from PG bank account
 # folded into OPEX as "Furniture & Supplies". No separate CAPEX section.
 
 EXCLUDED = {
     # Tenant deposit refunds are balance-sheet items only (return of liability) — not operating costs
-    "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163],  # Updated 2026-05-12
+    "Tenant Deposit Refund (balance sheet)":  [0,  15000,  47344,  55944,  74532,  182441, 151163, 184200],  # Updated 2026-05-12
     # Cash-exchange repayments: someone gave physical cash → used for ops (already in OPEX) → repaid via bank RTGS
     # Feb: Sri Lakshmi Chandrasekar ₹6L (id 1885)
     # Mar: Sravani ₹7.5L (id 1714) + Sri Lakshmi ₹6L (id 1623) + Bharathi ₹2L (id 1652) = ₹15.5L
@@ -117,14 +117,14 @@ EXCLUDED = {
     # Nov ₹5L REMOVED — startup capital repayment (Capital Contributions above), not a cash exchange.
     # Mar ₹5L Bharathi REMOVED — covered by THOR→HULK intercompany transfer, not a separate P&L item.
     # NOT an operating cost — the cash was already spent and counted in OPEX categories above.
-    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 1550000,  22357],
+    "Cash Exchange Repayments via Bank (non-op)": [0,      0,     0,      0,  600000, 1550000,  22357, 0],
 }
 
 # ── Deposit flows — queried from tenancies (security_deposit + maintenance_fee by check-in month)
 # These are LIABILITY inflows — real cash but NOT revenue. Subtracted from gross income for True Revenue.
-DEPOSIT_RECEIVED = [0, 448000, 838000, 1383000, 1074250, 1256450, 1161125]
+DEPOSIT_RECEIVED = [0, 448000, 838000, 1383000, 1074250, 1256450, 1161125, 616250]
 # Deposit refunds = same figures as EXCLUDED["Tenant Deposit Refund"] — shown here for net calc
-DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638]  # Mar +22000, Apr +9970 (personal SBI)
+DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638, 184200]  # Mar +22000, Apr +9970 (personal SBI)
 
 # Security deposits = active tenants only (what we owe back), split by check-in month
 # Maintenance fees  = all non-no-show tenants (non-refundable, retained), by check-in month
@@ -132,8 +132,8 @@ DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638]  # Mar
 DEPOSITS = {
     # Pure refundable security only (combined total was ₹33,83,875 but included maintenance ₹10,68,700)
     # True refundable = combined − maintenance = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
-    "Security Deposits — refundable (must return to active tenants)": [0, 140000, 266500, 455500, 353000, 526550, 573625],
-    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000],
+    "Security Deposits — refundable (must return to active tenants)": [0, 140000, 266500, 455500, 353000, 526550, 573625, 424250],
+    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000, 192000],
 }
 
 # Monthly bank balances — from Yes Bank statements (verified)
@@ -149,6 +149,7 @@ BANK_BALANCE_THOR: Dict[str, tuple] = {
     "Feb'26": (1878517,  1250402),
     "Mar'26": (1250402,   205008),
     "Apr'26": ( 205008,  1373863),
+    "May'26": (1321663,   914858),  # THOR May statement: open 1,321,662.65 → close 914,857.74
 }
 
 BANK_BALANCE_HULK: Dict[str, tuple] = {
@@ -159,6 +160,7 @@ BANK_BALANCE_HULK: Dict[str, tuple] = {
     "Feb'26": (None, None),
     "Mar'26": (  10000,  571550),
     "Apr'26": ( 571550,  814941),  # verified Apr 30 figure
+    "May'26": ( 814941, 2026041),  # HULK May statement: open 814,941 → close 2,026,040.66
 }
 
 BANK_CLOSING_BALANCE_THOR = BANK_BALANCE_THOR["Apr'26"][1]
@@ -460,8 +462,8 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     ws_recon = wb.create_sheet("THOR Bank Reconciliation")
 
     # Capital flows that actually hit the THOR bank account (not cash/personal advances)
-    _thor_cap_in  = [500000, 0,      0, 90000, 0, 0,      0]  # Oct: startup ₹5L; Jan: Kiran top-up ₹90K
-    _thor_cap_out = [0,      500000, 0, 0,     0, 0, 500000]  # Nov: startup repaid ₹5L; Apr: transferred to HULK ₹5L
+    _thor_cap_in  = [500000, 0,      0, 90000, 0, 0,      0, 0]  # Oct: startup ₹5L; Jan: Kiran top-up ₹90K
+    _thor_cap_out = [0,      500000, 0, 0,     0, 0, 500000, 0]  # Nov: startup repaid ₹5L; Apr: transferred to HULK ₹5L
 
     _thor_income  = INCOME["THOR — Bank Income (UPI + NEFT)"]
     _thor_open    = [BANK_BALANCE_THOR[m][0] for m in MONTHS]
