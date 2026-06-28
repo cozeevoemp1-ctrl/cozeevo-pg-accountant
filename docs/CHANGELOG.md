@@ -1,5 +1,18 @@
 # Changelog
 
+## Session K — 2026-06-27 — Premium phantom-bed root cause + occupancy point-in-time + Generate P&L
+
+### Summary
+- 🐛 **Premium/whole-room tenants showed a phantom free bed** (Chandra/503, Abhishek/G03, Tanya/311, Soham/105). Root cause: the **`/bookings/quick-book` endpoint dropped `sharing_type` for MONTHLY bookings** — it only persisted it on the daily path, so the OnboardingSession AND no_show Tenancy were created NULL even when "Premium" was picked on the form. (The forms — kpi-grid "Pre-book Room" modal + pre-register — were always correct.) Fix (`5c49401`): quick-book resolves sharing_type for both paths and defaults to the room's master type when unspecified; onboarding-approve + bot add_tenant also default from room. **sharing_type is never NULL now.** Backfilled all 17 existing NULLs (sole whole-room → premium, rest → room type); set Chandra/G03/Soham → premium. 0 NULLs remain.
+- 🐛 **Occupancy chart showed identical numbers for May & June (both 291/97.7%)** — `get_occupied_beds()` filters only `status='active'` with no date bound, so it returns *today's* count for any month. Added `get_occupied_beds_asof()` (point-in-time: present on date, incl. since-exited, capped per room); analytics live months now use it. May 287/96.3%, June 290/97.3%. (`c95810c`)
+- ✅ **Generate P&L button** on Finance page → `/finance/pnl/excel` (same `pnl_builder`, byte-identical to offline export). Error handling surfaces the real status (`d65afc6`).
+- ✅ **REPORTING.md** updated: P&L gross-includes-everything + deposit-flow-summed; occupancy point-in-time rule (`c1c51fd`).
+- 📊 May unit economics confirmed: avg 282 occupied beds (96.3% month-end); rent ₹7,572/bed + non-rent ₹3,056/bed = ₹10,627/occupied bed.
+
+### Open
+- Tanya/311 (₹26K, tagged double + 2 no-shows) — premium mistag? Needs Kiran's call.
+- Live P&L generator + adjustments table (new months self-serve). May 31 cash-in-hand → roll balance sheet.
+
 ## Session J — 2026-06-27 — May P&L build, HULK parser fix, reclassification, occupancy point-in-time
 
 ### Summary
