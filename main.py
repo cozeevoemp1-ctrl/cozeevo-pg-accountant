@@ -451,9 +451,21 @@ if os.getenv("TEST_MODE") == "1":
 
 # ── Health check ───────────────────────────────────────────────────────────
 
+import subprocess as _subprocess
+try:
+    _GIT_SHA = _subprocess.check_output(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+        stderr=_subprocess.DEVNULL, text=True,
+    ).strip()
+except Exception:
+    _GIT_SHA = "unknown"
+
 @app.get("/healthz")
 async def health():
-    return {"status": "ok", "service": "pg-accountant"}
+    # `commit` = the git SHA the running process started on. If this lags behind
+    # `git rev-parse --short HEAD` after a push, the VPS deploy webhook is failing.
+    return {"status": "ok", "service": "pg-accountant", "commit": _GIT_SHA}
 
 
 @app.get("/")
