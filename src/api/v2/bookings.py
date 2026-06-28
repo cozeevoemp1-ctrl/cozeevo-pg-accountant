@@ -238,7 +238,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 sharing_type=SharingType(_sharing) if _sharing else None,
                 checkin_date=checkin,
                 checkout_date=checkout,
-                agreed_rent=req.monthly_rent if req.stay_type == "monthly" else 0,
+                agreed_rent=req.monthly_rent if req.stay_type == "monthly" else Decimal(str(req.daily_rate)),  # daily: agreed_rent holds per-day rate (canonical convention; see onboarding_router check-in)
                 security_deposit=req.security_deposit,
                 booking_amount=Decimal(str(req.booking_amount)),
                 maintenance_fee=req.maintenance_fee if req.stay_type == "monthly" else 0,
