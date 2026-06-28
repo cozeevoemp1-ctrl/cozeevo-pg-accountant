@@ -1,5 +1,19 @@
 # Changelog
 
+## Session N — 2026-06-28 — Duplicate-booking prevention (DB constraint) + stay history + day-wise display
+
+### Summary
+- 🐛 **Manual bookings created duplicate tenancies** (same person/room/dates shown 2–3×). Built a 3-layer permanent fix:
+  1. **DB exclusion constraint `no_overlap_active_tenancy`** (EXCLUDE USING gist + btree_gist) — physically blocks two active/no_show tenancies for the same tenant+room with overlapping dates, on ANY code path. Scoped to active/no_show so historical exited stays are untouched. Live + added to `migrate_all`.
+  2. **App guard** in quick-book (`find_overlapping_tenancy` in room_occupancy) → 409 before insert.
+  3. **App-wide handler** in `main.py` catches the constraint violation → 409 popup ("already has a booking in this room for overlapping dates") instead of a 500.
+  - Repeat guest on DIFFERENT dates still allowed (new tenancy id, same tenant id).
+- ✅ **Cleaned existing duplicates:** Udhayabharathi/115 (1264), Arun/608 (1259), Raja/618 (1167), Rama/G09 (1080) cancelled (0-payment side). Ajit/510 (kept 1158, re-linked ₹750 waiver, cancelled 1159), Jagan/G03 (kept 1252, voided duplicate ₹3,900 rent, cancelled 1263).
+- ✅ **Tenant model = repeat-guest correct:** one Tenant id (the person) → many Tenancy ids (each stay). Confirmed/documented.
+- ✅ **Tenant-search dropdown now shows each stay's dates + status** ("Room 115 · 10 Jun → 12 Jun · exited") so repeat stays are distinct, not identical rows. Search endpoint returns checkin/checkout/stay_type.
+- 🐛 **Day-wise stays showed "/mo"** → fixed to "/day" on checkouts, bookings list, tenant-search. Backfilled 16 historical day-stay tenancies that had `agreed_rent=0` (8 from booking sessions, 8 from prepaid÷nights); Ajit/1158 set to ₹750/day (Kiran-confirmed). 3 ancient March/April records left at 0 (no rate data).
+- Commits: `f154f4d` (dedup constraint+guard), `4361bd0` (dropdown dates), `39ee820` (popup handler + /day labels).
+
 ## Session M — 2026-06-28 — Day-stay rate lost on quick-book + capacity check dead since 3a6c5bb + VPS deploy-lag
 
 ### Summary
