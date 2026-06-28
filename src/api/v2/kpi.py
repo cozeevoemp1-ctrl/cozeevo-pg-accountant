@@ -522,18 +522,16 @@ async def get_kpi_detail(
                 for row in upcoming_rows:
                     upcoming_map[row.room_id] = row.next_checkin
 
-                # Also include pre-bookings (OnboardingSession pending_tenant/pending_review)
+                # Also include pre-bookings (OnboardingSession pending_tenant/pending_review/expired).
+                # An expired link only means the tenant never completed the self-service form —
+                # the room hold is NOT released, so the bed must still show "Until <date>" to
+                # prevent double-booking over a future check-in. Hence no expires_at gate here.
                 session_rows = (await session.execute(
                     select(OnboardingSession.room_id, func.min(OnboardingSession.checkin_date).label("next_checkin"))
                     .where(
                         OnboardingSession.room_id.in_(vacant_room_ids),
-                        OnboardingSession.status.in_(["pending_tenant", "pending_review"]),
+                        OnboardingSession.status.in_(["pending_tenant", "pending_review", "expired"]),
                         OnboardingSession.checkin_date > today,
-                        or_(
-                            OnboardingSession.status == "pending_review",
-                            OnboardingSession.expires_at == None,
-                            OnboardingSession.expires_at > datetime.now(timezone.utc).replace(tzinfo=None),
-                        ),
                     )
                     .group_by(OnboardingSession.room_id)
                 )).all()
