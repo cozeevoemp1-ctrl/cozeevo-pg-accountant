@@ -1,5 +1,14 @@
 # Changelog
 
+## Session M — 2026-06-28 — Day-stay rate lost on quick-book + capacity check dead since 3a6c5bb + VPS deploy-lag
+
+### Summary
+- 🐛 **Day-stay quick-book lost the per-night rate** — Lokesh booked Room 608 at ₹800/night, edit page showed ₹0. Root cause: when an advance is paid, quick-book creates the tenancy immediately, but `bookings.py:241` hardcoded `agreed_rent=0` for day-stays — the rate was saved only on the OnboardingSession (`daily_rate`), never on the Tenancy. Every reader (tenant detail, checkin, preview) reads the per-day rate from `Tenancy.agreed_rent` (canonical convention — see `onboarding_router.py:1662`; `Tenancy` has no `daily_rate` column). **Fix (`0bae69f`):** quick-book writes `daily_rate` into `agreed_rent` for day-stays. Repaired live records: Tenancy 1267 (Lokesh) 0→₹800; Tenancy 1226 (Sujal Jaiswal) 0→₹1,450 (inferred 14,500÷10 nights — confirm). Both audit-logged.
+- 🐛 **Quick-book capacity check has been DEAD CODE since `3a6c5bb`** — that commit removed the `if room.room_number != "000":` guard but left its body indented one level deeper, so the entire bed-limit check silently nested under `if room.room_number == "000": raise` → unreachable for every room. **Bed limits were never enforced; any room could be overbooked past max_occupancy.** `ast.parse` passed (valid syntax, wrong logic) so it went unnoticed. **Fix (`81846de`):** dedented the block to run for every real room.
+- 🐛 **VPS running stale pre-`bb4bbab` code (deploy-lag).** Lokesh's booking (check-in today) auto-jumped to `active`/"currently staying", skipping Bookings approval — the date-based auto-checkin behavior `bb4bbab` removed on **13 Jun**, still live on the VPS 15 days later. The deploy webhook is silently failing. Pushed redeploy trigger (`8b096d4`); **Kiran must verify VPS is at `81846de` via Hostinger console** — if older, every booking keeps auto-checking-in and new day-stays keep losing their rate.
+- ✅ **Cleaned 7 stale onboarding sessions** (active tenant + pending session, all from the old auto-checkin path): Lokesh, Rajramani/G15, Nishant/116, Rajveer/108, Abhishek/G03, Sheenad/116, Santosh/507 → set `approved`. Removes orphaned "pending bookings" that double-count in occupancy/KPIs.
+- ✅ **Room 608 confirmed legit double** (max_occ 2): Vaibhav (monthly) + Lokesh (day-stay) = 2/2 full, not a double-book.
+
 ## Session L — 2026-06-28 — Vacant-beds badge missing for expired-link bookings
 
 ### Summary
