@@ -22,7 +22,7 @@ from src.database.models import (
     OnboardingSession, Room, Property,
     Tenant, Tenancy, Payment, TenancyStatus, StayType, PaymentMode, PaymentFor, SharingType,
 )
-from src.services.room_occupancy import _normalize_phone
+from src.services.room_occupancy import _normalize_phone, find_overlapping_tenancy
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -226,6 +226,20 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 tenant = Tenant(name=req.tenant_name.strip(), phone=phone)
                 session.add(tenant)
                 await session.flush()
+
+            # Block duplicate: same tenant + same room + overlapping dates.
+            # A repeat stay on different dates is fine (new tenancy id); only an
+            # overlapping second booking for the same person+room is rejected.
+            _dup = await find_overlapping_tenancy(session, tenant.id, room.id, checkin, checkout)
+            if _dup:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"{req.tenant_name.strip()} already has a booking in Room "
+                        f"{room.room_number} overlapping these dates (booking #{_dup.id}). "
+                        f"For a repeat stay use different dates."
+                    ),
+                )
 
             _stay = StayType.daily if req.stay_type == "daily" else StayType.monthly
             # Always create as no_show — only transition to active when admin approves via Bookings page

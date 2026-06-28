@@ -35,6 +35,42 @@ from src.database.models import (
 )
 
 
+async def find_overlapping_tenancy(
+    session: AsyncSession,
+    tenant_id: int,
+    room_id: int,
+    checkin: _date,
+    checkout: Optional[_date] = None,
+    exclude_id: Optional[int] = None,
+):
+    """
+    Return an existing NON-cancelled tenancy for the same tenant+room whose stay
+    overlaps [checkin, checkout], or None. Used to block duplicate bookings.
+
+    A repeat guest on DIFFERENT (non-overlapping) dates is allowed — that's a new
+    stay (new tenancy id, same tenant). Only an overlapping second booking for the
+    same person+room is a duplicate.
+    """
+    if not (tenant_id and room_id and checkin):
+        return None
+    end = checkout or _date(2099, 12, 31)
+    q = (
+        select(Tenancy)
+        .where(
+            Tenancy.tenant_id == tenant_id,
+            Tenancy.room_id == room_id,
+            Tenancy.status != TenancyStatus.cancelled,
+            Tenancy.checkin_date.isnot(None),
+            Tenancy.checkin_date <= end,
+            or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date >= checkin),
+        )
+        .limit(1)
+    )
+    if exclude_id:
+        q = q.where(Tenancy.id != exclude_id)
+    return await session.scalar(q)
+
+
 def _normalize_phone(phone: str) -> str:
     """Strip country code / punctuation and return the last 10 digits.
 

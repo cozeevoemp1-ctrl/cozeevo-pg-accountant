@@ -1629,6 +1629,27 @@ async def run_staff_room_corrections_2026_05_16(conn: AsyncConnection) -> None:
     print(f"  [ok] Rooms 107 + 114 + 618 + 614 set to non-staff: {r.rowcount} updated")
 
 
+async def run_no_overlap_tenancy_constraint_2026_06_28(conn: AsyncConnection) -> None:
+    """Block duplicate bookings at the DB level: no two active/no_show tenancies for the
+    same tenant + room with overlapping stay dates. Repeat stays on DIFFERENT dates are
+    allowed (new tenancy id, same tenant). Idempotent."""
+    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
+    exists = (await conn.execute(text(
+        "SELECT 1 FROM pg_constraint WHERE conname='no_overlap_active_tenancy'"
+    ))).scalar()
+    if exists:
+        return
+    await conn.execute(text("""
+        ALTER TABLE tenancies ADD CONSTRAINT no_overlap_active_tenancy
+        EXCLUDE USING gist (
+            tenant_id WITH =,
+            room_id WITH =,
+            daterange(checkin_date, COALESCE(checkout_date, 'infinity'::date), '[]') WITH &&
+        ) WHERE (status IN ('active'::tenancystatus, 'no_show'::tenancystatus)
+                 AND checkin_date IS NOT NULL AND room_id IS NOT NULL)
+    """))
+
+
 async def main(args: argparse.Namespace) -> None:
     if not DB_URL or DB_URL == "+asyncpg://":
         print("ERROR: DATABASE_URL not set in .env")
@@ -1676,6 +1697,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_staff_room_corrections_2026_05_16(conn)
             await run_add_supabase_auth_id_2026_05_19(conn)
             await run_room_108_revenue_2026_05_31(conn)
+            await run_no_overlap_tenancy_constraint_2026_06_28(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)
