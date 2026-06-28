@@ -20,7 +20,7 @@ from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
     OnboardingSession, Room, Property,
-    Tenant, Tenancy, Payment, TenancyStatus, StayType, PaymentMode, PaymentFor,
+    Tenant, Tenancy, Payment, TenancyStatus, StayType, PaymentMode, PaymentFor, SharingType,
 )
 from src.services.room_occupancy import _normalize_phone
 
@@ -158,10 +158,14 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
 
         # Create session — pre-fill name in tenant_data so Bookings page shows it immediately
         token = str(uuid.uuid4())
+        # Resolve sharing_type ONCE for all paths — never leave it NULL.
+        # Honor the explicit pick (incl. "premium" = whole room); otherwise default to
+        # the room's master type so a whole-room tenant is never silently stored as a
+        # single bed (which makes the room show a phantom free bed everywhere).
+        _sharing = (req.sharing_type or "").strip().lower()
+        if _sharing not in ("single", "double", "triple", "premium"):
+            _sharing = (room.room_type.value if room and room.room_type else None)
         if req.stay_type == "daily":
-            _sharing = req.sharing_type.strip().lower() if req.sharing_type else None
-            if _sharing not in ("single", "double", "triple", "premium"):
-                _sharing = None
             obs = OnboardingSession(
                 token=token,
                 status="pending_tenant",
@@ -199,6 +203,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 advance_mode=req.advance_mode or "",
                 checkin_date=checkin,
                 stay_type="monthly",
+                sharing_type=_sharing,
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
                 special_terms=req.notes.strip() or None,
                 expires_at=datetime.utcnow() + timedelta(hours=48),
@@ -230,6 +235,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 room_id=room.id,
                 stay_type=_stay,
                 status=_target_status,
+                sharing_type=SharingType(_sharing) if _sharing else None,
                 checkin_date=checkin,
                 checkout_date=checkout,
                 agreed_rent=req.monthly_rent if req.stay_type == "monthly" else 0,

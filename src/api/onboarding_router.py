@@ -1773,6 +1773,14 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     sharing_default = SharingType(effective_sharing)
                 except ValueError:
                     sharing_default = None
+            # Never leave sharing_type NULL: fall back to the room's master type
+            # (a NULL/double whole-room tenant shows a phantom free bed everywhere).
+            # Premium (whole room) must still be picked explicitly by the receptionist.
+            if sharing_default is None and room is not None and getattr(room, "room_type", None):
+                try:
+                    sharing_default = SharingType(room.room_type.value)
+                except (ValueError, AttributeError):
+                    sharing_default = None
             # Only auto-checkin if explicitly requested (instant_checkin flag), not based on date
             _target_status = TenancyStatus.active if (req and req.instant_checkin) else TenancyStatus.no_show
             _pre_tenancy = None

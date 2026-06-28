@@ -6043,6 +6043,17 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
     if _bookable_err:
         return f"❌ Cannot add {name} to room {room_number}: {_bookable_err}"
 
+    # Default sharing_type from the room so a whole-room tenant is never stored as a
+    # single bed (which shows a phantom free bed). Premium is set explicitly elsewhere.
+    from src.database.models import SharingType as _ST
+    _room_obj = await session.get(Room, room_id) if room_id else None
+    _sharing_def = None
+    if _room_obj is not None and getattr(_room_obj, "room_type", None):
+        try:
+            _sharing_def = _ST(_room_obj.room_type.value)
+        except (ValueError, AttributeError):
+            _sharing_def = None
+
     # Tenancy record — future date = no_show until physical arrival confirmed
     tenancy = Tenancy(
         tenant_id        = tenant.id,
@@ -6052,6 +6063,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
         security_deposit = deposit,
         booking_amount   = advance,
         maintenance_fee  = maintenance,
+        sharing_type     = _sharing_def,
         entered_by       = "whatsapp_bot",
         status           = TenancyStatus.active if checkin_date <= date.today() else TenancyStatus.no_show,
     )
