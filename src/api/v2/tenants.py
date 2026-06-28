@@ -181,6 +181,9 @@ async def search_tenants(
             "building_code": _building_code(prop.name),
             "rent": float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0,
             "status": tenancy.status.value,
+            "stay_type": tenancy.stay_type.value if tenancy.stay_type else "monthly",
+            "checkin_date": tenancy.checkin_date.isoformat() if tenancy.checkin_date else None,
+            "checkout_date": tenancy.checkout_date.isoformat() if tenancy.checkout_date else None,
         }
         for tenancy, tenant, room, prop in rows
     ]

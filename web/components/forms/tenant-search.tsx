@@ -3,6 +3,21 @@
 import { useState, useRef } from "react"
 import { searchTenants, TenantSearchResult } from "@/lib/api"
 
+// "10 Jun → 12 Jun" for a dated stay; "from 1 Jul" for open-ended; "" if no dates
+function fmtStay(t: TenantSearchResult): string {
+  const f = (iso?: string | null) => {
+    if (!iso) return ""
+    const [, m, d] = iso.split("-")
+    const mon = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m)]
+    return `${parseInt(d)} ${mon}`
+  }
+  const ci = f(t.checkin_date)
+  const co = f(t.checkout_date)
+  if (ci && co) return `${ci} → ${co}`
+  if (ci) return `from ${ci}`
+  return ""
+}
+
 interface TenantSearchProps {
   onSelect: (tenant: TenantSearchResult) => void
   defaultValue?: string
@@ -84,7 +99,10 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
             >
               <div>
                 <p className="font-semibold text-ink text-sm">{t.name}</p>
-                <p className="text-ink-muted text-xs">Room {t.room_number} · {t.building_code}</p>
+                <p className="text-ink-muted text-xs">
+                  Room {t.room_number} · {t.building_code}{fmtStay(t) ? ` · ${fmtStay(t)}` : ""}
+                  {t.status === "exited" ? " · exited" : t.status === "no_show" ? " · upcoming" : ""}
+                </p>
               </div>
               <span className="text-xs text-ink-muted">₹{t.rent.toLocaleString("en-IN")}/mo</span>
             </li>

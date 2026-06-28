@@ -224,6 +224,9 @@ export interface TenantSearchResult {
   building_code: string;
   rent: number;
   status: string;
+  stay_type?: string;
+  checkin_date?: string | null;
+  checkout_date?: string | null;
 }
 
 export interface TenantDues {
