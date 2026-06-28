@@ -1,5 +1,12 @@
 # Changelog
 
+## Session L — 2026-06-28 — Vacant-beds badge missing for expired-link bookings
+
+### Summary
+- 🐛 **Room with a real future booking showed as plainly free** in the home "Vacant beds" widget — no "Until \<date\>" badge — so the bed looked open and could be double-booked. Repro: Room 416 had a booking (Shreyas Shetty, check-in 1 Jul 2026) but showed only "1 bed free · Male". Root cause: the vacant-tile upcoming-checkin query (`src/api/v2/kpi.py` ~L526) gated onboarding sessions on `expires_at > now`. Shreyas's session is stored `status='pending_tenant'` with `expires_at=25 Jun` (link expired) — the "Link expired" UI label is a *lazily-computed display status*, the DB status is still `pending_tenant`. The expired-link session failed the `or_(...)` expires_at gate and was dropped, so no badge.
+- ✅ **Fix (`22e4395`):** dropped the `expires_at` gate and added `"expired"` to the status set, so any non-cancelled future booking surfaces as an upcoming check-in. An expired link only means the tenant didn't finish their self-service form — the **room hold is NOT released**. Verified against live Supabase DB: new query returns `(416, 2026-07-01)` → "Until 30 Jun". Cancelled bookings still excluded (Cancel on Bookings page clears the badge); a held bed drops its badge once check-in date passes.
+- General fix (query logic, not a 416 data patch) — applies to every room with an expired-link future booking.
+
 ## Session K — 2026-06-27 — Premium phantom-bed root cause + occupancy point-in-time + Generate P&L
 
 ### Summary
