@@ -121,30 +121,30 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
         if room.room_number == "000":
             raise HTTPException(422, "Room 000 is a placeholder. Please select a specific room for this booking.")
 
-        # Capacity check
-            from src.services.room_occupancy import get_room_occupants
-            occ = await get_room_occupants(session, room)
-            max_occ = room.max_occupancy or 1
-            if occ.beds_occupied(max_occ) >= max_occ:
-                # Allow pre-booking if enough beds will be free on the requested checkin_date.
-                # A bed is free if the current tenant's checkout_date < checkin_date.
-                active_rows = (await session.execute(
-                    select(Tenancy.checkout_date, Tenancy.expected_checkout)
-                    .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
-                )).all()
-                def _eff(row): return row.checkout_date or row.expected_checkout
-                beds_still_occupied = sum(1 for row in active_rows if _eff(row) is None or _eff(row) >= checkin)
-                if beds_still_occupied >= max_occ:
-                    ends = [_eff(row) for row in active_rows if _eff(row) is not None]
-                    if ends:
-                        free_from = min(ends) + timedelta(days=1)
-                        detail = (
-                            f"Room {room.room_number} is fully booked until {min(ends).strftime('%d %b %Y')}. "
-                            f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
-                        )
-                    else:
-                        detail = f"Room {room.room_number} is full with no checkout dates set — cannot pre-book."
-                    raise HTTPException(409, detail)
+        # Capacity check (runs for every real room — 000 is rejected above)
+        from src.services.room_occupancy import get_room_occupants
+        occ = await get_room_occupants(session, room)
+        max_occ = room.max_occupancy or 1
+        if occ.beds_occupied(max_occ) >= max_occ:
+            # Allow pre-booking if enough beds will be free on the requested checkin_date.
+            # A bed is free if the current tenant's checkout_date < checkin_date.
+            active_rows = (await session.execute(
+                select(Tenancy.checkout_date, Tenancy.expected_checkout)
+                .where(Tenancy.room_id == room.id, Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
+            )).all()
+            def _eff(row): return row.checkout_date or row.expected_checkout
+            beds_still_occupied = sum(1 for row in active_rows if _eff(row) is None or _eff(row) >= checkin)
+            if beds_still_occupied >= max_occ:
+                ends = [_eff(row) for row in active_rows if _eff(row) is not None]
+                if ends:
+                    free_from = min(ends) + timedelta(days=1)
+                    detail = (
+                        f"Room {room.room_number} is fully booked until {min(ends).strftime('%d %b %Y')}. "
+                        f"Set check-in on or after {free_from.strftime('%d %b %Y')}."
+                    )
+                else:
+                    detail = f"Room {room.room_number} is full with no checkout dates set — cannot pre-book."
+                raise HTTPException(409, detail)
 
         # Cancel old pending sessions for the same phone
         old = await session.execute(
