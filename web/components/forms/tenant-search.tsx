@@ -104,7 +104,7 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
                   {t.status === "exited" ? " · exited" : t.status === "no_show" ? " · upcoming" : ""}
                 </p>
               </div>
-              <span className="text-xs text-ink-muted">₹{t.rent.toLocaleString("en-IN")}/mo</span>
+              <span className="text-xs text-ink-muted">₹{t.rent.toLocaleString("en-IN")}{t.stay_type === "daily" ? "/day" : "/mo"}</span>
             </li>
           ))}
         </ul>

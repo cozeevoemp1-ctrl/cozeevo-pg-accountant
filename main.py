@@ -147,6 +147,26 @@ app = FastAPI(
 
 app.add_middleware(LocalOnlyMiddleware)
 
+# ── Duplicate-booking guard (app-wide) ───────────────────────────────────────
+# The DB constraint `no_overlap_active_tenancy` physically blocks two active/no_show
+# tenancies for the same tenant+room with overlapping dates. Turn that DB error into
+# a clean 409 + clear message so the UI shows a popup instead of a 500 — on EVERY
+# booking/check-in path, current or future.
+from fastapi import Request as _Request
+from fastapi.responses import JSONResponse as _JSONResponse
+from sqlalchemy.exc import IntegrityError as _IntegrityError
+
+@app.exception_handler(_IntegrityError)
+async def _integrity_error_handler(request: _Request, exc: _IntegrityError):
+    msg = str(getattr(exc, "orig", exc) or exc)
+    if "no_overlap_active_tenancy" in msg:
+        return _JSONResponse(
+            status_code=409,
+            content={"detail": "This person already has a booking in this room for overlapping "
+                               "dates. For a repeat stay, use different dates."},
+        )
+    return _JSONResponse(status_code=409, content={"detail": "Conflicting record — please refresh and retry."})
+
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,

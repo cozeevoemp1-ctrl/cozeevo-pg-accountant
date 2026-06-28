@@ -44,9 +44,9 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }
 
-function fmtRent(n?: number) {
+function fmtRent(n?: number, stayType?: string) {
   if (!n) return "—"
-  return `₹${n.toLocaleString("en-IN")}/mo`
+  return `₹${n.toLocaleString("en-IN")}${stayType === "daily" ? "/day" : "/mo"}`
 }
 
 function proratedRent(rent: number, checkinIso: string): number {
@@ -680,7 +680,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             </>
           ) : (
             <>
-              <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.agreed_rent)}</p>
+              <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.stay_type === "daily" ? b.daily_rate : b.agreed_rent, b.stay_type)}</p>
               {b.agreed_rent && b.checkin_date && new Date(b.checkin_date).getDate() !== 1 && (
                 <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
                   1st mo: ₹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}

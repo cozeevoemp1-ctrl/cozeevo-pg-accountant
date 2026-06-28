@@ -189,8 +189,8 @@ export default function CheckoutsPage() {
                 <p className="font-semibold text-ink">{fmtINR(item.security_deposit)}</p>
               </div>
               <div>
-                <p className="text-ink-muted">Agreed rent</p>
-                <p className="font-semibold text-ink">{fmtINR(item.agreed_rent)}/mo</p>
+                <p className="text-ink-muted">{item.stay_type === "daily" ? "Daily rate" : "Agreed rent"}</p>
+                <p className="font-semibold text-ink">{fmtINR(item.agreed_rent)}{item.stay_type === "daily" ? "/day" : "/mo"}</p>
               </div>
               <div>
                 <p className="text-ink-muted">Refund</p>
