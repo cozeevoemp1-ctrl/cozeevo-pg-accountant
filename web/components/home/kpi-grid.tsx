@@ -744,9 +744,24 @@ function ExpansionPanel({
               ))}
             </select>
           </div>
-          {!loading && filtered.length > 0 && (
-            <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} tenants</p>
-          )}
+          <div className="flex gap-1.5 items-center">
+            {STAY_FILTERS.map((sf) => (
+              <button
+                key={sf.value}
+                onClick={() => setStayFilter(sf.value)}
+                className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
+                  stayFilter === sf.value
+                    ? "bg-brand-pink text-white border-brand-pink"
+                    : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                }`}
+              >
+                {sf.label}
+              </button>
+            ))}
+            {!loading && filtered.length > 0 && (
+              <span className="ml-auto text-[10px] font-bold text-brand-pink">{filtered.length} tenants</span>
+            )}
+          </div>
         </div>
       )}
 
@@ -1361,7 +1376,8 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
           !nameSearch.trim() ||
           it.name.toLowerCase().includes(nameSearch.toLowerCase()) ||
           it.room.toLowerCase().includes(nameSearch.toLowerCase());
-        return matchName && inRentRange(it.rent, rentRange);
+        const matchStay = stayFilter === "all" || it.stay_type === stayFilter;
+        return matchName && matchStay && inRentRange(it.rent, rentRange);
       }
       if (open === "checkins_today" || open === "checkouts_today") {
         const matchName =
