@@ -1472,6 +1472,25 @@ async def run_cash_tables_2026_05_11(conn) -> None:
     print("  [ok] cash_expenses + cash_counts created")
 
 
+async def run_pnl_adjustments_2026_07_02(conn) -> None:
+    """Manual per-month P&L figures never present in the bank CSV (cash holding,
+    rent paid in cash, cash expense). Powers the dynamic SOP-format P&L."""
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS pnl_monthly_adjustments (
+            id             SERIAL PRIMARY KEY,
+            month          DATE NOT NULL UNIQUE,
+            cash_holding   NUMERIC(12,2) NOT NULL DEFAULT 0,
+            rent_paid_cash NUMERIC(12,2) NOT NULL DEFAULT 0,
+            cash_expense   NUMERIC(12,2) NOT NULL DEFAULT 0,
+            notes          TEXT,
+            updated_by     VARCHAR(100),
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """))
+    print("  [ok] pnl_monthly_adjustments created")
+
+
 async def run_btxn_dedup_2026_05_12(conn: AsyncConnection) -> None:
     """
     One-time cleanup: deduplicate bank_transactions and fix the unique constraint.
@@ -1691,6 +1710,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_widen_checkout_phone_fields_2026_04_29(conn)
             await run_widen_changed_by_2026_04_29(conn)
             await run_cash_tables_2026_05_11(conn)
+            await run_pnl_adjustments_2026_07_02(conn)
             await run_upi_collection_table_2026_05_11(conn)
             await run_btxn_dedup_2026_05_12(conn)
             await run_add_checkout_session_other_comments_2026_05_16(conn)

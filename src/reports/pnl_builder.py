@@ -178,6 +178,80 @@ _CASH_INCOME_KEY  = "Cash (physical"
 _CASH_RENT_KEY    = "Property Rent — Cash paid"
 
 
+# ── Dynamic-month translation (DB → SOP-format line keys) ─────────────────────
+# When new months are appended from the DB, their values attach to these exact
+# verified line keys so they land in the same rows as the hardcoded history.
+_KEY_INCOME_THOR = "THOR — Bank Income (UPI + NEFT)"
+_KEY_INCOME_HULK = "HULK — Bank Income (UPI + cheque)"
+_KEY_INCOME_CASH = "Cash (physical — both buildings combined)"
+_KEY_RENT_CASH   = "Property Rent — Cash paid (Jan rent in Feb, Feb in Mar, Mar in Apr)"
+_KEY_CASH_EXP    = "Cash Expenses (paid in cash — manual entry)"
+_KEY_EXCL_REFUND = "Tenant Deposit Refund (balance sheet)"
+_KEY_EXCL_NONOP  = "Cash Exchange Repayments via Bank (non-op)"
+_KEY_DEP_SEC     = "Security Deposits — refundable (must return to active tenants)"
+_KEY_DEP_MAINT   = "  Maintenance Fee retained (non-refundable, by check-in month)"
+
+# bank_transactions.category → verified OPEX line key
+_DB_CAT_TO_OPEX_KEY = {
+    "Property Rent":         "Property Rent — Bank UPI/RTGS paid",
+    "Electricity":           "Electricity",
+    "Water":                 "Water (bank tankers + Manoj cash; Mar bill paid Apr)",
+    "IT & Software":         "IT & Software",
+    "Internet & WiFi":       "Internet & WiFi (cash — Jan Airwire UPI, Feb 8x Razorpay, Mar-Dec Rs.0)",
+    "Food & Groceries":      "Food & Groceries",
+    "Fuel & Diesel":         "Fuel & Diesel",
+    "Staff & Labour":        "Staff & Labour",
+    "Maintenance & Repairs": "Maintenance & Repairs",
+    "Cleaning Supplies":     "Cleaning Supplies",
+    "Waste Disposal":        "Waste Disposal (Pavan Rs.3.5K/mo)",
+    "Shopping & Supplies":   "Shopping & Supplies",
+    "Furniture & Fittings":  "Furniture & Supplies",
+    "Capital Investment":    "Furniture & Supplies",
+    "Marketing":             "Marketing",
+    "Govt & Regulatory":     "Govt & Regulatory (incl Police Rs.3K accrual Jan+)",
+    "Bank Charges":          "Bank Charges",
+    "Other Expenses":        "Other Expenses",
+}
+
+
+def _dynamic_line_values(d: dict):
+    """Translate one DB-month record into (income, opex, excluded) contributions
+    keyed by the verified SOP line names."""
+    income = {
+        _KEY_INCOME_THOR: d.get("income_thor", 0),
+        _KEY_INCOME_HULK: d.get("income_hulk", 0),
+        _KEY_INCOME_CASH: d.get("cash", 0),
+    }
+    opex: Dict[str, float] = {}
+    for cat, amt in (d.get("opex_by_cat") or {}).items():
+        key = _DB_CAT_TO_OPEX_KEY.get(cat, "Other Expenses")
+        opex[key] = opex.get(key, 0) + amt
+    if d.get("rent_paid_cash"):
+        opex[_KEY_RENT_CASH] = opex.get(_KEY_RENT_CASH, 0) + d["rent_paid_cash"]
+    if d.get("cash_expense"):
+        opex[_KEY_CASH_EXP] = opex.get(_KEY_CASH_EXP, 0) + d["cash_expense"]
+    excluded = {
+        _KEY_EXCL_REFUND: d.get("dep_refunded", 0),
+        _KEY_EXCL_NONOP:  d.get("non_op", 0),
+    }
+    return income, opex, excluded
+
+
+def _extend_dict(base: Dict[str, List[int]], per_month: List[dict]) -> Dict[str, List[int]]:
+    """Append one column per dynamic month to every verified line; add any
+    dynamic-only keys as new rows (verified months = 0)."""
+    n_verified = len(MONTHS)
+    out: Dict[str, List[int]] = {k: list(v) + [pm.get(k, 0) for pm in per_month] for k, v in base.items()}
+    extra: List[str] = []
+    for pm in per_month:
+        for k in pm:
+            if k not in base and k not in extra:
+                extra.append(k)
+    for k in extra:
+        out[k] = [0] * n_verified + [pm.get(k, 0) for pm in per_month]
+    return out
+
+
 # ── Shared P&L sheet writer ───────────────────────────────────────────────────
 
 def _write_pnl_tab(
@@ -185,13 +259,34 @@ def _write_pnl_tab(
     income_dict: Dict[str, List[int]],
     opex_dict: Dict[str, List[int]],
     tab_note: str = "",
+    *,
+    months: List[str] | None = None,
+    deposits: Dict[str, List[int]] | None = None,
+    excluded: Dict[str, List[int]] | None = None,
+    capital: Dict[str, List[int]] | None = None,
+    bank_thor_close: int | None = None,
+    bank_hulk_close: int | None = None,
+    cash_in_hand: Dict[str, int] | None = None,
+    sec_owed: int = 2315175,
+    snapshot_label: str = "Apr 30",
 ) -> None:
     """
     Render a complete P&L into *ws*.
 
     income_dict / opex_dict are the (possibly filtered) subsets of INCOME / OPEX.
     tab_note is shown in the top-left header cell when provided.
+
+    All month-varying inputs default to the verified module globals, so calling
+    with no keyword args reproduces the canonical Oct'25–May'26 report byte-for-byte.
+    Pass extended dicts + a longer `months` list to append dynamic (DB) months.
     """
+    months          = months          if months          is not None else MONTHS
+    deposits        = deposits         if deposits        is not None else DEPOSITS
+    excluded        = excluded         if excluded        is not None else EXCLUDED
+    capital         = capital          if capital         is not None else CAPITAL_CONTRIBUTIONS
+    bank_thor_close = bank_thor_close  if bank_thor_close is not None else BANK_CLOSING_BALANCE_THOR
+    bank_hulk_close = bank_hulk_close  if bank_hulk_close is not None else BANK_CLOSING_BALANCE_HULK
+    cash_in_hand    = cash_in_hand     if cash_in_hand    is not None else CASH_IN_HAND
     bold       = Font(bold=True)
     hdr_fill   = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     hdr_font   = Font(bold=True, color="FFFFFF")
@@ -199,7 +294,7 @@ def _write_pnl_tab(
     flag_fill  = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
     ctr        = Alignment(horizontal="center")
 
-    header = [tab_note or "", "Op"] + MONTHS + ["TOTAL"]
+    header = [tab_note or "", "Op"] + months + ["TOTAL"]
     ws.append(header)
     for c in ws[1]:
         c.fill = hdr_fill; c.font = hdr_font; c.alignment = ctr
@@ -216,7 +311,7 @@ def _write_pnl_tab(
             c.font = acct_font
 
     def _get(key):
-        return income_dict.get(key, [0] * len(MONTHS))
+        return income_dict.get(key, [0] * len(months))
 
     ws.append(["INCOME", ""])
     ws[ws.max_row][0].font = bold
@@ -254,12 +349,12 @@ def _write_pnl_tab(
     for c in ws[ws.max_row]:
         c.font = bold; c.fill = total_fill
 
-    sec_dep_collected   = DEPOSITS["Security Deposits — refundable (must return to active tenants)"]
-    maint_fee_collected = DEPOSITS["  Maintenance Fee retained (non-refundable, by check-in month)"]
+    sec_dep_collected   = deposits["Security Deposits — refundable (must return to active tenants)"]
+    maint_fee_collected = deposits["  Maintenance Fee retained (non-refundable, by check-in month)"]
     sec_dep_neg         = [-v for v in sec_dep_collected]
     # Each monthly column = deposits COLLECTED that month (a flow, not a stock).
     # TOTAL col = SUM of the monthly flows = total deposits collected/held over the period.
-    dep_refunded     = EXCLUDED["Tenant Deposit Refund (balance sheet)"]
+    dep_refunded     = excluded["Tenant Deposit Refund (balance sheet)"]
     dep_refunded_neg = [-v for v in dep_refunded]
     closing_sec_dep  = sum(sec_dep_neg)        # total refundable deposits collected
     closing_maint    = sum(maint_fee_collected)
@@ -290,9 +385,9 @@ def _write_pnl_tab(
     # ── 2. BORROWED MONEY / OWNER ADVANCES ────────────────────────────────────
     ws.append(["BORROWED MONEY — Owner loans & advances (to be repaid, not P&L)", ""])
     ws[ws.max_row][0].font = bold
-    for label, row in CAPITAL_CONTRIBUTIONS.items():
+    for label, row in capital.items():
         ws.append([label, "↑"] + row + [sum(row)])
-    borrowed_row = [sum(col) for col in zip(*CAPITAL_CONTRIBUTIONS.values())]
+    borrowed_row = [sum(col) for col in zip(*capital.values())]
     ws.append(["Total Borrowed Money (owners must be repaid this)", "="] + borrowed_row + [sum(borrowed_row)])
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="9C0006")
@@ -311,7 +406,7 @@ def _write_pnl_tab(
 
     ws.append(["EXCLUDED FROM OPEX (balance sheet items — not costs)", ""])
     ws[ws.max_row][0].font = Font(italic=True)
-    for label, row in EXCLUDED.items():
+    for label, row in excluded.items():
         ws.append(["  " + label, "(B/S)"] + row + [sum(row)])
 
     opex_row = [sum(col) for col in zip(*opex_dict.values())]
@@ -357,38 +452,42 @@ def _write_pnl_tab(
     # Pure refundable security deposits owed to active tenants
     # Combined total ₹33,83,875 included maintenance ₹10,68,700 — maintenance is non-refundable
     # True refundable liability = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
-    _sec_collected = 2315175
-    _bank_total    = BANK_CLOSING_BALANCE_THOR + BANK_CLOSING_BALANCE_HULK
-    _cash_total    = sum(CASH_IN_HAND.values())
+    _sec_collected = sec_owed
+    _bank_total    = bank_thor_close + bank_hulk_close
+    _cash_total    = sum(cash_in_hand.values())
 
-    ws.append(["BALANCE SHEET ITEMS (Apr 30)", ""])
+    # value lands one column before TOTAL (matches verified layout for 8 months)
+    def _bs_row(label, value):
+        ws.append([label] + [""] * (len(months) - 1) + [value])
+
+    ws.append([f"BALANCE SHEET ITEMS ({snapshot_label})", ""])
     ws[ws.max_row][0].font = bold
-    ws.append(["Bank closing balance THOR acct ...0961 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_THOR])
-    ws.append(["Bank closing balance HULK acct ...0881 (Apr 30)", "", "", "", "", "", "", "", BANK_CLOSING_BALANCE_HULK])
-    ws.append(["Total bank balance", "", "", "", "", "", "", "", _bank_total])
+    _bs_row(f"Bank closing balance THOR acct ...0961 ({snapshot_label})", bank_thor_close)
+    _bs_row(f"Bank closing balance HULK acct ...0881 ({snapshot_label})", bank_hulk_close)
+    _bs_row("Total bank balance", _bank_total)
     for c in ws[ws.max_row]:
         c.font = bold
     ws.append([])
     ws.append(["Cash in hand (physical)", ""])
     ws[ws.max_row][0].font = bold
-    for name, amt in CASH_IN_HAND.items():
-        ws.append(["  " + name, "", "", "", "", "", "", "", amt])
-    ws.append(["Total cash in hand", "", "", "", "", "", "", "", _cash_total])
+    for name, amt in cash_in_hand.items():
+        _bs_row("  " + name, amt)
+    _bs_row("Total cash in hand", _cash_total)
     for c in ws[ws.max_row]:
         c.font = bold
     ws.append([])
-    ws.append(["Net deposits still owed to active tenants (liability)", "", "", "", "", "", "", "", _sec_collected])
+    _bs_row("Net deposits still owed to active tenants (liability)", _sec_collected)
     for c in ws[ws.max_row]:
         c.font = Font(bold=True, color="9C0006")
     ws.append([])
-    ws.append(["True free cash (bank − deposits owed) — excl. cash in hand", "", "", "", "", "", "", "", _bank_total - _sec_collected])
+    _bs_row("True free cash (bank − deposits owed) — excl. cash in hand", _bank_total - _sec_collected)
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
-    ws.append(["True free cash incl. cash in hand", "", "", "", "", "", "", "", _bank_total + _cash_total - _sec_collected])
+    _bs_row("True free cash incl. cash in hand", _bank_total + _cash_total - _sec_collected)
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
-    ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)", "", "", "", "", "", "", "", ""])
-    ws.append(["As revenue grows, bank balance will recover and exceed deposit liability", "", "", "", "", "", "", "", ""])
+    ws.append(["NOTE: negative = deposit money was used to fund early operations (CAPEX+OPEX)"])
+    ws.append(["As revenue grows, bank balance will recover and exceed deposit liability"])
     ws.append([])
 
     # ── 8. FLAGS ───────────────────────────────────────────────────────────────
@@ -417,38 +516,85 @@ def _write_pnl_tab(
 
     ws.column_dimensions["A"].width = 62
     ws.column_dimensions["B"].width = 6
-    for col_letter in "CDEFGHIJ":
-        ws.column_dimensions[col_letter].width = 14
+    from openpyxl.utils import get_column_letter as _gcl
+    for _ci in range(3, 3 + len(months) + 1):  # month cols + TOTAL
+        ws.column_dimensions[_gcl(_ci)].width = 14
 
 
-def build_pnl_workbook() -> openpyxl.Workbook:
+def build_pnl_workbook(dynamic_data: List[dict] | None = None) -> openpyxl.Workbook:
     """
-    Return the canonical P&L workbook (Oct'25 – Apr'26).
+    Return the P&L workbook.
+
+    With no argument → the canonical verified report (Oct'25 – May'26), byte-identical
+    to before. With `dynamic_data` (a list of per-month DB records, oldest→newest) →
+    those months are appended as extra columns in the same SOP format, on top of the
+    verified history. Tabs 1 & 2 grow; the THOR reconciliation + rules tabs stay verified.
 
     Tabs:
       1. P&L — Full (incl Cash)   — all items including cash income + cash rent
       2. Bank — Digital Only       — same layout; cash income + cash rent excluded
-      3. Rules Applied             — methodology notes
+      3. THOR Bank Reconciliation
+      4. Rules Applied             — methodology notes
     """
     wb = openpyxl.Workbook()
+
+    # Build the (possibly extended) line dicts + snapshot kwargs for tabs 1 & 2.
+    if dynamic_data:
+        # sanity: every translation key must still exist in the verified dicts
+        for k in (_KEY_INCOME_THOR, _KEY_INCOME_HULK, _KEY_INCOME_CASH):
+            assert k in INCOME, f"income key drift: {k!r}"
+        assert _KEY_RENT_CASH in OPEX, "opex key drift (rent cash)"
+        for k in (_KEY_EXCL_REFUND, _KEY_EXCL_NONOP):
+            assert k in EXCLUDED, f"excluded key drift: {k!r}"
+        for k in (_KEY_DEP_SEC, _KEY_DEP_MAINT):
+            assert k in DEPOSITS, f"deposits key drift: {k!r}"
+
+        inc_pm, opex_pm, excl_pm = [], [], []
+        for d in dynamic_data:
+            i, o, e = _dynamic_line_values(d)
+            inc_pm.append(i); opex_pm.append(o); excl_pm.append(e)
+
+        months   = MONTHS + [d["label"] for d in dynamic_data]
+        income   = _extend_dict(INCOME, inc_pm)
+        opex     = _extend_dict(OPEX,   opex_pm)
+        excluded = _extend_dict(EXCLUDED, excl_pm)
+        capital  = {k: list(v) + [0] * len(dynamic_data) for k, v in CAPITAL_CONTRIBUTIONS.items()}
+        deposits = {
+            _KEY_DEP_SEC:   list(DEPOSITS[_KEY_DEP_SEC])   + [d.get("sec_dep", 0) for d in dynamic_data],
+            _KEY_DEP_MAINT: list(DEPOSITS[_KEY_DEP_MAINT]) + [d.get("maint", 0)   for d in dynamic_data],
+        }
+        last = dynamic_data[-1]
+        dyn_kwargs = dict(
+            months=months, deposits=deposits, excluded=excluded, capital=capital,
+            bank_thor_close=last.get("bank_thor_close", 0),
+            bank_hulk_close=last.get("bank_hulk_close", 0),
+            cash_in_hand={"Cash in hand (physical count)": last.get("cash_holding", 0)},
+            sec_owed=last.get("sec_owed_total", 0),
+            snapshot_label=last["label"],
+        )
+    else:
+        income, opex = INCOME, OPEX
+        dyn_kwargs = {}
 
     # ── Tab 1: Full P&L (canonical — all items) ────────────────────────────────
     ws_full = wb.active
     assert ws_full is not None
     ws_full.title = "P&L — Full (incl Cash)"
-    _write_pnl_tab(ws_full, INCOME, OPEX)
+    _write_pnl_tab(ws_full, income, opex, **dyn_kwargs)
 
     # ── Tab 2: Bank / Digital-only P&L ────────────────────────────────────────
     # Removes: cash income from tenants + cash rent paid to owners
     # Useful for: loan applications, bank-verified reporting, digital economy view
     ws_bank = wb.create_sheet("Bank — Digital Only")
-    income_bank = {k: v for k, v in INCOME.items() if _CASH_INCOME_KEY not in k}
-    opex_bank   = {k: v for k, v in OPEX.items()   if _CASH_RENT_KEY   not in k}
+    income_bank = {k: v for k, v in income.items() if _CASH_INCOME_KEY not in k}
+    opex_bank   = {k: v for k, v in opex.items()
+                   if _CASH_RENT_KEY not in k and "paid in cash" not in k}
     _write_pnl_tab(
         ws_bank,
         income_bank,
         opex_bank,
         tab_note="Bank / Digital Only — excl. cash income from tenants + cash rent paid to owners",
+        **dyn_kwargs,
     )
 
     # ── Tab 3: THOR Bank Reconciliation ───────────────────────────────────────
@@ -580,9 +726,11 @@ def build_pnl_workbook() -> openpyxl.Workbook:
     return wb
 
 
-def build_pnl_bytes() -> bytes:
-    """Return the P&L workbook as bytes (for streaming from FastAPI)."""
+def build_pnl_bytes(dynamic_data: List[dict] | None = None) -> bytes:
+    """Return the P&L workbook as bytes (for streaming from FastAPI).
+
+    Pass `dynamic_data` (per-month DB records) to append new months in SOP format."""
     buf = io.BytesIO()
-    build_pnl_workbook().save(buf)
+    build_pnl_workbook(dynamic_data).save(buf)
     buf.seek(0)
     return buf.read()

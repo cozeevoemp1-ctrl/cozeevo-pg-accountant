@@ -159,7 +159,8 @@ Kiran's Excel (offline)
 | `web/components/finance/cash-tab.tsx` | PWA Cash tab — monthly cash position: collected (auto), expenses (manual), count check card, 6-month history, add expense + log count sheets |
 | `tests/test_cash_logic.py` | Unit tests for cash balance and variance calculation logic |
 | `web/components/home/recent-checkins.tsx` | PWA home: recent check-ins section — 45-day window, paid/partial/unpaid, tap unpaid → payment deep-link |
-| `src/reports/pnl_builder.py` | Canonical P&L builder — hardcoded verified Oct'25–Apr'26 figures. Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. Update here when figures change. |
+| `src/reports/pnl_builder.py` | Canonical P&L builder — verified Oct'25–May'26 hardcoded (frozen). Parameterized: `build_pnl_workbook(dynamic_data)` appends any newer DB month as a column in the same SOP layout (no-arg = verified, byte-identical). Shared by `GET /finance/pnl/excel` + `scripts/export_pnl_2026_05_02.py`. |
+| `pnl_monthly_adjustments` + `web/components/finance/pnl-adjustments-card.tsx` | Manual per-month cash figures never in bank CSV (cash holding, rent paid in cash, cash expense) → feed the dynamic P&L. API `GET/POST /finance/pnl/adjustments`. `GET /finance/pnl/excel` = verified frozen months + every newer `bank_transactions` month computed live via `_compute_dynamic_pnl_months()` in `finance.py`. |
 | `src/services/blacklist.py` | Blacklist service — `check_blacklisted()` (fuzzy name + phone), add/list/remove. Shared by REST API + onboarding guard. |
 | `src/api/v2/blacklist.py` | Blacklist REST API — GET/POST/DELETE `/api/v2/app/blacklist`. Admin-only. |
 | `scripts/_import_may_payments.py` | One-off: imports May rent payments from source sheet cols Z/AA by phone match. Idempotent. |

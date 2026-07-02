@@ -7,6 +7,7 @@ import { InvestmentSection } from "@/components/finance/investment-section"
 import { ThreeStatementTab } from "@/components/finance/three-statement-tab"
 import { UploadCard } from "@/components/finance/upload-card"
 import { FinanceUploadResult, downloadPnlExcel } from "@/lib/api"
+import { PnlAdjustmentsCard } from "@/components/finance/pnl-adjustments-card"
 import { supabase } from "@/lib/supabase"
 
 export default function FinancePage() {
@@ -69,15 +70,18 @@ export default function FinancePage() {
           className="flex items-center justify-center gap-2 rounded-pill bg-[#0F0E0D] py-3 text-sm font-bold text-white disabled:opacity-50 active:opacity-80"
         >
           <span>📊</span>
-          <span>{pnlState === "loading" ? "Generating…" : "Generate P&L (Oct'25 → May'26)"}</span>
+          <span>{pnlState === "loading" ? "Generating…" : "Generate P&L (all uploaded months)"}</span>
         </button>
         {pnlState === "error" && (
           <p className="text-[10px] text-status-warn text-center">Could not generate — {pnlError || "try again"}</p>
         )}
         <p className="text-[10px] text-ink-muted text-center">
-          Full Excel: income, deposits, expenses, reconciliation — the verified accountant figures.
+          SOP-format Excel. Verified months stay frozen; every uploaded month after is
+          computed live from the bank statement + the cash figures below.
         </p>
       </div>
+
+      <PnlAdjustmentsCard />
 
       <ThreeStatementTab key={refreshKey} />
       <OccupancyTab />

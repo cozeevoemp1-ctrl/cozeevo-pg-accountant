@@ -26,10 +26,11 @@ from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
     BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
-    InvestmentExpense, Payment, PaymentFor, PaymentMode, Tenancy, Tenant, UpiCollectionEntry,
+    InvestmentExpense, Payment, PaymentFor, PaymentMode, PnlMonthlyAdjustment,
+    Tenancy, Tenant, UpiCollectionEntry,
 )
 from src.parsers.yes_bank import read_yes_bank_csv
-from src.reports.pnl_builder import build_pnl_bytes
+from src.reports.pnl_builder import MONTHS as PNL_VERIFIED_MONTHS, build_pnl_bytes
 from src.rules.pnl_classify import classify_txn
 from src.utils.inr_format import INR_NUMBER_FORMAT
 
@@ -152,6 +153,152 @@ async def _detect_tenant_refunds(session) -> int:
 def _validate_month(m: str, param: str = "month"):
     if not _re.fullmatch(r"\d{4}-\d{2}", m):
         raise HTTPException(status_code=400, detail=f"{param} must be YYYY-MM")
+
+
+# ── Dynamic SOP-format P&L: compute new months from the DB ─────────────────────
+
+_MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _ym_to_pnl_label(y: int, mo: int) -> str:
+    """(2026, 6) -> \"Jun'26\" — matches pnl_builder.MONTHS labels."""
+    return f"{_MONTH_ABBR[mo - 1]}'{str(y)[2:]}"
+
+
+def _pnl_label_to_ym(label: str) -> str:
+    """\"Jun'26\" -> \"2026-06\"."""
+    abbr, yy = label.split("'")
+    return f"20{yy}-{_MONTH_ABBR.index(abbr) + 1:02d}"
+
+
+# YYYY-MM strings already frozen as hardcoded verified columns — never recompute these
+_VERIFIED_YM = {_pnl_label_to_ym(m) for m in PNL_VERIFIED_MONTHS}
+
+# Expense categories that are NOT operating opex — handled on their own SOP lines
+_NON_OPEX_EXP_CATS = {"Tenant Deposit Refund", "Non-Operating"}
+
+
+async def _compute_dynamic_pnl_months(session) -> list[dict]:
+    """
+    Build one SOP-format record per month present in bank_transactions but NOT in the
+    frozen verified set. Everything derivable is pulled from the DB (classifier income,
+    OPEX by category, deposits, refunds, bank closing balance); the three cash figures
+    that never appear in a bank CSV come from pnl_monthly_adjustments.
+    Returns oldest -> newest.
+    """
+    month_rows = await session.execute(
+        select(func.to_char(BankTransaction.txn_date, "YYYY-MM")).distinct()
+    )
+    all_ym = sorted({r[0] for r in month_rows if r[0]})
+    target_ym = [ym for ym in all_ym if ym not in _VERIFIED_YM]
+    if not target_ym:
+        return []
+
+    # Manual adjustments keyed by YYYY-MM
+    adj_rows = (await session.scalars(select(PnlMonthlyAdjustment))).all()
+    adj_by_ym = {a.month.strftime("%Y-%m"): a for a in adj_rows}
+
+    # All-active refundable security deposits (snapshot liability — same for every month)
+    sec_owed_total = float(await session.scalar(
+        select(func.coalesce(func.sum(Tenancy.security_deposit), 0)).where(Tenancy.status == "active")
+    ) or 0)
+
+    out: list[dict] = []
+    for ym in target_ym:
+        y, mo = int(ym[:4]), int(ym[5:7])
+        start = date(y, mo, 1)
+        end = date(y, mo, _calendar.monthrange(y, mo)[1])
+        period_date = date(y, mo, 1)
+
+        # Income by account (exclude security-deposit inflows — those are a liability)
+        inc_rows = await session.execute(
+            select(BankTransaction.account_name, func.sum(BankTransaction.amount))
+            .where(
+                BankTransaction.txn_type == "income",
+                BankTransaction.txn_date.between(start, end),
+                BankTransaction.category != "Advance Deposit",
+            )
+            .group_by(BankTransaction.account_name)
+        )
+        inc_by_acct = {(r[0] or "THOR"): float(r[1] or 0) for r in inc_rows}
+
+        # Cash rent collected via app (physical, not deposited)
+        cash = float(await session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.payment_mode == PaymentMode.cash,
+                Payment.for_type == PaymentFor.rent,
+                Payment.is_void == False,
+                Payment.period_month == period_date,
+            )
+        ) or 0)
+
+        # Expenses by category
+        exp_rows = await session.execute(
+            select(BankTransaction.category, func.sum(BankTransaction.amount))
+            .where(
+                BankTransaction.txn_type == "expense",
+                BankTransaction.txn_date.between(start, end),
+            )
+            .group_by(BankTransaction.category)
+        )
+        opex_by_cat: dict[str, float] = {}
+        dep_refunded = 0.0
+        non_op = 0.0
+        for cat, amt in exp_rows:
+            amt = float(amt or 0)
+            if cat == "Tenant Deposit Refund":
+                dep_refunded += amt
+            elif cat == "Non-Operating":
+                non_op += amt
+            else:
+                opex_by_cat[cat] = opex_by_cat.get(cat, 0.0) + amt
+
+        # Deposits collected this month (active tenants, by check-in month)
+        dep_row = await session.execute(
+            select(
+                func.coalesce(func.sum(Tenancy.security_deposit), 0),
+                func.coalesce(func.sum(Tenancy.maintenance_fee), 0),
+            ).where(
+                func.extract("year", Tenancy.checkin_date) == y,
+                func.extract("month", Tenancy.checkin_date) == mo,
+                Tenancy.status == "active",
+            )
+        )
+        sec_dep_v, maint_v = dep_row.one()
+
+        # Bank closing balance = last transaction's running balance per account this month
+        async def _closing(acct: str) -> float:
+            row = await session.scalar(
+                select(BankTransaction.balance)
+                .where(
+                    BankTransaction.account_name == acct,
+                    BankTransaction.txn_date.between(start, end),
+                    BankTransaction.balance != None,
+                )
+                .order_by(BankTransaction.txn_date.desc(), BankTransaction.id.desc())
+                .limit(1)
+            )
+            return float(row) if row is not None else 0.0
+
+        adj = adj_by_ym.get(ym)
+        out.append({
+            "label": _ym_to_pnl_label(y, mo),
+            "income_thor": inc_by_acct.get("THOR", 0.0),
+            "income_hulk": inc_by_acct.get("HULK", 0.0),
+            "cash": cash,
+            "opex_by_cat": opex_by_cat,
+            "dep_refunded": dep_refunded,
+            "non_op": non_op,
+            "sec_dep": float(sec_dep_v or 0),
+            "maint": float(maint_v or 0),
+            "bank_thor_close": await _closing("THOR"),
+            "bank_hulk_close": await _closing("HULK"),
+            "sec_owed_total": sec_owed_total,
+            "rent_paid_cash": float(adj.rent_paid_cash) if adj else 0.0,
+            "cash_expense": float(adj.cash_expense) if adj else 0.0,
+            "cash_holding": float(adj.cash_holding) if adj else 0.0,
+        })
+    return out
 
 
 # ── Cash position ─────────────────────────────────────────────────────────────
@@ -646,15 +793,88 @@ _CAPEX_CATS = ["Furniture & Fittings", "Capital Investment"]
 
 @router.get("/finance/pnl/excel")
 async def download_pnl_excel(user: AppUser = Depends(get_current_user)):
-    """Verified canonical P&L (Oct'25–Apr'26) — same as local export script."""
+    """
+    SOP-format P&L Excel. Verified months (Oct'25–May'26) stay frozen/hardcoded;
+    every newer month present in bank_transactions is computed live from the DB
+    (classifier income/OPEX + deposits + bank balances) and merged with its manual
+    cash figures from pnl_monthly_adjustments, then appended in the same SOP layout.
+    """
     _require_admin(user)
-    buf = io.BytesIO(build_pnl_bytes())
-    filename = f"PnL_Cozeevo_Verified_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
+    async with get_session() as session:
+        dynamic = await _compute_dynamic_pnl_months(session)
+    buf = io.BytesIO(build_pnl_bytes(dynamic or None))
+    filename = f"PnL_Cozeevo_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/finance/pnl/adjustments")
+async def get_pnl_adjustments(
+    month: str = Query(..., description="YYYY-MM"),
+    user: AppUser = Depends(get_current_user),
+):
+    """Manual per-month cash figures (holding / rent paid in cash / cash expense)."""
+    _require_admin(user)
+    _validate_month(month)
+    mon = date(int(month[:4]), int(month[5:7]), 1)
+    async with get_session() as session:
+        row = await session.scalar(
+            select(PnlMonthlyAdjustment).where(PnlMonthlyAdjustment.month == mon)
+        )
+        is_verified = month in _VERIFIED_YM
+    return {
+        "month": month,
+        "is_verified_frozen": is_verified,
+        "cash_holding":   float(row.cash_holding)   if row else 0.0,
+        "rent_paid_cash": float(row.rent_paid_cash) if row else 0.0,
+        "cash_expense":   float(row.cash_expense)   if row else 0.0,
+        "notes":          row.notes if row else None,
+    }
+
+
+@router.post("/finance/pnl/adjustments")
+async def save_pnl_adjustments(
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    """Upsert the three manual cash figures for a month (used by the dynamic P&L)."""
+    _require_admin(user)
+    month = str(body.get("month", ""))
+    _validate_month(month)
+    if month in _VERIFIED_YM:
+        raise HTTPException(status_code=400, detail=f"{month} is a frozen verified month — figures are hardcoded")
+    mon = date(int(month[:4]), int(month[5:7]), 1)
+
+    def _num(k: str) -> float:
+        try:
+            v = float(body.get(k, 0) or 0)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail=f"{k} must be a number")
+        if v < 0:
+            raise HTTPException(status_code=400, detail=f"{k} must be >= 0")
+        return v
+
+    vals = {
+        "cash_holding":   _num("cash_holding"),
+        "rent_paid_cash": _num("rent_paid_cash"),
+        "cash_expense":   _num("cash_expense"),
+        "notes":          (str(body["notes"]).strip() if body.get("notes") else None),
+        "updated_by":     user.phone,
+    }
+    async with get_session() as session:
+        row = await session.scalar(
+            select(PnlMonthlyAdjustment).where(PnlMonthlyAdjustment.month == mon)
+        )
+        if row:
+            for k, v in vals.items():
+                setattr(row, k, v)
+        else:
+            session.add(PnlMonthlyAdjustment(month=mon, **vals))
+        await session.commit()
+    return {"ok": True, "month": month, **{k: vals[k] for k in ("cash_holding", "rent_paid_cash", "cash_expense")}}
 
 
 @router.get("/finance/pnl/live")

@@ -799,12 +799,36 @@ async function _downloadExcel(path: string, filename: string): Promise<void> {
   URL.revokeObjectURL(a.href);
 }
 
-/** Verified canonical P&L — Oct'25–Apr'26, manually verified figures */
+/** SOP-format P&L — verified months frozen + every newer uploaded month computed live */
 export function downloadPnlExcel(): Promise<void> {
   return _downloadExcel(
     "/api/v2/app/finance/pnl/excel",
-    `PnL_Verified_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    `PnL_Cozeevo_${new Date().toISOString().slice(0, 10)}.xlsx`,
   );
+}
+
+export interface PnlAdjustments {
+  month: string;
+  is_verified_frozen: boolean;
+  cash_holding: number;
+  rent_paid_cash: number;
+  cash_expense: number;
+  notes: string | null;
+}
+
+/** Manual per-month cash figures that never appear in the bank CSV. */
+export function getPnlAdjustments(month: string): Promise<PnlAdjustments> {
+  return _get<PnlAdjustments>(`/api/v2/app/finance/pnl/adjustments?month=${month}`);
+}
+
+export function savePnlAdjustments(body: {
+  month: string;
+  cash_holding: number;
+  rent_paid_cash: number;
+  cash_expense: number;
+  notes?: string;
+}): Promise<{ ok: boolean; month: string }> {
+  return _post(`/api/v2/app/finance/pnl/adjustments`, body);
 }
 
 /** Live P&L recomputed from DB — reflects latest uploads (HULK, new months) */

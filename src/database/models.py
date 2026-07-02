@@ -1497,6 +1497,28 @@ class CashCount(Base):
     created_at  = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class PnlMonthlyAdjustment(Base):
+    """
+    Manual P&L figures that are NEVER in the bank CSV — entered per month via the
+    Finance page so the dynamic SOP-format P&L can reach verified accuracy.
+    See memory/sop_pnl.md Step 11-G. One row per month (unique on `month`).
+      - cash_holding   : physical cash in hand at month close (balance-sheet line)
+      - rent_paid_cash : property rent paid to landlords in cash (OPEX line)
+      - cash_expense   : other operating expenses paid in cash (OPEX line)
+    """
+    __tablename__ = "pnl_monthly_adjustments"
+
+    id             = Column(Integer, primary_key=True)
+    month          = Column(Date, nullable=False, unique=True)  # 1st of month
+    cash_holding   = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)
+    rent_paid_cash = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)
+    cash_expense   = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)
+    notes          = Column(Text, nullable=True)
+    updated_by     = Column(String(100), nullable=True)
+    created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
 class OperationalLogCategory(str, enum.Enum):
     power_outage        = "power_outage"
     hp_gas              = "hp_gas"

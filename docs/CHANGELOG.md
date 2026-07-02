@@ -1,5 +1,17 @@
 # Changelog
 
+## Session O — 2026-07-02 — Dynamic SOP-format P&L (any future month) + Occupied day-wise filter
+
+### Summary
+- 🚀 **"Generate P&L" is now dynamic for every future month** — no longer hardcoded to Oct'25→May'26. Verified months stay frozen/hardcoded (byte-identical output — regression-checked: NET OP ₹14.97L, ADJ ₹11.17L unchanged); every newer month present in `bank_transactions` is computed **live from the DB** (classifier income THOR/HULK, OPEX by category, deposit refunds, security deposits, bank closing = last txn running balance) and **appended as a new column in the same SOP layout**. Upload dedup (`unique_hash`) already skips re-uploaded past lines, so re-uploading overlapping statements is safe.
+  - `pnl_builder.py` parameterized: `_write_pnl_tab` + `build_pnl_workbook(dynamic_data=None)` + `build_pnl_bytes(dynamic_data=None)`. No-arg call = canonical verified report unchanged. DB→SOP key maps (`_DB_CAT_TO_OPEX_KEY`, income/excluded/deposit keys) co-located with the dicts; F&F+Capital Investment merge to "Furniture & Supplies"; unmapped categories fold to "Other Expenses".
+  - `finance.py`: `_compute_dynamic_pnl_months()` builds one SOP record per non-verified month from the DB; `GET /finance/pnl/excel` now serves verified + dynamic; new `GET/POST /finance/pnl/adjustments` for the manual cash figures. Frozen verified months reject writes (400).
+- 📝 **Manual cash form (Finance page)** — the 3 figures never in a bank CSV: **cash holding** (balance-sheet), **rent paid in cash** (OPEX), **cash expense** (OPEX). New `pnl_monthly_adjustments` table (unique on month) + `PnlAdjustmentsCard` component + `getPnlAdjustments`/`savePnlAdjustments` API. Verified months shown as locked.
+- ✅ Verified end-to-end against live DB (fake June injected + rolled back → Jun'26 column renders correctly): builder unchanged, dynamic append, `_compute_dynamic_pnl_months`, HTTP handlers (download xlsx 20,901 B, adjustments round-trip, frozen 400, admin 403), app routes registered, PWA production build.
+- ✅ **Occupied beds panel** now has the All/Regular/Day-wise stay filter (was only on check-ins/check-outs) — `kpi-grid.tsx`.
+- ⚠️ Today only Oct'25–May'26 exist in DB (all frozen) → Generate gives verified-only until a June+ bank statement is uploaded, then the column appears automatically.
+- Migration `run_pnl_adjustments_2026_07_02` (append-only) — run on DB.
+
 ## Session N — 2026-06-28 — Duplicate-booking prevention (DB constraint) + stay history + day-wise display
 
 ### Summary
