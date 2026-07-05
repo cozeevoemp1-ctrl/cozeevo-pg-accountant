@@ -26,7 +26,7 @@ from src.database.models import (
     TenancyStatus,
     Tenant,
 )
-from services.room_transfer import execute_room_transfer
+from services.room_transfer import execute_room_transfer, resolve_sharing_on_room_change
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -744,11 +744,28 @@ async def update_tenant(
                 tenancy.room_id = new_room.id
                 _from_room = room.room_number
                 room = new_room
-                # Sync sharing_type to match new room's type
-                try:
-                    tenancy.sharing_type = SharingType(new_room.room_type.value)
-                except (ValueError, AttributeError):
-                    pass
+                # Re-derive sharing_type via the shared helper — preserves an explicit
+                # premium (whole-room) tenancy instead of silently downgrading it to the
+                # room's physical type. Single source of truth: resolve_sharing_on_room_change.
+                _old_sharing = tenancy.sharing_type.value if tenancy.sharing_type else None
+                _resolved_sharing, _sharing_changed = resolve_sharing_on_room_change(
+                    tenancy.sharing_type, new_room.room_type
+                )
+                if _sharing_changed:
+                    tenancy.sharing_type = _resolved_sharing
+                    session.add(AuditLog(
+                        changed_by=user.actor,
+                        entity_type="tenancy",
+                        entity_id=tenancy_id,
+                        entity_name=tenant.name,
+                        field="sharing_type",
+                        old_value=_old_sharing,
+                        new_value=_resolved_sharing.value if _resolved_sharing else None,
+                        room_number=new_rn,
+                        source="pwa",
+                        note=f"Re-derived from room type on room change {_from_room} → {new_rn}",
+                        org_id=tenancy.org_id,
+                    ))
 
                 session.add(AuditLog(
                     changed_by=user.actor,

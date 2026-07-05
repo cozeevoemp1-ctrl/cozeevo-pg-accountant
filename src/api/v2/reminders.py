@@ -140,6 +140,9 @@ async def send_reminders(
     body: dict,
     user: AppUser = Depends(get_current_user),
 ):
+    # PERMANENTLY DISABLED — no reminder messages are ever sent (tenant or staff).
+    raise HTTPException(status_code=410, detail="Reminders are permanently disabled — no messages are sent.")
+
     if user.role not in ("admin", "staff", "power_user", "key_user"):
         raise HTTPException(status_code=403, detail="Only staff can send reminders")
 
@@ -198,6 +201,9 @@ async def trigger_prep_reminder(
     Admin-only. Useful for testing when the scheduled fire didn't arrive.
     Body: {"when": "today"} or {"when": "tomorrow"}
     """
+    # PERMANENTLY DISABLED — no reminder messages are ever sent.
+    raise HTTPException(status_code=410, detail="Reminders are permanently disabled — no messages are sent.")
+
     if user.role not in ("admin", "owner"):
         raise HTTPException(status_code=403, detail="Admin only")
 

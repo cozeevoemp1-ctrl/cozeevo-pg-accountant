@@ -15,10 +15,38 @@ from src.database.models import (
     Room,
     RentRevision,
     RentSchedule,
+    SharingType,
     Tenancy,
     Tenant,
 )
 from src.services.room_occupancy import get_room_occupants
+
+
+def resolve_sharing_on_room_change(current_sharing, new_room_type):
+    """Single source of truth for what a tenancy's sharing_type becomes on a room move.
+
+    Re-derives sharing_type from the destination room's physical type (e.g. a
+    triple-room tenant moving into a double becomes "double") — but NEVER clobbers
+    an explicit *premium* (whole-room) tenancy. Premium is a tenancy-level choice
+    that no room's room_type can ever produce, so a blind "sync to room type"
+    silently downgraded whole-room tenants to "double" on every room change,
+    causing a phantom free bed and the wrong rent bucket.
+
+    Args:
+        current_sharing: the tenancy's current SharingType (enum) or None
+        new_room_type:   the destination Room.room_type (enum) or its .value string
+
+    Returns:
+        (new_sharing: SharingType | None, changed: bool)
+    """
+    if current_sharing == SharingType.premium:
+        return current_sharing, False
+    raw = getattr(new_room_type, "value", new_room_type)
+    try:
+        new_sharing = SharingType(raw)
+    except (ValueError, AttributeError):
+        return current_sharing, False
+    return new_sharing, new_sharing != current_sharing
 
 
 async def execute_room_transfer(

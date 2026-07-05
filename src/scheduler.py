@@ -146,61 +146,28 @@ def start_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    scheduler.add_job(
-        _checkout_deposit_alerts,
-        trigger=CronTrigger(hour=9, minute=0),   # every day at 9am IST
-        id="checkout_deposit_alerts",
-        name="Checkout Deposit Alerts — 9am daily",
-        replace_existing=True,
-    )
-
-    # Rollover on second-last calendar day of every month at 23:00 IST.
-    # Job self-checks (handles 28/29/30/31-day months + leap years automatically).
+    # Monthly rollover — 1st of every month at 00:00 IST.
+    # Generates the current month's RentSchedule rows + sheet tab at month start.
+    # misfire_grace_time is wide so a server that was down at midnight still runs
+    # the rollover once it comes back up within the day (never skip a month).
     scheduler.add_job(
         _monthly_tab_rollover,
-        trigger=CronTrigger(hour=23, minute=0),  # daily 11pm; self-checks day
+        trigger=CronTrigger(day=1, hour=0, minute=0),  # 1st of month, 12:00 AM IST
         id="monthly_tab_rollover",
-        name="Monthly Rollover — 2nd-to-last calendar day, 11pm IST",
+        name="Monthly Rollover — 1st of month, 12:00 AM IST",
         replace_existing=True,
+        misfire_grace_time=43200,  # 12h catch-up window if server was down at midnight
     )
 
+    # Prep reminders and checkout-deposit alerts are PERMANENTLY DISABLED.
+    # No automated reminder messages of any kind are sent (to tenants OR staff).
+    # Their persisted jobs are purged from the DB job store on startup below.
 
-    # Prep reminders — TWO separate messages at 08:00 IST daily.
-    # Each message is only sent if its target day actually has movements;
-    # nothing scheduled → nothing sent (no empty "no movements" noise).
-    # Recipients: every admin / owner / receptionist in authorized_users
-    # (includes Lokesh 7680814628).
-    # 9am → TODAY (morning briefing of what's happening today).
-    # 2pm → TOMORROW (afternoon heads-up so reception can prep for next day).
-    scheduler.add_job(
-        _prep_reminder,
-        trigger=CronTrigger(hour=9, minute=0, timezone="Asia/Kolkata"),
-        id="prep_reminder_today",
-        name="Prep Reminder — today's checkins/outs (9am IST)",
-        replace_existing=True,
-        kwargs={"when": "today"},
-    )
-    scheduler.add_job(
-        _prep_reminder,
-        trigger=CronTrigger(hour=14, minute=0, timezone="Asia/Kolkata"),
-        id="prep_reminder_tomorrow",
-        name="Prep Reminder — tomorrow's checkins/outs (2pm IST)",
-        replace_existing=True,
-        kwargs={"when": "tomorrow"},
-    )
-
-    # Nightly sheet↔DB drift audit — 23:30 IST. Alerts admin on WhatsApp when
-    # TENANTS / current-monthly-tab values diverge from DB (manual sheet edits).
-    scheduler.add_job(
-        _nightly_sheet_audit,
-        trigger=CronTrigger(hour=23, minute=30, timezone="Asia/Kolkata"),
-        id="nightly_sheet_audit",
-        name="Nightly Sheet Audit — DB↔Sheet drift check (11:30pm IST)",
-        replace_existing=True,
-    )
+    # Nightly sheet↔DB drift audit is DISABLED — it only surfaced drift via an
+    # admin WhatsApp alert, and all outbound messaging is switched off.
 
     scheduler.start()
-    logger.info("[Scheduler] Started — tenant reminder jobs permanently disabled")
+    logger.info("[Scheduler] Started — all reminder jobs permanently disabled")
 
     # Remove any stale tenant reminder jobs that may be persisted in the DB job store.
     # Must run AFTER start() so the jobstore is connected.
@@ -208,6 +175,9 @@ def start_scheduler() -> AsyncIOScheduler:
         "rent_reminder_advance", "rent_reminder_early", "rent_reminder_late",
         "rent_reminder_day1",    "rent_reminder_day2",  "rent_reminder_day3",
         "rent_reminder_day4",    "rent_reminder_day5",
+        # Prep reminders + checkout-deposit alerts + sheet audit — permanently removed.
+        "prep_reminder_today",   "prep_reminder_tomorrow",
+        "checkout_deposit_alerts", "nightly_sheet_audit",
     ]
     for _stale_id in _STALE_REMINDER_IDS:
         try:
@@ -634,8 +604,8 @@ async def _daily_reconciliation() -> None:
         f"  {pay_count} transactions — ₹{pay_total:,.0f}"
     )
 
-    if _ADMIN_PHONE:
-        await _send_whatsapp(_ADMIN_PHONE, report)
+    # Outbound messaging disabled — reconciliation summary goes to the log only.
+    logger.info("[Scheduler] daily_reconciliation report:\n%s", report)
     logger.info(f"[Scheduler] daily_reconciliation done — gap ₹{gap or 0:,.0f}")
 
 
@@ -685,18 +655,9 @@ async def _weekly_backup() -> None:
     # Prune backups older than 8 weeks (keep last 8 Sunday snapshots)
     _prune_old_backups(max_keep=8)
 
-    logger.info(f"[Scheduler] weekly_backup complete — {total_rows} rows across {len(TABLES)} tables")
-
-    # Notify admin
-    if _ADMIN_PHONE:
-        from src.whatsapp.webhook_handler import _send_whatsapp
-        await _send_whatsapp(
-            _ADMIN_PHONE,
-            f"✅ *Weekly Backup Complete — {today}*\n"
-            f"Tables: {', '.join(TABLES)}\n"
-            f"Total rows exported: {total_rows}\n"
-            f"Location: data/backups/{today}/"
-        )
+    # Outbound messaging disabled — completion goes to the log only.
+    logger.info(f"[Scheduler] weekly_backup complete — {total_rows} rows across {len(TABLES)} tables "
+                f"→ data/backups/{today}/")
 
 
 def _serialize(val) -> object:
@@ -724,35 +685,31 @@ def _prune_old_backups(max_keep: int = 8) -> None:
 # ── Job: Monthly Sheet Tab Rollover ───────────────────────────────────────────
 
 async def _monthly_tab_rollover() -> None:
-    """Atomic monthly rollover — fires daily at 23:00 IST, self-checks whether
-    today is the second-last calendar day of the month. If yes:
+    """Atomic monthly rollover — fires on the 1st of every month at 00:00 IST.
+    Generates the month that has just started (the CURRENT month):
       1. Pull source sheet → DB
-      2. Generate RentSchedule rows for NEXT month (active + no-show only,
+      2. Generate RentSchedule rows for the current month (active + no-show only,
          exited/cancelled skipped; first-month prorate applied)
-      3. Create NEXT month's tab in Operations sheet
+      3. Create the current month's tab in Operations sheet
       4. Reconcile sheet ↔ DB
-    Handles 28/29/30/31-day months + Feb leap years automatically via
-    calendar.monthrange (Python stdlib).
+    Running at month-start (rather than the day before) means a tenant exited on
+    the prior month's last day is already `exited` and is correctly skipped.
     """
     import asyncio
-    import calendar
     import subprocess
     import sys
     import os
     from datetime import date
 
     today = date.today()
-    last_day = calendar.monthrange(today.year, today.month)[1]
-    if today.day != last_day - 1:
-        # Not the second-last day — skip silently. Daily fire is intentional.
+    if today.day != 1:
+        # Safety guard — cron already restricts to day 1; skip silently otherwise.
         return
 
     MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY",
               "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
-    if today.month == 12:
-        next_year, next_month_num = today.year + 1, 1
-    else:
-        next_year, next_month_num = today.year, today.month + 1
+    # Target is the month that just started — the current month.
+    next_year, next_month_num = today.year, today.month
     next_month_name = MONTHS[next_month_num - 1]
 
     logger.info("[Scheduler] Monthly rollover fire — target %s %d",
@@ -769,27 +726,16 @@ async def _monthly_tab_rollover() -> None:
             capture_output=True, text=True, timeout=900,
         )
         if result.returncode != 0:
-            logger.error("[Scheduler] Monthly rollover failed (rc=%s): %s",
-                         result.returncode, (result.stderr or result.stdout)[-600:])
-            if _ADMIN_PHONE:
-                from src.whatsapp.webhook_handler import _send_whatsapp
-                await _send_whatsapp(
-                    _ADMIN_PHONE,
-                    f"⚠️ Monthly rollover FAILED for {next_month_name} {next_year}.\n"
-                    f"Check server logs. Run manually:\n"
-                    f"python scripts/run_monthly_rollover.py {next_month_name} {next_year}"
-                )
+            # No WhatsApp notification — all outbound messaging is disabled.
+            # Failures are surfaced in the server log only.
+            logger.error("[Scheduler] Monthly rollover FAILED (rc=%s) for %s %d — run manually: "
+                         "python scripts/run_monthly_rollover.py %s %d\n%s",
+                         result.returncode, next_month_name, next_year,
+                         next_month_name, next_year, (result.stderr or result.stdout)[-600:])
             return
 
-        logger.info("[Scheduler] Monthly rollover done: %s %d",
+        logger.info("[Scheduler] Monthly rollover done: %s %d — tab + RentSchedule rows generated",
                     next_month_name, next_year)
-        if _ADMIN_PHONE:
-            from src.whatsapp.webhook_handler import _send_whatsapp
-            await _send_whatsapp(
-                _ADMIN_PHONE,
-                f"✅ Monthly rollover complete — {next_month_name} {next_year}\n"
-                f"Sheet tab created, RentSchedule rows generated, dashboard refreshed."
-            )
     except Exception as e:
         logger.error("[Scheduler] Monthly rollover exception: %s", e)
 

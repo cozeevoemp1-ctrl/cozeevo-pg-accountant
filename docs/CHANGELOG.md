@@ -1,5 +1,15 @@
 # Changelog
 
+## Session P — 2026-07-05 — Premium clobber-on-room-change fix + rollover moved to 1st + all reminders killed
+
+### Summary
+- 🐛 **Premium (whole-room) tenants silently downgraded to "double" on every room change.** Root cause: PWA Edit-Tenant `PATCH /tenancies/{id}` ran `tenancy.sharing_type = SharingType(new_room.room_type.value)` on room reassignment ([tenants.py](../src/api/v2/tenants.py)). Since no room is ever `room_type=premium`, this could only produce single/double/triple — wiping premium, with **no audit entry**. That's why it "kept repeating": every manual premium fix was re-clobbered by the next room move. The shared `execute_room_transfer()` (bot + transfer-room endpoint) was already clean.
+  - **Fix:** extracted `resolve_sharing_on_room_change(current_sharing, new_room_type)` into `services/room_transfer.py` (single source of truth) — preserves premium, only re-derives for non-premium (e.g. triple→double), and audits the change. `tenants.py` now uses it. 7 regression tests in `tests/test_sharing_on_room_change.py` (all pass).
+  - **Data repair:** restored `premium` on 3 clobbered tenants (audited): Nitya Dangarh/503, Chandra Sagar/604, Tanya Rishikesh/311 (all single-occupant whole-room ₹26–28k). Final scan: 0 victims remaining.
+- 🗓️ **Monthly rent generation moved from the 2nd-last day (23:00) to the 1st of the month (00:00 IST).** `_monthly_tab_rollover` now targets the current month (the one that just started) with a 12h misfire catch-up. A tenant properly exited on the prior month's last day is now already `exited` before generation runs → no phantom next-month rent. (Krish Kumar/512 got a full July ₹25k on 29 Jun because it pre-generated while he was still active with a 30 Jun flagged checkout; the skip rule was left as-is per Kiran.)
+- 🔕 **All automated outbound messaging switched off.** Removed/disabled: prep reminders (today/tomorrow), checkout-deposit alerts, nightly sheet-drift audit — job registrations removed AND added to the startup DB-jobstore purge list. Stripped admin WhatsApp notifications from rollover (success/failure), daily reconciliation, and weekly backup (now log-only). Manual PWA reminder endpoints (`POST /reminders/send`, `/reminders/trigger-prep`) hard-disabled (410). Only 3 scheduler jobs remain — reconciliation, backup, rollover — none send messages.
+- ⚠️ **Needs VPS restart** to take effect (and to purge the persisted reminder jobs from the DB job store).
+
 ## Session O — 2026-07-02 — Dynamic SOP-format P&L (any future month) + Occupied day-wise filter
 
 ### Summary
