@@ -17,6 +17,12 @@ import pytest
 # The service we're testing — imported lazily inside each test so the module
 # is fresh each run (avoids circular-import issues at collection time).
 
+# Use the current (never-frozen) month so these tests don't rot: log_payment
+# rejects past/frozen months, so a hardcoded month fails once it rolls into the
+# past. _OPEN is always the current open period.
+_OPEN = date.today().replace(day=1)
+_OPEN_STR = _OPEN.strftime("%Y-%m")
+
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +89,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -111,7 +117,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -125,7 +131,7 @@ class TestLogPayment:
         assert p.payment_mode == PaymentMode.upi
         assert p.for_type == PaymentFor.rent
         assert p.is_void == False
-        assert p.period_month == date(2026, 6, 1)
+        assert p.period_month == _OPEN
 
     @pytest.mark.asyncio
     async def test_audit_log_row_created(self):
@@ -142,7 +148,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -169,7 +175,7 @@ class TestLogPayment:
             amount=8000,
             method="cash",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -190,7 +196,7 @@ class TestLogPayment:
             amount=5000,
             method="cash",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -220,7 +226,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -240,7 +246,7 @@ class TestLogPayment:
             amount=8000,
             method="cash",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -262,7 +268,7 @@ class TestLogPayment:
             amount=5000,
             method="cash",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
@@ -307,7 +313,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
             room_number="101",
@@ -335,7 +341,7 @@ class TestLogPayment:
             amount=8000,
             method="UPI",
             for_type="rent",
-            period_month="2026-06",
+            period_month=_OPEN_STR,
             recorded_by="kiran@cozeevo",
             session=session,
         )
