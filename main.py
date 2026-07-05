@@ -95,23 +95,14 @@ async def lifespan(app: FastAPI):
     await init_agent(test_mode=_test_mode)
     logger.info("✓ Agent graph initialized")
 
-    # Auto-flip no_show → active for tenancies whose checkin_date has arrived
-    try:
-        from src.database.db_manager import get_session
-        from src.database.models import Tenancy, TenancyStatus
-        from sqlalchemy import select, update
-        from datetime import date
-        async with get_session() as s:
-            result = await s.execute(
-                update(Tenancy)
-                .where(Tenancy.status == TenancyStatus.no_show, Tenancy.checkin_date <= date.today())
-                .values(status=TenancyStatus.active)
-            )
-            if result.rowcount:
-                await s.commit()
-                logger.info("Auto-flipped %d no_show tenancies to active", result.rowcount)
-    except Exception as e:
-        logger.warning("No-show auto-flip failed: %s", e)
+    # NOTE: The startup "auto-flip no_show → active" hook was REMOVED 2026-07-05.
+    # It bulk-activated every booking whose checkin_date had passed on every server
+    # restart — with no onboarding form, no admin approval, and no audit log. It was
+    # the real root cause of the recurring "auto-checkin" bug (mis-diagnosed as deploy
+    # lag): every deploy restarts the app, so the hook re-flipped bookings each time.
+    # A no_show booking now becomes active ONLY via an explicit, form-gated approval
+    # (onboarding_router approve requires status=pending_review) or a deliberate staff
+    # check-in action. Do NOT reintroduce a date-based auto-activation here.
 
     # Retry any failed Sheet writes from previous session
     try:

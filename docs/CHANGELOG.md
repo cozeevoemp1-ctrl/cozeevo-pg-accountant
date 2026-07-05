@@ -1,5 +1,14 @@
 # Changelog
 
+## Session Q — 2026-07-05 — ROOT CAUSE of recurring auto-checkin found + killed (main.py startup hook)
+
+### Summary
+- 🔴 **Root cause of the long-recurring "auto-checkin without a form" bug — found and removed.** A startup hook in [main.py](../main.py) (~line 98) ran, on **every app start**, one bulk statement: `UPDATE tenancies SET status=active WHERE status=no_show AND checkin_date<=today` — no onboarding form, no admin approval, no audit log. `bb4bbab` (13 Jun) only removed the date-based flip from `bookings.py`; this hook was never touched. That's why it "recurred after every deploy" — **every deploy restarts the app, re-running the hook.** The prior "deploy-lag / stale VPS commit" diagnosis was wrong. **Fix: hook deleted** (single-UPDATE culprit; Depthi/210 + K.Ramesh/320 flipped in the same txn at `09:00:15.726547` after a ~09:00 restart today).
+- 🔁 **Data repair — 5 erroneously auto-activated tenants reverted to `no_show`** (form never filled: `pending_tenant`, no signature): Depthi/210 (t1246), Shreyas Shetty/416 (t1253), K.Ramesh Chandra/320 (t1275), Aryan Sharma/208 (t1247), Swadesh Yadav/221 (t1271). Advances retained, RS rows already `na`, each change `audit_log`ged.
+- 🔎 **Full audit of every `status=active` path.** Only `main.py` was automatic. Approve is form-gated (`onboarding_router` requires `pending_review`); `bookings.py` always creates `no_show`. Remaining active-setters are deliberate staff actions: PWA check-in (`checkin.py:291`, blocks if a pending form-session exists), bot add_tenant (`owner_handler.py:6068`, still active-by-date, no form), bot assign-room (`:2639`), bot door check-in (`resolvers/onboarding.py:275`).
+- ⚠️ **Needs commit + DEPLOY** — until the main.py fix is live, the next restart on old code re-flips the 5 reverted `no_show`s back to active.
+- 🟠 **Open (Kiran's call):** whether to also lock down bot `add_tenant` (`owner_handler.py:6068`) so it never sets active without a form. Group B (10 tenants who DID fill+sign but were auto-activated without formal approval) left active — cleanup = run proper approve to generate their agreement PDFs.
+
 ## Session P — 2026-07-05 — Premium clobber-on-room-change fix + rollover moved to 1st + all reminders killed
 
 ### Summary
