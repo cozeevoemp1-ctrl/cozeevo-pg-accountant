@@ -1651,25 +1651,62 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     _dw_sharing = _ST(obs.sharing_type)
                 except ValueError:
                     pass
-            tenancy = Tenancy(
-                tenant_id=tenant.id,
-                room_id=room.id if room else None,
-                stay_type=StayType.daily,
-                status=TenancyStatus.active,
-                checkin_date=checkin,
-                checkout_date=checkout,
-                expected_checkout=checkout,
-                agreed_rent=obs.daily_rate or (obs.agreed_rent / num_days if num_days else obs.agreed_rent) or 0,  # per-day rate; fallback: total/days
-                booking_amount=obs.booking_amount or 0,
-                maintenance_fee=obs.maintenance_fee or 0,
-                notes=obs.special_terms or "",
-                sharing_type=_dw_sharing,
-                entered_by="onboarding_form",
-            )
-            session.add(tenancy)
+            _daily_rate = obs.daily_rate or (obs.agreed_rent / num_days if num_days else obs.agreed_rent) or 0  # per-day rate; fallback: total/days
+
+            # Reuse the pre-booked tenancy if one exists (its advance is already
+            # recorded on it); only INSERT when there's no prior tenancy. Blindly
+            # inserting a second row for the same tenant+room+dates collides with the
+            # no_overlap_active_tenancy exclusion constraint — the "Approve failed:
+            # ExclusionViolationError" crash on day-stay check-in. Mirrors the monthly path.
+            _pre_tenancy = None
+            if obs.tenancy_id:
+                _pre_tenancy = await session.get(Tenancy, obs.tenancy_id)
+            if _pre_tenancy is None and tenant and room:
+                _pre_tenancy = await session.scalar(
+                    select(Tenancy).where(
+                        Tenancy.tenant_id == tenant.id,
+                        Tenancy.room_id == room.id,
+                        Tenancy.status == TenancyStatus.no_show,
+                    )
+                )
+            if _pre_tenancy and _pre_tenancy.status in (TenancyStatus.no_show, TenancyStatus.active):
+                _pre_tenancy.tenant_id        = tenant.id
+                _pre_tenancy.room_id          = room.id if room else _pre_tenancy.room_id
+                _pre_tenancy.stay_type        = StayType.daily
+                _pre_tenancy.status           = TenancyStatus.active
+                _pre_tenancy.checkin_date     = checkin
+                _pre_tenancy.checkout_date    = checkout
+                _pre_tenancy.expected_checkout = checkout
+                _pre_tenancy.agreed_rent      = _daily_rate
+                _pre_tenancy.booking_amount   = obs.booking_amount or 0
+                _pre_tenancy.maintenance_fee  = obs.maintenance_fee or 0
+                _pre_tenancy.notes            = obs.special_terms or ""
+                _pre_tenancy.sharing_type     = _dw_sharing
+                _pre_tenancy.entered_by       = "onboarding_form"
+                tenancy = _pre_tenancy
+            else:
+                tenancy = Tenancy(
+                    tenant_id=tenant.id,
+                    room_id=room.id if room else None,
+                    stay_type=StayType.daily,
+                    status=TenancyStatus.active,
+                    checkin_date=checkin,
+                    checkout_date=checkout,
+                    expected_checkout=checkout,
+                    agreed_rent=_daily_rate,
+                    booking_amount=obs.booking_amount or 0,
+                    maintenance_fee=obs.maintenance_fee or 0,
+                    notes=obs.special_terms or "",
+                    sharing_type=_dw_sharing,
+                    entered_by="onboarding_form",
+                )
+                session.add(tenancy)
             await session.flush()
 
-            if total_paid > 0:
+            # Only record the day-stay payment when we created a NEW tenancy — a reused
+            # pre-booking already carries its advance/booking payment, so re-adding would
+            # double-count.
+            if total_paid > 0 and _pre_tenancy is None:
                 session.add(Payment(
                     tenancy_id=tenancy.id,
                     amount=obs.agreed_rent,
