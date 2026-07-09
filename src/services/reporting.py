@@ -48,6 +48,39 @@ _VERIFIED_METHOD_BREAKDOWN: dict[str, dict[str, int]] = {
 }
 
 
+async def cash_flow_by_method(session: AsyncSession, period_month: str) -> dict[str, int]:
+    """SINGLE SOURCE OF TRUTH for "how it was paid" this month — the TILL VIEW.
+
+    Every non-void payment PHYSICALLY RECEIVED in this calendar month (by
+    payment_date), across ALL for_types (rent + maintenance + deposit + booking),
+    grouped by payment mode. This is the "what cash/UPI came in the door this
+    month" view. Both the Money Dashboard ("How it was paid") and the Cash tab
+    MUST call this so the two can never show different cash totals again.
+
+    Verified/frozen months return the manually-reconciled ground-truth totals.
+
+    Returns e.g. {"cash": 2543181, "upi": 2120339}.
+    """
+    month_key = period_month[:7]
+    if month_key in _VERIFIED_METHOD_BREAKDOWN:
+        return dict(_VERIFIED_METHOD_BREAKDOWN[month_key])
+    y, m = int(month_key[:4]), int(month_key[5:7])
+    rows = (await session.execute(
+        select(Payment.payment_mode, func.sum(Payment.amount).label("total"))
+        .where(
+            Payment.is_void == False,
+            Payment.payment_mode.is_not(None),
+            extract("year", Payment.payment_date) == y,
+            extract("month", Payment.payment_date) == m,
+        )
+        .group_by(Payment.payment_mode)
+    )).all()
+    return {
+        (r.payment_mode.value if hasattr(r.payment_mode, "value") else str(r.payment_mode)): int(r.total or 0)
+        for r in rows
+    }
+
+
 @dataclass
 class CollectionSummary:
     period_month: str
@@ -256,42 +289,10 @@ async def collection_summary(
     collected = max(0, expected - pending)
     collection_pct = round(collected / expected * 100) if expected > 0 else 0
 
-    # ── Payment method breakdown — use verified sheet totals for frozen months ──
-    month_key = from_date.strftime("%Y-%m")
-    if month_key in _VERIFIED_METHOD_BREAKDOWN:
-        method_breakdown = dict(_VERIFIED_METHOD_BREAKDOWN[month_key])
-    else:
-        # "How it was paid" = everything collected FOR this month:
-        # - rent/maintenance: use period_month (catches advance payments like "paid May 31 for June")
-        # - deposits/bookings: use payment_date (no period_month on these)
-        method_rows = (
-            await session.execute(
-                select(
-                    Payment.payment_mode,
-                    func.sum(Payment.amount).label("total"),
-                )
-                .where(
-                    Payment.is_void == False,
-                    Payment.payment_mode.is_not(None),
-                    or_(
-                        and_(
-                            Payment.for_type.in_([PaymentFor.rent, PaymentFor.maintenance]),
-                            Payment.period_month == from_date,
-                        ),
-                        and_(
-                            Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                            Payment.payment_date >= from_date,
-                            Payment.payment_date <= to_date,
-                        ),
-                    ),
-                )
-                .group_by(Payment.payment_mode)
-            )
-        ).all()
-        method_breakdown = {}
-        for row in method_rows:
-            key = row.payment_mode.value if hasattr(row.payment_mode, "value") else str(row.payment_mode)
-            method_breakdown[key] = int(row.total or 0)
+    # ── Payment method breakdown — canonical TILL VIEW (single source of truth) ──
+    # All cash/UPI physically received this calendar month, all for_types. Same
+    # function backs the Cash tab, so the two surfaces can never diverge.
+    method_breakdown = await cash_flow_by_method(session, period_month)
 
     # ── Overdue count — tenants with actual remaining balance > 0 ───────────────
     overdue_count = int(await session.scalar(

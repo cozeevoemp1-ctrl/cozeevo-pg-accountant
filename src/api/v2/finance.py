@@ -313,15 +313,11 @@ async def get_cash_position(
     year, month_num = int(month[:4]), int(month[5:7])
 
     async with get_session() as session:
-        collected = float(await session.scalar(
-            select(func.coalesce(func.sum(Payment.amount), 0)).where(
-                Payment.payment_mode == PaymentMode.cash,
-                Payment.for_type == PaymentFor.rent,
-                Payment.is_void == False,
-                extract("year", Payment.payment_date) == year,
-                extract("month", Payment.payment_date) == month_num,
-            )
-        ) or 0)
+        # Canonical cash — the same TILL VIEW the Money Dashboard "How it was paid"
+        # uses (all cash physically received this month, all for_types). Single
+        # source of truth so the Cash tab and Dashboard can never diverge.
+        from src.services.reporting import cash_flow_by_method
+        collected = float((await cash_flow_by_method(session, month)).get("cash", 0))
 
         expense_rows = (await session.scalars(
             select(CashExpense).where(
@@ -348,15 +344,7 @@ async def get_cash_position(
             while hm <= 0:
                 hm += 12
                 hy -= 1
-            h_col = float(await session.scalar(
-                select(func.coalesce(func.sum(Payment.amount), 0)).where(
-                    Payment.payment_mode == PaymentMode.cash,
-                    Payment.for_type == PaymentFor.rent,
-                    Payment.is_void == False,
-                    extract("year", Payment.payment_date) == hy,
-                    extract("month", Payment.payment_date) == hm,
-                )
-            ) or 0)
+            h_col = float((await cash_flow_by_method(session, f"{hy}-{hm:02d}")).get("cash", 0))
             h_exp = float(await session.scalar(
                 select(func.coalesce(func.sum(CashExpense.amount), 0)).where(
                     extract("year", CashExpense.date) == hy,
