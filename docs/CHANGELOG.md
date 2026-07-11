@@ -1,5 +1,17 @@
 # Changelog
 
+## Session S — 2026-07-11 — Buyout ledger written + loan register + exit-based maintenance + named non-op P&L lines
+
+### Summary
+- 💰 **Ashokan & Jitendra buyout ledger WRITTEN to `investment_expenses`** (Kiran confirmed ₹35L Prabhakaran personal, not ₹30L). 3 rows dated 18 Jun 2026, hash-deduped: Ashokan −₹29,04,152 · Jitendra −₹34,13,342.75 · Prabhakaran +₹35,00,000. **Cap table verified = ₹2,30,93,378** (Prabhakaran ₹1.06Cr, Chandrasekhar ₹1.03Cr, A&J zero). Synced: `unit_economics.py` `_TOTAL_INVESTMENT` → ₹2.31Cr + PWA card label. Classifier rules added so re-imports can't misroute the buyout NEFTs (`ashokan perumal`, `jitendranath` → Non-Operating; staff-Jitendra salaries unaffected).
+- 🏦 **New Whitefield Expense Tracker (21-June-26) reconciled vs DB — EXACT match** (228 rows, ₹2,59,10,872.75, all 7 investor totals identical).
+- 💸 **Loan register — 4 accounts, ₹27.5L lent out of profits (never P&L):** Bava/Bunk ₹19L (₹5L Jun-30 bank + ₹13L Jul-1 + ₹1L Jul-2; "Krishnama Naidu" = Bava's second account; his other ₹61L came from Bharathi = personal, outside PG books) · Balaji Bellandur ₹5L cash Jul-9 · Boopalan ₹3L cash Jul-11 · Boopalan(Tanvi) ₹50K. Jun-30 ₹5L bank txn (id 3417, was mislabeled "Investor Capital Return – Chandrasekhar") reclassified → `Hand Loan to Bava (Bunk)`; classifier keyword `chandrasekhar service` added. July prep notes saved in `memory/sop_pnl.md`. Structure artifact: claude.ai/code/artifact/92286d7c.
+- 📊 **P&L "Maintenance Fee retained" line switched to EXIT-month basis (Kiran directive):** SUM(maintenance_fee) of tenancies checked out that month. Frozen row now Oct–Feb 0 (no exit data pre-Mar) · Mar ₹34.5K · Apr ₹1,08.5K · May ₹95.5K; Jun dynamic ₹1,87K (55 exits). Also fixed: May was frozen with maintenance 0 by mistake. Display-only — True Revenue math untouched. `pnl_builder.py` + `_compute_dynamic_pnl_months()`.
+- 📊 **Non-Operating lump split into NAMED lines in the dynamic P&L excluded section** (`non_op_detail` by sub_category): June now shows Hand Loan to Bava ₹5L, Ashokan ₹5L, Jitendra ₹5L, Fencing ₹2.5L on their own rows instead of one ₹17.5L lump. Full P&L regenerated: `data/reports/PnL_Cozeevo_2026_07_11_v4.xlsx` (June: True Rev ₹35.99L, Opex ₹30.01L, NOP ₹5.98L, 16.6%).
+- ✅ **June sanity checks (Kiran challenges, all verified clean):** deposit-refund ₹4,08,009 ties to ~75 genuine refund txns + `refunds` table corroborates (44/₹3.58L); 55 monthly June exits are NOT double-counted (55 distinct tenants; Bhanu Prakash + Sathya Priya = couple sharing phone, room 314); exits' net refundable = ₹6,15,875 − ₹1,87,000 = ₹4,28,875.
+- 🟠 **OPEN:** (1) Kiran's offline Excel has 46 monthly June checkouts vs DB 55 — exit list exported (`June_2026_Exits_Maintenance.xlsx`), bulk days Jun-7 (21) + Jun-30 (20) are where to look. (2) PWA cash-collected vs Kiran's Excel: May gap ₹3.12L (likely deposit+booking cash definitional), June gap ₹17,231 — item register exported (`Cash_Register_May_Jun_2026.xlsx`). (3) Chit cadence (monthly from Aug?) + Tanvi ₹50K date/mode unconfirmed.
+- 📝 Docs: `REPORTING.md` (exit-basis rule + buyout/loans never-expense rule), memory (`reference_total_investment.md` settled, `sop_pnl.md` July prep + loan register, MEMORY.md index).
+
 ## Session R — 2026-07-09→11 — June'26 P&L reclassification + investor buyout + day-stay deposit fix
 
 ### Summary

@@ -127,13 +127,15 @@ DEPOSIT_RECEIVED = [0, 448000, 838000, 1383000, 1074250, 1256450, 1161125, 61625
 DEPOSIT_REFUNDED = [0, 10000,  21500,   55944,   74532,  160231,  139638, 184200]  # Mar +22000, Apr +9970 (personal SBI)
 
 # Security deposits = active tenants only (what we owe back), split by check-in month
-# Maintenance fees  = all non-no-show tenants (non-refundable, retained), by check-in month
 # Source: DB query 2026-05-06
 DEPOSITS = {
     # Pure refundable security only (combined total was ₹33,83,875 but included maintenance ₹10,68,700)
     # True refundable = combined − maintenance = ₹33,83,875 − ₹10,68,700 = ₹23,15,175
     "Security Deposits — refundable (must return to active tenants)": [0, 140000, 266500, 455500, 353000, 526550, 573625, 744534],
-    "  Maintenance Fee retained (non-refundable, by check-in month)": [0,  53000, 120000, 178000, 145000, 285700, 287000, 0],
+    # Maintenance retained = by EXIT month (Kiran directive 2026-07-11): the fee stands
+    # finally kept when the tenant checks out. DB has no exit records before Mar'26
+    # (pre-live window), so Oct–Feb show 0. Display-only — never in True Revenue math.
+    "  Maintenance Fee retained (non-refundable, by exit month)": [0, 0, 0, 0, 0, 34500, 108500, 95500],
 }
 
 # Monthly bank balances — from Yes Bank statements (verified)
@@ -189,7 +191,7 @@ _KEY_CASH_EXP    = "Cash Expenses (paid in cash — manual entry)"
 _KEY_EXCL_REFUND = "Tenant Deposit Refund (balance sheet)"
 _KEY_EXCL_NONOP  = "Cash Exchange Repayments via Bank (non-op)"
 _KEY_DEP_SEC     = "Security Deposits — refundable (must return to active tenants)"
-_KEY_DEP_MAINT   = "  Maintenance Fee retained (non-refundable, by check-in month)"
+_KEY_DEP_MAINT   = "  Maintenance Fee retained (non-refundable, by exit month)"
 
 # bank_transactions.category → verified OPEX line key
 _DB_CAT_TO_OPEX_KEY = {
@@ -232,8 +234,15 @@ def _dynamic_line_values(d: dict):
         opex[_KEY_CASH_EXP] = opex.get(_KEY_CASH_EXP, 0) + d["cash_expense"]
     excluded = {
         _KEY_EXCL_REFUND: d.get("dep_refunded", 0),
-        _KEY_EXCL_NONOP:  d.get("non_op", 0),
     }
+    # Show non-operating money by name (buyout, hand loans, capital returns) instead
+    # of one blind lump. Falls back to the lump line if no breakdown was provided.
+    detail = d.get("non_op_detail") or {}
+    if detail:
+        for sub, amt in sorted(detail.items(), key=lambda kv: -kv[1]):
+            excluded[f"└ {sub} (non-op)"] = amt
+    else:
+        excluded[_KEY_EXCL_NONOP] = d.get("non_op", 0)
     return income, opex, excluded
 
 
@@ -350,7 +359,7 @@ def _write_pnl_tab(
         c.font = bold; c.fill = total_fill
 
     sec_dep_collected   = deposits["Security Deposits — refundable (must return to active tenants)"]
-    maint_fee_collected = deposits["  Maintenance Fee retained (non-refundable, by check-in month)"]
+    maint_fee_collected = deposits["  Maintenance Fee retained (non-refundable, by exit month)"]
     sec_dep_neg         = [-v for v in sec_dep_collected]
     # Each monthly column = deposits COLLECTED that month (a flow, not a stock).
     # TOTAL col = SUM of the monthly flows = total deposits collected/held over the period.
@@ -363,7 +372,7 @@ def _write_pnl_tab(
               + sec_dep_neg + [closing_sec_dep])
     ws[ws.max_row][0].font = Font(italic=True)
 
-    ws.append(["     └ Maintenance Fee retained from same tenants (non-refundable — yours to keep)", "(kept)"]
+    ws.append(["     └ Maintenance Fee retained from tenants EXITED this month (non-refundable — yours to keep)", "(kept)"]
               + list(maint_fee_collected) + [closing_maint])
     ws[ws.max_row][0].font = Font(italic=True, color="375623")
     for c in ws[ws.max_row][1:]:

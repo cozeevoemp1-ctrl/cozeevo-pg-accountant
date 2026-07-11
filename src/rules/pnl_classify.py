@@ -30,6 +30,14 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Non-Operating",        "Repayment",                    ["repaymen","repayment","loan repay"]),
     ("Non-Operating",        "Borrowed From",                ["borrowed f","borrowed from"]),
     ("Non-Operating",        "Loan Repayment (Bharathi)",    ["bharathi prabhakaran"]),
+    # Partner exit settlement 18 Jun 2026 — Ashokan & Jitendra bought out (capital return,
+    # never opex). Bank leg = ₹5L each via NEFT/IMPS Jun 23–25; must not fall into Bank Charges.
+    ("Non-Operating",        "Investor Capital Return - Ashokan (bank)",  ["ashokan perumal"]),
+    ("Non-Operating",        "Investor Capital Return - Jitendra (bank)", ["jitendranath"]),
+    # Hand loans to Bava (Bunk) routed via the Chandrasekhar Service family account —
+    # receivables, never opex. Jun-30 ₹5L; more legs expected in July CSV. The Feb ₹6L
+    # repayment through the same account is caught by the "Repayment" rule above.
+    ("Non-Operating",        "Hand Loan to Bava (Bunk)",     ["chandrasekhar service"]),
 
     # ── PROPERTY RENT ─────────────────────────────────────────────────────────
     ("Property Rent",        "Vakkal Sravani",               ["vakkal", "sravani"]),

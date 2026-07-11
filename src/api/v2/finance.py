@@ -253,18 +253,38 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             else:
                 opex_by_cat[cat] = opex_by_cat.get(cat, 0.0) + amt
 
+        # Non-Operating breakdown by sub_category — so buyouts / hand loans / capital
+        # returns show as named lines in the P&L excluded section, never a blind lump.
+        nonop_rows = await session.execute(
+            select(BankTransaction.sub_category, func.sum(BankTransaction.amount))
+            .where(
+                BankTransaction.txn_type == "expense",
+                BankTransaction.txn_date.between(start, end),
+                BankTransaction.category == "Non-Operating",
+            )
+            .group_by(BankTransaction.sub_category)
+        )
+        non_op_detail = {
+            (r[0] or "Other non-operating"): float(r[1] or 0) for r in nonop_rows
+        }
+
         # Deposits collected this month (active tenants, by check-in month)
-        dep_row = await session.execute(
-            select(
-                func.coalesce(func.sum(Tenancy.security_deposit), 0),
-                func.coalesce(func.sum(Tenancy.maintenance_fee), 0),
-            ).where(
+        sec_dep_v = await session.scalar(
+            select(func.coalesce(func.sum(Tenancy.security_deposit), 0)).where(
                 func.extract("year", Tenancy.checkin_date) == y,
                 func.extract("month", Tenancy.checkin_date) == mo,
                 Tenancy.status == "active",
             )
         )
-        sec_dep_v, maint_v = dep_row.one()
+        # Maintenance fee retained = by EXIT month (Kiran directive 2026-07-11):
+        # the fee stands finally kept when the tenant checks out.
+        maint_v = await session.scalar(
+            select(func.coalesce(func.sum(Tenancy.maintenance_fee), 0)).where(
+                func.extract("year", Tenancy.checkout_date) == y,
+                func.extract("month", Tenancy.checkout_date) == mo,
+                Tenancy.status == "exited",
+            )
+        )
 
         # Bank closing balance = last transaction's running balance per account this month
         async def _closing(acct: str) -> float:
@@ -289,6 +309,7 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             "opex_by_cat": opex_by_cat,
             "dep_refunded": dep_refunded,
             "non_op": non_op,
+            "non_op_detail": non_op_detail,
             "sec_dep": float(sec_dep_v or 0),
             "maint": float(maint_v or 0),
             "bank_thor_close": await _closing("THOR"),

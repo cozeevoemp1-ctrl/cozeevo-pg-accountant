@@ -71,6 +71,22 @@ Bank data cannot split these — they will be grouped as "Food & Kitchen" until 
 
 Maintenance fees (non-refundable) are retained income and stay in Gross Inflows. Do NOT deduct them.
 
+**Maintenance Fee "retained" display line — by EXIT month (Kiran-confirmed 2026-07-11):**
+- The P&L's "└ Maintenance Fee retained" line = SUM(`maintenance_fee`) of tenancies whose
+  `checkout_date` falls in the month (`status='exited'`) — the fee stands FINALLY kept when the
+  tenant leaves. It is display-only and never enters the True Revenue math (the money itself
+  entered Gross Inflows in the month it was collected).
+- Supersedes the old "by check-in month" basis. DB has no exit records before Mar'26
+  (pre-live window), so Oct'25–Feb'26 show 0 on this line.
+- Verified figures: Mar ₹34,500 · Apr ₹1,08,500 · May ₹95,500 · Jun ₹1,87,000 (55 exits).
+
+**Partner buyout / hand loans / chit savings are NEVER expenses (2026-07-11):**
+- Ashokan & Jitendra buyout (₹75L settlement, 18 Jun 2026) = capital transaction →
+  `Non-Operating` bank category + `investment_expenses` ledger. Cap table now ₹2.31 Cr.
+- Hand loans (Bava ₹19L from PG) and chit savings (Balaji/Boopalan ₹8.5L cash) = loan
+  receivables in a 4-account register — shown below the P&L, excluded from opex, and added
+  back in the cash position ("+ Loans given") so the cash count reconciles.
+
 Capital contributions (owner equity injections) are shown separately — NOT in income.
 
 ### 1.3 Report Layout (updated 2026-05-06)

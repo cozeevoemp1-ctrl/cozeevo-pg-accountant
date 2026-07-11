@@ -110,7 +110,7 @@ export function UnitEconomicsCard({ data }: Props) {
       {/* ── CONCEPT A: INVESTMENT RETURN ── */}
       {data.bank_available && data.investment_yield_pct !== null && (
         <div className="bg-[#0A1628] rounded-card px-4 py-3">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-[#4A6A8A] mb-3">Investment Return · ₹2.59Cr Deployed</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-[#4A6A8A] mb-3">Investment Return · ₹2.31Cr Deployed</p>
 
           {/* Yield hero + benchmarks */}
           <div className="flex items-center justify-between mb-3">

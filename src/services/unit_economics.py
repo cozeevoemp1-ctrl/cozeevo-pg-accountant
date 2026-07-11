@@ -18,7 +18,7 @@ from src.database.models import (
 )
 from src.rules.pnl_classify import classify_txn
 
-_TOTAL_INVESTMENT = 25_900_000  # ₹2.59Cr — Ashokan + Jitendra + Chandra&Team
+_TOTAL_INVESTMENT = 23_093_378  # ₹2.31Cr — post Ashokan & Jitendra buyout 18 Jun 2026 (Prabhakaran absorbed their stake)
 
 _OPEX_CATS = {
     "Property Rent", "Electricity", "Water", "IT & Software", "Internet & WiFi",
