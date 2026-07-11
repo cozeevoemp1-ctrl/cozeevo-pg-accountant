@@ -130,7 +130,9 @@ async def create_checkout(
         # Deposit is forfeited when NO notice OR late notice (after NOTICE_BY_DAY) — see property_logic.
         from services.property_logic import is_deposit_eligible, NOTICE_BY_DAY
         is_daily = tenancy.stay_type.value == "daily"
-        deposit_eligible = False if is_daily else is_deposit_eligible(tenancy.notice_date)
+        # Day-stay tenants have no notice period — exclude them from the notice-forfeiture
+        # rule entirely. Their deposit is always refundable (minus dues/deductions).
+        deposit_eligible = True if is_daily else is_deposit_eligible(tenancy.notice_date)
         maintenance_due = Decimal("0") if is_daily else Decimal(str(tenancy.maintenance_fee or 0))
         pending_dues_dec = Decimal(str(body.pending_dues))
         deductions_dec = Decimal(str(body.deductions))

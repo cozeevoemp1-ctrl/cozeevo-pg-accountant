@@ -360,9 +360,14 @@ async def _build_checkout_summary(action_data: dict, phone: str, session: "Async
     ded_reason = action_data.get("deduction_reason", "")
 
     nd = tenancy.notice_date if tenancy else None
-    deposit_forfeited = not is_deposit_eligible(nd)
+    # Day-stay tenants have no notice period — exclude from notice-forfeiture logic.
+    # Their deposit is always refundable (minus dues/deductions).
+    _is_daily = bool(tenancy and tenancy.stay_type.value == "daily")
+    deposit_forfeited = False if _is_daily else not is_deposit_eligible(nd)
     notice_line = ""
-    if nd is None:
+    if _is_daily:
+        notice_line = ""  # day-stay: no notice concept
+    elif nd is None:
         notice_line = "\nNo notice on record — *deposit forfeited*"
     elif nd.day <= _NOTICE_BY_DAY:
         notice_line = (
@@ -4384,9 +4389,12 @@ async def _do_checkout(
     tenancy.status = TenancyStatus.exited
     tenancy.checkout_date = checkout_date_val
 
-    # Notice period check
+    # Notice period check — day-stays have no notice period (deposit always refundable)
+    _is_daily = tenancy.stay_type == StayType.daily
     notice_warn = ""
-    if not tenancy.notice_date:
+    if _is_daily:
+        notice_warn = ""
+    elif not tenancy.notice_date:
         notice_warn = "\n⚠️ No notice on record — deposit forfeited."
     elif tenancy.notice_date.day > _NOTICE_BY_DAY:
         notice_warn = (
@@ -4405,8 +4413,8 @@ async def _do_checkout(
     o_rent, o_maintenance = await _calc_outstanding_dues(tenancy.id, session)
     damages = Decimal("0")
 
-    eligible = is_deposit_eligible(tenancy.notice_date)
-    no_notice = not tenancy.notice_date
+    eligible = True if _is_daily else is_deposit_eligible(tenancy.notice_date)
+    no_notice = (not tenancy.notice_date) and not _is_daily
     if eligible:
         extra_month = Decimal("0")
         net = deposit - o_rent - o_maintenance - damages

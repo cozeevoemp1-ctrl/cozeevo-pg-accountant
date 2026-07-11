@@ -1,5 +1,17 @@
 # Changelog
 
+## Session R — 2026-07-09→11 — June'26 P&L reclassification + investor buyout + day-stay deposit fix
+
+### Summary
+- 🔴 **June'26 P&L was badly misclassified — 23 bank rows reclassified (committed to DB, revert log saved).** Root causes in `pnl_classify.py`: (1) the `Bank Charges → "Bank Transfer / IMPS / NEFT"` catch-all swallows the **full principal** of any unmatched NEFT/RTGS/IMPS (not just a fee); (2) the `vakkal`/`sravani` Property-Rent keyword matches investor **Jitendranath Guptha Vakkalagadda**. Fixes to June DATA (rules still need patching — see pending):
+  - Property Rent ₹13.5L → **₹6.0L** (Raghu ₹3L + Suma ₹3L only). Bank Charges ₹9.2L → **₹0**. Food ₹3.68L → **₹3.83L** (chicken vendor `9739392035` ₹15,330 moved in from Other). Other ₹1.47L → ₹0.33L.
+  - Investor money OUT of OPEX → Non-Operating: Ashokan ₹5L + Jitendra ₹5L + Sri Lakshmi Chandrasekhar ₹5L. Fencing (M M Industries ₹1.7L + UPI ₹80K = ₹2.5L) → Non-Operating (capital, Kiran: not opex).
+  - Tenant cross-check on "Other Expenses" (per [[rules_audit_logs]] SOP-E): `629939585`=**Naitik Raj** (₹8K) + `manideep163031`=**Manideep** t#566 (₹9.5K) → Tenant Deposit Refund. Unmatched: ₹11,352 "ylg", ₹10,500 "dranbukmb" (left in Other, flagged).
+  - Set `pnl_monthly_adjustments` June: rent_paid_cash=₹15,32,000, cash_holding=₹2,35,059. Regenerated `data/reports/PnL_Cozeevo_June2026.xlsx`. **June NET OPERATING PROFIT ₹6,22,309** (True Rev ₹36.23L − OPEX ₹30.01L).
+- 💰 **Investor buyout — Ashokan & Jitendra fully exited (18 Jun 2026); Prabhakaran absorbed their remaining stake.** Settlement ₹75L total = ₹10L UPI (₹5L each, in bank) + ₹30L PG cash + ₹35L Prabhakaran personal. **Invested capital recalculated ₹2.59Cr → ₹2.31Cr** (₹63.17L exited out, ₹35L Prabhakaran in). Ledger records NOT yet written — pending Kiran's go (see pending).
+- 🐛 **Day-stay tenants were wrongly forfeiting deposit under the monthly notice rule.** Fixed 4 surfaces: `checkout.py:135` (API validation), `web/app/checkout/new/page.tsx:122` (modal), `owner_handler.py:365` + `:4413` (bot). Day-stays now excluded from notice-forfeiture entirely — deposit refundable (minus dues/deductions). Monthly unchanged. Both .py compile. **Needs deploy.**
+- 🔧 **Data fix: Mukund Jalan (tenancy 1160, room 209) sharing_type double→premium.** Was clobbered on Lokesh's 413→209 room move (07-05 15:40) — the non-premium re-derive fired because he was stored as `single` (not premium) at move time, so the Session-P premium-preservation guard didn't catch him. Data corrected; premium guard gap noted in pending.
+
 ## Session Q — 2026-07-05 — ROOT CAUSE of recurring auto-checkin found + killed (main.py startup hook)
 
 ### Summary
