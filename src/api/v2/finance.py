@@ -198,9 +198,13 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
     adj_rows = (await session.scalars(select(PnlMonthlyAdjustment))).all()
     adj_by_ym = {a.month.strftime("%Y-%m"): a for a in adj_rows}
 
-    # All-active refundable security deposits (snapshot liability — same for every month)
+    # All-active NET refundable deposit liability (snapshot — same for every month).
+    # tenancies.security_deposit stores the FULL amount paid (maintenance included);
+    # the true refund owed = deposit − maintenance_fee (Kiran-confirmed 2026-07-11).
     sec_owed_total = float(await session.scalar(
-        select(func.coalesce(func.sum(Tenancy.security_deposit), 0)).where(Tenancy.status == "active")
+        select(func.coalesce(
+            func.sum(Tenancy.security_deposit - func.coalesce(Tenancy.maintenance_fee, 0)), 0
+        )).where(Tenancy.status == "active")
     ) or 0)
 
     out: list[dict] = []
@@ -268,9 +272,13 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             (r[0] or "Other non-operating"): float(r[1] or 0) for r in nonop_rows
         }
 
-        # Deposits collected this month (active tenants, by check-in month)
+        # Refundable deposits collected this month (active tenants, by check-in month).
+        # security_deposit includes the maintenance portion — subtract only the PURE
+        # refundable part from Gross Inflows (matches the frozen Oct–Apr convention).
         sec_dep_v = await session.scalar(
-            select(func.coalesce(func.sum(Tenancy.security_deposit), 0)).where(
+            select(func.coalesce(
+                func.sum(Tenancy.security_deposit - func.coalesce(Tenancy.maintenance_fee, 0)), 0
+            )).where(
                 func.extract("year", Tenancy.checkin_date) == y,
                 func.extract("month", Tenancy.checkin_date) == mo,
                 Tenancy.status == "active",

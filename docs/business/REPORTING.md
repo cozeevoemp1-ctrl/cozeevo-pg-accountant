@@ -71,6 +71,14 @@ Bank data cannot split these — they will be grouped as "Food & Kitchen" until 
 
 Maintenance fees (non-refundable) are retained income and stay in Gross Inflows. Do NOT deduct them.
 
+**`tenancies.security_deposit` INCLUDES the maintenance portion (Kiran-confirmed 2026-07-11):**
+- True refund liability per tenant = `security_deposit − maintenance_fee`. Every "deposits owed /
+  net deposits" figure must deduct maintenance: liability = SUM(security_deposit − maintenance_fee)
+  WHERE status='active'.
+- The monthly "Less: Security Deposits" subtraction likewise uses only the PURE refundable part
+  (deposit − maintenance of that month's active check-ins) — matches the frozen Oct–Apr convention.
+- Both fixed 2026-07-11 in `_compute_dynamic_pnl_months()` (`sec_owed_total`, `sec_dep_v`).
+
 **Maintenance Fee "retained" display line — by EXIT month (Kiran-confirmed 2026-07-11):**
 - The P&L's "└ Maintenance Fee retained" line = SUM(`maintenance_fee`) of tenancies whose
   `checkout_date` falls in the month (`status='exited'`) — the fee stands FINALLY kept when the
