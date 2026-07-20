@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # sync_demo_repo.ps1 — one-way sync: LIVE repo → DEMO repo (separate folder+git)
 #
 # Usage (from live repo root):
@@ -44,38 +44,41 @@ $ExcludeFiles = @(".env", ".env.local", ".env.production", "*.tsbuildinfo", "*.p
 # Deterministic rewrites for real data living in files we cannot edit in the
 # live repo (migrate_all.py is append-only; role_service keeps the real role
 # map for production). Order matters: longer strings first.
-$Transforms = [ordered]@{
+# Array of (case-sensitive regex, replacement) pairs — order matters, longer
+# strings first. [regex]::Replace is case-sensitive by default, so upper/lower
+# variants are listed separately (identifiers rename consistently).
+$Transforms = @(
     # phones (all formats) → reserved demo numbers
-    "\+917845952289" = "+919000000001"; "917845952289" = "919000000001"; "7845952289" = "9000000001"
-    "\+917358341775" = "+919000000002"; "917358341775" = "919000000002"; "7358341775" = "9000000002"
-    "\+919444296681" = "+919000000003"; "919444296681" = "919000000003"; "9444296681" = "9000000003"
-    "\+917680814628" = "+919000000004"; "917680814628" = "919000000004"; "7680814628" = "9000000004"
-    "966534015243"   = "919000000005"
-    "8106778788" = "9000000006"; "9600288048" = "9000000007"
-    "9535665407" = "9000000008"; "9342205440" = "9000000009"
+    @("\+917845952289", "+919000000001"), @("917845952289", "919000000001"), @("7845952289", "9000000001"),
+    @("\+917358341775", "+919000000002"), @("917358341775", "919000000002"), @("7358341775", "9000000002"),
+    @("\+919444296681", "+919000000003"), @("919444296681", "919000000003"), @("9444296681", "9000000003"),
+    @("\+917680814628", "+919000000004"), @("917680814628", "919000000004"), @("7680814628", "9000000004"),
+    @("966534015243", "919000000005"),
+    @("8106778788", "9000000006"), @("9600288048", "9000000007"),
+    @("9535665407", "9000000008"), @("9342205440", "9000000009"),
     # emails
-    "kirankumarpemmasani@gmail\.com" = "demo-admin@example.com"
-    "cozeevoemp1@gmail\.com"         = "demo-ops@example.com"
-    "lakshmigorjala6@gmail\.com"     = "demo-owner@example.com"
-    "devarajuluprabhakaran1@gmail\.com" = "demo-investor@example.com"
-    "krish484@gmail\.com"            = "demo-user1@example.com"
-    "sai1522kl@gmail\.com"           = "demo-user2@example.com"
-    # distinctive surnames/full names first, then first names (word-boundary,
-    # case variants listed explicitly so identifiers rename consistently)
-    "Vakkalagadda" = "Sharma"; "vakkalagadda" = "sharma"
-    "Jitendranath" = "Deepaknath"; "jitendranath" = "deepaknath"
-    "Devarjulu" = "Rao"; "Pemmasani" = "Verma"; "Gorjala" = "Iyer"
-    "Chandrasekhar" = "Rameshbabu"; "chandrasekhar" = "rameshbabu"; "CHANDRASEKHAR" = "RAMESHBABU"
-    "Prabhakaran" = "Sureshkanth"; "prabhakaran" = "sureshkanth"; "PRABHAKARAN" = "SURESHKANTH"
-    "\bJitendra\b" = "Deepak"; "\bjitendra\b" = "deepak"
-    "\bAshokan\b" = "Mohanraj"; "\bashokan\b" = "mohanraj"
-    "\bLakshmi\b" = "Meera"; "\blakshmi\b" = "meera"; "\bLAKSHMI\b" = "MEERA"
-    "\bLokesh\b" = "Ravi"; "\blokesh\b" = "ravi"
-    "\bKiran\b" = "Arjun"; "\bkiran\b" = "arjun"; "\bKIRAN\b" = "ARJUN"
-    "\bBharathi\b" = "Kavita"; "\bbharathi\b" = "kavita"
-    "\bRaghu\b" = "Vijayan"; "\braghu\b" = "vijayan"
-    "\bCozeevo\b" = "DemoStay"; "\bcozeevo\b" = "demostay"; "\bCOZEEVO\b" = "DEMOSTAY"
-}
+    @("kirankumarpemmasani@gmail\.com", "demo-admin@example.com"),
+    @("cozeevoemp1@gmail\.com", "demo-ops@example.com"),
+    @("lakshmigorjala6@gmail\.com", "demo-owner@example.com"),
+    @("devarajuluprabhakaran1@gmail\.com", "demo-investor@example.com"),
+    @("krish484@gmail\.com", "demo-user1@example.com"),
+    @("sai1522kl@gmail\.com", "demo-user2@example.com"),
+    # distinctive surnames/full names first, then first names (word-boundary)
+    @("Vakkalagadda", "Sharma"), @("vakkalagadda", "sharma"),
+    @("Jitendranath", "Deepaknath"), @("jitendranath", "deepaknath"),
+    @("Devarjulu", "Rao"), @("Pemmasani", "Verma"), @("Gorjala", "Iyer"),
+    @("Chandrasekhar", "Rameshbabu"), @("chandrasekhar", "rameshbabu"), @("CHANDRASEKHAR", "RAMESHBABU"),
+    @("Prabhakaran", "Sureshkanth"), @("prabhakaran", "sureshkanth"), @("PRABHAKARAN", "SURESHKANTH"),
+    @("\bJitendra\b", "Deepak"), @("\bjitendra\b", "deepak"),
+    @("\bAshokan\b", "Mohanraj"), @("\bashokan\b", "mohanraj"),
+    @("\bLakshmi\b", "Meera"), @("\blakshmi\b", "meera"), @("\bLAKSHMI\b", "MEERA"),
+    @("\bLokesh\b", "Ravi"), @("\blokesh\b", "ravi"),
+    @("\bKiran\b", "Arjun"), @("\bkiran\b", "arjun"), @("\bKIRAN\b", "ARJUN"),
+    @("\bBharathi\b", "Kavita"), @("\bbharathi\b", "kavita"),
+    @("\bRaghu\b", "Vijayan"), @("\braghu\b", "vijayan"),
+    # plain substring (no \b): also catches compound identifiers like cozeevo_qr
+    @("Cozeevo", "DemoStay"), @("cozeevo", "demostay"), @("COZEEVO", "DEMOSTAY")
+)
 $TransformExtensions = @(".py", ".ts", ".tsx", ".js", ".jsx", ".md", ".sh", ".sql", ".example", ".json", ".html", ".css")
 
 # ── Leak gate patterns ───────────────────────────────────────────────────────
@@ -151,8 +154,8 @@ Get-ChildItem $DemoDir -Recurse -File |
     ForEach-Object {
         $text = [System.IO.File]::ReadAllText($_.FullName)
         $orig = $text
-        foreach ($k in $Transforms.Keys) {
-            $text = [regex]::Replace($text, $k, $Transforms[$k])
+        foreach ($t in $Transforms) {
+            $text = [regex]::Replace($text, $t[0], $t[1])
         }
         if ($text -ne $orig) {
             [System.IO.File]::WriteAllText($_.FullName, $text)
@@ -172,30 +175,40 @@ Write-Host "Compile check passed."
 
 # ── 3. Leak gate ─────────────────────────────────────────────────────────────
 Write-Host "Running leak gate..."
+# --no-index: works before the first commit and scans untracked files too.
+# EAP=Continue: PS 5.1 promotes native stderr to a terminating error under
+# Stop, which silently killed the script here on git's harmless warnings.
+# Native git commands from here on: stay on Continue — PS 5.1 turns captured
+# native stderr into terminating errors under Stop, killing the script silently.
+$ErrorActionPreference = "Continue"
 $hits = @()
 foreach ($p in $BlockPatterns) {
-    $found = git -C $DemoDir grep -l -I --untracked $p -- . 2>$null
+    $found = & git -C $DemoDir grep --no-index -l -I $p -- "." 2>$null
     if ($found) { $hits += ($found | ForEach-Object { "$p -> $_" }) }
 }
+Write-Host "  gate scanned $($BlockPatterns.Count) block patterns, $($hits.Count) hits."
 if ($hits.Count -gt 0) {
     Write-Host "`nLEAK GATE FAILED — sync ABORTED before commit:" -ForegroundColor Red
     $hits | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
     Write-Host "Fix these in the LIVE repo (env-driven / DEMO_MODE guard), then re-sync."
     exit 1
 }
+$warns = @()
 foreach ($p in $WarnPatterns) {
-    $found = git -C $DemoDir grep -l -I --untracked $p -- . 2>$null
-    if ($found) { $found | ForEach-Object { Write-Warning "name '$p' present in $_ (comment-level, allowed)" } }
+    $found = & git -C $DemoDir grep --no-index -l -I $p -- "." 2>$null
+    if ($found) { $warns += ($found | ForEach-Object { "$p -> $_" }) }
 }
+foreach ($w in $warns) { Write-Host "  warn (allowed, eyeball it): $w" -ForegroundColor Yellow }
+Write-Host "Leak gate passed."
 
 # ── 4. Commit (+ optional push) ──────────────────────────────────────────────
-$liveHash = (git -C $LiveDir rev-parse --short HEAD).Trim()
-git -C $DemoDir add -A
-$status = git -C $DemoDir status --porcelain
+$liveHash = (& git -C $LiveDir rev-parse --short HEAD 2>$null | Out-String).Trim()
+& git -C $DemoDir add -A 2>&1 | Out-Null
+$status = & git -C $DemoDir status --porcelain 2>$null
 if ($status) {
-    git -C $DemoDir commit -m "sync from live @$liveHash" | Out-Null
+    & git -C $DemoDir commit -m "sync from live @$liveHash" 2>&1 | Out-Null
     Write-Host "Demo repo committed (live @$liveHash)."
-    if ($Push) { git -C $DemoDir push; Write-Host "Pushed." }
+    if ($Push) { & git -C $DemoDir push 2>&1 | ForEach-Object { "$_" }; Write-Host "Pushed." }
 } else {
     Write-Host "No changes — demo already up to date with live @$liveHash."
 }
