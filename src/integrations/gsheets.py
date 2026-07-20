@@ -49,7 +49,14 @@ from typing import Any, Optional
 import gspread
 from google.oauth2.service_account import Credentials
 
+from src.utils.demo import is_demo_mode
+
 logger = logging.getLogger(__name__)
+
+
+def _demo_skip(**extra: Any) -> dict:
+    """Standard no-op return for a Sheet write skipped in demo mode (demo has no Sheet)."""
+    return {"success": True, "skipped": "demo_mode", "error": None, **extra}
 
 # -- Configuration ------------------------------------------------------------
 
@@ -225,6 +232,8 @@ def _queue_failed_write(operation: str, kwargs: dict) -> None:
 async def retry_failed_writes() -> dict:
     """Retry all queued Sheet writes. Call on bot startup or periodically.
     Returns {"retried": N, "failed": N, "remaining": N}."""
+    if is_demo_mode():
+        return {"retried": 0, "failed": 0, "remaining": 0}
     if not os.path.exists(_FAILED_WRITES_PATH):
         return {"retried": 0, "failed": 0, "remaining": 0}
     try:
@@ -1393,6 +1402,8 @@ async def update_payment(
 
     Returns dict: success, row, tab, rent_due, total_paid, balance, overpayment, warning, error
     """
+    if is_demo_mode():
+        return _demo_skip()
     return await asyncio.to_thread(
         _update_payment_sync, room_number, tenant_name, amount, method, month, year, entered_by, is_daily,
     )
@@ -1530,6 +1541,8 @@ async def void_payment(
     year: Optional[int] = None,
 ) -> dict:
     """Async entry point — void/reverse a payment in Google Sheet monthly tab."""
+    if is_demo_mode():
+        return _demo_skip()
     return await asyncio.to_thread(
         _void_payment_sync, room_number, tenant_name, amount, method, month, year,
     )
@@ -1611,6 +1624,8 @@ def _add_daywise_stay_sync(
 async def add_daywise_stay(**kwargs) -> dict:
     """Async wrapper for _add_daywise_stay_sync."""
     import asyncio
+    if is_demo_mode():
+        return _demo_skip(row=None)
     return await asyncio.to_thread(_add_daywise_stay_sync, **kwargs)
 
 
@@ -1655,6 +1670,8 @@ async def add_tenant(
 
     Returns dict: success, tenants_row, monthly_row, monthly_tab, error
     """
+    if is_demo_mode():
+        return _demo_skip(tenants_row=None, monthly_row=None, monthly_tab=None)
     return await asyncio.to_thread(
         _add_tenant_sync, room_number, name, phone, gender, building, floor,
         sharing, checkin, agreed_rent, deposit, booking, maintenance, notes,
@@ -1676,6 +1693,8 @@ async def record_checkout(
 
     Returns dict: success, row, tab, error
     """
+    if is_demo_mode():
+        return _demo_skip(row=None, tab=None)
     return await asyncio.to_thread(
         _record_checkout_sync, room_number, tenant_name, notice_date, exit_date,
     )
@@ -1693,6 +1712,8 @@ async def record_notice(
 
     Returns dict: success, row, tab, error
     """
+    if is_demo_mode():
+        return _demo_skip(row=None, tab=None)
     return await asyncio.to_thread(
         _record_notice_sync, room_number, tenant_name, notice_date or "", expected_exit or "",
     )
@@ -1774,6 +1795,8 @@ def _update_checkin_sync(room_number: str, tenant_name: str, new_checkin: str) -
 
 async def update_checkin(room_number: str, tenant_name: str, new_checkin: str) -> dict:
     """Async entry point — update check-in date in TENANTS + monthly tabs."""
+    if is_demo_mode():
+        return _demo_skip()
     return await asyncio.to_thread(_update_checkin_sync, room_number, tenant_name, new_checkin)
 
 
@@ -1831,6 +1854,8 @@ def _update_notes_sync(room_number: str, tenant_name: str, notes: str,
 async def update_notes(room_number: str, tenant_name: str, notes: str,
                        month: Optional[int] = None, year: Optional[int] = None) -> dict:
     """Async entry point — update notes in monthly tab."""
+    if is_demo_mode():
+        return _demo_skip(tab=None)
     return await asyncio.to_thread(_update_notes_sync, room_number, tenant_name, notes, month, year)
 
 
@@ -1902,6 +1927,8 @@ async def sync_tenants_tab_notes(
     max_retries: int = 3,
 ) -> dict:
     """Async entry point — update permanent notes in TENANTS tab with retry."""
+    if is_demo_mode():
+        return _demo_skip()
     result = {}
     for attempt in range(max_retries):
         result = await asyncio.to_thread(_update_tenants_tab_notes_sync, room_number, tenant_name, notes)
@@ -1963,6 +1990,8 @@ async def sync_tenants_tab_field(
     max_retries: int = 3,
 ) -> dict:
     """Async wrapper — update any single field in the TENANTS master tab with retry."""
+    if is_demo_mode():
+        return _demo_skip()
     result: dict = {}
     for attempt in range(max_retries):
         result = await asyncio.to_thread(
@@ -2016,6 +2045,8 @@ def _update_tenant_gender_sync(phone: str, gender: str) -> dict:
 
 async def update_tenant_gender(phone: str, gender: str) -> dict:
     """Async entry point — update gender in TENANTS tab by phone."""
+    if is_demo_mode():
+        return _demo_skip()
     return await asyncio.to_thread(_update_tenant_gender_sync, phone, gender)
 
 
@@ -2119,6 +2150,8 @@ async def update_tenant_field(
     tab_name: Optional[str] = None,
 ) -> dict:
     """Async entry point — update a tenant field on the Sheet."""
+    if is_demo_mode():
+        return _demo_skip()
     return await asyncio.to_thread(
         _update_tenant_field_sync, room_number, tenant_name, field, new_value, tab_name,
     )
@@ -2208,6 +2241,8 @@ async def update_tenants_tab_field(
     new_value: Any,
 ) -> dict:
     """Async entry point — update one column on the TENANTS master tab."""
+    if is_demo_mode():
+        return _demo_skip()
     return await asyncio.to_thread(
         _update_tenants_tab_field_sync, room_number, tenant_name, field, new_value
     )
@@ -2476,6 +2511,8 @@ async def sync_tenant_all_fields(tenant_id: int, skip_fields: list | None = None
     Fire-and-forget pattern is expected — schedule via asyncio.create_task
     if you don't need to await. Never raises.
     """
+    if is_demo_mode():
+        return _demo_skip(tenants_written=0, monthly_written=0)
     return await asyncio.to_thread(_sync_tenant_all_fields_sync, tenant_id, skip_fields)
 
 
@@ -2486,6 +2523,9 @@ def trigger_daywise_sheet_sync() -> None:
     tab reflects DB state without waiting for the nightly cron.
     Fire-and-forget — never raises.
     """
+    if is_demo_mode():
+        logger.info("[DEMO] Suppressed trigger_daywise_sheet_sync")
+        return
     import subprocess
     import sys
     from pathlib import Path
@@ -2517,6 +2557,9 @@ def trigger_monthly_sheet_sync(month: int, year: int) -> None:
     Fire-and-forget — never raises. Used after deposit/rent/field changes so
     the monthly tab summary reflects DB state without waiting for the cron.
     """
+    if is_demo_mode():
+        logger.info("[DEMO] Suppressed trigger_monthly_sheet_sync %d/%d", month, year)
+        return
     import subprocess
     import sys
     from pathlib import Path

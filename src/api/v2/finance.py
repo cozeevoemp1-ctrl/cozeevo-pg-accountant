@@ -32,6 +32,7 @@ from src.database.models import (
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.reports.pnl_builder import MONTHS as PNL_VERIFIED_MONTHS, build_pnl_bytes
 from src.rules.pnl_classify import classify_txn
+from src.utils.demo import is_demo_mode
 from src.utils.inr_format import INR_NUMBER_FORMAT
 
 logger = logging.getLogger(__name__)
@@ -819,7 +820,8 @@ async def download_pnl_excel(user: AppUser = Depends(get_current_user)):
     _require_admin(user)
     async with get_session() as session:
         dynamic = await _compute_dynamic_pnl_months(session)
-    buf = io.BytesIO(build_pnl_bytes(dynamic or None))
+    # Demo mode: never embed the real business's verified/frozen months.
+    buf = io.BytesIO(build_pnl_bytes(dynamic or None, include_verified=not is_demo_mode()))
     filename = f"PnL_Cozeevo_{datetime.now().strftime('%Y_%m_%d')}.xlsx"
     return StreamingResponse(
         buf,
@@ -841,7 +843,7 @@ async def get_pnl_adjustments(
         row = await session.scalar(
             select(PnlMonthlyAdjustment).where(PnlMonthlyAdjustment.month == mon)
         )
-        is_verified = month in _VERIFIED_YM
+        is_verified = (not is_demo_mode()) and (month in _VERIFIED_YM)
     return {
         "month": month,
         "is_verified_frozen": is_verified,
@@ -861,7 +863,7 @@ async def save_pnl_adjustments(
     _require_admin(user)
     month = str(body.get("month", ""))
     _validate_month(month)
-    if month in _VERIFIED_YM:
+    if not is_demo_mode() and month in _VERIFIED_YM:
         raise HTTPException(status_code=400, detail=f"{month} is a frozen verified month — figures are hardcoded")
     mon = date(int(month[:4]), int(month[5:7]), 1)
 

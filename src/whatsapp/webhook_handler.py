@@ -18,6 +18,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Request, BackgroundTasks
 from loguru import logger
 
+from src.utils.demo import is_demo_mode
+
 
 def _open_log(path: str):
     """Open a /tmp debug log with owner-only (0o600) permissions to protect PII."""
@@ -336,6 +338,9 @@ async def _send_whatsapp(to_number: str, message: str, *, intent: str = "OUTBOUN
     goes through here. Logging to DB ensures auditability — without it,
     'did the customer get the message?' is unanswerable from the DB.
     """
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed outbound WhatsApp text to {to_number}: {message[:80]!r}")
+        return
     token    = os.getenv("WHATSAPP_TOKEN", "")
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
@@ -409,6 +414,9 @@ async def _send_whatsapp_template(
     url_button_token: if the template has a URL button with a variable suffix,
     pass the token/suffix here and it will be sent as the button parameter.
     """
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed outbound WhatsApp template '{template_name}' to {to_number}")
+        return True
     token    = os.getenv("WHATSAPP_TOKEN", "")
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
     if not (token and phone_id):
@@ -469,6 +477,9 @@ async def _send_whatsapp_template(
 
 async def _send_whatsapp_interactive(to_number: str, payload: dict):
     """Send a WhatsApp interactive message (buttons / list) via Meta Graph API."""
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed outbound WhatsApp interactive message to {to_number}")
+        return
     token    = os.getenv("WHATSAPP_TOKEN", "")
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
 
@@ -495,6 +506,9 @@ async def _send_whatsapp_interactive(to_number: str, payload: dict):
 
 async def _send_whatsapp_document(to_number: str, document_url: str, filename: str, caption: str = ""):
     """Send a document via WhatsApp Cloud API."""
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed outbound WhatsApp document '{filename}' to {to_number}")
+        return
     token    = os.getenv("WHATSAPP_TOKEN", "")
     phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
     if not (token and phone_id):

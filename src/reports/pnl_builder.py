@@ -530,7 +530,7 @@ def _write_pnl_tab(
         ws.column_dimensions[_gcl(_ci)].width = 14
 
 
-def build_pnl_workbook(dynamic_data: List[dict] | None = None) -> openpyxl.Workbook:
+def build_pnl_workbook(dynamic_data: List[dict] | None = None, include_verified: bool = True) -> openpyxl.Workbook:
     """
     Return the P&L workbook.
 
@@ -539,16 +539,58 @@ def build_pnl_workbook(dynamic_data: List[dict] | None = None) -> openpyxl.Workb
     those months are appended as extra columns in the same SOP format, on top of the
     verified history. Tabs 1 & 2 grow; the THOR reconciliation + rules tabs stay verified.
 
+    `include_verified=False` (demo mode only) strips the hardcoded verified history
+    entirely — only `dynamic_data` months appear, and the THOR reconciliation + Rules
+    tabs (which embed real verified figures) are omitted. Default True reproduces
+    existing behaviour byte-for-byte.
+
     Tabs:
       1. P&L — Full (incl Cash)   — all items including cash income + cash rent
       2. Bank — Digital Only       — same layout; cash income + cash rent excluded
-      3. THOR Bank Reconciliation
-      4. Rules Applied             — methodology notes
+      3. THOR Bank Reconciliation  — omitted when include_verified=False
+      4. Rules Applied             — methodology notes; omitted when include_verified=False
     """
     wb = openpyxl.Workbook()
 
     # Build the (possibly extended) line dicts + snapshot kwargs for tabs 1 & 2.
-    if dynamic_data:
+    if dynamic_data and not include_verified:
+        # Demo mode: dynamic DB months only — no verified history embedded.
+        inc_pm, opex_pm, excl_pm = [], [], []
+        for d in dynamic_data:
+            i, o, e = _dynamic_line_values(d)
+            inc_pm.append(i); opex_pm.append(o); excl_pm.append(e)
+
+        def _collect(per_month: List[dict]) -> Dict[str, List[int]]:
+            keys: List[str] = []
+            for pm in per_month:
+                for k in pm:
+                    if k not in keys:
+                        keys.append(k)
+            return {k: [pm.get(k, 0) for pm in per_month] for k in keys}
+
+        months   = [d["label"] for d in dynamic_data]
+        income   = _collect(inc_pm)
+        opex     = _collect(opex_pm)
+        excluded = _collect(excl_pm)
+        capital: Dict[str, List[int]] = {}
+        deposits = {
+            _KEY_DEP_SEC:   [d.get("sec_dep", 0) for d in dynamic_data],
+            _KEY_DEP_MAINT: [d.get("maint", 0)   for d in dynamic_data],
+        }
+        last = dynamic_data[-1]
+        dyn_kwargs = dict(
+            months=months, deposits=deposits, excluded=excluded, capital=capital,
+            bank_thor_close=last.get("bank_thor_close", 0),
+            bank_hulk_close=last.get("bank_hulk_close", 0),
+            cash_in_hand={"Cash in hand (physical count)": last.get("cash_holding", 0)},
+            sec_owed=last.get("sec_owed_total", 0),
+            snapshot_label=last["label"],
+        )
+    elif not dynamic_data and not include_verified:
+        # Demo mode, no DB months yet — empty shell workbook.
+        months, income, opex = [], {}, {}
+        dyn_kwargs = {"months": [], "deposits": {_KEY_DEP_SEC: [], _KEY_DEP_MAINT: []}, "excluded": {}, "capital": {}}
+    elif dynamic_data:
         # sanity: every translation key must still exist in the verified dicts
         for k in (_KEY_INCOME_THOR, _KEY_INCOME_HULK, _KEY_INCOME_CASH):
             assert k in INCOME, f"income key drift: {k!r}"
@@ -605,6 +647,12 @@ def build_pnl_workbook(dynamic_data: List[dict] | None = None) -> openpyxl.Workb
         tab_note="Bank / Digital Only — excl. cash income from tenants + cash rent paid to owners",
         **dyn_kwargs,
     )
+
+    if not include_verified:
+        # Demo mode: skip the THOR reconciliation + Rules tabs — both embed real
+        # verified figures (bank balances, staff names/phone numbers) that must
+        # never appear in a public demo instance.
+        return wb
 
     # ── Tab 3: THOR Bank Reconciliation ───────────────────────────────────────
     # Shows actual bank cash flow — Opening + bank credits - bank debits = Closing
@@ -735,11 +783,12 @@ def build_pnl_workbook(dynamic_data: List[dict] | None = None) -> openpyxl.Workb
     return wb
 
 
-def build_pnl_bytes(dynamic_data: List[dict] | None = None) -> bytes:
+def build_pnl_bytes(dynamic_data: List[dict] | None = None, include_verified: bool = True) -> bytes:
     """Return the P&L workbook as bytes (for streaming from FastAPI).
 
-    Pass `dynamic_data` (per-month DB records) to append new months in SOP format."""
+    Pass `dynamic_data` (per-month DB records) to append new months in SOP format.
+    `include_verified=False` (demo mode) strips the hardcoded verified history."""
     buf = io.BytesIO()
-    build_pnl_workbook(dynamic_data).save(buf)
+    build_pnl_workbook(dynamic_data, include_verified=include_verified).save(buf)
     buf.seek(0)
     return buf.read()

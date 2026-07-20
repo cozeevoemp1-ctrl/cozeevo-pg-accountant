@@ -25,6 +25,8 @@ import httpx
 from dotenv import load_dotenv
 from loguru import logger
 
+from src.utils.demo import is_demo_mode
+
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -112,6 +114,10 @@ async def send_template(
                        template_name, to_number)
         return False
 
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed reminder template '{template_name}' to {to_number}")
+        return True
+
     token, phone_id = _get_reminder_creds()
     if not (token and phone_id):
         logger.error("[Reminder] No WhatsApp credentials available — cannot send template")
@@ -174,6 +180,10 @@ async def send_reminder_text(to_number: str, message: str) -> bool:
     NOTE: This only works within 24hrs of the recipient's last message to this number.
     For proactive outreach, use send_template() instead.
     """
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed reminder text to {to_number}")
+        return True
+
     token, phone_id = _get_reminder_creds()
     if not (token and phone_id):
         logger.error("[Reminder] No WhatsApp credentials available")
