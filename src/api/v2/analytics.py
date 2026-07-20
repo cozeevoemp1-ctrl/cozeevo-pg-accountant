@@ -15,6 +15,7 @@ from src.database.models import Room, Tenancy, TenancyStatus, StayType
 from src.services.occupancy import (
     get_total_revenue_beds, get_occupied_beds, get_occupied_beds_asof, get_occupancy_pct,
 )
+from src.utils.demo import is_demo_mode
 
 router = APIRouter(prefix="/analytics")
 
@@ -254,8 +255,9 @@ async def get_occupancy(
             lbl = f"{MONTH_ABBR[cur.month]} '{str(cur.year)[2:]}"
             types = ci_type_map.get(ym, {})
 
-            if ym in VERIFIED_MONTHS:
+            if ym in VERIFIED_MONTHS and not is_demo_mode():
                 # Frozen month — use verified figures directly
+                # (demo mode always computes live — never leak the real business's numbers)
                 v = VERIFIED_MONTHS[ym]
                 occ_beds  = v["occ_beds"]
                 fill_pct  = v["fill_pct"]

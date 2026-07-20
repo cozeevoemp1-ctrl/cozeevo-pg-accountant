@@ -27,6 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
+from src.utils.demo import is_demo_mode
+
 MONTHS = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY",
           "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
 
@@ -104,15 +106,19 @@ async def main() -> int:
     print(f"Monthly rollover: {month_name} {year}")
     print("=" * 50)
 
-    # 1. Source sync
-    if not skip_source:
+    demo = is_demo_mode()
+
+    # 1. Source sync (touches the Google Sheet — no-op in demo, which has no sheet)
+    if demo:
+        print("[1/4] Source sync skipped (DEMO_MODE)")
+    elif not skip_source:
         if not _run_source_sync():
             print("Aborting — source sync failed.")
             return 1
     else:
         print("[1/4] Source sync skipped (--skip-source)")
 
-    # 2. Generate RentSchedule rows in DB
+    # 2. Generate RentSchedule rows in DB — core functionality, still runs in demo
     print(f"[2/4] Generating RentSchedule rows for {month_name} {year}...")
     try:
         stats = await _generate_rs(year, month_num)
@@ -121,6 +127,13 @@ async def main() -> int:
     except Exception as e:
         print(f"  ✗ RentSchedule generation failed: {e}")
         return 2
+
+    if demo:
+        print("[3/4] Sheet tab creation skipped (DEMO_MODE)")
+        print("[4/4] Sheet reconciliation skipped (DEMO_MODE)")
+        print("=" * 50)
+        print(f"Rollover complete (DB only, DEMO_MODE): {month_name} {year}")
+        return 0
 
     # 3. Create sheet tab
     if not _create_sheet_tab(month_name, year):

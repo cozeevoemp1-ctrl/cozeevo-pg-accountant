@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database.models import (
     AuthorizedUser, RateLimitLog, Tenant, UserRole
 )
+from src.utils.demo import is_demo_mode
 
 # ── Config ────────────────────────────────────────────────────────────────────
 RATE_WINDOW_MINUTES = 10
@@ -43,6 +44,34 @@ _HARDCODED_ROLES: dict[str, tuple[str, str]] = {
 }
 
 
+def _demo_roles() -> dict[str, tuple[str, str]]:
+    """DEMO_MODE allowlist — sourced from DEMO_ROLES env var instead of the real
+    business's hardcoded phone numbers. Format: "phone:name:role,phone2:name2:role2".
+    Falls back to a single generic demo admin if DEMO_ROLES is unset."""
+    raw = os.getenv("DEMO_ROLES", "")
+    roles: dict[str, tuple[str, str]] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        parts = entry.split(":")
+        if len(parts) != 3:
+            continue
+        phone, name, role = (p.strip() for p in parts)
+        if phone:
+            roles[phone] = (name or "Demo Admin", role or "admin")
+    if not roles:
+        demo_admin_phone = os.getenv("DEMO_ADMIN_PHONE", "")
+        if demo_admin_phone:
+            roles[demo_admin_phone] = ("Demo Admin", "admin")
+    return roles
+
+
+def _active_roles() -> dict[str, tuple[str, str]]:
+    """Role allowlist in effect — real hardcoded numbers unless DEMO_MODE is on."""
+    return _demo_roles() if is_demo_mode() else _HARDCODED_ROLES
+
+
 @dataclass
 class CallerContext:
     phone:        str
@@ -60,7 +89,7 @@ async def get_caller_context(phone: str, session: AsyncSession) -> CallerContext
     """
     phone = _normalize(phone)
 
-    entry = _HARDCODED_ROLES.get(phone)
+    entry = _active_roles().get(phone)
     if entry:
         name, role = entry
         return CallerContext(phone=phone, role=role, name=name)

@@ -913,13 +913,13 @@ export interface AddExpenseBody {
   date: string
   description: string
   amount: number
-  paid_by: "Prabhakaran" | "Lakshmi" | "Other"
+  paid_by: string
 }
 
 export interface LogCountBody {
   date: string
   amount: number
-  counted_by: "Prabhakaran" | "Lakshmi"
+  counted_by: string
   notes?: string
 }
 

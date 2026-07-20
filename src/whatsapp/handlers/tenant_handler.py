@@ -985,7 +985,7 @@ async def handle_onboarding_step(
 
         # Save pending action for admin (2-hour expiry, don't clear other admin pendings)
         import os, re as _re
-        admin_phone = os.getenv("ADMIN_PHONE", "+917845952289")
+        admin_phone = os.getenv("ADMIN_PHONE", "+919000000000")
         # Normalize phone to match how role_service stores it (strip +91 for Indian numbers)
         _digits = _re.sub(r"[^0-9]", "", admin_phone)
         if len(_digits) == 12 and _digits.startswith("91"):

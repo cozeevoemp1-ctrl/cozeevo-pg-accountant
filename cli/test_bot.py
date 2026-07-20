@@ -28,7 +28,7 @@ load_dotenv()
 # ── Config ────────────────────────────────────────────────────────────────────
 
 BASE_URL       = os.getenv("TEST_API_URL", "http://localhost:8000")
-ADMIN_PHONE    = os.getenv("ADMIN_PHONE",  "+917845952289")
+ADMIN_PHONE    = os.getenv("ADMIN_PHONE",  "+919000000000")
 SCENARIOS_FILE = Path(__file__).parent.parent / "tests" / "bot_scenarios.json"
 FAILURES_LOG   = Path(__file__).parent.parent / "tests" / "failures_log.jsonl"
 

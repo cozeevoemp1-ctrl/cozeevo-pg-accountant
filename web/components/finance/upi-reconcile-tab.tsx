@@ -104,7 +104,7 @@ export function UpiReconcileTab() {
         </label>
 
         <p className="text-[10px] text-ink-muted text-center">
-          XLSX or CSV from Lakshmi UPI app — safe to re-upload (deduped by RRN)
+          XLSX or CSV from the UPI app export — safe to re-upload (deduped by RRN)
         </p>
       </div>
 
@@ -179,7 +179,7 @@ export function UpiReconcileTab() {
               </div>
             ))}
             <p className="text-[10px] text-ink-muted text-center pt-1">
-              Manual assignment coming soon — share RRN with Kiran to match
+              Manual assignment coming soon — share the RRN with your admin to match
             </p>
           </div>
         )}

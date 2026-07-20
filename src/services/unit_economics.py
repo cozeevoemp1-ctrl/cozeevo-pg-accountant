@@ -6,6 +6,7 @@ All monetary figures use True Revenue (gross income − security deposits held).
 
 from __future__ import annotations
 
+import os
 from datetime import date
 from typing import Optional
 
@@ -18,7 +19,9 @@ from src.database.models import (
 )
 from src.rules.pnl_classify import classify_txn
 
-_TOTAL_INVESTMENT = 23_093_378  # ₹2.31Cr — post Ashokan & Jitendra buyout 18 Jun 2026 (Prabhakaran absorbed their stake)
+# ₹2.31Cr — post Ashokan & Jitendra buyout 18 Jun 2026 (Prabhakaran absorbed their stake)
+# Override via TOTAL_INVESTMENT env var (e.g. demo deployments use a fake figure).
+_TOTAL_INVESTMENT = float(os.getenv("TOTAL_INVESTMENT", "23093378"))
 
 _OPEX_CATS = {
     "Property Rent", "Electricity", "Water", "IT & Software", "Internet & WiFi",

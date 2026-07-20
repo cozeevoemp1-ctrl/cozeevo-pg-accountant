@@ -580,7 +580,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. referred by Kiran, needs AC room…"
+                  placeholder="e.g. referred by staff, needs AC room…"
                   rows={2}
                   className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink resize-none"
                 />

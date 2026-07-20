@@ -199,7 +199,7 @@ export function ThreeStatementTab() {
             <Row label="Fixed Assets (net)" value={data.balance_sheet.assets.net_fixed_assets} indent />
             <Row label="  Gross" value={data.balance_sheet.assets.gross_fixed_assets} indent muted />
             <Row label="  Accum. Depreciation" value={-data.balance_sheet.assets.accumulated_depreciation} indent muted />
-            <Row label="Lease Deposit (Raghu)" value={data.balance_sheet.assets.lease_deposit} indent />
+            <Row label="Lease Deposit" value={data.balance_sheet.assets.lease_deposit} indent />
             <Row label="Total Assets" value={data.balance_sheet.total_assets} bold />
             <Divider />
             <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Liabilities</span>

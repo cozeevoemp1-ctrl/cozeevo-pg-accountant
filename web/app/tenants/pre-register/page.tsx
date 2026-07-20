@@ -332,7 +332,7 @@ export default function PreRegisterPage() {
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="e.g. referred by Kiran, needs AC room, twin-share preferred…"
+              placeholder="e.g. referred by staff, needs AC room, twin-share preferred…"
               rows={2}
               className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink resize-none"
             />

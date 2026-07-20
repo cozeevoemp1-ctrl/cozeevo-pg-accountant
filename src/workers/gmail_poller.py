@@ -45,7 +45,7 @@ GMAIL_USER         = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 HULK_EMAIL_SUBJECT = os.getenv("HULK_EMAIL_SUBJECT", "HULK")
 THOR_EMAIL_SUBJECT = os.getenv("THOR_EMAIL_SUBJECT", "THOR")
-ADMIN_WHATSAPP     = os.getenv("ADMIN_WHATSAPP", "917845952289")
+ADMIN_WHATSAPP     = os.getenv("ADMIN_WHATSAPP", "919000000000")
 
 
 # ── IMAP helpers ──────────────────────────────────────────────────────────────

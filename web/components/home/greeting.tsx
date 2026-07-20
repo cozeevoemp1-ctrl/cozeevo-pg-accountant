@@ -5,6 +5,8 @@ interface GreetingProps {
   session: AuthSession;
 }
 
+const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 function _hour(): number {
   return new Date().getHours();
 }
@@ -26,7 +28,14 @@ export function Greeting({ session }: GreetingProps) {
   return (
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-xs text-ink-muted font-medium">{salutation} · {tagline}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-ink-muted font-medium">{salutation} · {tagline}</p>
+          {IS_DEMO && (
+            <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800 bg-amber-100 border border-amber-300 rounded-full px-2 py-0.5 leading-none">
+              Demo
+            </span>
+          )}
+        </div>
         <h1 className="text-xl font-extrabold text-ink leading-tight capitalize">{display}</h1>
       </div>
       <LogoutAvatar initial={(name?.[0] ?? display[0] ?? "K").toUpperCase()} />

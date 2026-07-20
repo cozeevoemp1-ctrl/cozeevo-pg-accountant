@@ -47,6 +47,12 @@ function todayStr(): string {
 
 const inputCls = "bg-[#F8F5F3] border border-[#E2DEDD] rounded-xl px-3 py-2.5 text-sm text-[#1A1614] font-medium w-full"
 
+const CASH_HANDLERS = (process.env.NEXT_PUBLIC_CASH_HANDLERS || "Prabhakaran,Lakshmi")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean)
+const CASH_HANDLERS_WITH_OTHER = [...CASH_HANDLERS, "Other"]
+
 function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -82,7 +88,7 @@ function AddExpenseSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const [date, setDate] = useState(todayStr())
   const [desc, setDesc] = useState("")
   const [amount, setAmount] = useState("")
-  const [paidBy, setPaidBy] = useState<AddExpenseBody["paid_by"]>("Prabhakaran")
+  const [paidBy, setPaidBy] = useState<AddExpenseBody["paid_by"]>(CASH_HANDLERS[0] || "Other")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
@@ -127,7 +133,7 @@ function AddExpenseSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Paid by</label>
           <div className="flex gap-2 flex-wrap">
-            {(["Prabhakaran", "Lakshmi", "Other"] as const).map(p => (
+            {CASH_HANDLERS_WITH_OTHER.map(p => (
               <Pill key={p} label={p} active={paidBy === p} onClick={() => setPaidBy(p)} />
             ))}
           </div>
@@ -187,7 +193,7 @@ function EditExpenseSheet({ expense, onClose, onSaved }: { expense: CashExpense;
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Paid by</label>
           <div className="flex gap-2 flex-wrap">
-            {(["Prabhakaran", "Lakshmi", "Other"] as const).map(p => (
+            {CASH_HANDLERS_WITH_OTHER.map(p => (
               <Pill key={p} label={p} active={paidBy === p} onClick={() => setPaidBy(p)} />
             ))}
           </div>
@@ -204,7 +210,7 @@ function EditExpenseSheet({ expense, onClose, onSaved }: { expense: CashExpense;
 function LogCountSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [date, setDate] = useState(todayStr())
   const [amount, setAmount] = useState("")
-  const [countedBy, setCountedBy] = useState<LogCountBody["counted_by"]>("Prabhakaran")
+  const [countedBy, setCountedBy] = useState<LogCountBody["counted_by"]>(CASH_HANDLERS[0] || "Other")
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
@@ -244,7 +250,7 @@ function LogCountSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () 
         <div className="flex flex-col gap-1">
           <label className="text-[10px] font-bold text-[#999] uppercase tracking-wide">Counted by</label>
           <div className="flex gap-2">
-            {(["Prabhakaran", "Lakshmi"] as const).map(p => (
+            {CASH_HANDLERS.map(p => (
               <Pill key={p} label={p} active={countedBy === p} onClick={() => setCountedBy(p)} />
             ))}
           </div>
