@@ -1,5 +1,11 @@
 # Changelog
 
+## Session T — 2026-08-04 — VPS spec check + 2 new WhatsApp templates submitted (unwired)
+
+### Summary
+- 🖥️ **Hostinger VPS specs checked live via SSH:** 1 vCPU, 4GB RAM (~2.8GB avail), no GPU, 43GB disk free. Verdict: not enough to host Qwen-TTS 3B alongside the live bot — 1 vCPU would bottleneck both; needs 4+ vCPU/8GB+ RAM for tolerable CPU-only inference, or a separate GPU box for real-time speed.
+- 📋 **2 new WhatsApp templates submitted to Meta (PENDING approval), NOT wired to any send/scheduler code:** `fridge_cleaning_notice` (id 4436544943254987, static "tomorrow" text — one-time use only, needs resubmission per future cleaning) and `laundry_rules_notice` (id 1024139837077941, reusable, no date content). Both logged in `memory/reference_whatsapp_templates.md` with explicit "never send without Kiran's go" flag per [[rules_no_tenant_comms]].
+
 ## Session S — 2026-07-11 — Buyout ledger written + loan register + exit-based maintenance + named non-op P&L lines
 
 ### Summary
