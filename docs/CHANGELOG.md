@@ -1,5 +1,22 @@
 # Changelog
 
+## Session U — 2026-08-06 — Duplicate tenant identities merged + dedup guardrails + payment-date bug
+
+### Summary
+- 🔴 **Room 415 "Rakesh" was two tenant rows sharing one phone (+919515739255)** — payments split across tenancy 894 (`Rakesh Thallapally`, 4 pmts) and tenancy 901 (`T.Rakesh Chetan`, 7 pmts). PWA history groups by `tenant_id`, so opening the wrong row showed collection stopping in May. **Cause:** no phone dedup existed on 22 Apr; the normalized-phone lookup landed 4 days later in `2e19b1d`. Also `tenants.phone` is `unique=True` in the model but the live DB only has a **non-unique** index `ix_tenants_phone`.
+- ✅ **Merged, keeping the row with more payments (901/914):** ₹20,000 booking advance re-pointed, 4 KYC documents + onboarding session moved, DOB/Aadhaar/address copied onto the surviving tenant, 2 duplicate `rent_schedule` rows dropped, then tenancy 894 + tenant 897 hard-deleted with a JSON backup (`scripts/_backup_dup_tenancy_894.json`). **₹61,533 of double-counted Apr+May collections removed** (Apr rent 9,533 + deposit 26,000 + May rent 26,000 existed non-void on both). Scripts: `_merge_duplicate_tenants_415_615.py`, `_purge_dup_tenancy_894.py`.
+- 🔴 **Room 615 "Sheetal" — different failure, still live in code:** booking made with phone 9444921568, onboarding form submitted with 9790791568 → phone lookup missed → second tenant row → `onboarding_router` re-pointed the tenancy to it, orphaning tenant 1169. Orphan deleted.
+- 🛡 **Guardrails added (3 layers):**
+  1. `onboarding_router.py` — approve now reuses the booking's own stub tenant row (its only tenancy) and lets the form win, so a **corrected phone no longer forks a new identity** and a **corrected name is no longer silently discarded**.
+  2. `_absorb_orphan_tenant()` — backstop after both tenancy re-point sites: moves documents/onboarding sessions and deletes the abandoned row, only when zero tenancies remain.
+  3. `payments.py::_tenancy_ids_for_person()` — history now groups by the **last 10 digits of the phone**, not `tenant_id`; a split can no longer hide payments. Phones under 10 digits fall back to `tenant_id`. Verified on live split 823/957 → both return `[820, 1039]`.
+  - **Deliberately NOT a UNIQUE index on `tenants.phone`** — 4 pairs of genuinely different people share a number (Rupali/Sonali Rout, V.Sathya Priya/V.Bhanu Prakash, Anshsinha/anubhav, Shree Yaswanth/Lavanya). A constraint would block their check-ins.
+- 🆕 **`scripts/check_tenant_integrity.py`** — reports SPLIT (same phone + similar name), ORPHAN (tenant with no tenancy), SHARED (same phone, different people = expected). `--strict` exits 1. Run after any data load.
+- 🐛 **Advances were stamped with the check-in date, not the collection date** (`bookings.py:268` + 4 sites in `onboarding_router`). An advance taken today for a future check-in landed in the wrong month and read as a payment that hadn't happened. Fixed via `_receipt_date()` — today for future check-ins, the check-in date when back-dated. Sheetal's row was the only future-dated payment in the DB; corrected.
+- 🔧 **Room 615 P Sheetal Reddy record rebuilt to match staff account** (`_fix_sheetal_615_record.py`): check-in 28 Aug → **1 Aug**; ₹14,500 UPI re-dated 2 Aug → **27 Jul** and re-typed booking → **deposit**; `booking_amount` 2,000 → 0; Aug RS recalculated 14,306 → **28,500** (full rent 14,000 + deposit 14,500) via `recalc_checkin_month_rs()`.
+  - **Audit trail explains the mess:** Lokesh logged a ₹2,000 advance at booking (audit 2008), then on 4 Aug **edited that row's amount to ₹14,500** (audit 2105) to represent the deposit — there is no way to log a deposit against a pre-check-in booking, so editing the advance is the path of least resistance. The 2 Aug cash rent was never logged at all.
+- 🟠 **Why "No dues ✓" showed on an unpaid tenant:** `tenants.py:398` forces dues to 0 when `checkin_date > today`. Correct behaviour, misleading label — a future booking is indistinguishable from a paid-up tenant.
+
 ## Session T — 2026-08-04 — VPS spec check + 2 new WhatsApp templates submitted (unwired)
 
 ### Summary

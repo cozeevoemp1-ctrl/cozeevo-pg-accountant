@@ -167,6 +167,9 @@ Kiran's Excel (offline)
 | `scripts/_import_investment_sbi.py` | One-off: imports Investment.xlsx (Lakshmi SBI direct vendor payments Oct–Dec 2025) into bank_transactions as account_name=LAKSHMI_SBI. Skip logic for Cozeevo capital transfers, test txns, Chandra credits. |
 | `scripts/_add_missing_may_tenants.py` | One-off: adds long-term tenants missing from DB (Chandraprakash, Mathew Koshy, Rama Krishnan, Akshitha Jawahar). |
 | `scripts/_add_daywise_may.py` | One-off: adds day-wise tenants missing from DB (Rayirth, Lakshmi Pathi, Chinchu David, Avirneni Karthik). |
+| `scripts/check_tenant_integrity.py` | Tenant identity guard — reports SPLIT (same phone + similar name = one person in two rows), ORPHAN (tenant with no tenancy), SHARED (same phone, different people = expected). `--strict` exits 1. Run after any data load. |
+| `scripts/_merge_duplicate_tenants_415_615.py` + `_purge_dup_tenancy_894.py` | One-off: merged the Room 415 duplicate Rakesh (kept the row with more payments) and deleted the Room 615 orphan. Recipe to copy for the remaining splits. |
+| `scripts/_fix_sheetal_615_record.py` | One-off: Room 615 Sheetal — check-in 28 Aug→1 Aug, ₹14,500 re-dated 27 Jul + re-typed deposit, booking_amount→0, RS recalc. `--rent <amt>` adds the missing 2 Aug cash rent. |
 | `scripts/resync_missing_tenants_to_sheet.py` | Finds tenants in DB but missing from TENANTS ops sheet tab; appends them. Safe to re-run. |
 
 ## DO NOT touch

@@ -5,6 +5,7 @@ Onboarding form API — receptionist creates session, tenant fills, receptionist
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import uuid
@@ -15,7 +16,7 @@ from decimal import Decimal
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update, text
+from sqlalchemy import func, select, update, text
 from typing import Optional
 
 from src.database.db_manager import get_session
@@ -1476,6 +1477,46 @@ async def manual_checkin(token: str, request: Request, req: ManualCheckinRequest
         raise HTTPException(500, f"KYC saved but check-in failed — session is now in Bookings for review. Error: {type(e).__name__}: {e}")
 
 
+def _receipt_date(checkin: date):
+    """The date money actually changed hands.
+
+    Stamping a payment with the check-in date breaks whenever check-in is in the
+    future: an advance taken today lands in next month's collection and the
+    receipt reads as a payment that hasn't happened yet. For a back-dated
+    check-in the cash did change hands then, so keep the check-in date.
+    """
+    today = date.today()
+    return checkin if checkin < today else today
+
+
+async def _absorb_orphan_tenant(session, old_tenant_id: int | None, new_tenant_id: int) -> None:
+    """Backstop after a tenancy is re-pointed to a different tenant row.
+
+    Moves the old row's documents / onboarding sessions onto the surviving tenant
+    and deletes it if nothing references it any more. Without this, the abandoned
+    row lingers with the same person's phone and splits their payment history
+    (see Room 415 Rakesh / Room 615 Sheetal, Aug 2026).
+    """
+    if not old_tenant_id or old_tenant_id == new_tenant_id:
+        return
+    still_used = await session.scalar(
+        select(func.count(Tenancy.id)).where(Tenancy.tenant_id == old_tenant_id)
+    )
+    if still_used:
+        return
+    for _table in ("documents", "onboarding_sessions"):
+        await session.execute(
+            text(f"UPDATE {_table} SET tenant_id = :new WHERE tenant_id = :old"),
+            {"new": new_tenant_id, "old": old_tenant_id},
+        )
+    await session.execute(
+        text("DELETE FROM tenants WHERE id = :old"), {"old": old_tenant_id}
+    )
+    logging.getLogger(__name__).info(
+        "Absorbed orphan tenant %s into %s (tenancy re-pointed)", old_tenant_id, new_tenant_id
+    )
+
+
 async def _approve_session_impl(token: str, req: ApproveRequest | None):
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
@@ -1570,6 +1611,62 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 _func2.right(_func2.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10) == _norm10
             )
         )
+        # Pre-booking creates a stub tenant row from whatever the receptionist
+        # typed (name + phone). The onboarding form is the tenant's own data and
+        # may correct either field:
+        #   phone changed → the lookup above MISSES, a second tenant row is created
+        #                   and the pre-booked tenancy is re-pointed to it further
+        #                   down, orphaning the stub and splitting payment history
+        #   name changed  → the lookup HITS the stub, but the corrected name was
+        #                   silently discarded
+        # Both are fixed by reusing the booking's own stub (this booking is its
+        # only tenancy) and letting the form's values win.
+        _stub = None
+        if obs.tenancy_id:
+            _pre_t = await session.get(Tenancy, obs.tenancy_id)
+            if _pre_t:
+                _cand = await session.get(Tenant, _pre_t.tenant_id)
+                if _cand and (tenant is None or tenant.id == _cand.id):
+                    _other = await session.scalar(
+                        select(_func2.count(Tenancy.id)).where(
+                            Tenancy.tenant_id == _cand.id, Tenancy.id != _pre_t.id
+                        )
+                    )
+                    if not _other:
+                        _stub = _cand
+        if _stub is not None:
+            _stub.phone = phone
+            _stub.name = td["name"] or _stub.name
+            # Booking stubs carry only name+phone — fill the rest from the form.
+            for _f, _v in (
+                ("gender", td.get("gender")),
+                ("food_preference", td.get("food_preference")),
+                ("email", td.get("email")),
+                ("father_name", td.get("father_name")),
+                ("father_phone", td.get("father_phone")),
+                ("emergency_contact_name", td.get("emergency_contact_name")),
+                ("emergency_contact_phone", td.get("emergency_contact_phone")),
+                ("emergency_contact_relationship", td.get("emergency_contact_relationship")),
+                ("permanent_address", td.get("permanent_address")),
+                ("occupation", td.get("occupation")),
+                ("educational_qualification", td.get("educational_qualification")),
+                ("office_address", td.get("office_address")),
+                ("office_phone", td.get("office_phone")),
+                ("id_proof_type", td.get("id_proof_type")),
+                ("id_proof_number", td.get("id_proof_number")),
+            ):
+                if _v and not getattr(_stub, _f, None):
+                    setattr(_stub, _f, _v)
+            _dob = td.get("date_of_birth", "")
+            if _dob and not _stub.date_of_birth:
+                for _fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+                    try:
+                        _stub.date_of_birth = datetime.strptime(_dob, _fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            tenant = _stub
+
         if not tenant:
             tenant = Tenant(
                 name=td["name"], phone=phone, gender=td.get("gender"),
@@ -1670,6 +1767,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     )
                 )
             if _pre_tenancy and _pre_tenancy.status in (TenancyStatus.no_show, TenancyStatus.active):
+                _prev_tenant_id               = _pre_tenancy.tenant_id
                 _pre_tenancy.tenant_id        = tenant.id
                 _pre_tenancy.room_id          = room.id if room else _pre_tenancy.room_id
                 _pre_tenancy.stay_type        = StayType.daily
@@ -1684,6 +1782,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 _pre_tenancy.sharing_type     = _dw_sharing
                 _pre_tenancy.entered_by       = "onboarding_form"
                 tenancy = _pre_tenancy
+                await session.flush()
+                await _absorb_orphan_tenant(session, _prev_tenant_id, tenant.id)
             else:
                 tenancy = Tenancy(
                     tenant_id=tenant.id,
@@ -1710,7 +1810,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 session.add(Payment(
                     tenancy_id=tenancy.id,
                     amount=obs.agreed_rent,
-                    payment_date=checkin,
+                    payment_date=_receipt_date(checkin),
                     payment_mode=PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash,
                     for_type=PaymentFor.rent,
                     notes="day-stay onboarding payment",
@@ -1835,6 +1935,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 )
             if _pre_tenancy and _pre_tenancy.status in (TenancyStatus.no_show, TenancyStatus.active):
                 # Reuse the tenancy created at pre-booking time (advance was already recorded)
+                _prev_tenant_id = _pre_tenancy.tenant_id
                 _pre_tenancy.tenant_id = tenant.id
                 _pre_tenancy.room_id = room.id if room else _pre_tenancy.room_id
                 _pre_tenancy.checkin_date = checkin
@@ -1847,6 +1948,8 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 _pre_tenancy.entered_by = (req.entry_source or "onboarding_form") if req else "onboarding_form"
                 _pre_tenancy.status = _target_status
                 tenancy = _pre_tenancy
+                await session.flush()
+                await _absorb_orphan_tenant(session, _prev_tenant_id, tenant.id)
             else:
                 # Final guard: block if tenant already has an active/no_show tenancy
                 # (catches cases where _pre_tenancy was missed due to active-status fallback)
@@ -1923,7 +2026,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             if obs.booking_amount and float(obs.booking_amount) > 0 and not _existing_bk_pmt:
                 _pmt_booking = Payment(
                     tenancy_id=tenancy.id, amount=obs.booking_amount,
-                    payment_date=checkin,
+                    payment_date=_receipt_date(checkin),
                     payment_mode=PaymentMode.upi if obs.advance_mode == "upi" else PaymentMode.cash,
                     for_type=PaymentFor.booking, period_month=None,
                     notes=f"Advance/booking payment recorded at check-in ({obs.advance_mode or 'cash'})",
@@ -1935,7 +2038,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             if req and req.collected_rent_dues > 0:
                 _pmt_rent = Payment(
                     tenancy_id=tenancy.id, amount=req.collected_rent_dues,
-                    payment_date=checkin, payment_mode=_ci_mode(req.rent_dues_mode),
+                    payment_date=_receipt_date(checkin), payment_mode=_ci_mode(req.rent_dues_mode),
                     for_type=PaymentFor.rent, period_month=checkin.replace(day=1),
                     notes=f"Rent dues collected at check-in ({req.rent_dues_mode})",
                 )
@@ -1944,7 +2047,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
             if req and req.collected_deposit_dues > 0:
                 _pmt_deposit = Payment(
                     tenancy_id=tenancy.id, amount=req.collected_deposit_dues,
-                    payment_date=checkin, payment_mode=PaymentMode.upi,
+                    payment_date=_receipt_date(checkin), payment_mode=PaymentMode.upi,
                     for_type=PaymentFor.deposit,
                     notes="Deposit dues collected at check-in (upi)",
                 )

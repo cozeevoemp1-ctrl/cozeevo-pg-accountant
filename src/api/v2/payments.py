@@ -125,6 +125,31 @@ async def create_payment(body: PaymentCreate, user: AppUser = Depends(get_curren
         )
 
 
+async def _tenancy_ids_for_person(session, tenant_id: int) -> list[int]:
+    """Every tenancy belonging to this person — matched by phone, not just tenant_id.
+
+    One person can end up with more than one `tenants` row (a phone corrected on
+    the onboarding form, a pre-dedup-guard check-in). Keying history on tenant_id
+    alone hides the payments sitting on the other row — that is how Room 415's
+    Aug rent looked unpaid. Grouping on the last 10 digits of the phone survives
+    the split. Blank/short phones fall back to tenant_id so junk data can never
+    merge two unrelated people.
+    """
+    phone = await session.scalar(select(Tenant.phone).where(Tenant.id == tenant_id))
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if len(digits) < 10:
+        return list((await session.execute(
+            select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
+        )).scalars().all())
+
+    norm = func.right(func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10)
+    return list((await session.execute(
+        select(Tenancy.id)
+        .join(Tenant, Tenant.id == Tenancy.tenant_id)
+        .where(norm == digits[-10:])
+    )).scalars().all())
+
+
 @router.get("/payments", response_model=List[PaymentListItem])
 async def list_payments(
     tenancy_id: Optional[int] = Query(None),
@@ -143,22 +168,17 @@ async def list_payments(
         #                one person's history
         #   neither    → recent payments across ALL tenants (default page view)
         tenancy_ids: Optional[list[int]] = None
-        if tenant_id:
-            tenancy_ids = (await session.execute(
-                select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
-            )).scalars().all()
-            if not tenancy_ids:
-                return []
-        elif tenancy_id:
+        owner: Optional[int] = tenant_id
+        if tenancy_id and not owner:
             owner = await session.scalar(
                 select(Tenancy.tenant_id).where(Tenancy.id == tenancy_id)
             )
-            if owner is not None:
-                tenancy_ids = (await session.execute(
-                    select(Tenancy.id).where(Tenancy.tenant_id == owner)
-                )).scalars().all()
-            else:
-                tenancy_ids = [tenancy_id]
+        if owner is not None:
+            tenancy_ids = await _tenancy_ids_for_person(session, owner)
+        if not tenancy_ids and tenancy_id:
+            tenancy_ids = [tenancy_id]
+        if tenant_id and not tenancy_ids:
+            return []
 
         # NULL-safe void filter: is_void IS NOT TRUE matches both False and NULL,
         # so a stray NULL row never silently disappears from history again.

@@ -265,7 +265,10 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             _pmt = Payment(
                 tenancy_id=tenancy.id,
                 amount=Decimal(str(req.booking_amount)),
-                payment_date=checkin,
+                # Money is in hand NOW — stamping the future check-in date put the
+                # advance in the wrong month's collection and made the receipt read
+                # like a payment that hasn't happened yet.
+                payment_date=date.today(),
                 payment_mode=_mode,
                 for_type=PaymentFor.booking,
                 notes=f"Advance collected at pre-booking ({req.advance_mode or 'cash'})",
