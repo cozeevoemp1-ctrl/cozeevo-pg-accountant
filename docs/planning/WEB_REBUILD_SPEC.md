@@ -76,7 +76,16 @@
 ## 4. Mobile app (phase after Web v2)
 - Same design system + components (Next.js PWA shell or Capacitor wrap — decide later); bottom pill nav (Board / Collect / + / Tenants / More); inspector = bottom sheet; 48px targets; numpad + ConfirmationCard patterns carried over. Existing PWA retired only after mobile parity sign-off.
 
-## 5. Rollout order
+## 5. Multi-tenant SaaS readiness (Kozzy as product — design decisions to bake in NOW)
+- **Token-driven theming = white-label for free.** The 7-kit switcher proves rebranding is ~20 CSS variables. Ship a neutral platform default kit; each customer org gets accent + logo + name as DB config. No per-customer redesign ever.
+- **Bed Board renders from data, not layout constants**: buildings/floors/rooms/beds come from the `rooms` table per org — any property shape (1 building or 5, 40 beds or 400) lays out automatically (side-by-side buildings when width allows). This is the flagship differentiator feature for sales demos.
+- **Kill every hardcoded constant** (TOTAL_BEDS in 8 files, NOTICE_BY_DAY, building names, admin phones) → per-org settings served by the config endpoint. This is the single biggest SaaS blocker today, not the design.
+- **Terminology + locale config**: tenant/guest/resident label, currency, date format, month-cycle rules per org.
+- **`org_id` already exists across the schema** — enforce it everywhere + Postgres RLS for isolation; per-org auth roles; per-org WhatsApp number (Meta WABA per customer or shared with sender profiles).
+- **Onboarding wizard as a product feature**: the Excel→Sheet→DB import pipeline (clean_and_load) becomes "bring your data" — that ugly migration work is a moat, competitors make customers start empty.
+- Pricing/tiers already sketched in `docs/business/PRICING.md`; demo mode (DEMO_MODE + sanitized sync) already built for sales demos.
+
+## 6. Rollout order
 1. Phase 3 backend consolidation (§3) + tests → deploy
 2. Web v2 scaffold (`web/` new route group or separate app) with locked brand kit + Cupertino type framework
 3. Screens in order: Bed Board → Tenants → Payments/Register → Bookings → Checkout/Notices → Finance tabs → Reports → Ops
