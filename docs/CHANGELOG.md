@@ -1,5 +1,14 @@
 # Changelog
 
+## Session U2 — 2026-08-06 — Root directory cleanup (Phase 1 of production-safe refactor) — Window B
+
+### Summary
+- 🧹 **Root reorganized, commit `dd1423c`** — 10 debug scripts → `scripts/utility/` (sys.path bootstrap added; verified zero external references — no shims needed); 4 root .md → `docs/` (INDEX.md link fixed); migration logs → `docs/audits/`; `file.svg` deleted (Next.js scaffold leftover, unreferenced).
+- 🔐 **Secrets consolidated into `credentials/` (gitignored), NOTHING deleted:** both "Cozeevo Receptionist API Key" txt files (byte-identical, md5-verified — actually contain Anthropic API key + Hostinger root password + recovery codes + ngrok codes + Supabase anon key) + `hostinger back up code.pdf`. Personal docs (passport, signature, SBI statement, receipt) → `credentials/personal/`.
+- 🗑️ **15 data files deleted after DB verification** (Kiran authorized: delete if incorporated in DB): THOR/HULK Apr–May statements (bank_transactions covers THOR Oct'25–Jun'26, HULK Mar–Jun'26), Whitefield trackers ×2 (Session S reconciled EXACT match), Investment.xlsx (imported as LAKSHMI_SBI), PnL_Accrual ×3 + PnL_Report (regenerable via pnl_builder), dues/reclassification worklists ×3 (acted on Sessions J/R). Plus 42 session screenshots + malformed `C:Temppg_api_test.log`.
+- ⚠️ **KEPT in `data/imports/review/` — NOT verifiable in DB:** `AccountSummary Cozeevo hulk` (pdf + 2 xlsx — contains HULK txns from Jan 5 '26 but DB HULK starts Mar 4 '26 → possible 2-month import gap to investigate), Paytm ×2 + PhonePe UPI statements (no such account in bank_transactions — never imported), Lakshmi Gorjala raw statements ×4, `Untitled spreadsheet.xlsx` (331-row tenant roster Nov'25–May'26). Brand assets → `data/brand/`; expense/income photos ×12 → `data/imports/`; WhatsApp chat export → `data/whatsapp_chats/`.
+- 📝 `.gitignore`: added `data/imports/`, `data/brand/`. Refactor mission Phases 2–5 queued in pending tasks.
+
 ## Session U — 2026-08-06 — Duplicate tenant identities merged + dedup guardrails + payment-date bug
 
 ### Summary
