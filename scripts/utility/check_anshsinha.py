@@ -1,3 +1,5 @@
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))))
 #!/usr/bin/env python3
 import os, sys, psycopg2
 from dotenv import load_dotenv

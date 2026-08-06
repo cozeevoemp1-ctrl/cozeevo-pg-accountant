@@ -71,7 +71,7 @@ Session A comprehensive analysis (reference only).
 
 - **[2026-06-08-pwa-comprehensive/](audits/2026-06-08-pwa-comprehensive/)** — 5 domain audits, 87 business rules, 42 bugs (2,900 lines)
 
-**Latest consolidated audit:** [COMPREHENSIVE_AUDIT.md](../COMPREHENSIVE_AUDIT.md) (Session C findings, root level)
+**Latest consolidated audit:** [COMPREHENSIVE_AUDIT.md](COMPREHENSIVE_AUDIT.md) (Session C findings)
 
 ---
 

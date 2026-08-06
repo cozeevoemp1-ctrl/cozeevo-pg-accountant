@@ -24,6 +24,8 @@ dist/
 build/
 
 # Exports, dashboards, raw data (user-specific, not in repo)
+data/imports/
+data/brand/
 data/raw/
 data/processed/
 data/exports/
