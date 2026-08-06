@@ -12,6 +12,7 @@
 3. **Every list ships with minimal filters + sorting** (segmented filter pills + sortable column headers). No filter crowding.
 4. **Exports come from the same endpoints as screens** — a report can never disagree with the app.
 5. Additive rollout: new Web at `web-v2` route/app consuming the SAME `/api/v2/app` layer; zero backend forks.
+6. **Never hardcode (Kiran 2026-08-06).** No fixed filter options, date lists, counts, constants or labels in UI code — filters/dates/options derive from data or config endpoints. When a value's source is unclear, ASK Kiran, don't invent. Per-screen endpoint contract before build: every UI element names its endpoint; every endpoint has ≥1 consumer; a parity test asserts the same figure matches across screen, export and bot (no dead ends, no stale/doubled data).
 
 ## 1. Carry-over inventory — everything the PWA does today
 
