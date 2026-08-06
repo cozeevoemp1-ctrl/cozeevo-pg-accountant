@@ -65,6 +65,20 @@
 - Universal inspector + sorting/filters everywhere · Ctrl-K tenant/room/action search · sticky KPI strip
 - Later: smart query bar (needs `/api/v2/app/query`)
 
+## 2b. Month-close pipeline in-app (Kiran 2026-08-06: "scripts run from VS Code must be buttons")
+Map each manual SOP step (memory `sop_pnl.md`) to a server-side job with UI, admin-only, every run audit-logged:
+| VS Code / script today | In-app job |
+|---|---|
+| CSV upload via endpoint | exists — `POST /finance/upload` (unique_hash dedup) |
+| `pnl_classify.py` rules + `reference_pnl_classifications.md` | rules table in DB + Rules Editor UI; auto-apply on import |
+| Manual "who is this payee" sessions with Claude | **Review-unknowns queue**: name a payee once → saved rule; blocks month close until empty (or explicit skip) |
+| `scripts/_generate_audit_logs.py` | `POST /finance/audit/generate` → deposit-refund + salary registers as in-app views |
+| `pnl_monthly_adjustments` (cash holding / rent in cash / cash expense) | exists — surface in Uploads tab, editable pre-recalc |
+| `_compute_dynamic_pnl_months` on demand | `POST /finance/recalculate?month=` — refreshes P&L/collections/dues caches |
+| `pnl_builder` Excel | exists — `GET /finance/pnl/excel` |
+| Known catch-all bug (Bank Charges swallows NEFT principal) | fix classifier BEFORE porting rules (open item from Session R) |
+Guardrails: frozen months reject, job history (who/when/rows touched), dry-run preview diff before commit — same discipline as CLEANUP_DRY_RUN.
+
 ## 3. Endpoint consolidation prerequisites (approved Phase 3 — build BEFORE Web v2 screens)
 1. `services/dues.py` — single `compute_tenant_dues()`; wire all 8 API + 3 bot call-sites
 2. Single **activity** endpoint (payments + audit_log derived); Home feed, Reports activity export, history views all consume it
