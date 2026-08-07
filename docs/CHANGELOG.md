@@ -1,5 +1,22 @@
 # Changelog
 
+## Session V — 2026-08-07 — Phase 3 backend consolidation (Web v2 prerequisite) — EXECUTED
+
+### Summary
+Kiran-approved Phase 3 from `docs/audits/2026-08-06-connectivity.md` + `WEB_REBUILD_SPEC.md` §3, implemented per plan `docs/superpowers/plans/2026-08-07-phase3-backend-consolidation.md`. Commits `40fcda7`…`136b4e1`, all pushed.
+
+- ✅ **`src/services/dues.py` — single source for ALL monthly dues math** (mirrors the daily_dues.py consolidation). `monthly_dues()` split view (first-month proration, rent→deposit overflow, booking_credit) + `paid_toward_period_clause()` / `period_remaining()` / `outstanding_months()` bundled view + `first_month_due()`. 15 unit tests in `tests/test_dues_logic.py`.
+- ✅ **All 7 API + 4 bot call-sites wired to it — zero inline copies left:** `get_tenant_dues`, `list_tenants` (now split-math → Manage list finally matches the dues page + KPI tile, fixes D-3; adds the booking credit it lacked), KPI tile, KPI dues panel, reminders overdue (**now credits booking advances — was overstating dues**), reporting pending, recent-checkins fallback (now prorates), bot `_calc_outstanding_dues`, `build_dues_snapshot`, `_query_dues`, `_my_balance`, rollover `_prev_outstanding`.
+- ✅ **Legacy PIN checkout stack RETIRED (D-1 HIGH fixed):** all `/api/checkout/*` → 410 tombstone; `static/checkout_admin.html` + `checkout_confirm.html` deleted; serve routes removed. v2 (`/api/v2/app/checkout/create`) with refund re-validation is the only checkout path.
+- ✅ **Dead weight deleted:** `sync_router.py` (was unmounted), `/api/ingest`, `/api/entities`, empty `/api/report` shell, v2 `voice/*` (client-side parser replaced it; unused `extractPaymentIntent` wrapper removed), onboarding `/admin/stats`. **KEPT deliberately:** blacklist REST (Web v2 admin UI), `regen-pdf` (10 pending agreement PDFs), `/api/reconcile`. auth_hooks docstring path corrected.
+- ✅ **Write-dedup guards:** cash expenses + cash counts → 409 on identical row (double-tap bug); quick-book advance Payment now carries `unique_hash` (same md5 recipe as `log_payment`) → 409 on duplicate submit.
+- ✅ **`GET /api/v2/app/config`** serves `notice_by_day` (property_logic) + `total_beds` (live from rooms table). `web/lib/config.ts` cached hook; checkout/new, notices, edit-tenant now consume it — the 2 hardcoded consts + 3 literal `5`s are gone (D-5, spec rule 6).
+- ✅ **Classifier catch-all fixed (Session R bug):** "Bank Charges / Bank Transfer / IMPS / NEFT" rule removed — Bank Charges now only matches genuine fee narrations (`neft chg`, `chrg`, …); bare IMPS/NEFT/RTGS principals → `Other Expenses / Unclassified Bank Transfer` so they surface in the review pass instead of silently booking as opex. Applies to future imports only.
+- ✅ **Reminders page → read-only "Overdue dues" list** (send actions were permanently 410 → guaranteed error toast); rows deep-link to collect payment; `sendReminder` wrapper removed; Tenants-hub tile renamed.
+- 🧪 **Verification:** 195 unit tests run — 191 pass; the 4 failures are the pre-existing `test_future_month_extracted` month-parsing cases (Session I note). `npx tsc --noEmit` clean. Live smoke: `/api/checkout/*` → 410, `/config` mounted (401 unauth), `/api/ingest` → 404.
+- ⚠️ **Golden suite is STALE, not broken by this session:** 55/105 fail — 36 are the deliberate WhatsApp finance block (`729ad81`, 25 May), 10 are tenant/lead auto-reply-disabled policy (empty replies), 9 are older behavior changes (ADD_TENANT → onboarding-form redirect) + test-data drift ("Anuron Dutta" not in DB). Zero failures touch dues math. Suite needs a policy-aware rewrite before it can gate deploys again.
+- 🚫 **Not deployed to VPS** — rides with the still-pending Session U deploy; see pending tasks.
+
 ## Session U2 — 2026-08-06 — Root directory cleanup (Phase 1 of production-safe refactor) — Window B
 
 ### Summary

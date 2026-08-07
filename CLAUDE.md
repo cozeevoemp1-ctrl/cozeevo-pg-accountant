@@ -134,6 +134,9 @@ Kiran's Excel (offline)
 | `src/api/v2/rooms.py` | GET /rooms/check — room availability check (free beds, occupants) |
 | `services/room_transfer.py` | Shared execute_room_transfer() — single source of truth for bot + PWA |
 | `src/services/rent_schedule.py` | `first_month_rent_due()` — canonical first-month formula; `prorated_first_month_rent()` — proration helper; `recalc_checkin_month_rs()` — recomputes first-month RS when security_deposit/checkin_date/agreed_rent changes; must be called from all 5 edit paths |
+| `src/services/dues.py` | **Single source for ALL monthly dues math** (Phase 3, 2026-08-07): `monthly_dues()` split view (PWA current-month surfaces), `paid_toward_period_clause()`/`period_remaining()`/`outstanding_months()` bundled view (bot/rollover/reporting), `first_month_due()`. Every dues change goes here — never inline the formula again. Tests: `tests/test_dues_logic.py` |
+| `src/api/checkout_router.py` | RETIRED 2026-08-07 — all `/api/checkout/*` are 410 tombstones; v2 `/api/v2/app/checkout/create` is the only checkout path |
+| `GET /api/v2/app/config` | Business-rule constants for frontend (`notice_by_day`, `total_beds` from rooms table) — `web/lib/config.ts` hook consumes it; never hardcode these in UI |
 | `web/app/notices/page.tsx` | PWA Notices page — monthly tenants with formal notice; deposit eligible (refundable) if notice given on any day; late notice (after 5th) = next month cycle + full month rent; forfeited only with zero notice |
 | `web/app/checkouts/page.tsx` | PWA Checkouts page — monthly checkout history, month picker, All/Regular/Day-wise filter |
 | `src/api/v2/checkouts.py` | GET /checkouts?month=YYYY-MM — all exited tenants for month (monthly + day-wise) |
