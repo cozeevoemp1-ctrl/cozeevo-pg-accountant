@@ -35,19 +35,14 @@ def _month_label(d: date) -> str:
 
 
 def _build_paid_subq(period: date, period_end: date):
+    # Canonical paid filter from services/dues.py — this copy used to omit
+    # booking-advance payments and overstate overdue amounts.
+    from src.services.dues import paid_toward_period_clause
     return (
         select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
         .where(
             Payment.is_void == False,
-            or_(
-                and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
-                and_(
-                    Payment.for_type == PaymentFor.deposit,
-                    Payment.period_month == None,
-                    Payment.payment_date >= period,
-                    Payment.payment_date < period_end,
-                ),
-            ),
+            paid_toward_period_clause(period, period_end),
         )
         .group_by(Payment.tenancy_id)
         .subquery()

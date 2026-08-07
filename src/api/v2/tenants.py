@@ -11,7 +11,8 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 
 from src.api.v2.auth import AppUser, get_current_user
-from src.services.daily_dues import daily_dues, booking_credit
+from src.services.daily_dues import daily_dues
+from src.services.dues import monthly_dues
 from src.database.db_manager import get_session
 from src.database.models import (
     AuditLog,
@@ -47,22 +48,28 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
     period_end = date(next_y, next_m, 1)
 
     async with get_session() as session:
-        paid_subq = (
+        # Split subqueries (rent this period / deposit ever / booking ever) so the
+        # list uses the same monthly_dues() split math as the dues page + KPI tile
+        # — the old bundled calc made the Manage list disagree with both (D-3).
+        rent_paid_subq = (
             select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
             .where(
                 Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent, Payment.period_month == period),
-                    # deposit payments only (not booking — booking is tracked via
-                    # tenancy.booking_amount and would double-deduct against RS.rent_due)
-                    and_(
-                        Payment.for_type == PaymentFor.deposit,
-                        Payment.period_month == None,
-                        Payment.payment_date >= period,
-                        Payment.payment_date < period_end,
-                    ),
-                ),
+                Payment.for_type == PaymentFor.rent,
+                Payment.period_month == period,
             )
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
+        dep_paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("dep_paid"))
+            .where(Payment.is_void == False, Payment.for_type == PaymentFor.deposit)
+            .group_by(Payment.tenancy_id)
+            .subquery()
+        )
+        booking_paid_subq = (
+            select(Payment.tenancy_id, func.sum(Payment.amount).label("booking_paid"))
+            .where(Payment.is_void == False, Payment.for_type == PaymentFor.booking)
             .group_by(Payment.tenancy_id)
             .subquery()
         )
@@ -81,7 +88,9 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
         rows = (await session.execute(
             select(Tenancy, Tenant, Room, Property,
                    RentSchedule.rent_due, RentSchedule.adjustment,
-                   func.coalesce(paid_subq.c.paid, 0).label("paid"),
+                   func.coalesce(rent_paid_subq.c.paid, 0).label("paid"),
+                   func.coalesce(dep_paid_subq.c.dep_paid, 0).label("dep_paid"),
+                   func.coalesce(booking_paid_subq.c.booking_paid, 0).label("booking_paid"),
                    func.coalesce(all_paid_subq.c.all_paid, 0).label("all_paid"))
             .join(Tenant, Tenancy.tenant_id == Tenant.id)
             .join(Room, Tenancy.room_id == Room.id)
@@ -90,24 +99,32 @@ async def list_tenants(_user: AppUser = Depends(get_current_user)):
                 RentSchedule.tenancy_id == Tenancy.id,
                 RentSchedule.period_month == period,
             ))
-            .outerjoin(paid_subq, paid_subq.c.tenancy_id == Tenancy.id)
+            .outerjoin(rent_paid_subq, rent_paid_subq.c.tenancy_id == Tenancy.id)
+            .outerjoin(dep_paid_subq, dep_paid_subq.c.tenancy_id == Tenancy.id)
+            .outerjoin(booking_paid_subq, booking_paid_subq.c.tenancy_id == Tenancy.id)
             .outerjoin(all_paid_subq, all_paid_subq.c.tenancy_id == Tenancy.id)
             .where(Tenancy.status.in_([TenancyStatus.active, TenancyStatus.no_show]))
             .order_by(Room.room_number)
         )).all()
 
     result = []
-    for tenancy, tenant, room, prop, rent_due, adjustment, paid, all_paid in rows:
+    for tenancy, tenant, room, prop, rent_due, adjustment, paid, dep_paid, booking_paid, all_paid in rows:
         if tenancy.stay_type and tenancy.stay_type.value == "daily":
             # all_paid = STAY payments only (advance/deposit excluded — held as deposit).
             _, dues, _ = daily_dues(
                 tenancy.checkin_date, tenancy.checkout_date, tenancy.agreed_rent, all_paid
             )
         else:
-            rd = float(rent_due or tenancy.agreed_rent or 0)
-            adj = float(adjustment or 0)
-            not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
-            dues = 0 if not_yet_checked_in else max(rd + adj - float(paid), 0.0)
+            dues = monthly_dues(
+                period=period, as_of=today,
+                checkin_date=tenancy.checkin_date,
+                agreed_rent=tenancy.agreed_rent,
+                security_deposit=tenancy.security_deposit,
+                rent_due=rent_due, adjustment=adjustment,
+                rent_paid=paid, deposit_paid=dep_paid,
+                booking_paid_rows=booking_paid,
+                booking_amount_field=tenancy.booking_amount,
+            ).total
         result.append({
             "tenancy_id": tenancy.id,
             "tenant_id": tenant.id,
@@ -370,38 +387,22 @@ async def get_tenant_dues(
         )
 
     rent = float(tenancy.agreed_rent) if tenancy.agreed_rent is not None else 0.0
-    rent_only_paid = float(rent_only_paid_result) if rent_only_paid_result is not None else 0.0
-    deposit_agreed = float(tenancy.security_deposit) if tenancy.security_deposit else 0.0
     deposit_paid_direct = float(deposit_paid_result) if deposit_paid_result else 0.0
-    booking_paid_via_pmts = float(booking_paid_result) if booking_paid_result else 0.0
-    # Advance credited toward deposit/rent — history rows first, field fallback.
-    booking_amount = booking_credit(booking_paid_via_pmts, tenancy.booking_amount)
-
     rent_due   = float(rs.rent_due)   if rs else rent
     adjustment = float(rs.adjustment) if rs and rs.adjustment else 0.0
-    not_yet_checked_in = tenancy.checkin_date and tenancy.checkin_date > today
 
-    # First-month detection: RS.rent_due bundles prorated+deposit, so we split them
-    # back out for display so rent and deposit show correctly when paid separately.
-    checkin = tenancy.checkin_date
-    is_check_in_month = checkin and checkin.replace(day=1) == period_month
-
-    if is_check_in_month and not not_yet_checked_in:
-        from src.services.rent_schedule import prorated_first_month_rent
-        prorated = float(prorated_first_month_rent(tenancy.agreed_rent, checkin))
-        effective_prorated = max(0.0, prorated + adjustment)  # apply waiver/adjustment
-        # Any rent overpay beyond effective prorated carries over to deposit
-        rent_overflow = max(0.0, rent_only_paid - effective_prorated)
-        effective_deposit_paid = deposit_paid_direct + rent_overflow
-        dues = max(0.0, effective_prorated - rent_only_paid)
-        deposit_due = max(0.0, deposit_agreed - effective_deposit_paid - booking_amount)
-        credit = max(0.0, rent_only_paid - effective_prorated) if rent_only_paid > effective_prorated and deposit_agreed == 0 else 0.0
-    else:
-        # Normal month: RS is the source of truth for rent; deposit tracked separately
-        effective_due = rent_due + adjustment
-        dues = 0.0 if not_yet_checked_in else max(effective_due - rent_only_paid, 0.0)
-        credit = 0.0 if not_yet_checked_in else max(rent_only_paid - effective_due, 0.0)
-        deposit_due = 0.0 if not_yet_checked_in else max(0.0, deposit_agreed - deposit_paid_direct - booking_amount)
+    bd = monthly_dues(
+        period=period_month, as_of=today,
+        checkin_date=tenancy.checkin_date,
+        agreed_rent=tenancy.agreed_rent,
+        security_deposit=tenancy.security_deposit,
+        rent_due=rent_due, adjustment=adjustment,
+        rent_paid=rent_only_paid_result, deposit_paid=deposit_paid_result,
+        booking_paid_rows=booking_paid_result,
+        booking_amount_field=tenancy.booking_amount,
+    )
+    dues, credit, deposit_due = bd.rent_dues, bd.credit, bd.deposit_due
+    booking_amount = bd.booking_credit_amt
 
     return {
         "tenancy_id": tenancy.id,

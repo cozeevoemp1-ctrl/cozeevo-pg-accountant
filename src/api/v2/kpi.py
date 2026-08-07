@@ -19,8 +19,8 @@ from src.database.models import (
 )
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
 from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
-from src.services.rent_schedule import prorated_first_month_rent
-from src.services.daily_dues import daily_dues, booking_credit
+from src.services.daily_dues import daily_dues
+from src.services.dues import first_month_due, monthly_dues
 from src.services.reporting import deposits_breakdown
 from services.property_logic import is_deposit_eligible
 
@@ -262,24 +262,18 @@ async def get_kpi(user: AppUser = Depends(get_current_user)):
         overdue_tenants = 0
         overdue_amount = 0.0
         for _r in dues_rows:
-            _eff = float(_r.effective_due or 0)
-            _rent_paid = float(_r.rent_paid or 0)
-            _dep_paid = float(_r.dep_paid or 0)
-            # Advance credit: history booking rows first, field fallback.
-            _booking = booking_credit(_r.booking_paid, _r.booking_amount)
-            _dep_agreed = float(_r.security_deposit or 0)
-            _checkin = _r.checkin_date
-            if _checkin and _checkin.replace(day=1) == period:
-                _prorated = float(prorated_first_month_rent(float(_r.agreed_rent or 0), _checkin))
-                # Apply waiver/adjustment to first-month rent (matches get_tenant_dues).
-                _prorated = max(0.0, _prorated + float(_r.adjustment or 0))
-                _overflow = max(0.0, _rent_paid - _prorated)
-                _rent_dues = max(0.0, _prorated - _rent_paid)
-                _dep_due = max(0.0, _dep_agreed - (_dep_paid + _overflow) - _booking)
-            else:
-                _rent_dues = max(0.0, _eff - _rent_paid)
-                _dep_due = max(0.0, _dep_agreed - _dep_paid - _booking)
-            _total = _rent_dues + _dep_due
+            # Shared split math — MUST match the dues-list panel + get_tenant_dues.
+            _adj = float(_r.adjustment or 0)
+            _total = monthly_dues(
+                period=period, as_of=today,
+                checkin_date=_r.checkin_date,
+                agreed_rent=_r.agreed_rent,
+                security_deposit=_r.security_deposit,
+                rent_due=float(_r.effective_due or 0) - _adj, adjustment=_adj,
+                rent_paid=_r.rent_paid, deposit_paid=_r.dep_paid,
+                booking_paid_rows=_r.booking_paid,
+                booking_amount_field=_r.booking_amount,
+            ).total
             if _total > 0:
                 overdue_tenants += 1
                 overdue_amount += _total
@@ -631,24 +625,18 @@ async def get_kpi_detail(
             )).all()
             items = []
             for r in rows:
-                eff = float(r.effective_due or 0)
-                rent_paid = float(r.rent_paid or 0)
-                dep_paid = float(r.dep_paid or 0)
-                # Advance credit: history booking rows first, field fallback.
-                booking_amt = booking_credit(r.booking_paid, r.booking_amount)
-                dep_agreed = float(r.security_deposit or 0)
-                checkin = r.checkin_date
-                if checkin and checkin.replace(day=1) == period:
-                    prorated = float(prorated_first_month_rent(float(r.agreed_rent or 0), checkin))
-                    # Apply waiver/adjustment to first-month rent (matches get_tenant_dues).
-                    prorated = max(0.0, prorated + float(r.adjustment or 0))
-                    overflow = max(0.0, rent_paid - prorated)
-                    rent_dues = max(0.0, prorated - rent_paid)
-                    dep_due = max(0.0, dep_agreed - (dep_paid + overflow) - booking_amt)
-                else:
-                    rent_dues = max(0.0, eff - rent_paid)
-                    dep_due = max(0.0, dep_agreed - dep_paid - booking_amt)
-                total_dues = rent_dues + dep_due
+                # Shared split math — MUST match the KPI tile + get_tenant_dues.
+                adj = float(r.adjustment or 0)
+                total_dues = monthly_dues(
+                    period=period, as_of=today,
+                    checkin_date=r.checkin_date,
+                    agreed_rent=r.agreed_rent,
+                    security_deposit=r.security_deposit,
+                    rent_due=float(r.effective_due or 0) - adj, adjustment=adj,
+                    rent_paid=r.rent_paid, deposit_paid=r.dep_paid,
+                    booking_paid_rows=r.booking_paid,
+                    booking_amount_field=r.booking_amount,
+                ).total
                 if total_dues <= 0:
                     continue
                 items.append({
@@ -1337,9 +1325,9 @@ async def get_recent_checkins(
         first_period = date(checkin.year, checkin.month, 1)
 
         due_info = rent_due_map.get(tid)
-        first_due = due_info[0] if due_info else (
-            float(r.agreed_rent or 0) + float(r.security_deposit or 0)
-            - float(r.booking_amount or 0)
+        # No RS row yet → same bundled first-month formula as first_month_rent_due.
+        first_due = due_info[0] if due_info else first_month_due(
+            r.agreed_rent, r.security_deposit, r.booking_amount, checkin
         )
 
         first_paid = sum(

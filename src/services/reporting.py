@@ -255,18 +255,12 @@ async def collection_summary(
     # ── Pending — canonical formula (matches kpi.py), NOT max(expected-collected,0) ─
     # paid = rent payments for this period_month
     #      + deposit/booking received in this calendar month (offset first-month rent_due)
+    from src.services.dues import paid_toward_period_clause
     _paid_sq = (
         select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
         .where(
             Payment.is_void == False,
-            or_(
-                and_(Payment.for_type == PaymentFor.rent,
-                     Payment.period_month == from_date),
-                and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                     Payment.period_month.is_(None),
-                     Payment.payment_date >= from_date,
-                     Payment.payment_date < next_month),
-            ),
+            paid_toward_period_clause(from_date, next_month),
         )
         .group_by(Payment.tenancy_id)
         .subquery()
