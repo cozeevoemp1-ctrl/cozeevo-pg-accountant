@@ -38,8 +38,12 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     # receivables, never opex. Jun-30 ₹5L; more legs expected in July CSV. The Feb ₹6L
     # repayment through the same account is caught by the "Repayment" rule above.
     ("Non-Operating",        "Hand Loan to Bava (Bunk)",     ["chandrasekhar service"]),
+    # Any transfer whose narration itself says "hand loan" is a loan, never opex.
+    ("Non-Operating",        "Hand Loan (narration)",        ["hand loan"]),
 
     # ── PROPERTY RENT ─────────────────────────────────────────────────────────
+    # Kaveri water routed via landlord — must outrank the landlord-name rules
+    ("Water",                "Kaveri Water (via landlord)",  ["kaveri water"]),
     ("Property Rent",        "Vakkal Sravani",               ["vakkal", "sravani"]),
     ("Property Rent",        "R Suma",                       ["r suma", "rsuma"]),
     ("Property Rent",        "Raghu Nandha Mandadi",         ["raghu nandha"]),
@@ -159,7 +163,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "WorkIndia (Recruitment)",      ["workindia","work india"]),
     ("Staff & Labour",       "Staff - kn.ravikumar",         ["kn.ravikumar","ravikumar80"]),
     ("Staff & Labour",       "Staff - sachindivya",          ["sachindivya"]),
-    ("Staff & Labour",       "Housekeeping / Cleaning Staff",["housekeep","salamtajamul","sarojrout","dilliprout","swamisarang","manisha","9398545495","9611622637","9071242117","8837062479","imranaaazmi58","rabhasoma4"]),
+    ("Staff & Labour",       "Housekeeping / Cleaning Staff",["housekeep","jalluram","salamtajamul","sarojrout","dilliprout","swamisarang","manisha","9398545495","9611622637","9071242117","8837062479","imranaaazmi58","rabhasoma4"]),
     ("Staff & Labour",       "Urban Company (Cleaning Svc)", ["urbancompany","urban company"]),
     ("Staff & Labour",       "Salary - Vivek",               ["6202601070","6287677379"]),
     ("Staff & Labour",       "Salary - Bhukesh",             ["bn895975"]),
@@ -260,6 +264,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Maintenance & Repairs","Key Maker (9148809732)",        ["9148809732"]),
     ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith","seals"]),
     ("Maintenance & Repairs","Fridge Delivery / Appliance",  ["fridge delivery","fridge"]),
+    ("Maintenance & Repairs","Sump / Tank Cleaning",         ["sump clean"]),
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain","stabilizer","stabiliser"]),
 
     # ── BANK CHARGES ──────────────────────────────────────────────────────────
