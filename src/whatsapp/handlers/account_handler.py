@@ -988,52 +988,10 @@ async def _calc_outstanding_dues(tenancy_id: int, session: AsyncSession) -> tupl
     For partial months, deducts what's already been paid.
     Also imported by owner_handler for _room_status and _do_checkout.
     """
-    pending_schedules_result = await session.execute(
-        select(RentSchedule).where(
-            RentSchedule.tenancy_id == tenancy_id,
-            RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-        )
-    )
-    outstanding_rent = Decimal("0")
-    outstanding_maintenance = Decimal("0")
-
-    for rs in pending_schedules_result.scalars().all():
-        # Rent: due minus already paid (rent payments + deposit/booking in same calendar month)
-        period_start = rs.period_month
-        period_end = date(
-            period_start.year + (1 if period_start.month == 12 else 0),
-            period_start.month % 12 + 1,
-            1,
-        )
-        paid_rent = await session.scalar(
-            select(func.sum(Payment.amount)).where(
-                Payment.tenancy_id == tenancy_id,
-                Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent,
-                         Payment.period_month == rs.period_month),
-                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                         Payment.period_month.is_(None),
-                         Payment.payment_date >= period_start,
-                         Payment.payment_date < period_end),
-                ),
-            )
-        ) or Decimal("0")
-        effective_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
-        outstanding_rent += max(Decimal("0"), effective_due - paid_rent)
-
-        # Maintenance: due minus already paid
-        paid_maint = await session.scalar(
-            select(func.sum(Payment.amount)).where(
-                Payment.tenancy_id == tenancy_id,
-                Payment.period_month == rs.period_month,
-                Payment.for_type == PaymentFor.maintenance,
-                Payment.is_void == False,
-            )
-        ) or Decimal("0")
-        maint_due = rs.maintenance_due or Decimal("0")
-        outstanding_maintenance += max(Decimal("0"), maint_due - paid_maint)
-
+    from src.services.dues import outstanding_months
+    months = await outstanding_months(session, tenancy_id)
+    outstanding_rent = sum((m.remaining for m in months), Decimal("0"))
+    outstanding_maintenance = sum((m.maintenance_remaining for m in months), Decimal("0"))
     return outstanding_rent, outstanding_maintenance
 
 
@@ -1071,18 +1029,12 @@ async def _query_dues(entities: dict, ctx: CallerContext, session: AsyncSession)
     # received in this calendar month (period_month IS NULL for those).
     # Matches kpi.py logic exactly — first-month tenants have deposit baked into
     # rent_due, so deposit payments must be subtracted too.
+    from src.services.dues import paid_toward_period_clause
     _paid_sq = (
         select(Payment.tenancy_id, func.sum(Payment.amount).label("paid"))
         .where(
             Payment.is_void == False,
-            or_(
-                and_(Payment.for_type == PaymentFor.rent,
-                     Payment.period_month == query_month),
-                and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                     Payment.period_month.is_(None),
-                     Payment.payment_date >= query_month,
-                     Payment.payment_date < query_month_last + timedelta(days=1)),
-            ),
+            paid_toward_period_clause(query_month, query_month_last + timedelta(days=1)),
         )
         .group_by(Payment.tenancy_id)
         .subquery()

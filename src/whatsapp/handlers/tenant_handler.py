@@ -94,25 +94,14 @@ async def _my_balance(entities: dict, ctx: CallerContext, session: AsyncSession)
                 f"No rent record found for {asked_month.strftime('%B %Y')}.\n"
                 "Please contact the PG office if you have questions."
             )
-        # Canonical payment query: rent payments for this period + deposit/booking
-        # received in this calendar month (deposit is baked into first-month rent_due)
-        _am_end = date(
-            asked_month.year + (1 if asked_month.month == 12 else 0),
-            asked_month.month % 12 + 1,
-            1,
-        )
+        # Canonical paid filter — services/dues.py single source.
+        from src.services.dues import paid_toward_period_clause, period_bounds
+        _am_start, _am_end = period_bounds(asked_month)
         paid = await session.scalar(
             select(func.sum(Payment.amount)).where(
                 Payment.tenancy_id == tenancy.id,
                 Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent,
-                         Payment.period_month == asked_month),
-                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                         Payment.period_month.is_(None),
-                         Payment.payment_date >= asked_month,
-                         Payment.payment_date < _am_end),
-                ),
+                paid_toward_period_clause(_am_start, _am_end),
             )
         ) or Decimal("0")
 

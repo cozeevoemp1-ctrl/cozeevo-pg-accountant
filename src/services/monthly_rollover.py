@@ -46,30 +46,17 @@ async def _prev_outstanding(session, tenancy_id: int, prev_period: date) -> Deci
     if not rs:
         return Decimal("0")
 
-    # prev_end = first day of current period (exclusive upper bound for payment_date)
-    prev_end = date(
-        prev_period.year + (1 if prev_period.month == 12 else 0),
-        prev_period.month % 12 + 1,
-        1,
-    )
+    # Canonical paid filter + remaining math — services/dues.py single source.
+    from src.services.dues import paid_toward_period_clause, period_bounds, period_remaining
+    prev_start, prev_end = period_bounds(prev_period)
     paid = await session.scalar(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(
             Payment.tenancy_id == tenancy_id,
             Payment.is_void == False,
-            or_(
-                and_(Payment.for_type == PaymentFor.rent,
-                     Payment.period_month == prev_period),
-                and_(
-                    Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                    Payment.period_month == None,
-                    Payment.payment_date >= prev_period,
-                    Payment.payment_date < prev_end,
-                ),
-            ),
+            paid_toward_period_clause(prev_start, prev_end),
         )
     )
-    due = rs.rent_due + (rs.adjustment or Decimal("0")) - Decimal(str(paid or 0))
-    return max(due, Decimal("0"))
+    return period_remaining(rs.rent_due, rs.adjustment, paid)
 
 
 async def generate_rent_schedule_for_month(year: int, month: int) -> dict:

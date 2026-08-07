@@ -425,50 +425,19 @@ async def build_dues_snapshot(
     tenancy = await session.get(Tenancy, tenancy_id)
     tenant_notes = tenancy.notes if tenancy else None
 
-    # Get all pending/partial rent_schedule rows, ordered oldest first
-    rs_result = await session.execute(
-        select(RentSchedule).where(
-            RentSchedule.tenancy_id == tenancy_id,
-            RentSchedule.status.in_([RentStatus.pending, RentStatus.partial]),
-        ).order_by(RentSchedule.period_month.asc())
-    )
+    # Shared per-month math (services/dues.py) — same numbers as PWA + checkout.
+    from src.services.dues import outstanding_months
     months = []
     total_outstanding = Decimal("0")
-
-    for rs in rs_result.scalars().all():
-        # Match PWA logic: rent payments for this period_month + deposit/booking
-        # payments received in this calendar month (deposit is baked into first-month rent_due)
-        period_start = rs.period_month
-        period_end = date(
-            period_start.year + (1 if period_start.month == 12 else 0),
-            period_start.month % 12 + 1,
-            1,
-        )
-        paid = await session.scalar(
-            select(func.sum(Payment.amount)).where(
-                Payment.tenancy_id == tenancy_id,
-                Payment.is_void == False,
-                or_(
-                    and_(Payment.for_type == PaymentFor.rent,
-                         Payment.period_month == rs.period_month),
-                    and_(Payment.for_type.in_([PaymentFor.deposit, PaymentFor.booking]),
-                         Payment.period_month.is_(None),
-                         Payment.payment_date >= period_start,
-                         Payment.payment_date < period_end),
-                ),
-            )
-        ) or Decimal("0")
-        effective_due = (rs.rent_due or Decimal("0")) + (rs.adjustment or Decimal("0"))
-        remaining = max(Decimal("0"), effective_due - paid)
-        total_outstanding += remaining
-        status_label = "partial" if paid > 0 else "unpaid"
+    for m in await outstanding_months(session, tenancy_id):
+        total_outstanding += m.remaining
         months.append({
-            "period": rs.period_month,
-            "due": effective_due,
-            "paid": paid,
-            "remaining": remaining,
-            "status": status_label,
-            "notes": rs.notes,
+            "period": m.period,
+            "due": m.effective_due,
+            "paid": m.paid,
+            "remaining": m.remaining,
+            "status": m.status,
+            "notes": m.notes,
         })
 
     # Build text
