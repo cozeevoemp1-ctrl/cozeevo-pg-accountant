@@ -262,9 +262,16 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             await session.flush()
 
             _mode = PaymentMode.upi if req.advance_mode == "upi" else PaymentMode.cash
+            # Same hash recipe as log_payment (services/payments.py) so the
+            # uq_payment_unique_hash partial index blocks a double-submitted
+            # advance — this raw insert was the only unguarded Payment writer
+            # on the PWA path (audit 2026-08-06 §5).
+            import hashlib as _hashlib
+            _amount_dec = Decimal(str(req.booking_amount))
+            _hash_raw = f"{tenancy.id}:{date.today()}:{_amount_dec}:{_mode.value}::{PaymentFor.booking.value}"
             _pmt = Payment(
                 tenancy_id=tenancy.id,
-                amount=Decimal(str(req.booking_amount)),
+                amount=_amount_dec,
                 # Money is in hand NOW — stamping the future check-in date put the
                 # advance in the wrong month's collection and made the receipt read
                 # like a payment that hasn't happened yet.
@@ -272,9 +279,18 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 payment_mode=_mode,
                 for_type=PaymentFor.booking,
                 notes=f"Advance collected at pre-booking ({req.advance_mode or 'cash'})",
+                unique_hash=_hashlib.md5(_hash_raw.encode()).hexdigest(),
             )
             session.add(_pmt)
-            await session.flush()  # need _pmt.id for audit entry
+            try:
+                await session.flush()  # need _pmt.id for audit entry
+            except Exception as _exc:
+                if "unique_hash" in str(_exc):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Advance already recorded for this booking today (duplicate submit).",
+                    ) from _exc
+                raise
 
             from src.services.audit import write_audit_entry as _wae
             await _wae(

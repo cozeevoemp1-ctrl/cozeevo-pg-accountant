@@ -439,10 +439,27 @@ async def add_cash_expense(
     if body["paid_by"] not in ("Prabhakaran", "Lakshmi", "Other"):
         raise HTTPException(status_code=400, detail="paid_by must be Prabhakaran, Lakshmi, or Other")
 
+    desc_clean = str(body["description"]).strip()
     async with get_session() as session:
+        # Dedup guard: double-tap / double-submit created two identical rows
+        # (audit 2026-08-06 §5). Same date+amount+description+payer = duplicate.
+        dup = await session.scalar(
+            select(CashExpense.id).where(
+                CashExpense.date == exp_date,
+                CashExpense.amount == amount,
+                func.lower(CashExpense.description) == desc_clean.lower(),
+                CashExpense.paid_by == body["paid_by"],
+                CashExpense.is_void == False,
+            ).limit(1)
+        )
+        if dup:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate: identical expense already logged (id {dup}). Void it first if this is intentional.",
+            )
         expense = CashExpense(
             date=exp_date,
-            description=str(body["description"]).strip(),
+            description=desc_clean,
             amount=amount,
             paid_by=body["paid_by"],
             created_by=user.phone,
@@ -551,6 +568,19 @@ async def log_cash_count(
         raise HTTPException(status_code=400, detail="counted_by must be Prabhakaran or Lakshmi")
 
     async with get_session() as session:
+        # Dedup guard: double-tap created two identical count rows (audit 2026-08-06 §5).
+        dup = await session.scalar(
+            select(CashCount.id).where(
+                CashCount.date == count_date,
+                CashCount.amount == amount,
+                CashCount.counted_by == body["counted_by"],
+            ).limit(1)
+        )
+        if dup:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate: identical count already logged for {count_date} (id {dup}).",
+            )
         count = CashCount(
             date=count_date,
             amount=amount,
