@@ -211,10 +211,6 @@ export function createPayment(body: PaymentCreate): Promise<PaymentResponse> {
   return _post("/api/v2/app/payments", body);
 }
 
-export function extractPaymentIntent(transcript: string): Promise<PaymentIntent> {
-  return _post("/api/v2/app/voice/intent", { transcript });
-}
-
 export interface TenantSearchResult {
   tenancy_id: number;
   tenant_id: number;

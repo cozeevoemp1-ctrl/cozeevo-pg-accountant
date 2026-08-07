@@ -3,12 +3,12 @@ src/api/v2/auth_hooks.py
 ========================
 Custom Supabase SMS provider webhook.
 
-Supabase Auth → POST /api/v2/auth/send-otp with {"phone": "+91...", "otp": "123456"}
+Supabase Auth → POST /api/v2/app/auth/send-otp with {"phone": "+91...", "otp": "123456"}
 We send the OTP via WhatsApp instead of SMS (no Twilio required).
 
 Configure in Supabase Dashboard:
   Authentication → SMS Provider → Custom → Webhook URL:
-    https://api.getkozzy.com/api/v2/auth/send-otp
+    https://api.getkozzy.com/api/v2/app/auth/send-otp
 """
 import logging
 import os

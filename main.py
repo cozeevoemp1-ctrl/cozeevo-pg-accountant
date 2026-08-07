@@ -44,10 +44,7 @@ class LocalOnlyMiddleware:
                 or path == "/qr"
                 or path.startswith("/admin/onboarding")
                 or path.startswith("/api/onboarding")
-                or path.startswith("/admin/checkout")
-                or path.startswith("/checkout")
-                or path.startswith("/api/checkout")
-                or path.startswith("/api/sync")
+                or path.startswith("/api/checkout")  # 410 tombstones
                 or path.startswith("/api/v2/app")):
             await self.app(scope, receive, send)
             return
@@ -179,91 +176,17 @@ app.include_router(chat_router)
 from src.api.onboarding_router import router as onboarding_router, _check_admin_pin, _rate_check
 app.include_router(onboarding_router)
 
+# Legacy PIN checkout stack — all routes are 410 tombstones (Phase 3, 2026-08-07).
+# v2 /api/v2/app/checkout/* is the only live checkout path (validates refunds).
 from src.api.checkout_router import router as checkout_router
 app.include_router(checkout_router)
 
 from src.api.v2 import app_router
 app.include_router(app_router)
 
-# ── Ingest API ─────────────────────────────────────────────────────────────
-
-from fastapi import APIRouter, UploadFile, File, Form
-import shutil, uuid, asyncio
-
-ingest_router = APIRouter(prefix="/api/ingest", tags=["ingestion"])
-
-@ingest_router.post("/upload")
-async def upload_file(request: Request, file: UploadFile = File(...)):
-    """Upload a CSV/PDF for ingestion."""
-    _check_admin_pin(request)
-    raw_dir = Path(os.getenv("DATA_RAW_DIR", "./data/raw"))
-    raw_dir.mkdir(parents=True, exist_ok=True)
-
-    ext = Path(file.filename or "").suffix.lower()
-    _ALLOWED_EXT = {".csv", ".pdf"}
-    _ALLOWED_MIME = {
-        "text/csv", "text/plain", "application/csv",
-        "application/vnd.ms-excel", "application/pdf",
-    }
-    if ext not in _ALLOWED_EXT:
-        raise HTTPException(400, f"Only CSV and PDF files are accepted (got extension {ext!r})")
-    mime = (file.content_type or "").split(";")[0].strip().lower()
-    if mime and mime not in _ALLOWED_MIME:
-        raise HTTPException(400, f"MIME type {mime!r} not allowed for upload")
-
-    filename = f"upload_{uuid.uuid4().hex[:8]}{ext}"
-    out_path = raw_dir / filename
-
-    with out_path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    # Ingest in background
-    asyncio.create_task(_bg_ingest(str(out_path)))
-    return {"status": "queued", "file": filename}
-
-@ingest_router.post("/scan")
-async def scan_raw_folder(request: Request):
-    """Scan data/raw/ for new unprocessed files and ingest them."""
-    _check_admin_pin(request)
-    raw_dir     = Path(os.getenv("DATA_RAW_DIR", "./data/raw"))
-    proc_dir    = Path(os.getenv("DATA_PROCESSED_DIR", "./data/processed"))
-    proc_dir.mkdir(parents=True, exist_ok=True)
-
-    files = list(raw_dir.glob("*.csv")) + list(raw_dir.glob("*.pdf"))
-    results = []
-    for f in files:
-        try:
-            await _bg_ingest(str(f))
-            shutil.move(str(f), str(proc_dir / f.name))
-            results.append({"file": f.name, "status": "ingested"})
-        except Exception as e:
-            results.append({"file": f.name, "status": "error", "error": str(e)})
-    return {"ingested": len([r for r in results if r["status"] == "ingested"]), "results": results}
-
-async def _bg_ingest(file_path: str):
-    from src.parsers.dispatcher import parse_file
-    from src.rules.deduplication import batch_deduplicate
-    from src.rules.categorization_rules import classify_batch
-    from src.database.db_manager import upsert_transaction, get_category_by_name
-
-    raw = parse_file(file_path)
-    unique, _ = batch_deduplicate(raw)
-    classified = classify_batch(unique)
-
-    for txn in classified:
-        cat = await get_category_by_name(txn.get("category", "Miscellaneous"))
-        txn_clean = {k: txn.get(k) for k in [
-            "date", "amount", "txn_type", "source", "description",
-            "upi_reference", "merchant", "unique_hash", "raw_data",
-            "ai_classified", "confidence",
-        ]}
-        if cat:
-            txn_clean["category_id"] = cat.id
-        await upsert_transaction(txn_clean)
-
-app.include_router(ingest_router)
-
 # ── Reconciliation API ─────────────────────────────────────────────────────
+
+from fastapi import APIRouter
 
 recon_router = APIRouter(prefix="/api/reconcile", tags=["reconciliation"])
 
@@ -289,12 +212,6 @@ async def reconcile(request: Request, req: ReconcileRequest):
     return await engine.daily_reconcile()
 
 app.include_router(recon_router)
-
-# ── Report API ─────────────────────────────────────────────────────────────
-
-report_router = APIRouter(prefix="/api/report", tags=["reports"])
-
-app.include_router(report_router)
 
 # ── Static / media serving ────────────────────────────────────────────────
 
@@ -362,54 +279,6 @@ async def serve_admin_onboarding():
     if not form_path.exists():
         return HTMLResponse("<h1>Admin panel not available yet</h1>", status_code=404)
     return HTMLResponse(form_path.read_text(encoding="utf-8"))
-
-@app.get("/admin/checkout", response_class=HTMLResponse)
-async def serve_admin_checkout():
-    """Serve the admin checkout panel."""
-    form_path = Path("static/checkout_admin.html")
-    if not form_path.exists():
-        return HTMLResponse("<h1>Checkout form not available yet</h1>", status_code=404)
-    return HTMLResponse(form_path.read_text(encoding="utf-8"))
-
-@app.get("/checkout/{token}", response_class=HTMLResponse)
-async def serve_checkout_confirm(token: str):
-    """Serve the tenant-facing checkout summary + confirm/dispute page."""
-    form_path = Path("static/checkout_confirm.html")
-    if not form_path.exists():
-        return HTMLResponse("<h1>Checkout form not available yet</h1>", status_code=404)
-    return HTMLResponse(form_path.read_text(encoding="utf-8"))
-
-# ── Pending entity approval API ───────────────────────────────────────────
-
-entity_router = APIRouter(prefix="/api/entities", tags=["master-data"])
-
-@entity_router.get("/pending")
-async def get_pending(request: Request):
-    from src.api.onboarding_router import _check_admin_pin
-    _check_admin_pin(request)
-    from src.database.db_manager import get_pending_entities
-    items = await get_pending_entities()
-    return [{"id": p.id, "type": p.entity_type, "data": p.raw_data} for p in items]
-
-@entity_router.post("/{entity_id}/approve")
-async def approve(entity_id: int, request: Request):
-    from src.api.onboarding_router import _check_admin_pin
-    _check_admin_pin(request)
-    from src.database.db_manager import approve_pending_entity
-    result = await approve_pending_entity(entity_id)
-    if not result:
-        raise HTTPException(404, "Pending entity not found")
-    return result
-
-@entity_router.post("/{entity_id}/reject")
-async def reject(entity_id: int, request: Request):
-    from src.api.onboarding_router import _check_admin_pin
-    _check_admin_pin(request)
-    from src.database.db_manager import reject_pending_entity
-    await reject_pending_entity(entity_id)
-    return {"status": "rejected"}
-
-app.include_router(entity_router)
 
 # ── Test utilities (TEST_MODE=1 only) ────────────────────────────────────
 

@@ -358,39 +358,7 @@ async def direct_checkin_removed(_request: Request):
 
 
 # ── List pending sessions (admin) ────────────────────────────────────────────
-
-@router.get("/admin/stats")
-async def onboarding_stats(request: Request, date_from: str = "", date_to: str = ""):
-    _check_admin_pin(request)
-    """Onboarding stats with optional date filter."""
-    from sqlalchemy import func
-    async with get_session() as session:
-        q = select(OnboardingSession.status, func.count()).group_by(OnboardingSession.status)
-        if date_from:
-            q = q.where(OnboardingSession.created_at >= date.fromisoformat(date_from))
-        if date_to:
-            q = q.where(OnboardingSession.created_at < date.fromisoformat(date_to) + timedelta(days=1))
-        result = await session.execute(q)
-        counts = {row[0]: row[1] for row in result.all()}
-
-        # Today's approved count
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_q = select(func.count()).where(
-            OnboardingSession.status == "approved",
-            OnboardingSession.approved_at >= today_start
-        )
-        today_approved = await session.scalar(today_q) or 0
-
-        return {
-            "total": sum(counts.values()),
-            "approved": counts.get("approved", 0),
-            "pending_tenant": counts.get("pending_tenant", 0),
-            "pending_review": counts.get("pending_review", 0),
-            "cancelled": counts.get("cancelled", 0),
-            "expired": counts.get("expired", 0),
-            "today_approved": today_approved,
-        }
-
+# (GET /admin/stats removed 2026-08-07 — no consumer; audit 2026-08-06.)
 
 @router.get("/admin/all")
 async def list_all_sessions(request: Request, status: str = "", date_from: str = "", date_to: str = ""):

@@ -17,7 +17,6 @@ from src.api.v2.checkouts import router as checkouts_router
 from src.api.v2.rooms import router as rooms_router
 from src.api.v2.reporting import router as reporting_router
 from src.api.v2.tenants import router as tenants_router
-from src.api.v2.voice import router as voice_router
 from src.api.v2.finance import router as finance_router
 from src.api.v2.blacklist import router as blacklist_router
 from src.api.v2.analytics import router as analytics_router
@@ -35,7 +34,6 @@ router.include_router(checkout_router)
 router.include_router(payments_router)
 router.include_router(reporting_router)
 router.include_router(tenants_router)
-router.include_router(voice_router)
 router.include_router(notices_router)
 router.include_router(reminders_router)
 router.include_router(checkouts_router)
