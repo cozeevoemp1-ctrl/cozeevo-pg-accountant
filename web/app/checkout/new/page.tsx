@@ -14,8 +14,7 @@ import {
   CheckoutCreateResponse,
 } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
-
-const NOTICE_BY_DAY = 5
+import { useAppConfig } from "@/lib/config"
 
 type RefundMode = "CASH" | "UPI" | "BANK"
 
@@ -69,6 +68,7 @@ function CheckBox({ label, checked, onChange }: { label: string; checked: boolea
 function NewCheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { notice_by_day: NOTICE_BY_DAY } = useAppConfig()
 
   const [tenant,        setTenant]        = useState<TenantSearchResult | null>(null)
   const [tenantFromUrl, setTenantFromUrl] = useState(false)

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
+import { useAppConfig } from "@/lib/config"
 
 function formatDate(iso: string | null): string {
   if (!iso) return ""
@@ -15,6 +16,7 @@ export default function EditTenantPage() {
   const router = useRouter()
   const params = useParams()
   const tenancyId = Number(params.tenancy_id)
+  const { notice_by_day: NOTICE_BY_DAY } = useAppConfig()
 
   const [original, setOriginal] = useState<TenantDues | null>(null)
   const [loading, setLoading] = useState(true)
@@ -284,8 +286,8 @@ export default function EditTenantPage() {
 
   const DELETE_REASONS = ["Cancelled booking", "Wrong booking", "Double booking", "Other"]
 
-  // Deposit refundable only with on-time notice (on/before 5th); late notice forfeits it.
-  const depositEligible = noticeDate ? new Date(noticeDate + "T00:00:00").getDate() <= 5 : null
+  // Deposit refundable only with on-time notice (on/before NOTICE_BY_DAY); late notice forfeits it.
+  const depositEligible = noticeDate ? new Date(noticeDate + "T00:00:00").getDate() <= NOTICE_BY_DAY : null
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
   const roomChanged = original && roomNumber.trim() && roomNumber.trim().toUpperCase() !== original.room_number.toUpperCase()
 
@@ -755,7 +757,7 @@ export default function EditTenantPage() {
               setNoticeDate(v)
               if (v) {
                 const d = new Date(v)
-                const onTime = d.getDate() <= 5
+                const onTime = d.getDate() <= NOTICE_BY_DAY
                 // Auto-calculate last day: on-time → end of this month, late → end of next month
                 const yr = d.getFullYear(), mo = d.getMonth()
                 const lastDay = onTime
@@ -770,9 +772,9 @@ export default function EditTenantPage() {
             }} />
             {noticeDate && (
               <p className="text-[10px] text-ink-muted mt-1 px-1">
-                {new Date(noticeDate).getDate() <= 5
-                  ? "Given on/before 5th — exits end of this month, deposit refundable"
-                  : "Given after 5th — next month's cycle applies, full month rent required, deposit forfeited"}
+                {new Date(noticeDate).getDate() <= NOTICE_BY_DAY
+                  ? `Given on/before ${NOTICE_BY_DAY}th — exits end of this month, deposit refundable`
+                  : `Given after ${NOTICE_BY_DAY}th — next month's cycle applies, full month rent required, deposit forfeited`}
               </p>
             )}
           </div>

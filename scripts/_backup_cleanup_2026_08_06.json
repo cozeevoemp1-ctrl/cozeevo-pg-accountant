@@ -1,0 +1,211 @@
+{
+  "executed_at": null,
+  "write_mode": true,
+  "payments": [
+    {
+      "id": 21449,
+      "tenancy_id": 1222,
+      "amount": "7000.00",
+      "payment_date": "2026-06-19",
+      "payment_mode": "cash",
+      "upi_reference": null,
+      "for_type": "rent",
+      "period_month": "2026-06-01",
+      "received_by_staff_id": null,
+      "notes": "Logged by Lokesh",
+      "is_void": false,
+      "created_at": "2026-06-19T14:05:41.124138",
+      "receipt_url": null,
+      "org_id": 1,
+      "unique_hash": "06411bee2ad365e2ee5f41391d07819c"
+    },
+    {
+      "id": 21450,
+      "tenancy_id": 1222,
+      "amount": "7000.00",
+      "payment_date": "2026-06-19",
+      "payment_mode": "cash",
+      "upi_reference": null,
+      "for_type": "rent",
+      "period_month": "2026-07-01",
+      "received_by_staff_id": null,
+      "notes": "Logged by Lokesh",
+      "is_void": false,
+      "created_at": "2026-06-19T14:08:05.949591",
+      "receipt_url": null,
+      "org_id": 1,
+      "unique_hash": "059776d1b0b76831e75740f8e6b1a1a7"
+    },
+    {
+      "id": 21676,
+      "tenancy_id": 1246,
+      "amount": "12000.00",
+      "payment_date": "2026-07-05",
+      "payment_mode": "upi",
+      "upi_reference": null,
+      "for_type": "deposit",
+      "period_month": null,
+      "received_by_staff_id": null,
+      "notes": "Logged by Lokesh",
+      "is_void": false,
+      "created_at": "2026-07-05T16:13:11.473612",
+      "receipt_url": null,
+      "org_id": 1,
+      "unique_hash": "7154195130042b5c0344d8b9a2bb46c8"
+    },
+    {
+      "id": 21829,
+      "tenancy_id": 1246,
+      "amount": "12000.00",
+      "payment_date": "2026-07-05",
+      "payment_mode": "upi",
+      "upi_reference": null,
+      "for_type": "deposit",
+      "period_month": null,
+      "received_by_staff_id": null,
+      "notes": "Deposit dues collected at check-in (upi)",
+      "is_void": false,
+      "created_at": "2026-07-12T17:05:15.357595",
+      "receipt_url": null,
+      "org_id": 1,
+      "unique_hash": null
+    },
+    {
+      "id": 21866,
+      "tenancy_id": 684,
+      "amount": "16000.00",
+      "payment_date": "2026-07-26",
+      "payment_mode": "upi",
+      "upi_reference": null,
+      "for_type": "rent",
+      "period_month": "2026-08-01",
+      "received_by_staff_id": null,
+      "notes": "Logged by Lokesh",
+      "is_void": false,
+      "created_at": "2026-07-26T12:48:02.798555",
+      "receipt_url": null,
+      "org_id": 1,
+      "unique_hash": "0419dc9ecd0f4d6375b21ba279e585e6"
+    },
+    {
+      "id": 21867,
+      "tenancy_id": 684,
+      "amount": "16000.00",
+      "payment_date": "2026-07-26",
+      "payment_mode": "upi",
+      "upi_reference": null,
+      "for_type": "rent",
+      "period_month": "2026-09-01",
+      "received_by_staff_id": null,
+      "notes": "Logged by Lokesh",
+      "is_void": false,
+      "created_at": "2026-07-26T12:48:40.440423",
+      "receipt_url": null,
+      "org_id": 1,
+      "unique_hash": "bbcd2651f5f5dd68c0f40f7f15c2fbc3"
+    }
+  ],
+  "rent_schedule_1226": [
+    {
+      "id": 15926,
+      "tenancy_id": 1226,
+      "period_month": "2026-07-01",
+      "rent_due": "1450.00",
+      "maintenance_due": "0.00",
+      "status": "pending",
+      "due_date": "2026-07-01",
+      "notes": null,
+      "adjustment": "0.00",
+      "adjustment_note": null,
+      "org_id": 1
+    }
+  ],
+  "onboarding_sessions": [
+    {
+      "id": 214,
+      "status": "pending_review",
+      "tenancy_id": 1220,
+      "tenant_name": "Vedant Merai"
+    },
+    {
+      "id": 223,
+      "status": "pending_review",
+      "tenancy_id": 1234,
+      "tenant_name": "Sourabh Ravindra Lande"
+    },
+    {
+      "id": 226,
+      "status": "pending_review",
+      "tenancy_id": 1237,
+      "tenant_name": "Rajanala Sai dheeraj"
+    },
+    {
+      "id": 227,
+      "status": "pending_review",
+      "tenancy_id": 1238,
+      "tenant_name": "Lohitaksh Maruvada"
+    },
+    {
+      "id": 229,
+      "status": "pending_review",
+      "tenancy_id": 1240,
+      "tenant_name": "Siddanathi Krishna Rakesh"
+    },
+    {
+      "id": 230,
+      "status": "pending_review",
+      "tenancy_id": 1241,
+      "tenant_name": "Sushil Pandey"
+    },
+    {
+      "id": 235,
+      "status": "pending_review",
+      "tenancy_id": 1248,
+      "tenant_name": "Ankush Marlingannavar"
+    },
+    {
+      "id": 249,
+      "status": "pending_review",
+      "tenancy_id": 1268,
+      "tenant_name": "GADDE BHARATH"
+    },
+    {
+      "id": 253,
+      "status": "pending_review",
+      "tenancy_id": 1272,
+      "tenant_name": "Lenin"
+    },
+    {
+      "id": 254,
+      "status": "pending_review",
+      "tenancy_id": 1273,
+      "tenant_name": "Madhupreetha. S"
+    },
+    {
+      "id": 279,
+      "status": "pending_tenant",
+      "tenancy_id": 1301,
+      "tenant_name": "Harshit Srivastava"
+    }
+  ],
+  "tenancy_1143": [
+    {
+      "id": 1143,
+      "status": "active",
+      "checkin_date": "2026-06-03",
+      "checkout_date": "2026-06-07",
+      "org_id": 1
+    }
+  ],
+  "t1143_payments_after_jun10": 1,
+  "tenancy_845": [
+    {
+      "id": 845,
+      "status": "exited",
+      "checkin_date": "2026-04-06",
+      "checkout_date": null,
+      "org_id": 1
+    }
+  ],
+  "checkout_records_845": []
+}

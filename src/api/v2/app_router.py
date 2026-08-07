@@ -58,3 +58,18 @@ def health(user: AppUser = Depends(get_current_user)):
 @router.get("/field-registry")
 def field_registry(_user: AppUser = Depends(get_current_user)):
     return {"fields": fields_for_pwa()}
+
+
+@router.get("/config")
+async def app_config(_user: AppUser = Depends(get_current_user)):
+    """Business-rule constants for the frontend — never hardcode these in UI
+    (spec rule 6). notice_by_day from services/property_logic (single source);
+    total_beds derived live from the rooms table (SaaS-ready, no constant).
+    """
+    from services.property_logic import NOTICE_BY_DAY
+    from src.database.db_manager import get_session
+    from src.services.occupancy import get_total_revenue_beds
+
+    async with get_session() as session:
+        total_beds = await get_total_revenue_beds(session)
+    return {"notice_by_day": NOTICE_BY_DAY, "total_beds": total_beds}

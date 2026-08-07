@@ -263,12 +263,19 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain","stabilizer","stabiliser"]),
 
     # ── BANK CHARGES ──────────────────────────────────────────────────────────
+    # ONLY genuine fee narrations. A bare IMPS/NEFT/RTGS narration is a TRANSFER
+    # PRINCIPAL, not a fee — the old rule booked full principals of unmatched
+    # NEFTs as Bank Charges opex (Session R bug; buyout names were shielded
+    # case-by-case but every other unmatched transfer still misrouted).
     ("Bank Charges",         "Debit Card Fee",               ["debit card replacement","card replace"]),
-    ("Bank Charges",         "Bank Transfer / IMPS / NEFT",  ["imps","rtgs","neft","yib-neft","net-neft"]),
+    ("Bank Charges",         "Transfer Charges",             ["neft chg","neft charge","imps chg","imps charge","rtgs chg","rtgs charge","neft fee","imps fee","chrg"]),
 
     # ── NON-OPERATING (defined at top of file now) ────────────────────────────
 
     # ── UNCLASSIFIED (catch-all) ───────────────────────────────────────────────
+    # Unmatched transfer principals: park visibly for the review-unknowns pass —
+    # never book as an expense category. Name the payee → add a rule above.
+    ("Other Expenses",       "Unclassified Bank Transfer",   ["imps","rtgs","neft"]),
     ("Other Expenses",       "Misc UPI Payments",            []),
 ]
 

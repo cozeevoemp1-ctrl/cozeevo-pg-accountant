@@ -39,6 +39,17 @@ async function _post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// ── App config (business-rule constants — never hardcode in UI) ─────────────
+
+export interface AppConfig {
+  notice_by_day: number;
+  total_beds: number;
+}
+
+export function fetchAppConfig(): Promise<AppConfig> {
+  return _get("/api/v2/app/config");
+}
+
 // ── Typed response shapes ────────────────────────────────────────────────────
 
 export interface CollectionSummary {
@@ -499,10 +510,6 @@ export interface OverdueTenant {
 
 export function getOverdueTenants(): Promise<OverdueTenant[]> {
   return _get<OverdueTenant[]>("/api/v2/app/reminders/overdue");
-}
-
-export function sendReminder(body: { tenancy_id?: number; send_all?: boolean }): Promise<{ sent: number[]; failed: number[] }> {
-  return _post<{ sent: number[]; failed: number[] }>("/api/v2/app/reminders/send", body);
 }
 
 // ── Notices ──────────────────────────────────────────────────────────────────

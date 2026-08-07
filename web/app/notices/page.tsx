@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation"
 import { getActiveNotices, patchTenant, NoticeItem } from "@/lib/api"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
-
-const NOTICE_BY_DAY = 5
+import { useAppConfig } from "@/lib/config"
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—"
@@ -46,6 +45,7 @@ function monthLabel(key: string): string {
 
 export default function NoticesPage() {
   const router = useRouter()
+  const { notice_by_day: NOTICE_BY_DAY } = useAppConfig()
   const [items,        setItems]        = useState<NoticeItem[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState("")
@@ -476,6 +476,7 @@ function NoticeCard({
   onCheckout: () => void
   onEdit: () => void
 }) {
+  const { notice_by_day: NOTICE_BY_DAY } = useAppConfig()
   const days = daysLabel(item.days_remaining)
   const noticeDay = item.notice_date ? new Date(item.notice_date + "T00:00:00").getDate() : null
   const eligibleRefund = item.deposit_eligible
