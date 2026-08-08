@@ -21,6 +21,8 @@ async def get_collection_summary(
     user: AppUser = Depends(get_current_user),
 ):
     """Return collection summary for a given month (YYYY-MM)."""
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     if not _MONTH_RE.match(period_month):
         raise HTTPException(status_code=422, detail="period_month must be YYYY-MM")
 
@@ -36,6 +38,8 @@ async def get_collection_history(
     user: AppUser = Depends(get_current_user),
 ):
     """Return collection summary for the last N months (newest first)."""
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     today = _date.today()
     results = []
     async with get_session() as session:

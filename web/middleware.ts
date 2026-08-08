@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
 
   // Use getSession() (cookie-only, no network call) so middleware is instant.
   // Actual data APIs verify the JWT on every request — this gate is just for UI routing.
-  let user: { user_metadata?: Record<string, unknown> } | null = null;
+  let user: { app_metadata?: Record<string, unknown> } | null = null;
   try {
     const { data: { session } } = await supabase.auth.getSession();
     user = session?.user ?? null;
@@ -48,7 +48,9 @@ export async function middleware(request: NextRequest) {
   // Finance routes → admin only
   const adminOnlyPaths = ["/finance", "/collection"];
   if (adminOnlyPaths.some(p => pathname.startsWith(p))) {
-    const role = user.user_metadata?.role as string | undefined;
+    // app_metadata is admin-only-writable (unlike user_metadata, which any
+    // logged-in user can self-edit via supabase.auth.updateUser()).
+    const role = user.app_metadata?.role as string | undefined;
     if (role !== "admin") {
       const homeUrl = request.nextUrl.clone();
       homeUrl.pathname = "/";

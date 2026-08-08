@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import date
 import calendar
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, and_
 
 from src.api.v2.auth import AppUser, get_current_user
@@ -22,6 +22,8 @@ async def get_checkouts(
     user: AppUser = Depends(get_current_user),
 ):
     """All tenants (monthly + day-wise) who checked out in the given month."""
+    if user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     today = date.today()
     if month:
         try:

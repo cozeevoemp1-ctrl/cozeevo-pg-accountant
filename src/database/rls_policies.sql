@@ -2,6 +2,18 @@
 -- Supabase Row Level Security (RLS) — Cozeevo PG Accountant
 -- Run this once in Supabase SQL Editor after tables are created.
 -- ============================================================
+--
+-- ** NOT CURRENTLY ENFORCED **
+-- The backend connects to Postgres as the `postgres` role (table owner),
+-- which bypasses RLS entirely regardless of these policies. The
+-- app.caller_phone session variable every policy below depends on is also
+-- never SET anywhere in the codebase (grep -rn "app.caller_phone" src/).
+-- All real authorization lives in the FastAPI/JWT layer
+-- (src/api/v2/auth.py + per-route role checks) — that is correct and
+-- intentional for this single-tenant deployment. This file is aspirational
+-- / for a future low-privilege DB role; do not assume it provides any
+-- protection today. See docs/SECURITY_AUDIT.md.
+-- ============================================================
 
 -- Step 1: Enable pgvector extension (for conversation_memory)
 CREATE EXTENSION IF NOT EXISTS vector;

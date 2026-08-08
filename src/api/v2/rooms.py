@@ -21,6 +21,8 @@ async def check_room_availability(
     _user: AppUser = Depends(get_current_user),
 ):
     """Check if a room exists and has free beds. Pass checkin_date to check future availability."""
+    if _user.role not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     room_number = room.upper().strip()
 
     checkin: date | None = None
