@@ -215,13 +215,15 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
         end = date(y, mo, _calendar.monthrange(y, mo)[1])
         period_date = date(y, mo, 1)
 
-        # Income by account (exclude security-deposit inflows — those are a liability)
+        # Income by account. Excluded: security-deposit inflows (liability) and
+        # Non-Operating credits (loan repayments / capital returns are never revenue
+        # — found live 2026-08-07: Chandra's ₹79,900 hand-loan repayment).
         inc_rows = await session.execute(
             select(BankTransaction.account_name, func.sum(BankTransaction.amount))
             .where(
                 BankTransaction.txn_type == "income",
                 BankTransaction.txn_date.between(start, end),
-                BankTransaction.category != "Advance Deposit",
+                BankTransaction.category.notin_(["Advance Deposit", "Non-Operating"]),
             )
             .group_by(BankTransaction.account_name)
         )
