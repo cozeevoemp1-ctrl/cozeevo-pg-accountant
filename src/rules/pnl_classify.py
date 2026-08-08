@@ -156,6 +156,7 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff - 7680814628 (Regular)", ["7680814628"]),
     ("Staff & Labour",       "Staff - 9110460729",           ["9110460729"]),
     ("Staff & Labour",       "Abhisek Mandal (Staff)",       ["9102937483"]),
+    ("Staff & Labour",       "Salary - Naveen",              ["9346853507"]),
     # 9342205440 = gas pipeline welding vendor — Maintenance & Repairs (confirmed Kiran 2026-05-30)
     ("Maintenance & Repairs","Gas Pipeline Welding (9342205440)", ["9342205440"]),
     ("Staff & Labour",       "Advance for Cook (Rampukar)",  ["rampukar","advance for cook","cooking t"]),
@@ -267,7 +268,8 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Maintenance & Repairs","Sump / Tank Cleaning",         ["sump clean"]),
     # Kiran rulings 2026-08-08 (classified 08_08.xlsx)
     ("Maintenance & Repairs","General Maintenance",          ["heat pump","hand shower","washing machine","alen ky","allen key"]),
-    ("Staff & Labour",       "Staff Advance",                ["lalbabukumar","master advance"]),
+    ("Staff & Labour",       "Staff Advance",                ["lalbabukumar","master advance","9346853507"]),
+    ("Staff & Labour",       "Staff - Inar Devi",            ["inar devi"]),
     ("Waste Disposal",       "Garbage / Supervisor",         ["garbage remov"]),
     ("Food & Groceries",     "Vegetables & Greens",          ["paneer","panner","mutter","tomoto","tomato","coriander","corrindar"]),
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain","stabilizer","stabiliser"]),

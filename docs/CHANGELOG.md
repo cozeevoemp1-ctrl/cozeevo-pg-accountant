@@ -1,5 +1,31 @@
 # Changelog
 
+## Session Y — 2026-08-08 — Broadcast messaging (manual, template-based) + WhatsApp CC reliability fix + July P&L correction
+
+### Summary
+Kiran wanted to check status of 2 pending WhatsApp templates, then send `laundry_rules_notice` to all active tenants as a real manual broadcast, plus scope out a future "type a message, send to tenants" feature for the PWA. Surfaced and fixed a real reliability bug in the CC mechanism along the way, then separately fixed a P&L misclassification Kiran flagged.
+
+- ✅ **`laundry_rules_notice` + `fridge_cleaning_notice`** — confirmed APPROVED on Meta (checked live via Graph API, memory was stale). Sent `laundry_rules_notice` to all 262 active tenants (`scripts/_send_laundry_notice.py`, one-off, dry-run by default, `--send` for live). First live attempt failed 404/0 sent — Meta silently normalized the template's language to `en_US` on approval (not `en` like other templates); fixed by passing `language_code="en_US"` explicitly. Retried and confirmed 262/262 sent.
+- ✅ **Submitted new template `custom_broadcast_notice`** (id `1403976844940891`, PENDING) — `Hi {{1}}, {{2}}, Thanks & regards, Team Cozeevo Coliving`. `{{1}}`=tenant name, `{{2}}`=operator-typed free text. This is the reusable wrapper for the future PWA broadcast-messaging feature (not built yet — see [[project_broadcast_messaging]]). Built + published a clickable mockup of that screen (Web v2 Host kit) for Kiran to review before real implementation.
+- 🐛 **Found + fixed: CC-to-operators reliability bug.** The original CC mechanism sent free-form text (`_send_whatsapp`) to Lokesh/Lakshmi/Prabhakaran/Kiran — only Kiran actually received it. Root cause: Meta's Cloud API returns HTTP 200 + a message ID for free-form text **even when it's about to silently drop the message** for being outside the 24h customer-service session window (checked via `whatsapp_log.from_number` — none of the 3 had messaged the bot in 2+ months). We don't capture Meta's delivery-status webhooks, so "200 OK" was misleading us, not just Kiran. **Fix:** CC now goes through the exact same `send_template()` path as the tenant broadcast (bypasses the window entirely) — operators are just added to the same send loop, receiving the literal tenant-facing message instead of an abstract summary. No new "CC summary" template needed. Re-sent to the 3 who missed it; all 3 accepted via the reliable path.
+- ✅ **Extended `rules_whatsapp_cc.md`** — CC now applies to ALL bulk/broadcast tenant sends (not just checkout notices), and documents the template-vs-free-form reliability finding so it isn't rediscovered.
+- ✅ **P&L fix: `9346853507` = Naveen (staff)**, 2 July transactions (₹15,000 + ₹9,000, was sitting in "Other Expenses / Misc UPI Payments") reclassified to Staff & Labour in DB, plus classifier rule added (`src/rules/pnl_classify.py`) so future imports auto-classify. July'26 Staff & Labour total now ₹1,70,143. July is computed live from `bank_transactions` on every P&L view (not frozen), so the DB fix is immediately reflected — no rebuild step needed.
+
+### Files touched
+- `scripts/_send_laundry_notice.py` (new, one-off) — dry-run/`--send` broadcast script; also sends the operator CC via the same reliable template path.
+- `src/rules/pnl_classify.py` — added `("Staff & Labour", "Salary - Naveen", ["9346853507"])`.
+- DB: `bank_transactions` id 3691, 3847 recategorized Staff & Labour.
+- Memory: `rules_whatsapp_cc.md` (extended + reliability fix documented), `reference_whatsapp_templates.md` (2 templates confirmed APPROVED, `custom_broadcast_notice` added PENDING), `project_broadcast_messaging.md` (new — decision + mockup + next steps), `reference_pnl_classifications.md` (Naveen entry).
+
+### Verification
+- ✅ Dry run matched 262 active tenants before live send.
+- ✅ 262/262 tenant sends confirmed (script summary).
+- ✅ CC re-verified via `whatsapp_log` DB rows + Meta 200 responses for all 4 operators on the reliable path.
+- ✅ July Staff & Labour total spot-checked via `_compute_dynamic_pnl_months()` directly (₹1,70,143, up from pre-fix).
+
+### Key lesson
+A `200 OK` from Meta's Cloud API is not proof of delivery for free-form text — it only proves acceptance. The 24h session-window check happens downstream and fails silently from our side (no delivery-status webhook wired up). Any CC/staff-notification mechanism must use an approved template, never free-form text, or it will intermittently and silently fail exactly like this did.
+
 ## Session X — 2026-08-08 — Deposit-forfeiture rule reverted (late notice no longer forfeits)
 
 ### Summary

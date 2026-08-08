@@ -175,6 +175,8 @@ Kiran's Excel (offline)
 | `scripts/_merge_duplicate_tenants_415_615.py` + `_purge_dup_tenancy_894.py` | One-off: merged the Room 415 duplicate Rakesh (kept the row with more payments) and deleted the Room 615 orphan. Recipe to copy for the remaining splits. |
 | `scripts/_fix_sheetal_615_record.py` | One-off: Room 615 Sheetal — check-in 28 Aug→1 Aug, ₹14,500 re-dated 27 Jul + re-typed deposit, booking_amount→0, RS recalc. `--rent <amt>` adds the missing 2 Aug cash rent. |
 | `scripts/resync_missing_tenants_to_sheet.py` | Finds tenants in DB but missing from TENANTS ops sheet tab; appends them. Safe to re-run. |
+| `scripts/_send_laundry_notice.py` | One-off manual broadcast: `laundry_rules_notice` template to all active tenants + operator CC (same reliable `send_template()` path for both — see [[rules_whatsapp_cc]] for why CC must never use free-form text). Dry-run by default, `--send` for live. |
+| `src/rules/pnl_classify.py` | Bank-transaction classifier rules (category/sub_category by keyword, first match wins) — shared by CSV import and the WhatsApp finance handler. Add new vendor/keyword rules here, never inline elsewhere. |
 
 ## DO NOT touch
 - `src/database/migrate_all.py` — only append, never remove existing migrations
