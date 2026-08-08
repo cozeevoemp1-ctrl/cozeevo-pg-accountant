@@ -32,7 +32,9 @@ router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
 # ── Security: Rate limiting + Admin auth ────────────────────────────────────
 
-ADMIN_PIN = os.getenv("ONBOARDING_ADMIN_PIN", "cozeevo2026")
+# The shared admin PIN was REMOVED 2026-08-08 (Kiran): it shipped inside public
+# client JS (PWA bundle + staff-sign page source), making every admin endpoint
+# effectively open. All admin access is now Supabase JWT (admin/staff role).
 # Per-file cap: 10MB base64 ≈ 7.3MB raw. Matches the client-side 10MB guard.
 # Aggregate stays well under the 200MB nginx cap on /etc/nginx/sites-enabled/pg-accountant.
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024
@@ -51,10 +53,18 @@ def _rate_check(key: str, max_requests: int, window_secs: int):
     _rate_limits[key].append(now)
 
 def _check_admin_pin(request: Request):
-    """Check admin PIN from header or query param."""
-    pin = request.headers.get("X-Admin-Pin") or request.query_params.get("pin")
-    if pin != ADMIN_PIN:
-        raise HTTPException(403, "Invalid admin PIN")
+    """Admin auth — Supabase JWT with admin/staff role (name kept so the many
+    call-sites and main.py import stay untouched). PIN auth is gone."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        try:
+            from src.api.v2.auth import get_current_user
+            user = get_current_user(authorization=auth)
+            if user.role in ("admin", "staff"):
+                return
+        except HTTPException:
+            pass
+    raise HTTPException(403, "Admin login required")
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
@@ -1005,7 +1015,7 @@ async def staff_sign_page(request: Request, phone: str = ""):
     try {{
       const r = await fetch('/api/onboarding/staff-signature/' + phone, {{
         method: 'POST',
-        headers: {{ 'Content-Type': 'application/json', 'X-Admin-Pin': '{ADMIN_PIN}' }},
+        headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ data_url: dataUrl }}),
       }});
       if (r.ok) {{

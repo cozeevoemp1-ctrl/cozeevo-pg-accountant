@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
-import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
+import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, authHeaders, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { useAppConfig } from "@/lib/config"
 
@@ -41,14 +41,13 @@ export default function EditTenantPage() {
   const [roomInfo, setRoomInfo] = useState<{ occupied: number; max_occupancy: number; is_full: boolean; occupants: string[] } | null>(null)
   const [roomInfoLoading, setRoomInfoLoading] = useState(false)
   const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
-  const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
 
   async function checkRoomOccupancy(room: string) {
     if (!room.trim() || room.trim() === original?.room_number) { setRoomInfo(null); return }
     setRoomInfoLoading(true)
     try {
       const res = await fetch(`${API_URL}/api/onboarding/room-lookup/${encodeURIComponent(room.trim())}`, {
-        headers: { "X-Admin-Pin": ADMIN_PIN }
+        headers: await authHeaders()
       })
       if (!res.ok) { setRoomInfo(null); return }
       setRoomInfo(await res.json())

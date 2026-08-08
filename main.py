@@ -42,7 +42,6 @@ class LocalOnlyMiddleware:
                 or path.startswith("/static") or path.startswith("/media")
                 or path.startswith("/onboard")
                 or path == "/qr"
-                or path.startswith("/admin/onboarding")
                 or path.startswith("/api/onboarding")
                 or path.startswith("/api/checkout")  # 410 tombstones
                 or path.startswith("/api/v2/app")):
@@ -272,13 +271,8 @@ async def serve_onboarding_form(token: str):
         return HTMLResponse("<h1>Form not available yet</h1>", status_code=404)
     return HTMLResponse(form_path.read_text(encoding="utf-8"))
 
-@app.get("/admin/onboarding", response_class=HTMLResponse)
-async def serve_admin_onboarding():
-    """Serve the admin onboarding panel."""
-    form_path = Path("static/admin_onboarding.html")
-    if not form_path.exists():
-        return HTMLResponse("<h1>Admin panel not available yet</h1>", status_code=404)
-    return HTMLResponse(form_path.read_text(encoding="utf-8"))
+# /admin/onboarding panel removed 2026-08-08 — PWA Bookings page replaced it;
+# its PIN auth shipped in page source (see onboarding_router._check_admin_pin).
 
 # ── Test utilities (TEST_MODE=1 only) ────────────────────────────────────
 

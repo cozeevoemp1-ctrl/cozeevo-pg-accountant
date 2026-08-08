@@ -1,16 +1,16 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { updateBookingSession, cancelBookingSession } from "@/lib/api"
+import { updateBookingSession, cancelBookingSession, authHeaders } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
-const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
 
-function pinHeaders() {
-  return { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN }
+// JWT auth (shared admin PIN removed 2026-08-08 â€” it shipped in this bundle)
+async function pinHeaders() {
+  return { ...(await authHeaders()), "Content-Type": "application/json" }
 }
 
 interface Booking {
@@ -40,13 +40,13 @@ interface Booking {
 }
 
 function fmtDate(iso: string) {
-  if (!iso) return "—"
+  if (!iso) return "â€”"
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }
 
 function fmtRent(n?: number, stayType?: string) {
-  if (!n) return "—"
-  return `₹${n.toLocaleString("en-IN")}${stayType === "daily" ? "/day" : "/mo"}`
+  if (!n) return "â€”"
+  return `â‚¹${n.toLocaleString("en-IN")}${stayType === "daily" ? "/day" : "/mo"}`
 }
 
 function proratedRent(rent: number, checkinIso: string): number {
@@ -79,12 +79,12 @@ export default function BookingsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/api/onboarding/admin/pending`, { headers: pinHeaders() })
+      const res = await fetch(`${API_URL}/api/onboarding/admin/pending`, { headers: await pinHeaders() })
       if (!res.ok) throw new Error(`Load failed: ${res.status}`)
       const d = await res.json()
       // Show all bookings: pending_tenant (awaiting form), pending_review (form filled), and expired
       const all = (d.sessions as Booking[])
-      // Sort: check-in today first, then pending_review → pending_tenant → expired, then by date
+      // Sort: check-in today first, then pending_review â†’ pending_tenant â†’ expired, then by date
       const statusOrder: Record<string, number> = { pending_review: 0, pending_tenant: 1, expired: 2 }
       all.sort((a, b) => {
         const aToday = isToday(a.checkin_date) ? 0 : 1
@@ -114,7 +114,7 @@ export default function BookingsPage() {
     try {
       const res = await fetch(`${API_URL}/api/onboarding/${token}/approve`, {
         method: "POST",
-        headers: pinHeaders(),
+        headers: await pinHeaders(),
         body: JSON.stringify({
           instant_checkin: true, approved_by_phone: "", overrides: {},
           ...(collection ?? {}),
@@ -140,7 +140,7 @@ export default function BookingsPage() {
   const stayMatch   = (b: Booking) => stayFilter === "all" || b.stay_type === stayFilter
   const monthMatch  = (b: Booking) => monthFilter === "all" || (b.checkin_date ?? "").startsWith(monthFilter)
 
-  // distinct months from bookings — current month onwards only (frozen past months excluded)
+  // distinct months from bookings â€” current month onwards only (frozen past months excluded)
   const currentYM = new Date().toISOString().slice(0, 7)
   const distinctMonths = Array.from(new Set(bookings.map(b => (b.checkin_date ?? "").slice(0, 7)).filter(Boolean)))
     .filter(m => m >= currentYM)
@@ -156,7 +156,7 @@ export default function BookingsPage() {
       <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
         <button onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
-          aria-label="Back">←</button>
+          aria-label="Back">â†</button>
         <h1 className="text-lg font-extrabold text-ink flex-1">Bookings</h1>
         <button onClick={load} className="text-xs font-semibold text-brand-pink px-3 py-1.5 rounded-pill border border-brand-pink/30">
           Refresh
@@ -170,7 +170,7 @@ export default function BookingsPage() {
             type="text"
             value={filter}
             onChange={e => setFilter(e.target.value)}
-            placeholder="Name or room…"
+            placeholder="Name or roomâ€¦"
             className="w-full rounded-xl border border-[#E5E1DC] bg-bg px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-pink/40"
           />
           {!loading && bookings.length > 0 && (
@@ -225,10 +225,10 @@ export default function BookingsPage() {
         )}
 
         {loading ? (
-          <p className="text-sm text-ink-muted text-center py-10">Loading bookings…</p>
+          <p className="text-sm text-ink-muted text-center py-10">Loading bookingsâ€¦</p>
         ) : bookings.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-4xl mb-3">📋</p>
+            <p className="text-4xl mb-3">ðŸ“‹</p>
             <p className="text-sm font-semibold text-ink">No pending bookings</p>
             <p className="text-xs text-ink-muted mt-1">Pre-book from vacant beds on the home screen</p>
           </div>
@@ -253,7 +253,7 @@ export default function BookingsPage() {
               </>
             )}
 
-            {/* Pre-booked — link sent, form not filled yet */}
+            {/* Pre-booked â€” link sent, form not filled yet */}
             {awaiting.length > 0 && (
               <>
                 <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide mt-2">
@@ -272,7 +272,7 @@ export default function BookingsPage() {
               </>
             )}
 
-            {/* Expired — link expired, tenant never filled */}
+            {/* Expired â€” link expired, tenant never filled */}
             {expired.length > 0 && (
               <>
                 <p className="text-xs text-ink-muted font-semibold uppercase tracking-wide mt-2">
@@ -314,7 +314,7 @@ async function manualCheckinApi(token: string, body: {
 }) {
   const res = await fetch(`${API_URL}/api/onboarding/${token}/manual-checkin`, {
     method: "POST",
-    headers: pinHeaders(),
+    headers: await pinHeaders(),
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -394,7 +394,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
   const [editPhone, setEditPhone] = useState(b.tenant_phone || "")
   const [editName, setEditName] = useState(b.tenant_name || "")
 
-  // Collection at check-in — recomputes when user edits checkin date or rent
+  // Collection at check-in â€” recomputes when user edits checkin date or rent
   const proRata = (editRent ? parseFloat(editRent) : b.agreed_rent) && (editCheckin || b.checkin_date)
     ? proratedRent(
         editRent ? parseFloat(editRent) : (b.agreed_rent || 0),
@@ -409,12 +409,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
   const defaultRentDues = useRef("")
   const defaultDepositDues = useRef("")
 
-  // Pre-fill outstanding dues once on mount — never overwrites user edits
+  // Pre-fill outstanding dues once on mount â€” never overwrites user edits
   useEffect(() => {
     if (prefillDone.current || b.status !== "pending_review") return
 
     // For pending_review, always calculate from booking agreement (not live tenancy dues)
-    // Day-stay: prepaid = daily_rate × num_days − advance
+    // Day-stay: prepaid = daily_rate Ã— num_days âˆ’ advance
     // Monthly: advance deducted from both rent and deposit
     const rentDue = b.stay_type === "daily"
       ? Math.max(0, (b.daily_rate || 0) * (b.num_days || 0) - (b.booking_amount || 0))
@@ -475,7 +475,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
     setResending(true); setErr("")
     try {
       const res = await fetch(`${API_URL}/api/onboarding/admin/${b.token}/resend`, {
-        method: "POST", headers: pinHeaders(),
+        method: "POST", headers: await pinHeaders(),
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -525,8 +525,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
       let mimeForOcr = file.type || "image/jpeg"
 
       if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-        // Same path as onboarding.html: render PDF page 1 → JPEG → OCR
-        setMIdScanMsg("Converting PDF…")
+        // Same path as onboarding.html: render PDF page 1 â†’ JPEG â†’ OCR
+        setMIdScanMsg("Converting PDFâ€¦")
         dataUrl = await pdfToJpegDataUrl(file)
         setMIdCardPreview(dataUrl)   // update preview to the rendered page
         mimeForOcr = "image/jpeg"
@@ -539,7 +539,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         })
       }
 
-      setMIdScanMsg("Reading ID details…")
+      setMIdScanMsg("Reading ID detailsâ€¦")
       const httpRes = await fetch(`${API_URL}/api/onboarding/${b.token}/extract-id`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -559,9 +559,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
       }
       if (f.address) setMAddress(f.address)
       const filled = [f.aadhaar_number, f.gender, f.dob, f.address].filter(Boolean).length
-      setMIdScanMsg(filled > 0 ? "Fields auto-filled — verify before saving" : "Card read but no fields found — fill manually")
+      setMIdScanMsg(filled > 0 ? "Fields auto-filled â€” verify before saving" : "Card read but no fields found â€” fill manually")
 
-      // Name match check — fuzzy word overlap, pure frontend, zero API cost
+      // Name match check â€” fuzzy word overlap, pure frontend, zero API cost
       const cardName: string = f.name || ""
       const bookingName: string = b.tenant_name || ""
       if (cardName && bookingName) {
@@ -571,7 +571,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         const cWords = words(cardName)
         const hasMatch = cWords.some(w => bWords.includes(w)) || bWords.some(w => cWords.includes(w))
         if (!hasMatch) {
-          setMNameMismatch(`Name on card "${cardName}" does not match booking name "${bookingName}" — confirm this is the right person`)
+          setMNameMismatch(`Name on card "${cardName}" does not match booking name "${bookingName}" â€” confirm this is the right person`)
         } else {
           setMNameMismatch("")
         }
@@ -579,7 +579,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         setMNameMismatch("")
       }
     } catch {
-      setMIdScanMsg("Scan failed — fill fields manually")
+      setMIdScanMsg("Scan failed â€” fill fields manually")
     } finally {
       setMIdScanLoading(false)
     }
@@ -645,7 +645,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
           )}
           {isExpired ? (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEE2E2] text-[#991B1B]">
-              Link expired{b.expired_ago ? ` · ${b.expired_ago}` : ""}
+              Link expired{b.expired_ago ? ` Â· ${b.expired_ago}` : ""}
             </span>
           ) : isPending ? (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[#FEF3C7] text-[#92400E]">Awaiting form</span>
@@ -670,11 +670,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
           {b.stay_type === "daily" ? (
             <>
               <p className="text-xs font-bold text-ink mt-0.5">
-                {b.daily_rate ? `₹${b.daily_rate.toLocaleString("en-IN")}/day` : "—"}
+                {b.daily_rate ? `â‚¹${b.daily_rate.toLocaleString("en-IN")}/day` : "â€”"}
               </p>
               {b.booking_amount ? (
                 <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
-                  Adv: ₹{b.booking_amount.toLocaleString("en-IN")}
+                  Adv: â‚¹{b.booking_amount.toLocaleString("en-IN")}
                 </p>
               ) : null}
             </>
@@ -683,7 +683,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.stay_type === "daily" ? b.daily_rate : b.agreed_rent, b.stay_type)}</p>
               {b.agreed_rent && b.checkin_date && new Date(b.checkin_date).getDate() !== 1 && (
                 <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
-                  1st mo: ₹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}
+                  1st mo: â‚¹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}
                 </p>
               )}
             </>
@@ -707,21 +707,21 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         </div>
       )}
 
-      {/* Pre-booked info line — show when booked and when link expires */}
+      {/* Pre-booked info line â€” show when booked and when link expires */}
       {isPending && !editing && (
         <p className="text-[10px] text-ink-muted -mt-1">
-          Booked {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
-          {b.expires_at ? ` · Link expires ${new Date(b.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+          Booked {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "â€”"}
+          {b.expires_at ? ` Â· Link expires ${new Date(b.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
         </p>
       )}
 
-      {/* Expand toggle — only for ready-to-check-in cards */}
+      {/* Expand toggle â€” only for ready-to-check-in cards */}
       {isReady && !editing && (
         <button
           onClick={() => setExpanded(v => !v)}
           className="text-[11px] font-semibold text-brand-pink text-left -mt-1"
         >
-          {expanded ? "▲ Hide details" : "▼ View details & collect"}
+          {expanded ? "â–² Hide details" : "â–¼ View details & collect"}
         </button>
       )}
 
@@ -744,9 +744,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               { label: "Room", val: editRoom, set: setEditRoom, type: "text", placeholder: "e.g. 416" },
               { label: "Check-in", val: editCheckin, set: setEditCheckin, type: "date", placeholder: "" },
               ...(b.stay_type === "daily" ? [{ label: "Check-out", val: editCheckout, set: setEditCheckout, type: "date", placeholder: "" }] : []),
-              { label: b.stay_type === "daily" ? "Rate (₹/day)" : "Rent (₹)", val: editRent, set: (v: string) => { setEditRent(v); if (b.stay_type !== "daily" && (!editDeposit || editDeposit === editRent)) setEditDeposit(v) }, type: "number", placeholder: "" },
-              ...(b.stay_type !== "daily" ? [{ label: "Maintenance (₹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" }] : []),
-              ...(b.stay_type !== "daily" ? [{ label: "Deposit (₹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" }] : []),
+              { label: b.stay_type === "daily" ? "Rate (â‚¹/day)" : "Rent (â‚¹)", val: editRent, set: (v: string) => { setEditRent(v); if (b.stay_type !== "daily" && (!editDeposit || editDeposit === editRent)) setEditDeposit(v) }, type: "number", placeholder: "" },
+              ...(b.stay_type !== "daily" ? [{ label: "Maintenance (â‚¹)", val: editMaint, set: setEditMaint, type: "number", placeholder: "5000" }] : []),
+              ...(b.stay_type !== "daily" ? [{ label: "Deposit (â‚¹)", val: editDeposit, set: setEditDeposit, type: "number", placeholder: "= rent" }] : []),
             ].map(({ label, val, set, type, placeholder }) => (
               <div key={label} className={label === "Name" || label === "Check-in" || label === "Check-out" ? "col-span-2" : ""}>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">{label}</label>
@@ -769,13 +769,13 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             const total = days * parseFloat(editRent)
             return days > 0 ? (
               <p className="text-[10px] text-brand-pink font-semibold -mt-1">
-                Total: ₹{parseFloat(editRent).toLocaleString("en-IN")} × {days} days = ₹{total.toLocaleString("en-IN")}
+                Total: â‚¹{parseFloat(editRent).toLocaleString("en-IN")} Ã— {days} days = â‚¹{total.toLocaleString("en-IN")}
               </p>
             ) : null
           })()}
           {b.stay_type !== "daily" && editCheckin && new Date(editCheckin).getDate() !== 1 && proRata > 0 && (
             <p className="text-[10px] text-brand-pink font-semibold -mt-1">
-              1st month rent: ₹{proRata.toLocaleString("en-IN")} (prorated from {new Date(editCheckin).getDate()} {new Date(editCheckin).toLocaleString("en-IN", { month: "short" })})
+              1st month rent: â‚¹{proRata.toLocaleString("en-IN")} (prorated from {new Date(editCheckin).getDate()} {new Date(editCheckin).toLocaleString("en-IN", { month: "short" })})
             </p>
           )}
           <div className="flex gap-2 pt-1">
@@ -785,7 +785,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             </button>
             <button onClick={saveEdit} disabled={saving}
               className="flex-1 rounded-pill bg-brand-pink py-2 text-xs font-bold text-white disabled:opacity-50">
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? "Savingâ€¦" : "Save changes"}
             </button>
           </div>
         </div>
@@ -796,7 +796,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Agreed terms</p>
 
-          {/* Reference info — display only */}
+          {/* Reference info â€” display only */}
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
               <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">
@@ -804,40 +804,40 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               </p>
               <p className="text-xs font-bold text-ink mt-0.5">
                 {b.stay_type === "daily"
-                  ? (b.daily_rate && b.num_days ? `₹${((b.daily_rate) * (b.num_days)).toLocaleString("en-IN")}` : "—")
-                  : (proRata ? `₹${proRata.toLocaleString("en-IN")}` : "—")}
+                  ? (b.daily_rate && b.num_days ? `â‚¹${((b.daily_rate) * (b.num_days)).toLocaleString("en-IN")}` : "â€”")
+                  : (proRata ? `â‚¹${proRata.toLocaleString("en-IN")}` : "â€”")}
               </p>
               <p className="text-[9px] text-ink-muted">
                 {b.stay_type === "daily" && b.daily_rate && b.num_days
-                  ? `₹${b.daily_rate.toLocaleString("en-IN")}/day × ${b.num_days} days`
+                  ? `â‚¹${b.daily_rate.toLocaleString("en-IN")}/day Ã— ${b.num_days} days`
                   : "Reference only"}
               </p>
             </div>
             <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
               <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Advance Paid</p>
               <p className="text-xs font-bold text-ink mt-0.5">
-                {b.booking_amount ? `₹${b.booking_amount.toLocaleString("en-IN")}` : "—"}
+                {b.booking_amount ? `â‚¹${b.booking_amount.toLocaleString("en-IN")}` : "â€”"}
               </p>
-              <p className="text-[9px] text-ink-muted">Auto-recorded · UPI</p>
+              <p className="text-[9px] text-ink-muted">Auto-recorded Â· UPI</p>
             </div>
           </div>
 
-          {/* Deposit — reference only, always UPI */}
+          {/* Deposit â€” reference only, always UPI */}
           <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
             <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Deposit</p>
             <p className="text-xs font-bold text-ink mt-0.5">
-              {b.security_deposit ? `₹${b.security_deposit.toLocaleString("en-IN")}` : "—"}
+              {b.security_deposit ? `â‚¹${b.security_deposit.toLocaleString("en-IN")}` : "â€”"}
             </p>
-            <p className="text-[9px] text-ink-muted">Auto-recorded · UPI</p>
+            <p className="text-[9px] text-ink-muted">Auto-recorded Â· UPI</p>
           </div>
 
-          {/* Against dues — split into rent (selectable mode) + deposit (always UPI) */}
+          {/* Against dues â€” split into rent (selectable mode) + deposit (always UPI) */}
           <div className="flex flex-col gap-1.5">
             <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Collected at check-in</p>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">
-                  {b.stay_type === "daily" ? "Stay amount (₹)" : "Rent (₹)"}
+                  {b.stay_type === "daily" ? "Stay amount (â‚¹)" : "Rent (â‚¹)"}
                 </label>
                 <input type="number" inputMode="decimal" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
                   onBlur={() => { if (collectRentDues === "" && defaultRentDues.current) setCollectRentDues(defaultRentDues.current) }}
@@ -846,7 +846,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 <ModeToggle mode={rentDuesMode} setMode={setRentDuesMode} />
               </div>
               <div>
-                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
+                <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (â‚¹)</label>
                 <input type="number" inputMode="decimal" value={collectDepositDues} onChange={(e) => setCollectDepositDues(e.target.value)}
                   onBlur={() => { if (collectDepositDues === "" && defaultDepositDues.current) setCollectDepositDues(defaultDepositDues.current) }}
                   className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
@@ -872,7 +872,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-[11px] text-ink-muted">{label}</span>
                     <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
-                      ₹{value.toLocaleString("en-IN")}
+                      â‚¹{value.toLocaleString("en-IN")}
                     </span>
                   </div>
                 ))}
@@ -890,7 +890,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <>
               <button onClick={doResend} disabled={resending}
                 className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white disabled:opacity-50">
-                {resending ? "Sending…" : "Regenerate & send →"}
+                {resending ? "Sendingâ€¦" : "Regenerate & send â†’"}
               </button>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
                 className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED]">
@@ -899,7 +899,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               {cancelConfirm ? (
                 <button onClick={doCancel} disabled={cancelling}
                   className="px-4 rounded-pill bg-[#FEE2E2] py-2.5 text-xs font-bold text-[#991B1B] disabled:opacity-50">
-                  {cancelling ? "…" : "Confirm?"}
+                  {cancelling ? "â€¦" : "Confirm?"}
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
@@ -911,7 +911,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 onClick={() => { setManualOpen(v => !v); setEditing(false); setCancelConfirm(false); setErr("") }}
                 className="w-full rounded-pill border border-[#6B7280] py-2.5 text-xs font-semibold text-[#6B7280] active:opacity-70"
               >
-                {manualOpen ? "▲ Close manual entry" : "Manual check-in ↓"}
+                {manualOpen ? "â–² Close manual entry" : "Manual check-in â†“"}
               </button>
             </>
           ) : isPending ? (
@@ -919,11 +919,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <>
               <a href={`${API_URL}/onboard/${b.token}`} target="_blank" rel="noopener noreferrer"
                 className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70">
-                Copy link →
+                Copy link â†’
               </a>
               <button onClick={doResend} disabled={resending}
                 className="px-3 rounded-pill border border-brand-pink py-2.5 text-xs font-semibold text-brand-pink disabled:opacity-50">
-                {resending ? "…" : "Resend"}
+                {resending ? "â€¦" : "Resend"}
               </button>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
                 className="px-3 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED]">
@@ -932,7 +932,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               {cancelConfirm ? (
                 <button onClick={doCancel} disabled={cancelling}
                   className="px-3 rounded-pill bg-[#FEE2E2] py-2.5 text-xs font-bold text-[#991B1B] disabled:opacity-50">
-                  {cancelling ? "…" : "Sure?"}
+                  {cancelling ? "â€¦" : "Sure?"}
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
@@ -944,17 +944,17 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 onClick={() => { setManualOpen(v => !v); setEditing(false); setCancelConfirm(false); setErr("") }}
                 className="w-full rounded-pill border border-[#6B7280] py-2.5 text-xs font-semibold text-[#6B7280] active:opacity-70"
               >
-                {manualOpen ? "▲ Close manual entry" : "Manual check-in ↓"}
+                {manualOpen ? "â–² Close manual entry" : "Manual check-in â†“"}
               </button>
             </>
           ) : b.source === "tenancy" ? (
-            /* Room 000 no-show (old bot pre-booking) — needs room assignment before check-in */
+            /* Room 000 no-show (old bot pre-booking) â€” needs room assignment before check-in */
             <>
-              <p className="w-full text-[10px] text-ink-muted font-medium -mt-1">No room assigned yet — assign a room in the tenant profile to check in.</p>
+              <p className="w-full text-[10px] text-ink-muted font-medium -mt-1">No room assigned yet â€” assign a room in the tenant profile to check in.</p>
               {b.tenancy_id && (
                 <a href={`/tenants/${b.tenancy_id}/edit`}
                   className="flex-1 text-center rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
-                  Edit tenant profile →
+                  Edit tenant profile â†’
                 </a>
               )}
             </>
@@ -968,7 +968,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               {cancelConfirm ? (
                 <button onClick={doCancel} disabled={cancelling}
                   className="px-4 rounded-pill bg-[#FEE2E2] py-2.5 text-xs font-bold text-[#991B1B] disabled:opacity-50">
-                  {cancelling ? "…" : "Confirm?"}
+                  {cancelling ? "â€¦" : "Confirm?"}
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
@@ -999,7 +999,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                       disabled={checkingIn === b.token}
                       className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70 disabled:opacity-50"
                     >
-                      {checkingIn === b.token ? "Checking in…" : "Confirm check in?"}
+                      {checkingIn === b.token ? "Checking inâ€¦" : "Confirm check in?"}
                     </button>
                   ) : (
                     <button
@@ -1016,7 +1016,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                   onClick={() => setExpanded(true)}
                   className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white active:opacity-70"
                 >
-                  Check In →
+                  Check In â†’
                 </button>
               )}
             </>
@@ -1024,11 +1024,11 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         </div>
       )}
 
-      {/* Manual check-in — KYC entry by staff */}
+      {/* Manual check-in â€” KYC entry by staff */}
       {manualOpen && (isPending || isExpired) && (
         <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">
-            Manual check-in — enter tenant details
+            Manual check-in â€” enter tenant details
           </p>
 
           {/* Personal */}
@@ -1037,7 +1037,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Gender *</label>
               <select value={mGender} onChange={e => setMGender(e.target.value)}
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
-                <option value="">Select…</option>
+                <option value="">Selectâ€¦</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Other">Other</option>
@@ -1095,7 +1095,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Relation *</label>
               <select value={mEcRel} onChange={e => setMEcRel(e.target.value)}
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
-                <option value="">Select…</option>
+                <option value="">Selectâ€¦</option>
                 <option value="Parent">Parent</option>
                 <option value="Sibling">Sibling</option>
                 <option value="Spouse">Spouse</option>
@@ -1142,7 +1142,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 Tap to upload ID card photo
               </button>
             )}
-            {mIdScanLoading && <p className="text-[9px] text-brand-pink font-medium">Scanning ID card…</p>}
+            {mIdScanLoading && <p className="text-[9px] text-brand-pink font-medium">Scanning ID cardâ€¦</p>}
             {mIdScanMsg && !mIdScanLoading && (
               <p className={`text-[9px] font-medium ${mIdScanMsg.includes("failed") ? "text-status-warn" : "text-[#065F46]"}`}>
                 {mIdScanMsg}
@@ -1163,7 +1163,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Type *</label>
               <select value={mIdType} onChange={e => setMIdType(e.target.value)}
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
-                <option value="">Select…</option>
+                <option value="">Selectâ€¦</option>
                 <option value="Aadhaar">Aadhaar</option>
                 <option value="PAN">PAN</option>
                 <option value="Passport">Passport</option>
@@ -1186,13 +1186,13 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
           <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide mt-1">Collect at check-in</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (â‚¹)</label>
               <input type="number" inputMode="decimal" value={mRentDues} onChange={e => setMRentDues(e.target.value)}
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
               <ModeToggle mode={mRentMode} setMode={setMRentMode} />
             </div>
             <div>
-              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
+              <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (â‚¹)</label>
               <input type="number" inputMode="decimal" value={mDepDues} onChange={e => setMDepDues(e.target.value)}
                 className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
               <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
@@ -1207,7 +1207,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             </button>
             <button onClick={doManualCheckin} disabled={manualSaving}
               className="flex-1 rounded-pill bg-brand-pink py-2.5 text-xs font-bold text-white disabled:opacity-50">
-              {manualSaving ? "Checking in…" : "Check In →"}
+              {manualSaving ? "Checking inâ€¦" : "Check In â†’"}
             </button>
           </div>
         </div>

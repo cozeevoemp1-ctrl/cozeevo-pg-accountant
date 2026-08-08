@@ -1106,7 +1106,11 @@ export async function deleteOperationalLog(id: number): Promise<void> {
   if (!res.ok) throw new Error(`DELETE /operations/${id} → ${res.status}`)
 }
 
-const ADMIN_PIN = process.env.NEXT_PUBLIC_ONBOARDING_PIN ?? "cozeevo2026"
+/** Public auth-header helper for pages that call /api/onboarding/admin/* directly.
+ *  (The shared admin PIN was removed 2026-08-08 — JWT only.) */
+export async function authHeaders(): Promise<Record<string, string>> {
+  return _authHeaders()
+}
 
 export async function updateBookingSession(token: string, payload: {
   agreed_rent?: number;
@@ -1120,7 +1124,7 @@ export async function updateBookingSession(token: string, payload: {
 }): Promise<{ ok: boolean }> {
   const res = await fetch(`${BASE_URL}/api/onboarding/admin/${token}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
+    headers: { ...(await _authHeaders()), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
   if (!res.ok) {
@@ -1133,7 +1137,7 @@ export async function updateBookingSession(token: string, payload: {
 export async function cancelBookingSession(token: string): Promise<{ status: string }> {
   const res = await fetch(`${BASE_URL}/api/onboarding/admin/${token}/cancel`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Admin-Pin": ADMIN_PIN },
+    headers: { ...(await _authHeaders()), "Content-Type": "application/json" },
   })
   if (!res.ok) {
     const d = await res.json().catch(() => ({}))
