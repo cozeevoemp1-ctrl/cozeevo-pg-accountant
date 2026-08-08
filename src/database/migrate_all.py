@@ -1491,6 +1491,17 @@ async def run_pnl_adjustments_2026_07_02(conn) -> None:
     print("  [ok] pnl_monthly_adjustments created")
 
 
+async def run_pnl_offline_cash_2026_08_08(conn) -> None:
+    """offline_cash: cash collected but never recorded in the app (Kiran's
+    month-close figure minus the app till view). Added to the dynamic P&L cash
+    income line — 'should not miss any cash collected' (Kiran 2026-08-08)."""
+    await conn.execute(text(
+        "ALTER TABLE pnl_monthly_adjustments "
+        "ADD COLUMN IF NOT EXISTS offline_cash NUMERIC(12,2) NOT NULL DEFAULT 0"
+    ))
+    print("  [ok] pnl_monthly_adjustments.offline_cash added")
+
+
 async def run_btxn_dedup_2026_05_12(conn: AsyncConnection) -> None:
     """
     One-time cleanup: deduplicate bank_transactions and fix the unique constraint.
@@ -1711,6 +1722,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_widen_changed_by_2026_04_29(conn)
             await run_cash_tables_2026_05_11(conn)
             await run_pnl_adjustments_2026_07_02(conn)
+            await run_pnl_offline_cash_2026_08_08(conn)
             await run_upi_collection_table_2026_05_11(conn)
             await run_btxn_dedup_2026_05_12(conn)
             await run_add_checkout_session_other_comments_2026_05_16(conn)

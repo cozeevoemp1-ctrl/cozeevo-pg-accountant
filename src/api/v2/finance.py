@@ -229,13 +229,16 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
         )
         inc_by_acct = {(r[0] or "THOR"): float(r[1] or 0) for r in inc_rows}
 
-        # Cash rent collected via app (physical, not deposited)
+        # Cash collected via app — ALL cash physically received this month
+        # (rent + deposit + advance, by receipt date), per Kiran 2026-08-08:
+        # "should not miss any cash collected". Deposit portion is netted out
+        # by the 'Less: Security Deposits' line, so this does not inflate profit.
+        # offline_cash (adjustments) adds cash that was never entered in the app.
         cash = float(await session.scalar(
             select(func.coalesce(func.sum(Payment.amount), 0)).where(
                 Payment.payment_mode == PaymentMode.cash,
-                Payment.for_type == PaymentFor.rent,
                 Payment.is_void == False,
-                Payment.period_month == period_date,
+                Payment.payment_date.between(start, end),
             )
         ) or 0)
 
@@ -316,7 +319,7 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             "label": _ym_to_pnl_label(y, mo),
             "income_thor": inc_by_acct.get("THOR", 0.0),
             "income_hulk": inc_by_acct.get("HULK", 0.0),
-            "cash": cash,
+            "cash": cash + (float(adj.offline_cash) if adj and getattr(adj, "offline_cash", None) else 0.0),
             "opex_by_cat": opex_by_cat,
             "dep_refunded": dep_refunded,
             "non_op": non_op,
@@ -882,6 +885,7 @@ async def get_pnl_adjustments(
         "cash_holding":   float(row.cash_holding)   if row else 0.0,
         "rent_paid_cash": float(row.rent_paid_cash) if row else 0.0,
         "cash_expense":   float(row.cash_expense)   if row else 0.0,
+        "offline_cash":   float(row.offline_cash)   if row else 0.0,
         "notes":          row.notes if row else None,
     }
 
@@ -912,6 +916,7 @@ async def save_pnl_adjustments(
         "cash_holding":   _num("cash_holding"),
         "rent_paid_cash": _num("rent_paid_cash"),
         "cash_expense":   _num("cash_expense"),
+        "offline_cash":   _num("offline_cash"),
         "notes":          (str(body["notes"]).strip() if body.get("notes") else None),
         "updated_by":     user.phone,
     }

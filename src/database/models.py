@@ -1513,6 +1513,7 @@ class PnlMonthlyAdjustment(Base):
     cash_holding   = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)
     rent_paid_cash = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)
     cash_expense   = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)
+    offline_cash   = Column(Numeric(12, 2), nullable=False, server_default="0", default=0)  # cash collected but never entered in app
     notes          = Column(Text, nullable=True)
     updated_by     = Column(String(100), nullable=True)
     created_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
