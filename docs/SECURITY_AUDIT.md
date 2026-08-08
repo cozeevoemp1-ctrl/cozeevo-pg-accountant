@@ -1,106 +1,203 @@
 # Security Audit — PG Accountant / Kozzy
 
-Date: 2026-08-08
-Scope: full repo (FastAPI backend `src/`, one-off `scripts/`, Next.js PWA `web/`) — DB authz/RLS/IDOR, secrets exposure, injection (SQL/command/path/prompt), CORS/session/webhook/XSS.
-Method: 3 parallel offensive-review passes (independent, no shared context) + direct verification of every claimed finding against the live source before patching. All fixes below are already applied and syntax-checked (`py_compile`); nothing has been deployed or run against production yet.
+**Date:** 2026-08-08
+**Type:** Full offensive ("hacker-mindset") audit — whole codebase + live infrastructure checks.
+**Status:** AUDIT ONLY. No fixes are deployed. One reference fix exists in an isolated git worktree (`../pg-security-sandbox`, branch `security-redo`) with passing tests — it is NOT on `master` and NOT live.
+
+> ## ⚠️ Read this first — the rollout lesson
+> An earlier attempt this session deployed the auth fix and **broke the live PWA** (403s across every page). Root cause: switching the role source invalidated every in-flight session token, and 4 of 5 frontend role-reads were missed. It was reverted; production is healthy. **Every fix in this document carries an "end-to-end impact" section describing what it can break. Nothing here should be deployed without working through that section, testing in the sandbox against real flows, and forcing a re-login where noted.**
+
+---
+
+## Severity summary
+
+| # | Finding | Severity | Live now? | Verified |
+|---|---------|----------|-----------|----------|
+| C-1 | Public Supabase buckets (KYC IDs, signed agreements) with guessable paths | **CRITICAL** | ✅ YES (buckets `public=true` confirmed live) | live-checked |
+| C-2 | Privilege escalation via self-editable `user_metadata.role` | **CRITICAL** | ✅ YES | sandbox test reproduces it |
+| C-3 | Anon key wide-open grants; only empty-policy RLS deny-all protects tables | **MEDIUM** (was Critical — RLS mitigates; live-tested) | ⚠️ mitigated, fragile | live-tested (read+write blocked) |
+| H-1 | No upper bound on payment amount (₹12cr fat-finger accepted) | **HIGH** | ✅ YES | code-read |
+| H-2 | Refund cap validated against client-supplied deposit → cash drain | **HIGH** | ✅ YES | code-read |
+| H-3 | `DELETE /tenants/{id}?force=true` erases frozen financial history | **HIGH** | ✅ YES | code-read |
+| H-4 | 11 API endpoints missing role checks (IDOR / data exposure) | **HIGH** | ✅ YES | code-read |
+| M-1 | `POST /auth/send-otp` fail-open (unauth WhatsApp send) | **MEDIUM** | ✅ YES | code + .env checked |
+| M-2 | `edit_payment` bypasses freeze trigger, unbounded, any month | **MEDIUM** | ✅ YES | code-read |
+| M-3 | Dues wiped via `PATCH /tenants/{id}` (future check-in date) | **MEDIUM** | ✅ YES | code-read |
+| M-4 | `extract-id` unauthenticated LLM call, no rate/size cap | **MEDIUM** | ✅ YES | code + .env checked |
+| M-5 | Unbounded negative `adjustment` zeroes dues | **MEDIUM** | ✅ YES | code-read |
+| M-6 | `org_id` never scopes any query (multi-org IDOR when 2nd org onboarded) | **MEDIUM** | ⚠️ latent | code-read |
+| L-1 | Signed agreement PDFs on public `/static` (regen-pdf path) | **LOW** | ✅ YES | code-read |
+| L-2 | `/documents` mount unauth; `LocalOnlyMiddleware` no-op behind nginx | **LOW** | ✅ (empty dir today) | code-read |
+| L-3 | In-memory rate limiter is per-worker, resets on deploy | **LOW** | ✅ YES | code-read |
+| L-4 | Duplicate-payment guard bypassable by ₹1 delta | **LOW** | ✅ YES | code-read |
+
+**Confirmed SAFE (checked, no action):** WhatsApp webhook HMAC signature (fail-closed), CORS whitelist, JWT algorithm allowlist, password-reset flow, XSS (no `dangerouslySetInnerHTML`), SQL/command injection (parameterized, no eval/exec/unsafe subprocess/pickle/yaml), onboarding token enumeration (UUID, no integer id, no oracle), tenant self-approval (submit only moves pending→pending_review, no financial fields), X-Forwarded-For rate-limit spoofing (uvicorn proxy-headers correct), OCR/vision never writes a payment amount, no un-void via API, service-role key server-side only, no secrets committed to git, FastAPI debug endpoints disabled, `/media` JWT-gated with path-traversal guard, KYC upload content-type forced (no stored-XSS).
 
 ---
 
 ## CRITICAL
 
-### 1. Privilege escalation — role trusted from self-editable `user_metadata`
-**Files:** `src/api/v2/auth.py:75-87` (fixed), `web/middleware.ts:33,51` (fixed), `scripts/create_auth_users.py:59-64` (fixed)
+### C-1 — Public Supabase buckets with guessable object paths → unauthenticated download of tenant government IDs, selfies, signatures, and signed agreements
+**Live-verified:** queried the production Storage API — `kyc-documents` and `agreements` are both `public=true` right now.
+**Where:** `src/services/storage.py:66` and `scripts/migrate_media_to_supabase.py:80` create every bucket `{"public": True}`. `public_url()` (`storage.py:46-48`) returns raw `.../object/public/{bucket}/{path}` URLs. **No `createSignedUrl` anywhere in the codebase.**
+**Guessable paths:**
+- Receipts: `{YYYY-MM}/{payment_id}.jpg` — `payment_id` is a **sequential integer** (`payments.py:541`).
+- KYC: `onboarding/{token8}/{selfie|id_proof|signature}.ext` — `token8` = first 8 hex of a UUID (32 bits) (`onboarding_router.py:1215`).
+- Staff signatures: `staff-signatures/{phone}.png` — raw phone, and staff phones are in public docs.
+- Agreements: `{YYYY-MM}/{filename}.pdf`.
 
-**Was:** `get_current_user()` read `role` and `org_id` from the JWT's `user_metadata` claim. In Supabase Auth, `user_metadata` is **self-editable by the authenticated user** via `supabase.auth.updateUser({ data: {...} })` — it only needs the user's own access token, not an admin key. `app_metadata` is the field Supabase reserves for admin-only writes, and the codebase never used it.
+**Exploit (no auth, no login):** the project ref is public (in the web bundle). An attacker iterates
+`https://<ref>.supabase.co/storage/v1/object/public/receipts/2026-08/1.jpg`, `/2.jpg`, … and `.../agreements/2026-08/…` → mass-downloads every payment receipt and signed rental agreement. Government-ID selfies need brute-forcing a 32-bit token space per session (feasible at scale).
 
-**Exploit:** Any logged-in account (e.g. the receptionist "staff" login) opens the browser console and runs:
+**Impact:** Wholesale exfiltration of tenant PII — government IDs, selfies, signatures, home addresses, payment screenshots. This is the single most serious finding and it is **live**.
+
+**Fix:** Flip `kyc-documents`, `agreements`, (and `receipts` if created) to `public:false`; serve via short-lived `createSignedUrl` or a JWT-gated FastAPI proxy (like `/media`); randomize object names to UUIDs. Rename existing objects — current names stay guessable even after going private if an old public URL was ever shared.
+
+**⚠️ End-to-end impact of the fix — WILL break things if done naively:**
+- The app stores and returns **raw public URLs** in `saved_files`, `payment.receipt_url`, agreement links, and the PWA `<img>`/PDF viewers load them directly. The moment buckets go private, **every one of those URLs 400s** — receipts, KYC previews, and agreement downloads break across the PWA, the Bookings page, and any WhatsApp-delivered agreement link.
+- Correct sequencing: (1) add a signed-URL generator in `storage.py`; (2) change every read path (`payments.py` receipt read, onboarding detail, agreement serve, PWA components that render these) to request a fresh signed URL through the backend; (3) migrate/rename existing objects; (4) *then* flip the bucket flag. Flipping the flag first = broken images everywhere.
+- Test in sandbox: upload a receipt, load it in the PWA, open a booking's KYC, download an agreement — all must work via signed URLs before deploy.
+
+### C-2 — Privilege escalation: role read from self-editable `user_metadata`
+**Where:** `src/api/v2/auth.py:75,83` (`role=meta.get("role")` from `user_metadata`), `web/middleware.ts:51`, and 4 frontend reads (`web/lib/auth-server.ts:13`, `web/components/auth/auth-provider.tsx:61,75`, `web/app/finance/page.tsx:36`).
+**Description:** `user_metadata` (`raw_user_meta_data`) is self-editable by any authenticated user via `supabase.auth.updateUser({ data: {...} })` — user's own token, no admin key. `app_metadata` is the admin-API-only field; the codebase never used it.
+**Exploit:** any logged-in account (e.g. staff receptionist) runs in the browser console:
 ```js
 await supabase.auth.updateUser({ data: { role: "admin" } })
 ```
-Supabase updates `raw_user_meta_data.role` and mints a new, validly-signed JWT with `user_metadata.role: "admin"`. Every admin-gated route (`finance.py` P&L/investment data, `blacklist.py`, the PWA's `/finance` middleware gate) now accepts them, because the signature check only proves the token wasn't tampered with — not that its self-supplied content is trustworthy.
+→ new validly-signed JWT with `user_metadata.role: "admin"` → passes every `_require_admin` check (finance P&L, investment data, blacklist) and the PWA `/finance` gate.
+**Reproduced:** `tests/test_auth_role_source.py` in the sandbox — `test_self_set_user_metadata_role_is_ignored` fails on current code, passes on the fix.
 
-**Fix applied:**
-- `src/api/v2/auth.py` — `role`/`org_id` now read from `app_metadata` only; `name` (non-privileged) stays in `user_metadata`.
-- `web/middleware.ts` — admin gate now reads `app_metadata.role`.
-- `scripts/create_auth_users.py` — new users get `role`/`org_id` written to `app_metadata` (via the service-role Admin API, which is the only way to write it).
-- `scripts/_migrate_role_to_app_metadata.py` (new) — one-off migration to move the 5 existing users' role from `user_metadata` into `app_metadata`. **Not yet run** — needs to be run against production once, after this code deploys (see "Next steps" below).
+**Fix:** read `role`/`org_id` from `app_metadata` only (no fallback); write them there in `create_auth_users.py` via the Admin API; update all 5 frontend/backend reads; migrate the 6 existing users (`scripts/_migrate_role_to_app_metadata.py`, already written — moves role into app_metadata, leaves user_metadata intact).
+
+**⚠️ End-to-end impact — THIS IS WHAT BROKE PRODUCTION EARLIER:**
+- The moment `auth.py` reads `app_metadata`, **every existing session's JWT (which has role only in `user_metadata`) resolves to `"tenant"` → 403 on every admin/staff endpoint.** The whole app appears broken until each user's token refreshes (~1hr) or they log out/in.
+- There are **5 places** that read the role, not 1: `auth.py` (backend), `middleware.ts`, `auth-server.ts`, `auth-provider.tsx` (×2), `finance/page.tsx`. Missing any one leaves the UI half-broken even after a fresh login. The earlier attempt fixed only `auth.py` + `middleware.ts` → still broken.
+- Correct sequencing: (1) run the migration script `--write` FIRST so all accounts have `app_metadata.role`; (2) deploy code that reads `app_metadata` across all 5 files; (3) force every admin/staff to log out and back in immediately (their old token is now role-less). Do NOT add a `user_metadata` fallback "to be safe" — that reopens the vulnerability.
+- Sandbox test: simulate an old-token payload (role only in user_metadata) → must resolve to `tenant` (fail-closed); simulate app_metadata payload → admin. Both covered by `test_auth_role_source.py`. Note: the account migration was already run once this session (all 6 accounts have `app_metadata.role` set AND still have `user_metadata.role`), so step 1 is effectively done — but re-verify before deploy.
+
+### C-3 — Anon key has wide-open table grants; only empty-policy RLS deny-all stands between the internet and all data
+**Downgraded from CRITICAL to MEDIUM after live testing — the breach is NOT currently exploitable, but the protection is one accidental policy away from failing.**
+
+**Live test results (2026-08-08, against production):**
+- RLS is **enabled** on every table checked (`tenants`, `payments`, `tenancies`, `rooms`, `bank_transactions`, `refunds` all `relrowsecurity=true`) with **0 policies** each. Postgres RLS-enabled-with-no-policy = deny-all for non-owner roles.
+- Anon read test: `GET /rest/v1/tenants` (and rooms, payments, bank_transactions) with the real anon key → **HTTP 200 `[]`** (empty — RLS denies, even though the tables have thousands of rows). ✅ reads blocked.
+- Anon write test: `POST /rest/v1/rooms` with the anon key → **`42501 new row violates row-level security policy`**, no row created. ✅ writes blocked.
+- So an attacker with the public anon key currently gets **nothing** from PostgREST. The earlier assumption ("RLS off → full table access") was WRONG; RLS is on and protecting the data.
+
+**Why this is still MEDIUM, not resolved — the fragility:**
+- The `anon` and `authenticated` roles hold **full table privileges** — `SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER` on `tenants`, `payments`, `rooms`, and (by default grant) the rest of the `public` schema. The ONLY thing preventing a breach is the RLS deny-all-because-no-policy state.
+- The instant anyone adds a single permissive policy to any table — e.g. someone building a tenant-facing feature runs `CREATE POLICY ... FOR SELECT USING (true)` on `tenants`, or clicks "enable read access" in the Supabase dashboard — that table becomes **world-readable/writable** through the anon key, because the grants underneath are wide open. There is no second layer.
+- `TRUNCATE` is granted to anon and is **not governed by RLS** at all (RLS only covers SELECT/INSERT/UPDATE/DELETE). It's currently unreachable because PostgREST doesn't expose TRUNCATE — but the grant should not exist.
+
+**Fix (defense-in-depth, lower urgency than C-1/C-2 now that reads/writes are confirmed blocked):**
+`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;` (and `... DEFAULT PRIVILEGES ... REVOKE` for future tables). Then anon has no table privileges at all, so even a future accidental permissive policy can't expose data without an explicit grant too. The backend uses the service role (bypasses grants + RLS), so it is unaffected.
+
+**⚠️ End-to-end impact of the fix:**
+- Revoking anon/authenticated grants: **should break nothing** — the FastAPI backend connects as service-role/`postgres` (bypasses grants), and the web app never calls `.from()`/`.rpc()` (grep-confirmed — only auth/session). This is a safe, isolated change.
+- Still test after: login, password reset, session refresh, and 2-3 data pages — in case any forgotten client path relies on the anon key for data (none found in audit, but confirm).
+- Do NOT rely on the current RLS-deny-all as the permanent control; revoking grants makes the safe state explicit rather than incidental.
 
 ---
 
 ## HIGH
 
-### 2. `DELETE /api/v2/app/tenants/{tenancy_id}` had no role check (fixed)
-**File:** `src/api/v2/tenants.py:1030` (now `:1032`)
+### H-1 — No upper bound on payment amount
+**Where:** `src/schemas/payments.py:9,29` — `amount: int = Field(gt=0)`, no `le=`. Only backstop is DB `Numeric(12,2)` (~₹99cr).
+**Exploit:** `POST /api/v2/app/payments {amount: 123123123, ...}` → ₹12.3cr payment recorded, flips RentSchedule to paid, mirrors to Google Sheet, feeds P&L/cash/collection KPIs. Matches the ₹12,32,46,246 the collect-payment modal showed.
+**Impact:** one typo corrupts collections, P&L, cash position, unit economics, and the Sheet mirror.
+**Fix:** `Field(gt=0, le=MAX_SINGLE_PAYMENT)` on create + edit (e.g. ₹5,00,000, configurable); confirmation prompt above a threshold; reject amounts far exceeding outstanding + deposit.
+**⚠️ End-to-end impact:** low risk. Pick a ceiling above any legitimate single payment (largest real deposit + rent). Verify the biggest historical real payment in `payments` is below the cap before setting it, or a legit large collection gets rejected. No data migration needed.
 
-Hard-deletes a tenant's entire financial history (payments, refunds, rent schedule, checkout records) — the one place in this codebase that bypasses the project's own "never hard-delete, use `is_void`" rule, by design, for erroneous-entry cleanup. It required a valid JWT but **no role check**, unlike every sibling mutating endpoint in the same file. Any authenticated account (including "staff") could wipe any tenant's history.
+### H-2 — Refund cap validated against client-supplied deposit → refund can exceed deposit held
+**Where:** `src/api/v2/checkout.py:137-158` (`create_checkout`).
+**Description:** `expected_refund = max(security_deposit − maintenance − dues − deductions, 0)` where `security_deposit`, `dues`, `deductions` **all come from the request body**. The check `abs(client_refund − expected_refund) > 100` is a tautology (both sides client-derived). Only `maintenance_due` and the forfeiture flag come from the DB.
+**Exploit:** `POST /api/v2/app/checkout/create {security_deposit: 500000, pending_dues: 0, deductions: 0, refund_amount: 500000, ...}` → passes even if the tenant's real `tenancy.security_deposit` is ₹20,000 and they owe ₹40,000. Creates a ₹5,00,000 refund.
+**Impact:** refund larger than deposit held, dues ignored — real cash drain, deposit reconciliation corrupted.
+**Fix:** ignore `body.security_deposit`/`body.pending_dues`; cap at `min(client_refund, actual_deposit_held) − server_recomputed_dues − deductions`, using `tenancy.security_deposit` (or summed deposit payments) and `src/services/dues.py`. The prefetch at `checkout.py:45-46` already computes real dues — just use it in the create path.
+**⚠️ End-to-end impact:** medium. Server-recomputed dues/deposit may differ from what the checkout UI currently shows (which trusts client values), so some checkouts that "passed" before will now correctly reject or adjust. Test: a normal-notice full refund, a with-dues partial refund, a day-stay refund, and a forfeited (no-notice) checkout — all must produce the right server-computed number. Confirm the PWA checkout screen sends fields the server can re-derive, or update it to stop sending authoritative deposit/dues.
 
-**Fix applied:** `if user.role != "admin": raise HTTPException(403)` before any DB access — admin-only, stricter than the `admin|staff` bar used by lesser mutations, since this one is irreversible.
+### H-3 — `DELETE /tenants/{id}?force=true` hard-deletes payments/refunds and bypasses the freeze
+**Where:** `src/api/v2/tenants.py:1030-1151`.
+**Description:** with `force=true` it sets `app.allow_historical_write='true'` then raw-`DELETE`s from `payments`, `refunds`, `rent_schedule`, `checkout_records` — including frozen Dec-2025–Mar-2026 rows. The only trail is one AuditLog row with a *count* (not amounts/dates). Violates the project's "never hard-delete financial records" rule; the "void" comment is inaccurate (it deletes).
+**Exploit:** `DELETE /api/v2/app/tenancies/{id}?reason=x&force=true` → all financial history for that tenancy erased, unreconstructable.
+**Fix:** never hard-delete `payments`/`refunds`; soft-void with per-row audit (amount+date+mode); don't auto-bypass the freeze here; also add the missing role check (admin-only — see H-4).
+**⚠️ End-to-end impact:** low. This endpoint is for erroneous-entry cleanup; making it soft-void changes cleanup semantics (voided rows remain, filtered by `is_void`). Verify the Bookings/Tenants UI and all reports already exclude `is_void` rows (they do elsewhere) so voided-not-deleted tenancies don't resurface. No legit flow depends on hard deletion.
 
-### 3. `POST /api/v2/app/tenants/{tenancy_id}/transfer-room` had no role check (fixed)
-**File:** `src/api/v2/tenants.py:1008` (now `:1010`)
-
-Any authenticated account could move any tenant to any room, changing rent/deposit as a side effect — no role gate, inconsistent with the `admin|staff` check on neighboring endpoints in the same file.
-
-**Fix applied:** `if user.role not in ("admin", "staff"): raise HTTPException(403)`.
+### H-4 — Endpoints missing role checks (IDOR / data exposure)
+**Where:** no role gate (only `Depends(get_current_user)`): `DELETE /tenants/{id}` and `POST /tenants/{id}/transfer-room` (mutating); `tenants.py` list/search/previous-stays/dues, `notices.py`, `checkouts.py`, `rooms.py`, `reporting.py` ×2, `analytics.py` (reads). `get_current_user` defaults an unset role to `"tenant"`.
+**Description:** any valid session can hit these. Mutating ones (delete/transfer) are the worst — any authenticated account could wipe history or move tenants. Reads leak full tenant PII/financials. Not exploitable *today* (only admin/staff accounts exist) but becomes live IDOR the instant any lower-privileged account is provisioned.
+**Fix:** add `if user.role not in ("admin","staff")` (or admin-only for delete) to all. Fail-closed.
+**⚠️ End-to-end impact:** **this was half of what broke production earlier** — combined with C-2, gating reads meant old-token sessions (role→tenant) got 403 on the pages that call these. The role gate is correct; it MUST ship together with C-2 done properly (migration + re-login) or the same pages 403 again. Test every listed page as admin AND as staff after the C-2 migration.
 
 ---
 
 ## MEDIUM
 
-### 4. Read endpoints authorized by "any valid JWT," not by role (fixed)
-**Files:** `src/api/v2/tenants.py` (`list_tenants`, `search_tenants`, `get_previous_stays`, `get_tenant_dues`), `notices.py` (`get_active_notices`), `checkouts.py` (`get_checkouts`), `rooms.py` (`check_room_availability`), `reporting.py` (`get_collection_summary`, `get_collection_history`), `analytics.py` (`get_occupancy`)
+### M-1 — `POST /api/v2/app/auth/send-otp` fail-open
+**Where:** `src/api/v2/auth_hooks.py:37` — bearer check only runs `if _HOOK_SECRET:`; `SUPABASE_SMS_HOOK_SECRET` is **not set** in `.env`, so the guard is skipped and the route is open. Registered under the internet-reachable `/api/v2/app` prefix.
+**Exploit:** `POST /api/v2/app/auth/send-otp {"phone":"+91...","otp":"verify at evil.link"}` → server sends `Your Kozzy login code is: *verify at evil.link*` from the business's WhatsApp sender.
+**Real-world caveat (lowers severity):** `_send_whatsapp` sends **free-form** text, which Meta silently drops outside the recipient's 24h customer-service window (the exact CC-reliability behavior found earlier this session). So delivery only succeeds to numbers that messaged the business in the last 24h — an attacker can't spam arbitrary numbers. Still: unauthenticated, delivers attacker text to active users, burns quota.
+**Fix:** fail closed when `_HOOK_SECRET` is empty (503, or refuse startup); add per-IP + per-recipient rate limiting; prefer verifying the Supabase webhook signature.
+**⚠️ End-to-end impact:** if login-OTP-over-WhatsApp is actually in use, making the secret mandatory means the secret must ALSO be set in the Supabase Auth hook config and the VPS `.env` at the same time, or OTP delivery breaks. Check whether this hook is live in Supabase before failing it closed; if unused, the safest fix is to remove the route entirely.
 
-None of these checked `user.role` — any Supabase Auth user with a valid session got full tenant PII, rent, dues, deposit, and occupancy data. Not exploitable **today** (only 5 accounts exist, all `admin`/`staff`, provisioned by `scripts/create_auth_users.py` — no self-signup path exists anywhere in `web/`), but `get_current_user()` silently defaults `role` to `"tenant"` for any account that ever lacks the claim. The moment a lower-privileged account type is provisioned (tenant self-service login, a future lead account, a password-reset-created account with no role set) it would get read access to every other tenant's financial data through these routes with zero additional check.
+### M-2 — `edit_payment` bypasses freeze, unbounded, any month
+**Where:** `src/api/v2/payments.py:257-346` — sets `app.allow_historical_write='true'` unconditionally; no period check, no amount ceiling. A frozen-month payment's amount/method/for_type can be rewritten to anything. AuditLog is written (good).
+**Fix:** block edits to `period_month < current` unless an explicit override; add the H-1 ceiling.
+**⚠️ End-to-end impact:** low. Confirm no legitimate workflow routinely edits frozen-month payments (corrections should be rare and can use an explicit override flag). Test editing a current-month payment still works.
 
-**Fix applied:** added `if user.role not in ("admin", "staff"): raise HTTPException(403)` to all nine routes above — fail-closed, matching the pattern already used by every mutating endpoint. Safe under current account population (all 5 existing accounts are `admin`/`staff`), closes the gap before it becomes live.
+### M-3 — Dues wiped via `PATCH /tenants/{id}` (future check-in date)
+**Where:** `tenants.py` recalc paths + `rent_schedule.py:38-56`. `checkin_date` accepts any date incl. future (only `agreed_rent>0`, `deposit>=0` validated). Future date → `monthly_dues` returns `not_yet` → 0 dues; live tenant's balance zeroed while `active`. Audited per-field (traceable) but no sanity guard.
+**Fix:** bound `checkin_date` (not far future, not before booking); flag/deny recalcs that zero a non-zero balance.
+**⚠️ End-to-end impact:** low-medium. Legit date corrections must still work — bound generously (e.g. within ±N months of booking). Test editing a real tenant's check-in date by a few days still recomputes correctly.
 
-### 5. `org_id` is decorative — never used to scope a query
-**Files:** `src/api/v2/auth.py`, every `src/api/v2/*.py` query keyed by `tenancy_id`/`payment_id`/etc.
+### M-4 — `extract-id` unauthenticated LLM call, no rate/size cap
+**Where:** `onboarding_router.py:1062-1117` — no `_check_admin_pin`, no `_rate_check`, no `MAX_UPLOAD_SIZE`; base64-decodes body and calls Anthropic Haiku on the owner's key.
+**Exploit:** any onboarding-token holder loops the call → unbounded Anthropic spend + memory blow-up from decoding large payloads.
+**Fix:** add `_rate_check`, enforce size limit before decode, gate to `pending_tenant`/`pending_review` sessions.
+**⚠️ End-to-end impact:** low. The onboarding form's ID-scan feature calls this — keep the rate limit high enough for a real tenant filling the form (a few calls), and confirm the size cap exceeds a normal phone photo (e.g. 10MB).
 
-`AppUser.org_id` is only ever stamped onto new `AuditLog`/`RentRevision` rows for record-keeping; no query anywhere filters `WHERE org_id = user.org_id`. This is single-tenant today (one PG business, `org_id` always `1`) so it's **not exploitable now** — but the field's presence signals multi-org SaaS intent (per the roadmap docs). If a second org is ever onboarded on the same DB/backend, every numeric-ID endpoint in this codebase becomes a cross-customer IDOR (any staff/tenant account could enumerate another org's `tenancy_id`/`payment_id`).
+### M-5 — Unbounded negative `adjustment` zeroes dues
+**Where:** `tenants.py:912-999` — `amount` any float; large negative waiver drives dues to 0. Audited + note required, but no magnitude cap or approval gate.
+**Fix:** cap `|adjustment|` at effective rent, or require admin role for large waivers.
+**⚠️ End-to-end impact:** low. Confirm legit waivers (partial rent concessions) stay under the cap.
 
-**Not fixed** — no code change made; this needs a real design decision (org-scoped dependency injection across every v2 router) before it matters, and making that change today with only one org would be speculative. **Action:** revisit before onboarding any second organization — do not treat "single-tenant so far" as permanent.
+### M-6 — `org_id` never scopes any query
+**Where:** `auth.py` sets `org_id`; no query filters by it. Single-tenant today (org_id always 1) so not exploitable now, but every numeric-ID endpoint becomes a cross-customer IDOR the moment a 2nd PG business shares this backend.
+**Fix:** add org-scoped filtering (or a dependency injecting it) before onboarding any 2nd org. **Do not fix speculatively now** — revisit at multi-org time.
 
 ---
 
 ## LOW
 
-### 6. `src/database/rls_policies.sql` is misleading dead code (fixed — documented, not deleted)
-The backend connects to Postgres as the `postgres` role (table owner), which bypasses RLS entirely regardless of these policies, and the `app.caller_phone` session variable every policy depends on is never `SET` anywhere in the codebase. Real authorization correctly lives in the FastAPI/JWT layer — but anyone reading this file cold would assume DB-level tenant isolation exists when it provides none.
-
-**Fix applied:** added a prominent header to the file stating it is not enforced and why, pointing at this audit.
-
-### 7. Stale doc with hardcoded webhook shared-secret (fixed)
-**File:** `docs/reference/APPS_SCRIPT_SYNC.md`
-
-Hardcoded token `kozzy-sync-2026` for `X-Sync-Token` auth on `/api/sync/source-sheet`. Confirmed `src/api/sync_router.py` no longer exists and isn't registered anywhere — the endpoint isn't live, so this isn't currently exploitable. Risk is only if someone resurrects the endpoint from git history without rotating the token, since it's sitting in a committed doc.
-
-**Fix applied:** replaced all three occurrences of the real-looking token with `REPLACE_WITH_NEW_SECRET` placeholders and added a "STALE — endpoint removed" banner.
+- **L-1** — `regen-pdf` copies signed agreement PDFs (PII) to public `/static/agreements/{token8}/…` (`onboarding_router.py:860-870`). Not enumerable (32-bit token + name) but unauthenticated URL-guessing. Serve via auth-gated endpoint or Supabase signed URL; stop writing PII to `/static`.
+- **L-2** — `/documents` StaticFiles mount (`main.py:239`) has no auth; its only guard `LocalOnlyMiddleware` is a **no-op behind nginx** (all proxied requests look like 127.0.0.1 because uvicorn trusts the proxy). Empty of real KYC today (migrated to Supabase), so low — but anything written there becomes internet-reachable. Drop the mount or JWT-gate it; add nginx `internal;` on sensitive prefixes.
+- **L-3** — In-memory rate limiter (`onboarding_router.py:43-53`) is per-worker (×2 with 2 workers) and resets on restart. Back with Redis/DB if the throttles are relied on.
+- **L-4** — Duplicate-payment guard (`services/payments.py:250`) hashes amount+mode+period; a ₹1 change defeats it. Fine for semi-trusted staff, noted.
 
 ---
 
-## Checked and confirmed SAFE (no action needed)
+## Prioritized remediation plan (deploy order matters)
 
-- **CORS** (`main.py`): explicit origin whitelist (localhost dev + `kozzy.vercel.app` + `app.getkozzy.com`), not `"*"` — safe combined with `allow_credentials=True`.
-- **WhatsApp webhook signature** (`src/whatsapp/webhook_handler.py`): `X-Hub-Signature-256` verified via `hmac.compare_digest` (timing-safe), fails closed (503) if the app secret is unset. GET verify-token challenge doesn't leak the token.
-- **Session cookies**: PWA uses `@supabase/ssr`'s cookie-based session storage throughout (`middleware.ts`, `auth/callback/route.ts`) — no tokens read from `localStorage`/`sessionStorage` for authorization decisions.
-- **JWT verification** (`src/api/v2/auth.py`): explicit algorithm allowlist (ES256/RS256 via JWKS, HS256 fallback with shared secret), audience-checked — no algorithm-confusion or `"none"`-alg path.
-- **Password reset flow**: `next` redirect param is whitelisted (no open redirect); code exchange happens server-side; can't be used to change an arbitrary user's password without a valid reset session.
-- **XSS**: no `dangerouslySetInnerHTML` anywhere in `web/` (JSX default-escapes). Only raw `innerHTML` usage is in the static, no-backend `web/public/mockups/kozzy.html` sales demo — not reachable with attacker-controlled input.
-- **SQL injection**: every raw-SQL f-string in the codebase interpolates a fixed table/column name from a Python literal in the same function — never request/WhatsApp-supplied text. All values go through SQLAlchemy bind params.
-- **Command/code injection**: no `eval`, `exec`, `pickle.load`, or unsafe `yaml.load` anywhere. All `subprocess` calls use list-argv form (never `shell=True` or a concatenated string).
-- **Path traversal**: media/upload handling never builds a filesystem path from user-supplied text — always fixed literals + internal numeric IDs.
-- **Prompt injection**: the vision-LLM (Claude Haiku) receipt-reading path never mutates financial records directly — output is either attached to an already-human-logged payment or shown as a preview an admin must confirm. It's also only reachable by the 4 hardcoded staff phone numbers (`role_service.py`) — tenants are silently blocked from the bot entirely, closing off the "malicious tenant image" injection scenario at the authorization layer.
-- **Secrets on disk**: no `.env` committed (`.gitignore`'d), only placeholder `.env.example`/`.env.template` files. Repo-wide + `venv`/`node_modules` scan for API-key-shaped strings and JWT-shaped strings found zero real secrets — only false positives inside third-party library source/docs (ecdsa, google-auth, twilio, jose, authlib, botocore examples).
-- **DB connection model**: backend connects via SQLAlchemy+asyncpg as the `postgres` role, not the Supabase REST/anon-key path — RLS bypass is total but intentional; the web client never queries Supabase tables directly (grepped for `.from(...)` calls — none found), only uses the Supabase JS client for auth/session.
-- **Every `finance.py` and `blacklist.py` route**: verified line-by-line — each uses `_require_admin()` or an explicit role allowlist, genuinely server-enforced (not just a hidden UI button).
+1. **C-1 (public buckets)** — most urgent, the one confirmed **live PII breach**. Needs the signed-URL refactor first or images break everywhere (see its impact section). Highest effort, highest urgency.
+2. **C-2 + H-4 (role source + role gates)** — the privilege-escalation hole. Ship together, in the exact order: verify accounts migrated → deploy all 5 file changes → force re-login. This is the one that already broke prod; treat with maximum care. Account migration is already done (verify before deploy).
+3. **H-1, H-2, H-3, M-2, M-5 (money-integrity)** — validation caps + server-side recompute + soft-void. Test each money flow in sandbox.
+4. **C-3 (anon grants)** — now MEDIUM: reads/writes are already blocked by RLS deny-all (live-tested), so not urgent, but `REVOKE` the wide-open anon/authenticated grants to make the safe state explicit. Low-risk, safe to do anytime.
+5. **M-1, M-4 (unauth endpoints)** — set/rotate secrets, add rate limits. Check the OTP hook is actually in use first.
+6. **M-3, L-1, L-2, L-3, L-4** — hardening, lower urgency.
+7. **M-6 (org scoping)** — only at multi-org time.
+
+**Process rule going forward (from today's incident):** no security fix ships without (a) its end-to-end impact worked through, (b) a sandbox test proving both the fix AND that existing flows still work, (c) a deploy sequence that accounts for in-flight sessions. The reference sandbox is `../pg-security-sandbox` (branch `security-redo`).
 
 ---
 
-## Next steps (require your go-ahead — not run yet)
+## Verification evidence
+- **C-1** — live query to production Storage API returned `kyc-documents public=true`, `agreements public=true` (2026-08-08). **Confirmed live breach.**
+- **C-2** — `tests/test_auth_role_source.py` (sandbox) — 7 tests; the exploit case fails on `master`, passes on the fix.
+- **C-3** — live-tested against production with the real anon key: catalog shows RLS enabled + 0 policies on all tables; anon SELECT → `200 []` (empty), anon INSERT → `42501 row-level security policy` violation. **Reads and writes confirmed blocked** → downgraded to MEDIUM (fragile grants, not a live breach). Wide-open anon grants (SELECT/INSERT/UPDATE/DELETE/TRUNCATE) confirmed present via `information_schema.role_table_grants`.
+- **H-1/H-2/H-3/M-2/M-5** — direct code reads (line refs above).
+- **M-1/M-4** — code + confirmed `SUPABASE_SMS_HOOK_SECRET` absent from `.env`.
+- Round-1 SAFE items re-confirmed by the deeper agents (webhook HMAC, JWT alg, no injection, no committed secrets).
 
-1. **Deploy the code fixes** (auth.py, middleware.ts, tenants.py, notices.py, checkouts.py, rooms.py, reporting.py, analytics.py, create_auth_users.py) to VPS after local testing.
-2. **Run `scripts/_migrate_role_to_app_metadata.py --write`** against production once (moves the 5 existing users' role into `app_metadata`). Dry-run first (no `--write`) to see what it would do.
-3. After deploy, existing sessions keep their old JWT (role only in `user_metadata`, which the new code no longer reads) until the access token refreshes (~1hr) or the user logs out/in — **admins should log out and back in** right after deploy to avoid a temporary "why can't I see Finance" confusion.
-4. Rotate the `SYNC_WEBHOOK_TOKEN` if `sync_router.py` is ever reintroduced (finding 7).
-5. Revisit `org_id` scoping (finding 5) before onboarding any second PG business on this backend.
+## Coverage & honesty note
+This audit covered: auth/authorization (JWT, roles, RLS, grants, IDOR), the full public/unauthenticated attack surface (onboarding, QR, webhook, static mounts), storage/bucket privacy, secrets exposure (repo + git history + client bundle), injection (SQL/command/path/prompt/XSS), CORS/session/cookies, and financial-integrity/business-logic abuse. Three independent agent passes plus direct verification of every finding. **No audit can prove zero vulnerabilities exist** — this reduces known risk to the items above. Areas deliberately not deep-tested (would need a live pentest / different tooling): dependency CVEs (`npm audit`/`pip-audit` not run here), timing side-channels, the nginx/VPS host config itself, and Meta/Supabase account-takeover paths outside this codebase. Recommend running `npm audit` + `pip-audit` and reviewing VPS/nginx hardening as a follow-up.
