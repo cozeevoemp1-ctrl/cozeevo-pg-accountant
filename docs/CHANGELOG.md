@@ -77,8 +77,12 @@ Built an interactive, self-contained sales-demo mockup (no backend, dummy data) 
 ### Security — shared admin PIN REMOVED (Kiran: "don't need this at all")
 - 🔐 `cozeevo2026` shipped inside public JS (PWA bundle + staff-sign page source) → all `/api/onboarding/admin/*` (approve, KYC, session edits, room lookup) effectively open. Now **Supabase JWT admin/staff only**; PIN paths deleted; `static/admin_onboarding.html` + serve route removed; PWA calls switched to JWT. **NOT live until VPS deploys — deploy is urgent.**
 
+### Deploy — DONE 2026-08-08 evening
+- ✅ Kiran deployed (VPS was already current via webhook, restarted API + rebuilt PWA ×2). Live-verified from outside: old PIN → 403, legacy checkout → 410, /config live, PWA serving. **The Session U → W deploy backlog is closed.**
+- 🐛 Post-deploy fix: bookings page showed mojibake (₹→"â‚¹") — my PowerShell regex edit had corrupted the file's UTF-8; repaired + redeployed (`6ae8af6`). Rule saved: never edit source via PS Get/Set-Content.
+
 ### Open (Kiran)
-Option A/B refund double-subtraction · ₹64,841 cash variance · internet accrual for dynamic months · chandrasekhar handle got ₹23K in frozen Jan/Feb labeled refunds (note only) · re-upload corrected P&L to Google Sheets (his copy has old balances) · **VPS deploy** · 2FA + Hostinger/Supabase key rotation.
+Option A/B refund double-subtraction · ₹64,841 cash variance · internet accrual for dynamic months · chandrasekhar handle got ₹23K in frozen Jan/Feb labeled refunds (note only) · re-upload corrected P&L to Google Sheets (his copy has old balances) · 2FA + Hostinger/Supabase key rotation · VPS `reboot` for kernel updates (quiet hour).
 
 ## Session V — 2026-08-07 — Phase 3 backend consolidation (Web v2 prerequisite) — EXECUTED
 
