@@ -633,6 +633,27 @@ async def upload_bank_csv(
             if not rows:
                 continue
 
+            # Reconcile against the statement's own printed figures BEFORE
+            # importing: opening + deposits − withdrawals must equal closing.
+            # Catches truncated files, misparsed columns, missing rows.
+            from src.parsers.yes_bank import read_statement_summary
+            summary = read_statement_summary(content)
+            if "opening" in summary and "closing" in summary:
+                dep = sum(a for _, _, t, a, _ in rows if t == "income")
+                wd = sum(a for _, _, t, a, _ in rows if t == "expense")
+                computed = summary["opening"] + dep - wd
+                if abs(computed - summary["closing"]) > 1.0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{upload_file.filename}: statement does NOT reconcile — "
+                            f"opening {summary['opening']:,.2f} + deposits {dep:,.2f} − "
+                            f"withdrawals {wd:,.2f} = {computed:,.2f}, but the statement "
+                            f"says closing {summary['closing']:,.2f}. Rows are missing or "
+                            f"misparsed; nothing was imported from this file."
+                        ),
+                    )
+
             from_date = min(r[0] for r in rows)
             to_date   = max(r[0] for r in rows)
 

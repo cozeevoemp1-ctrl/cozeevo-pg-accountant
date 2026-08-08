@@ -11,7 +11,34 @@ import io
 from datetime import date, datetime
 from typing import IO, Union
 
-__all__ = ["parse_date", "parse_amt", "read_yes_bank_csv"]
+__all__ = ["parse_date", "parse_amt", "read_yes_bank_csv", "read_statement_summary"]
+
+
+def read_statement_summary(source: Union[str, "IO"]) -> dict:
+    """Read the statement's OWN header figures: opening/closing balance + period.
+
+    Yes Bank prints 'Opening Balance,INR x' / 'Closing Balance,INR x' above the
+    transaction table. These are the bank's ground truth — importers use them to
+    verify the parse reconciles (opening + deposits − withdrawals == closing),
+    so a truncated or misparsed file can never be imported silently.
+    (Added 2026-08-08 after a mid-day balance shipped as the Jul closing.)
+    """
+    f, close_after = _open_text(source)
+    try:
+        head = "".join(f.readlines()[:10])
+    finally:
+        if close_after:
+            f.close()
+    out: dict = {}
+    for key, label in (("opening", "opening balance"), ("closing", "closing balance")):
+        for line in head.splitlines():
+            if line.lower().startswith(label):
+                parts = line.split(",")
+                if len(parts) > 1:
+                    val = parse_balance(parts[1])
+                    if val is not None:
+                        out[key] = val
+    return out
 
 
 def parse_date(v) -> date | None:
