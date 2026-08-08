@@ -265,6 +265,11 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Maintenance & Repairs","Key Duplicate / Locks",        ["/keys","key duplicate","locksmith","seals"]),
     ("Maintenance & Repairs","Fridge Delivery / Appliance",  ["fridge delivery","fridge"]),
     ("Maintenance & Repairs","Sump / Tank Cleaning",         ["sump clean"]),
+    # Kiran rulings 2026-08-08 (classified 08_08.xlsx)
+    ("Maintenance & Repairs","General Maintenance",          ["heat pump","hand shower","washing machine","alen ky","allen key"]),
+    ("Staff & Labour",       "Staff Advance",                ["lalbabukumar","master advance"]),
+    ("Waste Disposal",       "Garbage / Supervisor",         ["garbage remov"]),
+    ("Food & Groceries",     "Vegetables & Greens",          ["paneer","panner","mutter","tomoto","tomato","coriander","corrindar"]),
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain","stabilizer","stabiliser"]),
 
     # ── BANK CHARGES ──────────────────────────────────────────────────────────
