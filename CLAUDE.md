@@ -150,7 +150,8 @@ Kiran's Excel (offline)
 | `web/components/finance/investment-section.tsx` | Finance Investment section — collapsible per-investor groups from `investment_expenses` table; hides if count=0 |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
-| `web/middleware.ts` | Next.js auth gate — unauthenticated → /login; staff on /finance/** → /; 3s timeout fail-open; /auth/** always allowed |
+| `web/middleware.ts` | Next.js auth gate — unauthenticated → /login; staff on /finance/** → /; 3s timeout fail-open; /auth/** and /mockups/** always allowed (no login) |
+| `mockups/` | Sales-demo mockups (static HTML, dummy data, no backend) — source of truth to edit/reskin per client. See `mockups/README.md`. Deployed copy in `web/public/mockups/` (kept in sync manually), live at `app.getkozzy.com/mockups/<file>.html` with no login required |
 | `web/app/login/page.tsx` | PWA login — email+password sign-in + "Forgot password?" reset flow |
 | `web/app/auth/callback/route.ts` | PKCE code exchange — Supabase reset email → exchanges code → redirects to /auth/update-password |
 | `web/app/auth/update-password/page.tsx` | Set new password — works for any logged-in user; navigate directly after login with temp password |

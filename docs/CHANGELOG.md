@@ -1,5 +1,15 @@
 # Changelog
 
+## Session W — 2026-08-08 — Sales-demo mockups (Home/Finance/Bed Board) + VPS hosting
+
+### Summary
+Built an interactive, self-contained sales-demo mockup (no backend, dummy data) of Home, Finance, and the Web v2 Bed Board, for showing prospective PG-owner clients. Iterated through several rounds: static screenshots → single interactive device with real tab navigation → per-tile KPI expand panels (matching the real app's `ExpansionPanel`) → Bed Board room-tap filtering → dedicated Tenants tab (was accidentally aliased to Finance) → hosted on the live VPS instead of a claude.ai link.
+
+- ✅ **`mockups/kozzy.html`** — single HTML file, DM Sans + Geist + Geist Mono fonts embedded as base64 (zero external requests), old-PWA brand kit (cream/pink) for Home+Finance, Web v2 "Host" kit (coral/Geist) for Bed Board. Fully interactive: tab bar switches 4 pages (Home/Board/Tenants/Finance), all 7 Home KPI tiles expand inline with dummy detail rows, Bed Board's 3 KPI tiles filter the room grid (tap Dues → only due rooms stay active), every Bed Board room is tappable and updates the inspector card, Tenants has live name/room search, Finance's Generate P&L button gives real press feedback, Monthly/All-time toggle works.
+- ✅ **`mockups/README.md`** — documents the "BRAND TOKENS" comment blocks in the CSS (5 values for Home/Finance, 3 for Bed Board) so reskinning for a new client is a copy + edit ~8 color values, no rebuild needed.
+- ✅ **Hosted on the live VPS, not claude.ai** — copied into `web/public/mockups/kozzy.html` (Next.js serves `public/` as static passthrough) and `web/middleware.ts` allowlists `/mockups/**` so it's reachable **without login** (prospective clients have no account). Live at `app.getkozzy.com/mockups/kozzy.html`. Nothing else about the auth gate changed — every other route still requires login exactly as before.
+- ⚠️ **`[UNCONFIRMED]` `app.getkozzy.com/login` showed a client-side exception right after this deploy.** The middleware diff is minimal and doesn't touch `/login`'s existing bypass, so this is very likely an unrelated stale-service-worker cache from the deploy (known failure mode — see the "PWA Build Failure" incident earlier in this changelog) rather than something this change caused. **Not yet confirmed fixed** — Kiran was going to hard-refresh / unregister the SW and check `/tmp/deploy.log` on the VPS; needs a follow-up check next session before assuming it's resolved.
+
 ## Session V — 2026-08-07 — Phase 3 backend consolidation (Web v2 prerequisite) — EXECUTED
 
 ### Summary
