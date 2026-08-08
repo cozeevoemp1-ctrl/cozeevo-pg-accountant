@@ -300,7 +300,11 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             )
         )
 
-        # Bank closing balance = last transaction's running balance per account this month
+        # Bank closing balance = running balance of the month's chronologically
+        # LAST transaction. Yes Bank CSVs list NEWEST FIRST, so within the last
+        # date the FIRST-parsed row (lowest id) is the true closing — ordering
+        # by id DESC picked a mid-day balance (THOR Jul'26 showed 4,40,731
+        # instead of the statement's 2,70,437; caught by Kiran 2026-08-08).
         async def _closing(acct: str) -> float:
             row = await session.scalar(
                 select(BankTransaction.balance)
@@ -309,7 +313,7 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
                     BankTransaction.txn_date.between(start, end),
                     BankTransaction.balance != None,
                 )
-                .order_by(BankTransaction.txn_date.desc(), BankTransaction.id.desc())
+                .order_by(BankTransaction.txn_date.desc(), BankTransaction.id.asc())
                 .limit(1)
             )
             return float(row) if row is not None else 0.0
