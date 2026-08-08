@@ -57,6 +57,29 @@ Built an interactive, self-contained sales-demo mockup (no backend, dummy data) 
 - ✅ **Hosted on the live VPS, not claude.ai** — copied into `web/public/mockups/kozzy.html` (Next.js serves `public/` as static passthrough) and `web/middleware.ts` allowlists `/mockups/**` so it's reachable **without login** (prospective clients have no account). Live at `app.getkozzy.com/mockups/kozzy.html`. Nothing else about the auth gate changed — every other route still requires login exactly as before.
 - ⚠️ **`[UNCONFIRMED]` `app.getkozzy.com/login` showed a client-side exception right after this deploy.** The middleware diff is minimal and doesn't touch `/login`'s existing bypass, so this is very likely an unrelated stale-service-worker cache from the deploy (known failure mode — see the "PWA Build Failure" incident earlier in this changelog) rather than something this change caused. **Not yet confirmed fixed** — Kiran was going to hard-refresh / unregister the SW and check `/tmp/deploy.log` on the VPS; needs a follow-up check next session before assuming it's resolved.
 
+## Session W — 2026-08-07/08 — Web v2 real data · July P&L close · admin-PIN removal
+
+### Web v2 Bed Board demo (artifact `6e816cd3`)
+- ✅ Real DB snapshot embedded (`scripts/_export_web_demo_data.py`): 166 real rooms/floors, staff rooms grey, per-bed August dues via shared `services/dues.py`, KPIs, last-12-day register, bookings/checkouts/notices, 6-mo occupancy. Real structure captured (THOR x01–x12 / HULK x13–x24 mirror floors).
+- ✅ Kiran iterations: equal 12-slot floor grids, THOR left/HULK right, bed ICONS (premium = ONE wide king bed), legend chips = the filters (Today segmented control removed), KPI cards → drill-down tables replacing the board; dues KPI also lights board filters. Old artifacts (5-Directions, Command Center, P&L diagram) wiped to tombstones per Kiran.
+
+### July 2026 P&L — FULL month close (`data/reports/PnL_Cozeevo_2026_07.xlsx`)
+- ✅ Imported THOR 57 + HULK 202 rows (importer `scripts/_import_july_2026_csv.py`, dedup 0) — **both statements reconcile to the paisa**.
+- ✅ Classification loop ×3 with Kiran (review workbook `scripts/_export_july_review_workbook.py` → `classified 08_08.xlsx` → `scripts/_apply_classified_2026_08_08.py`): ~30 reclasses; permanent rules added: kaveri water→Water, jalluram→Housekeeping, "hand loan" narration→Non-Op, sump clean/heat pump/hand shower/washing machine→Maintenance, master advance→Staff Advance, inar devi→Staff, vegetable words→Food. Bava ₹13L+₹1L auto-classified Non-Op as planned (Session S prep).
+- ✅ **Chandra loan flow un-hidden**: ₹90,000 out narration "Hand Loan" was mislabeled Tenant Deposit Refund by the auto-detector (matched tenant "Chandrasekhar"); ₹79,900 back in was counted as rent income. Both → Non-Operating; `_compute_dynamic_pnl_months` income filter now excludes Non-Operating credits.
+- ✅ Adjustments final: rent_paid_cash 15,32,000 · cash_expense 2,000 (helper) · cash_holding 65,000 (Jul-31 count) · **offline_cash 67,850 — NEW column** (migration `run_pnl_offline_cash_2026_08_08`); cash income line = ALL cash received + offline (Kiran: "never miss any cash") → **₹28,99,100 = his figure exactly**. June also on all-cash basis now.
+- ✅ **July: True Revenue ₹44.18L · OPEX ₹30.18L · NET OPERATING ₹14,00,408 (31.7%)** vs June ₹8.83L — bridge: +3.8L cash (dues catch-up), fewer check-ins (deposit netting −1.65L), June's mass-exit refunds (−2.24L swing).
+- ✅ **Closing-balance bug fixed (Kiran caught)**: Yes Bank CSVs newest-first → code took mid-day balance (THOR 4,40,731 vs true 2,70,437; HULK 98,462 vs 77,996). Order id ASC within last date.
+- ✅ **Statement self-reconciliation guard**: `read_statement_summary()` reads the bank's printed opening/closing; upload REJECTS files where opening+deposits−withdrawals ≠ closing. Truncated/misparsed statements can no longer import silently.
+- ✅ Loan register July: bank Bava 14L + G Ravikumar 2L + Chandra 90K (−79.9K repaid) · cash Chit Belandur 5L + Chit Boobalan 3.5L + Chandra 50K + **Loan to Mama 7L**.
+- 📋 `docs/MONTH_CLOSE_TEMPLATE.md` + `data/reports/Cash_Book_2026.xlsx` (auto expected-closing/variance formulas; July example shows Kiran's **+₹64,841 unexplained cash variance — OPEN**).
+
+### Security — shared admin PIN REMOVED (Kiran: "don't need this at all")
+- 🔐 `cozeevo2026` shipped inside public JS (PWA bundle + staff-sign page source) → all `/api/onboarding/admin/*` (approve, KYC, session edits, room lookup) effectively open. Now **Supabase JWT admin/staff only**; PIN paths deleted; `static/admin_onboarding.html` + serve route removed; PWA calls switched to JWT. **NOT live until VPS deploys — deploy is urgent.**
+
+### Open (Kiran)
+Option A/B refund double-subtraction · ₹64,841 cash variance · internet accrual for dynamic months · chandrasekhar handle got ₹23K in frozen Jan/Feb labeled refunds (note only) · re-upload corrected P&L to Google Sheets (his copy has old balances) · **VPS deploy** · 2FA + Hostinger/Supabase key rotation.
+
 ## Session V — 2026-08-07 — Phase 3 backend consolidation (Web v2 prerequisite) — EXECUTED
 
 ### Summary
