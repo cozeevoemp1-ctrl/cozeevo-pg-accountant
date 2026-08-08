@@ -1,5 +1,32 @@
 # Changelog
 
+## Session Z — 2026-08-08 — Full offensive security audit + a broken/reverted deploy (postmortem)
+
+### Summary
+Kiran asked for an unsparing hacker-mindset security audit ("no leakage"). Ran multiple parallel offensive passes over the whole codebase + live infra. An early attempt to auto-fix the first finding **broke the live PWA and was reverted**; the rest of the session was audit-only, with every finding verified directly and a fix-impact analysis written for each. **No security fix is deployed.** Full report: `docs/SECURITY_AUDIT.md`.
+
+### The incident (important — postmortem)
+- First pass found a real privilege-escalation bug (role read from self-editable `user_metadata`). I fixed it across `auth.py` + `middleware.ts`, ran the account migration (`_migrate_role_to_app_metadata.py --write` — moved role into `app_metadata` for all 6 accounts, `user_metadata.role` left intact), committed, and pushed.
+- **The push auto-deployed** (this repo deploys on push — I had wrongly told Kiran it wouldn't) and **broke the live app**: every in-flight session's JWT had role only in `user_metadata`, which the new code no longer read → 403 across the PWA (Collect payment, Bookings "Load failed: 403", etc.). I had also only fixed 2 of the 5 places that read the role.
+- **Reverted** (`1514b5d`) → production restored. No data lost (`user_metadata.role` was never removed, so the reverted code reads it fine). Also gitignored `data/Private/` (a 293MB zip the Stop-hook auto-commit kept trying to push, which was blocking git).
+- Lesson recorded in `docs/SECURITY_AUDIT.md`: no security fix ships without its end-to-end impact worked through, a sandbox test, and a deploy sequence that accounts for in-flight sessions.
+
+### Audit findings (17 total; documented, NOT fixed)
+- **C-1 CRITICAL (live):** Supabase `kyc-documents` + `agreements` buckets are `public=true` (verified live) — tenant IDs/selfies/signatures/agreements downloadable via guessable paths. Fix needs signed-URL refactor first or images break app-wide.
+- **C-2 CRITICAL:** privilege escalation via self-editable `user_metadata.role` (the reverted bug). Reference fix + guard tests preserved in worktree `../pg-security-sandbox` branch `security-redo` (local only, not pushed).
+- **C-3 → MEDIUM (live-tested, downgraded):** RLS deny-all IS blocking anon reads+writes (anon `SELECT`→`200 []`, `INSERT`→`42501` policy violation). Not a live breach — but anon table grants are wide open, so one accidental policy = breach. Recommend `REVOKE`.
+- **H-1..H-4:** no payment amount cap (₹12cr fat-finger accepted — matches the collect-payment modal), refund cap validated against client-supplied deposit (cash drain), `DELETE ?force=true` erases frozen financial history, 11 endpoints missing role checks.
+- **M-1..M-6, L-1..L-4:** fail-open `/auth/send-otp`, freeze-bypass on payment edit, dues-wipe via future check-in date, unauthenticated LLM `extract-id`, unbounded negative adjustment, decorative `org_id`, PII PDFs on public `/static`, etc.
+- **Confirmed SAFE:** webhook HMAC, CORS, JWT alg, password reset, XSS, SQL/command/path injection, onboarding token enumeration, tenant self-approval, no committed secrets.
+
+### Files
+- Committed to master: `docs/SECURITY_AUDIT.md` (`a75debb`), `.gitignore` (data/Private), the revert (`1514b5d`).
+- Local-only (not pushed): worktree `../pg-security-sandbox` (branch `security-redo`) — C-2 reference fix + `tests/test_auth_role_source.py`.
+- New memory: `rules_security_role_source.md` (app_metadata rule). `scripts/_migrate_role_to_app_metadata.py` exists but its changes were reverted from master — re-add when C-2 is properly redone.
+
+### State at session end
+Production healthy (API + PWA both 200, verified). No security fix live. Everything is documented in `docs/SECURITY_AUDIT.md` with a prioritized remediation plan; C-1 (live PII breach) is the top item and the recommended next task.
+
 ## Session Y — 2026-08-08 — Broadcast messaging (manual, template-based) + WhatsApp CC reliability fix + July P&L correction
 
 ### Summary
