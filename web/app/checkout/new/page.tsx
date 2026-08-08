@@ -113,12 +113,14 @@ function NewCheckoutPage() {
 
   // Notice / deposit forfeiture — MONTHLY ONLY. Day-stays have no notice period, so they are
   // excluded from the forfeiture rule entirely: their deposit is refundable (minus dues/deductions).
-  // Monthly: deposit REFUNDABLE only with on-time notice (on/before NOTICE_BY_DAY);
-  // forfeited if no notice OR late notice (after the cutoff); or manual emergency forfeit.
+  // Monthly: deposit REFUNDABLE as long as SOME notice was given, on any day — forfeited only
+  // with zero notice, or a manual emergency forfeit. Mirrors property_logic.py::is_deposit_eligible
+  // (2026-08-08 rule — late notice still pushes the last day to next month, but no longer also
+  // forfeits the deposit).
   const noticeDay = prefetch?.notice_date && prefetch.notice_date.trim() !== ""
     ? new Date(prefetch.notice_date + "T00:00:00").getDate()
     : null
-  const noticeEligible = noticeDay !== null && noticeDay <= NOTICE_BY_DAY
+  const noticeEligible = noticeDay !== null
   const depositForfeited = isDaily ? false : ((prefetch && !noticeEligible) || manualForfeit)
 
   function calcLastDay(noticeDateISO: string): string {
@@ -472,14 +474,16 @@ function NewCheckoutPage() {
             )
           }
           if (lateNotice) {
-            // Late notice (after cutoff) — deposit FORFEITED; must stay till end of next month
+            // Late notice (after cutoff) — deposit still REFUNDABLE, but pushed to next
+            // month's cycle (full month rent required). Deposit is only forfeited with
+            // zero notice — see property_logic.py::is_deposit_eligible (2026-08-08 rule).
             return (
-              <div className="rounded-card p-3 border bg-tile-orange border-[#FFDCC0] text-[#7A3300]">
+              <div className="rounded-card p-3 border bg-tile-green border-[#C4EDD4] text-[#146B2E]">
                 <div className="flex items-start gap-2">
-                  <span className="text-base flex-shrink-0 mt-0.5">⚠</span>
+                  <span className="text-base flex-shrink-0 mt-0.5">✓</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold">
-                      Notice on {fmtDate(nd)} (after {NOTICE_BY_DAY}th) — Deposit Forfeited
+                      Notice on {fmtDate(nd)} (after {NOTICE_BY_DAY}th) — Deposit Refundable
                     </p>
                     <p className="text-[10px] mt-0.5 opacity-80">
                       Next month&apos;s cycle applies, full month rent required · {expectedLastDay ? `Last day: ${fmtDate(expectedLastDay)}` : ""}

@@ -1,6 +1,27 @@
 # Changelog
 
-## Session W — 2026-08-08 — Sales-demo mockups (Home/Finance/Bed Board) + VPS hosting
+## Session X — 2026-08-08 — Deposit-forfeiture rule reverted (late notice no longer forfeits)
+
+### Summary
+Kiran flagged Omkar Deodher (Room 616) showing "Deposit Forfeited" despite giving notice over a month before his actual last day (24 Jul notice, vacates 31 Aug). Traced to `is_deposit_eligible()` checking the day-of-month notice was given in, not the day relative to the month the tenant actually vacates in. Kiran confirmed the correct rule: refundable if notice arrives before the 5th of the VACATING month — which, walked through the math, is equivalent to "any notice at all is refundable, only zero notice forfeits." This reverts the 2026-06-27 rule (late notice also forfeits) back to the 2026-05-10 rule.
+
+- ✅ **`services/property_logic.py::is_deposit_eligible()`** — now refundable for any non-null `notice_date`; forfeited only when `notice_date is None`. Docstring + `NOTICE_BY_DAY` comment updated.
+- ✅ **`tests/test_notice_comprehensive.py::TestDepositEligibility`** — 12 parametrized day cases + edge cases updated to expect `True` for late notice, `False` only for `None`. 160/164 passing (4 pre-existing unrelated NLP month-parsing failures, not touched).
+- ✅ **Two frontend duplicate implementations fixed** — `web/app/tenants/[tenancy_id]/edit/page.tsx` and `web/app/checkout/new/page.tsx` had each re-implemented the day-of-month check in TS instead of calling the backend (the exact "same formula in two places" anti-pattern `rules_financial.md` §12 warns about). Both now treat any notice as eligible; checkout page's late-notice banner flipped from orange "Deposit Forfeited" to green "Deposit Refundable" (still shows the next-month-cycle/full-rent consequence).
+- ✅ **`web/app/notices/page.tsx` legend text** — already read `deposit_eligible` from the API (correct, no logic bug there), only the static help text explaining the rule was stale — fixed.
+- ✅ **`src/services/pdf_generator.py` HOUSE_RULES`** — rental-agreement PDF text updated to match (was saying "late notice = forfeited," now says refundable regardless of notice day). Tenants who signed 2026-06-27→2026-08-08 agreed to the stricter old text; app now treats them more generously than what they signed, not a risk to Kiran.
+- ✅ **`src/api/v2/checkout.py` and `src/whatsapp/handlers/owner_handler.py`** — both already called the shared `is_deposit_eligible()` function (no duplicate logic), so they picked up the fix automatically. Only had stale comments, not fixed (cosmetic, no behavior impact).
+- ✅ **Memory (`rules_financial.md`) reconciled** — had two contradicting entries (§0b said late=forfeited from 2026-06-27, §3 said any-notice=refundable from 2026-05-10, never cleaned up). Consolidated into one current statement with the full flip-flop history documented so it doesn't happen a third time silently.
+
+### Verification
+- ✅ 160/164 unit tests passing (4 pre-existing, unrelated)
+- ✅ `tsc --noEmit` clean on both edited frontend files
+- ⚠️ Not yet deployed to VPS — needs `git push` (webhook auto-deploys) to take effect for Omkar and any other currently-forfeited-due-to-late-notice tenants
+
+### Key lesson
+Same lesson as the June 27 entry, but the other direction: when a business rule flips, grep for **every** place that duplicates the check, not just the canonical function — two frontend files had silently drifted out of sync with the backend, which is exactly what "single source of truth" was supposed to prevent, and it still happened.
+
+
 
 ### Summary
 Built an interactive, self-contained sales-demo mockup (no backend, dummy data) of Home, Finance, and the Web v2 Bed Board, for showing prospective PG-owner clients. Iterated through several rounds: static screenshots → single interactive device with real tab navigation → per-tile KPI expand panels (matching the real app's `ExpansionPanel`) → Bed Board room-tap filtering → dedicated Tenants tab (was accidentally aliased to Finance) → hosted on the live VPS instead of a claude.ai link.

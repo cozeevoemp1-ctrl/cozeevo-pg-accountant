@@ -286,8 +286,9 @@ export default function EditTenantPage() {
 
   const DELETE_REASONS = ["Cancelled booking", "Wrong booking", "Double booking", "Other"]
 
-  // Deposit refundable only with on-time notice (on/before NOTICE_BY_DAY); late notice forfeits it.
-  const depositEligible = noticeDate ? new Date(noticeDate + "T00:00:00").getDate() <= NOTICE_BY_DAY : null
+  // Deposit refundable as long as SOME notice was given (any day) — forfeited only with
+  // zero notice. Mirrors services/property_logic.py::is_deposit_eligible (2026-08-08 rule).
+  const depositEligible = noticeDate ? true : null
   const rentChanged = original && agreedRent && Number(agreedRent) !== original.rent
   const roomChanged = original && roomNumber.trim() && roomNumber.trim().toUpperCase() !== original.room_number.toUpperCase()
 
@@ -774,7 +775,7 @@ export default function EditTenantPage() {
               <p className="text-[10px] text-ink-muted mt-1 px-1">
                 {new Date(noticeDate).getDate() <= NOTICE_BY_DAY
                   ? `Given on/before ${NOTICE_BY_DAY}th — exits end of this month, deposit refundable`
-                  : `Given after ${NOTICE_BY_DAY}th — next month's cycle applies, full month rent required, deposit forfeited`}
+                  : `Given after ${NOTICE_BY_DAY}th — next month's cycle applies, full month rent required, deposit still refundable`}
               </p>
             )}
           </div>

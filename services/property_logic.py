@@ -25,11 +25,15 @@ NOTICE_BY_DAY: int = 5
 """
 Cutoff day-of-month for the notice period calculation.
 
-  notice_date.day <= NOTICE_BY_DAY  → can vacate end of THIS month; deposit REFUNDABLE
-  notice_date.day >  NOTICE_BY_DAY  → must stay till end of NEXT month; deposit FORFEITED
+  notice_date.day <= NOTICE_BY_DAY  → can vacate end of THIS month
+  notice_date.day >  NOTICE_BY_DAY  → must stay till end of NEXT month (extra month charged)
 
-Deposit is forfeited when EITHER no notice is given at all OR notice is given late
-(after the cutoff day). Only on-time notice (on/before the cutoff) keeps the deposit refundable.
+Deposit eligibility (Kiran, 2026-08-08 — supersedes the 2026-06-27 rule): refundable if
+notice arrives on/before the NOTICE_BY_DAY cutoff of the month the tenant actually VACATES
+in (not the month notice happened to be given in). Because a late notice always pushes the
+last day to the end of next month, this means any notice at all — early or late — keeps the
+deposit refundable; only giving NO notice at all forfeits it. Late notice still costs the
+extra month's rent — that penalty is unchanged, only the deposit forfeiture on top of it is gone.
 """
 
 OVERPAYMENT_NOISE_RS: int = 10
@@ -122,14 +126,19 @@ def is_deposit_eligible(notice_date: date | None, notice_by_day: int = NOTICE_BY
     """
     True if the security deposit is refundable.
 
-    Refundable ONLY when notice is given on or before `notice_by_day` of the month.
-    Forfeited when EITHER:
-      - no notice is given at all (notice_date is None), OR
-      - notice is given after the cutoff day (late notice).
+    Refundable when notice arrives on or before `notice_by_day` of the month the tenant
+    actually VACATES in (i.e. the month `calc_notice_last_day` lands in) — not the month
+    notice happened to be given in. A late notice always pushes the last day to the end of
+    next month, so the notice date is always before that month's cutoff by construction —
+    in practice this means any notice at all keeps the deposit refundable.
+
+    Forfeited ONLY when no notice is given at all (notice_date is None).
     """
     if notice_date is None:
         return False
-    return notice_date.day <= notice_by_day
+    last_day = calc_notice_last_day(notice_date, notice_by_day)
+    cutoff = date(last_day.year, last_day.month, notice_by_day)
+    return notice_date <= cutoff
 
 
 def calc_notice_last_day(notice_date: date, notice_by_day: int = NOTICE_BY_DAY) -> date:

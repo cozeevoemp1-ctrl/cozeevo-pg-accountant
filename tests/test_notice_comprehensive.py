@@ -200,21 +200,24 @@ class TestCalcNoticeLastDay:
 # ============================================================================
 
 class TestDepositEligibility:
-    """Notice on/before 5th = deposit eligible; after 5th = forfeited."""
+    """Deposit refundable if notice arrives on/before the 5th of the VACATING month
+    (Kiran, 2026-08-08). Late notice still pushes the last day to next month and still
+    lands before that month's 5th — so any notice at all is refundable. Only no notice
+    at all (None) forfeits."""
 
     @pytest.mark.parametrize("day,eligible", [
         (1, True),
         (2, True),
         (3, True),
         (4, True),
-        (5, True),    # boundary — still eligible
-        (6, False),   # boundary — forfeited
-        (7, False),
-        (10, False),
-        (15, False),
-        (20, False),
-        (25, False),
-        (28, False),
+        (5, True),    # on-time — vacates this month
+        (6, True),    # late — pushed to next month, still before ITS 5th
+        (7, True),
+        (10, True),
+        (15, True),
+        (20, True),
+        (25, True),
+        (28, True),
     ])
     def test_deposit_eligibility_by_day(self, day, eligible):
         notice = date(2026, 3, day)
@@ -223,8 +226,9 @@ class TestDepositEligibility:
     def test_deposit_eligible_1st_of_month(self):
         assert is_deposit_eligible(date(2026, 1, 1)) is True
 
-    def test_deposit_forfeited_last_day_of_month(self):
-        assert is_deposit_eligible(date(2026, 3, 31)) is False
+    def test_deposit_eligible_last_day_of_month(self):
+        # Late notice (31st) pushes last day to next month end, still refundable
+        assert is_deposit_eligible(date(2026, 3, 31)) is True
 
     def test_deposit_eligible_5th_december(self):
         assert is_deposit_eligible(date(2026, 12, 5)) is True
@@ -285,7 +289,8 @@ class TestNoticeEdgeCases:
 
     def test_deposit_with_custom_notice_by_day(self):
         assert is_deposit_eligible(date(2026, 3, 10), notice_by_day=10) is True
-        assert is_deposit_eligible(date(2026, 3, 11), notice_by_day=10) is False
+        # Late even with the custom cutoff — still refundable, pushed to next month
+        assert is_deposit_eligible(date(2026, 3, 11), notice_by_day=10) is True
 
     def test_notice_on_feb_28_non_leap(self):
         # Feb 28 is after the 5th → next month (March 31)
