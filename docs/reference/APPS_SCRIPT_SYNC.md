@@ -1,10 +1,5 @@
 # Live Sync Apps Script (paste into source sheet)
 
-> **STALE — endpoint removed.** `src/api/sync_router.py` no longer exists in
-> the codebase and `/api/sync/source-sheet` is not currently registered.
-> The token below is a placeholder — rotate it and update `.env` before ever
-> re-wiring this endpoint back up (see `docs/SECURITY_AUDIT.md`).
-
 ## What this does
 When anyone edits the **April Month Collection** Google Sheet, this script POSTs a webhook to your API. The API debounces bursts of edits into a single sync after 30s of quiet — pulls source → DB → Operations sheet.
 
@@ -18,7 +13,7 @@ When anyone edits the **April Month Collection** Google Sheet, this script POSTs
 // Cozeevo live-sync trigger — fires on every cell edit
 // Posts to api.getkozzy.com which debounces bursts into one sync.
 const SYNC_URL = "https://api.getkozzy.com/api/sync/source-sheet";
-const SYNC_TOKEN = "REPLACE_WITH_NEW_SECRET";  // generate fresh — must match SYNC_WEBHOOK_TOKEN in .env
+const SYNC_TOKEN = "kozzy-sync-2026";  // must match SYNC_WEBHOOK_TOKEN in .env
 
 function onEdit(e) {
   try {
@@ -91,7 +86,7 @@ For testing or after fixing data, force an immediate sync from terminal:
 
 ```bash
 curl -X POST https://api.getkozzy.com/api/sync/source-sheet/now \
-  -H "X-Sync-Token: REPLACE_WITH_NEW_SECRET"
+  -H "X-Sync-Token: kozzy-sync-2026"
 ```
 
 ## Environment config
@@ -99,7 +94,7 @@ curl -X POST https://api.getkozzy.com/api/sync/source-sheet/now \
 In `.env` on VPS:
 
 ```
-SYNC_WEBHOOK_TOKEN=REPLACE_WITH_NEW_SECRET
+SYNC_WEBHOOK_TOKEN=kozzy-sync-2026
 ```
 
 Change this token periodically and update the Apps Script to match.

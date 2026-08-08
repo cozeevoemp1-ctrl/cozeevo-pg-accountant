@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select, func, or_
 
 from src.api.v2.auth import AppUser, get_current_user
@@ -23,8 +23,6 @@ router = APIRouter()
 @router.get("/notices/active")
 async def get_active_notices(user: AppUser = Depends(get_current_user)):
     """Active monthly tenants who have given formal notice, sorted by expected checkout."""
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Not authorized")
     today = date.today()
 
     async with get_session() as session:

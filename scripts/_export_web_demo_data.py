@@ -199,18 +199,20 @@ async def main() -> None:
             occs = occ_by_room.get(room.room_number, [])
             real = [o for o in occs if o["kind"] in ("monthly", "daily")]
             holds = [o for o in occs if o["kind"] == "hold"]
+            premium = any(o["tn"].sharing_type == SharingType.premium for o in real)
             if room.is_staff_room:
                 beds = ["staff"] * (room.max_occupancy or 1)
+            elif premium:
+                # Whole-room tenant = ONE wide bed icon, no phantom vacant beds.
+                beds = [o["st"] for o in real]
             else:
-                beds = []
-                for o in real:
-                    n = (room.max_occupancy or 1) if (o["tn"].sharing_type == SharingType.premium) else 1
-                    beds.extend([o["st"]] * n)
-                beds = beds[: room.max_occupancy or 1]
+                beds = [o["st"] for o in real][: room.max_occupancy or 1]
                 while len(beds) < (room.max_occupancy or 1):
                     beds.append("vac")
             rooms_json[room.room_number] = {
                 "beds": beds,
+                "premium": premium,
+                "bed_count": room.max_occupancy or 1,
                 "staff": bool(room.is_staff_room),
                 "today": room.room_number in today_rooms,
             }

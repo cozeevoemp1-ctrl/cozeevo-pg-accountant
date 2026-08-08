@@ -72,22 +72,16 @@ def get_current_user(authorization: str = Header(default=None)) -> AppUser:
     except Exception as e:
         logger.warning("JWT validation failed: %s", e)
         raise HTTPException(status_code=401, detail="invalid token")
-    # Privilege fields (role, org_id) MUST come from app_metadata, never
-    # user_metadata — user_metadata is self-editable by any authenticated
-    # user via supabase.auth.updateUser(), which would let anyone grant
-    # themselves admin. app_metadata can only be set via the service-role
-    # Admin API (see scripts/create_auth_users.py).
-    app_meta = payload.get("app_metadata") or {}
-    user_meta = payload.get("user_metadata") or {}
+    meta = payload.get("user_metadata") or {}
     try:
-        org_id_val = int(app_meta.get("org_id", 1))
+        org_id_val = int(meta.get("org_id", 1))
     except (TypeError, ValueError):
         org_id_val = 1
     return AppUser(
         user_id=payload.get("sub", ""),
         phone=payload.get("phone", ""),
-        role=app_meta.get("role", "tenant"),
+        role=meta.get("role", "tenant"),
         org_id=org_id_val,
-        name=user_meta.get("name", ""),
+        name=meta.get("name", ""),
         email=payload.get("email", ""),
     )

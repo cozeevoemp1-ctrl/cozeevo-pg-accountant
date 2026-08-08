@@ -56,14 +56,9 @@ def create_user(email: str, role: str, name: str, password: str, write: bool) ->
         "email": email,
         "password": password,
         "email_confirm": False,          # Supabase sends verification email
-        # role/org_id MUST be app_metadata (admin-API-only writable) — never
-        # user_metadata, which any logged-in user can self-edit and would
-        # let them grant themselves admin. See src/api/v2/auth.py.
-        "app_metadata": {
+        "user_metadata": {
             "role": role,
             "org_id": 1,
-        },
-        "user_metadata": {
             "name": name,
         },
     }

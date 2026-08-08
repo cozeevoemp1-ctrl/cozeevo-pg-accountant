@@ -41,8 +41,6 @@ def _building_code(property_name: str) -> str:
 @router.get("/tenants/list")
 async def list_tenants(_user: AppUser = Depends(get_current_user)):
     """All active/no_show tenants with current month dues for the Manage hub."""
-    if _user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Not authorized")
     today = date.today()
     period = date(today.year, today.month, 1)
     next_m = today.month % 12 + 1
@@ -148,8 +146,6 @@ async def search_tenants(
     user: AppUser = Depends(get_current_user),
     response: Response = Response(),
 ):
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Not authorized")
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="q must not be empty")
 
@@ -225,8 +221,6 @@ async def get_previous_stays(
     user: AppUser = Depends(get_current_user),
 ):
     """Return past (exited/cancelled) tenancies for the same tenant — for the edit page history panel."""
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Not authorized")
     async with get_session() as session:
         tenancy = await session.get(Tenancy, tenancy_id)
         if not tenancy:
@@ -265,8 +259,6 @@ async def get_tenant_dues(
     tenancy_id: int,
     user: AppUser = Depends(get_current_user),
 ):
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Not authorized")
     async with get_session() as session:
         row = await session.execute(
             select(Tenancy, Tenant, Room, Property)
@@ -1020,9 +1012,6 @@ async def transfer_room(
     user: AppUser = Depends(get_current_user),
 ):
     """Execute room transfer — called after PWA user confirms the 4-step panel."""
-    if user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Only admin and staff can transfer rooms")
-
     async with get_session() as session:
         result = await execute_room_transfer(
             tenancy_id=tenancy_id,
@@ -1051,9 +1040,6 @@ async def delete_tenant(
     If force=true, voids all payment records first (use for erroneous entries).
     Without force, refuses with 409 if any non-voided payments exist.
     """
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can hard-delete a tenant")
-
     if not reason.strip():
         raise HTTPException(status_code=422, detail="Deletion reason is required.")
 

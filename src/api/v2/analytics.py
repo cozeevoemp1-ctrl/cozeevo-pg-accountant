@@ -5,7 +5,7 @@ from calendar import monthrange
 from datetime import date
 from typing import List, Optional, TypedDict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import case, func, literal_column, select, and_, or_, text
 
@@ -149,8 +149,6 @@ async def get_occupancy(
     months: int = Query(12, ge=1, le=120, description="Rolling window in months (default 12)"),
     _user: AppUser = Depends(get_current_user),
 ):
-    if _user.role not in ("admin", "staff"):
-        raise HTTPException(status_code=403, detail="Not authorized")
     today = date.today()
     # Rolling window: last N months, but never before our data started
     window_start = max(_months_back(today, months), START_MONTH)

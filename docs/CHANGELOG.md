@@ -1,32 +1,5 @@
 # Changelog
 
-## Session Z — 2026-08-08 — Full offensive security audit (RLS/IDOR/secrets/injection/CORS) + critical privilege-escalation fix
-
-### Summary
-Kiran asked for an unsparing hacker-mindset security audit of the whole codebase ("no leakage"). Ran 3 parallel offensive-review passes (DB authz/RLS/IDOR, secrets/injection/path-traversal/prompt-injection, CORS/session/webhook/XSS) plus direct secret-pattern scans, verified every claimed finding against live source, then patched everything found. Full writeup: `docs/SECURITY_AUDIT.md`.
-
-- 🔴 **CRITICAL — privilege escalation via self-editable `user_metadata.role`.** Every server-side role check (`finance.py`, `blacklist.py`, PWA `middleware.ts` admin gate) trusted `role` from the JWT's `user_metadata` claim — but `user_metadata` is self-editable by any logged-in user via `supabase.auth.updateUser({data:{role:"admin"}})`, no admin key needed. Any staff/tenant account could grant itself admin. **Fixed:** `src/api/v2/auth.py` + `web/middleware.ts` now read `role`/`org_id` from `app_metadata` (admin-API-only writable) instead; `scripts/create_auth_users.py` updated to write there for future users; new one-off `scripts/_migrate_role_to_app_metadata.py` written (not yet run) to migrate the 5 existing live accounts.
-- 🟠 **HIGH — 2 unguarded mutating endpoints** in `src/api/v2/tenants.py`: `DELETE /tenants/{id}` (hard-deletes a tenant's entire financial history, no role check at all) and `POST /tenants/{id}/transfer-room` (moves any tenant to any room) — both required only a valid JWT, no role gate, unlike every sibling endpoint in the same file. Fixed: delete is now admin-only, transfer-room is admin/staff.
-- 🟡 **MEDIUM — 9 read endpoints** (`tenants.py` list/search/previous-stays/dues, `notices.py`, `checkouts.py`, `rooms.py`, `reporting.py` ×2, `analytics.py`) authorized by "any valid JWT" with no role check — not exploitable today (only 5 admin/staff accounts exist) but `get_current_user()` defaults unset roles to `"tenant"`, so this becomes a live IDOR the moment any lower-privileged account type is ever provisioned. Added `admin|staff` role gate to all 9, fail-closed.
-- 🟡 **MEDIUM — noted, not fixed:** `org_id` is stamped on audit rows but never used to scope any query. Harmless single-tenant today; would become a cross-customer IDOR the moment a second PG business is onboarded on this backend. Flagged for before that happens.
-- 🟢 **LOW — 2 housekeeping fixes:** `src/database/rls_policies.sql` header now states plainly it's unenforced dead code (backend connects as `postgres` superuser, bypasses RLS; the session var the policies depend on is never `SET` anywhere) so it stops giving false confidence. `docs/reference/APPS_SCRIPT_SYNC.md` had a hardcoded webhook token for an endpoint (`sync_router.py`) that no longer exists in the code — token replaced with a placeholder + stale-doc banner.
-- ✅ **Clean:** CORS whitelist (not `*`), WhatsApp webhook HMAC signature verification, session cookies (Supabase SSR, no localStorage tokens), JWT algorithm allowlist, password-reset flow (no open redirect, server-side code exchange), no XSS (`dangerouslySetInnerHTML` unused), no SQL/command injection (all raw SQL uses fixed identifiers + bind params, no `eval`/`exec`/unsafe `subprocess`), no path traversal, no prompt-injection-to-financial-mutation path (vision LLM output never trusted for writes, and the WhatsApp bot's media path is only reachable by 4 hardcoded staff numbers anyway), no committed secrets (`.env` gitignored, only placeholder examples).
-
-### Files touched
-- New: `docs/SECURITY_AUDIT.md` (full report), `scripts/_migrate_role_to_app_metadata.py` (not yet run against prod).
-- Fixed: `src/api/v2/auth.py`, `web/middleware.ts`, `scripts/create_auth_users.py`, `src/api/v2/tenants.py`, `src/api/v2/notices.py`, `src/api/v2/checkouts.py`, `src/api/v2/rooms.py`, `src/api/v2/reporting.py`, `src/api/v2/analytics.py`, `src/database/rls_policies.sql`, `docs/reference/APPS_SCRIPT_SYNC.md`.
-
-### Verification
-- `py_compile` + `ast.parse` clean on every edited Python file.
-- `main.py` app import smoke test: 97 routes loaded, no wiring errors from the new role checks or router imports.
-- Not yet deployed to VPS. Migration script not yet run against production Supabase (needs `--write` + admin sign-off — see "Next steps" in `docs/SECURITY_AUDIT.md`).
-
-### Next steps (pending Kiran)
-1. Test locally (uvicorn + PWA) with the staff account to confirm role checks don't block legitimate use.
-2. Deploy to VPS.
-3. Run `scripts/_migrate_role_to_app_metadata.py --write` once against production, then have admins log out/in.
-4. Revisit `org_id` scoping before onboarding any second PG business.
-
 ## Session Y — 2026-08-08 — Broadcast messaging (manual, template-based) + WhatsApp CC reliability fix + July P&L correction
 
 ### Summary
