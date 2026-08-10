@@ -1,5 +1,19 @@
 # Changelog
 
+## Session AA — 2026-08-10 — Noise/late-night notice broadcast (first real use of custom_broadcast_notice)
+
+### Summary
+Kiran drafted a noise & late-night-activities notice (gaming until 10:30 PM only, silence after). Sent it staff-first for review, then broadcast to all active tenants with operator CC. First production use of the `custom_broadcast_notice` template (approved since Session Y).
+
+- ✅ **Review copy → 4 operators** (Kiran, Lokesh, Lakshmi Mam, Prabhakaran), Kiran approved, then **broadcast: 261/261 unique tenant phones + 4/4 operator CC, zero API failures** (`scripts/_send_noise_notice.py`, dry-run default, `--tenants --send` for live).
+- 🐛 **Learned: Meta error #132018** — template *parameters* cannot contain newlines/tabs/4+ consecutive spaces. First live attempt failed 0/4; notice had to be flattened to one paragraph for `{{2}}`. Multi-paragraph notices need a dedicated 0-param template (text in BODY, 24-48h approval). Also: template hardcodes `Hi {{1}},` + sign-off, so greeting/sign-off are stripped from drafts; Kiran ruled general broadcasts use `{{1}}`="Tenants" (no per-tenant names).
+- ✅ **Standing rule reaffirmed by Kiran: "always include staff in broadcast"** — CC baked into the script, rule updated in `rules_whatsapp_cc.md` along with the #132018 constraint and the staff-review-first flow.
+- ⚠️ **Open: staff delivery gaps.** Kiran received both copies; **Devaprabha got nothing (she's not on the 4-person CC list at all)** and **Lakshmi Mam (7358341775) may have received neither** despite Meta accepting both sends — number possibly stale/not-on-WhatsApp. We don't capture delivery webhooks, so accepted ≠ delivered. Pending Kiran: Devaprabha's number (add to CC list?) + confirm Lakshmi's current WhatsApp number + whether Lokesh/Prabhakaran received.
+- Recipient list dedupes by unique phone (262 active tenancies → 261 numbers; shared numbers get one message).
+
+### State at session end
+No runtime code changed; no deploy needed. New file: `scripts/_send_noise_notice.py`.
+
 ## Session Z — 2026-08-08 — Full offensive security audit + a broken/reverted deploy (postmortem)
 
 ### Summary
