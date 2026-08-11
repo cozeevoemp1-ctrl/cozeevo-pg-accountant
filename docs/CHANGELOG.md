@@ -1,5 +1,29 @@
 # Changelog
 
+## Session AB — 2026-08-11 — Supabase RLS exposure fixed + anon grants revoked (defense-in-depth)
+
+### Summary
+Kiran got a Supabase security email ("Table publicly accessible — `rls_disabled_in_public`", dated 09 Aug, project `oxiqomoilqwfxjauxhzp`). Investigated live, confirmed a real (small) exposure, fixed it, and closed the underlying class of bug so it can't recur.
+
+### Root cause (not a compromise — a config gap on a new table)
+- Two tables had RLS **off**: `pnl_monthly_adjustments` and `pg_config`.
+- **`pnl_monthly_adjustments` was live anon-readable** — anon key `GET /rest/v1/pnl_monthly_adjustments` returned real rows (monthly cash-in-hand, cash rent to landlords, investor-return notes). This is the actual leak.
+- `pg_config` was RLS-off too but returned `[]` (empty) — no data lost.
+- Why now: `pnl_monthly_adjustments` is from the recent dynamic-P&L / manual-cash feature (table added 2026-07-02, `offline_cash` col 2026-08-08); it landed RLS-off. `pg_config` was **wrongly hard-coded into the RLS skip-list** in `migrate_all.py` (grouped with Postgres internals because of the `pg_` prefix — it's actually our app table).
+
+### Fix (live DB, applied immediately — no deploy needed)
+1. `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` on both tables (deny-all, matches all 54 tables).
+2. **Defense-in-depth — the real fix:** `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated` + `ALTER DEFAULT PRIVILEGES FOR ROLE postgres ... REVOKE ALL ON TABLES FROM anon, authenticated`. Anon/authenticated held full SELECT/INSERT/UPDATE/DELETE/TRUNCATE on all 54 tables **and default privileges granted the same on every future table** — so RLS was the only thing standing between the anon key and all data. Now stripped: even a table with RLS accidentally left off is unreachable via the anon key.
+3. Verified: anon read of `pnl_monthly_adjustments`, `pg_config`, `tenants`, `payments`, `bank_transactions` all now `401 permission denied`. Backend (`postgres`, BYPASSRLS) + `service_role` still read all 54 tables. PWA never queries public tables directly (grep-confirmed no `.from(`/`.rpc(` — auth/session only), so app is unaffected.
+
+### Durable in code
+- `src/database/migrate_all.py`: removed `pg_config` from the RLS skip-list (with a comment); appended the REVOKE + ALTER DEFAULT PRIVILEGES to `run_enable_rls_all_tables` so every migration re-applies both layers idempotently.
+
+### Open / caveats
+- **Who accessed it:** cannot be determined from here — Supabase API request logs (dashboard → Logs) retain ~1 day; Postgres doesn't log `SELECT`s. No DB-side audit trail. Leaked data was internal cash/P&L figures, not credentials/PII.
+- **`supabase_admin`-owned future tables** still carry default anon grants — `postgres` can't ALTER those defaults; needs a superuser action in the Supabase SQL editor. Not a practical exposure (we never create app tables as `supabase_admin`).
+- This resolves **C-3** in `docs/SECURITY_AUDIT.md` (was MEDIUM: fragile RLS-only protection) — now defense-in-depth.
+
 ## Session AA — 2026-08-10 — Noise/late-night notice broadcast (first real use of custom_broadcast_notice)
 
 ### Summary

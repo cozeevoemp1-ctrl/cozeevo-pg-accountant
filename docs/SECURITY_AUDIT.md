@@ -15,7 +15,7 @@
 |---|---------|----------|-----------|----------|
 | C-1 | Public Supabase buckets (KYC IDs, signed agreements) with guessable paths | **CRITICAL** | ✅ YES (buckets `public=true` confirmed live) | live-checked |
 | C-2 | Privilege escalation via self-editable `user_metadata.role` | **CRITICAL** | ✅ YES | sandbox test reproduces it |
-| C-3 | Anon key wide-open grants; only empty-policy RLS deny-all protects tables | **MEDIUM** (was Critical — RLS mitigates; live-tested) | ⚠️ mitigated, fragile | live-tested (read+write blocked) |
+| C-3 | Anon key wide-open grants; only empty-policy RLS deny-all protects tables | ~~MEDIUM~~ **RESOLVED 2026-08-11** | ✅ FIXED (anon/authenticated grants revoked, existing + future) | fix live-tested (anon → 401) |
 | H-1 | No upper bound on payment amount (₹12cr fat-finger accepted) | **HIGH** | ✅ YES | code-read |
 | H-2 | Refund cap validated against client-supplied deposit → cash drain | **HIGH** | ✅ YES | code-read |
 | H-3 | `DELETE /tenants/{id}?force=true` erases frozen financial history | **HIGH** | ✅ YES | code-read |

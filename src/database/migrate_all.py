@@ -1351,10 +1351,13 @@ async def run_enable_rls_all_tables(conn) -> None:
     tables = [row[0] for row in result.fetchall()]
     enabled = 0
     for t in tables:
-        # Skip Postgres/Supabase internal tables and non-owned views
+        # Skip Postgres/Supabase internal tables and non-owned views only.
+        # NOTE: `pg_config` is OUR application table (PG business config), not a
+        # Postgres internal — it must NOT be skipped, or it lands RLS-off and
+        # becomes anon-readable (Supabase flagged this 2026-08-09).
         if t.startswith(('_', 'sql_')) or t in (
             'schema_migrations', 'spatial_ref_sys',
-            'pg_config', 'pg_stat_statements',
+            'pg_stat_statements',
         ):
             continue
         try:
@@ -1366,6 +1369,23 @@ async def run_enable_rls_all_tables(conn) -> None:
             await conn.execute(text(f'ROLLBACK TO SAVEPOINT rls_{enabled}'))
             print(f"  [skip] {t} - {e}")
     print(f"  [ok] RLS enabled on {enabled} tables")
+
+    # Defense-in-depth (added 2026-08-11 after Supabase flagged pnl_monthly_adjustments
+    # as anon-readable): RLS alone is a per-table opt-in that gets forgotten on new
+    # tables. Strip the wide-open anon/authenticated grants so a table with RLS
+    # accidentally left off is STILL not reachable via the public anon key. The backend
+    # connects as `postgres` (BYPASSRLS + owner) and service_role keeps full access, so
+    # this is invisible to the app. The web PWA never queries public tables directly
+    # (auth/session only) — verified by grep for `.from(`/`.rpc(`.
+    await conn.execute(text(
+        "REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated"))
+    # Future tables created by `postgres` (all our migrations/app tables) are born locked.
+    # NOTE: cannot ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin here — `postgres`
+    # is not a member of it — but we never create app tables as supabase_admin.
+    await conn.execute(text(
+        "ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public "
+        "REVOKE ALL ON TABLES FROM anon, authenticated"))
+    print("  [ok] revoked anon/authenticated grants (existing + future postgres-owned tables)")
 
 
 async def run_payments_freeze_trigger_2026_04_27(conn) -> None:
