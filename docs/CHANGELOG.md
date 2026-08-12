@@ -1,5 +1,35 @@
 # Changelog
 
+## Session AE — 2026-08-12 — Best-practices adoption: secrets, single-source constants, security fixes, audit, dev branch
+
+Compared the spec-driven-AI-development video (transcript `data/uploads/14RP8liACqo.txt`) against the project; adopted the gaps.
+
+### Track 0 — committed credential removed
+- **DB password (`Anchorstrong123!`) was hardcoded in 13 scripts/tests** — all now read `DATABASE_URL` from env (`tests/diag_dues*.py`, `scripts/export_reclassify.py`, `sync_contacts_to_db.py`, `_apply_other_expenses_classifications.py`, `_check_*.py`, `_import_*_sbi.py`, `_migrate_room000_to_onboarding.py`, `_reset_pratham_to_pending.py`, `_void_pratham_payments.py`).
+- **ACTION KIRAN: rotate the Supabase DB password** (dashboard → Settings → Database), then update `DATABASE_URL` in local `.env` AND VPS `/opt/pg-accountant/.env`, restart `pg-accountant`. Old password is burned into git history.
+- Secret sweep of tracked files found nothing else real.
+
+### Track 1 — single source of truth for constants
+- **TOTAL_BEDS**: canonical = `src/services/occupancy.py` (`get_total_revenue_beds` + new `get_total_revenue_beds_sync`). Rewired: `analytics.py`, `unit_economics.py`, `gsheets.py` (`TOTAL_BEDS`→DB value w/ `TOTAL_BEDS_FALLBACK`), `account_handler._dashboard_summary`, `owner_handler._query_occupancy`, `clean_and_load.py` (DB w/ fallback). Fixed divergent formula in `room_occupancy.beds_free_on_date` (now canonical denominator + room-000 tenancies excluded from occupied counts — pre-registrations no longer eat real-bed inventory). Apps Script JS consts annotated as manual copies. Stale one-off scripts (291/293/297) left untouched — historical.
+- **FROZEN_MONTHS**: `sync_sheet_from_db.py` now imports from `gsheets.py` (was a verbatim copy). Note: analytics `VERIFIED_MONTHS` (occupancy stats), `pnl_verified_data.MONTHS` (P&L columns), and the rolling SQL `payments_freeze` trigger are three *distinct* concepts, not duplicates — left as-is.
+- **Admin phone**: new `role_service.get_primary_admin_phone()` (allowlist-derived, env-overridable). `gmail_poller` (was `ADMIN_WHATSAPP` w/ dummy default) and `tenant_handler` onboarding approval (was `ADMIN_PHONE` w/ dummy default) now use it.
+- **Sheet ID**: `clean_and_load.py` now env-backed (`GSHEETS_SHEET_ID`). **PWA API base**: `web/lib/api.ts` exports `BASE_URL`; 3 components that re-derived it now import it. `onboarding_router` PWA redirect now uses `PWA_URL` env.
+
+### Security fixes (from end-to-end audit)
+- `DELETE /api/v2/app/tenants/{id}` — had NO role check (any authenticated JWT could hard-delete a tenancy + payments with `force=true`). Now **admin-only** (behavior change: staff can no longer hard-delete).
+- `POST /tenants/{id}/transfer-room` — had NO role check (could rewrite `agreed_rent`). Now admin/staff.
+
+### End-to-end audit (3 parallel agents, video's bug-class checklist)
+Full findings in `memory/project_audit_findings_2026_08_12.md` — 30+ verified findings awaiting Kiran's triage. Top items: Quick Collect modal can double-charge on partial failure; payment Sheet write-back failure is silent (says "Payment logged" regardless); `_queue_failed_write` retry queue effectively dead (only fires on exceptions gsheets never raises); Gmail poller marks bank emails Seen before reconciling (failure loses the file); checkout writes no AuditLog; UPI reconciliation creates payments bypassing audit+RentSchedule; `_send_whatsapp` returns None so callers always see failure.
+
+### Workflow conventions adopted (CLAUDE.md)
+- `docs/specs/NN-name.md` feature specs (template: `docs/specs/TEMPLATE.md`).
+- `docs/specs/current-issues.md` debugging file (gitignored) + analyze-then-approve rule.
+- **`development` branch created** — work there; merge to `master` = deploy. Staging deferred (needs second env).
+
+### Tests
+`test_dues_logic.py` + `test_cash_logic.py`: 20 passed. `tsc --noEmit`: clean. All edited files compile.
+
 ## Session AD — 2026-08-12 — August P&L forecast (Google Sheet col N) + July P&L verification
 
 ### August forecast (external — Kiran's "August FC" Google Sheet, tab "P&L — Full", column N)

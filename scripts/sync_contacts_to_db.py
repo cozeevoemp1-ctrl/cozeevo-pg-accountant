@@ -6,13 +6,16 @@ Sync WhatsApp chat contacts into pg_contacts table in Supabase.
 """
 import asyncio
 import hashlib
+import os
 import re
 from decimal import Decimal
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 
-DB_URL = "postgresql+asyncpg://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+load_dotenv()
+DB_URL = os.environ["DATABASE_URL"]
 
 def normalize_phone(phone: str) -> str:
     """Strip to digits only, remove leading 91 if 12 digits."""

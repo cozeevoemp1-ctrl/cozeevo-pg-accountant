@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
+import { BASE_URL } from "@/lib/api"
 
 function inr(n: number) {
   if (n === 0) return "0"

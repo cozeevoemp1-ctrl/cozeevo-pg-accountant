@@ -17,10 +17,30 @@ import openpyxl
 import gspread
 from google.oauth2.service_account import Credentials
 
+from dotenv import load_dotenv
+load_dotenv()
+
 EXCEL_FILE = "Cozeevo Monthly stay (4).xlsx"
-NEW_SHEET = "1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw"
+NEW_SHEET = os.getenv("GSHEETS_SHEET_ID", "1Hp5dTM7TcDEq75jgHEjvwtBjOolruGfQ7CVMzVqjdGw")
 CREDS = "credentials/gsheets_service_account.json"
-TOTAL_BEDS = 298  # updated 2026-05-31; 108→revenue
+TOTAL_BEDS_FALLBACK = 298  # updated 2026-05-31; 108→revenue
+
+
+def _total_beds() -> int:
+    """DB rooms table is the source of truth for bed count; fall back to the
+    last-known value when the DB isn't reachable (e.g. fresh setup, offline)."""
+    try:
+        import os as _os, sys as _sys
+        _sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+        from dotenv import load_dotenv
+        load_dotenv()
+        from src.services.occupancy import get_total_revenue_beds_sync
+        return get_total_revenue_beds_sync() or TOTAL_BEDS_FALLBACK
+    except Exception:
+        return TOTAL_BEDS_FALLBACK
+
+
+TOTAL_BEDS = _total_beds()
 
 # ── Shared functions (identical to full_report.py) ───────────────────────────
 

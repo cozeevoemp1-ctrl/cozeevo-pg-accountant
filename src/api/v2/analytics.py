@@ -154,13 +154,8 @@ async def get_occupancy(
     window_start = max(_months_back(today, months), START_MONTH)
 
     async with get_session() as session:
-        # Total revenue beds
-        total_beds = int(
-            await session.scalar(
-                select(func.coalesce(func.sum(Room.max_occupancy), 0))
-                .where(Room.is_staff_room == False, Room.room_number != "000")
-            ) or 0
-        )
+        # Total revenue beds — canonical source
+        total_beds = await get_total_revenue_beds(session)
 
         # Today's live occupancy — use canonical calculation to match KPI endpoint
         today_beds = await get_occupied_beds(session, today)

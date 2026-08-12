@@ -10,12 +10,14 @@ What it does (per tenant):
 
 Dry-run by default. Pass --write to apply.
 """
-import asyncio, json, sys, uuid
+import asyncio, json, os, sys, uuid
 
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy import text
 
-URL = "postgresql+asyncpg://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+load_dotenv()
+URL = os.environ["DATABASE_URL"]
 CREATED_BY = "+917845952289"  # Kiran
 
 

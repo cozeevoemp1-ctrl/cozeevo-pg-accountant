@@ -412,11 +412,10 @@ async def beds_free_on_date(
     """
     when = on_date or _date.today()
     from sqlalchemy import case, literal_column
+    from src.services.occupancy import get_total_revenue_beds
 
-    total_beds = await session.scalar(
-        select(func.coalesce(func.sum(Room.max_occupancy), 0))
-        .where(Room.active == True, Room.is_staff_room == False)
-    ) or 0
+    # Canonical denominator (excludes staff rooms + placeholder room 000).
+    total_beds = await get_total_revenue_beds(session)
 
     occupied_lt = await session.scalar(
         select(func.coalesce(func.sum(
@@ -429,6 +428,7 @@ async def beds_free_on_date(
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
+            Room.room_number != "000",
             Tenancy.status == TenancyStatus.active,
             Tenancy.checkin_date <= when,
             or_(Tenancy.checkout_date.is_(None), Tenancy.checkout_date > when),
@@ -446,6 +446,7 @@ async def beds_free_on_date(
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
+            Room.room_number != "000",
             Tenancy.status == TenancyStatus.no_show,
             Tenancy.checkin_date <= when,
         )
@@ -463,6 +464,7 @@ async def beds_free_on_date(
         .join(Room, Room.id == Tenancy.room_id)
         .where(
             Room.is_staff_room == False,
+            Room.room_number != "000",
             Tenancy.stay_type == StayType.daily,
             Tenancy.checkin_date <= when,
             Tenancy.checkout_date > when,

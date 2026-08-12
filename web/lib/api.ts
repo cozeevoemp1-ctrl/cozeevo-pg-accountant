@@ -4,7 +4,8 @@
  */
 import { supabase } from "./supabase";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com";
+// Single source for the backend base URL — import this instead of re-deriving.
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com";
 
 async function _authHeaders(token?: string): Promise<Record<string, string>> {
   if (token) return { Authorization: `Bearer ${token}` };

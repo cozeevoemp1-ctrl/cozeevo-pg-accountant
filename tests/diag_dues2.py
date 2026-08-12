@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 os.environ['TEST_MODE'] = '1'
-DB_URL = "postgresql+asyncpg://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+DB_URL = os.environ["DATABASE_URL"]
 
 from datetime import date
 from src.database.db_manager import init_db, get_db_session

@@ -16,6 +16,9 @@
  *              and TENANTS tab. No hardcoded cell positions.
  */
 
+// MANUAL COPY of DB truth (rooms table via src/services/occupancy.py) — Apps
+// Script can't query the DB. Update alongside every is_staff_room change
+// (see CLAUDE.md staff-room checklist).
 const TOTAL_BEDS = 298; // updated 2026-05-31; 108→revenue
 const MONTH_NAMES = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
   "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];

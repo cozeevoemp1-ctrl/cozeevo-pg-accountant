@@ -6848,10 +6848,9 @@ async def _query_vacant_rooms(entities: dict, ctx: CallerContext, session: Async
 async def _query_occupancy(entities: dict, ctx: CallerContext, session: AsyncSession) -> str:
     revenue_filter = and_(Room.active == True, Room.is_staff_room == False)
 
-    # Total beds = sum(max_occupancy) across all revenue rooms
-    total_beds = await session.scalar(
-        select(func.sum(Room.max_occupancy)).where(revenue_filter)
-    ) or 0
+    # Total beds — canonical source (keeps bot numbers identical to PWA/Sheet)
+    from src.services.occupancy import get_total_revenue_beds
+    total_beds = await get_total_revenue_beds(session)
 
     # Total revenue rooms
     total_rooms = await session.scalar(

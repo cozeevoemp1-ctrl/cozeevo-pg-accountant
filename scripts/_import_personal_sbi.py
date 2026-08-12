@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import re
 import sys
 from collections import defaultdict
@@ -33,7 +34,9 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, ".")
 from src.rules.pnl_classify import classify_txn
 
-DB = "postgresql+asyncpg://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+from dotenv import load_dotenv
+load_dotenv()
+DB = os.environ["DATABASE_URL"]
 WRITE = "--write" in sys.argv
 
 PHONEPE_PDF = "PhonePe_Transaction_Statement.pdf"

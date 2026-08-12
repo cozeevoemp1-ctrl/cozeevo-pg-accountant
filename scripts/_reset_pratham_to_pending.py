@@ -1,8 +1,10 @@
-import asyncio, asyncpg
+import asyncio, asyncpg, os
+from dotenv import load_dotenv
+load_dotenv()
 
 async def main():
     conn = await asyncpg.connect(
-        "postgresql://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+        os.environ["DATABASE_URL"].replace("+asyncpg", "")
     )
     # Set tenancy 1102 to no_show (removes from active count, doesn't block room re-booking)
     await conn.execute(

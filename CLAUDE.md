@@ -7,6 +7,24 @@ Stack: FastAPI + Supabase (PostgreSQL) + Groq (llama-3.3-70b) + Meta WhatsApp Cl
 Live on Hostinger VPS (187.127.130.194), domain api.getkozzy.com.
 Architecture: Meta webhook → nginx → FastAPI (no n8n).
 
+## Workflow conventions (adopted 2026-08-12, from spec-driven dev review)
+- **Feature specs**: any non-trivial feature gets `docs/specs/NN-<name>.md` first
+  (copy `docs/specs/TEMPLATE.md`: goal / decisions / implementation / **out of scope**
+  / verification checklist). Invocation: "read spec NN, mark in-progress, implement
+  exactly as specified."
+- **Debugging**: bugs go into `docs/specs/current-issues.md` (gitignored) with error
+  + repro. Analyze → propose root cause → **wait for Kiran's approval** → fix ONE
+  issue at a time. Fixed = "pending to test" until re-tested.
+- **Branches**: work on `development`; merge to `master` only when tested —
+  **merging to master IS deploying** (webhook). `/ship` = commit+push development,
+  then merge to master + push when Kiran says ship to prod (or says "ship" while
+  already stable). No staging env yet — staging branch deferred until a second
+  server exists.
+- **Single source of truth for constants**: TOTAL_BEDS → `src/services/occupancy.py`
+  (`get_total_revenue_beds` / `_sync`); frozen sheet months → `gsheets.FROZEN_MONTHS`;
+  admin phone → `role_service.get_primary_admin_phone()`; PWA API base →
+  `web/lib/api.ts BASE_URL`. Never re-derive these inline.
+
 ## Core rules
 - **`docs/REPORTING.md`** — single source of truth for ALL financial logic
 - **`docs/EXCEL_IMPORT.md`** — single source of truth for Excel → Sheet → DB workflow

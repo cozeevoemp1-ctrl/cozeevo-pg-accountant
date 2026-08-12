@@ -179,7 +179,9 @@ T_NOTES = _T["T_NOTES"]
 T_EVENT = _T["T_EVENT"]
 
 MONTHLY_DATA_START_ROW = 5  # 1-based: rows 1-4 are title/summary/headers (legacy default)
-TOTAL_BEDS = 298  # updated 2026-05-31; 108→revenue
+# Fallback only — live value comes from src.services.occupancy.get_total_revenue_beds_sync()
+# (DB rooms table is the single source of truth for bed counts).
+TOTAL_BEDS_FALLBACK = 298  # updated 2026-05-31; 108→revenue
 
 
 def _locate_monthly_header(all_vals: list[list]) -> tuple[int, int]:
@@ -672,8 +674,10 @@ def _refresh_summary_sync(tab_name: str) -> None:
                 hulk_tenants += 1
 
         collected = cash_total + upi_total
-        vacant = TOTAL_BEDS - beds - noshow
-        occ_pct = f"{beds / TOTAL_BEDS * 100:.1f}" if TOTAL_BEDS > 0 else "0"
+        from src.services.occupancy import get_total_revenue_beds_sync
+        total_beds = get_total_revenue_beds_sync() or TOTAL_BEDS_FALLBACK
+        vacant = total_beds - beds - noshow
+        occ_pct = f"{beds / total_beds * 100:.1f}" if total_beds > 0 else "0"
         pending = max(0, int(balance_total))
 
         def _lk(n):

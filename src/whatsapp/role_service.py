@@ -44,6 +44,29 @@ _HARDCODED_ROLES: dict[str, tuple[str, str]] = {
 }
 
 
+def get_primary_admin_phone(wa_format: bool = False) -> str:
+    """Single source for 'the admin phone' across the project.
+
+    Order: ADMIN_PHONE env override → first 'admin' in the allowlist
+    (DEMO_ADMIN_PHONE in demo mode). Returns 10-digit form ('7845952289'),
+    or wa_id form ('917845952289') when wa_format=True.
+    Use THIS instead of reading ADMIN_PHONE / ADMIN_WHATSAPP env directly.
+    """
+    import re as _re
+    if is_demo_mode():
+        raw = os.getenv("DEMO_ADMIN_PHONE", "")
+    else:
+        raw = ADMIN_PHONE or next(
+            (p for p, (_n, r) in _HARDCODED_ROLES.items() if r == "admin"), ""
+        )
+    digits = _re.sub(r"\D", "", raw)
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    if wa_format and len(digits) == 10:
+        return "91" + digits
+    return digits
+
+
 def _demo_roles() -> dict[str, tuple[str, str]]:
     """DEMO_MODE allowlist — sourced from DEMO_ROLES env var instead of the real
     business's hardcoded phone numbers. Format: "phone:name:role,phone2:name2:role2".

@@ -15,6 +15,32 @@ async def get_total_revenue_beds(session: AsyncSession) -> int:
     return int(total or 0)
 
 
+def get_total_revenue_beds_sync() -> int:
+    """Sync variant for thread-run code (gsheets summary refresh) with no
+    async session. Opens its own short-lived engine from DATABASE_URL.
+    Returns 0 if the DB is unreachable — callers must fall back explicitly."""
+    import os
+    from sqlalchemy import create_engine
+    url = os.environ.get("DATABASE_URL", "")
+    if url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    if not url:
+        return 0
+    try:
+        engine = create_engine(url, pool_pre_ping=True)
+        try:
+            with engine.connect() as conn:
+                total = conn.scalar(
+                    select(func.coalesce(func.sum(Room.max_occupancy), 0))
+                    .where(Room.is_staff_room == False, Room.room_number != "000")
+                )
+        finally:
+            engine.dispose()
+        return int(total or 0)
+    except Exception:
+        return 0
+
+
 async def get_occupied_beds(session: AsyncSession, target_date: date) -> int:
     """Occupied beds on target_date: active + no_show (checkin_date <= target_date).
 

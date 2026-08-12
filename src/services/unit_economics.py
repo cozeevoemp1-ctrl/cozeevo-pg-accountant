@@ -18,6 +18,7 @@ from src.database.models import (
     Room, RentSchedule, Tenancy, TenancyStatus, StayType,
 )
 from src.rules.pnl_classify import classify_txn
+from src.services.occupancy import get_total_revenue_beds
 
 # ₹2.31Cr — post Ashokan & Jitendra buyout 18 Jun 2026 (Prabhakaran absorbed their stake)
 # Override via TOTAL_INVESTMENT env var (e.g. demo deployments use a fake figure).
@@ -42,11 +43,8 @@ async def get_unit_economics(month: date, session: AsyncSession) -> dict:
     else:
         next_month = date(month.year, month.month + 1, 1)
 
-    # ── 1. Total revenue beds ─────────────────────────────────────────────────
-    total_beds = int(await session.scalar(
-        select(func.coalesce(func.sum(Room.max_occupancy), 0))
-        .where(Room.is_staff_room == False, Room.room_number != "000")
-    ) or 0)
+    # ── 1. Total revenue beds — canonical source ─────────────────────────────
+    total_beds = await get_total_revenue_beds(session)
 
     # ── 2. Occupied beds (premium tenant = full room, else 1 per tenant) ──────
     per_room_occ = (

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { updateBookingSession, cancelBookingSession, authHeaders } from "@/lib/api"
+import { updateBookingSession, cancelBookingSession, authHeaders, BASE_URL } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
+const API_URL = BASE_URL
 
 // JWT auth (shared admin PIN removed 2026-08-08 — it shipped in this bundle)
 async function pinHeaders() {
