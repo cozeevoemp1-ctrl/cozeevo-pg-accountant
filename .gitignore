@@ -100,3 +100,10 @@ data/Private/
 
 # Debugging scratch file — may contain tokens/logs (video lesson: never commit)
 docs/specs/current-issues.md
+
+# Master secrets file + any password/secret txt — NEVER commit (plaintext creds)
+all passwords.txt
+*password*.txt
+*passwords*.txt
+*secret*.txt
+gmail passwords.txt
