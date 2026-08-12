@@ -107,7 +107,7 @@ export function DateTimePickerInput({ value, onChange }: Props) {
   return (
     <div ref={ref} className="relative mt-1">
       {/* Main row */}
-      <div className="flex h-[46px] rounded-lg border border-[#E0DDD8] bg-surface overflow-hidden focus-within:border-brand-pink transition-colors">
+      <div className="flex h-[46px] rounded-lg border border-border-strong bg-surface overflow-hidden focus-within:border-brand-pink transition-colors">
 
         {/* Date trigger */}
         <div
@@ -117,7 +117,7 @@ export function DateTimePickerInput({ value, onChange }: Props) {
           <span className={selDay ? "text-ink" : "text-ink-muted"}>{displayDate}</span>
         </div>
 
-        <div className="self-stretch w-px bg-[#E0DDD8] flex-shrink-0" />
+        <div className="self-stretch w-px bg-border-strong flex-shrink-0" />
 
         {/* Time: HH : MM AM/PM */}
         <div className="flex items-center gap-0.5 px-2" onClick={e => e.stopPropagation()}>
@@ -151,7 +151,7 @@ export function DateTimePickerInput({ value, onChange }: Props) {
               setPeriod(p)
               emitDate(selYear, selMonth, selDay, hour, minute, p)
             }}
-            className="ml-1 text-xs font-bold text-brand-pink bg-[#FCE2EE] rounded-md px-1.5 py-0.5 hover:bg-brand-pink hover:text-white transition-colors"
+            className="ml-1 text-xs font-bold text-brand-pink bg-tile-pink rounded-md px-1.5 py-0.5 hover:bg-brand-pink hover:text-white transition-colors"
           >
             {period}
           </button>
@@ -160,7 +160,7 @@ export function DateTimePickerInput({ value, onChange }: Props) {
 
       {/* Calendar popup */}
       {open && (
-        <div className="absolute z-50 mt-1 left-0 w-[280px] bg-white rounded-xl border border-[#E0DDD8] shadow-lg p-3">
+        <div className="absolute z-50 mt-1 left-0 w-[280px] bg-white rounded-xl border border-border-strong shadow-lg p-3">
           {yearMode ? (
             <>
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2 text-center">Select Year</p>
@@ -168,7 +168,7 @@ export function DateTimePickerInput({ value, onChange }: Props) {
                 {yearRange.map(y => (
                   <button key={y} type="button" onClick={() => pickYear(y)}
                     className={`rounded-lg py-2 text-sm font-semibold transition-colors
-                      ${y === viewYear ? "bg-brand-pink text-white" : "hover:bg-[#F6F5F0] text-ink"}`}>
+                      ${y === viewYear ? "bg-brand-pink text-white" : "hover:bg-bg text-ink"}`}>
                     {y}
                   </button>
                 ))}
@@ -178,13 +178,13 @@ export function DateTimePickerInput({ value, onChange }: Props) {
             <>
               <div className="flex items-center justify-between mb-2">
                 <button type="button" onClick={prevMonth}
-                  className="w-7 h-7 rounded-full hover:bg-[#F6F5F0] flex items-center justify-center text-ink-muted text-lg">‹</button>
+                  className="w-7 h-7 rounded-full hover:bg-bg flex items-center justify-center text-ink-muted text-lg">‹</button>
                 <button type="button" onClick={() => setYearMode(true)}
                   className="text-sm font-bold text-ink hover:text-brand-pink transition-colors">
                   {MONTHS_SHORT[viewMonth]} {viewYear}
                 </button>
                 <button type="button" onClick={nextMonth}
-                  className="w-7 h-7 rounded-full hover:bg-[#F6F5F0] flex items-center justify-center text-ink-muted text-lg">›</button>
+                  className="w-7 h-7 rounded-full hover:bg-bg flex items-center justify-center text-ink-muted text-lg">›</button>
               </div>
 
               <div className="grid grid-cols-7 mb-1">
@@ -202,8 +202,8 @@ export function DateTimePickerInput({ value, onChange }: Props) {
                     <button key={d} type="button" onClick={() => pickDay(d)}
                       className={`h-8 w-full rounded-lg text-sm font-medium transition-colors
                         ${isSelected ? "bg-brand-pink text-white"
-                          : isToday  ? "bg-[#FCE2EE] text-brand-pink font-bold"
-                          : "hover:bg-[#F6F5F0] text-ink"}`}>
+                          : isToday  ? "bg-tile-pink text-brand-pink font-bold"
+                          : "hover:bg-bg text-ink"}`}>
                       {d}
                     </button>
                   )

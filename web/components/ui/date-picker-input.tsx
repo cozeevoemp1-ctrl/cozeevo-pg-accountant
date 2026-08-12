@@ -99,7 +99,7 @@ export function DatePickerInput({ value, onChange }: Props) {
       <div
         ref={triggerRef}
         onClick={() => { setOpen(o => !o); setYearMode(false) }}
-        className="flex h-[46px] rounded-lg border border-[#E0DDD8] bg-surface items-center px-3 cursor-pointer select-none transition-colors hover:border-brand-pink"
+        className="flex h-[46px] rounded-lg border border-border-strong bg-surface items-center px-3 cursor-pointer select-none transition-colors hover:border-brand-pink"
       >
         <span className={`text-sm ${selDay ? "text-ink" : "text-ink-muted"}`}>{displayDate}</span>
         <span className="ml-auto text-ink-muted text-base">📅</span>
@@ -109,7 +109,7 @@ export function DatePickerInput({ value, onChange }: Props) {
       {open && (
         <div
           ref={popupRef}
-          className="fixed z-[9999] bg-white rounded-xl border border-[#E0DDD8] shadow-xl p-3"
+          className="fixed z-[9999] bg-white rounded-xl border border-border-strong shadow-xl p-3"
           style={popupStyle}
         >
           {yearMode ? (
@@ -119,7 +119,7 @@ export function DatePickerInput({ value, onChange }: Props) {
                 {yearRange.map(y => (
                   <button key={y} type="button" onClick={() => pickYear(y)}
                     className={`rounded-lg py-2 text-sm font-semibold transition-colors
-                      ${y === viewYear ? "bg-brand-pink text-white" : "hover:bg-[#F6F5F0] text-ink"}`}>
+                      ${y === viewYear ? "bg-brand-pink text-white" : "hover:bg-bg text-ink"}`}>
                     {y}
                   </button>
                 ))}
@@ -129,13 +129,13 @@ export function DatePickerInput({ value, onChange }: Props) {
             <>
               <div className="flex items-center justify-between mb-2">
                 <button type="button" onClick={prevMonth}
-                  className="w-7 h-7 rounded-full hover:bg-[#F6F5F0] flex items-center justify-center text-ink-muted text-lg">‹</button>
+                  className="w-7 h-7 rounded-full hover:bg-bg flex items-center justify-center text-ink-muted text-lg">‹</button>
                 <button type="button" onClick={() => setYearMode(true)}
                   className="text-sm font-bold text-ink hover:text-brand-pink transition-colors">
                   {MONTHS_SHORT[viewMonth]} {viewYear}
                 </button>
                 <button type="button" onClick={nextMonth}
-                  className="w-7 h-7 rounded-full hover:bg-[#F6F5F0] flex items-center justify-center text-ink-muted text-lg">›</button>
+                  className="w-7 h-7 rounded-full hover:bg-bg flex items-center justify-center text-ink-muted text-lg">›</button>
               </div>
 
               <div className="grid grid-cols-7 mb-1">
@@ -153,8 +153,8 @@ export function DatePickerInput({ value, onChange }: Props) {
                     <button key={d} type="button" onClick={() => pickDay(d)}
                       className={`h-8 w-full rounded-lg text-sm font-medium transition-colors
                         ${isSelected ? "bg-brand-pink text-white"
-                          : isToday  ? "bg-[#FCE2EE] text-brand-pink font-bold"
-                          : "hover:bg-[#F6F5F0] text-ink"}`}>
+                          : isToday  ? "bg-tile-pink text-brand-pink font-bold"
+                          : "hover:bg-bg text-ink"}`}>
                       {d}
                     </button>
                   )

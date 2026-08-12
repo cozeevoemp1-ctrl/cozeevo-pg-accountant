@@ -18,7 +18,7 @@ export function Button({
         "inline-flex items-center justify-center font-semibold rounded-pill transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
         {
           "bg-brand-pink text-white hover:opacity-90 active:opacity-80": variant === "primary",
-          "bg-surface border border-[#E2DEDD] text-ink hover:bg-bg": variant === "secondary",
+          "bg-surface border border-border-strong text-ink hover:bg-bg": variant === "secondary",
           "bg-transparent text-ink-muted hover:text-ink": variant === "ghost",
         },
         {
