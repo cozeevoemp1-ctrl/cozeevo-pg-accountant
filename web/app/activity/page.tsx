@@ -24,7 +24,7 @@ export default async function ActivityPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+      <div className="flex items-center gap-3 px-4 pt-12 pb-4 bg-surface border-b border-border">
         <Link href="/"
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold flex-shrink-0"
           aria-label="Back">←</Link>

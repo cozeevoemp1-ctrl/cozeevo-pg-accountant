@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconTile } from "@/components/ui/icon-tile";
 import { getKpiDetail, getTenantDues, cancelNoShow, quickBook, createPayment, type KpiDetailItem, type TenantDues } from "@/lib/api";
-import { rupee, rupeeL } from "@/lib/format";
+import { rupee } from "@/lib/format";
+import { fmtDate as fmtDateLib, monthLabel as monthLabelLib, periodMonth } from "@/lib/date";
+import { Modal } from "@/components/ui/modal";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import type { KpiResponse } from "@/lib/api";
 
@@ -58,9 +60,9 @@ function matchesGender(gender: string | undefined, filter: GenderFilter): boolea
   return true;
 }
 
+/** Same as lib fmtDate but shows an em-dash for missing dates (card layout needs a placeholder). */
 function fmtDate(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return iso ? fmtDateLib(iso) : "—";
 }
 
 function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => void }) {
@@ -73,7 +75,7 @@ function TenantDetailCard({ dues, onClose }: { dues: TenantDues; onClose: () => 
         </div>
         <button onClick={onClose} className="text-ink-muted text-xl leading-none px-1 -mt-0.5">×</button>
       </div>
-      <div className="flex flex-col divide-y divide-[#F0EDE9]">
+      <div className="flex flex-col divide-y divide-border">
         {[
           { label: "Check-in", value: fmtDate(dues.checkin_date) },
           ...(dues.expected_checkout ? [{ label: "Check-out", value: fmtDate(dues.expected_checkout) }] : []),
@@ -135,11 +137,6 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     }).catch(() => {});
   }, [item.tenancy_id]);
 
-  function currentMonth() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!fullDues) { setError("Could not load tenant info — try again"); return; }
@@ -148,7 +145,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     const da = parseFloat(depositAmt) || 0;
     if (ca <= 0 && ua <= 0 && da <= 0) { setError("Enter at least one amount"); return; }
     setSaving(true); setError("");
-    const pm = currentMonth();
+    const pm = periodMonth();
     try {
       if (ca > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ca, method: "CASH", for_type: "rent",    period_month: pm });
       if (ua > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ua, method: "UPI",  for_type: "rent",    period_month: pm });
@@ -169,16 +166,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   const remaining  = Math.max(0, totalDue - totalCollect);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div className="relative w-full max-w-sm bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl overflow-y-auto max-h-[90vh]">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-base font-extrabold text-ink">Collect payment</p>
-            <p className="text-xs text-ink-muted">{item.name} · Room {item.room}</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F6F5F0] flex items-center justify-center text-ink-muted font-bold text-lg leading-none">×</button>
-        </div>
+    <Modal open onClose={onClose} title="Collect payment" closeOnBackdrop={false}>
+      <p className="text-xs text-ink-muted -mt-3 mb-4">{item.name} · Room {item.room}</p>
 
         {success ? (
           <div className="rounded-tile bg-[#D1FAE5] border border-[#6EE7B7] px-4 py-3 text-sm font-semibold text-[#065F46] text-center">
@@ -212,7 +201,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                 value={cashAmt} onChange={(e) => setCashAmt(e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0" min="0"
-                className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
                 autoFocus
               />
             </div>
@@ -227,7 +216,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                 value={upiAmt} onChange={(e) => setUpiAmt(e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0" min="0"
-                className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
               />
             </div>
 
@@ -242,13 +231,13 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                   value={depositAmt} onChange={(e) => setDepositAmt(e.target.value)}
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0" min="0"
-                  className="w-full text-xl font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                  className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
                 />
                 <div className="flex gap-1.5 mt-1.5">
                   {(["CASH", "UPI"] as PayMethod[]).map((m) => (
                     <button key={m} type="button" onClick={() => setDepositMethod(m)}
                       className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg border transition-colors ${
-                        depositMethod === m ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                        depositMethod === m ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink-muted border-border-strong"
                       }`}>{m === "CASH" ? "Cash" : "UPI"}</button>
                   ))}
                 </div>
@@ -257,7 +246,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
 
             {/* Summary */}
             {fullDues && (
-              <div className="rounded-lg bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-1.5">
+              <div className="rounded-lg bg-bg px-3 py-2.5 flex flex-col gap-1.5">
                 {[
                   { label: "Total outstanding", value: totalDue,      warn: false, muted: true },
                   { label: "Collecting now",     value: totalCollect,  warn: false, muted: false },
@@ -279,8 +268,7 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
             </button>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -375,18 +363,8 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center px-4" style={{ zIndex: 9999 }}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative w-full max-w-lg bg-surface rounded-2xl px-5 pt-5 pb-6 shadow-xl overflow-y-auto max-h-[90vh]"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="text-base font-extrabold text-ink">Pre-book Room {room}</p>
-            <p className="text-xs text-ink-muted">Bed stays vacant until arrival</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-[#F6F5F0] flex items-center justify-center text-ink-muted font-bold text-lg leading-none">×</button>
-        </div>
+    <Modal open onClose={onClose} title={`Pre-book Room ${room}`} closeOnBackdrop={false}>
+      <p className="text-xs text-ink-muted -mt-3 mb-4">Bed stays vacant until arrival</p>
 
         {success && !error ? (
           <div className="rounded-tile bg-[#D1FAE5] border border-[#6EE7B7] px-4 py-3 text-sm font-semibold text-[#065F46] text-center">
@@ -400,14 +378,14 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               </div>
             )}
             {/* Stay type toggle */}
-            <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+            <div className="flex rounded-lg overflow-hidden border border-border-strong">
               {(["monthly", "daily"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setStayType(t)}
                   className={`flex-1 py-2 text-xs font-bold transition-colors ${
-                    stayType === t ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
+                    stayType === t ? "bg-brand-pink text-white" : "bg-bg text-ink-muted"
                   }`}
                 >
                   {t === "monthly" ? "Monthly" : "Day-wise"}
@@ -422,7 +400,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full name"
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                  className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                   required
                 />
               </div>
@@ -433,7 +411,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="10-digit mobile"
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                  className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                   required
                 />
               </div>
@@ -455,17 +433,17 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       onChange={(e) => setDailyRate(e.target.value)}
                       placeholder="e.g. 800"
                       min="1"
-                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                       required
                     />
                   </div>
                   <div className="col-span-2">
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed type</label>
-                    <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+                    <div className="flex rounded-lg overflow-hidden border border-border-strong">
                       <button
                         type="button"
                         onClick={() => setFullRoom(false)}
-                        className={`flex-1 py-2 text-xs font-bold transition-colors ${!fullRoom ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${!fullRoom ? "bg-brand-pink text-white" : "bg-bg text-ink-muted"}`}
                       >
                         Regular
                       </button>
@@ -475,8 +453,8 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                         disabled={!canFullRoom}
                         className={`flex-1 py-2 text-xs font-bold transition-colors ${
                           !canFullRoom
-                            ? "bg-[#F6F5F0] text-[#C0BAB4] cursor-not-allowed"
-                            : fullRoom ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"
+                            ? "bg-bg text-[#C0BAB4] cursor-not-allowed"
+                            : fullRoom ? "bg-brand-pink text-white" : "bg-bg text-ink-muted"
                         }`}
                       >
                         Premium
@@ -494,7 +472,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       onChange={(e) => setDeposit(e.target.value)}
                       placeholder="0 if none"
                       min="0"
-                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                     />
                   </div>
                 </>
@@ -508,7 +486,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       onChange={(e) => { setRent(e.target.value); setDeposit(e.target.value); }}
                       placeholder="e.g. 12000"
                       min="1"
-                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                       required
                     />
                   </div>
@@ -519,7 +497,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       value={maintenance}
                       onChange={(e) => setMaintenance(e.target.value)}
                       min="0"
-                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                     />
                   </div>
                   <div>
@@ -530,23 +508,23 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       onChange={(e) => setDeposit(e.target.value)}
                       placeholder="Auto = 1 month rent"
                       min="0"
-                      className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                      className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                     />
                   </div>
                   <div className="col-span-2">
                     <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Bed type</label>
-                    <div className="flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+                    <div className="flex rounded-lg overflow-hidden border border-border-strong">
                       <button
                         type="button"
                         onClick={() => setMonthlyBedType("regular")}
-                        className={`flex-1 py-2 text-xs font-bold transition-colors ${monthlyBedType === "regular" ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${monthlyBedType === "regular" ? "bg-brand-pink text-white" : "bg-bg text-ink-muted"}`}
                       >
                         Regular
                       </button>
                       <button
                         type="button"
                         onClick={() => setMonthlyBedType("premium")}
-                        className={`flex-1 py-2 text-xs font-bold transition-colors ${monthlyBedType === "premium" ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}
+                        className={`flex-1 py-2 text-xs font-bold transition-colors ${monthlyBedType === "premium" ? "bg-brand-pink text-white" : "bg-bg text-ink-muted"}`}
                       >
                         Premium
                       </button>
@@ -563,13 +541,13 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                   onChange={(e) => setAdvance(e.target.value)}
                   placeholder="0 if none"
                   min="0"
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
+                  className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink"
                 />
-                <div className="mt-2 flex rounded-pill overflow-hidden border border-[#E0DDD8] h-8">
+                <div className="mt-2 flex rounded-pill overflow-hidden border border-border-strong h-8">
                   {(["cash", "upi"] as const).map(m => (
                     <button key={m} type="button"
                       onClick={() => setAdvanceMode(m)}
-                      className={`flex-1 text-xs font-semibold transition-colors ${advanceMode === m ? "bg-brand-pink text-white" : "bg-[#F6F5F0] text-ink-muted"}`}>
+                      className={`flex-1 text-xs font-semibold transition-colors ${advanceMode === m ? "bg-brand-pink text-white" : "bg-bg text-ink-muted"}`}>
                       {m === "cash" ? "Cash" : "UPI"}
                     </button>
                   ))}
@@ -582,7 +560,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. referred by staff, needs AC room…"
                   rows={2}
-                  className="w-full text-sm rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink resize-none"
+                  className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink resize-none"
                 />
               </div>
             </div>
@@ -595,8 +573,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
             </button>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -630,9 +607,9 @@ interface PanelProps {
   onCollect: (item: KpiDetailItem) => void;
 }
 
+/** Month name only ("Jun") — chip labels have no room for the year. */
 function monthLabel(key: string): string {
-  const m = parseInt(key.split("-")[1])
-  return ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m]
+  return monthLabelLib(key).split(" ")[0]
 }
 
 function ExpansionPanel({
@@ -698,7 +675,7 @@ function ExpansionPanel({
             placeholder="Name or room…"
             value={nameSearch}
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            className="w-full text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
           <div className="flex gap-1.5 items-center">
             {(["all", "THOR", "HULK"] as const).map((b) => (
@@ -708,7 +685,7 @@ function ExpansionPanel({
                 className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
                   buildingFilter === b
                     ? "bg-brand-pink text-white border-brand-pink"
-                    : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    : "bg-bg text-ink-muted border-border-strong"
                 }`}
               >
                 {b === "all" ? "All" : b}
@@ -716,7 +693,7 @@ function ExpansionPanel({
             ))}
             {!loading && filtered.length > 0 && (
               <span className="ml-auto text-[10px] font-bold text-brand-pink">
-                ₹{filtered.reduce((s, it) => s + (it.dues ?? 0), 0).toLocaleString("en-IN")}
+                {rupee(filtered.reduce((s, it) => s + (it.dues ?? 0), 0))}
               </span>
             )}
           </div>
@@ -732,12 +709,12 @@ function ExpansionPanel({
               placeholder="Name or room…"
               value={nameSearch}
               onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-              className="flex-1 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              className="flex-1 text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
             />
             <select
               value={rentRange}
               onChange={(e) => setRentRange(e.target.value as RentRange)}
-              className="text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-2 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+              className="text-xs rounded-pill bg-bg border border-border-strong px-2 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
             >
               {RENT_RANGES.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
@@ -752,7 +729,7 @@ function ExpansionPanel({
                 className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
                   stayFilter === sf.value
                     ? "bg-brand-pink text-white border-brand-pink"
-                    : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    : "bg-bg text-ink-muted border-border-strong"
                 }`}
               >
                 {sf.label}
@@ -773,7 +750,7 @@ function ExpansionPanel({
             placeholder="Name or room…"
             value={nameSearch}
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            className="w-full text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
           <div className="flex gap-1.5 items-center">
             {STAY_FILTERS.map((sf) => (
@@ -783,7 +760,7 @@ function ExpansionPanel({
                 className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
                   stayFilter === sf.value
                     ? "bg-brand-pink text-white border-brand-pink"
-                    : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    : "bg-bg text-ink-muted border-border-strong"
                 }`}
               >
                 {sf.label}
@@ -804,7 +781,7 @@ function ExpansionPanel({
             placeholder="Name or room…"
             value={nameSearch}
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            className="w-full text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
           {!loading && filtered.length > 0 && (() => {
             const overdue = filtered.filter((it) => it.is_overdue).length;
@@ -829,7 +806,7 @@ function ExpansionPanel({
             placeholder="Name…"
             value={nameSearch}
             onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            className="w-full text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
           {!loading && filtered.length > 0 && (
             <p className="text-right text-[10px] font-bold text-brand-pink">{filtered.length} total</p>
@@ -851,7 +828,7 @@ function ExpansionPanel({
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setNoticeSortDir(noticeSortDir === "asc" ? "desc" : "asc")}
-              className="flex-shrink-0 w-7 h-7 rounded-lg border border-[#E0DDD8] bg-[#F6F5F0] flex items-center justify-center text-[11px] font-bold text-ink-muted"
+              className="flex-shrink-0 w-7 h-7 rounded-lg border border-border-strong bg-bg flex items-center justify-center text-[11px] font-bold text-ink-muted"
             >
               {noticeSortDir === "asc" ? "↑" : "↓"}
             </button>
@@ -860,14 +837,14 @@ function ExpansionPanel({
               placeholder="Name or room…"
               value={nameSearch}
               onChange={(e) => { setNameSearch(e.target.value); setSelected(null); }}
-              className="flex-1 min-w-0 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-1.5 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+              className="flex-1 min-w-0 text-xs rounded-pill bg-bg border border-border-strong px-3 py-1.5 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
             />
             <div className="flex gap-1 flex-shrink-0">
               {["all", ...noticeMonths].map(mk => (
                 <button
                   key={mk}
                   onClick={() => setNoticeMonthFilter(mk)}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeMonthFilter === mk ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeMonthFilter === mk ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink-muted border-border-strong"}`}
                 >
                   {mk === "all" ? "All" : monthLabel(mk)}
                 </button>
@@ -878,22 +855,22 @@ function ExpansionPanel({
           <div className="flex gap-1 flex-wrap">
             <button
               onClick={clearNoticeTypeFilters}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilters.size === 0 && !noticeNoReplacement ? "bg-brand-pink text-white border-brand-pink" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilters.size === 0 && !noticeNoReplacement ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink-muted border-border-strong"}`}
             >All</button>
             {([
-              { key: "full_room", label: "Full room",    active: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]" },
+              { key: "full_room", label: "Full room",    active: "bg-[#FFF3E0] text-status-warn border-[#F5C78A]" },
               { key: "single",    label: "Single room",  active: "bg-[#F0FDF4] text-[#166534] border-[#86EFAC]" },
               { key: "male",      label: "Male",         active: "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]" },
               { key: "female",    label: "Female",       active: "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]" },
             ] as const).map(({ key, label, active }) => (
               <button key={key} onClick={() => toggleNoticeTypeFilter(key)}
-                className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilters.has(key) ? active : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}>
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeTypeFilters.has(key) ? active : "bg-bg text-ink-muted border-border-strong"}`}>
                 {label}
               </button>
             ))}
             <button
               onClick={() => setNoticeNoReplacement(!noticeNoReplacement)}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeNoReplacement ? "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]" : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"}`}
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${noticeNoReplacement ? "bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]" : "bg-bg text-ink-muted border-border-strong"}`}
             >No replacement</button>
           </div>
         </div>
@@ -907,7 +884,7 @@ function ExpansionPanel({
             placeholder="Search room…"
             value={roomSearch}
             onChange={(e) => setRoomSearch(e.target.value)}
-            className="w-full text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+            className="w-full text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
           />
           <div className="flex gap-1.5 items-center flex-wrap">
             {GENDER_FILTERS.map((gf) => (
@@ -917,7 +894,7 @@ function ExpansionPanel({
                 className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
                   genderFilter === gf.value
                     ? "bg-brand-pink text-white border-brand-pink"
-                    : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                    : "bg-bg text-ink-muted border-border-strong"
                 }`}
               >
                 {gf.label}
@@ -928,7 +905,7 @@ function ExpansionPanel({
               className={`text-[10px] font-semibold px-2.5 py-1 rounded-pill border transition-colors ${
                 showStaff
                   ? "bg-[#6366F1] text-white border-[#6366F1]"
-                  : "bg-[#F6F5F0] text-ink-muted border-[#E0DDD8]"
+                  : "bg-bg text-ink-muted border-border-strong"
               }`}
             >
               Staff
@@ -952,15 +929,15 @@ function ExpansionPanel({
         ) : filtered.length === 0 ? (
           <p className="text-xs text-ink-muted text-center py-4">No matches</p>
         ) : (
-          <div className="flex flex-col divide-y divide-[#F0EDE9]">
+          <div className="flex flex-col divide-y divide-border">
             {filtered.map((item, i) => (
               <React.Fragment key={i}>
               <div
                 className={`flex justify-between items-center py-2.5 w-full text-left rounded px-1 -mx-1 transition-colors ${
                   item.tenancy_id
-                    ? "hover:bg-[#F6F5F0] active:bg-[#EEDFE8]"
+                    ? "hover:bg-bg active:bg-[#EEDFE8]"
                     : ""
-                } ${selected?.tenancy_id === item.tenancy_id ? "bg-[#FCE2EE]" : ""}`}
+                } ${selected?.tenancy_id === item.tenancy_id ? "bg-tile-pink" : ""}`}
               >
                 <button
                   onClick={() => open === "dues" ? (item.tenancy_id ? onCollect(item) : undefined) : (open === "prebooked" || open === "no_show") ? undefined : selectItem(item)}
@@ -1098,7 +1075,7 @@ function ExpansionPanel({
                             })()
                           : null
                         return (
-                          <div className="rounded-tile border border-[#F0EDE9] bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-2">
+                          <div className="rounded-tile border border-border bg-bg px-3 py-2.5 flex flex-col gap-2">
                             {freeFromDate && (
                               <div className="flex justify-between items-center">
                                 <span className="text-xs text-ink-muted">Free from</span>
@@ -1118,7 +1095,7 @@ function ExpansionPanel({
                               </div>
                             )}
                             {item.prebookings && item.prebookings.length > 0 && (
-                              <div className="flex flex-col gap-1 pt-1 border-t border-[#E0DDD8]">
+                              <div className="flex flex-col gap-1 pt-1 border-t border-border-strong">
                                 <span className="text-[10px] font-semibold text-[#4338CA] uppercase tracking-wide">Pre-booked next</span>
                                 {item.prebookings.map((pb, pi) => (
                                   <div key={pi} className="flex items-center justify-between">
@@ -1134,12 +1111,12 @@ function ExpansionPanel({
                                   href={`/payment/new?tenancy_id=${selected.tenancy_id}`}
                                   className="flex-1 text-center rounded-pill bg-brand-pink py-2 text-[11px] font-bold text-white active:opacity-70"
                                 >
-                                  Collect ₹{totalDue.toLocaleString("en-IN")} →
+                                  Collect {rupee(totalDue)} →
                                 </Link>
                               )}
                               <Link
                                 href={`/checkout/new?tenancy_id=${selected.tenancy_id}`}
-                                className={`${totalDue > 0 ? "" : "flex-1"} text-center rounded-pill border border-[#E2DEDD] py-2 px-3 text-[11px] font-bold text-ink active:opacity-70`}
+                                className={`${totalDue > 0 ? "" : "flex-1"} text-center rounded-pill border border-border-strong py-2 px-3 text-[11px] font-bold text-ink active:opacity-70`}
                               >
                                 Check-out →
                               </Link>
@@ -1469,7 +1446,7 @@ export function KpiGrid({ data, initialDetails }: KpiGridProps) {
           />
           <IconTile
             icon="💸" label={`Dues pending · ${data.overdue_tenants}`}
-            value={rupeeL(data.overdue_amount)}
+            value={rupee(data.overdue_amount)}
             color={data.overdue_tenants > 0 ? "orange" : "green"}
             active={open === "dues"}
             onClick={() => toggle("dues")}

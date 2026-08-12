@@ -16,6 +16,9 @@ import {
   TenantDues,
   PaymentIntent,
 } from "@/lib/api"
+import { rupee, rupeeExact } from "@/lib/format"
+import { monthLabel, periodMonth as currentPeriodMonth } from "@/lib/date"
+import { PageHeader } from "@/components/ui/page-header"
 
 type Method = "UPI" | "CASH"
 type ForType = "rent" | "deposit" | "booking"
@@ -31,13 +34,6 @@ const FOR_TYPES: { value: ForType; label: string }[] = [
   { value: "booking", label: "Advance" },
 ]
 
-function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-}
-
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-
 export default function NewPaymentPage() {
   const router = useRouter()
 
@@ -46,7 +42,7 @@ export default function NewPaymentPage() {
   const [amount, setAmount] = useState("")
   const [method, setMethod] = useState<Method>("CASH")
   const [forType, setForType] = useState<ForType>("rent")
-  const [periodMonth, setPeriodMonth] = useState(currentMonth())
+  const [periodMonth, setPeriodMonth] = useState(currentPeriodMonth())
   const [notes, setNotes] = useState("")
 
   const [showConfirm, setShowConfirm] = useState(false)
@@ -189,9 +185,8 @@ export default function NewPaymentPage() {
   if (success) {
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
-          <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold">←</button>
-          <span className="text-base font-extrabold text-ink">Payment Saved</span>
+        <div className="fixed top-0 left-0 right-0 z-10 px-5 pt-10 bg-bg border-b border-border">
+          <PageHeader title="Payment Saved" backHref="/" />
         </div>
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center text-4xl">✓</div>
         <div className="text-center">
@@ -199,15 +194,15 @@ export default function NewPaymentPage() {
           <p className="text-sm text-ink-muted mt-1">Synced to Supabase + Ops Sheet</p>
         </div>
         {tenant && (
-          <div className="w-full max-w-sm bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-2">
+          <div className="w-full max-w-sm bg-surface rounded-card border border-border p-4 flex flex-col gap-2">
             <Row label="Tenant" value={tenant.name} />
             <Row label="Room" value={`${tenant.room_number} · ${tenant.building_code}`} />
-            <Row label="Amount" value={`₹${Number(amount).toLocaleString("en-IN")}`} pink />
+            <Row label="Amount" value={rupee(Number(amount))} pink />
             <Row label="Method" value={method} />
             {dues && (
               <Row
                 label="Balance"
-                value={balanceAfter !== null && balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${Math.max(0, balanceAfter ?? 0).toLocaleString("en-IN")} remaining`}
+                value={balanceAfter !== null && balanceAfter <= 0 ? "₹0 (Cleared)" : `${rupee(Math.max(0, balanceAfter ?? 0))} remaining`}
               />
             )}
           </div>
@@ -237,7 +232,7 @@ export default function NewPaymentPage() {
         )}
 
         <div className="flex gap-3 w-full max-w-sm">
-          <button onClick={resetForm} className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
+          <button onClick={resetForm} className="flex-1 rounded-pill border border-border-strong py-3 text-ink font-semibold text-sm">
             + New
           </button>
           <button onClick={() => router.push("/")} className="flex-1 rounded-pill bg-brand-pink py-3 text-white font-bold text-sm">
@@ -251,22 +246,27 @@ export default function NewPaymentPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
-        <button onClick={() => router.back()} className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold">←</button>
-        <h1 className="text-lg font-extrabold text-ink">Collect Payment</h1>
-        <button
-          onClick={() => router.push("/payments/history")}
-          className="ml-auto mr-2 flex items-center gap-1 px-3 py-1.5 rounded-pill border border-[#E2DEDD] text-xs font-semibold text-ink-muted"
-        >History</button>
-        <button
-          onClick={() => setShowVoice(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink text-white text-xs font-bold shadow"
-        >🎙 Hey Kozzy</button>
+      <div className="px-5 pt-12 bg-surface border-b border-border">
+        <PageHeader
+          title="Collect Payment"
+          right={
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push("/payments/history")}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-pill border border-border-strong text-xs font-semibold text-ink-muted"
+              >History</button>
+              <button
+                onClick={() => setShowVoice(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-pill bg-brand-pink text-white text-xs font-bold shadow"
+              >🎙 Hey Kozzy</button>
+            </div>
+          }
+        />
       </div>
 
       <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
         {/* Tenant */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+        <div className="bg-surface rounded-card p-4 border border-border">
           <TenantSearch onSelect={handleTenantSelect} defaultValue={voiceHint} placeholder="Search by name, room, phone…" />
         </div>
 
@@ -274,13 +274,13 @@ export default function NewPaymentPage() {
         {dues && (() => {
           const totalOutstanding = (dues.dues || 0) + (dues.deposit_due || 0)
           return (
-            <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <div className="bg-surface rounded-card p-4 border border-border">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-xs text-ink-muted font-medium">Outstanding this month</p>
                   {totalOutstanding > 0 ? (
                     <p className="text-lg font-extrabold mt-0.5 text-status-warn">
-                      ₹{totalOutstanding.toLocaleString("en-IN")} due
+                      {rupee(totalOutstanding)} due
                     </p>
                   ) : (
                     <p className="text-lg font-extrabold mt-0.5 text-status-paid">No dues ✓</p>
@@ -289,14 +289,14 @@ export default function NewPaymentPage() {
                 {dues.last_payment_date && dues.adjustment >= 0 && (
                   <div className="text-right">
                     <p className="text-xs text-ink-muted">Last paid</p>
-                    <p className="text-xs font-semibold text-ink">₹{(dues.last_payment_amount ?? 0).toLocaleString("en-IN")}</p>
+                    <p className="text-xs font-semibold text-ink">{rupee(dues.last_payment_amount ?? 0)}</p>
                   </div>
                 )}
               </div>
               {totalOutstanding > 0 && dues.deposit_due > 0 && (
                 <div className="mt-2 flex gap-3">
-                  {dues.dues > 0 && <span className="text-[11px] text-ink-muted">Rent ₹{dues.dues.toLocaleString("en-IN")}</span>}
-                  <span className="text-[11px] text-ink-muted">Deposit ₹{dues.deposit_due.toLocaleString("en-IN")}</span>
+                  {dues.dues > 0 && <span className="text-[11px] text-ink-muted">Rent {rupee(dues.dues)}</span>}
+                  <span className="text-[11px] text-ink-muted">Deposit {rupee(dues.deposit_due)}</span>
                 </div>
               )}
             </div>
@@ -308,7 +308,7 @@ export default function NewPaymentPage() {
 
         {/* Live summary + waive toggle */}
         {dues && totalDues > 0 && Number(amount) > 0 && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-2">
+          <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-2">
             {[
               { label: "Total outstanding", value: totalDues, muted: true, warn: false },
               { label: "Collecting now",    value: Number(amount), muted: false, warn: false },
@@ -317,7 +317,7 @@ export default function NewPaymentPage() {
               <div key={label} className="flex items-center justify-between">
                 <span className="text-[11px] text-ink-muted">{label}</span>
                 <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
-                  ₹{value.toLocaleString("en-IN")}
+                  {rupee(value)}
                 </span>
               </div>
             ))}
@@ -325,12 +325,12 @@ export default function NewPaymentPage() {
               <button
                 type="button"
                 onClick={() => setWaiveRemaining((v) => !v)}
-                className={`mt-1 flex items-center justify-between px-3 py-2 rounded-tile border-2 transition-colors ${waiveRemaining ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"}`}
+                className={`mt-1 flex items-center justify-between px-3 py-2 rounded-tile border-2 transition-colors ${waiveRemaining ? "border-brand-pink bg-tile-pink" : "border-border-strong bg-bg"}`}
               >
                 <span className={`text-xs font-semibold ${waiveRemaining ? "text-brand-pink" : "text-ink-muted"}`}>
-                  Waive ₹{Math.round(balanceAfter).toLocaleString("en-IN")} remaining
+                  Waive {rupeeExact(balanceAfter)} remaining
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${waiveRemaining ? "bg-brand-pink text-white" : "bg-[#E2DEDD] text-ink-muted"}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${waiveRemaining ? "bg-brand-pink text-white" : "bg-border-strong text-ink-muted"}`}>
                   {waiveRemaining ? "ON" : "OFF"}
                 </span>
               </button>
@@ -339,12 +339,12 @@ export default function NewPaymentPage() {
         )}
 
         {/* Method */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+        <div className="bg-surface rounded-card p-4 border border-border">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
           <div className="grid grid-cols-2 gap-2">
             {METHODS.map((m) => (
               <button key={m.value} type="button" onClick={() => setMethod(m.value)}
-                className={`rounded-tile py-2.5 text-center border-2 transition-colors ${method === m.value ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"}`}>
+                className={`rounded-tile py-2.5 text-center border-2 transition-colors ${method === m.value ? "border-brand-pink bg-tile-pink" : "border-border-strong bg-bg"}`}>
                 <div className="text-lg">{m.icon}</div>
                 <div className={`text-[10px] font-bold mt-1 ${method === m.value ? "text-brand-pink" : "text-ink"}`}>{m.label}</div>
               </button>
@@ -353,12 +353,12 @@ export default function NewPaymentPage() {
         </div>
 
         {/* For type + period */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+        <div className="bg-surface rounded-card p-4 border border-border">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment For</p>
           <div className="flex gap-2 flex-wrap">
             {FOR_TYPES.map((f) => (
               <button key={f.value} type="button" onClick={() => { setForType(f.value); if (f.value === "deposit" || f.value === "booking") setMethod("UPI") }}
-                className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${forType === f.value ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink border-[#E2DEDD]"}`}>
+                className={`rounded-pill px-3 py-1.5 text-xs font-semibold border transition-colors ${forType === f.value ? "bg-brand-pink text-white border-brand-pink" : "bg-bg text-ink border-border-strong"}`}>
                 {f.label}
               </button>
             ))}
@@ -366,7 +366,7 @@ export default function NewPaymentPage() {
           <div className="mt-3">
             <p className="text-xs text-ink-muted font-medium mb-2">Period</p>
             <div ref={monthScrollRef} className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {MONTH_NAMES.map((name, idx) => {
+              {Array.from({ length: 12 }, (_, idx) => {
                 const todayIdx = new Date().getMonth()
                 const val = `${new Date().getFullYear()}-${String(idx + 1).padStart(2, "0")}`
                 const isSelected = periodMonth === val
@@ -375,21 +375,21 @@ export default function NewPaymentPage() {
                   <button key={val} type="button" data-selected={isSelected} onClick={() => setPeriodMonth(val)}
                     className={`flex-shrink-0 rounded-pill px-3 py-1.5 text-xs font-semibold border-2 transition-colors ${
                       isSelected ? "bg-brand-pink text-white border-brand-pink"
-                      : isPast   ? "bg-bg text-ink-muted border-[#E2DEDD] opacity-50"
-                      :            "bg-bg text-ink border-[#E2DEDD]"
+                      : isPast   ? "bg-bg text-ink-muted border-border-strong opacity-50"
+                      :            "bg-bg text-ink border-border-strong"
                     }`}>
-                    {name}
+                    {monthLabel(val).split(" ")[0]}
                   </button>
                 )
               })}
             </div>
           </div>
           <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Note (optional)…"
-            className="mt-2 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink" />
+            className="mt-2 w-full rounded-pill border border-border-strong bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink" />
         </div>
 
         {/* Receipt scanner — last step before confirming */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+        <div className="bg-surface rounded-card p-4 border border-border">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Attach Receipt / Screenshot</p>
           <ReceiptScanner onScan={handleScan} compact={false} />
         </div>
@@ -398,7 +398,7 @@ export default function NewPaymentPage() {
       </div>
 
       {/* CTA */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-[#F0EDE9]">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-border">
         <button onClick={handleReview} className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80">
           Review &amp; Confirm →
         </button>
@@ -409,14 +409,14 @@ export default function NewPaymentPage() {
           title="Record Payment"
           fields={[
             { label: "Tenant", value: `${tenant.name} · Room ${tenant.room_number}` },
-            { label: "Amount", value: `₹${Number(amount).toLocaleString("en-IN")}`, highlight: true },
+            { label: "Amount", value: rupee(Number(amount)), highlight: true },
             { label: "Method", value: `${METHODS.find(m => m.value === method)?.icon} ${method}` },
             { label: "For", value: FOR_TYPES.find(f => f.value === forType)?.label ?? forType },
-            { label: "Period", value: (() => { const [y, m] = periodMonth.split("-"); return `${MONTH_NAMES[parseInt(m)-1]} ${y}` })() },
+            { label: "Period", value: monthLabel(periodMonth) },
             ...(notes ? [{ label: "Note", value: notes }] : []),
             ...(transactionId ? [{ label: "Ref", value: transactionId }] : []),
-            ...(balanceAfter !== null ? [{ label: "Balance after", value: balanceAfter <= 0 ? "₹0 (Cleared)" : `₹${Math.round(balanceAfter).toLocaleString("en-IN")} remaining` }] : []),
-            ...(waiveRemaining && balanceAfter !== null && balanceAfter > 0 ? [{ label: "Also waiving", value: `₹${Math.round(balanceAfter).toLocaleString("en-IN")} (rounding)` }] : []),
+            ...(balanceAfter !== null ? [{ label: "Balance after", value: balanceAfter <= 0 ? "₹0 (Cleared)" : `${rupeeExact(balanceAfter)} remaining` }] : []),
+            ...(waiveRemaining && balanceAfter !== null && balanceAfter > 0 ? [{ label: "Also waiving", value: `${rupeeExact(balanceAfter)} (rounding)` }] : []),
           ]}
           onConfirm={handleConfirm}
           error={error}

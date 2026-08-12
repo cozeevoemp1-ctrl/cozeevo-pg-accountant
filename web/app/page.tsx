@@ -8,25 +8,17 @@ import { ActivityFeed } from "@/components/home/activity-feed";
 import { RecentCheckins } from "@/components/home/recent-checkins";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
+import { monthLabel, periodMonth } from "@/lib/date";
 
 // Always fetch fresh data — no caching
 export const revalidate = 0;
-
-function _monthLabel(d: Date): string {
-  return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
-
-function _periodMonth(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const now = new Date();
-  const period = _periodMonth(now);
-  const monthLabel = _monthLabel(now);
+  const period = periodMonth();
+  const monthName = monthLabel(period, { long: true });
 
   const token = session.session.access_token;
   const [collection, kpi, activity, recentCheckins] = await Promise.allSettled([
@@ -56,7 +48,7 @@ export default async function HomePage() {
 
       {collection.status === "fulfilled" && session.role === "admin" && (
         <Link href="/collection/breakdown" className="block">
-          <OverviewCard data={collection.value} month={monthLabel} />
+          <OverviewCard data={collection.value} month={monthName} />
         </Link>
       )}
 
@@ -73,23 +65,23 @@ export default async function HomePage() {
       <section>
         <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Tenants</h2>
         <div className="grid grid-cols-3 gap-2">
-          <Link href="/checkouts" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+          <Link href="/checkouts" className="bg-surface border border-border rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
             <span className="text-lg">🚪</span>
             <p className="text-xs font-bold text-ink leading-tight">Checkouts</p>
             <p className="text-[10px] text-ink-muted">This month</p>
           </Link>
-          <Link href="/notices" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+          <Link href="/notices" className="bg-surface border border-border rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
             <span className="text-lg">📋</span>
             <p className="text-xs font-bold text-ink leading-tight">Notices</p>
             <p className="text-[10px] text-ink-muted">On notice</p>
           </Link>
-          <Link href="/onboarding/bookings" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+          <Link href="/onboarding/bookings" className="bg-surface border border-border rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
             <span className="text-lg">🏷️</span>
             <p className="text-xs font-bold text-ink leading-tight">Bookings</p>
             <p className="text-[10px] text-ink-muted">Check-ins</p>
           </Link>
         </div>
-        <Link href="/tenants/pre-register" className="mt-2 flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
+        <Link href="/tenants/pre-register" className="mt-2 flex items-center gap-3 bg-surface border border-border rounded-card px-4 py-3 active:opacity-70">
           <span className="text-base">➕</span>
           <div className="flex-1">
             <p className="text-xs font-bold text-ink">Pre-register tenant</p>
@@ -103,12 +95,12 @@ export default async function HomePage() {
       <section>
         <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Operations</h2>
         <div className="grid grid-cols-2 gap-2">
-          <Link href="/activity" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+          <Link href="/activity" className="bg-surface border border-border rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
             <span className="text-lg">📝</span>
             <p className="text-xs font-bold text-ink leading-tight">Activity log</p>
             <p className="text-[10px] text-ink-muted">Payments · check-ins</p>
           </Link>
-          <Link href="/operations" className="bg-surface border border-[#F0EDE9] rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
+          <Link href="/operations" className="bg-surface border border-border rounded-card px-3 py-3 flex flex-col gap-1 active:opacity-70">
             <span className="text-lg">⚡</span>
             <p className="text-xs font-bold text-ink leading-tight">Operations log</p>
             <p className="text-[10px] text-ink-muted">Power · gas · water</p>
@@ -120,7 +112,7 @@ export default async function HomePage() {
       {session.role === "admin" && (
         <section>
           <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Finance</h2>
-          <Link href="/finance" className="flex items-center gap-3 bg-surface border border-[#F0EDE9] rounded-card px-4 py-3 active:opacity-70">
+          <Link href="/finance" className="flex items-center gap-3 bg-surface border border-border rounded-card px-4 py-3 active:opacity-70">
             <span className="text-base">📊</span>
             <div className="flex-1">
               <p className="text-xs font-bold text-ink">Finance & P&L</p>

@@ -20,6 +20,9 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
   then merge to master + push when Kiran says ship to prod (or says "ship" while
   already stable). No staging env yet — staging branch deferred until a second
   server exists.
+- **PWA UI**: before writing ANY new UI, read `docs/UI_SYSTEM.md` — every formatter,
+  overlay, header, and color token has ONE canonical implementation there. Rebuilding
+  one inline is a bug.
 - **Single source of truth for constants**: TOTAL_BEDS → `src/services/occupancy.py`
   (`get_total_revenue_beds` / `_sync`); frozen sheet months → `gsheets.FROZEN_MONTHS`;
   admin phone → `role_service.get_primary_admin_phone()`; PWA API base →

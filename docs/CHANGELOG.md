@@ -1,5 +1,25 @@
 # Changelog
 
+## Session AE (cont.) — 2026-08-12 — PWA UI system: canonical primitives, mass de-duplication
+
+Follow-up to the reuse audit (15 INR formatters, ~10 date formatters, 11 hand-rolled modals, 872 hex literals). Built the design-system layer, migrated every reachable page/component, documented it.
+
+### New canonical layer
+- `web/lib/date.ts` — fmtDate/fmtDateShort/fmtDateTime/todayISO/nowTime/monthLabel/addMonths/periodMonth (string-split parsing, no TZ off-by-one)
+- `web/lib/format.ts` — added `rupeeExact`, `rupeeShort` (K/L/Cr, negative-safe); `indianNumber` now decimal-safe (old version garbled fractions)
+- `web/components/ui/` — new `modal.tsx` (Modal + Sheet; encodes inline zIndex-9999 + safe-area rules), `spinner`, `skeleton`, `empty-state`, `page-header`, `month-nav`
+- Tailwind tokens: `border` (#F0EDE9) + `border-strong` (#E0DDD8; retires the #E2DEDD fork)
+- **`docs/UI_SYSTEM.md`** — the reference doc; CLAUDE.md now mandates reading it before any UI work
+- Deleted dead components: `pill.tsx`, `date-select.tsx`, `datetime-select.tsx` (0 importers)
+
+### Migration (3 parallel agents, disjoint scopes; 35 files)
+~30 local formatter definitions deleted; ~70 inline `₹…toLocaleString` swapped; 7 hand-rolled modals → `<Modal>`/`<Sheet>` (notices ×2, operations delete, payments-history edit, kpi-grid ×2, logout sheet); ~10 PageHeaders, ~8 EmptyStates, ~35 Skeleton bars, 1 MonthNav; ~350 mapped hex classes tokenized. Orphaned finance components untouched (pending Cash-tab decision). Documented skips: full-bleed sticky headers, voice-sheet roots, server-component month nav (collection/breakdown).
+Accepted visual unifications: "05 Jan 2026"→"5 Jan 2026"; standard modal chrome; K-tier gains one decimal in investment section.
+Found pre-existing bug: `bg-tile-yellow` (tenants Overdue tile) has no token — class resolves to nothing; logged in UI_SYSTEM.md debt, needs design decision.
+
+### Verification
+`tsc --noEmit` clean; `npm run build` passes; zero mapped hexes / local INR formatters left outside orphans; formatter algorithm spot-verified on edge cases.
+
 ## Session AE — 2026-08-12 — Best-practices adoption: secrets, single-source constants, security fixes, audit, dev branch
 
 Compared the spec-driven-AI-development video (transcript `data/uploads/14RP8liACqo.txt`) against the project; adopted the gaps.

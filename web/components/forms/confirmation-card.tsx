@@ -20,12 +20,12 @@ export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = f
     <div className="fixed inset-0 flex items-center justify-center bg-black/40 px-4" style={{ zIndex: 9999 }}>
       <div className="w-full max-w-md bg-surface rounded-[28px] shadow-2xl flex flex-col max-h-[85vh]">
         <div className="px-6 pt-5 shrink-0">
-          <div className="w-10 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5" />
+          <div className="w-10 h-1 bg-border-strong rounded-full mx-auto mb-5" />
           <h2 className="text-lg font-extrabold text-ink mb-4">{title}</h2>
         </div>
 
         <div className="overflow-y-auto px-6 flex-1">
-          <div className="divide-y divide-[#F0EDE9] mb-4">
+          <div className="divide-y divide-border mb-4">
             {fields.map((f) => (
               <div key={f.label} className="flex justify-between py-3">
                 <span className="text-sm text-ink-muted">{f.label}</span>
@@ -54,7 +54,7 @@ export function ConfirmationCard({ title, fields, onConfirm, onEdit, loading = f
           <button
             onClick={onEdit}
             disabled={loading}
-            className="w-full rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm active:opacity-80 disabled:opacity-50"
+            className="w-full rounded-pill border border-border-strong py-3 text-ink font-semibold text-sm active:opacity-80 disabled:opacity-50"
           >
             Edit
           </button>

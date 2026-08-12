@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSpeechInput } from "@/lib/voice";
 import { parseVoiceIntent } from "@/lib/parse-intent";
+import { rupee } from "@/lib/format";
+import { Spinner } from "@/components/ui/spinner";
 import type { PaymentIntent } from "@/lib/api";
 
 interface VoiceSheetProps {
@@ -59,7 +61,7 @@ export function VoiceSheet({ onClose, onPaymentIntent }: VoiceSheetProps) {
     <div className="fixed inset-0 bg-black/60 flex items-end" style={{ zIndex: 9999 }}>
       <div className="w-full bg-surface rounded-t-3xl px-5 pt-5 pb-10 min-h-[60vh] flex flex-col">
         {/* Handle bar */}
-        <div className="w-12 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5" />
+        <div className="w-12 h-1 bg-border-strong rounded-full mx-auto mb-5" />
 
         {step === "recording" && (
           <RecordingView
@@ -123,7 +125,7 @@ function RecordingView({
       <div className="flex gap-3 w-full mt-auto">
         <button
           onClick={onCancel}
-          className="flex-1 py-3 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted"
+          className="flex-1 py-3 rounded-pill border border-border-strong text-sm font-semibold text-ink-muted"
         >
           Cancel
         </button>
@@ -142,7 +144,7 @@ function RecordingView({
 function ProcessingView({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center gap-4 flex-1 justify-center">
-      <div className="w-10 h-10 rounded-full border-4 border-brand-pink border-t-transparent animate-spin" />
+      <Spinner />
       <p className="text-sm text-ink-muted">{label}</p>
     </div>
   );
@@ -164,7 +166,7 @@ function ConfirmView({
       <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Understood</p>
 
       {/* Transcript */}
-      <div className="bg-[#F6F5F0] rounded-tile px-3 py-2">
+      <div className="bg-bg rounded-tile px-3 py-2">
         <p className="text-xs text-ink-muted mb-0.5">You said</p>
         <p className="text-sm text-ink italic">&ldquo;{transcript}&rdquo;</p>
       </div>
@@ -178,7 +180,7 @@ function ConfirmView({
           <Row label="Room" value={intent.tenant_room} />
         )}
         {intent.amount != null && (
-          <Row label="Amount" value={`₹${intent.amount.toLocaleString("en-IN")}`} highlight />
+          <Row label="Amount" value={rupee(intent.amount)} highlight />
         )}
         {intent.method && (
           <Row label="Method" value={intent.method} />
@@ -193,7 +195,7 @@ function ConfirmView({
       <div className="flex gap-3 mt-auto">
         <button
           onClick={onCancel}
-          className="flex-1 py-3 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted"
+          className="flex-1 py-3 rounded-pill border border-border-strong text-sm font-semibold text-ink-muted"
         >
           Cancel
         </button>
@@ -213,7 +215,7 @@ function VoiceSummary({ intent }: { intent: PaymentIntent }) {
   const found: string[] = [];
   const missing: string[] = [];
 
-  if (intent.amount != null) found.push(`₹${intent.amount.toLocaleString("en-IN")}`);
+  if (intent.amount != null) found.push(rupee(intent.amount));
   else missing.push("amount");
 
   if (intent.tenant_name) found.push(intent.tenant_name);
@@ -250,7 +252,7 @@ function VoiceSummary({ intent }: { intent: PaymentIntent }) {
 
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-[#F0EDE9]">
+    <div className="flex items-center justify-between py-2 border-b border-border">
       <span className="text-xs text-ink-muted">{label}</span>
       <span className={`text-sm font-semibold ${highlight ? "text-status-paid" : "text-ink"}`}>
         {value}

@@ -7,6 +7,10 @@ export default {
       colors: {
         bg: "#F6F5F0",
         surface: "#FFFFFF",
+        border: {
+          DEFAULT: "#F0EDE9",   // hairlines, dividers
+          strong: "#E0DDD8",    // input borders, card edges (also replaces #E2DEDD fork)
+        },
         ink: {
           DEFAULT: "#0F0E0D",
           muted: "#6F655D",

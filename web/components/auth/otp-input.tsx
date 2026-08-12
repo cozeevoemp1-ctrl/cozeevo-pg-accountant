@@ -69,7 +69,7 @@ export function OtpInput({ phone, onSubmit, onBack, loading, error }: OtpInputPr
               value={d}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
-              className="w-12 h-14 text-center text-xl font-bold bg-white border border-[#E2DEDD] rounded-pill outline-none focus:border-brand-pink transition-colors"
+              className="w-12 h-14 text-center text-xl font-bold bg-white border border-border-strong rounded-pill outline-none focus:border-brand-pink transition-colors"
             />
           ))}
         </div>

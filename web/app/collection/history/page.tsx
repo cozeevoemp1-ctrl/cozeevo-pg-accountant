@@ -2,14 +2,10 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-server";
 import { getCollectionHistory } from "@/lib/api";
 import { rupee } from "@/lib/format";
+import { monthLabel } from "@/lib/date";
 import { Card } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import Link from "next/link";
-
-function _monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
 
 export default async function CollectionHistoryPage() {
   const session = await getSession();
@@ -62,7 +58,7 @@ export default async function CollectionHistoryPage() {
             <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
-                  {_monthLabel(data.period_month)}
+                  {monthLabel(data.period_month, { long: true })}
                 </p>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
                   <span className="text-2xl font-extrabold text-ink leading-none">
@@ -134,7 +130,7 @@ function BackButton() {
   return (
     <Link
       href="/collection/breakdown"
-      className="w-9 h-9 rounded-full bg-[#F0EDE9] flex items-center justify-center text-ink-muted flex-shrink-0"
+      className="w-9 h-9 rounded-full bg-border flex items-center justify-center text-ink-muted flex-shrink-0"
       aria-label="Back"
     >
       ←

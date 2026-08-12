@@ -15,6 +15,8 @@ import {
 } from "@/lib/api"
 import { ReceiptScanner, ReceiptScanResult } from "@/components/forms/receipt-scanner"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
+import { rupee, rupeeExact } from "@/lib/format"
+import { fmtDate, todayISO, nowTime } from "@/lib/date"
 
 type Method = "CASH" | "UPI" | "BANK" | "OTHER"
 
@@ -24,26 +26,6 @@ const METHODS: { value: Method; label: string; icon: string }[] = [
   { value: "BANK",  label: "Bank",   icon: "🏦" },
   { value: "OTHER", label: "Other",  icon: "💳" },
 ]
-
-function fmtINR(n: number) {
-  return `₹${Math.round(n).toLocaleString("en-IN")}`
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function nowTime(): string {
-  const now = new Date()
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
-}
-
-function fmtDate(iso: string): string {
-  if (!iso) return "—"
-  const [y, m, d] = iso.split("-")
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  return `${d} ${months[parseInt(m) - 1]} ${y}`
-}
 
 function NewCheckinPage() {
   const router = useRouter()
@@ -175,7 +157,7 @@ function NewCheckinPage() {
     const collected = Number(amount || 0)
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-border">
           <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
           <span className="text-base font-extrabold text-ink">Check-in Recorded</span>
         </div>
@@ -184,7 +166,7 @@ function NewCheckinPage() {
           <h1 className="text-xl font-extrabold text-ink">Check-in Recorded!</h1>
           <p className="text-sm text-ink-muted mt-1">WhatsApp sent · Synced to DB + Sheet</p>
         </div>
-        <div className="w-full max-w-sm bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-2">
+        <div className="w-full max-w-sm bg-surface rounded-card border border-border p-4 flex flex-col gap-2">
           <Row label="Tenant"      value={tenant.name} />
           <Row label="Room"        value={`${tenant.room_number} · ${tenant.building_code}`} />
           <Row label="Check-in"    value={fmtDate(actualDate)} />
@@ -192,15 +174,15 @@ function NewCheckinPage() {
             <Row label="Agreed date" value={fmtDate(preview.agreed_checkin_date ?? "")} muted />
           )}
           <Row label={preview.stay_type === "daily" ? "Daily rate" : "Monthly rent"}
-               value={preview.stay_type === "daily" ? `${fmtINR(preview.agreed_rent)}/day` : fmtINR(preview.agreed_rent)} />
-          <Row label={preview.stay_type === "daily" ? "Total stay cost" : "First month total"} value={fmtINR(preview.first_month_total)} />
-          <Row label="Advance paid" value={fmtINR(preview.booking_amount)} />
+               value={preview.stay_type === "daily" ? `${rupeeExact(preview.agreed_rent)}/day` : rupeeExact(preview.agreed_rent)} />
+          <Row label={preview.stay_type === "daily" ? "Total stay cost" : "First month total"} value={rupeeExact(preview.first_month_total)} />
+          <Row label="Advance paid" value={rupeeExact(preview.booking_amount)} />
           {collected > 0 && (
-            <Row label="Collected today" value={`${fmtINR(collected)} (${method})`} pink />
+            <Row label="Collected today" value={`${rupeeExact(collected)} (${method})`} pink />
           )}
           <Row
             label="Balance remaining"
-            value={result && result.balanceRemaining <= 0 ? "₹0 (Cleared)" : fmtINR(result?.balanceRemaining ?? 0)}
+            value={result && result.balanceRemaining <= 0 ? "₹0 (Cleared)" : rupeeExact(result?.balanceRemaining ?? 0)}
           />
         </div>
         {/* Receipt status / late upload */}
@@ -227,7 +209,7 @@ function NewCheckinPage() {
 
         <div className="flex gap-3 w-full max-w-sm">
           <button onClick={resetForm}
-            className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
+            className="flex-1 rounded-pill border border-border-strong py-3 text-ink font-semibold text-sm">
             + New
           </button>
           <button onClick={() => router.push("/")}
@@ -243,7 +225,7 @@ function NewCheckinPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-border">
         <button onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
           aria-label="Back">
@@ -255,7 +237,7 @@ function NewCheckinPage() {
       <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
 
         {/* Tenant search */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+        <div className="bg-surface rounded-card p-4 border border-border">
           <TenantSearch
             key={tenant?.tenancy_id ?? "empty"}
             defaultTenant={tenant ?? undefined}
@@ -266,7 +248,7 @@ function NewCheckinPage() {
 
         {/* Actual check-in date (+ time for day-wise) */}
         {tenant && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               Actual Check-in Date
             </p>
@@ -280,7 +262,7 @@ function NewCheckinPage() {
                   type="time"
                   value={checkinTime}
                   onChange={(e) => setCheckinTime(e.target.value)}
-                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
+                  className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
                 />
               </div>
             )}
@@ -295,12 +277,12 @@ function NewCheckinPage() {
 
         {/* Booking summary */}
         {preview && !loadingPrev && preview.stay_type === "monthly" && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               First Month Breakdown
             </p>
             <div className="flex flex-col gap-1.5">
-              <Row label="Monthly rent"     value={fmtINR(preview.agreed_rent)} />
+              <Row label="Monthly rent"     value={rupeeExact(preview.agreed_rent)} />
               {/* Full / Prorated toggle */}
               <div className="flex gap-2 py-1">
                 <button
@@ -309,10 +291,10 @@ function NewCheckinPage() {
                   className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${
                     prorateChoice === "full"
                       ? "bg-brand-pink text-white border-brand-pink"
-                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                      : "bg-bg text-ink-muted border-border-strong"
                   }`}
                 >
-                  Full {fmtINR(preview.agreed_rent)}
+                  Full {rupeeExact(preview.agreed_rent)}
                 </button>
                 <button
                   type="button"
@@ -320,25 +302,25 @@ function NewCheckinPage() {
                   className={`flex-1 rounded-pill py-2 text-xs font-bold border-2 transition-colors ${
                     prorateChoice === "prorated"
                       ? "bg-brand-pink text-white border-brand-pink"
-                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                      : "bg-bg text-ink-muted border-border-strong"
                   }`}
                 >
-                  Prorated {fmtINR(preview.prorated_rent)}
+                  Prorated {rupeeExact(preview.prorated_rent)}
                 </button>
               </div>
               <Row label="Days billed"      value={prorateChoice === "prorated" ? `${fmtDate(actualDate)} → end of month` : "Full month"} muted />
-              <Row label={prorateChoice === "prorated" ? "Prorated rent" : "Full rent"} value={fmtINR(preview.prorated_rent)} />
-              <Row label="Security deposit" value={fmtINR(preview.security_deposit)} />
-              <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
-                <Row label="Total due (first month)" value={fmtINR(preview.first_month_total)} />
-                <Row label="Advance already paid"    value={`− ${fmtINR(preview.booking_amount)}`} />
+              <Row label={prorateChoice === "prorated" ? "Prorated rent" : "Full rent"} value={rupeeExact(preview.prorated_rent)} />
+              <Row label="Security deposit" value={rupeeExact(preview.security_deposit)} />
+              <div className="border-t border-border pt-1.5 mt-0.5">
+                <Row label="Total due (first month)" value={rupeeExact(preview.first_month_total)} />
+                <Row label="Advance already paid"    value={`− ${rupeeExact(preview.booking_amount)}`} />
                 <Row
                   label={preview.balance_due > 0 ? "Balance to collect now" : preview.overpayment > 0 ? "Credit (overpaid)" : "Fully covered"}
                   value={
                     preview.balance_due > 0
-                      ? fmtINR(preview.balance_due)
+                      ? rupeeExact(preview.balance_due)
                       : preview.overpayment > 0
-                        ? `${fmtINR(preview.overpayment)} credit`
+                        ? `${rupeeExact(preview.overpayment)} credit`
                         : "₹0"
                   }
                   pink={preview.balance_due > 0}
@@ -350,26 +332,26 @@ function NewCheckinPage() {
 
         {/* Day-wise stay breakdown */}
         {preview && !loadingPrev && preview.stay_type === "daily" && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <div className="flex items-center gap-2 mb-3">
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Breakdown</p>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-tile-blue text-brand-blue">Day-wise</span>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Row label="Daily rate"      value={`${fmtINR(preview.daily_rate ?? 0)} / night`} />
+              <Row label="Daily rate"      value={`${rupeeExact(preview.daily_rate ?? 0)} / night`} />
               <Row label="Check-in"        value={`${fmtDate(actualDate)}${checkinTime ? `  ${checkinTime}` : ""}`} />
               <Row label="Check-out"       value={preview.checkout_date ? fmtDate(preview.checkout_date) : "—"} />
               <Row label="Nights"          value={`${preview.num_days ?? 0} nights`} />
-              <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
-                <Row label="Total stay cost"      value={fmtINR(preview.total_stay_amount ?? 0)} />
-                <Row label="Advance already paid" value={`− ${fmtINR(preview.booking_amount)}`} />
+              <div className="border-t border-border pt-1.5 mt-0.5">
+                <Row label="Total stay cost"      value={rupeeExact(preview.total_stay_amount ?? 0)} />
+                <Row label="Advance already paid" value={`− ${rupeeExact(preview.booking_amount)}`} />
                 <Row
                   label={preview.balance_due > 0 ? "Balance to collect now" : preview.overpayment > 0 ? "Credit (overpaid)" : "Fully covered"}
                   value={
                     preview.balance_due > 0
-                      ? fmtINR(preview.balance_due)
+                      ? rupeeExact(preview.balance_due)
                       : preview.overpayment > 0
-                        ? `${fmtINR(preview.overpayment)} credit`
+                        ? `${rupeeExact(preview.overpayment)} credit`
                         : "₹0"
                   }
                   pink={preview.balance_due > 0}
@@ -380,7 +362,7 @@ function NewCheckinPage() {
         )}
 
         {loadingPrev && tenant && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] text-xs text-ink-muted text-center">
+          <div className="bg-surface rounded-card p-4 border border-border text-xs text-ink-muted text-center">
             Loading check-in details…
           </div>
         )}
@@ -407,13 +389,13 @@ function NewCheckinPage() {
 
         {/* Method — only when collecting something */}
         {preview && Number(amount) > 0 && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Payment Method</p>
             <div className="grid grid-cols-4 gap-2">
               {METHODS.map((m) => (
                 <button key={m.value} type="button" onClick={() => setMethod(m.value)}
                   className={`rounded-tile py-2.5 text-center border-2 transition-colors ${
-                    method === m.value ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"
+                    method === m.value ? "border-brand-pink bg-tile-pink" : "border-border-strong bg-bg"
                   }`}>
                   <div className="text-lg">{m.icon}</div>
                   <div className={`text-[10px] font-bold mt-1 ${method === m.value ? "text-brand-pink" : "text-ink"}`}>
@@ -427,14 +409,14 @@ function NewCheckinPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Note (optional)…"
-              className="mt-3 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
+              className="mt-3 w-full rounded-pill border border-border-strong bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
             />
           </div>
         )}
 
         {/* Receipt scanner — last step before confirming */}
         {preview && Number(amount) > 0 && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Attach Receipt / Screenshot</p>
             <ReceiptScanner onScan={handleScan} compact={false} />
           </div>
@@ -444,7 +426,7 @@ function NewCheckinPage() {
       </div>
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-[#F0EDE9]">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-border">
         <button
           onClick={handleReview}
           disabled={!tenant || !preview || loadingPrev || !!preview?.already_checked_in}
@@ -464,9 +446,9 @@ function NewCheckinPage() {
             ...(preview.date_changed
               ? [{ label: "Date updated from", value: fmtDate(preview.agreed_checkin_date ?? "") }]
               : []),
-            { label: "First month total", value: `₹${Math.round(preview.first_month_total).toLocaleString("en-IN")}` },
-            { label: "Advance paid",      value: `₹${Math.round(preview.booking_amount).toLocaleString("en-IN")}` },
-            { label: "Collecting now",    value: `₹${Number(amount || 0).toLocaleString("en-IN")}`, highlight: true },
+            { label: "First month total", value: rupeeExact(preview.first_month_total) },
+            { label: "Advance paid",      value: rupeeExact(preview.booking_amount) },
+            { label: "Collecting now",    value: rupee(Number(amount || 0)), highlight: true },
             { label: "Method",            value: `${METHODS.find(m => m.value === method)?.icon} ${method}` },
             ...(notes ? [{ label: "Note", value: notes }] : []),
             ...(transactionId ? [{ label: "Ref", value: transactionId }] : []),

@@ -2,12 +2,9 @@
 
 import { useEffect, useRef, useState } from "react"
 import { getOccupancyData, OccupancyData } from "@/lib/api"
+import { indianNumber } from "@/lib/format"
 
 type Filter = "monthly" | "all"
-
-function fmt(n: number) {
-  return n.toLocaleString("en-IN")
-}
 
 function DownloadIcon() {
   return (
@@ -219,7 +216,7 @@ export function OccupancyTab() {
             ctx.font = `bold ${fs}px -apple-system, BlinkMacSystemFont, sans-serif`
             ctx.textAlign = "center"
             ctx.textBaseline = "bottom"
-            ctx.fillText(`₹${fmt(Math.round(v))}`, pt.x, yLabel)
+            ctx.fillText(`₹${indianNumber(Math.round(v))}`, pt.x, yLabel)
             ctx.restore()
           })
         })
@@ -441,7 +438,7 @@ export function OccupancyTab() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 label: (ctx: any) => {
                   if (ctx.dataset.yAxisID === "yRent")
-                    return ` Avg Rent: ₹${fmt(ctx.parsed.y)}`
+                    return ` Avg Rent: ₹${indianNumber(ctx.parsed.y)}`
                   return ` ${ctx.dataset.label}: ${ctx.parsed.y}`
                 },
               },
@@ -503,13 +500,13 @@ export function OccupancyTab() {
     <div className="flex flex-col gap-4">
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
+        <div className="rounded-xl bg-ink p-4 flex flex-col gap-1">
           <span style={{ color: "#EF1F9C" }} className="text-2xl font-extrabold leading-none">
             {kpi.today_occ_pct}%
           </span>
           <span className="text-[10px] text-ink-muted uppercase tracking-wide">Occupancy — Today</span>
         </div>
-        <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
+        <div className="rounded-xl bg-ink p-4 flex flex-col gap-1">
           <span style={{ color: "#00AEED" }} className="text-2xl font-extrabold leading-none">
             {kpi.today_occ_beds}
           </span>
@@ -517,13 +514,13 @@ export function OccupancyTab() {
             Beds Occupied / {kpi.total_beds}
           </span>
         </div>
-        <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
+        <div className="rounded-xl bg-ink p-4 flex flex-col gap-1">
           <span style={{ color: "#F4C842" }} className="text-2xl font-extrabold leading-none">
-            ₹{fmt(kpi.current_avg_rent)}
+            ₹{indianNumber(kpi.current_avg_rent)}
           </span>
           <span className="text-[10px] text-ink-muted uppercase tracking-wide">Avg Rent / Bed</span>
         </div>
-        <div className="rounded-xl bg-[#0F0E0D] p-4 flex flex-col gap-1">
+        <div className="rounded-xl bg-ink p-4 flex flex-col gap-1">
           {/* text-white — text-ink = #0F0E0D = same as bg, invisible */}
           <span className="text-2xl font-extrabold leading-none text-white">
             {kpi.total_checkins}
@@ -539,7 +536,7 @@ export function OccupancyTab() {
           <button
             onClick={() => setFilter("monthly")}
             className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-              filter === "monthly" ? "bg-[#1e3a5a] text-[#00AEED]" : "bg-[#0F0E0D] text-ink-muted"
+              filter === "monthly" ? "bg-[#1e3a5a] text-brand-blue" : "bg-ink text-ink-muted"
             }`}
           >
             Monthly Only
@@ -547,7 +544,7 @@ export function OccupancyTab() {
           <button
             onClick={() => setFilter("all")}
             className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-              filter === "all" ? "bg-[#1e3a5a] text-[#00AEED]" : "bg-[#0F0E0D] text-ink-muted"
+              filter === "all" ? "bg-[#1e3a5a] text-brand-blue" : "bg-ink text-ink-muted"
             }`}
           >
             All incl. Daily
@@ -562,7 +559,7 @@ export function OccupancyTab() {
                 key={w}
                 onClick={() => setMonthWindow(w)}
                 className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                  monthWindow === w ? "bg-[#1e3a5a] text-[#EF1F9C]" : "bg-[#0F0E0D] text-ink-muted"
+                  monthWindow === w ? "bg-[#1e3a5a] text-brand-pink" : "bg-ink text-ink-muted"
                 }`}
               >
                 {w === 0 ? "All" : `${w}M`}
@@ -577,7 +574,7 @@ export function OccupancyTab() {
         className={
           expanded === 1
             ? "fixed inset-0 z-[60] bg-[#080d14] flex flex-col p-4"
-            : "rounded-xl bg-[#0F0E0D] p-4"
+            : "rounded-xl bg-ink p-4"
         }
       >
         <div className="flex items-center justify-between mb-3">
@@ -588,7 +585,7 @@ export function OccupancyTab() {
             {expanded === 1 && (
               <button
                 onClick={() => downloadPDF(1)}
-                className="text-white hover:text-[#EF1F9C] transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
+                className="text-white hover:text-brand-pink transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Download PDF"
                 title="Download PDF"
               >
@@ -619,7 +616,7 @@ export function OccupancyTab() {
         className={
           expanded === 2
             ? "fixed inset-0 z-[60] bg-[#080d14] flex flex-col p-4"
-            : "rounded-xl bg-[#0F0E0D] p-4"
+            : "rounded-xl bg-ink p-4"
         }
       >
         <div className="flex items-center justify-between mb-3">
@@ -630,7 +627,7 @@ export function OccupancyTab() {
             {expanded === 2 && (
               <button
                 onClick={() => downloadPDF(2)}
-                className="text-white hover:text-[#EF1F9C] transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
+                className="text-white hover:text-brand-pink transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Download PDF"
                 title="Download PDF"
               >
@@ -661,7 +658,7 @@ export function OccupancyTab() {
         className={
           expanded === 3
             ? "fixed inset-0 z-[60] bg-[#080d14] flex flex-col p-4"
-            : "rounded-xl bg-[#0F0E0D] p-4"
+            : "rounded-xl bg-ink p-4"
         }
       >
         <div className="flex items-center justify-between mb-3">
@@ -672,7 +669,7 @@ export function OccupancyTab() {
             {expanded === 3 && (
               <button
                 onClick={() => downloadPDF(3)}
-                className="text-white hover:text-[#EF1F9C] transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
+                className="text-white hover:text-brand-pink transition-colors p-1.5 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Download PDF"
                 title="Download PDF"
               >
@@ -736,7 +733,7 @@ export function OccupancyTab() {
                     <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_premium || "—"}</td>
                     <td className="py-1.5 px-2 text-right text-[#8aacbf]">{m.ci_daily || "—"}</td>
                     <td className="py-1.5 px-2 text-right" style={{ color: "#F4C842" }}>
-                      {m.avg_rent > 0 ? `₹${fmt(m.avg_rent)}` : "—"}
+                      {m.avg_rent > 0 ? `₹${indianNumber(m.avg_rent)}` : "—"}
                     </td>
                   </tr>
                 )

@@ -11,6 +11,11 @@ import {
   PaymentListItem,
   PaymentEditBody,
 } from "@/lib/api"
+import { rupeeExact } from "@/lib/format"
+import { monthLabel } from "@/lib/date"
+import { Modal } from "@/components/ui/modal"
+import { PageHeader } from "@/components/ui/page-header"
+import { EmptyState } from "@/components/ui/empty-state"
 
 type Method = "UPI" | "CASH"
 type ForType = "rent" | "deposit" | "booking" | "maintenance" | "food" | "penalty" | "other"
@@ -153,33 +158,33 @@ export default function PaymentHistoryPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
-        <button
-          onClick={() => router.back()}
-          className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold"
-        >←</button>
-        <span className="text-base font-extrabold text-ink">Payment History</span>
-        <button
-          onClick={() => router.push("/payment/new")}
-          className="ml-auto px-3 py-1.5 rounded-pill bg-brand-pink text-white text-xs font-bold"
-        >+ New</button>
+      <div className="fixed top-0 left-0 right-0 z-10 px-5 pt-10 bg-bg border-b border-border">
+        <PageHeader
+          title="Payment History"
+          right={
+            <button
+              onClick={() => router.push("/payment/new")}
+              className="px-3 py-1.5 rounded-pill bg-brand-pink text-white text-xs font-bold"
+            >+ New</button>
+          }
+        />
       </div>
 
       <div className="px-4 pt-20 pb-32 flex flex-col gap-3 max-w-lg mx-auto">
         {/* Tenant filter */}
         {selectedTenant ? (
-          <div className="flex items-center gap-2 bg-surface rounded-card border border-[#F0EDE9] px-4 py-3">
+          <div className="flex items-center gap-2 bg-surface rounded-card border border-border px-4 py-3">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-extrabold text-ink">{selectedTenant.name}</p>
               <p className="text-[11px] text-ink-muted">Room {selectedTenant.room_number} · {tenantPayments.length} payments</p>
             </div>
             <button
               onClick={clearTenant}
-              className="shrink-0 text-xs text-ink-muted border border-[#E2DEDD] rounded-pill px-3 py-1"
+              className="shrink-0 text-xs text-ink-muted border border-border-strong rounded-pill px-3 py-1"
             >Show all</button>
           </div>
         ) : (
-          <div className="bg-surface rounded-card border border-[#F0EDE9] p-4">
+          <div className="bg-surface rounded-card border border-border p-4">
             <TenantSearch
               onSelect={handleTenantSelect}
               placeholder="Filter by tenant…"
@@ -193,7 +198,7 @@ export default function PaymentHistoryPage() {
         {loadError && <p className="text-center text-status-warn text-sm">{loadError}</p>}
 
         {!isLoading && displayList.length === 0 && (
-          <p className="text-center text-ink-muted text-sm py-8">No payments found</p>
+          <EmptyState>No payments found</EmptyState>
         )}
 
         {!isLoading && displayList.length > 0 && (
@@ -218,38 +223,34 @@ export default function PaymentHistoryPage() {
 
       {/* Edit payment modal */}
       {editing && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-black/40" onClick={() => { setEditing(null); setConfirmDelete(false) }}>
-          <div className="relative bg-bg rounded-2xl px-5 pt-5 pb-6 flex flex-col gap-4 w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-extrabold text-ink">Edit Payment</h2>
-              <div className="flex items-center gap-3">
-                {!confirmDelete ? (
+        <Modal open onClose={() => { setEditing(null); setConfirmDelete(false) }} title="Edit Payment">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-end gap-3">
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={saving || deleting}
+                  className="text-sm font-bold text-red-500 disabled:opacity-50"
+                >Delete</button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setConfirmDelete(false)} className="text-xs text-ink-muted font-semibold">Cancel</button>
                   <button
-                    onClick={() => setConfirmDelete(true)}
-                    disabled={saving || deleting}
-                    className="text-sm font-bold text-red-500 disabled:opacity-50"
-                  >Delete</button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setConfirmDelete(false)} className="text-xs text-ink-muted font-semibold">Cancel</button>
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="text-xs font-bold text-white bg-red-500 px-3 py-1 rounded-full disabled:opacity-50"
-                    >{deleting ? "…" : "Confirm"}</button>
-                  </div>
-                )}
-                <button onClick={() => { setEditing(null); setConfirmDelete(false) }} className="text-ink-muted text-lg font-bold">✕</button>
-              </div>
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="text-xs font-bold text-white bg-red-500 px-3 py-1 rounded-full disabled:opacity-50"
+                  >{deleting ? "…" : "Confirm"}</button>
+                </div>
+              )}
             </div>
 
-            <div className="bg-surface rounded-card p-3 border border-[#F0EDE9] text-xs text-ink-muted">
+            <div className="bg-surface rounded-card p-3 border border-border text-xs text-ink-muted">
               <span className="font-semibold text-ink">
                 {editing.tenant_name ?? ""}{editing.room_number ? ` · Rm ${editing.room_number}` : ""}
               </span>
-              {" · "}₹{Math.round(editing.amount).toLocaleString("en-IN")}
+              {" · "}{rupeeExact(editing.amount)}
               {" · "}{editing.payment_date}
-              {editing.period_month ? ` · for ${new Date(editing.period_month + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` : ""}
+              {editing.period_month ? ` · for ${monthLabel(editing.period_month)}` : ""}
             </div>
 
             <div>
@@ -262,7 +263,7 @@ export default function PaymentHistoryPage() {
                     className={`rounded-pill px-4 py-2 text-xs font-bold border-2 transition-colors ${
                       editForType === f.value
                         ? "border-brand-pink bg-tile-pink text-brand-pink"
-                        : "border-[#E2DEDD] bg-bg text-ink"
+                        : "border-border-strong bg-bg text-ink"
                     }`}
                   >{f.label}</button>
                 ))}
@@ -279,7 +280,7 @@ export default function PaymentHistoryPage() {
                     className={`rounded-pill px-4 py-2 text-xs font-bold border-2 transition-colors ${
                       editMethod === m.value
                         ? "border-brand-pink bg-tile-pink text-brand-pink"
-                        : "border-[#E2DEDD] bg-bg text-ink"
+                        : "border-border-strong bg-bg text-ink"
                     }`}
                   >{m.label}</button>
                 ))}
@@ -292,7 +293,7 @@ export default function PaymentHistoryPage() {
                 type="number"
                 value={editAmount}
                 onChange={e => setEditAmount(e.target.value)}
-                className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
+                className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
               />
             </div>
 
@@ -303,7 +304,7 @@ export default function PaymentHistoryPage() {
                 value={editNotes}
                 onChange={e => setEditNotes(e.target.value)}
                 placeholder="Optional…"
-                className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
+                className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
               />
             </div>
 
@@ -316,7 +317,7 @@ export default function PaymentHistoryPage() {
             >{saving ? "Saving…" : "Save Changes"}</button>
 
           </div>
-        </div>
+        </Modal>
       )}
     </main>
   )
@@ -335,7 +336,7 @@ function PaymentRow({
 
   return (
     <div className={`bg-surface rounded-card border p-4 flex items-center gap-3 ${
-      isJustSaved ? "border-status-paid bg-tile-green" : "border-[#F0EDE9]"
+      isJustSaved ? "border-status-paid bg-tile-green" : "border-border"
     }`}>
       <div className="flex-1 min-w-0">
         {showTenant && (
@@ -346,17 +347,17 @@ function PaymentRow({
         )}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-sm font-extrabold text-ink">
-            ₹{Math.round(payment.amount).toLocaleString("en-IN")}
+            {rupeeExact(payment.amount)}
           </span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${methodColor}`}>
             {payment.method}
           </span>
-          <span className="text-[10px] text-ink-muted border border-[#E2DEDD] px-2 py-0.5 rounded-full">
+          <span className="text-[10px] text-ink-muted border border-border-strong px-2 py-0.5 rounded-full">
             {forLabel}
           </span>
         </div>
         <p className="text-[11px] text-ink-muted mt-0.5">
-          {payment.payment_date}{payment.period_month ? ` · for ${new Date(payment.period_month + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` : ""}
+          {payment.payment_date}{payment.period_month ? ` · for ${monthLabel(payment.period_month)}` : ""}
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
         {payment.upi_reference && (
@@ -366,7 +367,7 @@ function PaymentRow({
       </div>
       <button
         onClick={onEdit}
-        className="shrink-0 rounded-pill border border-[#E2DEDD] px-3 py-1.5 text-xs font-semibold text-ink"
+        className="shrink-0 rounded-pill border border-border-strong px-3 py-1.5 text-xs font-semibold text-ink"
       >Edit</button>
     </div>
   )

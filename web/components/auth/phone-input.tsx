@@ -25,7 +25,7 @@ export function PhoneInput({ onSubmit, loading, error }: PhoneInputProps) {
         <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
           WhatsApp Number
         </label>
-        <div className="flex items-center gap-2 bg-white border border-[#E2DEDD] rounded-pill px-4 py-3 focus-within:border-brand-pink transition-colors">
+        <div className="flex items-center gap-2 bg-white border border-border-strong rounded-pill px-4 py-3 focus-within:border-brand-pink transition-colors">
           <span className="text-ink-muted font-semibold text-sm select-none">+91</span>
           <input
             type="tel"

@@ -6,7 +6,11 @@ import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, authHeaders, BASE_URL, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { useAppConfig } from "@/lib/config"
+import { rupee } from "@/lib/format"
+import { PageHeader } from "@/components/ui/page-header"
 
+// NOT a display formatter — produces "YYYY-MM-DD" values to FILL date inputs.
+// Do not replace with lib/date fmtDate (which renders "5 Jan 2026").
 function formatDate(iso: string | null): string {
   if (!iso) return ""
   return iso.slice(0, 10)
@@ -154,26 +158,26 @@ export default function EditTenantPage() {
         // Room-only change: show the chosen this-month amount
         const monthName = new Date().toLocaleString("en-IN", { month: "short" })
         const thisMonthAmt = prorateChoice === "prorated"
-          ? `₹${proratedInfo.amount.toLocaleString("en-IN")} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
-          : `₹${Number(agreedRent).toLocaleString("en-IN")} full month`
+          ? `${rupee(proratedInfo.amount)} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
+          : `${rupee(Number(agreedRent))} full month`
         fields.push({ label: `${monthName} this month`, value: thisMonthAmt, highlight: true })
       }
     }
     if (changes.agreed_rent !== undefined) {
       const label = original?.stay_type === "daily" ? "Daily Rate (₹/night)" : "Agreed Rent (₹/mo)"
-      fields.push({ label, value: `₹${Number(changes.agreed_rent).toLocaleString("en-IN")}`, highlight: true })
+      fields.push({ label, value: rupee(Number(changes.agreed_rent)), highlight: true })
       if (proratedInfo) {
         const monthName = new Date().toLocaleString("en-IN", { month: "short" })
         const thisMonthAmt = prorateChoice === "prorated"
-          ? `₹${proratedInfo.amount.toLocaleString("en-IN")} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
-          : `₹${Number(changes.agreed_rent).toLocaleString("en-IN")} full month`
+          ? `${rupee(proratedInfo.amount)} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
+          : `${rupee(Number(changes.agreed_rent))} full month`
         fields.push({ label: `${monthName} this month`, value: thisMonthAmt })
       }
     }
     if (changes.security_deposit !== undefined)
-      fields.push({ label: "Security Deposit", value: `₹${Number(changes.security_deposit).toLocaleString("en-IN")}` })
+      fields.push({ label: "Security Deposit", value: rupee(Number(changes.security_deposit)) })
     if (changes.maintenance_fee !== undefined)
-      fields.push({ label: "Maintenance Fee", value: `₹${Number(changes.maintenance_fee).toLocaleString("en-IN")}` })
+      fields.push({ label: "Maintenance Fee", value: rupee(Number(changes.maintenance_fee)) })
     if (changes.lock_in_months !== undefined)
       fields.push({ label: "Lock-in Months", value: String(changes.lock_in_months) })
     if (changes.notice_date !== undefined)
@@ -253,7 +257,7 @@ export default function EditTenantPage() {
     setAdjSubmitting(true)
     try {
       const result = await patchAdjustment(tenancyId, -amt, adjNote.trim())
-      setAdjSuccess(`Waived ₹${amt.toLocaleString("en-IN")} — new dues ₹${Math.max(result.effective_due, 0).toLocaleString("en-IN")}`)
+      setAdjSuccess(`Waived ${rupee(amt)} — new dues ${rupee(Math.max(result.effective_due, 0))}`)
       setAdjAmount("")
       setAdjNote("")
       setAdjWarned(false)
@@ -306,13 +310,12 @@ export default function EditTenantPage() {
   if (loading) {
     return (
       <main className="min-h-screen bg-bg">
-        <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
-          <button onClick={() => router.back()} className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold">←</button>
-          <h1 className="text-lg font-extrabold text-ink">Edit Tenant</h1>
+        <div className="px-5 pt-12 bg-surface border-b border-border">
+          <PageHeader title="Edit Tenant" />
         </div>
         <div className="px-4 pt-6 flex flex-col gap-3 max-w-lg mx-auto">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-surface rounded-card border border-[#F0EDE9] h-14 animate-pulse" />
+            <div key={i} className="bg-surface rounded-card border border-border h-14 animate-pulse" />
           ))}
         </div>
       </main>
@@ -323,7 +326,7 @@ export default function EditTenantPage() {
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 gap-4">
         <p className="text-sm text-status-warn text-center">{fetchError}</p>
-        <button onClick={() => router.back()} className="rounded-pill border border-[#E2DEDD] px-6 py-3 text-sm font-semibold text-ink">
+        <button onClick={() => router.back()} className="rounded-pill border border-border-strong px-6 py-3 text-sm font-semibold text-ink">
           ← Go Back
         </button>
       </main>
@@ -333,9 +336,8 @@ export default function EditTenantPage() {
   if (success) {
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
-          <button onClick={() => router.push("/tenants")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Back">←</button>
-          <span className="text-base font-extrabold text-ink">Changes Saved</span>
+        <div className="fixed top-0 left-0 right-0 z-10 px-5 pt-10 bg-bg border-b border-border">
+          <PageHeader title="Changes Saved" backHref="/tenants" />
         </div>
         <div className="w-20 h-20 rounded-full bg-tile-green flex items-center justify-center">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -359,7 +361,7 @@ export default function EditTenantPage() {
   if (deleteSuccess) {
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-border">
           <span className="text-base font-extrabold text-ink">Tenant Deleted</span>
         </div>
         <div className="w-20 h-20 rounded-full bg-[#FEE2E2] flex items-center justify-center mt-8">
@@ -379,7 +381,7 @@ export default function EditTenantPage() {
         </button>
         <button
           onClick={() => router.push("/tenants")}
-          className="rounded-pill border border-[#E2DEDD] px-8 py-3 text-sm font-semibold text-ink"
+          className="rounded-pill border border-border-strong px-8 py-3 text-sm font-semibold text-ink"
         >
           Manage Tenants
         </button>
@@ -390,7 +392,7 @@ export default function EditTenantPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-border">
         <button
           onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
@@ -408,7 +410,7 @@ export default function EditTenantPage() {
 
       <div className="px-4 pt-4 pb-52 flex flex-col gap-4 max-w-lg mx-auto">
         {/* Room reassignment */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-2">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-2">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">Room</p>
           <input
             type="text"
@@ -416,7 +418,7 @@ export default function EditTenantPage() {
             onChange={(e) => { setRoomNumber(e.target.value); setRoomInfo(null) }}
             onBlur={(e) => checkRoomOccupancy(e.target.value)}
             placeholder="e.g. 219"
-            className={`w-full rounded-pill border bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors ${roomInfo?.is_full ? "border-status-warn" : "border-[#E2DEDD]"}`}
+            className={`w-full rounded-pill border bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors ${roomInfo?.is_full ? "border-status-warn" : "border-border-strong"}`}
           />
           {roomInfoLoading && <p className="text-[10px] text-ink-muted">Checking occupancy…</p>}
           {roomInfo && !roomInfoLoading && (
@@ -436,7 +438,7 @@ export default function EditTenantPage() {
         </div>
 
         {/* Personal details */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-4">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Personal Details</p>
 
           <div>
@@ -445,7 +447,7 @@ export default function EditTenantPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
 
@@ -455,7 +457,7 @@ export default function EditTenantPage() {
               type="text"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
 
@@ -466,13 +468,13 @@ export default function EditTenantPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="optional"
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
         </div>
 
         {/* Financial */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Financials</p>
             {original?.stay_type === "daily" && (
@@ -490,7 +492,7 @@ export default function EditTenantPage() {
                   inputMode="numeric"
                   value={dailyRate}
                   onChange={(e) => setDailyRate(e.target.value)}
-                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+                  className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
                 />
               </div>
               <div>
@@ -500,7 +502,7 @@ export default function EditTenantPage() {
                   inputMode="numeric"
                   value={securityDeposit}
                   onChange={(e) => setSecurityDeposit(e.target.value)}
-                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+                  className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
                 />
               </div>
             </>
@@ -513,7 +515,7 @@ export default function EditTenantPage() {
                   inputMode="numeric"
                   value={agreedRent}
                   onChange={(e) => setAgreedRent(e.target.value)}
-                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+                  className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
                 />
                 {rentChanged && (
                   <p className="text-xs text-status-warn mt-1.5 px-1">
@@ -524,7 +526,7 @@ export default function EditTenantPage() {
 
           {/* Proration toggle — shown whenever rent or room changes */}
           {proratedInfo && (
-            <div className="rounded-tile border border-[#E2DEDD] bg-[#FAFAF8] p-3 flex flex-col gap-2">
+            <div className="rounded-tile border border-border-strong bg-[#FAFAF8] p-3 flex flex-col gap-2">
               <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
                 This month ({new Date().toLocaleString("en-IN", { month: "long" })}) — {proratedInfo.remaining} of {proratedInfo.daysInMonth} days remaining
               </p>
@@ -535,10 +537,10 @@ export default function EditTenantPage() {
                   className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 transition-colors ${
                     prorateChoice === "full"
                       ? "bg-brand-pink text-white border-brand-pink"
-                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                      : "bg-bg text-ink-muted border-border-strong"
                   }`}
                 >
-                  Full ₹{Number(agreedRent).toLocaleString("en-IN")}
+                  Full {rupee(Number(agreedRent))}
                 </button>
                 <button
                   type="button"
@@ -546,10 +548,10 @@ export default function EditTenantPage() {
                   className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 transition-colors ${
                     prorateChoice === "prorated"
                       ? "bg-brand-pink text-white border-brand-pink"
-                      : "bg-bg text-ink-muted border-[#E0DDD8]"
+                      : "bg-bg text-ink-muted border-border-strong"
                   }`}
                 >
-                  Prorated ₹{proratedInfo.amount.toLocaleString("en-IN")}
+                  Prorated {rupee(proratedInfo.amount)}
                 </button>
               </div>
             </div>
@@ -562,7 +564,7 @@ export default function EditTenantPage() {
               inputMode="numeric"
               value={securityDeposit}
               onChange={(e) => setSecurityDeposit(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
 
@@ -573,7 +575,7 @@ export default function EditTenantPage() {
               inputMode="numeric"
               value={maintenanceFee}
               onChange={(e) => setMaintenanceFee(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
             </>
@@ -585,13 +587,13 @@ export default function EditTenantPage() {
               type="text"
               readOnly
               value={original ? String(original.booking_amount ?? 0) : ""}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink-muted outline-none cursor-default"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink-muted outline-none cursor-default"
             />
           </div>
         </div>
 
         {/* Stay details */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-4">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Details</p>
 
           <div>
@@ -606,7 +608,7 @@ export default function EditTenantPage() {
               inputMode="numeric"
               value={lockIn}
               onChange={(e) => setLockIn(e.target.value)}
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
 
@@ -617,7 +619,7 @@ export default function EditTenantPage() {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Any notes about this tenant or tenancy…"
-              className="w-full rounded-[16px] border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors resize-none"
+              className="w-full rounded-[16px] border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors resize-none"
             />
           </div>
         </div>
@@ -627,7 +629,7 @@ export default function EditTenantPage() {
           <div className="flex flex-col gap-2">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide px-1">Previous Stays</p>
             {prevStays.map((s) => (
-              <div key={s.tenancy_id} className="bg-[#F6F5F2] border border-[#E2DEDD] rounded-[16px] px-4 py-3 flex flex-col gap-1.5">
+              <div key={s.tenancy_id} className="bg-[#F6F5F2] border border-border-strong rounded-[16px] px-4 py-3 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-ink">Room {s.room_number} · {s.building_code}</span>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.status === "exited" ? "bg-[#E9F5EE] text-[#1A6B3A]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
@@ -635,7 +637,7 @@ export default function EditTenantPage() {
                   </span>
                 </div>
                 <p className="text-[11px] text-ink-muted">
-                  {s.checkin_date ?? "—"} → {s.checkout_date ?? "—"} · ₹{s.agreed_rent.toLocaleString("en-IN")}/{s.stay_type === "daily" ? "night" : "mo"}
+                  {s.checkin_date ?? "—"} → {s.checkout_date ?? "—"} · {rupee(s.agreed_rent)}/{s.stay_type === "daily" ? "night" : "mo"}
                 </p>
                 {s.notes ? (
                   <div className="mt-0.5 border-l-2 border-[#C8C2BC] pl-2.5">
@@ -650,12 +652,12 @@ export default function EditTenantPage() {
         )}
 
         {/* Balance Adjustment */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-3">
           <div className="flex justify-between items-center">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Balance Adjustment</p>
             {original && (
               <span className="text-[10px] text-ink-muted">
-                {original.period_month} · Due ₹{(original.rent_due + original.adjustment).toLocaleString("en-IN")}
+                {original.period_month} · Due {rupee(original.rent_due + original.adjustment)}
               </span>
             )}
           </div>
@@ -664,16 +666,16 @@ export default function EditTenantPage() {
           {original && (
             <div className="flex gap-2 text-[11px]">
               <span className="bg-[#F5F3F0] rounded-pill px-3 py-1 text-ink-muted">
-                Rent ₹{original.rent_due.toLocaleString("en-IN")}
+                Rent {rupee(original.rent_due)}
               </span>
               {original.adjustment !== 0 && (
                 <span className={`rounded-pill px-3 py-1 font-semibold ${original.adjustment < 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEF3C7] text-[#92400E]"}`}>
-                  {original.adjustment < 0 ? "−" : "+"}₹{Math.abs(original.adjustment).toLocaleString("en-IN")} {original.adjustment_note || ""}
+                  {original.adjustment < 0 ? "−" : "+"}{rupee(Math.abs(original.adjustment))} {original.adjustment_note || ""}
                 </span>
               )}
               {original.credit > 0 && (
                 <span className="bg-[#EFF6FF] rounded-pill px-3 py-1 font-semibold text-[#1D4ED8]">
-                  Credit ₹{original.credit.toLocaleString("en-IN")}
+                  Credit {rupee(original.credit)}
                 </span>
               )}
             </div>
@@ -687,7 +689,7 @@ export default function EditTenantPage() {
               value={adjAmount}
               onChange={(e) => { setAdjAmount(e.target.value); setAdjWarned(false); setAdjError("") }}
               placeholder="e.g. 5000"
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
 
@@ -698,14 +700,14 @@ export default function EditTenantPage() {
               value={adjNote}
               onChange={(e) => { setAdjNote(e.target.value); setAdjWarned(false); setAdjError("") }}
               placeholder="e.g. collected cash offline Apr 15 / water issue"
-              className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+              className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
             />
           </div>
 
           {/* Preview */}
           {adjAmount && !isNaN(parseFloat(adjAmount)) && parseFloat(adjAmount) > 0 && original && (
             <div className="rounded-tile bg-[#F5F3F0] px-3 py-2 text-xs text-ink-muted">
-              {`After waive: effective due ₹${Math.max(original.rent_due - parseFloat(adjAmount), 0).toLocaleString("en-IN")}`}
+              {`After waive: effective due ${rupee(Math.max(original.rent_due - parseFloat(adjAmount), 0))}`}
             </div>
           )}
 
@@ -729,15 +731,15 @@ export default function EditTenantPage() {
               type="button"
               onClick={handleClearAdjustment}
               disabled={adjSubmitting}
-              className={`rounded-pill py-2.5 text-sm font-bold w-full transition-colors disabled:opacity-40 ${clearWarned ? "bg-red-500 text-white" : "border border-[#E2DEDD] text-ink-muted bg-bg"}`}
+              className={`rounded-pill py-2.5 text-sm font-bold w-full transition-colors disabled:opacity-40 ${clearWarned ? "bg-red-500 text-white" : "border border-border-strong text-ink-muted bg-bg"}`}
             >
-              {adjSubmitting ? "Clearing…" : clearWarned ? "Confirm — clear adjustment?" : `Clear existing adjustment (₹${Math.abs(original.adjustment).toLocaleString("en-IN")})`}
+              {adjSubmitting ? "Clearing…" : clearWarned ? "Confirm — clear adjustment?" : `Clear existing adjustment (${rupee(Math.abs(original.adjustment))})`}
             </button>
           )}
         </div>
 
         {/* Notice */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-4">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-4">
           <div className="flex justify-between items-center">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notice</p>
             {noticeDate && (
@@ -788,7 +790,7 @@ export default function EditTenantPage() {
             <button
               type="button"
               onClick={() => { setNoticeDate(""); setExpectedCheckout("") }}
-              className="rounded-pill border border-[#E2DEDD] py-2.5 text-sm font-semibold text-status-warn w-full"
+              className="rounded-pill border border-border-strong py-2.5 text-sm font-semibold text-status-warn w-full"
             >
               Withdraw notice
             </button>
@@ -798,7 +800,7 @@ export default function EditTenantPage() {
         {error && <p className="text-xs text-status-warn font-medium text-center">{error}</p>}
 
         {/* Delete — admin danger zone */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] flex flex-col gap-3">
+        <div className="bg-surface rounded-card p-4 border border-border flex flex-col gap-3">
           <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Danger Zone</p>
           <div className="flex flex-wrap gap-2">
             {DELETE_REASONS.map((r) => (
@@ -844,7 +846,7 @@ export default function EditTenantPage() {
       </div>
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-[80px] left-0 right-0 px-4 pb-2 pt-3 bg-bg border-t border-[#F0EDE9]">
+      <div className="fixed bottom-[80px] left-0 right-0 px-4 pb-2 pt-3 bg-bg border-t border-border">
         <button
           onClick={handleReview}
           disabled={!!roomInfo?.is_full}
