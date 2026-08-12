@@ -2361,4 +2361,5 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
 async def redirect_to_pwa_bookings():
     """Redirects legacy admin onboarding page to PWA bookings page."""
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url='https://app.getkozzy.com/onboarding/bookings', status_code=302)
+    pwa_url = os.environ.get("PWA_URL", "https://app.getkozzy.com").rstrip("/")
+    return RedirectResponse(url=f'{pwa_url}/onboarding/bookings', status_code=302)

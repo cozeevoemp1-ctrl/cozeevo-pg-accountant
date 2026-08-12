@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ConfirmationCard } from "@/components/forms/confirmation-card"
-import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, authHeaders, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
+import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, authHeaders, BASE_URL, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { useAppConfig } from "@/lib/config"
 
@@ -40,7 +40,7 @@ export default function EditTenantPage() {
   // Room occupancy check
   const [roomInfo, setRoomInfo] = useState<{ occupied: number; max_occupancy: number; is_full: boolean; occupants: string[] } | null>(null)
   const [roomInfoLoading, setRoomInfoLoading] = useState(false)
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.getkozzy.com"
+  const API_URL = BASE_URL
 
   async function checkRoomOccupancy(room: string) {
     if (!room.trim() || room.trim() === original?.room_number) { setRoomInfo(null); return }

@@ -10,8 +10,12 @@ Each sheet has a blank "New Category" column with dropdown validation.
 Run: python scripts/export_reclassify.py
 Output: data/reports/reclassify_review.xlsx
 """
+import os
 from datetime import date
 from pathlib import Path
+
+from dotenv import load_dotenv
+load_dotenv()
 
 import psycopg2
 import psycopg2.extras
@@ -19,7 +23,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 
-DB = "postgresql://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+DB = os.environ["DATABASE_URL"].replace("+asyncpg", "")
 OUTPUT_PATH = Path("data/reports/reclassify_review.xlsx")
 
 VALID_CATEGORIES = [

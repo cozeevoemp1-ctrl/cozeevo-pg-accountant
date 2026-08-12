@@ -1,8 +1,10 @@
-import asyncio, asyncpg
+import asyncio, asyncpg, os
+from dotenv import load_dotenv
+load_dotenv()
 
 async def run():
     conn = await asyncpg.connect(
-        'postgresql://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres'
+        os.environ["DATABASE_URL"].replace("+asyncpg", "")
     )
 
     # All-time monthly exits

@@ -4,11 +4,14 @@ Run: venv/Scripts/python scripts/_apply_other_expenses_classifications.py
 """
 from __future__ import annotations
 import asyncio
+import os
 import sqlalchemy as sa
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-DB = "postgresql+asyncpg://postgres:Anchorstrong123!@db.oxiqomoilqwfxjauxhzp.supabase.co:5432/postgres"
+load_dotenv()
+DB = os.environ["DATABASE_URL"]
 
 # (db_id, category, sub_category)
 UPDATES = [

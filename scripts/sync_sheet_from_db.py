@@ -33,7 +33,7 @@ from src.database.models import (
 )
 # Canonical column list (single source of truth). Row width and column
 # letters are derived from this — never hardcoded.
-from src.integrations.gsheets import MONTHLY_HEADERS
+from src.integrations.gsheets import MONTHLY_HEADERS, FROZEN_MONTHS
 from src.services.rent_status import NO_SHOW, EXIT, PAID, PARTIAL
 
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -801,12 +801,9 @@ async def main(args):
     print("\nDone.")
 
 
-# Frozen months — DB is source of truth. These months are verified correct
-# and protected by the payments_freeze DB trigger. Do NOT re-sync without
-# explicit approval. Use --force-frozen only for deliberate corrections.
-FROZEN_MONTHS = {
-    (2025, 12), (2026, 1), (2026, 2), (2026, 3),
-}
+# Frozen months guard — single source: src.integrations.gsheets.FROZEN_MONTHS
+# (imported above). Do NOT re-sync those tabs without explicit approval;
+# use --force-frozen only for deliberate corrections.
 
 
 if __name__ == "__main__":

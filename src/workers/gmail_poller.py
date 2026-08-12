@@ -45,7 +45,19 @@ GMAIL_USER         = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 HULK_EMAIL_SUBJECT = os.getenv("HULK_EMAIL_SUBJECT", "HULK")
 THOR_EMAIL_SUBJECT = os.getenv("THOR_EMAIL_SUBJECT", "THOR")
-ADMIN_WHATSAPP     = os.getenv("ADMIN_WHATSAPP", "919000000000")
+# Single source: role_service allowlist (ADMIN_WHATSAPP env kept as override)
+def _admin_whatsapp() -> str:
+    override = os.getenv("ADMIN_WHATSAPP", "")
+    if override:
+        return override
+    try:
+        from src.whatsapp.role_service import get_primary_admin_phone
+        return get_primary_admin_phone(wa_format=True) or "919000000000"
+    except Exception:
+        return "919000000000"
+
+
+ADMIN_WHATSAPP = _admin_whatsapp()
 
 
 # ── IMAP helpers ──────────────────────────────────────────────────────────────

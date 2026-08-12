@@ -2569,7 +2569,9 @@ async def _dashboard_summary(entities: dict, ctx: CallerContext, session: AsyncS
         .where(Room.active == True, Room.is_staff_room == False)
     )).all()
 
-    total_beds = sum(r.max_occupancy or 1 for r, _ in room_rows)
+    # Canonical denominator — keeps bot numbers identical to PWA/Sheet
+    from src.services.occupancy import get_total_revenue_beds
+    total_beds = await get_total_revenue_beds(session)
     room_id_to_max = {r.id: (r.max_occupancy or 1) for r, _ in room_rows}
     room_id_to_bld = {
         r.id: ("THOR" if "THOR" in pn.upper() else "HULK")

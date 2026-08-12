@@ -97,3 +97,6 @@ media/
 
 scripts/_web_demo_data.json
 data/Private/
+
+# Debugging scratch file — may contain tokens/logs (video lesson: never commit)
+docs/specs/current-issues.md
