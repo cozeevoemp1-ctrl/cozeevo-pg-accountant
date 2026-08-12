@@ -14,7 +14,7 @@
 | # | Finding | Severity | Live now? | Verified |
 |---|---------|----------|-----------|----------|
 | C-1 | Public Supabase buckets (KYC IDs, signed agreements) with guessable paths | **CRITICAL** | ✅ YES (buckets `public=true` confirmed live) | live-checked |
-| C-2 | Privilege escalation via self-editable `user_metadata.role` | **CRITICAL** | ✅ YES | sandbox test reproduces it |
+| C-2 | Privilege escalation via self-editable `user_metadata.role` | ~~CRITICAL~~ **FIXED IN CODE 2026-08-12** (⏳ pending VPS deploy + re-login) | code reads `app_metadata` in all 5 sites; 7 guard tests pass | fixed + tested |
 | C-3 | Anon key wide-open grants; only empty-policy RLS deny-all protects tables | ~~MEDIUM~~ **RESOLVED 2026-08-11** | ✅ FIXED (anon/authenticated grants revoked, existing + future) | fix live-tested (anon → 401) |
 | H-1 | No upper bound on payment amount (₹12cr fat-finger accepted) | **HIGH** | ✅ YES | code-read |
 | H-2 | Refund cap validated against client-supplied deposit → cash drain | **HIGH** | ✅ YES | code-read |
@@ -75,6 +75,12 @@ await supabase.auth.updateUser({ data: { role: "admin" } })
 - There are **5 places** that read the role, not 1: `auth.py` (backend), `middleware.ts`, `auth-server.ts`, `auth-provider.tsx` (×2), `finance/page.tsx`. Missing any one leaves the UI half-broken even after a fresh login. The earlier attempt fixed only `auth.py` + `middleware.ts` → still broken.
 - Correct sequencing: (1) run the migration script `--write` FIRST so all accounts have `app_metadata.role`; (2) deploy code that reads `app_metadata` across all 5 files; (3) force every admin/staff to log out and back in immediately (their old token is now role-less). Do NOT add a `user_metadata` fallback "to be safe" — that reopens the vulnerability.
 - Sandbox test: simulate an old-token payload (role only in user_metadata) → must resolve to `tenant` (fail-closed); simulate app_metadata payload → admin. Both covered by `test_auth_role_source.py`. Note: the account migration was already run once this session (all 6 accounts have `app_metadata.role` set AND still have `user_metadata.role`), so step 1 is effectively done — but re-verify before deploy.
+
+**✅ FIXED IN CODE 2026-08-12 (commit on master; NOT yet deployed to VPS):**
+- All 5 read sites now read `role`/`org_id` from `app_metadata` only, no `user_metadata` fallback: `src/api/v2/auth.py` (backend), `web/middleware.ts`, `web/lib/auth-server.ts`, `web/components/auth/auth-provider.tsx` (×2), `web/app/finance/page.tsx`. Display-only `name` stays from `user_metadata`.
+- `tests/test_auth_role_source.py` (7 tests) passes, incl. the exploit case (`test_self_set_user_metadata_role_is_ignored`) and fail-closed (`test_user_metadata_only_token_fails_closed` → old token = tenant).
+- **Precondition re-verified 2026-08-12:** all 6 auth accounts have `app_metadata.role` (dry-run of `_migrate_role_to_app_metadata.py`); migrated 2026-08-08, so 4 days of hourly token refresh means live JWTs already carry `app_metadata.role` → the 403-storm risk that broke prod on 08-08 is now largely pre-mitigated.
+- **REMAINING deploy steps (Kiran-controlled):** (1) deploy backend (`update.sh` on VPS) + rebuild/redeploy PWA — must ship together, all 5 files; (2) have the 6 admin/staff log out & back in. Fix is fail-closed, so worst case for a stale token is one re-login, never a privilege leak. Backend fix is the real security boundary; frontend gates are UI-only (APIs verify the JWT regardless).
 
 ### C-3 — Anon key has wide-open table grants; only empty-policy RLS deny-all stands between the internet and all data
 **Downgraded from CRITICAL to MEDIUM after live testing — the breach is NOT currently exploitable, but the protection is one accidental policy away from failing.**

@@ -5,11 +5,13 @@ export async function getSession(): Promise<AuthSession | null> {
   const client = await createSupabaseServer();
   const { data } = await client.auth.getSession();
   if (!data.session) return null;
-  const meta = data.session.user.user_metadata ?? {};
+  // role from app_metadata ONLY (admin-API-writable). user_metadata is
+  // self-editable via supabase.auth.updateUser() → never trust it for privilege.
+  const appMeta = data.session.user.app_metadata ?? {};
   return {
     user: data.session.user,
     session: data.session,
     phone: data.session.user.phone ?? "",
-    role: (meta.role as AuthSession["role"]) ?? "tenant",
+    role: (appMeta.role as AuthSession["role"]) ?? "tenant",
   };
 }

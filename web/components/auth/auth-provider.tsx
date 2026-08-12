@@ -53,12 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load initial session
     client.auth.getSession().then(({ data }) => {
       if (data.session) {
-        const meta = data.session.user.user_metadata ?? {};
+        // role from app_metadata ONLY — user_metadata is self-editable.
+        const appMeta = data.session.user.app_metadata ?? {};
         setSession({
           user: data.session.user,
           session: data.session,
           phone: data.session.user.phone ?? "",
-          role: (meta.role as AuthSession["role"]) ?? "tenant",
+          role: (appMeta.role as AuthSession["role"]) ?? "tenant",
         });
       }
       setLoading(false);
@@ -67,12 +68,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: listener } = client.auth.onAuthStateChange((_event, sb_session) => {
       if (sb_session) {
-        const meta = sb_session.user.user_metadata ?? {};
+        // role from app_metadata ONLY — user_metadata is self-editable.
+        const appMeta = sb_session.user.app_metadata ?? {};
         setSession({
           user: sb_session.user,
           session: sb_session,
           phone: sb_session.user.phone ?? "",
-          role: (meta.role as AuthSession["role"]) ?? "tenant",
+          role: (appMeta.role as AuthSession["role"]) ?? "tenant",
         });
       } else {
         setSession(null);

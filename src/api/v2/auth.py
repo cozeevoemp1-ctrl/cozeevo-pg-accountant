@@ -72,16 +72,27 @@ def get_current_user(authorization: str = Header(default=None)) -> AppUser:
     except Exception as e:
         logger.warning("JWT validation failed: %s", e)
         raise HTTPException(status_code=401, detail="invalid token")
-    meta = payload.get("user_metadata") or {}
+    # Privilege fields (role, org_id) come from app_metadata ONLY.
+    # user_metadata is self-editable by the authenticated user via
+    # supabase.auth.updateUser(), so trusting it for role lets anyone grant
+    # themselves admin. app_metadata is writable only through the service-role
+    # Admin API (see scripts/create_auth_users.py).
+    #
+    # Deliberately NO fallback to user_metadata: a fallback would reopen the
+    # exact hole this closes. Tokens issued before the account migration have
+    # role only in user_metadata and will resolve to "tenant" here — that is
+    # why deploying this REQUIRES forcing a re-login (see docs/SECURITY_AUDIT.md).
+    app_meta = payload.get("app_metadata") or {}
+    user_meta = payload.get("user_metadata") or {}
     try:
-        org_id_val = int(meta.get("org_id", 1))
+        org_id_val = int(app_meta.get("org_id", 1))
     except (TypeError, ValueError):
         org_id_val = 1
     return AppUser(
         user_id=payload.get("sub", ""),
         phone=payload.get("phone", ""),
-        role=meta.get("role", "tenant"),
+        role=app_meta.get("role", "tenant"),
         org_id=org_id_val,
-        name=meta.get("name", ""),
+        name=user_meta.get("name", ""),   # display-only, safe to be self-edited
         email=payload.get("email", ""),
     )

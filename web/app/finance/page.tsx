@@ -33,7 +33,8 @@ export default function FinancePage() {
   // Admin gate — client-side check
   useEffect(() => {
     supabase().auth.getSession().then(({ data: s }) => {
-      const role = s.session?.user.user_metadata?.role
+      // role from app_metadata ONLY — user_metadata is self-editable.
+      const role = s.session?.user.app_metadata?.role
       if (role !== "admin") router.replace("/")
     })
   }, [router])

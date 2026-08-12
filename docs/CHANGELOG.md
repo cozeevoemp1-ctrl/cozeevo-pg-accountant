@@ -1,5 +1,22 @@
 # Changelog
 
+## Session AC — 2026-08-12 — C-2 privilege-escalation fixed in code (role from app_metadata)
+
+### Summary
+Fixed the C-2 critical from `docs/SECURITY_AUDIT.md` — the privilege-escalation bug where `role` was read from self-editable `user_metadata` (any logged-in user could `supabase.auth.updateUser({data:{role:'admin'}})` and become admin). This is the finding that broke prod on 2026-08-08 when fixed carelessly; done properly this time.
+
+### What changed (all 5 read sites, together — the 08-08 attempt fixed only 2)
+- `src/api/v2/auth.py` — `role`/`org_id` from `app_metadata` only, **no `user_metadata` fallback** (a fallback reopens the hole). `name` stays from `user_metadata` (display-only).
+- `web/middleware.ts`, `web/lib/auth-server.ts`, `web/components/auth/auth-provider.tsx` (×2), `web/app/finance/page.tsx` — all read `app_metadata.role`.
+- `tests/test_auth_role_source.py` — 7 guard tests ported from the `security-redo` sandbox; all pass. Covers the exploit (self-set user_metadata ignored) and fail-closed (old token → tenant).
+
+### Verification
+- 79 unit tests pass (pre-push set + auth + dues + cash). Frontend `tsc --noEmit` clean.
+- Precondition re-verified: all 6 auth accounts already have `app_metadata.role` (migrated 08-08). 4 days of hourly token refresh → live JWTs already carry it, so the 403-storm risk is largely pre-mitigated.
+
+### Deploy state — CODE ON MASTER, NOT YET ON VPS
+Deploy is manual (`deploy/update.sh` via SSH) — pushing to GitHub does not touch the live server. **Remaining Kiran-controlled steps:** (1) run `update.sh` on VPS + rebuild/redeploy the PWA (ship all 5 files together); (2) have the 6 admin/staff log out & back in. Fail-closed, so a stale token means one re-login, never a leak. Resolves C-2 in SECURITY_AUDIT.md (pending deploy).
+
 ## Session AB — 2026-08-11 — Supabase RLS exposure fixed + anon grants revoked (defense-in-depth)
 
 ### Summary
