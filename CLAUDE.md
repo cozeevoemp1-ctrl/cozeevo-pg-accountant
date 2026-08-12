@@ -85,7 +85,14 @@ python -m src.database.migrate_all
 # Audit logs — run after EVERY bank CSV import (P&L classification)
 python scripts/_generate_audit_logs.py   # → docs/DEPOSIT_REFUND_AUDIT.md + docs/SALARY_PAYMENT_AUDIT.md
 
-# VPS deploy
+# VPS deploy — AUTOMATIC. Every push to master fires a GitHub webhook →
+# kozzy-webhook.service on the VPS runs /opt/deploy.sh: git pull +
+# restart pg-accountant, and if web/ changed, npm run build + restart kozzy-pwa.
+# Pushing IS deploying. Do NOT ask Kiran to SSH or to "trigger" a deploy — and
+# do NOT ask permission to deploy. Claude cannot SSH from Windows (port 22 blocked);
+# the webhook doesn't need it. Verify live: curl https://api.getkozzy.com/healthz
+# (returns {"commit":"<sha>"} — compare to HEAD). If webhook fails: push an empty commit.
+# Manual fallback (Kiran only, Hostinger web console):
 cd /opt/pg-accountant && git pull && systemctl restart pg-accountant
 ```
 

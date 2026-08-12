@@ -1,5 +1,28 @@
 # Changelog
 
+## Session AD — 2026-08-12 — August P&L forecast (Google Sheet col N) + July P&L verification
+
+### August forecast (external — Kiran's "August FC" Google Sheet, tab "P&L — Full", column N)
+Built a data-driven August forecast in column N (left Kiran's manual col M untouched), written via the `cozeevo-sheets-bot` service account (sheet `1qDrj_lQctxmNgOflXDi_d3xI_roaTxKbMUjOoa8d8t4`, gid 1548899605).
+- **Method:** per-line **trailing-4-month median** (Apr–Jul), outliers/ramp-zeros excluded, totals computed from components. Plain all-history median was rejected — it produced a false ₹1.7L *loss* because medianing across the ramp-up (cash ₹3L→₹29L) lands mid-growth, not at current scale.
+- **Actuals override the median** wherever Kiran supplied them: Cash ₹28,62,450 (collection sheet), Property Rent ₹16L cash + ₹6.14L UPI, Electricity ₹2,66,570, Water ₹1,66,000.
+- **UPI income from the actual CSVs:** parsed `data/uploads/csv/Thor…` + `Hulk Thor…` (UPI-gateway COLLECTION reports, 20 Jul–12 Aug). Aug 1–12 = ₹15,05,180 (THOR ₹7.97L + HULK ₹7.08L); confirms Kiran's ₹16.5L full-month projection. **Double-count avoided** by counting each txn on its own date — Jul 20–31 receipts (₹1.36L) stay in July. Split ₹16.5L into r3/r8 by the 53:47 THOR:HULK ratio.
+- **Row 12 (deposits held)** fixed from a bogus median (−₹5.23L, past busy months) to August check-ins only: −₹1,85,000 (10 active + 7 pending, net dep−maint).
+- **Result:** col N net operating profit ≈ **₹7.7L (18.8%)**, converging with Kiran's col M (₹8.13L / 20.1%).
+- **Still open in the forecast:** r14 refunds to the 28 leaving (on median −₹2.3L; needs actual Aug vs Sep split), small opex lines on median.
+
+### July P&L verified REAL (₹14,00,408)
+Kiran suspected July was an outlier (~2× August). Independent reconstruction from source **reconciles to the rupee** (₹17.08L rebuild − ₹3.08L deposits-held = ₹14.00L). July income is clean rent (cash 99% rent, no one-offs; ₹79,900 Chandra loan correctly excluded as Non-Operating). **Key finding: July is NOT the outlier — Mar–May were overstated by ~₹15L each** because the ₹15.32L/mo cash rent to landlords was only added to the model from June. Jun/Jul are the first honest months. Aug < Jul is real: −₹4L income (churn) + ~₹2.6L higher summer utilities & rent hike.
+
+### Data-integrity issues surfaced (need Kiran's decision)
+- **`security_deposit` convention:** DB stores it *excluding* maintenance for onboarding-created tenants, but `finance.py`/row-12 subtracts maintenance again → row 12 understated. Contradicts the 2026-07-11 "deposit includes maintenance" rule. Unresolved.
+- **5 August "check-ins" are no_show/cancelled/pending in DB** (Prashant, Soumya, D Yaswanth, Ganesh Patil, Kishore Babu) — sheet counts them, DB doesn't.
+- **Sheet cash vs live DB drift** for Apr (−₹1.36L) / May (−₹84K); Jun/Jul tie exactly.
+- Collection sheet `1Vr_…` (August cash/UPI) NOT shared with `cozeevo-sheets-bot@…` — could not read it directly.
+
+### Repo change
+`CLAUDE.md` — documented that **VPS deploy is automatic on push** (webhook), so no SSH / no permission-to-deploy needed.
+
 ## Session AC (cont.) — 2026-08-12 — C-1 fixed: Supabase buckets made private + signed URLs (last critical closed)
 
 ### Summary
