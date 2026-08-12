@@ -6,6 +6,7 @@ import { ConfirmationCard } from "@/components/forms/confirmation-card"
 import { getTenantDues, patchTenant, patchAdjustment, deleteTenant, getPreviousStays, authHeaders, BASE_URL, TenantDues, PatchTenantBody, PreviousStay } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { useAppConfig } from "@/lib/config"
+import { monthShortName, monthLongName } from "@/lib/date"
 import { rupee } from "@/lib/format"
 import { PageHeader } from "@/components/ui/page-header"
 
@@ -156,7 +157,7 @@ export default function EditTenantPage() {
       fields.push({ label: "New Room", value: changes.room_number, highlight: true })
       if (proratedInfo && changes.agreed_rent === undefined) {
         // Room-only change: show the chosen this-month amount
-        const monthName = new Date().toLocaleString("en-IN", { month: "short" })
+        const monthName = monthShortName()
         const thisMonthAmt = prorateChoice === "prorated"
           ? `${rupee(proratedInfo.amount)} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
           : `${rupee(Number(agreedRent))} full month`
@@ -167,7 +168,7 @@ export default function EditTenantPage() {
       const label = original?.stay_type === "daily" ? "Daily Rate (₹/night)" : "Agreed Rent (₹/mo)"
       fields.push({ label, value: rupee(Number(changes.agreed_rent)), highlight: true })
       if (proratedInfo) {
-        const monthName = new Date().toLocaleString("en-IN", { month: "short" })
+        const monthName = monthShortName()
         const thisMonthAmt = prorateChoice === "prorated"
           ? `${rupee(proratedInfo.amount)} prorated (${proratedInfo.remaining}/${proratedInfo.daysInMonth} days)`
           : `${rupee(Number(changes.agreed_rent))} full month`
@@ -528,7 +529,7 @@ export default function EditTenantPage() {
           {proratedInfo && (
             <div className="rounded-tile border border-border-strong bg-[#FAFAF8] p-3 flex flex-col gap-2">
               <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">
-                This month ({new Date().toLocaleString("en-IN", { month: "long" })}) — {proratedInfo.remaining} of {proratedInfo.daysInMonth} days remaining
+                This month ({monthLongName()}) — {proratedInfo.remaining} of {proratedInfo.daysInMonth} days remaining
               </p>
               <div className="flex gap-2">
                 <button

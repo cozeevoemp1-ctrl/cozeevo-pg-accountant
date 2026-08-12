@@ -42,7 +42,7 @@ export function TabBar({ items, activeKey }: TabBarProps) {
               aria-label={item.label}
               className={clsx(
                 "flex items-center justify-center w-12 h-12 rounded-full transition-all duration-200",
-                isActive ? "bg-[#00AEED] text-white" : "text-[#8E8E93]",
+                isActive ? "bg-brand-blue text-white" : "text-[#8E8E93]",
               )}
             >
               {item.icon}

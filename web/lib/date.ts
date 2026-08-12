@@ -77,3 +77,13 @@ export function addMonths(ym: string, delta: number): string {
 export function periodMonth(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** Date (default now) → bare short month name, e.g. "Aug". */
+export function monthShortName(d: Date = new Date()): string {
+  return MONTHS_SHORT[d.getMonth()];
+}
+
+/** Date (default now) → bare long month name, e.g. "August". */
+export function monthLongName(d: Date = new Date()): string {
+  return MONTHS_LONG[d.getMonth()];
+}

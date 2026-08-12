@@ -3,6 +3,11 @@
 **The rule: before writing ANY new UI, check this file. If a primitive exists, import it.
 Never re-implement a formatter, overlay, header, or color. If a primitive is missing,
 add it HERE (lib/ or components/ui/) first, document it below, then use it.**
+
+**Enforced mechanically**: `scripts/check_ui_consistency.py` runs in the pre-push hook
+and blocks pushes containing tokened hexes, local INR formatters, inline `en-IN`
+currency, hand-rolled `fixed inset-0 bg-black` overlays, or re-derived API base URLs.
+Run it any time: `py -3 scripts/check_ui_consistency.py`.
 (Adopted 2026-08-12 after an audit found 15 INR formatters, 10 date formatters and
 11 hand-rolled modals. Consolidation lesson: duplicated copies diverge and grow bugs.)
 

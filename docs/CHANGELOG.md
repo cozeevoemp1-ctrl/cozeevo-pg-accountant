@@ -20,6 +20,9 @@ Found pre-existing bug: `bg-tile-yellow` (tenants Overdue tile) has no token —
 ### Verification
 `tsc --noEmit` clean; `npm run build` passes; zero mapped hexes / local INR formatters left outside orphans; formatter algorithm spot-verified on edge cases.
 
+### Enforcement (added after Kiran asked "will it stay this way?")
+`scripts/check_ui_consistency.py` — mechanical gate in the pre-push hook (blocks tokened hexes, local INR formatters, inline en-IN currency, hand-rolled modal backdrops, re-derived API URLs). First run caught 22 stragglers (ui/ primitives' own hexes, 3 month-name lookups, 1 false-positive click-catcher) — all fixed; `monthShortName`/`monthLongName` added to lib/date.ts. NOTE: the hook itself (.git/hooks/pre-push) is machine-local — on a fresh clone, re-add the ui-check call after the unit-test block.
+
 ## Session AE — 2026-08-12 — Best-practices adoption: secrets, single-source constants, security fixes, audit, dev branch
 
 Compared the spec-driven-AI-development video (transcript `data/uploads/14RP8liACqo.txt`) against the project; adopted the gaps.
