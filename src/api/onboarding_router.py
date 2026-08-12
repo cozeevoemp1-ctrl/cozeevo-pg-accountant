@@ -483,6 +483,15 @@ async def get_session_detail(token: str, request: Request):
                 approved_by_name = f"{staff.name} ({obs.approved_by_phone})"
 
         td = json.loads(obs.tenant_data) if obs.tenant_data else {}
+        # Buckets are private — re-sign stored KYC/agreement URLs so staff can view
+        # them (short-lived signed URLs). Passthrough-safe for base64/local values.
+        from src.services import storage as _storage
+        _sf = td.get("saved_files")
+        if isinstance(_sf, dict):
+            for _k in ("selfie", "id_proof", "signature"):
+                if _sf.get(_k):
+                    _sf[_k] = await _storage.sign_stored_url(_sf[_k])
+        _agreement_signed = await _storage.sign_stored_url(obs.agreement_pdf_path or "")
         return {
             "status": obs.status,
             "token": obs.token,
@@ -504,7 +513,7 @@ async def get_session_detail(token: str, request: Request):
             "sharing_type": obs.sharing_type or "",
             "tenant_data": td,
             "signature_image": obs.signature_image or "",
-            "agreement_pdf_path": obs.agreement_pdf_path or "",
+            "agreement_pdf_path": _agreement_signed or "",
             "checkout_date": obs.checkout_date.isoformat() if obs.checkout_date else "",
             "num_days": obs.num_days or 0,
             "daily_rate": float(obs.daily_rate or 0),
@@ -876,8 +885,11 @@ async def regen_pdf(token: str, request: Request):
         if send and obs.tenant_phone:
             try:
                 from src.whatsapp.webhook_handler import _send_whatsapp_document
-                base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-                pdf_url = f"{base_url}/static/{pdf_path}"
+                from src.services.storage import sign_stored_url as _sign
+                # pdf_path is a private-bucket Supabase URL. Meta fetches this link
+                # at send time, so a short-lived signed URL is sufficient. (Also
+                # fixes a pre-existing bug: the old /static/{url} concat was garbage.)
+                pdf_url = await _sign(pdf_path)
                 phone_wa = obs.tenant_phone.strip()
                 if not phone_wa.startswith("91"):
                     phone_wa = "91" + phone_wa
@@ -2180,8 +2192,10 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 from src.whatsapp.webhook_handler import (
                     _send_whatsapp_document, _send_whatsapp, _send_whatsapp_template,
                 )
-                # agreement_pdf_path is now a full Supabase Storage URL
-                pdf_url = obs.agreement_pdf_path
+                # agreement_pdf_path is a private-bucket Supabase URL — sign it so
+                # Meta can fetch it at send time (buckets are no longer public).
+                from src.services.storage import sign_stored_url as _sign
+                pdf_url = await _sign(obs.agreement_pdf_path)
 
                 phone_wa = obs.tenant_phone.strip()
                 if not phone_wa.startswith("91"):

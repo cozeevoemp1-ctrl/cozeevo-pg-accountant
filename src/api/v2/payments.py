@@ -19,6 +19,7 @@ from src.integrations.gsheets import trigger_monthly_sheet_sync, trigger_daywise
 from src.schemas.payments import PaymentCreate, PaymentEdit, PaymentListItem, PaymentResponse
 from src.services.payments import _resolve_payment_mode, log_payment
 from src.services.storage import BUCKET_RECEIPTS
+from src.services.storage import sign_stored_url
 from src.services.storage import upload as storage_upload
 
 logger = logging.getLogger(__name__)
@@ -212,7 +213,7 @@ async def list_payments(
                 payment_date=p.payment_date.strftime("%Y-%m-%d"),
                 notes=p.notes,
                 is_void=p.is_void,
-                receipt_url=p.receipt_url,
+                receipt_url=await sign_stored_url(p.receipt_url),
                 upi_reference=p.upi_reference,
                 tenant_name=tenant_name,
                 room_number=room_number,
@@ -390,7 +391,7 @@ async def edit_payment(
         payment_date=payment.payment_date.strftime("%Y-%m-%d"),
         notes=payment.notes,
         is_void=payment.is_void,
-        receipt_url=payment.receipt_url,
+        receipt_url=await sign_stored_url(payment.receipt_url),
         upi_reference=payment.upi_reference,
     )
 
@@ -554,4 +555,4 @@ async def upload_receipt(
         "[PWA] receipt uploaded: payment=%s txn_id=%s url=%s by=%s",
         payment_id, txn_id, url, user.phone,
     )
-    return {"payment_id": payment_id, "receipt_url": url, "transaction_id": txn_id}
+    return {"payment_id": payment_id, "receipt_url": await sign_stored_url(url), "transaction_id": txn_id}

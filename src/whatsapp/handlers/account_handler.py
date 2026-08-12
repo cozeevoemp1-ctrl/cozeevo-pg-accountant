@@ -1281,7 +1281,10 @@ async def resolve_query_receipt_step(
         ]
 
         if payment.receipt_url:
-            receipt_url = f"https://api.getkozzy.com/documents/{payment.receipt_url}"
+            # Private bucket — hand back a signed link (24h; staff opens it in a
+            # browser later). Also fixes the old broken /documents/{full_url} concat.
+            from src.services.storage import sign_stored_url
+            receipt_url = await sign_stored_url(payment.receipt_url, expires_in=86400)
             lines.append(f"\n[Receipt]({receipt_url})")
         else:
             lines.append("\n❌ No receipt uploaded for this payment.")
