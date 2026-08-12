@@ -7,7 +7,7 @@ One-off: three-way August-2026 CASH reconciliation.
            window the receipt book actually covers (21-Jul .. 31-Aug-2026).
            NOTE: the book's first 6 rows are dated 21-31 Jul but are August rent,
            so a plain "August only" window loses ~Rs 1.3L and shows false gaps.
-  GSHEET   data/uploads/csv/google sheet local excel.xlsx -> col 'Aug Cash'
+  GSHEET   data/uploads/csv/august 11.xlsx -> col 'Aug Cash'
 
 Output: data/reports/Aug2026_Cash_3Way_Reconciliation.xlsx
   Tab 1 'Reconciliation' — one row per tenant, three amount columns side by side
@@ -43,7 +43,7 @@ from src.database.db_manager import get_session, init_engine  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 RECEIPT_XLSX = ROOT / "data/uploads/csv/Cash -Kiran.xlsx"
-GSHEET_XLSX = ROOT / "data/uploads/csv/google sheet local excel.xlsx"
+GSHEET_XLSX = ROOT / "data/uploads/csv/august 11.xlsx"
 OUT_XLSX = ROOT / "data/reports/Aug2026_Cash_3Way_Reconciliation.xlsx"
 
 RECEIPT_SHEET = "CASH COLLECTION August-26"
