@@ -1,5 +1,25 @@
 # Changelog
 
+## Session AC (cont.) — 2026-08-12 — C-1 fixed: Supabase buckets made private + signed URLs (last critical closed)
+
+### Summary
+Closed C-1, the last and most serious `docs/SECURITY_AUDIT.md` critical — a **live PII breach**. `kyc-documents` and `agreements` buckets were `public=true`; anyone could download tenant govt IDs, selfies, signatures, and signed rental agreements by guessing object paths (live-verified: pulled a real agreement PDF with zero auth). Now private, served via short-lived signed URLs.
+
+### What changed
+- `src/services/storage.py` — `create_signed_url()` + `sign_stored_url()` (parses bucket/path out of the stored public URL and re-signs; passthrough-safe for base64/local/empty; fails open so a Storage hiccup degrades one image, never 500s the response). `ensure_bucket()` now creates buckets `public=False`.
+- Re-sign at every read path handing a URL to a viewer: `payments.py` list/detail/upload `receipt_url`; onboarding booking-detail KYC (`saved_files` selfie/id_proof/signature) + `agreement_pdf_path`; both WhatsApp agreement sends (approve flow + regenerate — the regenerate one also **fixes a pre-existing bug** where it concatenated `/static/` onto a full Supabase URL); WhatsApp "show receipt" link (24h expiry). Meta fetches document links at send time, so short-lived signed URLs suffice.
+- Staff-signature read already streams server-side via service key → private-safe, unchanged.
+- **No DB migration** — stored public URLs are re-signed on read.
+- `scripts/_flip_buckets_private.py` — flips the live buckets + `--verify` proves public 403 / signed 200.
+- `tests/test_storage_signed_url.py` — 5 tests (parse public/signed, passthrough non-Supabase, fail-open).
+
+### Deploy + verification (done, live)
+- Sequenced correctly: deployed signing code FIRST (signed URLs work on public buckets, zero breakage), confirmed live commit `5e751a9` via `/healthz`, live-tested the deployed `sign_stored_url()` on a real agreement URL (→ signed → GET 200), THEN flipped both buckets private.
+- **Live-verified closed:** public URL of a real agreement PDF + staff signature now return **HTTP 400** to unauthenticated requests; signed URLs return 200. `receipts` bucket doesn't exist yet (no PWA receipt uploaded) → born private on first upload.
+
+### Note
+All three audit criticals (C-1, C-2, C-3) are now resolved. Remaining audit items are lower severity (see SECURITY_AUDIT.md).
+
 ## Session AC — 2026-08-12 — C-2 privilege-escalation fixed in code (role from app_metadata)
 
 ### Summary

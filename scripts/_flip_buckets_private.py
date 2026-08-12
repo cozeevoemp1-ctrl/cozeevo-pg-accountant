@@ -44,7 +44,7 @@ def flip(write: bool):
             continue
         r = requests.put(f"{URL}/storage/v1/bucket/{b}", headers=H, json={"public": False}, timeout=15)
         r.raise_for_status()
-        print(f"  FLIPPED {b} → private")
+        print(f"  FLIPPED {b} -> private")
 
 
 def verify():

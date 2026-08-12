@@ -13,7 +13,7 @@
 
 | # | Finding | Severity | Live now? | Verified |
 |---|---------|----------|-----------|----------|
-| C-1 | Public Supabase buckets (KYC IDs, signed agreements) with guessable paths | **CRITICAL** | ✅ YES (buckets `public=true` confirmed live) | live-checked |
+| C-1 | Public Supabase buckets (KYC IDs, signed agreements) with guessable paths | ~~CRITICAL~~ **RESOLVED 2026-08-12** | ✅ FIXED — buckets `public=false` + signed URLs | public URL now 400, signed 200 (live) |
 | C-2 | Privilege escalation via self-editable `user_metadata.role` | ~~CRITICAL~~ **FIXED IN CODE 2026-08-12** (⏳ pending VPS deploy + re-login) | code reads `app_metadata` in all 5 sites; 7 guard tests pass | fixed + tested |
 | C-3 | Anon key wide-open grants; only empty-policy RLS deny-all protects tables | ~~MEDIUM~~ **RESOLVED 2026-08-11** | ✅ FIXED (anon/authenticated grants revoked, existing + future) | fix live-tested (anon → 401) |
 | H-1 | No upper bound on payment amount (₹12cr fat-finger accepted) | **HIGH** | ✅ YES | code-read |
@@ -38,7 +38,9 @@
 ## CRITICAL
 
 ### C-1 — Public Supabase buckets with guessable object paths → unauthenticated download of tenant government IDs, selfies, signatures, and signed agreements
-**Live-verified:** queried the production Storage API — `kyc-documents` and `agreements` are both `public=true` right now.
+**✅ RESOLVED 2026-08-12** — both buckets flipped `public=false`; served via short-lived signed URLs. Live-verified: the public URL of a real agreement PDF + staff signature now returns **400** to unauthenticated requests, signed URLs return 200. See CHANGELOG Session AC. Fix commit on master + deployed; buckets flipped via `scripts/_flip_buckets_private.py --write`.
+
+**Live-verified (original):** queried the production Storage API — `kyc-documents` and `agreements` are both `public=true` right now.
 **Where:** `src/services/storage.py:66` and `scripts/migrate_media_to_supabase.py:80` create every bucket `{"public": True}`. `public_url()` (`storage.py:46-48`) returns raw `.../object/public/{bucket}/{path}` URLs. **No `createSignedUrl` anywhere in the codebase.**
 **Guessable paths:**
 - Receipts: `{YYYY-MM}/{payment_id}.jpg` — `payment_id` is a **sequential integer** (`payments.py:541`).
