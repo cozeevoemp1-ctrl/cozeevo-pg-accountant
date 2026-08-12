@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { ocrReceiptPreview, uploadReceipt, OcrResult } from "@/lib/api"
+import { rupee } from "@/lib/format"
 
 export interface ReceiptScanResult {
   file: File
@@ -81,7 +82,7 @@ export function ReceiptScanner({ onScan, paymentId, onUploaded, compact = false 
           <span className="text-blue-600 text-xs font-semibold">Screenshot scanned ✓</span>
           {ocr?.amount && (
             <span className="ml-auto text-blue-700 text-xs font-extrabold">
-              ₹{ocr.amount.toLocaleString("en-IN")}
+              {rupee(ocr.amount)}
             </span>
           )}
           {ocr?.method && (
@@ -122,8 +123,8 @@ export function ReceiptScanner({ onScan, paymentId, onUploaded, compact = false 
         disabled={state === "scanning"}
         className={
           compact
-            ? "flex items-center gap-2 rounded-pill border border-[#E2DEDD] px-4 py-2 text-xs font-semibold text-ink-muted disabled:opacity-50 active:opacity-70"
-            : "w-full flex items-center justify-center gap-2 rounded-pill border border-[#E2DEDD] py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70"
+            ? "flex items-center gap-2 rounded-pill border border-border-strong px-4 py-2 text-xs font-semibold text-ink-muted disabled:opacity-50 active:opacity-70"
+            : "w-full flex items-center justify-center gap-2 rounded-pill border border-border-strong py-3 text-sm font-semibold text-ink disabled:opacity-50 active:opacity-70"
         }
       >
         <span className="text-base">📎</span>

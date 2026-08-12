@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getPnlAdjustments, savePnlAdjustments } from "@/lib/api";
-
-function currentMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+import { periodMonth } from "@/lib/date";
 
 const FIELDS: { key: "cash_holding" | "rent_paid_cash" | "cash_expense"; label: string; hint: string }[] = [
   { key: "cash_holding",   label: "Cash holding (physical)",     hint: "Cash in hand at month close — balance-sheet line" },
@@ -15,7 +11,7 @@ const FIELDS: { key: "cash_holding" | "rent_paid_cash" | "cash_expense"; label: 
 ];
 
 export function PnlAdjustmentsCard() {
-  const [month, setMonth] = useState(currentMonth());
+  const [month, setMonth] = useState(periodMonth());
   const [vals, setVals] = useState({ cash_holding: "", rent_paid_cash: "", cash_expense: "" });
   const [frozen, setFrozen] = useState(false);
   const [state, setState] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
@@ -60,7 +56,7 @@ export function PnlAdjustmentsCard() {
   }
 
   return (
-    <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3 flex flex-col gap-3">
+    <div className="bg-surface rounded-card border border-border px-4 py-3 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">
           P&amp;L · Manual cash figures
@@ -69,7 +65,7 @@ export function PnlAdjustmentsCard() {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-2 py-1 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+          className="text-xs rounded-pill bg-bg border border-border-strong px-2 py-1 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
         />
       </div>
 
@@ -78,7 +74,7 @@ export function PnlAdjustmentsCard() {
       </p>
 
       {frozen ? (
-        <div className="rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-[11px] text-ink-muted">
+        <div className="rounded-lg bg-bg border border-border-strong px-3 py-2 text-[11px] text-ink-muted">
           {month} is a verified frozen month — its figures are locked in the report.
         </div>
       ) : (
@@ -97,7 +93,7 @@ export function PnlAdjustmentsCard() {
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0"
                   disabled={state === "loading"}
-                  className="w-full text-base font-bold rounded-lg bg-[#F6F5F0] border border-[#E0DDD8] pl-7 pr-3 py-2 text-ink outline-none focus:ring-2 focus:ring-brand-pink disabled:opacity-50"
+                  className="w-full text-base font-bold rounded-lg bg-bg border border-border-strong pl-7 pr-3 py-2 text-ink outline-none focus:ring-2 focus:ring-brand-pink disabled:opacity-50"
                 />
               </div>
               <p className="text-[10px] text-ink-muted mt-0.5">{f.hint}</p>

@@ -1,12 +1,14 @@
 export function indianNumber(n: number): string {
-  const abs = Math.abs(n);
-  const s = abs.toString();
-  const last3 = s.slice(-3);
-  const rest = s.slice(0, -3);
+  // Decimal-safe: group only the integer part (lakh grouping), keep ≤2 decimals.
+  const fixed = Number.isInteger(n) ? Math.abs(n).toString() : Math.abs(n).toFixed(2);
+  const [intPart, fracPart] = fixed.split(".");
+  const last3 = intPart.slice(-3);
+  const rest = intPart.slice(0, -3);
   const withCommas = rest.length
     ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + last3
     : last3;
-  return n < 0 ? `-${withCommas}` : withCommas;
+  const out = fracPart ? `${withCommas}.${fracPart}` : withCommas;
+  return n < 0 ? `-${out}` : out;
 }
 
 export function rupee(n: number): string {

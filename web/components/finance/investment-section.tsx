@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getInvestments, type InvestmentsData } from "@/lib/api"
-
-const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN")
-const inrShort = (n: number) => {
-  const abs = Math.abs(n)
-  if (abs >= 100000) return `₹${(abs / 100000).toFixed(1)}L`
-  if (abs >= 1000) return `₹${(abs / 1000).toFixed(0)}K`
-  return inr(n)
-}
+import { rupeeExact, rupeeShort } from "@/lib/format"
 
 export function InvestmentSection() {
   const [data, setData] = useState<InvestmentsData | null>(null)
@@ -49,7 +42,7 @@ export function InvestmentSection() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">{inrShort(group.total)}</span>
+              <span className="text-sm font-bold text-white">{rupeeShort(group.total)}</span>
               <span className="text-ink-muted text-xs">{expanded === group.investor ? "▲" : "▼"}</span>
             </div>
           </button>
@@ -70,7 +63,7 @@ export function InvestmentSection() {
                       )}
                     </div>
                     <span className="text-xs font-semibold text-white shrink-0">
-                      {inr(row.amount)}
+                      {rupeeExact(row.amount)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -91,7 +84,7 @@ export function InvestmentSection() {
       {/* Grand total */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#0d1520] rounded-2xl border border-brand-pink/20">
         <span className="text-xs font-bold text-ink-muted uppercase tracking-wide">Total Invested</span>
-        <span className="text-base font-extrabold text-brand-pink">{inr(data.grand_total)}</span>
+        <span className="text-base font-extrabold text-brand-pink">{rupeeExact(data.grand_total)}</span>
       </div>
     </section>
   )

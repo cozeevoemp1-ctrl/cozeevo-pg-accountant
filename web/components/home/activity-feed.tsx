@@ -2,15 +2,12 @@
 
 import { useState } from "react";
 import { rupee } from "@/lib/format";
+import { fmtDateShort } from "@/lib/date";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { ActivityItem } from "@/lib/api";
 
 interface ActivityFeedProps {
   items: ActivityItem[];
-}
-
-function _shortDate(iso: string): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
 const METHOD_LABEL: Record<string, string> = {
@@ -44,11 +41,11 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
           placeholder="Name or room…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 text-xs rounded-pill bg-[#F6F5F0] border border-[#E0DDD8] px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
+          className="flex-1 text-xs rounded-pill bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-1 focus:ring-brand-pink"
         />
         <button
           onClick={() => setNewestFirst((v) => !v)}
-          className="flex-shrink-0 text-[10px] font-semibold px-3 py-2 rounded-pill border border-[#E0DDD8] bg-[#F6F5F0] text-ink-muted active:bg-[#EEDFE8] transition-colors"
+          className="flex-shrink-0 text-[10px] font-semibold px-3 py-2 rounded-pill border border-border-strong bg-bg text-ink-muted active:bg-[#EEDFE8] transition-colors"
         >
           {newestFirst ? "Newest ↓" : "Oldest ↑"}
         </button>
@@ -56,9 +53,9 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
 
       {/* List */}
       {filtered.length === 0 ? (
-        <p className="text-center text-sm text-ink-muted py-6">No payments found</p>
+        <EmptyState>No payments found</EmptyState>
       ) : (
-        <div className="flex flex-col divide-y divide-[#F0EDE9]">
+        <div className="flex flex-col divide-y divide-border">
           {filtered.map((item, i) => (
             <div key={i} className="flex items-center gap-3 py-3">
               <div className="w-9 h-9 rounded-full bg-tile-blue flex items-center justify-center text-sm font-bold text-[#0077B6] flex-shrink-0">
@@ -72,7 +69,7 @@ export function ActivityFeed({ items }: ActivityFeedProps) {
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-bold text-status-paid">{rupee(item.amount)}</p>
-                <p className="text-xs text-ink-muted">{_shortDate(item.payment_date)}</p>
+                <p className="text-xs text-ink-muted">{fmtDateShort(item.payment_date)}</p>
               </div>
             </div>
           ))}

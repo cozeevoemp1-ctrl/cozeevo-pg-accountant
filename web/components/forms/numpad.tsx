@@ -1,5 +1,7 @@
 "use client"
 
+import { rupee, indianNumber } from "@/lib/format"
+
 interface NumpadProps {
   value: string
   onChange: (value: string) => void
@@ -17,10 +19,10 @@ export function Numpad({ value, onChange, suggestAmounts = [] }: NumpadProps) {
     onChange(value + key)
   }
 
-  const display = value ? Number(value).toLocaleString("en-IN") : "0"
+  const display = value ? indianNumber(Number(value)) : "0"
 
   return (
-    <div className="bg-[#0F0E0D] rounded-tile p-4">
+    <div className="bg-ink rounded-tile p-4">
       <div className="text-center mb-3">
         <p className="text-xs font-semibold text-[#666] uppercase tracking-wide mb-1">Amount</p>
         <p className="text-4xl font-extrabold text-white tracking-tight">
@@ -41,7 +43,7 @@ export function Numpad({ value, onChange, suggestAmounts = [] }: NumpadProps) {
                   : "border-[#333] text-[#888]"
               }`}
             >
-              ₹{amt.toLocaleString("en-IN")}
+              {rupee(amt)}
             </button>
           ))}
         </div>

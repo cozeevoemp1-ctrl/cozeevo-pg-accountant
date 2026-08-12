@@ -2,17 +2,13 @@
 
 import { useState, useRef } from "react"
 import { searchTenants, TenantSearchResult } from "@/lib/api"
+import { rupee } from "@/lib/format"
+import { fmtDateShort } from "@/lib/date"
 
 // "10 Jun → 12 Jun" for a dated stay; "from 1 Jul" for open-ended; "" if no dates
 function fmtStay(t: TenantSearchResult): string {
-  const f = (iso?: string | null) => {
-    if (!iso) return ""
-    const [, m, d] = iso.split("-")
-    const mon = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m)]
-    return `${parseInt(d)} ${mon}`
-  }
-  const ci = f(t.checkin_date)
-  const co = f(t.checkout_date)
+  const ci = fmtDateShort(t.checkin_date)
+  const co = fmtDateShort(t.checkout_date)
   if (ci && co) return `${ci} → ${co}`
   if (ci) return `from ${ci}`
   return ""
@@ -83,14 +79,14 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
           onFocus={() => { clearTimeout(blurTimerRef.current); if (results.length > 0) setOpen(true) }}
           onBlur={() => { blurTimerRef.current = setTimeout(() => setOpen(false), 150) }}
           placeholder={placeholder}
-          className="w-full rounded-pill border border-[#E2DEDD] bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
+          className="w-full rounded-pill border border-border-strong bg-surface px-4 py-3 text-sm text-ink outline-none focus:border-brand-pink transition-colors"
         />
         {loading && (
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-muted text-xs">...</span>
         )}
       </div>
       {open && results.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full bg-surface rounded-tile shadow-lg border border-[#E2DEDD] max-h-56 overflow-y-auto">
+        <ul className="absolute z-20 mt-1 w-full bg-surface rounded-tile shadow-lg border border-border-strong max-h-56 overflow-y-auto">
           {results.map((t) => (
             <li
               key={t.tenancy_id}
@@ -104,7 +100,7 @@ export function TenantSearch({ onSelect, defaultValue = "", defaultTenant, place
                   {t.status === "exited" ? " · exited" : t.status === "no_show" ? " · upcoming" : ""}
                 </p>
               </div>
-              <span className="text-xs text-ink-muted">₹{t.rent.toLocaleString("en-IN")}{t.stay_type === "daily" ? "/day" : "/mo"}</span>
+              <span className="text-xs text-ink-muted">{rupee(t.rent)}{t.stay_type === "daily" ? "/day" : "/mo"}</span>
             </li>
           ))}
         </ul>

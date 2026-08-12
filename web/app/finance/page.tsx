@@ -8,6 +8,7 @@ import { ThreeStatementTab } from "@/components/finance/three-statement-tab"
 import { UploadCard } from "@/components/finance/upload-card"
 import { FinanceUploadResult, downloadPnlExcel } from "@/lib/api"
 import { PnlAdjustmentsCard } from "@/components/finance/pnl-adjustments-card"
+import { PageHeader } from "@/components/ui/page-header"
 import { supabase } from "@/lib/supabase"
 
 export default function FinancePage() {
@@ -47,13 +48,14 @@ export default function FinancePage() {
   return (
     <main className="flex flex-col gap-4 px-4 pt-6 pb-32 max-w-lg mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="text-ink-muted text-lg font-bold">←</button>
-        <h1 className="text-lg font-extrabold text-ink flex-1">Finance</h1>
-        <span className="text-[9px] font-bold px-2 py-1 rounded-full bg-tile-pink text-brand-pink uppercase tracking-wide">
-          Owner
-        </span>
-      </div>
+      <PageHeader
+        title="Finance"
+        right={
+          <span className="text-[9px] font-bold px-2 py-1 rounded-full bg-tile-pink text-brand-pink uppercase tracking-wide">
+            Owner
+          </span>
+        }
+      />
 
       <UploadCard onUploaded={handleUploaded} />
       {lastUpload && lastUpload.months_affected.length > 0 && (
@@ -63,12 +65,12 @@ export default function FinancePage() {
       )}
 
       {/* Generate full P&L Excel — identical to the verified accountant output */}
-      <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3 flex flex-col gap-2">
+      <div className="bg-surface rounded-card border border-border px-4 py-3 flex flex-col gap-2">
         <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Profit &amp; Loss</p>
         <button
           onClick={handleGeneratePnl}
           disabled={pnlState === "loading"}
-          className="flex items-center justify-center gap-2 rounded-pill bg-[#0F0E0D] py-3 text-sm font-bold text-white disabled:opacity-50 active:opacity-80"
+          className="flex items-center justify-center gap-2 rounded-pill bg-ink py-3 text-sm font-bold text-white disabled:opacity-50 active:opacity-80"
         >
           <span>📊</span>
           <span>{pnlState === "loading" ? "Generating…" : "Generate P&L (all uploaded months)"}</span>

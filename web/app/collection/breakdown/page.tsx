@@ -2,30 +2,10 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth-server";
 import { getCollectionSummary, getDepositsHeld } from "@/lib/api";
 import { rupee } from "@/lib/format";
+import { monthLabel, periodMonth, addMonths } from "@/lib/date";
 import { Card } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import Link from "next/link";
-
-function _periodMonth(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function _monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-}
-
-function _prevMonth(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  const d = new Date(y, m - 2, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function _nextMonth(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  const d = new Date(y, m, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 const METHOD_LABELS: Record<string, string> = {
   cash: "Cash",
@@ -43,12 +23,11 @@ export default async function CollectionBreakdownPage({
   if (!session) redirect("/login");
 
   const params = await searchParams;
-  const now = new Date();
-  const currentPeriod = _periodMonth(now);
+  const currentPeriod = periodMonth();
   const period = params.month ?? currentPeriod;
   const isCurrentMonth = period === currentPeriod;
-  const nextPeriod = _nextMonth(period);
-  const prevPeriod = _prevMonth(period);
+  const nextPeriod = addMonths(period, 1);
+  const prevPeriod = addMonths(period, -1);
 
   const token = session.session.access_token;
   let data;
@@ -69,7 +48,6 @@ export default async function CollectionBreakdownPage({
     );
   }
 
-  const monthLabel = _monthLabel(period);
   const methods = Object.entries(data.method_breakdown ?? {})
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
@@ -93,9 +71,9 @@ export default async function CollectionBreakdownPage({
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between bg-surface rounded-tile px-2 py-1 border border-[#E0DDD8]">
+      <div className="flex items-center justify-between bg-surface rounded-tile px-2 py-1 border border-border-strong">
         <Link href={`/collection/breakdown?month=${prevPeriod}`} className="flex items-center justify-center w-11 h-11 text-brand-pink font-bold text-2xl leading-none">‹</Link>
-        <span className="text-sm font-semibold text-ink">{monthLabel}</span>
+        <span className="text-sm font-semibold text-ink">{monthLabel(period, { long: true })}</span>
         <Link
           href={isCurrentMonth ? "#" : `/collection/breakdown?month=${nextPeriod}`}
           className={`flex items-center justify-center w-11 h-11 font-bold text-2xl leading-none ${isCurrentMonth ? "text-ink-muted opacity-30 pointer-events-none" : "text-brand-pink"}`}
@@ -182,7 +160,7 @@ export default async function CollectionBreakdownPage({
 
 function BackButton() {
   return (
-    <Link href="/" className="w-9 h-9 rounded-full bg-[#F0EDE9] flex items-center justify-center text-ink-muted flex-shrink-0" aria-label="Back">
+    <Link href="/" className="w-9 h-9 rounded-full bg-border flex items-center justify-center text-ink-muted flex-shrink-0" aria-label="Back">
       ←
     </Link>
   );
@@ -198,7 +176,7 @@ function Section({ title, accent, items, total, totalLabel, totalColor = "text-i
       <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${accent}`}>{title}</p>
       <div className="flex flex-col gap-0">
         {items.map((item) => (
-          <div key={item.label} className="flex justify-between py-2 border-b border-[#F0EDE9]">
+          <div key={item.label} className="flex justify-between py-2 border-b border-border">
             <span className="text-sm text-ink-muted">{item.label}</span>
             <span className={`text-sm font-semibold ${item.highlight === "due" ? "text-status-due" : item.highlight === "paid" ? "text-status-paid" : "text-ink"}`}>
               {rupee(item.value)}

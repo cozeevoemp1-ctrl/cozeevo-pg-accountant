@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth";
+import { Sheet } from "@/components/ui/modal";
 
 function SignOutSheet({ onClose }: { onClose: () => void }) {
   const router = useRouter();
@@ -13,21 +14,19 @@ function SignOutSheet({ onClose }: { onClose: () => void }) {
     router.replace("/login");
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-surface rounded-t-2xl px-5 pt-5 pb-10 flex flex-col gap-3">
-        <p className="text-sm font-bold text-ink text-center">Sign out?</p>
+    <Sheet open onClose={onClose} title="Sign out?">
+      <div className="flex flex-col gap-3">
         <p className="text-xs text-ink-muted text-center">You will need to log in again to use the app.</p>
         <button onClick={handleSignOut} disabled={loading}
           className="w-full rounded-pill bg-brand-pink py-3 text-white font-bold text-sm active:opacity-80 disabled:opacity-50">
           {loading ? "Signing out…" : "Sign out"}
         </button>
         <button onClick={onClose}
-          className="w-full rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
+          className="w-full rounded-pill border border-border-strong py-3 text-ink font-semibold text-sm">
           Cancel
         </button>
       </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -36,7 +35,7 @@ export function LogoutButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} title="Sign out"
-        className="w-9 h-9 rounded-full bg-bg border border-[#E2DEDD] flex items-center justify-center text-ink-muted active:opacity-70">
+        className="w-9 h-9 rounded-full bg-bg border border-border-strong flex items-center justify-center text-ink-muted active:opacity-70">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
           <polyline points="16 17 21 12 16 7"/>

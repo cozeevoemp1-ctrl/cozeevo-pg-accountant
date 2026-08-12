@@ -32,7 +32,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
   }
 
   return (
-    <div className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3 flex flex-col gap-3">
+    <div className="bg-surface rounded-card border border-border px-4 py-3 flex flex-col gap-3">
       <p className="text-[9px] font-bold text-ink-muted uppercase tracking-wide">Bank Statement</p>
 
       {/* Account selector */}
@@ -44,8 +44,8 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
             onClick={() => setAccount(a)}
             className={`flex-1 py-2 rounded-pill text-xs font-bold border transition-colors ${
               account === a
-                ? "bg-[#0F0E0D] text-white border-[#0F0E0D]"
-                : "bg-surface text-ink-muted border-[#E2DEDD]"
+                ? "bg-ink text-white border-ink"
+                : "bg-surface text-ink-muted border-border-strong"
             }`}
           >
             {a}
@@ -66,7 +66,7 @@ export function UploadCard({ onUploaded }: UploadCardProps) {
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={state === "uploading"}
-        className="flex items-center justify-center gap-2 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink disabled:opacity-50 active:opacity-70"
+        className="flex items-center justify-center gap-2 rounded-pill border border-border-strong py-2.5 text-xs font-semibold text-ink disabled:opacity-50 active:opacity-70"
       >
         <span>📎</span>
         <span>{state === "uploading" ? "Uploading…" : "Select CSV files"}</span>

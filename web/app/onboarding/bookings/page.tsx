@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { updateBookingSession, cancelBookingSession, authHeaders, BASE_URL } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
+import { rupee, rupeeExact } from "@/lib/format"
+import { fmtDate, fmtDateShort, monthLabel, periodMonth } from "@/lib/date"
 
 const API_URL = BASE_URL
 
@@ -39,14 +41,10 @@ interface Booking {
   current_occupants?: string[]
 }
 
-function fmtDate(iso: string) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-}
-
+/** rupee + "/day"|"/mo" suffix — thin wrapper over the canonical formatter. */
 function fmtRent(n?: number, stayType?: string) {
   if (!n) return "—"
-  return `₹${n.toLocaleString("en-IN")}${stayType === "daily" ? "/day" : "/mo"}`
+  return `${rupee(n)}${stayType === "daily" ? "/day" : "/mo"}`
 }
 
 function proratedRent(rent: number, checkinIso: string): number {
@@ -141,7 +139,7 @@ export default function BookingsPage() {
   const monthMatch  = (b: Booking) => monthFilter === "all" || (b.checkin_date ?? "").startsWith(monthFilter)
 
   // distinct months from bookings — current month onwards only (frozen past months excluded)
-  const currentYM = new Date().toISOString().slice(0, 7)
+  const currentYM = periodMonth()
   const distinctMonths = Array.from(new Set(bookings.map(b => (b.checkin_date ?? "").slice(0, 7)).filter(Boolean)))
     .filter(m => m >= currentYM)
     .sort()
@@ -153,7 +151,7 @@ export default function BookingsPage() {
   return (
     <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-border">
         <button onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
           aria-label="Back">←</button>
@@ -165,7 +163,7 @@ export default function BookingsPage() {
 
       <div className="px-4 pt-4 pb-32 max-w-lg mx-auto flex flex-col gap-3">
         {/* Search + filters */}
-        <div className="bg-surface rounded-card border border-[#F0EDE9] px-3 pt-3 pb-2 flex flex-col gap-2">
+        <div className="bg-surface rounded-card border border-border px-3 pt-3 pb-2 flex flex-col gap-2">
           <input
             type="text"
             value={filter}
@@ -202,16 +200,12 @@ export default function BookingsPage() {
                     className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors ${monthFilter === "all" ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
                     All months
                   </button>
-                  {distinctMonths.map(m => {
-                    const [y, mo] = m.split("-")
-                    const label = new Date(+y, +mo - 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
-                    return (
-                      <button key={m} onClick={() => setMonthFilter(m)}
-                        className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors ${monthFilter === m ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
-                        {label}
-                      </button>
-                    )
-                  })}
+                  {distinctMonths.map(m => (
+                    <button key={m} onClick={() => setMonthFilter(m)}
+                      className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors ${monthFilter === m ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
+                      {monthLabel(m)}
+                    </button>
+                  ))}
                 </div>
               )}
             </>
@@ -329,7 +323,7 @@ function ModeToggle({ mode, setMode }: { mode: "cash" | "upi"; setMode: (m: "cas
     <div className="flex gap-1 mt-1">
       {(["cash", "upi"] as const).map((m) => (
         <button key={m} onClick={() => setMode(m)}
-          className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${mode === m ? "bg-brand-pink text-white border-brand-pink" : "border-[#E0DDD8] text-ink-muted"}`}>
+          className={`px-2 py-0.5 rounded text-[9px] font-bold border transition-colors ${mode === m ? "bg-brand-pink text-white border-brand-pink" : "border-border-strong text-ink-muted"}`}>
           {m.toUpperCase()}
         </button>
       ))}
@@ -621,7 +615,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
   }
 
   return (
-    <div className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
+    <div className="bg-surface rounded-card border border-border p-4 flex flex-col gap-3">
       {/* Name + badges */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -657,24 +651,24 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
 
       {/* Details row */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+        <div className="bg-bg rounded-tile px-2.5 py-2">
           <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Room</p>
           <p className="text-xs font-bold text-ink mt-0.5">{b.room === "000" ? "TBD" : (b.room || "TBD")}</p>
         </div>
-        <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+        <div className="bg-bg rounded-tile px-2.5 py-2">
           <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Check-in</p>
           <p className="text-xs font-bold text-ink mt-0.5">{fmtDate(b.checkin_date)}</p>
         </div>
-        <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+        <div className="bg-bg rounded-tile px-2.5 py-2">
           <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Rent</p>
           {b.stay_type === "daily" ? (
             <>
               <p className="text-xs font-bold text-ink mt-0.5">
-                {b.daily_rate ? `₹${b.daily_rate.toLocaleString("en-IN")}/day` : "—"}
+                {b.daily_rate ? `${rupee(b.daily_rate)}/day` : "—"}
               </p>
               {b.booking_amount ? (
                 <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
-                  Adv: ₹{b.booking_amount.toLocaleString("en-IN")}
+                  Adv: {rupee(b.booking_amount)}
                 </p>
               ) : null}
             </>
@@ -683,7 +677,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <p className="text-xs font-bold text-ink mt-0.5">{fmtRent(b.stay_type === "daily" ? b.daily_rate : b.agreed_rent, b.stay_type)}</p>
               {b.agreed_rent && b.checkin_date && new Date(b.checkin_date).getDate() !== 1 && (
                 <p className="text-[9px] text-brand-pink font-semibold mt-0.5">
-                  1st mo: ₹{proratedRent(b.agreed_rent, b.checkin_date).toLocaleString("en-IN")}
+                  1st mo: {rupee(proratedRent(b.agreed_rent, b.checkin_date))}
                 </p>
               )}
             </>
@@ -710,8 +704,8 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
       {/* Pre-booked info line — show when booked and when link expires */}
       {isPending && !editing && (
         <p className="text-[10px] text-ink-muted -mt-1">
-          Booked {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
-          {b.expires_at ? ` · Link expires ${new Date(b.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
+          Booked {b.created_at ? fmtDateShort(b.created_at) : "—"}
+          {b.expires_at ? ` · Link expires ${fmtDateShort(b.expires_at)}` : ""}
         </p>
       )}
 
@@ -730,7 +724,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
 
       {/* Inline edit panel */}
       {editing && (
-        <div className="flex flex-col gap-2 border-t border-[#F0EDE9] pt-3">
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Edit booking</p>
             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-pill ${b.stay_type === "daily" ? "bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]" : "bg-[#D1FAE5] text-[#065F46] border border-[#A7F3D0]"}`}>
@@ -758,7 +752,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                     value={val}
                     onChange={(e) => set(e.target.value)}
                     placeholder={placeholder}
-                    className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                    className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                   />
                 )}
               </div>
@@ -769,18 +763,18 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             const total = days * parseFloat(editRent)
             return days > 0 ? (
               <p className="text-[10px] text-brand-pink font-semibold -mt-1">
-                Total: ₹{parseFloat(editRent).toLocaleString("en-IN")} × {days} days = ₹{total.toLocaleString("en-IN")}
+                Total: {rupeeExact(parseFloat(editRent))} × {days} days = {rupeeExact(total)}
               </p>
             ) : null
           })()}
           {b.stay_type !== "daily" && editCheckin && new Date(editCheckin).getDate() !== 1 && proRata > 0 && (
             <p className="text-[10px] text-brand-pink font-semibold -mt-1">
-              1st month rent: ₹{proRata.toLocaleString("en-IN")} (prorated from {new Date(editCheckin).getDate()} {new Date(editCheckin).toLocaleString("en-IN", { month: "short" })})
+              1st month rent: {rupee(proRata)} (prorated from {fmtDateShort(editCheckin)})
             </p>
           )}
           <div className="flex gap-2 pt-1">
             <button onClick={() => { setEditing(false); setErr("") }}
-              className="flex-1 rounded-pill border border-[#E2DEDD] py-2 text-xs font-semibold text-ink-muted">
+              className="flex-1 rounded-pill border border-border-strong py-2 text-xs font-semibold text-ink-muted">
               Cancel
             </button>
             <button onClick={saveEdit} disabled={saving}
@@ -793,40 +787,40 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
 
       {/* Collection at check-in (form-filled, expanded only) */}
       {!editing && isReady && expanded && (
-        <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
+        <div className="border-t border-border pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Agreed terms</p>
 
           {/* Reference info — display only */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+            <div className="bg-bg rounded-tile px-2.5 py-2">
               <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">
                 {b.stay_type === "daily" ? "Total stay" : "1st Month Rent"}
               </p>
               <p className="text-xs font-bold text-ink mt-0.5">
                 {b.stay_type === "daily"
-                  ? (b.daily_rate && b.num_days ? `₹${((b.daily_rate) * (b.num_days)).toLocaleString("en-IN")}` : "—")
-                  : (proRata ? `₹${proRata.toLocaleString("en-IN")}` : "—")}
+                  ? (b.daily_rate && b.num_days ? rupee(b.daily_rate * b.num_days) : "—")
+                  : (proRata ? rupee(proRata) : "—")}
               </p>
               <p className="text-[9px] text-ink-muted">
                 {b.stay_type === "daily" && b.daily_rate && b.num_days
-                  ? `₹${b.daily_rate.toLocaleString("en-IN")}/day × ${b.num_days} days`
+                  ? `${rupee(b.daily_rate)}/day × ${b.num_days} days`
                   : "Reference only"}
               </p>
             </div>
-            <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+            <div className="bg-bg rounded-tile px-2.5 py-2">
               <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Advance Paid</p>
               <p className="text-xs font-bold text-ink mt-0.5">
-                {b.booking_amount ? `₹${b.booking_amount.toLocaleString("en-IN")}` : "—"}
+                {b.booking_amount ? rupee(b.booking_amount) : "—"}
               </p>
               <p className="text-[9px] text-ink-muted">Auto-recorded · UPI</p>
             </div>
           </div>
 
           {/* Deposit — reference only, always UPI */}
-          <div className="bg-[#F6F5F0] rounded-tile px-2.5 py-2">
+          <div className="bg-bg rounded-tile px-2.5 py-2">
             <p className="text-[9px] text-ink-muted font-semibold uppercase tracking-wide">Deposit</p>
             <p className="text-xs font-bold text-ink mt-0.5">
-              {b.security_deposit ? `₹${b.security_deposit.toLocaleString("en-IN")}` : "—"}
+              {b.security_deposit ? rupee(b.security_deposit) : "—"}
             </p>
             <p className="text-[9px] text-ink-muted">Auto-recorded · UPI</p>
           </div>
@@ -841,7 +835,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 </label>
                 <input type="number" inputMode="decimal" value={collectRentDues} onChange={(e) => setCollectRentDues(e.target.value)}
                   onBlur={() => { if (collectRentDues === "" && defaultRentDues.current) setCollectRentDues(defaultRentDues.current) }}
-                  className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                  className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                 />
                 <ModeToggle mode={rentDuesMode} setMode={setRentDuesMode} />
               </div>
@@ -849,9 +843,9 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
                 <input type="number" inputMode="decimal" value={collectDepositDues} onChange={(e) => setCollectDepositDues(e.target.value)}
                   onBlur={() => { if (collectDepositDues === "" && defaultDepositDues.current) setCollectDepositDues(defaultDepositDues.current) }}
-                  className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
+                  className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink"
                 />
-                <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
+                <span className="text-[9px] font-bold text-brand-blue px-2 py-0.5 rounded border border-brand-blue/30 mt-1 inline-block">UPI</span>
               </div>
             </div>
           </div>
@@ -863,7 +857,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             const collecting = rd + dd
             const remaining = Math.max(0, totalDues - collecting)
             return (
-              <div className="rounded-tile bg-[#F6F5F0] px-3 py-2.5 flex flex-col gap-1">
+              <div className="rounded-tile bg-bg px-3 py-2.5 flex flex-col gap-1">
                 {[
                   { label: "Total outstanding", value: totalDues, muted: false, warn: false },
                   { label: "Collecting now",     value: collecting, muted: false, warn: false },
@@ -872,7 +866,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-[11px] text-ink-muted">{label}</span>
                     <span className={`text-[11px] font-bold ${warn ? "text-status-due" : muted ? "text-ink-muted" : "text-ink"}`}>
-                      ₹{value.toLocaleString("en-IN")}
+                      {rupeeExact(value)}
                     </span>
                   </div>
                 ))}
@@ -893,7 +887,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 {resending ? "Sending…" : "Regenerate & send →"}
               </button>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
-                className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED]">
+                className="px-4 rounded-pill border border-brand-blue py-2.5 text-xs font-semibold text-brand-blue">
                 Edit
               </button>
               {cancelConfirm ? (
@@ -903,7 +897,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
-                  className="px-3 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted">
+                  className="px-3 rounded-pill border border-border-strong py-2.5 text-xs font-semibold text-ink-muted">
                   Cancel
                 </button>
               )}
@@ -918,7 +912,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             /* Awaiting form: Copy link + Resend + Edit + Cancel */
             <>
               <a href={`${API_URL}/onboard/${b.token}`} target="_blank" rel="noopener noreferrer"
-                className="flex-1 text-center rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink active:opacity-70">
+                className="flex-1 text-center rounded-pill border border-border-strong py-2.5 text-xs font-semibold text-ink active:opacity-70">
                 Copy link →
               </a>
               <button onClick={doResend} disabled={resending}
@@ -926,7 +920,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 {resending ? "…" : "Resend"}
               </button>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
-                className="px-3 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED]">
+                className="px-3 rounded-pill border border-brand-blue py-2.5 text-xs font-semibold text-brand-blue">
                 Edit
               </button>
               {cancelConfirm ? (
@@ -936,7 +930,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
-                  className="px-3 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted">
+                  className="px-3 rounded-pill border border-border-strong py-2.5 text-xs font-semibold text-ink-muted">
                   Cancel
                 </button>
               )}
@@ -953,7 +947,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <p className="w-full text-[10px] text-ink-muted font-medium -mt-1">No room assigned yet — assign a room in the tenant profile to check in.</p>
               {b.tenancy_id && (
                 <a href={`/tenants/${b.tenancy_id}/edit`}
-                  className="flex-1 text-center rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                  className="flex-1 text-center rounded-pill border border-brand-blue py-2.5 text-xs font-semibold text-brand-blue active:opacity-70">
                   Edit tenant profile →
                 </a>
               )}
@@ -962,7 +956,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             /* Form filled: Edit + Cancel + Check In (expand to collect first) */
             <>
               <button onClick={() => { setEditing(true); setCancelConfirm(false); setErr("") }}
-                className="px-4 rounded-pill border border-[#00AEED] py-2.5 text-xs font-semibold text-[#00AEED] active:opacity-70">
+                className="px-4 rounded-pill border border-brand-blue py-2.5 text-xs font-semibold text-brand-blue active:opacity-70">
                 Edit
               </button>
               {cancelConfirm ? (
@@ -972,7 +966,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
                 </button>
               ) : (
                 <button onClick={() => setCancelConfirm(true)}
-                  className="px-4 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted active:opacity-70">
+                  className="px-4 rounded-pill border border-border-strong py-2.5 text-xs font-semibold text-ink-muted active:opacity-70">
                   Cancel
                 </button>
               )}
@@ -1026,7 +1020,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
 
       {/* Manual check-in — KYC entry by staff */}
       {manualOpen && (isPending || isExpired) && (
-        <div className="border-t border-[#F0EDE9] pt-3 flex flex-col gap-2">
+        <div className="border-t border-border pt-3 flex flex-col gap-2">
           <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">
             Manual check-in — enter tenant details
           </p>
@@ -1036,7 +1030,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Gender *</label>
               <select value={mGender} onChange={e => setMGender(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                 <option value="">Select…</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -1046,7 +1040,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Food *</label>
               <select value={mFood} onChange={e => setMFood(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                 <option value="Veg">Veg</option>
                 <option value="Non-Veg">Non-Veg</option>
               </select>
@@ -1055,17 +1049,17 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Date of Birth</label>
               <div className="grid grid-cols-3 gap-1">
                 <select value={mDobDay} onChange={e => { setMDobDay(e.target.value); const d=e.target.value,m=mDobMonth,y=mDobYear; if(d&&m&&y) setMDob(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`) }}
-                  className="text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                  className="text-xs rounded-tile bg-bg border border-border-strong px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                   <option value="">Day</option>
                   {Array.from({length:31},(_,i)=>i+1).map(d=><option key={d} value={d}>{d}</option>)}
                 </select>
                 <select value={mDobMonth} onChange={e => { setMDobMonth(e.target.value); const d=mDobDay,m=e.target.value,y=mDobYear; if(d&&m&&y) setMDob(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`) }}
-                  className="text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                  className="text-xs rounded-tile bg-bg border border-border-strong px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                   <option value="">Month</option>
                   {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
                 </select>
                 <select value={mDobYear} onChange={e => { setMDobYear(e.target.value); const d=mDobDay,m=mDobMonth,y=e.target.value; if(d&&m&&y) setMDob(`${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`) }}
-                  className="text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                  className="text-xs rounded-tile bg-bg border border-border-strong px-1.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                   <option value="">Year</option>
                   {Array.from({length:60},(_,i)=>new Date().getFullYear()-18-i).map(y=><option key={y} value={y}>{y}</option>)}
                 </select>
@@ -1074,7 +1068,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Occupation</label>
               <input type="text" value={mOccupation} onChange={e => setMOccupation(e.target.value)} placeholder="e.g. Engineer"
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
           </div>
 
@@ -1084,17 +1078,17 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div className="col-span-2">
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Name *</label>
               <input type="text" value={mEcName} onChange={e => setMEcName(e.target.value)} placeholder="Full name"
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Phone *</label>
               <input type="tel" value={mEcPhone} onChange={e => setMEcPhone(e.target.value)} placeholder="10 digits"
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Relation *</label>
               <select value={mEcRel} onChange={e => setMEcRel(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                 <option value="">Select…</option>
                 <option value="Parent">Parent</option>
                 <option value="Sibling">Sibling</option>
@@ -1126,10 +1120,10 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             />
             {mIdCardPreview ? (
               <div className="relative">
-                <img src={mIdCardPreview} alt="ID card" className="w-full rounded-tile border border-[#E0DDD8] max-h-40 object-contain bg-[#F6F5F0]" />
+                <img src={mIdCardPreview} alt="ID card" className="w-full rounded-tile border border-border-strong max-h-40 object-contain bg-bg" />
                 <button
                   onClick={() => idFileRef.current?.click()}
-                  className="absolute top-1 right-1 bg-white rounded-full px-2 py-0.5 text-[9px] font-semibold text-ink-muted border border-[#E0DDD8]"
+                  className="absolute top-1 right-1 bg-white rounded-full px-2 py-0.5 text-[9px] font-semibold text-ink-muted border border-border-strong"
                 >
                   Change
                 </button>
@@ -1137,7 +1131,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             ) : (
               <button
                 onClick={() => idFileRef.current?.click()}
-                className="w-full rounded-tile border-2 border-dashed border-[#E0DDD8] py-4 text-xs text-ink-muted font-semibold active:opacity-70"
+                className="w-full rounded-tile border-2 border-dashed border-border-strong py-4 text-xs text-ink-muted font-semibold active:opacity-70"
               >
                 Tap to upload ID card photo
               </button>
@@ -1162,7 +1156,7 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Type *</label>
               <select value={mIdType} onChange={e => setMIdType(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink">
                 <option value="">Select…</option>
                 <option value="Aadhaar">Aadhaar</option>
                 <option value="PAN">PAN</option>
@@ -1173,12 +1167,12 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">ID Number *</label>
               <input type="text" value={mIdNum} onChange={e => setMIdNum(e.target.value)} placeholder="e.g. 1234 5678 9012"
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
             <div className="col-span-2">
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Permanent Address</label>
               <input type="text" value={mAddress} onChange={e => setMAddress(e.target.value)} placeholder="City, State (auto-filled from ID)"
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
             </div>
           </div>
 
@@ -1188,21 +1182,21 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Rent (₹)</label>
               <input type="number" inputMode="decimal" value={mRentDues} onChange={e => setMRentDues(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
               <ModeToggle mode={mRentMode} setMode={setMRentMode} />
             </div>
             <div>
               <label className="text-[9px] font-semibold text-ink-muted uppercase tracking-wide block mb-0.5">Deposit (₹)</label>
               <input type="number" inputMode="decimal" value={mDepDues} onChange={e => setMDepDues(e.target.value)}
-                className="w-full text-xs rounded-tile bg-[#F6F5F0] border border-[#E0DDD8] px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
-              <span className="text-[9px] font-bold text-[#00AEED] px-2 py-0.5 rounded border border-[#00AEED]/30 mt-1 inline-block">UPI</span>
+                className="w-full text-xs rounded-tile bg-bg border border-border-strong px-2.5 py-2 text-ink outline-none focus:ring-1 focus:ring-brand-pink" />
+              <span className="text-[9px] font-bold text-brand-blue px-2 py-0.5 rounded border border-brand-blue/30 mt-1 inline-block">UPI</span>
             </div>
           </div>
 
           {/* Confirm */}
           <div className="flex gap-2 pt-1">
             <button onClick={() => { setManualOpen(false); setErr("") }}
-              className="flex-1 rounded-pill border border-[#E2DEDD] py-2.5 text-xs font-semibold text-ink-muted">
+              className="flex-1 rounded-pill border border-border-strong py-2.5 text-xs font-semibold text-ink-muted">
               Cancel
             </button>
             <button onClick={doManualCheckin} disabled={manualSaving}

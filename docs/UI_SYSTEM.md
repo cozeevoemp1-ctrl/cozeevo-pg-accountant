@@ -70,6 +70,14 @@ Never type a hex that has a token (`#E2DEDD` was an accidental fork of `#E0DDD8`
 `border-strong`). Missing a color? Add the token first.
 
 ## Known debt (accepted, don't copy the pattern)
+- `bg-tile-yellow` is used in app/tenants/page.tsx (Overdue tile) but has NO token in
+  tailwind.config.ts — the class silently resolves to nothing (pre-existing bug;
+  needs a design decision on the yellow).
+- Full-bleed sticky page headers (checkin/checkout/notices/operations, tenant edit)
+  keep their custom bars — PageHeader has no subtitle/kicker slot yet; add one before
+  migrating them.
+- Voice sheets keep their custom bottom-sheet roots (recording-lock backdrop,
+  drag handle) — migrate to `<Sheet>` only after it grows those affordances.
 - Finance dark-theme palette (`#080d14` family) is untokenised — tokenise when the
   finance tree is next reworked.
 - `date-picker-input` and `datetime-picker-input` share ~120 duplicated lines — merge

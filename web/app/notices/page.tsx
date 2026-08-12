@@ -6,13 +6,9 @@ import { getActiveNotices, patchTenant, NoticeItem } from "@/lib/api"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { useAppConfig } from "@/lib/config"
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—"
-  const [y, m, d] = iso.split("-")
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`
-}
+import { rupeeExact } from "@/lib/format"
+import { fmtDate, monthLabel, addMonths, periodMonth } from "@/lib/date"
+import { Modal } from "@/components/ui/modal"
 
 function freeFrom(checkout: string | null): string {
   if (!checkout) return "—"
@@ -21,14 +17,10 @@ function freeFrom(checkout: string | null): string {
   return fmtDate(d.toISOString().slice(0, 10))
 }
 
-function fmtINR(n: number): string {
-  return `₹${Math.round(n).toLocaleString("en-IN")}`
-}
-
 function daysLabel(days: number): { text: string; color: string } {
   if (days < 0)  return { text: `${Math.abs(days)}d overdue`, color: "text-status-warn" }
   if (days === 0) return { text: "Last day today",            color: "text-status-warn" }
-  if (days <= 3)  return { text: `${days}d left`,             color: "text-[#C25000]" }
+  if (days <= 3)  return { text: `${days}d left`,             color: "text-status-warn" }
   if (days <= 7)  return { text: `${days}d left`,             color: "text-[#F59E0B]" }
   return { text: `${days}d left`, color: "text-ink-muted" }
 }
@@ -38,9 +30,9 @@ function monthKey(iso: string): string {
   return iso.slice(0, 7)
 }
 
-function monthLabel(key: string): string {
-  const [, m] = key.split("-")
-  return ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m)]
+/** "2026-05" → "May" — month-only label for the compact filter chips. */
+function chipMonthLabel(key: string): string {
+  return monthLabel(key).split(" ")[0]
 }
 
 export default function NoticesPage() {
@@ -75,11 +67,8 @@ export default function NoticesPage() {
 
   // Rolling 4-month window starting from current month (never shows past months)
   const months = useMemo(() => {
-    const now = new Date()
-    return Array.from({ length: 4 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-    })
+    const now = periodMonth()
+    return Array.from({ length: 4 }, (_, i) => addMonths(now, i))
   }, [])
 
   const filtered = useMemo(() => {
@@ -166,7 +155,7 @@ export default function NoticesPage() {
   return (
     <main className="min-h-screen bg-bg pb-32">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9] sticky top-0 z-10">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-border sticky top-0 z-10">
         <button
           onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
@@ -198,15 +187,15 @@ export default function NoticesPage() {
       {/* Summary bar */}
       {!loading && items.length > 0 && (
         <div className="px-4 pt-3 pb-0 max-w-lg mx-auto flex gap-3">
-          <div className="flex-1 bg-surface rounded-xl border border-[#F0EDE9] px-3 py-2 text-center">
+          <div className="flex-1 bg-surface rounded-xl border border-border px-3 py-2 text-center">
             <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Beds freeing</p>
             <p className="text-base font-extrabold text-ink">{totalBeds}</p>
           </div>
-          <div className="flex-1 bg-surface rounded-xl border border-[#F0EDE9] px-3 py-2 text-center">
+          <div className="flex-1 bg-surface rounded-xl border border-border px-3 py-2 text-center">
             <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Full rooms</p>
             <p className="text-base font-extrabold text-brand-pink">{fullRooms}</p>
           </div>
-          <div className="flex-1 bg-surface rounded-xl border border-[#F0EDE9] px-3 py-2 text-center">
+          <div className="flex-1 bg-surface rounded-xl border border-border px-3 py-2 text-center">
             <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide">Tenants</p>
             <p className="text-base font-extrabold text-ink">{filtered.length}</p>
           </div>
@@ -255,7 +244,7 @@ export default function NoticesPage() {
                   : "bg-surface text-ink-muted border-[#E5E1DC]"
               }`}
             >
-              {monthLabel(mk)}
+              {chipMonthLabel(mk)}
             </button>
           ))}
         </div>
@@ -267,7 +256,7 @@ export default function NoticesPage() {
           const labels: Record<string, string> = { all: "All", full_room: "Full room", premium: "Premium", male: "Male", female: "Female", day_stay: "Day stay" }
           const colors: Record<string, string> = {
             all:       "bg-brand-pink text-white border-brand-pink",
-            full_room: "bg-[#FFF3E0] text-[#C25000] border-[#F5C78A]",
+            full_room: "bg-[#FFF3E0] text-status-warn border-[#F5C78A]",
             premium:   "bg-[#F3E8FF] text-[#7C3AED] border-[#D8B4FE]",
             male:      "bg-[#EFF6FF] text-[#1D4ED8] border-[#93C5FD]",
             female:    "bg-[#FDF2F8] text-[#BE185D] border-[#F9A8D4]",
@@ -297,13 +286,13 @@ export default function NoticesPage() {
           <div className="text-center text-xs text-status-warn py-6">{error}</div>
         )}
         {!loading && !error && items.length === 0 && (
-          <div className="bg-surface rounded-card border border-[#F0EDE9] p-8 text-center">
+          <div className="bg-surface rounded-card border border-border p-8 text-center">
             <p className="text-sm font-semibold text-ink-muted">No tenants on notice</p>
             <p className="text-xs text-ink-muted mt-1">Tenants who gave notice will appear here</p>
           </div>
         )}
         {!loading && !error && items.length > 0 && filtered.length === 0 && (
-          <div className="bg-surface rounded-card border border-[#F0EDE9] p-8 text-center">
+          <div className="bg-surface rounded-card border border-border p-8 text-center">
             <p className="text-sm font-semibold text-ink-muted">No matches</p>
           </div>
         )}
@@ -356,7 +345,7 @@ export default function NoticesPage() {
               {dailyItems.map(item => {
                 const dl = daysLabel(item.days_remaining)
                 return (
-                  <div key={item.tenancy_id} className="bg-surface rounded-card border border-[#F0EDE9] px-4 py-3 flex items-center justify-between gap-3">
+                  <div key={item.tenancy_id} className="bg-surface rounded-card border border-border px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-ink truncate">{item.tenant_name}</p>
                       <p className="text-xs text-ink-muted">Room {item.room_number} · Checkout {fmtDate(item.expected_checkout)}</p>
@@ -379,7 +368,7 @@ export default function NoticesPage() {
 
         {/* Legend */}
         {!loading && items.length > 0 && (
-          <div className="bg-surface rounded-card border border-[#F0EDE9] p-3 text-xs text-ink-muted">
+          <div className="bg-surface rounded-card border border-border p-3 text-xs text-ink-muted">
             <p className="font-semibold text-ink mb-1">Notice rules</p>
             <p>On/before {NOTICE_BY_DAY}th of month → vacate by month end, deposit refunded</p>
             <p className="mt-0.5">After {NOTICE_BY_DAY}th → notice applies to next month, full month&apos;s rent charged, deposit still refunded</p>
@@ -389,44 +378,25 @@ export default function NoticesPage() {
       </div>
 
       {/* Add Notice modal */}
-      {showSearch && (
-        <div className="fixed inset-0 flex items-center justify-center px-5" style={{ zIndex: 9999 }}>
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowSearch(false)} />
-          <div className="relative bg-bg rounded-2xl px-4 pt-4 pb-5 flex flex-col gap-4 w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-extrabold text-ink">Add Notice — select tenant</p>
-              <button onClick={() => setShowSearch(false)} className="text-ink-muted font-bold text-lg leading-none">✕</button>
-            </div>
-            <TenantSearch
-              placeholder="Search by name, room, phone…"
-              onSelect={(t) => {
-                setShowSearch(false)
-                router.push(`/tenants/${t.tenancy_id}/edit`)
-              }}
-            />
-            <p className="text-[10px] text-ink-muted text-center">
-              You&apos;ll be taken to the tenant edit page — scroll to the Notice section to set the date
-            </p>
-          </div>
+      <Modal open={showSearch} onClose={() => setShowSearch(false)} title="Add Notice — select tenant">
+        <div className="flex flex-col gap-4">
+          <TenantSearch
+            placeholder="Search by name, room, phone…"
+            onSelect={(t) => {
+              setShowSearch(false)
+              router.push(`/tenants/${t.tenancy_id}/edit`)
+            }}
+          />
+          <p className="text-[10px] text-ink-muted text-center">
+            You&apos;ll be taken to the tenant edit page — scroll to the Notice section to set the date
+          </p>
         </div>
-      )}
+      </Modal>
 
       {/* Edit Notice modal */}
       {editItem && (
-        <div className="fixed inset-0 flex items-center justify-center px-5" style={{ zIndex: 9999 }}>
-          <div className="absolute inset-0 bg-black/40" onClick={() => !editSaving && setEditItem(null)} />
-          <div className="relative bg-bg rounded-2xl px-4 pt-4 pb-5 flex flex-col gap-4 w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-extrabold text-ink">Edit Notice</p>
-              <button
-                onClick={() => setEditItem(null)}
-                disabled={editSaving}
-                className="text-ink-muted font-bold text-lg leading-none disabled:opacity-40"
-              >
-                ✕
-              </button>
-            </div>
-
+        <Modal open onClose={() => { if (!editSaving) setEditItem(null) }} title="Edit Notice">
+          <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs font-semibold text-ink">{editItem.tenant_name}</p>
               <p className="text-xs text-ink-muted">Room {editItem.room_number} · {editItem.phone}</p>
@@ -438,7 +408,7 @@ export default function NoticesPage() {
               </label>
               <DatePickerInput value={editDate} onChange={setEditDate} />
               <p className="text-[10px] text-ink-muted mt-0.5">
-                Notice given: {editItem?.notice_date ? new Date(editItem.notice_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                Notice given: {editItem?.notice_date ? fmtDate(editItem.notice_date) : "—"}
               </p>
             </div>
 
@@ -463,7 +433,7 @@ export default function NoticesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </main>
   )
@@ -484,14 +454,14 @@ function NoticeCard({
     : 0
 
   return (
-    <div className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-3">
+    <div className="bg-surface rounded-card border border-border p-4 flex flex-col gap-3">
       {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-sm font-bold text-ink truncate">{item.tenant_name}</p>
             {item.is_full_exit && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FFF3E0] text-[#C25000] flex-shrink-0">Full room</span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#FFF3E0] text-status-warn flex-shrink-0">Full room</span>
             )}
             {item.sharing_type === "premium" && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#F3E8FF] text-[#7C3AED] flex-shrink-0">Premium</span>
@@ -514,7 +484,7 @@ function NoticeCard({
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
             item.deposit_eligible
               ? "bg-tile-green text-status-paid"
-              : "bg-tile-orange text-[#C25000]"
+              : "bg-tile-orange text-status-warn"
           }`}>
             {item.deposit_eligible ? "Refundable" : "Forfeited"}
           </span>
@@ -527,10 +497,10 @@ function NoticeCard({
         <Detail label="Notice given" value={item.notice_date ? `${fmtDate(item.notice_date)} (${noticeDay! <= NOTICE_BY_DAY ? "on time" : "late"})` : "No notice given"} />
         <Detail label="Last day" value={fmtDate(item.expected_checkout)} />
         <Detail label="Free from" value={freeFrom(item.expected_checkout)} highlight />
-        <Detail label="Security deposit" value={fmtINR(item.security_deposit)} />
-        <Detail label="Agreed rent" value={`${fmtINR(item.agreed_rent)}/mo`} />
+        <Detail label="Security deposit" value={rupeeExact(item.security_deposit)} />
+        <Detail label="Agreed rent" value={`${rupeeExact(item.agreed_rent)}/mo`} />
         {item.deposit_eligible ? (
-          <Detail label="Est. refund" value={eligibleRefund > 0 ? fmtINR(eligibleRefund) : "₹0"} highlight />
+          <Detail label="Est. refund" value={eligibleRefund > 0 ? rupeeExact(eligibleRefund) : "₹0"} highlight />
         ) : (
           <Detail label="Est. refund" value="₹0 (forfeited)" warn />
         )}

@@ -44,7 +44,7 @@ export default function UpdatePasswordPage() {
               required
               minLength={8}
               autoComplete="new-password"
-              className="rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
+              className="rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink outline-none focus:border-brand-pink"
             />
           </div>
           {error && <p className="text-xs text-status-warn font-medium">{error}</p>}

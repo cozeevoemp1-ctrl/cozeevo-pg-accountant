@@ -41,12 +41,10 @@ export function Modal({ open, onClose, title, closeOnBackdrop = true, children }
         onClick={closeOnBackdrop ? onClose : undefined}
       />
       <div className="relative bg-surface rounded-card w-full max-w-md max-h-[85vh] overflow-y-auto p-5">
-        {(title || onClose) && (
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-ink">{title}</h2>
-            <CloseButton onClose={onClose} />
-          </div>
-        )}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          <CloseButton onClose={onClose} />
+        </div>
         {children}
       </div>
     </div>
@@ -66,12 +64,10 @@ export function Sheet({ open, onClose, title, closeOnBackdrop = true, children }
         className="relative bg-surface rounded-t-card w-full max-h-[85vh] overflow-y-auto p-5"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)" }}
       >
-        {(title || onClose) && (
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-ink">{title}</h2>
-            <CloseButton onClose={onClose} />
-          </div>
-        )}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          <CloseButton onClose={onClose} />
+        </div>
         {children}
       </div>
     </div>

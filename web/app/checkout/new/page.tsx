@@ -15,6 +15,8 @@ import {
 } from "@/lib/api"
 import { DatePickerInput } from "@/components/ui/date-picker-input"
 import { useAppConfig } from "@/lib/config"
+import { rupee, rupeeExact } from "@/lib/format"
+import { fmtDate, todayISO, nowTime } from "@/lib/date"
 
 type RefundMode = "CASH" | "UPI" | "BANK"
 
@@ -24,26 +26,6 @@ const REFUND_MODES: { value: RefundMode; label: string; icon: string }[] = [
   { value: "BANK", label: "Bank",  icon: "🏦" },
 ]
 
-function fmtINR(n: number) {
-  return `₹${Math.round(n).toLocaleString("en-IN")}`
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function nowTime(): string {
-  const now = new Date()
-  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`
-}
-
-function fmtDate(iso: string): string {
-  if (!iso) return "—"
-  const [y, m, d] = iso.split("-")
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  return `${d} ${months[parseInt(m) - 1]} ${y}`
-}
-
 function CheckBox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -52,7 +34,7 @@ function CheckBox({ label, checked, onChange }: { label: string; checked: boolea
       className="flex items-center gap-3 py-2.5 w-full text-left"
     >
       <span className={`w-5 h-5 rounded-[5px] flex items-center justify-center border-2 flex-shrink-0 transition-colors ${
-        checked ? "bg-brand-pink border-brand-pink" : "bg-bg border-[#E2DEDD]"
+        checked ? "bg-brand-pink border-brand-pink" : "bg-bg border-border-strong"
       }`}>
         {checked && (
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -210,7 +192,7 @@ function NewCheckoutPage() {
     if (!prefetch) { setError("Loading tenant details…"); return }
     if (refundAmount > 0 && !refundMode) { setError("Select refund mode"); return }
     if (totalPendingDues > 0 && !duesWarned) {
-      setError(`Tenant has ₹${totalPendingDues.toLocaleString("en-IN")} unpaid dues. Tap again to proceed anyway.`)
+      setError(`Tenant has ${rupeeExact(totalPendingDues)} unpaid dues. Tap again to proceed anyway.`)
       setDuesWarned(true)
       return
     }
@@ -274,7 +256,7 @@ function NewCheckoutPage() {
 
     return (
       <main className="min-h-screen bg-bg flex flex-col items-center px-6 gap-5 pt-16 pb-32">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-[#F0EDE9]">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center gap-3 px-5 pt-10 pb-3 bg-bg border-b border-border">
           <button onClick={() => router.push("/")} className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-ink-muted font-bold" aria-label="Home">←</button>
           <span className="text-base font-extrabold text-ink">Checkout Initiated</span>
         </div>
@@ -283,28 +265,28 @@ function NewCheckoutPage() {
           <h1 className="text-xl font-extrabold text-ink">Checkout Initiated!</h1>
           <p className="text-sm text-ink-muted mt-1">WhatsApp sent · Link shared with tenant</p>
         </div>
-        <div className="w-full max-w-sm bg-surface rounded-card border border-[#F0EDE9] p-4 flex flex-col gap-2">
+        <div className="w-full max-w-sm bg-surface rounded-card border border-border p-4 flex flex-col gap-2">
           <Row label="Tenant"           value={tenant.name} />
           <Row label="Room"             value={tenant.room_number} />
           <Row label="Checkout date"    value={fmtDate(checkoutDate)} />
-          <Row label="Security deposit" value={fmtINR(prefetch.security_deposit)} />
-          <Row label="Maintenance fee"  value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
+          <Row label="Security deposit" value={rupeeExact(prefetch.security_deposit)} />
+          <Row label="Maintenance fee"  value={`− ${rupeeExact(prefetch.maintenance_fee)}`} />
           {totalPendingDues > 0 && (
-            <Row label="Unpaid rent" value={`− ${fmtINR(totalPendingDues)}`} />
+            <Row label="Unpaid rent" value={`− ${rupeeExact(totalPendingDues)}`} />
           )}
           {deductionsNum > 0 && (
-            <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
+            <Row label="Deductions" value={`− ${rupeeExact(deductionsNum)}`} />
           )}
           <Row label="Refund amount"
-               value={refundAmount > 0 ? `${fmtINR(refundAmount)} (${refundMode})` : "₹0 (no refund)"}
+               value={refundAmount > 0 ? `${rupeeExact(refundAmount)} (${refundMode})` : "₹0 (no refund)"}
                pink={refundAmount > 0} />
-          <div className="border-t border-[#F0EDE9] pt-2 mt-1">
+          <div className="border-t border-border pt-2 mt-1">
             <p className={`text-xs font-semibold text-center ${statusColor}`}>{statusLabel}</p>
           </div>
         </div>
         <div className="flex gap-3 w-full max-w-sm">
           <button onClick={resetForm}
-            className="flex-1 rounded-pill border border-[#E2DEDD] py-3 text-ink font-semibold text-sm">
+            className="flex-1 rounded-pill border border-border-strong py-3 text-ink font-semibold text-sm">
             + New
           </button>
           <button onClick={() => router.push("/")}
@@ -320,7 +302,7 @@ function NewCheckoutPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
+      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-border">
         <button onClick={() => router.back()}
           className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
           aria-label="Back">
@@ -333,7 +315,7 @@ function NewCheckoutPage() {
 
         {/* Tenant — locked banner when navigated from KPI tile, search otherwise */}
         {tenantFromUrl && tenant ? (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Tenant</p>
             <div className="flex items-center justify-between">
               <div>
@@ -349,7 +331,7 @@ function NewCheckoutPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <TenantSearch
               key={tenant?.tenancy_id ?? "empty"}
               defaultTenant={tenant ?? undefined}
@@ -361,7 +343,7 @@ function NewCheckoutPage() {
 
         {/* Checkout date (+ time for day-wise) */}
         {tenant && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               Checkout Date
             </p>
@@ -375,7 +357,7 @@ function NewCheckoutPage() {
                   type="time"
                   value={checkoutTime}
                   onChange={(e) => setCheckoutTime(e.target.value)}
-                  className="w-full rounded-pill border border-[#E2DEDD] bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
+                  className="w-full rounded-pill border border-border-strong bg-bg px-4 py-2.5 text-sm text-ink font-semibold outline-none focus:border-brand-pink"
                 />
               </div>
             )}
@@ -384,7 +366,7 @@ function NewCheckoutPage() {
 
         {/* Day-wise stay summary: check-in time + nights + extra stay */}
         {prefetch && !loadingPre && isDaily && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <div className="flex items-center gap-2 mb-3">
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Stay Summary</p>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-tile-blue text-brand-blue">Day-wise</span>
@@ -395,15 +377,15 @@ function NewCheckoutPage() {
               )}
               <Row label="Booked checkout" value={prefetch.booked_checkout_date ? fmtDate(prefetch.booked_checkout_date) : "—"} />
               <Row label="Checkout time"   value={checkoutTime} />
-              <Row label="Daily rate"      value={`${fmtINR(prefetch.daily_rate ?? 0)} / night`} />
+              <Row label="Daily rate"      value={`${rupeeExact(prefetch.daily_rate ?? 0)} / night`} />
               {nightsDiff > 0 && (
                 <>
-                  <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
-                    <Row label={`Extra nights (${nightsDiff})`} value={`+ ${fmtINR(nightsAdjustment)}`} pink />
+                  <div className="border-t border-border pt-1.5 mt-0.5">
+                    <Row label={`Extra nights (${nightsDiff})`} value={`+ ${rupeeExact(nightsAdjustment)}`} pink />
                   </div>
                   <div className="rounded-tile bg-tile-orange px-3 py-2 text-xs font-medium text-[#7A3300]">
                     Stayed {nightsDiff} extra night{nightsDiff > 1 ? "s" : ""} beyond booked checkout.
-                    {fmtINR(nightsAdjustment)} added to dues.
+                    {rupeeExact(nightsAdjustment)} added to dues.
                   </div>
                 </>
               )}
@@ -418,14 +400,14 @@ function NewCheckoutPage() {
         )}
 
         {loadingPre && tenant && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9] text-xs text-ink-muted text-center">
+          <div className="bg-surface rounded-card p-4 border border-border text-xs text-ink-muted text-center">
             Loading tenant details…
           </div>
         )}
 
         {/* Physical handover checklist */}
         {prefetch && !loadingPre && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-1">
               Handover Checklist
             </p>
@@ -441,7 +423,7 @@ function NewCheckoutPage() {
                 onChange={(e) => setDamageNotes(e.target.value)}
                 placeholder="Describe damage or issues…"
                 rows={2}
-                className="mt-3 w-full rounded-tile border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink resize-none"
+                className="mt-3 w-full rounded-tile border border-border-strong bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink resize-none"
               />
             )}
             <div className="mt-3">
@@ -451,7 +433,7 @@ function NewCheckoutPage() {
                 onChange={(e) => setComments(e.target.value)}
                 placeholder="Any notes about this checkout (optional)…"
                 rows={2}
-                className="w-full rounded-tile border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink resize-none"
+                className="w-full rounded-tile border border-border-strong bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink resize-none"
               />
             </div>
           </div>
@@ -504,7 +486,7 @@ function NewCheckoutPage() {
                       Notice on {fmtDate(nd)} — Deposit Refundable
                     </p>
                     <p className="text-xs font-semibold mt-0.5">
-                      {fmtINR(Math.max(0, prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues))} to return
+                      {rupeeExact(Math.max(0, prefetch.security_deposit - prefetch.maintenance_fee - prefetch.pending_dues))} to return
                     </p>
                     {expectedLastDay && (
                       <p className="text-[10px] mt-0.5 opacity-80">Last day: {fmtDate(expectedLastDay)}</p>
@@ -518,11 +500,11 @@ function NewCheckoutPage() {
                 className={`flex items-center justify-between px-3 py-2.5 rounded-card border-2 text-xs font-semibold transition-colors ${
                   manualForfeit
                     ? "border-status-warn bg-[#FFF0F0] text-status-warn"
-                    : "border-[#E2DEDD] bg-surface text-ink-muted"
+                    : "border-border-strong bg-surface text-ink-muted"
                 }`}
               >
                 <span>Emergency exit — forfeit deposit</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${manualForfeit ? "bg-status-warn text-white" : "bg-[#E2DEDD] text-ink-muted"}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-pill ${manualForfeit ? "bg-status-warn text-white" : "bg-border-strong text-ink-muted"}`}>
                   {manualForfeit ? "ON" : "OFF"}
                 </span>
               </button>
@@ -532,26 +514,26 @@ function NewCheckoutPage() {
 
         {/* Financial summary */}
         {prefetch && !loadingPre && (
-          <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+          <div className="bg-surface rounded-card p-4 border border-border">
             <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
               Refund Calculation
             </p>
             <div className="flex flex-col gap-1.5 mb-3">
-              <Row label="Security deposit"  value={fmtINR(prefetch.security_deposit)} />
-              <Row label="Maintenance fee"   value={`− ${fmtINR(prefetch.maintenance_fee)}`} />
+              <Row label="Security deposit"  value={rupeeExact(prefetch.security_deposit)} />
+              <Row label="Maintenance fee"   value={`− ${rupeeExact(prefetch.maintenance_fee)}`} />
               {totalPendingDues > 0 && (
                 <Row
                   label={nightsDiff > 0 ? `Unpaid rent + ${nightsDiff} extra night${nightsDiff > 1 ? "s" : ""}` : nightsDiff < 0 ? `Dues (${Math.abs(nightsDiff)} nights early)` : "Unpaid rent"}
-                  value={`− ${fmtINR(totalPendingDues)}`}
+                  value={`− ${rupeeExact(totalPendingDues)}`}
                 />
               )}
               {!depositForfeited && deductionsNum > 0 && (
-                <Row label="Deductions" value={`− ${fmtINR(deductionsNum)}`} />
+                <Row label="Deductions" value={`− ${rupeeExact(deductionsNum)}`} />
               )}
               {depositForfeited && (
-                <Row label="Deposit forfeiture" value={`− ${fmtINR(prefetch.security_deposit)}`} muted />
+                <Row label="Deposit forfeiture" value={`− ${rupeeExact(prefetch.security_deposit)}`} muted />
               )}
-              <div className="border-t border-[#F0EDE9] pt-1.5 mt-0.5">
+              <div className="border-t border-border pt-1.5 mt-0.5">
                 {depositForfeited && refundOverride === null ? (
                   <div className="flex items-center justify-between py-1.5">
                     <span className="text-xs text-ink-muted">Refund to tenant</span>
@@ -570,11 +552,11 @@ function NewCheckoutPage() {
                   <div className="flex items-center justify-between py-1.5">
                     <span className="text-xs text-ink-muted">Refund to tenant</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-extrabold text-brand-pink">{fmtINR(refundOverride)}</span>
+                      <span className="text-xs font-extrabold text-brand-pink">{rupeeExact(refundOverride)}</span>
                       <button
                         type="button"
                         onClick={() => { setRefundOverride(null); setShowRefundOverride(false); setRefundOverrideVal("0") }}
-                        className="text-[10px] font-bold text-ink-muted border border-[#E2DEDD] rounded-full px-2 py-0.5 active:opacity-70"
+                        className="text-[10px] font-bold text-ink-muted border border-border-strong rounded-full px-2 py-0.5 active:opacity-70"
                       >
                         Reset
                       </button>
@@ -583,7 +565,7 @@ function NewCheckoutPage() {
                 ) : (
                   <Row
                     label="Refund to tenant"
-                    value={refundAmount > 0 ? fmtINR(refundAmount) : "₹0"}
+                    value={refundAmount > 0 ? rupeeExact(refundAmount) : "₹0"}
                     pink={refundAmount > 0}
                   />
                 )}
@@ -592,7 +574,7 @@ function NewCheckoutPage() {
 
             {/* Override numpad — shown when forfeited and user taps Override */}
             {depositForfeited && showRefundOverride && refundOverride === null && (
-              <div className="border-t border-[#F0EDE9] pt-3 mt-1">
+              <div className="border-t border-border pt-3 mt-1">
                 <p className="text-xs font-semibold text-ink-muted mb-2">Override refund amount</p>
                 <Numpad
                   value={refundOverrideVal === "0" ? "" : refundOverrideVal}
@@ -605,12 +587,12 @@ function NewCheckoutPage() {
                     onClick={() => { setRefundOverride(Number(refundOverrideVal) || 0); setShowRefundOverride(false) }}
                     className="flex-1 rounded-pill bg-brand-pink py-2 text-white font-bold text-xs active:opacity-80"
                   >
-                    Set ₹{(Number(refundOverrideVal) || 0).toLocaleString("en-IN")}
+                    Set {rupee(Number(refundOverrideVal) || 0)}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowRefundOverride(false)}
-                    className="flex-1 rounded-pill border border-[#E2DEDD] py-2 text-ink font-semibold text-xs active:opacity-70"
+                    className="flex-1 rounded-pill border border-border-strong py-2 text-ink font-semibold text-xs active:opacity-70"
                   >
                     Cancel
                   </button>
@@ -623,7 +605,7 @@ function NewCheckoutPage() {
         {/* Deductions numpad — hidden when deposit is forfeited (override handles refund there) */}
         {prefetch && !loadingPre && !depositForfeited && (
           <>
-            <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+            <div className="bg-surface rounded-card p-4 border border-border">
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
                 Deductions (damage / dues)
               </p>
@@ -634,7 +616,7 @@ function NewCheckoutPage() {
               />
               {deductionsNum > prefetch.security_deposit && (
                 <p className="text-xs text-status-warn font-semibold mt-2 px-1">
-                  Deductions ({fmtINR(deductionsNum)}) exceed deposit ({fmtINR(prefetch.security_deposit)}) — refund will be ₹0 and surplus is not charged
+                  Deductions ({rupeeExact(deductionsNum)}) exceed deposit ({rupeeExact(prefetch.security_deposit)}) — refund will be ₹0 and surplus is not charged
                 </p>
               )}
               <input
@@ -642,13 +624,13 @@ function NewCheckoutPage() {
                 value={deductionReason}
                 onChange={(e) => setDeductionReason(e.target.value)}
                 placeholder="Reason for deduction (optional)…"
-                className="mt-3 w-full rounded-pill border border-[#E2DEDD] bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
+                className="mt-3 w-full rounded-pill border border-border-strong bg-bg px-3 py-2 text-xs text-ink outline-none focus:border-brand-pink"
               />
             </div>
 
             {/* Refund mode — only when there's an actual refund amount */}
             {refundAmount > 0 && (
-              <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+              <div className="bg-surface rounded-card p-4 border border-border">
                 <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">
                   Refund Mode
                 </p>
@@ -656,7 +638,7 @@ function NewCheckoutPage() {
                   {REFUND_MODES.map((m) => (
                     <button key={m.value} type="button" onClick={() => setRefundMode(m.value)}
                       className={`rounded-tile py-2.5 text-center border-2 transition-colors ${
-                        refundMode === m.value ? "border-brand-pink bg-tile-pink" : "border-[#E2DEDD] bg-bg"
+                        refundMode === m.value ? "border-brand-pink bg-tile-pink" : "border-border-strong bg-bg"
                       }`}>
                       <div className="text-lg">{m.icon}</div>
                       <div className={`text-[10px] font-bold mt-1 ${refundMode === m.value ? "text-brand-pink" : "text-ink"}`}>
@@ -674,7 +656,7 @@ function NewCheckoutPage() {
       </div>
 
       {/* Sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-[#F0EDE9]">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-28 pt-3 bg-bg border-t border-border">
         <button
           onClick={handleReview}
           disabled={!tenant || !prefetch || loadingPre}
@@ -691,10 +673,10 @@ function NewCheckoutPage() {
           fields={[
             { label: "Tenant",     value: `${tenant.name} · Room ${tenant.room_number}` },
             { label: "Checkout",   value: fmtDate(checkoutDate) },
-            { label: "Deposit",    value: fmtINR(prefetch.security_deposit) },
-            ...(totalPendingDues > 0 ? [{ label: "Pending dues", value: `− ${fmtINR(totalPendingDues)}` }] : []),
-            ...(deductionsNum > 0 ? [{ label: "Deductions", value: `− ${fmtINR(deductionsNum)}` }] : []),
-            { label: "Refund",     value: refundAmount > 0 ? `${fmtINR(refundAmount)} · ${refundMode}` : "₹0 (no refund)", highlight: refundAmount > 0 },
+            { label: "Deposit",    value: rupeeExact(prefetch.security_deposit) },
+            ...(totalPendingDues > 0 ? [{ label: "Pending dues", value: `− ${rupeeExact(totalPendingDues)}` }] : []),
+            ...(deductionsNum > 0 ? [{ label: "Deductions", value: `− ${rupeeExact(deductionsNum)}` }] : []),
+            { label: "Refund",     value: refundAmount > 0 ? `${rupeeExact(refundAmount)} · ${refundMode}` : "₹0 (no refund)", highlight: refundAmount > 0 },
             { label: "Checklist",  value: [roomKey && "Key", wardrobeKey && "Wardrobe", biometric && "Biometric", conditionOk && "Condition OK"].filter(Boolean).join(" · ") || "—" },
           ]}
           onConfirm={handleConfirm}

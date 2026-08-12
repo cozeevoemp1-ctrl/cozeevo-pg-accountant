@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import { TenantSearch } from "@/components/forms/tenant-search"
 import { getTenantsList, TenantListItem, TenantSearchResult } from "@/lib/api"
 import { LogoutButton } from "@/components/home/logout-avatar"
+import { rupee } from "@/lib/format"
+import { PageHeader } from "@/components/ui/page-header"
+import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/ui/empty-state"
 
 const QUICK_ACTIONS = [
   {
@@ -17,7 +21,7 @@ const QUICK_ACTIONS = [
         <line x1="15" y1="12" x2="3" y2="12" />
       </svg>
     ),
-    textColor: "text-[#00AEED]",
+    textColor: "text-brand-blue",
     bg: "bg-tile-blue",
   },
   {
@@ -30,7 +34,7 @@ const QUICK_ACTIONS = [
         <line x1="21" y1="12" x2="9" y2="12" />
       </svg>
     ),
-    textColor: "text-[#C25000]",
+    textColor: "text-status-warn",
     bg: "bg-tile-orange",
   },
   {
@@ -68,7 +72,7 @@ const QUICK_ACTIONS = [
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
     ),
-    textColor: "text-[#C25000]",
+    textColor: "text-status-warn",
     bg: "bg-tile-orange",
   },
 ]
@@ -94,21 +98,13 @@ export default function ManageTenantsPage() {
   return (
     <main className="min-h-screen bg-bg">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-12 pb-4 bg-surface border-b border-[#F0EDE9]">
-        <button
-          onClick={() => router.back()}
-          className="w-9 h-9 rounded-full bg-bg flex items-center justify-center text-ink-muted font-bold"
-          aria-label="Back"
-        >
-          ←
-        </button>
-        <h1 className="text-lg font-extrabold text-ink flex-1">Manage Tenants</h1>
-        <LogoutButton />
+      <div className="px-5 pt-12 bg-surface border-b border-border">
+        <PageHeader title="Manage Tenants" right={<LogoutButton />} />
       </div>
 
       <div className="px-4 pt-4 pb-32 flex flex-col gap-5 max-w-lg mx-auto">
         {/* Search */}
-        <div className="bg-surface rounded-card p-4 border border-[#F0EDE9]">
+        <div className="bg-surface rounded-card p-4 border border-border">
           <TenantSearch
             onSelect={handleTenantSelect}
             placeholder="Search by name, room, phone…"
@@ -123,7 +119,7 @@ export default function ManageTenantsPage() {
               <button
                 key={action.label}
                 onClick={() => router.push(action.href)}
-                className={`${action.bg} rounded-card p-4 flex flex-col items-start gap-2 active:opacity-80 border border-[#F0EDE9] ${i === QUICK_ACTIONS.length - 1 && QUICK_ACTIONS.length % 2 !== 0 ? "col-span-2" : ""}`}
+                className={`${action.bg} rounded-card p-4 flex flex-col items-start gap-2 active:opacity-80 border border-border ${i === QUICK_ACTIONS.length - 1 && QUICK_ACTIONS.length % 2 !== 0 ? "col-span-2" : ""}`}
               >
                 <span className={action.textColor}>{action.icon}</span>
                 <span className="text-sm font-bold text-ink leading-tight">{action.label}</span>
@@ -139,27 +135,25 @@ export default function ManageTenantsPage() {
           {loading && (
             <div className="flex flex-col gap-2">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex justify-between items-center">
+                <div key={i} className="bg-surface rounded-card border border-border p-4 flex justify-between items-center">
                   <div className="flex flex-col gap-2">
-                    <div className="h-3.5 w-32 bg-[#F0EDE9] rounded-full animate-pulse" />
-                    <div className="h-2.5 w-20 bg-[#F0EDE9] rounded-full animate-pulse" />
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-2.5 w-20" />
                   </div>
-                  <div className="h-6 w-16 bg-[#F0EDE9] rounded-pill animate-pulse" />
+                  <div className="h-6 w-16 bg-border rounded-pill animate-pulse" />
                 </div>
               ))}
             </div>
           )}
 
           {!loading && error && (
-            <div className="bg-surface rounded-card border border-[#F0EDE9] p-6 text-center">
+            <div className="bg-surface rounded-card border border-border p-6 text-center">
               <p className="text-sm text-status-warn">{error}</p>
             </div>
           )}
 
           {!loading && !error && tenants.length === 0 && (
-            <div className="bg-surface rounded-card border border-[#F0EDE9] p-6 text-center">
-              <p className="text-sm text-ink-muted">No active tenants found</p>
-            </div>
+            <EmptyState>No active tenants found</EmptyState>
           )}
 
           {!loading && !error && tenants.length > 0 && (
@@ -168,7 +162,7 @@ export default function ManageTenantsPage() {
                 <button
                   key={t.tenancy_id}
                   onClick={() => router.push(`/tenants/${t.tenancy_id}/edit`)}
-                  className="bg-surface rounded-card border border-[#F0EDE9] p-4 flex justify-between items-center active:opacity-70 text-left w-full"
+                  className="bg-surface rounded-card border border-border p-4 flex justify-between items-center active:opacity-70 text-left w-full"
                 >
                   <div>
                     <p className="text-sm font-semibold text-ink">{t.name}</p>
@@ -181,7 +175,7 @@ export default function ManageTenantsPage() {
                         : "bg-tile-green text-status-paid"
                     }`}
                   >
-                    {t.dues > 0 ? `₹${t.dues.toLocaleString("en-IN")}` : "Paid"}
+                    {t.dues > 0 ? rupee(t.dues) : "Paid"}
                   </span>
                 </button>
               ))}

@@ -9,6 +9,8 @@ import {
   type OnboardingParseResult,
 } from "@/lib/parse-onboarding"
 import { speakText } from "@/lib/tts"
+import { rupee } from "@/lib/format"
+import { Spinner } from "@/components/ui/spinner"
 
 interface OnboardingVoiceSheetProps {
   onClose: () => void
@@ -40,7 +42,7 @@ const MONEY_FIELDS = new Set([
 ])
 
 function formatValue(key: string, value: unknown): string {
-  if (MONEY_FIELDS.has(key)) return `₹${Number(value).toLocaleString("en-IN")}`
+  if (MONEY_FIELDS.has(key)) return rupee(Number(value))
   return String(value)
 }
 
@@ -94,7 +96,7 @@ export function OnboardingVoiceSheet({ onClose, onConfirm }: OnboardingVoiceShee
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end" style={{ zIndex: 9999 }}>
       <div className="w-full bg-surface rounded-t-3xl px-5 pt-5 pb-10 min-h-[65vh] flex flex-col max-h-[90vh] overflow-y-auto">
-        <div className="w-12 h-1 bg-[#E2DEDD] rounded-full mx-auto mb-5 flex-shrink-0" />
+        <div className="w-12 h-1 bg-border-strong rounded-full mx-auto mb-5 flex-shrink-0" />
 
         {step === "idle" && (
           <IdleView
@@ -165,7 +167,7 @@ function IdleView({ hasPartial, onStart, onCancel }: { hasPartial: boolean; onSt
           : "Tap mic and say: \"Room 201, phone 9876543210, rent 12k, deposit 15k\""}
       </p>
       <div className="flex gap-3 w-full mt-auto">
-        <button onClick={onCancel} className="flex-1 py-3 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted">Cancel</button>
+        <button onClick={onCancel} className="flex-1 py-3 rounded-pill border border-border-strong text-sm font-semibold text-ink-muted">Cancel</button>
         <button onClick={onStart} className="flex-1 py-3 rounded-pill bg-brand-pink text-white text-sm font-semibold">Tap to Start</button>
       </div>
     </div>
@@ -197,7 +199,7 @@ function RecordingView({
           : "Say something like: \"Room 201, phone 9876543210, rent 12k, deposit 15k\""}
       </p>
       <div className="flex gap-3 w-full mt-auto">
-        <button onClick={onCancel} className="flex-1 py-3 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted">Cancel</button>
+        <button onClick={onCancel} className="flex-1 py-3 rounded-pill border border-border-strong text-sm font-semibold text-ink-muted">Cancel</button>
         <button onClick={onStop} disabled={!isActive} className="flex-1 py-3 rounded-pill bg-brand-pink text-white text-sm font-semibold disabled:opacity-40">Done</button>
       </div>
     </div>
@@ -207,7 +209,7 @@ function RecordingView({
 function ProcessingView({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center gap-4 flex-1 justify-center">
-      <div className="w-10 h-10 rounded-full border-4 border-brand-pink border-t-transparent animate-spin" />
+      <Spinner />
       <p className="text-sm text-ink-muted">{label}</p>
     </div>
   )
@@ -235,7 +237,7 @@ function ConfirmView({
       ) : (
         <div className="flex flex-col">
           {captured.map(([key, value]) => (
-            <div key={key} className="flex items-center justify-between py-2 border-b border-[#F0EDE9]">
+            <div key={key} className="flex items-center justify-between py-2 border-b border-border">
               <span className="text-xs text-ink-muted">{FIELD_LABELS[key] ?? key}</span>
               <span className="text-sm font-semibold text-ink">{formatValue(key, value)}</span>
             </div>
@@ -256,7 +258,7 @@ function ConfirmView({
       )}
 
       <div className="flex gap-2 mt-auto">
-        <button onClick={onCancel} className="py-3 px-4 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted">Cancel</button>
+        <button onClick={onCancel} className="py-3 px-4 rounded-pill border border-border-strong text-sm font-semibold text-ink-muted">Cancel</button>
         <button onClick={onRecordAgain} className="flex-1 py-3 rounded-pill border-2 border-brand-pink text-sm font-semibold text-brand-pink">Record again</button>
         <button onClick={onConfirm} disabled={!requiredMet} className="flex-1 py-3 rounded-pill bg-brand-pink text-white text-sm font-bold disabled:opacity-40">Fill Form</button>
       </div>
@@ -269,7 +271,7 @@ function ErrorView({ message, onRetry, onClose }: { message: string; onRetry: ()
     <div className="flex flex-col items-center gap-4 flex-1 justify-center">
       <p className="text-sm text-status-warn text-center">{message}</p>
       <div className="flex gap-3">
-        <button onClick={onClose} className="px-6 py-3 rounded-pill border border-[#E2DEDD] text-sm font-semibold text-ink-muted">Close</button>
+        <button onClick={onClose} className="px-6 py-3 rounded-pill border border-border-strong text-sm font-semibold text-ink-muted">Close</button>
         <button onClick={onRetry} className="px-6 py-3 rounded-pill bg-brand-pink text-white text-sm font-semibold">Try again</button>
       </div>
     </div>

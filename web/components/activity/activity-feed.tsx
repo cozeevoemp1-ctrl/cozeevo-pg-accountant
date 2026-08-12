@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { rupee } from "@/lib/format";
+import { fmtDate } from "@/lib/date";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { ActivityFeedEvent } from "@/lib/api";
 
 const TYPE_CONFIG: Record<ActivityFeedEvent["type"], { icon: string; color: string }> = {
@@ -12,7 +15,7 @@ const TYPE_CONFIG: Record<ActivityFeedEvent["type"], { icon: string; color: stri
   void:        { icon: "✕", color: "bg-[#FEE2E2] text-[#991B1B]" },
   adjustment:  { icon: "~", color: "bg-[#FEF3C7] text-[#78350F]" },
   notice:      { icon: "!", color: "bg-[#FEF3C7] text-[#B45309]" },
-  other:       { icon: "•", color: "bg-[#F6F5F0] text-ink-muted" },
+  other:       { icon: "•", color: "bg-bg text-ink-muted" },
 };
 
 const FILTERS = [
@@ -28,6 +31,7 @@ const FILTERS = [
 
 type FilterKey = typeof FILTERS[number]["key"];
 
+/** Relative day label ("Today"/"Yesterday"/weekday) — falls back to lib fmtDate for older dates. */
 function _dayLabel(ts: string): string {
   const d = new Date(ts);
   const now = new Date();
@@ -37,7 +41,7 @@ function _dayLabel(ts: string): string {
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   if (diff > 1 && diff < 7) return d.toLocaleDateString("en-IN", { weekday: "long" });
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return fmtDate(ts);
 }
 
 function _timeLabel(ts: string): string {
@@ -61,10 +65,6 @@ function _daySummary(evs: ActivityFeedEvent[]): { upi: number; cash: number } | 
     else if (mode === "cash") { cash += amt; found = true; }
   }
   return found ? { upi, cash } : null;
-}
-
-function _inr(n: number): string {
-  return "₹" + n.toLocaleString("en-IN");
 }
 
 export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
@@ -116,7 +116,7 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search name or room…"
-        className="w-full rounded-pill border border-[#E2DEDD] bg-surface px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted/60"
+        className="w-full rounded-pill border border-border-strong bg-surface px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ink-muted/60"
       />
 
       {/* Filter chips — wrap so no scroll arrow */}
@@ -127,8 +127,8 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
             onClick={() => setFilter(f.key)}
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
               filter === f.key
-                ? "bg-[#EF1F9C] text-white"
-                : "bg-[#F0EDE9] text-ink-muted"
+                ? "bg-brand-pink text-white"
+                : "bg-border text-ink-muted"
             }`}
           >
             {f.label}
@@ -138,7 +138,7 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
 
       {/* Events grouped by day */}
       {groups.length === 0 ? (
-        <p className="text-sm text-ink-muted text-center mt-8">No activity</p>
+        <EmptyState className="mt-8">No activity</EmptyState>
       ) : (
         groups.map((group) => {
           const summary = _daySummary(group.events);
@@ -148,13 +148,13 @@ export function ActivityFeed({ events }: { events: ActivityFeedEvent[] }) {
               <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{group.label}</p>
               {summary && (
                 <p className="text-sm font-semibold text-ink">
-                  {summary.upi > 0 && <span>UPI {_inr(summary.upi)}</span>}
+                  {summary.upi > 0 && <span>UPI {rupee(summary.upi)}</span>}
                   {summary.upi > 0 && summary.cash > 0 && <span className="mx-1.5 text-ink-muted opacity-40">·</span>}
-                  {summary.cash > 0 && <span>Cash {_inr(summary.cash)}</span>}
+                  {summary.cash > 0 && <span>Cash {rupee(summary.cash)}</span>}
                 </p>
               )}
             </div>
-            <div className="bg-surface rounded-card border border-[#F0EDE9] divide-y divide-[#F0EDE9]">
+            <div className="bg-surface rounded-card border border-border divide-y divide-border">
               {group.events.map((ev) => {
                 const cfg = TYPE_CONFIG[ev.type] ?? TYPE_CONFIG.other;
                 return (

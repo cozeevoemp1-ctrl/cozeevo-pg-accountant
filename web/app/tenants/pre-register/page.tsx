@@ -6,10 +6,8 @@ import { quickBook, checkRoomAvailability, type RoomCheckResult } from "@/lib/ap
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
-
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
+import { PageHeader } from "@/components/ui/page-header";
+import { fmtDate } from "@/lib/date";
 
 export default function PreRegisterPage() {
   const router = useRouter();
@@ -147,10 +145,7 @@ export default function PreRegisterPage() {
   if (done) {
     return (
       <main className="flex flex-col gap-4 px-4 pt-6 pb-24 max-w-lg mx-auto">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="w-9 h-9 rounded-full bg-[#F0EDE9] flex items-center justify-center text-ink-muted flex-shrink-0">←</Link>
-          <h1 className="text-lg font-extrabold text-ink">Pre-registered</h1>
-        </div>
+        <PageHeader title="Pre-registered" backHref="/" />
         <Card className="p-5 flex flex-col gap-3">
           <p className="text-sm font-semibold text-status-paid">Tenant pre-registered successfully</p>
           <p className="text-sm text-ink-muted">
@@ -168,7 +163,7 @@ export default function PreRegisterPage() {
             <Link href="/onboarding/bookings" className="flex-1 text-center text-sm font-semibold text-brand-pink py-2 border border-brand-pink rounded-lg">
               View Bookings
             </Link>
-            <Link href="/" className="flex-1 text-center text-sm font-semibold text-ink py-2 bg-[#F0EDE9] rounded-lg">
+            <Link href="/" className="flex-1 text-center text-sm font-semibold text-ink py-2 bg-border rounded-lg">
               Home
             </Link>
           </div>
@@ -180,7 +175,7 @@ export default function PreRegisterPage() {
   return (
     <main className="flex flex-col gap-4 px-4 pt-6 pb-24 max-w-lg mx-auto">
       <div className="flex items-center gap-3">
-        <Link href="/" className="w-9 h-9 rounded-full bg-[#F0EDE9] flex items-center justify-center text-ink-muted flex-shrink-0">←</Link>
+        <Link href="/" className="w-9 h-9 rounded-full bg-border flex items-center justify-center text-ink-muted flex-shrink-0">←</Link>
         <div>
           <p className="text-xs text-ink-muted font-medium">Future tenant</p>
           <h1 className="text-lg font-extrabold text-ink leading-tight">Pre-register</h1>
@@ -200,7 +195,7 @@ export default function PreRegisterPage() {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Full name"
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
 
@@ -211,7 +206,7 @@ export default function PreRegisterPage() {
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="10-digit mobile"
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
 
@@ -228,7 +223,7 @@ export default function PreRegisterPage() {
                 onChange={e => handleRoomChange(e.target.value)}
                 placeholder="e.g. 207"
                 className={`mt-1 w-full rounded-lg border bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink ${
-                  roomStatus ? (roomStatus.ok ? "border-[#6EE7B7]" : "border-status-warn") : "border-[#E0DDD8]"
+                  roomStatus ? (roomStatus.ok ? "border-[#6EE7B7]" : "border-status-warn") : "border-border-strong"
                 }`}
               />
               {roomChecking && <p className="mt-0.5 text-[10px] text-ink-muted">Checking…</p>}
@@ -251,7 +246,7 @@ export default function PreRegisterPage() {
               onWheel={e => e.currentTarget.blur()}
               placeholder="e.g. 12000"
               min="0"
-              className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full h-[42px] rounded-lg border border-border-strong bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
           </div>
 
@@ -264,7 +259,7 @@ export default function PreRegisterPage() {
                 onChange={e => setMaintenance(e.target.value)}
                 onWheel={e => e.currentTarget.blur()}
                 min="0"
-                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+                className="mt-1 w-full h-[42px] rounded-lg border border-border-strong bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
               />
             </div>
             <div>
@@ -277,7 +272,7 @@ export default function PreRegisterPage() {
                 onWheel={e => e.currentTarget.blur()}
                 placeholder="Auto = 1 month rent"
                 min="0"
-                className="mt-1 w-full h-[42px] rounded-lg border border-[#E0DDD8] bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+                className="mt-1 w-full h-[42px] rounded-lg border border-border-strong bg-surface px-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
               />
               {rentNum > 0 && !depositOverridden && (
                 <p className="mt-0.5 text-[10px] text-ink-muted">auto = 1 month rent</p>
@@ -294,9 +289,9 @@ export default function PreRegisterPage() {
               onWheel={e => e.currentTarget.blur()}
               placeholder="0 if none"
               min="0"
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface px-3 h-[42px] text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink"
             />
-            <div className="mt-2 flex rounded-lg overflow-hidden border border-[#E0DDD8] h-[42px]">
+            <div className="mt-2 flex rounded-lg overflow-hidden border border-border-strong h-[42px]">
               {(["cash", "upi"] as const).map(m => (
                 <button key={m} type="button"
                   onClick={() => setAdvanceMode(m)}
@@ -309,7 +304,7 @@ export default function PreRegisterPage() {
 
           <div>
             <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Bed type</label>
-            <div className="mt-1 flex rounded-lg overflow-hidden border border-[#E0DDD8]">
+            <div className="mt-1 flex rounded-lg overflow-hidden border border-border-strong">
               <button
                 type="button"
                 onClick={() => setBedType("regular")}
@@ -334,7 +329,7 @@ export default function PreRegisterPage() {
               onChange={e => setNotes(e.target.value)}
               placeholder="e.g. referred by staff, needs AC room, twin-share preferred…"
               rows={2}
-              className="mt-1 w-full rounded-lg border border-[#E0DDD8] bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink resize-none"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink resize-none"
             />
           </div>
 

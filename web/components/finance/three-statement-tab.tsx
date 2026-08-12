@@ -4,21 +4,8 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
 import { BASE_URL } from "@/lib/api"
-
-function inr(n: number) {
-  if (n === 0) return "0"
-  const abs = Math.abs(n)
-  const sign = n < 0 ? "-" : ""
-  if (abs >= 1_00_00_000) return `${sign}₹${(abs / 1_00_00_000).toFixed(2)}Cr`
-  if (abs >= 1_00_000)    return `${sign}₹${(abs / 1_00_000).toFixed(1)}L`
-  if (abs >= 1_000)       return `${sign}₹${(abs / 1_000).toFixed(1)}K`
-  return `${sign}₹${abs.toFixed(0)}`
-}
-
-function inrFull(n: number) {
-  const sign = n < 0 ? "-" : ""
-  return `${sign}₹${Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
-}
+import { rupeeExact, rupeeShort } from "@/lib/format"
+import { periodMonth } from "@/lib/date"
 
 function Row({ label, value, bold, indent, positive, negative, muted }: {
   label: string
@@ -38,7 +25,7 @@ function Row({ label, value, bold, indent, positive, negative, muted }: {
         {label}
       </span>
       <span className={`text-sm font-mono ${bold ? "font-bold" : ""} ${color || (value < 0 ? "text-red-500" : "text-ink")}`}>
-        {inrFull(value)}
+        {rupeeExact(value)}
       </span>
     </div>
   )
@@ -104,13 +91,8 @@ interface ThreeStatement {
   }
 }
 
-function currentMonth() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-}
-
 export function ThreeStatementTab() {
-  const [month, setMonth] = useState(currentMonth())
+  const [month, setMonth] = useState(periodMonth())
   const [data, setData] = useState<ThreeStatement | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -174,7 +156,7 @@ export function ThreeStatementTab() {
               onClick={() => setExpandOpex(x => !x)}
             >
               <span>Operating Expenses {expandOpex ? "▲" : "▼"}</span>
-              <span className="font-mono text-red-500">{inrFull(-data.pnl.total_opex)}</span>
+              <span className="font-mono text-red-500">{rupeeExact(-data.pnl.total_opex)}</span>
             </button>
             {expandOpex && Object.entries(data.pnl.opex_breakdown)
               .sort((a, b) => b[1] - a[1])
@@ -212,7 +194,7 @@ export function ThreeStatementTab() {
               onClick={() => setExpandInvestors(x => !x)}
             >
               <span>Investor Capital {expandInvestors ? "▲" : "▼"}</span>
-              <span className="font-mono text-ink">{inrFull(data.balance_sheet.equity.investor_capital)}</span>
+              <span className="font-mono text-ink">{rupeeExact(data.balance_sheet.equity.investor_capital)}</span>
             </button>
             {expandInvestors && Object.entries(data.balance_sheet.equity.investor_breakdown)
               .sort((a, b) => b[1] - a[1])
@@ -225,12 +207,12 @@ export function ThreeStatementTab() {
             <Divider />
             <Row label="Liabilities + Equity" value={data.balance_sheet.total_liabilities_equity} bold />
             <div className={`mt-2 rounded-lg px-3 py-2 text-xs font-bold text-center ${data.balance_sheet.check_balanced ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
-              {data.balance_sheet.check_balanced ? "Balance Sheet Balanced" : `Gap: ${inr(data.balance_sheet.total_assets - data.balance_sheet.total_liabilities_equity)}`}
+              {data.balance_sheet.check_balanced ? "Balance Sheet Balanced" : `Gap: ${rupeeShort(data.balance_sheet.total_assets - data.balance_sheet.total_liabilities_equity)}`}
             </div>
           </Section>
 
           {/* ── Cash Flow ── */}
-          <Section title="Cash Flows" color="bg-[#00AEED]">
+          <Section title="Cash Flows" color="bg-brand-blue">
             <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wide">Operating</span>
             <Row label="Net Income" value={data.cash_flow.operating.net_income} indent />
             <Row label="Depreciation (add back)" value={data.cash_flow.operating.depreciation} indent />
