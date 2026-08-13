@@ -109,10 +109,19 @@ python scripts/_generate_audit_logs.py   # → docs/DEPOSIT_REFUND_AUDIT.md + do
 # VPS deploy — AUTOMATIC. Every push to master fires a GitHub webhook →
 # kozzy-webhook.service on the VPS runs /opt/deploy.sh: git pull +
 # restart pg-accountant, and if web/ changed, npm run build + restart kozzy-pwa.
-# Pushing IS deploying. Do NOT ask Kiran to SSH or to "trigger" a deploy — and
-# do NOT ask permission to deploy. Claude cannot SSH from Windows (port 22 blocked);
-# the webhook doesn't need it. Verify live: curl https://api.getkozzy.com/healthz
+# Pushing IS deploying. Do NOT ask permission to deploy for code changes.
+# Verify live: curl https://api.getkozzy.com/healthz
 # (returns {"commit":"<sha>"} — compare to HEAD). If webhook fails: push an empty commit.
+#
+# SSH WORKS from this machine (verified 2026-08-13): ssh root@187.127.130.194
+# (key ~/.ssh/id_ed25519). Use it directly for anything the git webhook can't carry —
+# above all .env / SECRETS, which are gitignored and therefore NEVER deployed by push.
+# NEVER hand a VPS .env edit back to Kiran; do it yourself:
+#   scripts/vps_env_set.sh KEY "value"   (updates /opt/pg-accountant/.env + restarts)
+# DB CONNECTION: use the Supabase POOLER, not the direct host. The direct host
+# db.<ref>.supabase.co is IPv6-only and the VPS can't reach it (startup fails).
+# Correct DATABASE_URL host: aws-1-ap-south-1.pooler.supabase.com:5432,
+# user postgres.<ref> (note the dotted username). Pooler serves IPv4.
 # Manual fallback (Kiran only, Hostinger web console):
 cd /opt/pg-accountant && git pull && systemctl restart pg-accountant
 ```
