@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-13 — Bike parking notice broadcast
+
+- Sent bike parking notice to all 260 active tenants (unique phones) + 4 operator CCs via `custom_broadcast_notice` template — 260/260 tenants OK, 4/4 CC OK.
+- New one-off script `scripts/_send_bike_parking_notice.py` (copied from `_send_noise_notice.py` recipe: flat-paragraph body per Meta #132018, greeting/sign-off stripped, phone dedupe, operator CC in same run).
+
 ## Session AE (cont.) — 2026-08-12 — PWA UI system: canonical primitives, mass de-duplication
 
 Follow-up to the reuse audit (15 INR formatters, ~10 date formatters, 11 hand-rolled modals, 872 hex literals). Built the design-system layer, migrated every reachable page/component, documented it.
