@@ -1,9 +1,13 @@
 # Changelog
 
-## 2026-08-13 — Bike parking notice broadcast
+## 2026-08-13 — Bike parking notice broadcast + TIER_250 root cause + delivery-status capture
 
-- Sent bike parking notice to all 260 active tenants (unique phones) + 4 operator CCs via `custom_broadcast_notice` template — 260/260 tenants OK, 4/4 CC OK.
-- New one-off script `scripts/_send_bike_parking_notice.py` (copied from `_send_noise_notice.py` recipe: flat-paragraph body per Meta #132018, greeting/sign-off stripped, phone dedupe, operator CC in same run).
+- Sent bike parking notice to all 260 active tenants (unique phones) + 4 operator CCs via `custom_broadcast_notice` template — 264/264 accepted by Meta.
+- **Root cause found for Lakshmi/Prabhakaran missing broadcasts (2nd time):** sending number is on `messaging_limit_tier: TIER_250` — 250 unique business-initiated conversations per rolling 24h. Operators were sent LAST (positions 261–264) so they fall past the cap; Meta still returns HTTP 200 for dropped sends. Alphabetically-last ~10 tenants likely also dropped. Permanent fix = Meta Business Verification (Kiran) → TIER_1K.
+- **Delivery-status capture built:** new `whatsapp_status_log` table (migration `run_whatsapp_status_log_2026_08_13`, run on live DB); webhook now persists Meta `statuses` events (sent/delivered/read/failed + error code) — previously silently ignored. `send_template()` now returns the wamid (truthy str, backward-compatible).
+- **Broadcast delivery report:** `src/whatsapp/broadcast_report.py` — after a broadcast, waits for status webhooks then WhatsApps operators a one-paragraph summary (delivered/read counts + FAILED names with Meta reason) via `custom_broadcast_notice`. Unit tests `tests/test_broadcast_report.py` (added to pre-push gate).
+- **All broadcast scripts flipped to operators-FIRST** (staff must never sit past the 250 cap); `_send_bike_parking_notice.py` is now the canonical recipe (wamid collection + report).
+- NOTE: status capture goes live on next merge to master (webhook runs on VPS).
 
 ## Session AE (cont.) — 2026-08-12 — PWA UI system: canonical primitives, mass de-duplication
 

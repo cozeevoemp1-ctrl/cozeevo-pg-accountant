@@ -61,6 +61,20 @@ async def main() -> None:
         print("\nRe-run with --send to actually send.")
         return
 
+    # Operator CC FIRST — TIER_250 cap (250 unique conversations/24h) silently
+    # drops whoever sits past position 250; staff must never be at the end.
+    # Same reliable template path as tenants (free-form text silently drops
+    # outside the 24h session window; templates don't have that problem).
+    cc_sent = 0
+    for name, phone in OPERATORS:
+        ok = await send_template(phone, TEMPLATE, language_code=LANGUAGE)
+        if ok:
+            cc_sent += 1
+        else:
+            print(f"  CC FAILED -> {name} ({phone})")
+        await asyncio.sleep(0.3)
+    print(f"CC sent to {cc_sent}/{len(OPERATORS)} operators.\n")
+
     sent, failed = 0, []
     for r in rows:
         ok = await send_template(r.phone, TEMPLATE, language_code=LANGUAGE)
@@ -75,19 +89,6 @@ async def main() -> None:
         print(f"Failed ({len(failed)}):")
         for name, phone in failed:
             print(f"  {name} ({phone})")
-
-    # Operator CC — same reliable template path as tenants (free-form text
-    # silently drops outside the 24h session window; templates don't have
-    # that problem). Operators get the real message, not a text summary.
-    cc_sent = 0
-    for name, phone in OPERATORS:
-        ok = await send_template(phone, TEMPLATE, language_code=LANGUAGE)
-        if ok:
-            cc_sent += 1
-        else:
-            print(f"  CC FAILED -> {name} ({phone})")
-        await asyncio.sleep(0.3)
-    print(f"\nCC sent to {cc_sent}/{len(OPERATORS)} operators.")
 
 
 if __name__ == "__main__":

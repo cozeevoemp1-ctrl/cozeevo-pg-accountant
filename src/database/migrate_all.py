@@ -1522,6 +1522,32 @@ async def run_pnl_offline_cash_2026_08_08(conn) -> None:
     print("  [ok] pnl_monthly_adjustments.offline_cash added")
 
 
+async def run_whatsapp_status_log_2026_08_13(conn) -> None:
+    """Meta delivery-status webhook capture (sent/delivered/read/failed per wamid).
+    Why: Meta returns HTTP 200 for sends it later silently drops (TIER_250
+    messaging limit hit on the 2026-08-13 bike-parking broadcast — last 2
+    operators + tail tenants never delivered). `failed` events here are the
+    only place the drop is visible."""
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS whatsapp_status_log (
+            id            SERIAL PRIMARY KEY,
+            message_id    VARCHAR(120) NOT NULL,
+            recipient     VARCHAR(20),
+            status        VARCHAR(20) NOT NULL,
+            error_code    INTEGER,
+            error_message TEXT,
+            occurred_at   TIMESTAMP NOT NULL DEFAULT now(),
+            created_at    TIMESTAMP NOT NULL DEFAULT now(),
+            CONSTRAINT uq_wsl_msg_status UNIQUE (message_id, status)
+        )
+    """))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_wsl_recipient ON whatsapp_status_log (recipient)"))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_wsl_created ON whatsapp_status_log (created_at)"))
+    print("  [ok] whatsapp_status_log created")
+
+
 async def run_btxn_dedup_2026_05_12(conn: AsyncConnection) -> None:
     """
     One-time cleanup: deduplicate bank_transactions and fix the unique constraint.
@@ -1750,6 +1776,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_supabase_auth_id_2026_05_19(conn)
             await run_room_108_revenue_2026_05_31(conn)
             await run_no_overlap_tenancy_constraint_2026_06_28(conn)
+            await run_whatsapp_status_log_2026_08_13(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)

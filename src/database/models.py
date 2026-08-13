@@ -14,6 +14,7 @@ L0 — PERMANENT / NEVER WIPE
   • food_plans            — meal subscription options
   • expense_categories    — expense taxonomy
   • whatsapp_log          — full audit trail of every message, in + out
+  • whatsapp_status_log   — Meta delivery-status webhook events (sent/delivered/read/failed)
   • conversation_memory   — bot training data / semantic memory (pgvector)
   • documents             — file registry: receipts, licenses, agreements, IDs
   • investment_expenses   — Whitefield PG setup/construction investment tracker (owner-only)
@@ -664,6 +665,32 @@ class WhatsappLog(Base):
         Index("ix_whatsapp_log_from", "from_number"),
         Index("ix_whatsapp_log_created", "created_at"),
         Index("ix_whatsapp_log_intent", "intent"),
+    )
+
+
+class WhatsappStatusLog(Base):
+    """
+    Meta delivery-status webhook events (sent/delivered/read/failed) per outbound
+    message id (wamid). Meta returns HTTP 200 even for sends it later silently
+    drops (TIER_250 messaging limit, unroutable numbers) — the `failed` events
+    landing here are the only place real delivery failure is visible.
+    """
+    __tablename__ = "whatsapp_status_log"
+
+    id            = Column(Integer, primary_key=True)
+    message_id    = Column(String(120), nullable=False)   # wamid from the send response
+    recipient     = Column(String(20))                     # digits-only phone (91xxxxxxxxxx)
+    status        = Column(String(20), nullable=False)     # sent / delivered / read / failed
+    error_code    = Column(Integer)                        # Meta error code when failed
+    error_message = Column(Text)                           # Meta error title + details
+    occurred_at   = Column(DateTime, default=datetime.utcnow)   # Meta's event timestamp (UTC)
+    created_at    = Column(DateTime, default=datetime.utcnow, server_default=func.now())
+
+    __table_args__ = (
+        # Meta re-sends status webhooks from multiple IPs — one row per (message, status)
+        UniqueConstraint("message_id", "status", name="uq_wsl_msg_status"),
+        Index("ix_wsl_recipient", "recipient"),
+        Index("ix_wsl_created", "created_at"),
     )
 
 

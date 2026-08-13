@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """One-off: send the noise / late-night activity notice via custom_broadcast_notice.
 
+NOTE 2026-08-13: superseded as the copy-recipe by _send_bike_parking_notice.py
+(operators FIRST — TIER_250 cap — plus wamid collection + delivery report).
+
 Stage 1 (this run): operators only (Kiran + staff) for review.
     python send_noise_notice.py            # dry run
     python send_noise_notice.py --send     # live send to operators
@@ -103,6 +106,15 @@ async def main() -> None:
         print("\nRe-run with --send to actually send.")
         return
 
+    # Operators FIRST — TIER_250 cap (250 unique conversations/24h) silently
+    # drops whoever sits past position 250; staff must never be at the end.
+    for name, phone in OPERATORS:
+        ok = await send_template(
+            phone, TEMPLATE, language_code=LANGUAGE, body_params=[GREETING, BODY]
+        )
+        print(f"  CC {'OK  ' if ok else 'FAIL'} -> {name} ({phone})")
+        await asyncio.sleep(0.4)
+
     sent, failed = 0, []
     for r in rows:
         ok = await send_template(
@@ -120,14 +132,6 @@ async def main() -> None:
             print(f"Failed ({len(failed)}):")
             for name, phone in failed:
                 print(f"  {name} ({phone})")
-
-    # Operator CC — same template path, ALWAYS included in every broadcast (Kiran's rule).
-    for name, phone in OPERATORS:
-        ok = await send_template(
-            phone, TEMPLATE, language_code=LANGUAGE, body_params=[GREETING, BODY]
-        )
-        print(f"  CC {'OK  ' if ok else 'FAIL'} -> {name} ({phone})")
-        await asyncio.sleep(0.4)
 
 
 if __name__ == "__main__":

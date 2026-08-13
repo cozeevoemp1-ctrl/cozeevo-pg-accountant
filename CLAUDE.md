@@ -204,6 +204,8 @@ Kiran's Excel (offline)
 | `scripts/_fix_sheetal_615_record.py` | One-off: Room 615 Sheetal — check-in 28 Aug→1 Aug, ₹14,500 re-dated 27 Jul + re-typed deposit, booking_amount→0, RS recalc. `--rent <amt>` adds the missing 2 Aug cash rent. |
 | `scripts/resync_missing_tenants_to_sheet.py` | Finds tenants in DB but missing from TENANTS ops sheet tab; appends them. Safe to re-run. |
 | `scripts/_send_laundry_notice.py` | One-off manual broadcast: `laundry_rules_notice` template to all active tenants + operator CC (same reliable `send_template()` path for both — see [[rules_whatsapp_cc]] for why CC must never use free-form text). Dry-run by default, `--send` for live. |
+| `scripts/_send_bike_parking_notice.py` | **Canonical broadcast recipe** — operators FIRST (TIER_250 cap: 250 unique conversations/24h silently drops whoever sits past position 250), wamid collection, delivery report at end. Copy this for future notices. |
+| `src/whatsapp/broadcast_report.py` | Broadcast delivery report — `summarize_statuses()` + `send_delivery_report()`: joins a broadcast's wamids against `whatsapp_status_log` and WhatsApps a delivered/read/FAILED summary to the 4 operators (OPERATORS list lives here). Meta 200 ≠ delivery; this is the truth. |
 | `src/rules/pnl_classify.py` | Bank-transaction classifier rules (category/sub_category by keyword, first match wins) — shared by CSV import and the WhatsApp finance handler. Add new vendor/keyword rules here, never inline elsewhere. |
 
 ## DO NOT touch
