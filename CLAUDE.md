@@ -109,10 +109,19 @@ python scripts/_generate_audit_logs.py   # → docs/DEPOSIT_REFUND_AUDIT.md + do
 # VPS deploy — AUTOMATIC. Every push to master fires a GitHub webhook →
 # kozzy-webhook.service on the VPS runs /opt/deploy.sh: git pull +
 # restart pg-accountant, and if web/ changed, npm run build + restart kozzy-pwa.
-# Pushing IS deploying. Do NOT ask Kiran to SSH or to "trigger" a deploy — and
-# do NOT ask permission to deploy. Claude cannot SSH from Windows (port 22 blocked);
-# the webhook doesn't need it. Verify live: curl https://api.getkozzy.com/healthz
+# Pushing IS deploying. Do NOT ask permission to deploy for code changes.
+# Verify live: curl https://api.getkozzy.com/healthz
 # (returns {"commit":"<sha>"} — compare to HEAD). If webhook fails: push an empty commit.
+#
+# SSH WORKS from this machine (verified 2026-08-13): ssh root@187.127.130.194
+# (key ~/.ssh/id_ed25519). Use it directly for anything the git webhook can't carry —
+# above all .env / SECRETS, which are gitignored and therefore NEVER deployed by push.
+# NEVER hand a VPS .env edit back to Kiran; do it yourself:
+#   scripts/vps_env_set.sh KEY "value"   (updates /opt/pg-accountant/.env + restarts)
+# DB CONNECTION: use the Supabase POOLER, not the direct host. The direct host
+# db.<ref>.supabase.co is IPv6-only and the VPS can't reach it (startup fails).
+# Correct DATABASE_URL host: aws-1-ap-south-1.pooler.supabase.com:5432,
+# user postgres.<ref> (note the dotted username). Pooler serves IPv4.
 # Manual fallback (Kiran only, Hostinger web console):
 cd /opt/pg-accountant && git pull && systemctl restart pg-accountant
 ```
@@ -204,6 +213,8 @@ Kiran's Excel (offline)
 | `scripts/_fix_sheetal_615_record.py` | One-off: Room 615 Sheetal — check-in 28 Aug→1 Aug, ₹14,500 re-dated 27 Jul + re-typed deposit, booking_amount→0, RS recalc. `--rent <amt>` adds the missing 2 Aug cash rent. |
 | `scripts/resync_missing_tenants_to_sheet.py` | Finds tenants in DB but missing from TENANTS ops sheet tab; appends them. Safe to re-run. |
 | `scripts/_send_laundry_notice.py` | One-off manual broadcast: `laundry_rules_notice` template to all active tenants + operator CC (same reliable `send_template()` path for both — see [[rules_whatsapp_cc]] for why CC must never use free-form text). Dry-run by default, `--send` for live. |
+| `scripts/_send_bike_parking_notice.py` | **Canonical broadcast recipe** — operators FIRST (TIER_250 cap: 250 unique conversations/24h silently drops whoever sits past position 250), wamid collection, delivery report at end. Copy this for future notices. |
+| `src/whatsapp/broadcast_report.py` | Broadcast delivery report — `summarize_statuses()` + `send_delivery_report()`: joins a broadcast's wamids against `whatsapp_status_log` and WhatsApps a delivered/read/FAILED summary to the 4 operators (OPERATORS list lives here). Meta 200 ≠ delivery; this is the truth. |
 | `src/rules/pnl_classify.py` | Bank-transaction classifier rules (category/sub_category by keyword, first match wins) — shared by CSV import and the WhatsApp finance handler. Add new vendor/keyword rules here, never inline elsewhere. |
 
 ## DO NOT touch

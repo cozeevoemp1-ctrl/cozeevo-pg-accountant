@@ -117,7 +117,13 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     # Extract message from Meta's nested structure
     msg_data = _extract_message(payload)
     if not msg_data:
-        # Meta also sends status updates (delivered, read) -- just acknowledge
+        # Meta status updates (sent/delivered/read/failed) — persist them.
+        # Meta returns HTTP 200 for sends it later silently drops (TIER_250
+        # messaging limit); the `failed` events landing here are the only
+        # place a dropped send is visible. See src/whatsapp/broadcast_report.py.
+        statuses = _extract_statuses(payload)
+        if statuses:
+            background.add_task(_log_statuses, statuses)
         return {"status": "ok"}
 
     from_number = msg_data["from"]
@@ -250,6 +256,70 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         else:
             background.add_task(_send_whatsapp, from_number, reply)
     return {"status": "ok"}
+
+
+# -- Meta delivery-status capture ----------------------------------------------
+
+def _extract_statuses(payload: dict) -> list[dict]:
+    """Pull the `statuses` array out of Meta's nested webhook payload."""
+    try:
+        return payload["entry"][0]["changes"][0]["value"].get("statuses") or []
+    except (KeyError, IndexError):
+        return []
+
+
+async def _log_statuses(statuses: list[dict]) -> None:
+    """Persist Meta delivery-status events to whatsapp_status_log.
+
+    Meta re-sends the same status from multiple IPs — the (message_id, status)
+    unique constraint + ON CONFLICT DO NOTHING dedupes at the DB level.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from src.database.db_manager import get_session
+    from src.database.models import WhatsappStatusLog
+
+    rows = []
+    for s in statuses:
+        msg_id = s.get("id")
+        status = s.get("status")
+        if not (msg_id and status):
+            continue
+        try:
+            occurred = datetime.fromtimestamp(
+                int(s.get("timestamp", 0)), tz=timezone.utc
+            ).replace(tzinfo=None)
+        except (ValueError, TypeError, OSError):
+            occurred = datetime.utcnow()
+        err = (s.get("errors") or [{}])[0]
+        err_detail = None
+        if err:
+            detail = (err.get("error_data") or {}).get("details", "")
+            err_detail = " — ".join(x for x in (err.get("title", ""), detail) if x)[:500]
+        rows.append({
+            "message_id":    str(msg_id)[:120],
+            "recipient":     str(s.get("recipient_id", ""))[:20] or None,
+            "status":        str(status)[:20],
+            "error_code":    err.get("code"),
+            "error_message": err_detail,
+            "occurred_at":   occurred,
+        })
+        if status == "failed":
+            logger.warning(f"[Webhook] Delivery FAILED wamid={msg_id} to={s.get('recipient_id')} "
+                           f"code={err.get('code')} {err_detail}")
+    if not rows:
+        return
+    try:
+        async with get_session() as sess:
+            stmt = pg_insert(WhatsappStatusLog).values(rows).on_conflict_do_nothing(
+                constraint="uq_wsl_msg_status"
+            )
+            await sess.execute(stmt)
+            await sess.commit()
+    except Exception as e:
+        logger.warning(f"[Webhook] whatsapp_status_log write failed: {e}")
 
 
 # -- Meta signature verifier ---------------------------------------------------

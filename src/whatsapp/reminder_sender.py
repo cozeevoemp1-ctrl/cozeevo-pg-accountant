@@ -79,7 +79,7 @@ async def send_template(
     language_code: str = "en",
     body_params: Optional[list[str]] = None,
     param_names: Optional[list[str]] = None,
-) -> bool:
+) -> "bool | str":
     """
     Send an approved Message Template via the official reminder number.
 
@@ -92,7 +92,10 @@ async def send_template(
                        TEMPLATE_PARAM_NAMES lookup or falls back to positional.
 
     Returns:
-        True if sent successfully, False otherwise.
+        The Meta message id (wamid, truthy str) on accepted send, False otherwise.
+        NOTE: Meta accepting (HTTP 200) is NOT delivery — real delivery/failure
+        arrives later via `statuses` webhooks into whatsapp_status_log. Keep the
+        wamid to look the outcome up (see src/whatsapp/broadcast_report.py).
     """
     # HARD RULE: only cozeevo_checkout_reminder may ever be sent to a tenant.
     # All other templates either go to staff only (checkin_prep, checkout_prep)
@@ -163,7 +166,11 @@ async def send_template(
             resp = await client.post(url, json=payload, headers=headers)
         if resp.status_code == 200:
             logger.info(f"[Reminder] Template '{template_name}' sent to {to}")
-            return True
+            try:
+                wamid = resp.json()["messages"][0]["id"]
+            except Exception:
+                wamid = ""
+            return wamid or True
         else:
             logger.error(f"[Reminder] Template send failed {resp.status_code}: {resp.text[:300]}")
             return False
