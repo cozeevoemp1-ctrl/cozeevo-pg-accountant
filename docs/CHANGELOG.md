@@ -1,5 +1,19 @@
 # Changelog
 
+## Session AF — 2026-08-13 — DB password rotation, VPS pooler fix, SSH workflow corrected
+
+### DB password rotated + fully propagated
+Old leaked `Anchorstrong123!` now DEAD (verified), new value connects. Propagated to local `.env` AND VPS `/opt/pg-accountant/.env`.
+
+### Incident: VPS DB outage exposed + fixed (Supabase pooler)
+Restarting the VPS to apply the new password surfaced a latent outage: **Supabase's direct host `db.<ref>.supabase.co` is IPv6-only and the VPS can't reach it** (`ConnectionRefused` → "Application startup failed"). It only worked before on the old process's pre-established connections — the next deploy would have taken the bot down regardless. Fixed by switching both `DATABASE_URL` and `DATABASE_URL_PSYCOPG` to the **Supabase pooler**: `aws-1-ap-south-1.pooler.supabase.com:5432`, session mode, user `postgres.oxiqomoilqwfxjauxhzp` (dotted). Local + VPS both migrated. Verified: service active, DB reads (167 rooms), live healthy, webhook OK.
+
+### Root-cause of recurring "update VPS .env" pain — FIXED
+A stale note claimed "Claude cannot SSH (port 22 blocked)". **False — SSH works** (verified). Corrected CLAUDE.md + `reference_vps_ssh.md` + `feedback_never_ask_to_deploy.md`. Added `scripts/vps_env_set.sh KEY "value"` — updates VPS `.env` + restarts over SSH (value passed at runtime, never committed). Secret propagation handled directly now, never handed to Kiran.
+
+### Secrets hygiene
+`all passwords.txt` master doc kept current; verified gitignored + never pushed. `rules_no_secrets_in_git.md` saved. service_role key confirmed NOT in git history. Still open (Kiran): rotate 2 Gmail passwords (were in git history) + set real `API_SECRET_KEY` (strong values generated).
+
 ## 2026-08-13 — Bike parking notice broadcast + TIER_250 root cause + delivery-status capture
 
 - Sent bike parking notice to all 260 active tenants (unique phones) + 4 operator CCs via `custom_broadcast_notice` template — 264/264 accepted by Meta.
