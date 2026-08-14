@@ -267,6 +267,41 @@ async def _do_confirm_checkout(
         notes       = f"Web checkout session {cs.token}",
     ))
 
+    # Audit trail — checkout itself + the deposit settlement decision.
+    # field="status+checkout_date" is what the activity feed (kpi.py) reads.
+    from src.database.models import AuditLog as _AuditLog
+    _who = cs.created_by_phone or "system"
+    session.add(_AuditLog(
+        changed_by=_who,
+        entity_type="tenancy",
+        entity_id=cs.tenancy_id,
+        entity_name=tenant_name,
+        field="status+checkout_date",
+        old_value="active",
+        new_value=f"exited {cs.checkout_date.isoformat()}",
+        room_number=room_number,
+        source="checkout",
+        note=f"Checkout session {cs.token}",
+    ))
+    session.add(_AuditLog(
+        changed_by=_who,
+        entity_type="tenancy",
+        entity_id=cs.tenancy_id,
+        entity_name=tenant_name,
+        field="deposit_settlement",
+        old_value=str(cs.security_deposit or 0),
+        new_value=str(cs.refund_amount or 0),
+        room_number=room_number,
+        source="checkout",
+        note=(
+            f"Refund Rs.{int(cs.refund_amount or 0):,}"
+            + (f" via {cs.refund_mode}" if cs.refund_mode else "")
+            + f"; dues Rs.{int(cs.pending_dues or 0):,}"
+            + f"; deductions Rs.{int(cs.deductions or 0):,}"
+            + (f" ({cs.deduction_reason})" if cs.deduction_reason else "")
+        ),
+    ))
+
     # Mark confirmed_at
     cs.confirmed_at = datetime.utcnow()
     await session.flush()
@@ -2789,6 +2824,7 @@ async def resolve_pending_action(
                 tenant_name=chosen["label"],
                 checkout_date_val=checkout_date_val,
                 session=session,
+                changed_by=pending.phone or "whatsapp",
             )
 
         if checkout_date_val > date.today():
@@ -2798,6 +2834,7 @@ async def resolve_pending_action(
                 tenant_name=chosen["label"],
                 checkout_date_val=checkout_date_val,
                 session=session,
+                changed_by=pending.phone or "whatsapp",
             )
 
         # Today/past → start checklist (monthly tenants only)
@@ -4354,6 +4391,7 @@ async def _do_checkout(
     tenant_name: str,
     checkout_date_val: date,
     session: AsyncSession,
+    changed_by: str = "whatsapp",
 ) -> str:
     tenancy = await session.get(Tenancy, tenancy_id)
     if not tenancy:
@@ -4388,6 +4426,18 @@ async def _do_checkout(
     # Past/today → actual checkout
     tenancy.status = TenancyStatus.exited
     tenancy.checkout_date = checkout_date_val
+    from src.database.models import AuditLog as _AuditLog
+    session.add(_AuditLog(
+        changed_by=changed_by,
+        entity_type="tenancy",
+        entity_id=tenancy_id,
+        entity_name=tenant_name,
+        field="status+checkout_date",
+        old_value="active",
+        new_value=f"exited {checkout_date_val.isoformat()}",
+        source="whatsapp",
+        note="Bot checkout",
+    ))
 
     # Notice period check — day-stays have no notice period (deposit always refundable)
     _is_daily = tenancy.stay_type == StayType.daily
@@ -4457,24 +4507,27 @@ async def _do_checkout(
             import logging as _log
             _log.getLogger(__name__).warning("trigger_daywise_sheet_sync failed: %s", e)
     elif room_obj:
+        notice_str = tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None
+        _gs_err = None
         try:
             from src.integrations.gsheets import record_checkout as gsheets_checkout
-            notice_str = tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None
             gs_r = await gsheets_checkout(room_obj.room_number, tenant_name, notice_str)
             if gs_r.get("success"):
                 gsheets_note = "\nSheet updated: EXIT"
-            elif gs_r.get("error"):
-                import logging as _log
-                _log.getLogger(__name__).warning("GSheets checkout: %s", gs_r["error"])
+            else:
+                _gs_err = gs_r.get("error") or "unknown error"
         except Exception as e:
+            _gs_err = str(e)
+        if _gs_err:
             import logging as _log
-            _log.getLogger(__name__).error("GSheets checkout failed: %s", e)
+            _log.getLogger(__name__).error("GSheets checkout failed: %s", _gs_err)
             try:
                 from src.integrations.gsheets import _queue_failed_write
                 _queue_failed_write("record_checkout", {
                     "room_number": room_obj.room_number, "tenant_name": tenant_name,
-                    "notice_date": tenancy.notice_date.strftime("%d/%m/%Y") if tenancy.notice_date else None,
+                    "notice_date": notice_str,
                 })
+                gsheets_note = "\n⚠️ Sheet EXIT update failed — queued for auto-retry"
             except Exception:
                 pass
 
@@ -5537,6 +5590,37 @@ async def _process_checkout_from_form(
             notes=f"Deposit: {int(deposit)}, Deductions: {int(deductions)}. {extracted.get('deductions_reason', '')}".strip(),
         ))
 
+    # Audit trail — form checkout + deposit settlement
+    from src.database.models import AuditLog as _AuditLog
+    session.add(_AuditLog(
+        changed_by=pending.phone or "whatsapp",
+        entity_type="tenancy",
+        entity_id=tenancy.id,
+        entity_name=tenant.name,
+        field="status+checkout_date",
+        old_value="active",
+        new_value=f"exited {checkout_date.isoformat()}",
+        room_number=room_obj.room_number,
+        source="whatsapp",
+        note="Form checkout",
+    ))
+    session.add(_AuditLog(
+        changed_by=pending.phone or "whatsapp",
+        entity_type="tenancy",
+        entity_id=tenancy.id,
+        entity_name=tenant.name,
+        field="deposit_settlement",
+        old_value=str(int(deposit)),
+        new_value=str(int(refund_amount)),
+        room_number=room_obj.room_number,
+        source="whatsapp",
+        note=(
+            f"Refund Rs.{int(refund_amount):,} via {refund_mode}; "
+            f"deductions Rs.{int(deductions):,}"
+            + (f" ({extracted.get('deductions_reason')})" if extracted.get("deductions_reason") else "")
+        ),
+    ))
+
     # Save checkout form as document
     form_path = action_data.get("form_image_path", "")
     if form_path:
@@ -6213,9 +6297,12 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
             )
             if gs_r.get("success"):
                 gsheets_note = "\nSheet updated"
-            elif gs_r.get("error"):
+            else:
+                # Dict-failure: gsheets returns {"success": False} instead of raising,
+                # so this must enqueue too — the except below never sees it.
                 import logging as _log
-                _log.getLogger(__name__).warning("GSheets add_tenant: %s", gs_r["error"])
+                _log.getLogger(__name__).warning("GSheets add_tenant: %s", gs_r.get("error"))
+                raise RuntimeError(gs_r.get("error") or "sheet add_tenant failed")
     except Exception as e:
         import logging as _log
         _log.getLogger(__name__).error("GSheets add_tenant failed: %s", e)
@@ -6230,6 +6317,7 @@ async def _do_add_tenant(data: dict, session: AsyncSession) -> str:
                 "booking": float(advance), "maintenance": float(maintenance),
                 "notes": data.get("notes", ""),
             })
+            gsheets_note = "\n⚠️ Sheet update failed — queued for auto-retry"
         except Exception:
             pass
 

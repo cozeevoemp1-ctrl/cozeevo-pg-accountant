@@ -52,6 +52,7 @@ export default function NewPaymentPage() {
   const [success, setSuccess] = useState(false)
   const [voiceHint, setVoiceHint] = useState("")
   const [waiveRemaining, setWaiveRemaining] = useState(false)
+  const [waiveWarning, setWaiveWarning] = useState<string | null>(null)
 
   const monthScrollRef = useRef<HTMLDivElement>(null)
 
@@ -160,7 +161,12 @@ export default function NewPaymentPage() {
         try {
           await patchAdjustment(tenant.tenancy_id, -Math.round(balanceAfter), "Waived rounding difference")
         } catch {
-          // non-critical — payment already saved
+          // Payment is already saved — but the waive did NOT apply, so the
+          // tenant still shows this balance. Must be surfaced, not swallowed.
+          setWaiveWarning(
+            `Waive of ${rupee(Math.round(balanceAfter))} failed — tenant still shows that balance. ` +
+            `Apply it again from the tenant's edit page.`
+          )
         }
       }
 
@@ -179,7 +185,7 @@ export default function NewPaymentPage() {
   function resetForm() {
     setSuccess(false); setTenant(null); setDues(null); setAmount(""); setNotes("")
     setScannedFile(null); setReceiptUrl(null); setTransactionId(null); setLastPaymentId(null)
-    setWaiveRemaining(false)
+    setWaiveRemaining(false); setWaiveWarning(null)
   }
 
   if (success) {
@@ -193,6 +199,11 @@ export default function NewPaymentPage() {
           <h1 className="text-xl font-extrabold text-ink">Payment Saved!</h1>
           <p className="text-sm text-ink-muted mt-1">Synced to Supabase + Ops Sheet</p>
         </div>
+        {waiveWarning && (
+          <div className="w-full max-w-sm rounded-card bg-[#FFF5F0] border border-status-warn px-4 py-3 text-xs font-medium text-status-warn">
+            {waiveWarning}
+          </div>
+        )}
         {tenant && (
           <div className="w-full max-w-sm bg-surface rounded-card border border-border p-4 flex flex-col gap-2">
             <Row label="Tenant" value={tenant.name} />

@@ -127,6 +127,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
   const [error,   setError]   = useState("");
   const [success, setSuccess] = useState(false);
   const [fullDues, setFullDues] = useState<import("@/lib/api").TenantDues | null>(null);
+  // Legs already posted to the server — a retry after a partial failure must not re-post them
+  const posted = useRef({ cash: false, upi: false, deposit: false });
 
   useEffect(() => {
     if (!item.tenancy_id) return;
@@ -147,13 +149,29 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
     setSaving(true); setError("");
     const pm = periodMonth();
     try {
-      if (ca > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ca, method: "CASH", for_type: "rent",    period_month: pm });
-      if (ua > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: ua, method: "UPI",  for_type: "rent",    period_month: pm });
-      if (da > 0) await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: depositMethod, for_type: "deposit", period_month: pm });
+      if (ca > 0 && !posted.current.cash) {
+        await createPayment({ tenant_id: fullDues.tenant_id, amount: ca, method: "CASH", for_type: "rent",    period_month: pm });
+        posted.current.cash = true;
+      }
+      if (ua > 0 && !posted.current.upi) {
+        await createPayment({ tenant_id: fullDues.tenant_id, amount: ua, method: "UPI",  for_type: "rent",    period_month: pm });
+        posted.current.upi = true;
+      }
+      if (da > 0 && !posted.current.deposit) {
+        await createPayment({ tenant_id: fullDues.tenant_id, amount: da, method: depositMethod, for_type: "deposit", period_month: pm });
+        posted.current.deposit = true;
+      }
       setSuccess(true);
       setTimeout(() => { onSuccess(); onClose(); }, 1200);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Payment failed");
+      const done: string[] = [];
+      if (posted.current.cash && ca > 0) done.push("cash rent");
+      if (posted.current.upi && ua > 0) done.push("UPI rent");
+      if (posted.current.deposit && da > 0) done.push("deposit");
+      const base = err instanceof Error ? err.message : "Payment failed";
+      setError(done.length
+        ? `${base} — ${done.join(" + ")} already recorded; retry will post only the remaining part.`
+        : base);
     } finally {
       setSaving(false);
     }
@@ -200,8 +218,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                 type="number" inputMode="numeric"
                 value={cashAmt} onChange={(e) => setCashAmt(e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
-                placeholder="0" min="0"
-                className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                placeholder="0" min="0" disabled={posted.current.cash}
+                className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink disabled:opacity-50"
                 autoFocus
               />
             </div>
@@ -215,8 +233,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                 type="number" inputMode="numeric"
                 value={upiAmt} onChange={(e) => setUpiAmt(e.target.value)}
                 onWheel={(e) => e.currentTarget.blur()}
-                placeholder="0" min="0"
-                className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                placeholder="0" min="0" disabled={posted.current.upi}
+                className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink disabled:opacity-50"
               />
             </div>
 
@@ -230,8 +248,8 @@ function QuickCollectModal({ item, onClose, onSuccess }: {
                   type="number" inputMode="numeric"
                   value={depositAmt} onChange={(e) => setDepositAmt(e.target.value)}
                   onWheel={(e) => e.currentTarget.blur()}
-                  placeholder="0" min="0"
-                  className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                  placeholder="0" min="0" disabled={posted.current.deposit}
+                  className="w-full text-xl font-bold rounded-lg bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink disabled:opacity-50"
                 />
                 <div className="flex gap-1.5 mt-1.5">
                   {(["CASH", "UPI"] as PayMethod[]).map((m) => (

@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
-    BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
+    AuditLog, BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
     InvestmentExpense, Payment, PaymentFor, PaymentMode, PnlMonthlyAdjustment,
     Tenancy, Tenant, UpiCollectionEntry,
 )
@@ -475,6 +475,16 @@ async def add_cash_expense(
         )
         session.add(expense)
         await session.flush()
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="cash_expense",
+            entity_id=expense.id,
+            field="created",
+            old_value=None,
+            new_value=str(amount),
+            source="app",
+            note=f"{exp_date} · {desc_clean} · paid by {body['paid_by']}",
+        ))
         result = {
             "id": expense.id,
             "date": str(expense.date),
@@ -500,29 +510,49 @@ async def edit_cash_expense(
             raise HTTPException(status_code=404, detail="Expense not found")
         if expense.is_void:
             raise HTTPException(status_code=400, detail="Cannot edit a voided expense")
+        changes: dict[str, tuple[str, str]] = {}
         if "date" in body:
             try:
                 from datetime import date as _date_type
-                expense.date = _date_type.fromisoformat(body["date"])
+                new_date = _date_type.fromisoformat(body["date"])
             except ValueError:
                 raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+            if new_date != expense.date:
+                changes["date"] = (str(expense.date), str(new_date))
+            expense.date = new_date
         if "description" in body:
             desc = str(body["description"]).strip()
             if not desc:
                 raise HTTPException(status_code=400, detail="description cannot be empty")
+            if desc != expense.description:
+                changes["description"] = (expense.description, desc)
             expense.description = desc
         if "amount" in body:
             try:
                 amount = float(body["amount"])
                 if amount <= 0:
                     raise ValueError
-                expense.amount = amount
             except (ValueError, TypeError):
                 raise HTTPException(status_code=400, detail="amount must be a positive number")
+            if amount != float(expense.amount):
+                changes["amount"] = (str(float(expense.amount)), str(amount))
+            expense.amount = amount
         if "paid_by" in body:
             if body["paid_by"] not in ("Prabhakaran", "Lakshmi", "Other"):
                 raise HTTPException(status_code=400, detail="paid_by must be Prabhakaran, Lakshmi, or Other")
+            if body["paid_by"] != expense.paid_by:
+                changes["paid_by"] = (expense.paid_by, body["paid_by"])
             expense.paid_by = body["paid_by"]
+        for fld, (old_v, new_v) in changes.items():
+            session.add(AuditLog(
+                changed_by=user.phone or user.actor,
+                entity_type="cash_expense",
+                entity_id=expense.id,
+                field=fld,
+                old_value=old_v,
+                new_value=new_v,
+                source="app",
+            ))
         await session.commit()
     return {
         "id": expense.id,
@@ -549,6 +579,16 @@ async def void_cash_expense(
             raise HTTPException(status_code=400, detail="Already voided")
         expense.is_void = True
         expense.voided_at = datetime.now(timezone.utc)
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="cash_expense",
+            entity_id=expense.id,
+            field="is_void",
+            old_value="False",
+            new_value="True",
+            source="app",
+            note=f"{expense.date} · {expense.description} · Rs.{float(expense.amount):,.0f}",
+        ))
         await session.commit()
     return {"ok": True, "id": expense_id}
 
@@ -598,6 +638,16 @@ async def log_cash_count(
         )
         session.add(count)
         await session.flush()
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="cash_count",
+            entity_id=count.id,
+            field="created",
+            old_value=None,
+            new_value=str(amount),
+            source="app",
+            note=f"Cash count {count_date} by {body['counted_by']}",
+        ))
         result = {
             "id": count.id,
             "date": str(count.date),
@@ -915,6 +965,16 @@ async def get_pnl_adjustments(
     }
 
 
+def _norm_adj(v):
+    """Normalize Decimal/float/str for change comparison in adjustments audit."""
+    if v is None:
+        return None
+    try:
+        return round(float(v), 2)
+    except (TypeError, ValueError):
+        return str(v)
+
+
 @router.post("/finance/pnl/adjustments")
 async def save_pnl_adjustments(
     body: dict,
@@ -937,25 +997,48 @@ async def save_pnl_adjustments(
             raise HTTPException(status_code=400, detail=f"{k} must be >= 0")
         return v
 
-    vals = {
-        "cash_holding":   _num("cash_holding"),
-        "rent_paid_cash": _num("rent_paid_cash"),
-        "cash_expense":   _num("cash_expense"),
-        "offline_cash":   _num("offline_cash"),
-        "notes":          (str(body["notes"]).strip() if body.get("notes") else None),
-        "updated_by":     user.phone,
-    }
+    # Partial update: only fields actually present in the request body are touched.
+    # (Saving from a card that omits offline_cash/notes must NOT wipe them — M1.)
+    _NUM_FIELDS = ("cash_holding", "rent_paid_cash", "cash_expense", "offline_cash")
+    vals: dict = {k: _num(k) for k in _NUM_FIELDS if k in body}
+    if "notes" in body:
+        vals["notes"] = (str(body["notes"]).strip() if body.get("notes") else None)
+    if not vals:
+        raise HTTPException(status_code=400, detail="No adjustment fields in body")
+    vals["updated_by"] = user.phone
+
     async with get_session() as session:
         row = await session.scalar(
             select(PnlMonthlyAdjustment).where(PnlMonthlyAdjustment.month == mon)
         )
         if row:
+            changes = {
+                k: (getattr(row, k), v) for k, v in vals.items()
+                if k != "updated_by" and _norm_adj(getattr(row, k)) != _norm_adj(v)
+            }
             for k, v in vals.items():
                 setattr(row, k, v)
         else:
-            session.add(PnlMonthlyAdjustment(month=mon, **vals))
+            for k in _NUM_FIELDS:
+                vals.setdefault(k, 0.0)
+            row = PnlMonthlyAdjustment(month=mon, **vals)
+            session.add(row)
+            changes = {k: (None, vals[k]) for k in vals if k != "updated_by"}
+        await session.flush()
+        for fld, (old_v, new_v) in changes.items():
+            session.add(AuditLog(
+                changed_by=user.phone or user.actor,
+                entity_type="pnl_adjustment",
+                entity_id=row.id,
+                field=fld,
+                old_value=None if old_v is None else str(old_v),
+                new_value=None if new_v is None else str(new_v),
+                source="app",
+                note=f"P&L manual figure for {month}",
+            ))
+        out = {k: float(getattr(row, k) or 0) for k in _NUM_FIELDS}
         await session.commit()
-    return {"ok": True, "month": month, **{k: vals[k] for k in ("cash_holding", "rent_paid_cash", "cash_expense")}}
+    return {"ok": True, "month": month, **out}
 
 
 @router.get("/finance/pnl/live")

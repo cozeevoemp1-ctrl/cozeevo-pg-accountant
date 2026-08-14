@@ -434,6 +434,9 @@ async def _do_log_payment_by_ids(
             source="whatsapp",
             room_number=_room_obj.room_number if _room_obj else None,
             entity_name=tenant.name,
+            # "Log anyway" (or an intentional pair) must also bypass the hard
+            # unique_hash — otherwise a genuine second identical payment 500s.
+            allow_duplicate=skip_duplicate_check,
         )
     except ValueError as _ve:
         if "duplicate_payment" in str(_ve):
@@ -499,27 +502,35 @@ async def _do_log_payment_by_ids(
     # ── Google Sheets write-back ──────────────────────────────────────────────
     import asyncio as _aio
     from src.integrations import gsheets as _gs
+    sheet_note = ""
     if is_daily_stay:
         # Day-wise: regenerate full DAY WISE tab from DB (correct columns/totals)
         _gs.trigger_daywise_sheet_sync()
     elif room_obj:
+        _gs_kwargs = {
+            "room_number": room_obj.room_number,
+            "tenant_name": tenant.name,
+            "amount": float(amount_dec),
+            "method": mode,
+            "month": period_month.month,
+            "year": period_month.year,
+            "entered_by": ctx_name or "bot",
+            "is_daily": False,
+        }
+        _gs_err = None
         try:
-            await _aio.wait_for(_gs.update_payment(
-                room_number=room_obj.room_number,
-                tenant_name=tenant.name,
-                amount=float(amount_dec),
-                method=mode,
-                month=period_month.month,
-                year=period_month.year,
-                entered_by=ctx_name or "bot",
-                is_daily=False,
-            ), timeout=10)
+            _gs_result = await _aio.wait_for(_gs.update_payment(**_gs_kwargs), timeout=10)
+            if not (_gs_result and _gs_result.get("success")):
+                _gs_err = (_gs_result or {}).get("error") or "unknown error"
         except _aio.TimeoutError:
-            import logging as _logging
-            _logging.getLogger(__name__).warning("GSheets write-back timed out (10s)")
+            _gs_err = "timed out (10s)"
         except Exception as e:
+            _gs_err = str(e)
+        if _gs_err:
             import logging as _logging
-            _logging.getLogger(__name__).error("GSheets write-back failed: %s", e)
+            _logging.getLogger(__name__).error("GSheets write-back failed: %s", _gs_err)
+            _gs._queue_failed_write("update_payment", _gs_kwargs)
+            sheet_note = "\n⚠️ Sheet update failed — queued for auto-retry"
         _gs.trigger_monthly_sheet_sync(period_month.month, period_month.year)
 
     # ── Payment-received WhatsApp template (fire-and-forget) ──
@@ -576,6 +587,7 @@ async def _do_log_payment_by_ids(
         f"Status: {status_str}"
         f"{underpayment_note}"
         f"{wrong_month_note}"
+        f"{sheet_note}"
         f"{overpayment_pending}"
     )
 
