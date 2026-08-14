@@ -1,6 +1,8 @@
 # Spec 01 — Finance page rework: one P&L engine, drill-down, reclassify, guardrails
 
-> Status: **approved design, build phase by phase** (Kiran 2026-08-14).
+> Status: **Phase 1 DONE 2026-08-14** (on development; verified vs July close ₹14,00,408 / 31.7%).
+> Phases 2–6 pending. Layout note from Kiran: keep the P&L SHORT — collapsed top-level
+> nodes, SAC-style hierarchy expansion (implemented in Phase 1's PnlMonthCard).
 > Invocation per phase: "Read docs/specs/01-finance-pnl-page.md, implement Phase N exactly as specified."
 > One phase = one build/test/commit cycle. Do not start Phase N+1 until Phase N is verified.
 
@@ -96,7 +98,14 @@ show a "being rebuilt" note or stay hidden — no wrong numbers on screen.
 
 ## Phases & user stories
 
-### Phase 1 — SOP P&L on screen (replaces three-statement P&L section)
+### Phase 1 — SOP P&L on screen (replaces three-statement P&L section) — ✅ DONE 2026-08-14
+Built: `GET /finance/pnl/month` (+ pure tree builders `_pnl_tree` / `_build_pnl_tree_dynamic`
+/ `_build_pnl_tree_frozen` in finance.py), `web/components/finance/pnl-month-card.tsx`
+(SAC-style expandable hierarchy, 5 collapsed top-level rows), page swap (ThreeStatementTab
+removed from page; file kept for Phase 5–6 reference), `tests/test_pnl_tree.py` (5 parity
+tests, wired into pre-push). Live check: Jun'26 net ₹8,95,323 / Jul'26 net ₹14,00,408 (31.7%)
+== Kiran's verified July close. Node keys (income.bank.THOR, opex.<Category>, deposits.*)
+are the Phase-2 drill-down contract.
 - **US-1.1** As owner, I pick a month on the Finance page and see that month's P&L with the
   exact SOP lines (income rows per account, cash line, Gross Inflows, Less: deposits,
   True Revenue, OPEX by category, excluded items inline, Net Operating + margin) — the same

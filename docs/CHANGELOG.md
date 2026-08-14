@@ -1,5 +1,15 @@
 # Changelog
 
+## Session AG (cont.) — 2026-08-14 — Finance P&L rework Phase 1: SOP hierarchy on screen
+
+Spec `docs/specs/01-finance-pnl-page.md` Phase 1 implemented (Kiran: "keep P&L short, SAC-style hierarchy, dynamically drillable").
+
+- **`GET /api/v2/app/finance/pnl/month?month=YYYY-MM`** — one month's SOP P&L as a node tree. Dynamic months reshape `_compute_dynamic_pnl_months()` records; frozen months come from `pnl_verified_data`; both flow through ONE shared assembler (`_pnl_tree`) so the math cannot diverge: True Revenue = Gross − deposits held − deposits refunded; Net Operating = True Revenue − Total Opex. No new math anywhere — reshape only.
+- **`pnl-month-card.tsx`** — collapsed 5-line P&L (Gross inflows / Deposit pass-throughs / True revenue / OPEX / Net operating), each node expands SAC-style into children (bank income per account, cash incl. offline, OPEX by category, manual figures tagged "manual", non-op detail as display-only). MonthNav picker, frozen badge, empty state for months with no bank rows. Node keys are the Phase-2 drill-down contract (`drillable` flags already set).
+- **Three-statement card removed from the page** — its P&L deviated from the SOP in 6 documented ways (see spec). BS/CF return in Phases 5–6 rebuilt on SOP outputs; `three_statement.py` + component kept on disk as reference.
+- **Parity pinned by tests** — `tests/test_pnl_tree.py` (5 tests, added to pre-push): totals follow SOP formulas; tree sums == `pnl_builder._dynamic_line_values` Excel translation; children sum to parents; manual rows marked; frozen months not drillable.
+- **Live verification:** Jul'26 from the endpoint = Net Operating ₹14,00,408 (31.7%) — identical to Kiran's verified July close. Jun'26 ₹8,95,323. Aug shows empty state until its CSV is uploaded.
+
 ## Session AG — 2026-08-14 — Audit fixes: 11 CRITICAL/HIGH findings from the 2026-08-12 audit
 
 Kiran approved the audit triage ("go ahead"). Fixed one finding at a time, all on `development`. Verified: py_compile + module imports OK, `tsc --noEmit` clean, 20/20 unit tests (dues + cash logic). NOT yet merged to master — payment paths need a smoke test first.

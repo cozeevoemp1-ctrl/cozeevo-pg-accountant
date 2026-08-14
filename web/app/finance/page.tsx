@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { OccupancyTab } from "@/components/finance/occupancy-tab"
 import { InvestmentSection } from "@/components/finance/investment-section"
-import { ThreeStatementTab } from "@/components/finance/three-statement-tab"
+import { PnlMonthCard } from "@/components/finance/pnl-month-card"
 import { UploadCard } from "@/components/finance/upload-card"
 import { FinanceUploadResult, downloadPnlExcel } from "@/lib/api"
 import { PnlAdjustmentsCard } from "@/components/finance/pnl-adjustments-card"
@@ -86,7 +86,10 @@ export default function FinancePage() {
 
       <PnlAdjustmentsCard />
 
-      <ThreeStatementTab key={refreshKey} />
+      {/* SOP P&L hierarchy — same engine as the Excel (spec 01 Phase 1).
+          Balance Sheet + Cash Flow return in Phases 5–6, rebuilt on SOP outputs
+          (the old three-statement card deviated from the SOP and was retired). */}
+      <PnlMonthCard key={refreshKey} />
       <OccupancyTab />
       <InvestmentSection />
     </main>
