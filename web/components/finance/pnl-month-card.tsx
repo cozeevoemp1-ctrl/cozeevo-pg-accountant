@@ -68,7 +68,12 @@ function NodeRow({ node, depth, expanded, onToggle }: {
   )
 }
 
-export function PnlMonthCard() {
+export function PnlMonthCard({ refreshSignal }: {
+  /** Bump `n` to refetch; set `month` to also jump the view there
+      (fired after CSV upload / manual-figures save — the server computes
+      live, so a refetch IS the recalculation). */
+  refreshSignal?: { month?: string; n: number }
+} = {}) {
   const [month, setMonth] = useState(periodMonth())
   const [data, setData] = useState<PnlMonthResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -89,6 +94,16 @@ export function PnlMonthCard() {
   }, [])
 
   useEffect(() => { load(month) }, [month, load])
+
+  // External refresh: after an upload or a manual-figures save the page bumps
+  // the signal; jump to that month (if given) or refetch the current one.
+  useEffect(() => {
+    if (!refreshSignal || refreshSignal.n === 0) return
+    const m = refreshSignal.month
+    if (m && m !== month) setMonth(m)  // month effect triggers the load
+    else load(month)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal?.n])
 
   function toggle(key: string) {
     setExpanded((prev) => {

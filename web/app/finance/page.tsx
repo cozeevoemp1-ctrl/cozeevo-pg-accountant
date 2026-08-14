@@ -13,8 +13,9 @@ import { supabase } from "@/lib/supabase"
 
 export default function FinancePage() {
   const router = useRouter()
-  // Bump on every successful upload → remounts ThreeStatementTab so it refetches
-  const [refreshKey, setRefreshKey] = useState(0)
+  // Bumped after CSV upload / manual-figures save → PnlMonthCard jumps to that
+  // month and refetches (the server computes live; a refetch IS the recalc).
+  const [pnlSignal, setPnlSignal] = useState<{ month?: string; n: number }>({ n: 0 })
   const [lastUpload, setLastUpload] = useState<FinanceUploadResult | null>(null)
   const [pnlState, setPnlState] = useState<"idle" | "loading" | "error">("idle")
   const [pnlError, setPnlError] = useState("")
@@ -42,7 +43,8 @@ export default function FinancePage() {
 
   function handleUploaded(res: FinanceUploadResult) {
     setLastUpload(res)
-    setRefreshKey(k => k + 1)
+    const latest = res.months_affected[res.months_affected.length - 1]
+    setPnlSignal(s => ({ month: latest, n: s.n + 1 }))
   }
 
   return (
@@ -84,12 +86,12 @@ export default function FinancePage() {
         </p>
       </div>
 
-      <PnlAdjustmentsCard />
+      <PnlAdjustmentsCard onSaved={(m) => setPnlSignal(s => ({ month: m, n: s.n + 1 }))} />
 
       {/* SOP P&L hierarchy — same engine as the Excel (spec 01 Phase 1).
           Balance Sheet + Cash Flow return in Phases 5–6, rebuilt on SOP outputs
           (the old three-statement card deviated from the SOP and was retired). */}
-      <PnlMonthCard key={refreshKey} />
+      <PnlMonthCard refreshSignal={pnlSignal} />
       <OccupancyTab />
       <InvestmentSection />
     </main>

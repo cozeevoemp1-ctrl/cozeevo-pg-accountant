@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getPnlAdjustments, savePnlAdjustments } from "@/lib/api";
+import { rupee } from "@/lib/format";
 import { periodMonth } from "@/lib/date";
 
 const FIELDS: { key: "cash_holding" | "rent_paid_cash" | "cash_expense"; label: string; hint: string }[] = [
@@ -10,9 +11,12 @@ const FIELDS: { key: "cash_holding" | "rent_paid_cash" | "cash_expense"; label: 
   { key: "cash_expense",   label: "Cash expense (other)",        hint: "Other operating costs paid in cash — OPEX" },
 ];
 
-export function PnlAdjustmentsCard() {
+export function PnlAdjustmentsCard({ onSaved }: { onSaved?: (month: string) => void } = {}) {
   const [month, setMonth] = useState(periodMonth());
   const [vals, setVals] = useState({ cash_holding: "", rent_paid_cash: "", cash_expense: "" });
+  // Values as loaded from the server — used to detect overwrites of saved figures
+  const [saved, setSaved] = useState({ cash_holding: 0, rent_paid_cash: 0, cash_expense: 0 });
+  const [overwriteWarning, setOverwriteWarning] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(false);
   const [state, setState] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
@@ -28,6 +32,12 @@ export function PnlAdjustmentsCard() {
         rent_paid_cash: a.rent_paid_cash ? String(a.rent_paid_cash) : "",
         cash_expense:   a.cash_expense   ? String(a.cash_expense)   : "",
       });
+      setSaved({
+        cash_holding:   a.cash_holding   || 0,
+        rent_paid_cash: a.rent_paid_cash || 0,
+        cash_expense:   a.cash_expense   || 0,
+      });
+      setOverwriteWarning(null);
       setState("idle");
     } catch (e) {
       setError(e instanceof Error ? e.message : "could not load");
@@ -38,6 +48,18 @@ export function PnlAdjustmentsCard() {
   useEffect(() => { load(month); }, [month, load]);
 
   async function save() {
+    // Overwrite guardrail: changing an already-saved non-zero figure needs a
+    // second tap (a test save once clobbered July's closed rent figure).
+    if (!overwriteWarning) {
+      const diffs = FIELDS
+        .filter((f) => saved[f.key] > 0 && (parseFloat(vals[f.key]) || 0) !== saved[f.key])
+        .map((f) => `${f.label}: ${rupee(saved[f.key])} → ${rupee(parseFloat(vals[f.key]) || 0)}`);
+      if (diffs.length > 0) {
+        setOverwriteWarning(diffs);
+        return;
+      }
+    }
+    setOverwriteWarning(null);
     setState("saving");
     setError("");
     try {
@@ -48,6 +70,9 @@ export function PnlAdjustmentsCard() {
         cash_expense:   parseFloat(vals.cash_expense)   || 0,
       });
       setState("saved");
+      // The P&L is computed live server-side — telling the page the month is
+      // enough to "recalculate": the P&L card jumps there and refetches.
+      onSaved?.(month);
       setTimeout(() => setState("idle"), 1600);
     } catch (e) {
       setError(e instanceof Error ? e.message : "save failed");
@@ -89,7 +114,7 @@ export function PnlAdjustmentsCard() {
                 <input
                   type="number" inputMode="numeric" min="0"
                   value={vals[f.key]}
-                  onChange={(e) => setVals((v) => ({ ...v, [f.key]: e.target.value }))}
+                  onChange={(e) => { setOverwriteWarning(null); setVals((v) => ({ ...v, [f.key]: e.target.value })); }}
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0"
                   disabled={state === "loading"}
@@ -104,12 +129,32 @@ export function PnlAdjustmentsCard() {
             <p className="text-[10px] text-status-warn text-center">Could not save — {error}</p>
           )}
 
+          {overwriteWarning && (
+            <div className="rounded-lg bg-[#FFF5F0] border border-status-warn px-3 py-2 flex flex-col gap-1">
+              <p className="text-[11px] font-bold text-status-warn">
+                This month already has saved figures — you are changing:
+              </p>
+              {overwriteWarning.map((d) => (
+                <p key={d} className="text-[11px] text-status-warn">{d}</p>
+              ))}
+              <button
+                onClick={() => setOverwriteWarning(null)}
+                className="self-end text-[10px] font-bold text-ink-muted underline"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           <button
             onClick={save}
             disabled={state === "saving" || state === "loading"}
             className="w-full rounded-pill bg-brand-pink py-2.5 text-sm font-bold text-white active:opacity-70 disabled:opacity-50"
           >
-            {state === "saving" ? "Saving…" : state === "saved" ? "Saved ✓" : `Save ${month} figures`}
+            {state === "saving" ? "Saving…"
+              : state === "saved" ? "Saved ✓"
+              : overwriteWarning ? "Confirm overwrite"
+              : `Save ${month} figures`}
           </button>
         </>
       )}
