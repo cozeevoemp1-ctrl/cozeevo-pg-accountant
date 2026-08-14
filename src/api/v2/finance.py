@@ -27,7 +27,7 @@ from src.database.db_manager import get_session
 from src.database.models import (
     AuditLog, BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
     InvestmentExpense, Payment, PaymentFor, PaymentMode, PnlMonthlyAdjustment,
-    Tenancy, Tenant, UpiCollectionEntry,
+    Room, Tenancy, Tenant, UpiCollectionEntry,
 )
 from src.parsers.yes_bank import read_yes_bank_csv
 from src.reports.pnl_builder import MONTHS as PNL_VERIFIED_MONTHS, build_pnl_bytes
@@ -131,6 +131,8 @@ async def _detect_tenant_refunds(session) -> int:
             select(BankTransaction).where(
                 BankTransaction.txn_type == "expense",
                 BankTransaction.category == "Other Expenses",
+                # Never touch rows the owner reclassified by hand (spec 01 Phase 3)
+                BankTransaction.manual_category == False,
             )
         )).all()
         n = 0
@@ -438,10 +440,12 @@ def _build_pnl_tree_dynamic(d: dict):
         for sub, amt in sorted(detail.items(), key=lambda kv: -kv[1]):
             if amt:
                 excluded_children.append(_pnl_node(
-                    f"excluded.nonop.{sub}", f"{sub} (non-op)", -amt, display_only=True))
+                    f"excluded.nonop.{sub}", f"{sub} (non-op)", -amt,
+                    display_only=True, drillable=True))
     elif d.get("non_op"):
         excluded_children.append(_pnl_node(
-            "excluded.nonop", "Non-operating outflows", -d["non_op"], display_only=True))
+            "excluded.nonop", "Non-operating outflows", -d["non_op"],
+            display_only=True, drillable=True))
     return _pnl_tree(
         income_children, d.get("sec_dep", 0), d.get("maint", 0),
         d.get("dep_refunded", 0), opex_children, excluded_children, drillable=True,
@@ -501,6 +505,234 @@ async def get_pnl_month(
     tree, totals = _build_pnl_tree_dynamic(rec)
     return {"month": month, "label": label, "is_frozen": False,
             "has_data": True, "tree": tree, "totals": totals}
+
+
+# ── P&L drill-down: the transactions behind one line (spec 01, Phase 2) ───────
+# Each line key maps to the SAME WHERE clauses the engine uses, so the listed
+# rows always sum to the line amount. A mismatch means engine drift — the UI
+# shows it as a warning instead of hiding it.
+
+# Income categories excluded from revenue (mirrors the engine's income query)
+_INCOME_EXCLUDED_CATS = ["Advance Deposit", "Non-Operating"]
+# Allowed reclassification targets for income-side bank rows
+_INCOME_CATS = ["Rent Income", "Other Income", "Advance Deposit", "Non-Operating"]
+
+
+def _bank_row(t: BankTransaction) -> dict:
+    return {
+        "id": t.id,
+        "source": "bank",
+        "date": t.txn_date.isoformat(),
+        "description": t.description or "",
+        "account": t.account_name,
+        "amount": float(t.amount or 0),
+        "category": t.category,
+        "sub_category": t.sub_category or "",
+        "manual_category": bool(t.manual_category),
+        "reclassifiable": True,
+    }
+
+
+@router.get("/finance/pnl/line-items")
+async def get_pnl_line_items(
+    month: str = Query(..., description="YYYY-MM"),
+    key: str = Query(..., description="P&L line key, e.g. opex.Other Expenses"),
+    user: AppUser = Depends(get_current_user),
+):
+    _require_admin(user)
+    _validate_month(month)
+    if (not is_demo_mode()) and month in _VERIFIED_YM:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{month} is a verified frozen month — its figures are hardcoded, there are no rows to list",
+        )
+    y, mo = int(month[:4]), int(month[5:7])
+    start = date(y, mo, 1)
+    end = date(y, mo, _calendar.monthrange(y, mo)[1])
+
+    rows: list[dict] = []
+    async with get_session() as session:
+        if key in ("income.bank.THOR", "income.bank.HULK"):
+            acct = key.rsplit(".", 1)[-1]
+            txns = (await session.scalars(
+                select(BankTransaction).where(
+                    BankTransaction.txn_type == "income",
+                    BankTransaction.account_name == acct,
+                    BankTransaction.txn_date.between(start, end),
+                    BankTransaction.category.notin_(_INCOME_EXCLUDED_CATS),
+                ).order_by(BankTransaction.amount.desc())
+            )).all()
+            rows = [_bank_row(t) for t in txns]
+
+        elif key == "income.cash":
+            res = await session.execute(
+                select(Payment, Tenant.name, Room.room_number)
+                .join(Tenancy, Payment.tenancy_id == Tenancy.id)
+                .join(Tenant, Tenancy.tenant_id == Tenant.id)
+                .outerjoin(Room, Tenancy.room_id == Room.id)
+                .where(
+                    Payment.payment_mode == PaymentMode.cash,
+                    Payment.is_void == False,
+                    Payment.payment_date.between(start, end),
+                ).order_by(Payment.payment_date)
+            )
+            for pay, tname, room_no in res:
+                ft = pay.for_type.value if hasattr(pay.for_type, "value") else str(pay.for_type or "")
+                rows.append({
+                    "id": pay.id, "source": "payment",
+                    "date": pay.payment_date.isoformat(),
+                    "description": f"{tname} · Room {room_no or '—'} · {ft}",
+                    "amount": float(pay.amount or 0),
+                    "reclassifiable": False,
+                })
+            adj = await session.scalar(
+                select(PnlMonthlyAdjustment).where(PnlMonthlyAdjustment.month == start)
+            )
+            if adj and float(adj.offline_cash or 0):
+                rows.append({
+                    "id": None, "source": "manual", "date": month,
+                    "description": "Offline cash (manual figure — never entered in app)",
+                    "amount": float(adj.offline_cash), "reclassifiable": False,
+                })
+
+        elif key == "deposits.received":
+            res = await session.execute(
+                select(Tenant.name, Room.room_number, Tenancy.checkin_date,
+                       Tenancy.security_deposit, Tenancy.maintenance_fee)
+                .select_from(Tenancy)
+                .join(Tenant, Tenancy.tenant_id == Tenant.id)
+                .outerjoin(Room, Tenancy.room_id == Room.id)
+                .where(
+                    func.extract("year", Tenancy.checkin_date) == y,
+                    func.extract("month", Tenancy.checkin_date) == mo,
+                    Tenancy.status == "active",
+                ).order_by(Tenancy.checkin_date)
+            )
+            for tname, room_no, cin, dep, maint in res:
+                amt = float(dep or 0) - float(maint or 0)
+                if amt:
+                    rows.append({
+                        "id": None, "source": "tenancy", "date": cin.isoformat(),
+                        "description": f"{tname} · Room {room_no or '—'} · refundable deposit",
+                        "amount": amt, "reclassifiable": False,
+                    })
+
+        elif key == "deposits.maintenance":
+            res = await session.execute(
+                select(Tenant.name, Room.room_number, Tenancy.checkout_date, Tenancy.maintenance_fee)
+                .select_from(Tenancy)
+                .join(Tenant, Tenancy.tenant_id == Tenant.id)
+                .outerjoin(Room, Tenancy.room_id == Room.id)
+                .where(
+                    func.extract("year", Tenancy.checkout_date) == y,
+                    func.extract("month", Tenancy.checkout_date) == mo,
+                    Tenancy.status == "exited",
+                ).order_by(Tenancy.checkout_date)
+            )
+            for tname, room_no, cout, maint in res:
+                if float(maint or 0):
+                    rows.append({
+                        "id": None, "source": "tenancy", "date": cout.isoformat(),
+                        "description": f"{tname} · Room {room_no or '—'} · maintenance kept at exit",
+                        "amount": float(maint), "reclassifiable": False,
+                    })
+
+        elif key == "deposits.refunded":
+            txns = (await session.scalars(
+                select(BankTransaction).where(
+                    BankTransaction.txn_type == "expense",
+                    BankTransaction.category == "Tenant Deposit Refund",
+                    BankTransaction.txn_date.between(start, end),
+                ).order_by(BankTransaction.amount.desc())
+            )).all()
+            rows = [_bank_row(t) for t in txns]
+
+        elif key.startswith("opex.") and not key.startswith("opex.manual."):
+            # No allowlist here: legacy categories (e.g. "Furniture & Supplies")
+            # exist in old rows and must still be listable. Unknown cat → 0 rows.
+            cat = key[len("opex."):]
+            txns = (await session.scalars(
+                select(BankTransaction).where(
+                    BankTransaction.txn_type == "expense",
+                    BankTransaction.category == cat,
+                    BankTransaction.txn_date.between(start, end),
+                ).order_by(BankTransaction.amount.desc())
+            )).all()
+            rows = [_bank_row(t) for t in txns]
+
+        elif key.startswith("excluded.nonop"):
+            sub = key[len("excluded.nonop."):] if key.startswith("excluded.nonop.") else None
+            q = select(BankTransaction).where(
+                BankTransaction.txn_type == "expense",
+                BankTransaction.category == "Non-Operating",
+                BankTransaction.txn_date.between(start, end),
+            )
+            if sub:
+                q = q.where(func.coalesce(
+                    func.nullif(BankTransaction.sub_category, ""), "Other non-operating") == sub)
+            txns = (await session.scalars(q.order_by(BankTransaction.amount.desc()))).all()
+            rows = [_bank_row(t) for t in txns]
+
+        else:
+            raise HTTPException(status_code=400, detail=f"Line '{key}' has no drill-down")
+
+    return {
+        "month": month,
+        "key": key,
+        "rows": rows,
+        "total": round(sum(r["amount"] for r in rows), 2),
+        # Fixed category lists come from the backend — the UI must never hardcode them
+        "reclass_categories": {"expense": EXPENSE_CATS, "income": _INCOME_CATS},
+    }
+
+
+# ── Reclassify one bank transaction (spec 01, Phase 3) ────────────────────────
+
+@router.patch("/finance/transactions/{txn_id}")
+async def reclassify_transaction(
+    txn_id: int,
+    body: dict,
+    user: AppUser = Depends(get_current_user),
+):
+    """Owner override of a transaction's category. Sets manual_category=True so
+    classifier passes and re-uploads can never undo the correction. Audited."""
+    _require_admin(user)
+    category = str(body.get("category", "")).strip()
+    sub_category = body.get("sub_category")
+
+    async with get_session() as session:
+        txn = await session.get(BankTransaction, txn_id)
+        if not txn:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        allowed = EXPENSE_CATS if txn.txn_type == "expense" else _INCOME_CATS
+        if category not in allowed:
+            raise HTTPException(
+                status_code=422,
+                detail=f"category must be one of: {', '.join(allowed)}",
+            )
+        if category == txn.category and (sub_category is None or sub_category == txn.sub_category):
+            return {"ok": True, "id": txn.id, "category": txn.category,
+                    "sub_category": txn.sub_category, "manual_category": bool(txn.manual_category),
+                    "unchanged": True}
+
+        old_cat, old_sub = txn.category, txn.sub_category
+        txn.category = category
+        if sub_category is not None:
+            txn.sub_category = str(sub_category).strip()
+        txn.manual_category = True
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="bank_transaction",
+            entity_id=txn.id,
+            field="category",
+            old_value=f"{old_cat}" + (f" / {old_sub}" if old_sub else ""),
+            new_value=f"{txn.category}" + (f" / {txn.sub_category}" if txn.sub_category else ""),
+            source="app",
+            note=f"Reclassified from P&L drill-down · {txn.txn_date} · Rs.{float(txn.amount):,.0f} · {(txn.description or '')[:120]}",
+        ))
+        await session.commit()
+        return {"ok": True, "id": txn.id, "category": txn.category,
+                "sub_category": txn.sub_category, "manual_category": True}
 
 
 # ── Cash position ─────────────────────────────────────────────────────────────

@@ -1,5 +1,21 @@
 # Changelog
 
+## Session AG (cont. 3) — 2026-08-14 — Phases 2+3: P&L drill-down + reclassification
+
+Kiran: "if I doubt an expense, how do I deep-dive and reclassify?" — that is spec 01 Phases 2+3, built together.
+
+- **Drill-down** — `GET /finance/pnl/line-items?month=&key=`: every drillable P&L line lists the exact rows behind it, using the SAME WHERE clauses as the engine (bank txns for income/opex/refunds/non-op; cash payments + offline-cash pseudo-row; tenancy rows for deposits held / maintenance kept). UI: tap a line → bottom Sheet with rows + sum; if |sum| ≠ |line| an explicit "engine drift" warning shows (never hidden).
+- **Reclassify** — tap a bank row in the sheet → pick a category (fixed lists served by the backend: EXPENSE_CATS for debits, income cats for credits) → "Move to X". `PATCH /finance/transactions/{id}` writes AuditLog (old→new + txn context) and sets new column `bank_transactions.manual_category=true` (migration `run_btxn_manual_category_2026_08_14`, applied to the live DB). Locked rows are skipped by `_detect_tenant_refunds` — the only pass that rewrites existing categories — and re-uploads are hash-dups that never touch existing rows, so a human correction can never be undone by automation. Reclassified rows show a "reclassified" chip.
+- After a move, both the sheet and the P&L tree refetch — the amount visibly moves between categories, P&L totals update live.
+- Ops note: the Supabase session-mode pooler (15 slots) is mostly held by the VPS app — local scripts must retry or use the 6543 transaction pooler for one-off DDL.
+
+## Session AG (cont. 2) — 2026-08-14 — Phase 1 deployed + save-recalc wiring + July figures incident
+
+- **Deployed to prod** (`18cac6d` then `bd30a89`): Phase 1 P&L card + the 11 audit fixes went live (Kiran wanted to see Phase 1; development-only work is invisible until merged to master).
+- **Kiran's first test found a real gap:** saving manual cash figures didn't refresh the P&L (and he saw the OLD three-statement card from the stale service-worker bundle). Fix: no recalculate button — the P&L is computed live server-side, so `PnlAdjustmentsCard.onSaved` / CSV upload now signal `PnlMonthCard` to jump to that month and refetch. Recalculation is automatic and month-aware.
+- **Incident: test save clobbered July's closed figures** (rent_paid_cash 15,32,000 → 21,32,000, cash_holding 65,000 → 0, cash_expense 2,000 → 0). The adjustments audit trail deployed ~20s earlier captured the old values; offline_cash + notes survived thanks to the M1 partial-update fix. **Restored** (audit rows written, `updated_by=claude-restore-2026-08-14`); July back to verified ₹14,00,408 / 31.7%.
+- **New guardrail from the incident:** changing an already-saved non-zero figure now shows the old → new diff and requires a second "Confirm overwrite" tap.
+
 ## Session AG (cont.) — 2026-08-14 — Finance P&L rework Phase 1: SOP hierarchy on screen
 
 Spec `docs/specs/01-finance-pnl-page.md` Phase 1 implemented (Kiran: "keep P&L short, SAC-style hierarchy, dynamically drillable").

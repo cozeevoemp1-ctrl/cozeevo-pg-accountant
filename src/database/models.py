@@ -1298,6 +1298,8 @@ class BankTransaction(Base):
     account_name  = Column(String(20), default="THOR")   # copied from upload
     balance       = Column(Numeric(14, 2), nullable=True)  # running balance from statement
     reconciled_checkout_id = Column(Integer, ForeignKey("checkout_records.id"), nullable=True)
+    # Owner reclassified from PWA drill-down — classifier passes must skip these
+    manual_category = Column(Boolean, nullable=False, default=False, server_default="false")
 
     upload = relationship("BankUpload", back_populates="transactions")
 

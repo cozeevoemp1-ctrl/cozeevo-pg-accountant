@@ -804,6 +804,50 @@ export async function getPnlMonth(month: string): Promise<PnlMonthResponse> {
   return _get<PnlMonthResponse>(`/api/v2/app/finance/pnl/month?month=${month}`);
 }
 
+export interface PnlLineItem {
+  id: number | null;
+  source: "bank" | "payment" | "tenancy" | "manual";
+  date: string;
+  description: string;
+  account?: string;
+  amount: number;
+  category?: string;
+  sub_category?: string;
+  manual_category?: boolean;
+  reclassifiable: boolean;
+}
+
+export interface PnlLineItemsResponse {
+  month: string;
+  key: string;
+  rows: PnlLineItem[];
+  total: number;
+  reclass_categories: { expense: string[]; income: string[] };
+}
+
+export async function getPnlLineItems(month: string, key: string): Promise<PnlLineItemsResponse> {
+  return _get<PnlLineItemsResponse>(
+    `/api/v2/app/finance/pnl/line-items?month=${month}&key=${encodeURIComponent(key)}`,
+  );
+}
+
+export async function reclassifyTransaction(
+  txnId: number,
+  category: string,
+  subCategory?: string,
+): Promise<{ ok: boolean; id: number; category: string; sub_category: string | null }> {
+  const res = await fetch(`${BASE_URL}/api/v2/app/finance/transactions/${txnId}`, {
+    method: "PATCH",
+    headers: { ...(await _authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ category, ...(subCategory !== undefined ? { sub_category: subCategory } : {}) }),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error((d as { detail?: string }).detail ?? `Reclassify failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export interface DepositReconcileRow {
   txn_id: number;
   txn_date: string;
