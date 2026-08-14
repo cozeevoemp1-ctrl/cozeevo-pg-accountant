@@ -1548,6 +1548,19 @@ async def run_whatsapp_status_log_2026_08_13(conn) -> None:
     print("  [ok] whatsapp_status_log created")
 
 
+async def run_btxn_manual_category_2026_08_14(conn) -> None:
+    """manual_category: owner reclassified this bank transaction from the PWA
+    drill-down (spec 01 Phase 3). Locked rows must be skipped by every
+    classifier pass (_detect_tenant_refunds etc.) so re-uploads and future
+    rules never undo a human correction. NOT NULL DEFAULT false backfills
+    existing rows (rules_server_default_nulls)."""
+    await conn.execute(text(
+        "ALTER TABLE bank_transactions "
+        "ADD COLUMN IF NOT EXISTS manual_category BOOLEAN NOT NULL DEFAULT false"
+    ))
+    print("  [ok] bank_transactions.manual_category added")
+
+
 async def run_btxn_dedup_2026_05_12(conn: AsyncConnection) -> None:
     """
     One-time cleanup: deduplicate bank_transactions and fix the unique constraint.
@@ -1777,6 +1790,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_room_108_revenue_2026_05_31(conn)
             await run_no_overlap_tenancy_constraint_2026_06_28(conn)
             await run_whatsapp_status_log_2026_08_13(conn)
+            await run_btxn_manual_category_2026_08_14(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)

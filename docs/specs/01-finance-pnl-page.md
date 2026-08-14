@@ -116,7 +116,12 @@ are the Phase-2 drill-down contract.
 - Backend: endpoint + reshape only. Frontend: new `pnl-month-card.tsx`; remove the P&L
   section from `three-statement-tab.tsx` and hide its BS/CF behind a "rebuilding" note.
 
-### Phase 2 — Drill-down
+### Phase 2 — Drill-down — ✅ DONE 2026-08-14 (with Phase 3, same cycle)
+Built: `GET /finance/pnl/line-items?month=&key=` (bank rows for income/opex/refunds/non-op;
+payment rows + offline-cash pseudo-row for income.cash; tenancy rows for deposits held/
+maintenance). Frontend: tap a drillable leaf → bottom Sheet with rows, sum row, and an
+explicit engine-drift warning when |sum| ≠ |line| (never hidden). Frozen months 400
+(nothing to list — figures are hardcoded).
 - **US-2.1** As owner, I tap any drillable P&L line and a bottom Sheet lists the transactions
   behind it (date, description, account, amount) with a sum row.
   *Accept:* for every drillable line, `sum == line.amount` (`matches_line` true); mismatch renders a red warning instead of hiding it.
@@ -124,7 +129,13 @@ are the Phase-2 drill-down contract.
   drill-downs as clearly-labelled "manual figure" rows so the sum still matches.
 - Backend: `line-items` endpoint sharing WHERE-fragments with the engine.
 
-### Phase 3 — Reclassification
+### Phase 3 — Reclassification — ✅ DONE 2026-08-14
+Built: `bank_transactions.manual_category` (migration `run_btxn_manual_category_2026_08_14`,
+applied to live DB via txn-pooler 6543 — session pool was full), `PATCH /finance/transactions/{id}`
+(category from backend-served fixed lists, AuditLog old→new, lock), `_detect_tenant_refunds`
+skips locked rows (the only pass that rewrites existing categories; upload classification only
+touches newly-inserted rows, and re-uploads are hash-dups that never update). UI: tap a bank
+row in the drill-down → category select → "Move to X" → refetches both the rows and the tree.
 - **US-3.1** As owner, from a drill-down I tap a transaction, pick the correct category from
   the fixed list, and save. The sheet and P&L refresh; the amount moved between lines.
   *Accept:* AuditLog row written; `manual_category=true`; P&L totals change by exactly the amount.
