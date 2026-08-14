@@ -1,5 +1,33 @@
 # Changelog
 
+## Session AG (cont.) — 2026-08-14 — Finance P&L rework Phase 1: SOP hierarchy on screen
+
+Spec `docs/specs/01-finance-pnl-page.md` Phase 1 implemented (Kiran: "keep P&L short, SAC-style hierarchy, dynamically drillable").
+
+- **`GET /api/v2/app/finance/pnl/month?month=YYYY-MM`** — one month's SOP P&L as a node tree. Dynamic months reshape `_compute_dynamic_pnl_months()` records; frozen months come from `pnl_verified_data`; both flow through ONE shared assembler (`_pnl_tree`) so the math cannot diverge: True Revenue = Gross − deposits held − deposits refunded; Net Operating = True Revenue − Total Opex. No new math anywhere — reshape only.
+- **`pnl-month-card.tsx`** — collapsed 5-line P&L (Gross inflows / Deposit pass-throughs / True revenue / OPEX / Net operating), each node expands SAC-style into children (bank income per account, cash incl. offline, OPEX by category, manual figures tagged "manual", non-op detail as display-only). MonthNav picker, frozen badge, empty state for months with no bank rows. Node keys are the Phase-2 drill-down contract (`drillable` flags already set).
+- **Three-statement card removed from the page** — its P&L deviated from the SOP in 6 documented ways (see spec). BS/CF return in Phases 5–6 rebuilt on SOP outputs; `three_statement.py` + component kept on disk as reference.
+- **Parity pinned by tests** — `tests/test_pnl_tree.py` (5 tests, added to pre-push): totals follow SOP formulas; tree sums == `pnl_builder._dynamic_line_values` Excel translation; children sum to parents; manual rows marked; frozen months not drillable.
+- **Live verification:** Jul'26 from the endpoint = Net Operating ₹14,00,408 (31.7%) — identical to Kiran's verified July close. Jun'26 ₹8,95,323. Aug shows empty state until its CSV is uploaded.
+
+## Session AG — 2026-08-14 — Audit fixes: 11 CRITICAL/HIGH findings from the 2026-08-12 audit
+
+Kiran approved the audit triage ("go ahead"). Fixed one finding at a time, all on `development`. Verified: py_compile + module imports OK, `tsc --noEmit` clean, 20/20 unit tests (dues + cash logic). NOT yet merged to master — payment paths need a smoke test first.
+
+1. **Quick Collect double-charge** (`kpi-grid.tsx`) — the 3 sequential createPayment legs (cash/UPI/deposit) now track per-leg posted state in a ref; a retry after partial failure posts only the remaining legs, posted inputs disable, and the error names what already went through.
+2. **Payment Sheet write-back silently dropped** (`account_handler.py`) — `update_payment` result is now checked; failure (dict, timeout, or exception) queues to the retry queue and the bot reply says "Sheet update failed — queued for auto-retry" instead of claiming success.
+3. **Retry queue revived** — (a) checkout + add_tenant call sites now enqueue on `{"success": False}` returns too (previously only on raised exceptions, which gsheets never raises); (b) new APScheduler job `sheet_write_retry` drains the queue every 15 min (was only drained at process start).
+4. **Checkout audit trail** — `_do_confirm_checkout` (PWA), bot `_do_checkout`, and form checkout now write AuditLog: `status+checkout_date` (feeds the activity feed, which already queried that field) + `deposit_settlement` (refund vs deposit, dues, deductions, mode, reason).
+5. **Finance audit trail** (`finance.py`) — add/edit/void cash expense, cash count, and P&L adjustment saves all write AuditLog rows (old→new per changed field).
+6. **UPI reconciliation traceability** (`upi_reconciliation.py`) — every auto-created Payment logs an AuditLog entry with RRN, payer name, and match method (phone/name/fuzzy); manual assignment logs too. (Fuzzy 0.6 threshold + RentSchedule non-update left as-is — behavior changes need Kiran's call.)
+7. **Waive-remaining silent failure** (`payment/new/page.tsx`) — a failed waive PATCH now shows a warning on the success screen with the amount and where to re-apply it (was swallowed; tenant kept phantom dues).
+8. **"Log anyway" now actually works** (`payments.py` + `account_handler.py`) — new `allow_duplicate` flag salts the unique_hash so a confirmed genuine second identical payment isn't blocked by `uq_payment_unique_hash` (was understating collections).
+9. **Gmail poller no longer loses bank emails** (`gmail_poller.py`) — emails are marked Seen only AFTER their reconcile succeeds (was at fetch time, so a failed reconcile permanently skipped the file); UNSEEN search widened to a 3-day lookback so failures retry; IMAP gets a 30s timeout.
+10. **M1: P&L adjustments save wiped offline_cash/notes** (`finance.py`) — POST /finance/pnl/adjustments is now a partial update: only fields present in the body are touched (the PWA card omits offline_cash/notes, which were being zeroed/nulled on every save).
+11. **A1: extract-id endpoint hardened** (`onboarding_router.py`) — 10/min per-IP rate limit + 403 on closed sessions (approved/cancelled/expired) so anonymous token-holders can't burn Claude vision credits.
+
+Also: BRAIN.md scheduler line updated (4 jobs incl. sheet-write retry). Stale docs index noted: CLAUDE.md points at `docs/BRAIN.md` etc. but most docs live in `docs/architecture/` + subfolders.
+
 ## Session AF — 2026-08-13 — DB password rotation, VPS pooler fix, SSH workflow corrected
 
 ### DB password rotated + fully propagated

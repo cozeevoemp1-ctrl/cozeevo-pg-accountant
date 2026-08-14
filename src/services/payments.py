@@ -143,6 +143,7 @@ async def log_payment(
     source: str = "service",
     room_number: Optional[str] = None,
     entity_name: Optional[str] = None,
+    allow_duplicate: bool = False,
 ) -> PaymentResult:
     """Insert a payment and update rent schedule status.
 
@@ -249,6 +250,10 @@ async def log_payment(
     # ── Create Payment row ─────────────────────────────────────────────────
     _period_for_hash = (period if pay_for == PaymentFor.rent else None) or ""
     _hash_raw = f"{tenancy.id}:{date.today()}:{amount_dec}:{pay_mode.value}:{_period_for_hash}:{pay_for.value}"
+    if allow_duplicate:
+        # Caller explicitly confirmed this is a genuine second identical payment
+        # ("Log anyway") — salt the hash so uq_payment_unique_hash doesn't block it.
+        _hash_raw += f":dup:{datetime.utcnow().isoformat()}"
     _unique_hash = hashlib.md5(_hash_raw.encode()).hexdigest()
 
     payment = Payment(

@@ -63,7 +63,7 @@ ADMIN_WHATSAPP = _admin_whatsapp()
 # ── IMAP helpers ──────────────────────────────────────────────────────────────
 
 def _connect_imap() -> imaplib.IMAP4_SSL:
-    imap = imaplib.IMAP4_SSL("imap.gmail.com")
+    imap = imaplib.IMAP4_SSL("imap.gmail.com", timeout=30)
     imap.login(GMAIL_USER, GMAIL_APP_PASSWORD)
     return imap
 
@@ -93,26 +93,31 @@ def _get_attachment(msg: email.message.Message) -> tuple[Optional[bytes], Option
             return part.get_payload(decode=True), fname
     return None, None
 
-def fetch_today_bank_emails() -> list[tuple[str, bytes, str]]:
+def fetch_today_bank_emails() -> list[tuple[str, bytes, str, bytes]]:
     """
-    Returns list of (account_name, file_bytes, filename) for today's bank emails.
-    Marks emails as read after processing.
+    Returns list of (account_name, file_bytes, filename, imap_msg_id) for recent
+    unseen bank emails (3-day lookback so a failed day gets retried).
+
+    Does NOT mark emails Seen — the caller marks each one via mark_email_seen()
+    only AFTER its reconciliation succeeds. Marking at fetch time permanently
+    lost the file when reconcile failed (UNSEEN search skipped it next run).
     """
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         logger.warning("GMAIL_USER or GMAIL_APP_PASSWORD not set — skipping email fetch")
         return []
 
     results = []
-    today_str = datetime.now().strftime("%d-%b-%Y")  # e.g. "11-May-2026"
+    from datetime import timedelta
+    since_str = (datetime.now() - timedelta(days=3)).strftime("%d-%b-%Y")
 
     try:
         imap = _connect_imap()
         imap.select("INBOX")
 
-        # Search unseen emails from today
-        _, msg_ids = imap.search(None, f'(UNSEEN SINCE "{today_str}")')
+        # Search unseen emails from the last 3 days (retry window for failed runs)
+        _, msg_ids = imap.search(None, f'(UNSEEN SINCE "{since_str}")')
         if not msg_ids[0]:
-            logger.info("No unseen emails today")
+            logger.info("No unseen emails in window")
             imap.logout()
             return []
 
@@ -130,8 +135,7 @@ def fetch_today_bank_emails() -> list[tuple[str, bytes, str]]:
                 logger.warning("Bank email found but no XLSX/CSV attachment: %s", subject)
                 continue
 
-            results.append((account, file_bytes, filename))
-            imap.store(mid, "+FLAGS", "\\Seen")  # mark read
+            results.append((account, file_bytes, filename, mid))
             logger.info("Fetched %s bank file from email: %s (%s bytes)", account, filename, len(file_bytes))
 
         imap.logout()
@@ -139,6 +143,17 @@ def fetch_today_bank_emails() -> list[tuple[str, bytes, str]]:
         logger.exception("IMAP fetch failed")
 
     return results
+
+
+def mark_email_seen(mid: bytes) -> None:
+    """Mark one email Seen — call only after its file reconciled successfully."""
+    try:
+        imap = _connect_imap()
+        imap.select("INBOX")
+        imap.store(mid, "+FLAGS", "\\Seen")
+        imap.logout()
+    except Exception:
+        logger.exception("IMAP mark-seen failed for msg %s", mid)
 
 
 # ── WhatsApp alert ────────────────────────────────────────────────────────────
@@ -188,13 +203,23 @@ async def run_daily_reconciliation(emails: Optional[list] = None) -> None:
     today = date.today()
     period = date(today.year, today.month, 1)
 
-    for account_name, file_bytes, filename in items:
+    for item in items:
+        # 4-tuple from IMAP fetch (incl. msg id); 3-tuple from tests/manual runs
+        if len(item) == 4:
+            account_name, file_bytes, filename, mid = item
+        else:
+            account_name, file_bytes, filename = item
+            mid = None
         logger.info("Reconciling %s — %s (%d bytes)", account_name, filename, len(file_bytes))
         try:
             async with get_session() as session:
                 result = await reconcile_upi_file(
                     session, file_bytes, filename, account_name, period
                 )
+
+            # Only now is the email safe to mark Seen — reconcile succeeded.
+            if mid is not None:
+                mark_email_seen(mid)
 
             logger.info(
                 "%s: %d matched (Rs.%,.0f) | %d unmatched (Rs.%,.0f) | %d duplicates skipped",

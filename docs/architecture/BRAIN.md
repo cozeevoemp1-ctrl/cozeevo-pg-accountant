@@ -437,7 +437,7 @@ ledger_handler.py (thin adapter) --> finance/ package
 | LLM | Groq llama-3.3-70b-versatile | cloud |
 | Reverse Proxy | nginx + Let's Encrypt SSL | 443 |
 | WhatsApp | Meta Cloud API (free) | -- |
-| Scheduler | APScheduler (4 jobs) | in-process |
+| Scheduler | APScheduler (4 jobs: daily reconciliation 2am, weekly backup Sun 3am, monthly rollover 1st 00:00, sheet-write retry every 15 min) | in-process |
 
 ---
 

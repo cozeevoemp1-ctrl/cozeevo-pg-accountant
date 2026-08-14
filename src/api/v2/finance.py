@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
 from src.database.models import (
-    BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
+    AuditLog, BankTransaction, BankUpload, CashCount, CashExpense, CheckoutRecord,
     InvestmentExpense, Payment, PaymentFor, PaymentMode, PnlMonthlyAdjustment,
     Tenancy, Tenant, UpiCollectionEntry,
 )
@@ -340,6 +340,169 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
     return out
 
 
+# ── SOP P&L tree — the month view the PWA renders ─────────────────────────────
+# Values come from _compute_dynamic_pnl_months() (dynamic months) or
+# pnl_verified_data (frozen months) and are only RESHAPED into a hierarchy here.
+# No math of its own beyond the same totals the Excel writer computes:
+#   True Revenue  = Gross Inflows − deposits held − deposits refunded
+#   Net Operating = True Revenue − Total Opex   (excluded items never in opex)
+
+def _pnl_node(key, label, amount, *, drillable=False, display_only=False,
+              manual=False, style=None, children=None):
+    node = {
+        "key": key, "label": label, "amount": round(float(amount), 2),
+        "drillable": bool(drillable), "display_only": bool(display_only),
+    }
+    if manual:
+        node["manual"] = True
+    if style:
+        node["style"] = style
+    if children is not None:
+        node["children"] = children
+    return node
+
+
+def _pnl_tree(income_children, sec_dep, maint, dep_refunded,
+              opex_children, excluded_children, *, drillable):
+    """Assemble the SOP hierarchy from normalized parts. Shared by frozen and
+    dynamic months so the math cannot diverge between them (or the Excel)."""
+    gross = sum(c["amount"] for c in income_children)
+    opex_total = -sum(c["amount"] for c in opex_children)   # children carry negatives
+    true_rev = gross - float(sec_dep) - float(dep_refunded)
+    net = true_rev - opex_total
+
+    deposit_children = [
+        _pnl_node("deposits.received",
+                  "Less: security deposits held (return at exit)",
+                  -float(sec_dep), drillable=drillable),
+        _pnl_node("deposits.maintenance",
+                  "Maintenance fee kept (tenants exited this month)",
+                  float(maint), display_only=True, drillable=drillable),
+        _pnl_node("deposits.refunded",
+                  "Less: deposits refunded to exited tenants",
+                  -float(dep_refunded), drillable=drillable),
+    ]
+    tree = [
+        _pnl_node("income", "Gross inflows", gross, style="total",
+                  children=income_children),
+        _pnl_node("deposits", "Deposit pass-throughs",
+                  -(float(sec_dep) + float(dep_refunded)),
+                  children=deposit_children),
+        _pnl_node("true_revenue", "True rent revenue", true_rev, style="result"),
+        _pnl_node("opex", "Operating expenses", -opex_total, style="total",
+                  children=opex_children),
+    ]
+    if excluded_children:
+        tree.append(_pnl_node(
+            "excluded", "Balance-sheet outflows (not costs)",
+            sum(c["amount"] for c in excluded_children),
+            display_only=True, children=excluded_children,
+        ))
+    tree.append(_pnl_node("net_operating", "Net operating profit", net, style="result"))
+    totals = {
+        "gross": round(gross, 2),
+        "true_revenue": round(true_rev, 2),
+        "opex_total": round(opex_total, 2),
+        "net_operating": round(net, 2),
+        "margin_pct": round(net / true_rev * 100, 1) if true_rev else None,
+    }
+    return tree, totals
+
+
+def _build_pnl_tree_dynamic(d: dict):
+    """Tree for one engine record (see _compute_dynamic_pnl_months output)."""
+    income_children = [
+        _pnl_node("income.bank.THOR", "THOR — bank income (UPI + NEFT)",
+                  d.get("income_thor", 0), drillable=True),
+        _pnl_node("income.bank.HULK", "HULK — bank income (UPI + cheque)",
+                  d.get("income_hulk", 0), drillable=True),
+        _pnl_node("income.cash", "Cash (physical, incl. offline)",
+                  d.get("cash", 0), drillable=True),
+    ]
+    opex_children = [
+        _pnl_node(f"opex.{cat}", cat, -amt, drillable=True)
+        for cat, amt in sorted((d.get("opex_by_cat") or {}).items(), key=lambda kv: -kv[1])
+        if amt
+    ]
+    if d.get("rent_paid_cash"):
+        opex_children.append(_pnl_node(
+            "opex.manual.rent_paid_cash", "Property rent — paid in cash",
+            -d["rent_paid_cash"], manual=True))
+    if d.get("cash_expense"):
+        opex_children.append(_pnl_node(
+            "opex.manual.cash_expense", "Cash expenses (manual figure)",
+            -d["cash_expense"], manual=True))
+    excluded_children = []
+    detail = d.get("non_op_detail") or {}
+    if detail:
+        for sub, amt in sorted(detail.items(), key=lambda kv: -kv[1]):
+            if amt:
+                excluded_children.append(_pnl_node(
+                    f"excluded.nonop.{sub}", f"{sub} (non-op)", -amt, display_only=True))
+    elif d.get("non_op"):
+        excluded_children.append(_pnl_node(
+            "excluded.nonop", "Non-operating outflows", -d["non_op"], display_only=True))
+    return _pnl_tree(
+        income_children, d.get("sec_dep", 0), d.get("maint", 0),
+        d.get("dep_refunded", 0), opex_children, excluded_children, drillable=True,
+    )
+
+
+def _build_pnl_tree_frozen(ym: str):
+    """Tree for a verified frozen month, straight from pnl_verified_data.
+    Nothing is drillable — the figures are hardcoded, there are no rows to list."""
+    from src.reports import pnl_builder as _pb
+    from src.reports.pnl_verified_data import INCOME, OPEX, EXCLUDED, DEPOSITS
+
+    label = _ym_to_pnl_label(int(ym[:4]), int(ym[5:7]))
+    i = PNL_VERIFIED_MONTHS.index(label)
+
+    income_children = [
+        _pnl_node(f"income.frozen.{n}", k, v[i])
+        for n, (k, v) in enumerate(INCOME.items()) if v[i]
+    ]
+    opex_children = [
+        _pnl_node(f"opex.frozen.{n}", k, -v[i])
+        for n, (k, v) in enumerate(OPEX.items()) if v[i]
+    ]
+    refund_key = _pb._KEY_EXCL_REFUND
+    excluded_children = [
+        _pnl_node(f"excluded.frozen.{n}", k, -v[i], display_only=True)
+        for n, (k, v) in enumerate(EXCLUDED.items()) if k != refund_key and v[i]
+    ]
+    sec = DEPOSITS[_pb._KEY_DEP_SEC][i]
+    maint = DEPOSITS[_pb._KEY_DEP_MAINT][i]
+    refunds = EXCLUDED.get(refund_key, [0] * len(PNL_VERIFIED_MONTHS))[i]
+    return _pnl_tree(income_children, sec, maint, refunds,
+                     opex_children, excluded_children, drillable=False)
+
+
+@router.get("/finance/pnl/month")
+async def get_pnl_month(
+    month: str = Query(..., description="YYYY-MM"),
+    user: AppUser = Depends(get_current_user),
+):
+    """One month's SOP-format P&L as a hierarchy (spec 01, Phase 1)."""
+    _require_admin(user)
+    _validate_month(month)
+    label = _ym_to_pnl_label(int(month[:4]), int(month[5:7]))
+
+    if (not is_demo_mode()) and month in _VERIFIED_YM:
+        tree, totals = _build_pnl_tree_frozen(month)
+        return {"month": month, "label": label, "is_frozen": True,
+                "has_data": True, "tree": tree, "totals": totals}
+
+    async with get_session() as session:
+        records = await _compute_dynamic_pnl_months(session)
+    rec = next((r for r in records if r["label"] == label), None)
+    if rec is None:
+        return {"month": month, "label": label, "is_frozen": False,
+                "has_data": False, "tree": [], "totals": None}
+    tree, totals = _build_pnl_tree_dynamic(rec)
+    return {"month": month, "label": label, "is_frozen": False,
+            "has_data": True, "tree": tree, "totals": totals}
+
+
 # ── Cash position ─────────────────────────────────────────────────────────────
 
 @router.get("/finance/cash")
@@ -475,6 +638,16 @@ async def add_cash_expense(
         )
         session.add(expense)
         await session.flush()
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="cash_expense",
+            entity_id=expense.id,
+            field="created",
+            old_value=None,
+            new_value=str(amount),
+            source="app",
+            note=f"{exp_date} · {desc_clean} · paid by {body['paid_by']}",
+        ))
         result = {
             "id": expense.id,
             "date": str(expense.date),
@@ -500,29 +673,49 @@ async def edit_cash_expense(
             raise HTTPException(status_code=404, detail="Expense not found")
         if expense.is_void:
             raise HTTPException(status_code=400, detail="Cannot edit a voided expense")
+        changes: dict[str, tuple[str, str]] = {}
         if "date" in body:
             try:
                 from datetime import date as _date_type
-                expense.date = _date_type.fromisoformat(body["date"])
+                new_date = _date_type.fromisoformat(body["date"])
             except ValueError:
                 raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+            if new_date != expense.date:
+                changes["date"] = (str(expense.date), str(new_date))
+            expense.date = new_date
         if "description" in body:
             desc = str(body["description"]).strip()
             if not desc:
                 raise HTTPException(status_code=400, detail="description cannot be empty")
+            if desc != expense.description:
+                changes["description"] = (expense.description, desc)
             expense.description = desc
         if "amount" in body:
             try:
                 amount = float(body["amount"])
                 if amount <= 0:
                     raise ValueError
-                expense.amount = amount
             except (ValueError, TypeError):
                 raise HTTPException(status_code=400, detail="amount must be a positive number")
+            if amount != float(expense.amount):
+                changes["amount"] = (str(float(expense.amount)), str(amount))
+            expense.amount = amount
         if "paid_by" in body:
             if body["paid_by"] not in ("Prabhakaran", "Lakshmi", "Other"):
                 raise HTTPException(status_code=400, detail="paid_by must be Prabhakaran, Lakshmi, or Other")
+            if body["paid_by"] != expense.paid_by:
+                changes["paid_by"] = (expense.paid_by, body["paid_by"])
             expense.paid_by = body["paid_by"]
+        for fld, (old_v, new_v) in changes.items():
+            session.add(AuditLog(
+                changed_by=user.phone or user.actor,
+                entity_type="cash_expense",
+                entity_id=expense.id,
+                field=fld,
+                old_value=old_v,
+                new_value=new_v,
+                source="app",
+            ))
         await session.commit()
     return {
         "id": expense.id,
@@ -549,6 +742,16 @@ async def void_cash_expense(
             raise HTTPException(status_code=400, detail="Already voided")
         expense.is_void = True
         expense.voided_at = datetime.now(timezone.utc)
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="cash_expense",
+            entity_id=expense.id,
+            field="is_void",
+            old_value="False",
+            new_value="True",
+            source="app",
+            note=f"{expense.date} · {expense.description} · Rs.{float(expense.amount):,.0f}",
+        ))
         await session.commit()
     return {"ok": True, "id": expense_id}
 
@@ -598,6 +801,16 @@ async def log_cash_count(
         )
         session.add(count)
         await session.flush()
+        session.add(AuditLog(
+            changed_by=user.phone or user.actor,
+            entity_type="cash_count",
+            entity_id=count.id,
+            field="created",
+            old_value=None,
+            new_value=str(amount),
+            source="app",
+            note=f"Cash count {count_date} by {body['counted_by']}",
+        ))
         result = {
             "id": count.id,
             "date": str(count.date),
@@ -915,6 +1128,16 @@ async def get_pnl_adjustments(
     }
 
 
+def _norm_adj(v):
+    """Normalize Decimal/float/str for change comparison in adjustments audit."""
+    if v is None:
+        return None
+    try:
+        return round(float(v), 2)
+    except (TypeError, ValueError):
+        return str(v)
+
+
 @router.post("/finance/pnl/adjustments")
 async def save_pnl_adjustments(
     body: dict,
@@ -937,25 +1160,48 @@ async def save_pnl_adjustments(
             raise HTTPException(status_code=400, detail=f"{k} must be >= 0")
         return v
 
-    vals = {
-        "cash_holding":   _num("cash_holding"),
-        "rent_paid_cash": _num("rent_paid_cash"),
-        "cash_expense":   _num("cash_expense"),
-        "offline_cash":   _num("offline_cash"),
-        "notes":          (str(body["notes"]).strip() if body.get("notes") else None),
-        "updated_by":     user.phone,
-    }
+    # Partial update: only fields actually present in the request body are touched.
+    # (Saving from a card that omits offline_cash/notes must NOT wipe them — M1.)
+    _NUM_FIELDS = ("cash_holding", "rent_paid_cash", "cash_expense", "offline_cash")
+    vals: dict = {k: _num(k) for k in _NUM_FIELDS if k in body}
+    if "notes" in body:
+        vals["notes"] = (str(body["notes"]).strip() if body.get("notes") else None)
+    if not vals:
+        raise HTTPException(status_code=400, detail="No adjustment fields in body")
+    vals["updated_by"] = user.phone
+
     async with get_session() as session:
         row = await session.scalar(
             select(PnlMonthlyAdjustment).where(PnlMonthlyAdjustment.month == mon)
         )
         if row:
+            changes = {
+                k: (getattr(row, k), v) for k, v in vals.items()
+                if k != "updated_by" and _norm_adj(getattr(row, k)) != _norm_adj(v)
+            }
             for k, v in vals.items():
                 setattr(row, k, v)
         else:
-            session.add(PnlMonthlyAdjustment(month=mon, **vals))
+            for k in _NUM_FIELDS:
+                vals.setdefault(k, 0.0)
+            row = PnlMonthlyAdjustment(month=mon, **vals)
+            session.add(row)
+            changes = {k: (None, vals[k]) for k in vals if k != "updated_by"}
+        await session.flush()
+        for fld, (old_v, new_v) in changes.items():
+            session.add(AuditLog(
+                changed_by=user.phone or user.actor,
+                entity_type="pnl_adjustment",
+                entity_id=row.id,
+                field=fld,
+                old_value=None if old_v is None else str(old_v),
+                new_value=None if new_v is None else str(new_v),
+                source="app",
+                note=f"P&L manual figure for {month}",
+            ))
+        out = {k: float(getattr(row, k) or 0) for k in _NUM_FIELDS}
         await session.commit()
-    return {"ok": True, "month": month, **{k: vals[k] for k in ("cash_holding", "rent_paid_cash", "cash_expense")}}
+    return {"ok": True, "month": month, **out}
 
 
 @router.get("/finance/pnl/live")

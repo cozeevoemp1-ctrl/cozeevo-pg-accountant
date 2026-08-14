@@ -1074,10 +1074,16 @@ Rules:
 @router.post("/{token}/extract-id")
 async def extract_id_photo(token: str, request: Request):
     """Extract Aadhaar details from an uploaded ID photo using Claude Haiku vision."""
+    # Vision calls cost real money — rate-limit per IP and only serve sessions
+    # that are still open (a closed/approved session has no reason to OCR).
+    _rate_check(f"extract:{request.client.host}", 10, 60)  # 10/min per IP
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
     if not obs:
         raise HTTPException(404, "Session not found")
+    _status = obs.status.value if hasattr(obs.status, "value") else str(obs.status)
+    if _status in ("approved", "cancelled", "rejected", "expired"):
+        raise HTTPException(403, "Session is closed")
 
     body = await request.json()
     image_b64 = body.get("image_b64", "")

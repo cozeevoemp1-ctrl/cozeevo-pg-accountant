@@ -33,7 +33,7 @@ import openpyxl
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models import Payment, PaymentFor, PaymentMode, UpiCollectionEntry
+from src.database.models import AuditLog, Payment, PaymentFor, PaymentMode, UpiCollectionEntry
 
 
 # ── Matching helpers ──────────────────────────────────────────────────────────
@@ -218,6 +218,21 @@ async def reconcile_upi_file(
             session.add(upi_entry)
             existing_rrns.add(entry.rrn)
 
+            # Audit trail — auto-created payments must be traceable to how the
+            # tenant was matched (esp. fuzzy matches, which can pick the wrong one)
+            session.add(AuditLog(
+                changed_by="upi_reconciler",
+                entity_type="payment",
+                entity_id=pay.id,
+                entity_name=matched_tenant['name'],
+                field="created_auto_reconciled",
+                old_value=None,
+                new_value=str(float(entry.amount)),
+                room_number=str(matched_tenant.get('room') or ""),
+                source="upi_reconcile",
+                note=f"RRN {entry.rrn} · payer '{entry.name}' · matched by {match_method} · {account_name} · {filename}",
+            ))
+
             result.matched.append(MatchedEntry(
                 rrn=entry.rrn, amount=entry.amount, payer_name=entry.name,
                 tenant_name=matched_tenant['name'], room=matched_tenant['room'],
@@ -309,6 +324,17 @@ async def assign_upi_entry(
     entry.payment_id  = pay.id
     entry.matched_by  = 'manual'
     entry.period_month= period_month
+
+    session.add(AuditLog(
+        changed_by="upi_reconciler",
+        entity_type="payment",
+        entity_id=pay.id,
+        field="created_manual_assign",
+        old_value=None,
+        new_value=str(float(entry.amount)),
+        source="upi_reconcile",
+        note=f"RRN {rrn} · payer '{entry.payer_name}' manually assigned to tenancy {tenancy_id}",
+    ))
 
     await session.commit()
     return pay.id

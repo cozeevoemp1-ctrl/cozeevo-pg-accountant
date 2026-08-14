@@ -34,6 +34,7 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy import text
@@ -157,6 +158,16 @@ def start_scheduler() -> AsyncIOScheduler:
         name="Monthly Rollover — 1st of month, 12:00 AM IST",
         replace_existing=True,
         misfire_grace_time=43200,  # 12h catch-up window if server was down at midnight
+    )
+
+    # Failed Sheet-write retry — the queue was previously only drained at process
+    # start, so anything queued mid-run sat until the next deploy/restart.
+    scheduler.add_job(
+        _retry_sheet_writes,
+        trigger=IntervalTrigger(minutes=15),
+        id="sheet_write_retry",
+        name="Retry queued Sheet writes (15 min)",
+        replace_existing=True,
     )
 
     # Prep reminders and checkout-deposit alerts are PERMANENTLY DISABLED.
@@ -532,6 +543,16 @@ async def _rent_reminder(mode: str = "day1") -> None:
 
 
 # ── Job: Daily Reconciliation ──────────────────────────────────────────────────
+
+async def _retry_sheet_writes() -> None:
+    """Drain the failed Sheet-write queue (data/sheet_write_queue.json).
+    Cheap no-op when the queue file is absent."""
+    from src.integrations.gsheets import retry_failed_writes
+
+    result = await retry_failed_writes()
+    if result.get("retried") or result.get("remaining"):
+        logger.info(f"[Scheduler] sheet_write_retry — {result}")
+
 
 async def _daily_reconciliation() -> None:
     """

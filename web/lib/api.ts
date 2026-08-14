@@ -772,6 +772,38 @@ export async function getFinancePnl(month?: string): Promise<FinancePnlResponse>
   return _get<FinancePnlResponse>(`/api/v2/app/finance/pnl${qs}`);
 }
 
+// ── SOP P&L month tree (spec 01 — hierarchy view) ───────────────────────────
+
+export interface PnlNode {
+  key: string;
+  label: string;
+  amount: number;
+  drillable: boolean;
+  display_only: boolean;
+  manual?: boolean;
+  style?: "total" | "result";
+  children?: PnlNode[];
+}
+
+export interface PnlMonthResponse {
+  month: string;
+  label: string;
+  is_frozen: boolean;
+  has_data: boolean;
+  tree: PnlNode[];
+  totals: {
+    gross: number;
+    true_revenue: number;
+    opex_total: number;
+    net_operating: number;
+    margin_pct: number | null;
+  } | null;
+}
+
+export async function getPnlMonth(month: string): Promise<PnlMonthResponse> {
+  return _get<PnlMonthResponse>(`/api/v2/app/finance/pnl/month?month=${month}`);
+}
+
 export interface DepositReconcileRow {
   txn_id: number;
   txn_date: string;
