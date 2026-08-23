@@ -81,7 +81,10 @@ async def run_script(text: str, lead: Lead, sess: LeadSession, db) -> str:
     if step == STEP_EMAIL:
         lead.email = ix.extract_email(text) or text
         sess.context = {**(sess.context or {}), "script_step": STEP_DATETIME}
-        return "What date and time works for your visit? (e.g. '28 August 4pm')"
+        return (
+            "We do visits Monday to Friday, 12:30 PM – 8:30 PM. "
+            "What date and time works for you? (e.g. '28 August 4pm')"
+        )
 
     if step == STEP_DATETIME:
         parsed = dateparser.parse(text, settings={"PREFER_DATES_FROM": "future"}) or _FALLBACK_SLOT

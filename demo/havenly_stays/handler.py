@@ -127,7 +127,7 @@ _REPROMPTS = {
     "month_for_availability": "Which month were you thinking of moving in?",
     "visit_name": "What's your name, so I can set up the visit?",
     "visit_email": "What email should I send the visit invite to?",
-    "visit_datetime": "What date and time works for your visit?",
+    "visit_datetime": "What date and time works for your visit? (Mon-Fri, 12:30 PM - 8:30 PM)",
     "visit_confirm": "Should I go ahead and book that visit? (yes/no)",
     "escalate_confirm": "Should I pass your message along to the property owner? (yes/no)",
 }
@@ -308,7 +308,10 @@ async def _start_visit_flow(lead: Lead, sess: LeadSession) -> str:
         sess.pending_field = "visit_email"
         return f"Thanks {lead.name}! What email should I send the visit invite to?"
     sess.pending_field = "visit_datetime"
-    return "What date and time works for your visit? (e.g. '28 August 4pm')"
+    return (
+        "We do visits Monday to Friday, 12:30 PM – 8:30 PM. "
+        "What date and time works for you? (e.g. '28 August 4pm')"
+    )
 
 
 async def _notify_owner(text: str, lead: Lead, interest: str = None) -> bool:
