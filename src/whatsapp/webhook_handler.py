@@ -135,12 +135,25 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
 
     logger.info(f"[Webhook] From={from_number} | Body={body[:80]} | MsgId={msg_id[:20] if msg_id else '-'}")
 
+    # -- Dedup: skip if we've already processed this exact message ----------------
+    # Meta delivers the same message from multiple IPs — this MUST run before
+    # any branch (including the demo bot below), or duplicate deliveries cause
+    # duplicate replies and duplicate side effects (e.g. double-booking a
+    # calendar slot, the first succeeding and the retry failing with a
+    # confusing "already booked" error).
+    if await _is_duplicate(msg_id):
+        with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
+            _wdbg.write(f"  DUPLICATE SKIPPED: {msg_id}\n")
+        return {"status": "ok"}
+
     # -- Havenly Stays demo bot branch ------------------------------------------
     # Keyed on Meta's phone_number_id (a different WhatsApp test number from
     # production), NOT on message content or sender — so it can never
     # misfire onto real Cozeevo traffic. Fully isolated: own DB, own
-    # WhatsApp send function, own handler. Short-circuits before dedup,
-    # role_service, intent_detector, gatekeeper, and the production DB.
+    # WhatsApp send function, own handler. Runs after dedup (above) and under
+    # the same per-phone lock as production, so concurrent Meta retries can't
+    # race each other into double-processing one message. Short-circuits
+    # before role_service, intent_detector, gatekeeper, and the production DB.
     _demo_phone_number_id = os.getenv("HAVENLY_WHATSAPP_PHONE_NUMBER_ID")
     if _demo_phone_number_id:
         try:
@@ -150,7 +163,9 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
         if _incoming_phone_number_id == _demo_phone_number_id:
             from demo.havenly_stays.handler import handle_demo_message
             from demo.havenly_stays.whatsapp_send import send_demo_whatsapp
-            demo_reply = await handle_demo_message(from_number, body)
+            _demo_lock = _get_phone_lock(from_number)
+            async with _demo_lock:
+                demo_reply = await handle_demo_message(from_number, body)
             if demo_reply:
                 background.add_task(send_demo_whatsapp, from_number, demo_reply)
             return {"status": "ok"}
@@ -158,12 +173,6 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
     # File-based debug log — journald not working
     with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
         _wdbg.write(f"[{from_number}] msg={body[:60]} msg_id={msg_id[:30] if msg_id else '-'}\n")
-
-    # -- Dedup: skip if we've already processed this exact message ----------------
-    if await _is_duplicate(msg_id):
-        with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
-            _wdbg.write(f"  DUPLICATE SKIPPED: {msg_id}\n")
-        return {"status": "ok"}
 
     # -- Master data approval replies ------------------------------------------
     import re

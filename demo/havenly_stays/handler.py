@@ -10,6 +10,7 @@ forcing the caller back into a rigid slot-filling script.
 """
 from __future__ import annotations
 
+import json
 import os
 from datetime import date, datetime, timedelta
 
@@ -34,14 +35,22 @@ GREETING_REPLY = (
     "I can help with room pricing, availability, or booking a visit. What would you like to know?"
 )
 
-_PERSONA_PROMPT = (
+_UNCLEAR_PROMPT = (
     f"You are the WhatsApp receptionist for {PROPERTY_NAME}, a PG (paying guest) accommodation "
-    f"in {LOCATION}. Reply naturally and warmly in 1-2 short sentences, like a helpful human "
-    "receptionist texting back — not a menu or a form. You only have real information about room "
-    "pricing, room availability, and booking a visit. Never invent facts (amenities, policies, "
-    "deposit rules, food, wifi, etc.) that weren't given to you. If the guest's message is small talk "
-    "or a simple acknowledgement, just respond warmly and briefly. Do not use the phrase "
-    "'clarify your request' or sound like an error message."
+    f"in {LOCATION}. You only have real information about room pricing, room availability, and "
+    "booking a visit. Never invent facts (amenities, policies, deposit rules, food, wifi, pets, "
+    "negotiating price, etc.) that weren't given to you.\n\n"
+    "A guest just sent a message that didn't match your normal pricing/availability/visit flow. "
+    "Decide exactly ONE of two actions:\n"
+    '- "clarify": the message is still about pricing, availability, or a visit, but you need ONE '
+    "more piece of information to help (e.g. they mentioned a stay duration and check-in date but "
+    "no room type). Ask exactly one short, warm, natural question — never two questions in one message.\n"
+    '- "escalate": the message needs something you genuinely can\'t answer (policies, negotiating, '
+    "complaints, anything outside pricing/availability/visit-booking). Write one short, warm sentence "
+    "acknowledging what they asked, with no question in it — the caller will separately ask permission "
+    "to forward it to the owner.\n\n"
+    'Respond with ONLY strict JSON, no markdown fences: {"action": "clarify"|"escalate", "reply": "..."}\n\n'
+    "Guest's message: __MESSAGE__"
 )
 
 
@@ -123,21 +132,31 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
 
 
 async def _handle_unclear(text: str, lead: Lead, sess: LeadSession) -> str:
-    """Anything that isn't a recognised intent: reply naturally via the LLM
-    (never fabricating facts), then offer — once, with the guest's consent —
-    to forward it to the property owner rather than dead-ending on a
-    'please clarify' error."""
+    """Anything that isn't a recognised intent: the LLM decides between
+    asking ONE clarifying question (still in scope: pricing/availability/
+    visit, just missing a detail) or escalating (genuinely out of scope) —
+    never both in the same message."""
     ai = get_claude_client()
+    action, reply = "escalate", "I'm not totally sure about that one."
     try:
-        natural_reply = await ai._call(f"{_PERSONA_PROMPT}\n\nGuest's message: {text}\n\nYour reply:")
-        natural_reply = natural_reply.strip()
+        raw = await ai._call(_UNCLEAR_PROMPT.replace("__MESSAGE__", text))
+        clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+        parsed = json.loads(clean)
+        if parsed.get("action") in ("clarify", "escalate") and parsed.get("reply"):
+            action, reply = parsed["action"], parsed["reply"].strip()
     except Exception as e:
-        logger.warning(f"[Demo] persona reply failed: {e}")
-        natural_reply = "I'm not totally sure about that one."
+        logger.warning(f"[Demo] unclear-message decision failed: {e}")
+
+    if action == "clarify":
+        # No pending_field set — the guest's next message may answer with
+        # new entities (room type, date, etc.) that re-enter the normal
+        # regex flow on its own, or land here again for another single
+        # clarifying question. Never a second question stacked on top.
+        return reply
 
     sess.pending_field = "escalate_confirm"
     sess.context = {**(sess.context or {}), "escalate_text": text}
-    return f"{natural_reply} Want me to pass this along to the property owner so they can help directly?"
+    return f"{reply} Want me to pass this along to the property owner so they can help directly?"
 
 
 async def _price_reply(room_type: str, db) -> str:
