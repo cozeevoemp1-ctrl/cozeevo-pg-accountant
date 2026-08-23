@@ -164,8 +164,15 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
             from demo.havenly_stays.handler import handle_demo_message
             from demo.havenly_stays.whatsapp_send import send_demo_whatsapp
             _demo_lock = _get_phone_lock(from_number)
-            async with _demo_lock:
-                demo_reply = await handle_demo_message(from_number, body)
+            try:
+                async with _demo_lock:
+                    demo_reply = await handle_demo_message(from_number, body)
+            except Exception as e:
+                # Never let a demo bug 500 the webhook — Meta retries a 500,
+                # which re-delivers the same message and compounds whatever
+                # went wrong. Fail soft instead.
+                logger.error(f"[Demo] handle_demo_message error: {e}", exc_info=True)
+                demo_reply = "Sorry, something went wrong on my end — could you try that again?"
             if demo_reply:
                 background.add_task(send_demo_whatsapp, from_number, demo_reply)
             return {"status": "ok"}
