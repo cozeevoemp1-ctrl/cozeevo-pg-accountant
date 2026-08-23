@@ -47,8 +47,8 @@ async def run_script(text: str, lead: Lead, sess: LeadSession, db) -> str:
     if step == STEP_GREETING:
         sess.context = {**(sess.context or {}), "script_step": STEP_PRICE_SINGLE}
         return (
-            f"Hi! Welcome to {PROPERTY_NAME}, {LOCATION}.\n"
-            "I can help with room pricing, availability, or booking a visit. What would you like to know?"
+            f"Hi there! 👋 Welcome to {PROPERTY_NAME}, {LOCATION}! 🏠\n"
+            "I'd love to help — ask me about room pricing, availability, or let's book you a visit! 😊"
         )
 
     if step == STEP_PRICE_SINGLE:
@@ -56,8 +56,8 @@ async def run_script(text: str, lead: Lead, sess: LeadSession, db) -> str:
         price = f"Rs. {room.price_monthly:,}" if room else "Rs. 12,000"
         sess.context = {**(sess.context or {}), "script_step": STEP_AVAILABILITY_SEPT}
         return (
-            f"*Single* at {PROPERTY_NAME}, {LOCATION}: {price}/month.\n"
-            "Want to check availability, or book a visit?"
+            f"💰 *Single* at {PROPERTY_NAME}, {LOCATION}: {price}/month.\n"
+            "Want to check availability, or book a visit? 🙂"
         )
 
     if step == STEP_AVAILABILITY_SEPT:
@@ -65,24 +65,24 @@ async def run_script(text: str, lead: Lead, sess: LeadSession, db) -> str:
         price = f"Rs. {room.price_monthly:,}" if room else "Rs. 12,000"
         sess.context = {**(sess.context or {}), "script_step": STEP_VISIT_START}
         return (
-            f"Yes — *Single* is available from September 2026 ({price}/month).\n\n"
-            "Would you like to book a visit?"
+            f"✅ Yes — *Single* is available from September 2026 ({price}/month).\n\n"
+            "Would you like to book a visit? 🏡"
         )
 
     if step == STEP_VISIT_START:
         sess.context = {**(sess.context or {}), "script_step": STEP_NAME}
-        return "Great, let's set up a visit! What's your name?"
+        return "Great, let's set up a visit! 🎉 What's your name?"
 
     if step == STEP_NAME:
         lead.name = text or "Guest"
         sess.context = {**(sess.context or {}), "script_step": STEP_EMAIL}
-        return f"Thanks {lead.name}! What email should I send the visit invite to?"
+        return f"Thanks {lead.name}! 😊 What email should I send the visit invite to? 📧"
 
     if step == STEP_EMAIL:
         lead.email = ix.extract_email(text) or text
         sess.context = {**(sess.context or {}), "script_step": STEP_DATETIME}
         return (
-            "We do visits Monday to Friday, 12:30 PM – 8:30 PM. "
+            "🕒 We do visits Monday to Friday, 12:30 PM – 8:30 PM. "
             "What date and time works for you? (e.g. '28 August 4pm')"
         )
 
@@ -95,7 +95,7 @@ async def run_script(text: str, lead: Lead, sess: LeadSession, db) -> str:
         }
         return (
             f"Just to confirm — visit on {parsed.strftime('%d %b %Y, %I:%M %p')} "
-            f"at {PROPERTY_NAME}, {LOCATION}. Shall I book it? (yes/no)"
+            f"at {PROPERTY_NAME}, {LOCATION}. Shall I book it? ✅ (yes/no)"
         )
 
     if step == STEP_CONFIRM:
@@ -120,17 +120,18 @@ async def run_script(text: str, lead: Lead, sess: LeadSession, db) -> str:
 
         if event_id:
             return (
-                f"Booked! Your visit to {PROPERTY_NAME}, {LOCATION} is confirmed for "
-                f"{slot.strftime('%d %b %Y, %I:%M %p')}. A calendar invite has been sent to {lead.email}."
+                f"🎉 Booked! Your visit to {PROPERTY_NAME}, {LOCATION} is confirmed for "
+                f"{slot.strftime('%d %b %Y, %I:%M %p')}. A calendar invite has been sent to {lead.email} 📅✨\n"
+                "Looking forward to seeing you!"
             )
         return (
             f"Booked in our system for {slot.strftime('%d %b %Y, %I:%M %p')} — the calendar invite "
-            "hit a snag, but the owner has the details and will confirm with you directly."
+            "hit a snag, but no worries, the owner has your details and will confirm with you directly! 🙏"
         )
 
     # STEP_DONE or anything unexpected — reset so another take can be recorded immediately.
     sess.context = {"script_step": STEP_GREETING}
     return (
-        f"Hi again! Welcome back to {PROPERTY_NAME}, {LOCATION}. "
-        "Ask me about pricing, availability, or say you'd like to book a visit."
+        f"Hi again! 👋 Welcome back to {PROPERTY_NAME}, {LOCATION}! "
+        "Ask me about pricing, availability, or say you'd like to book a visit 😊"
     )
