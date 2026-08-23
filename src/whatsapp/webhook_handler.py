@@ -135,6 +135,26 @@ async def receive_whatsapp(request: Request, background: BackgroundTasks):
 
     logger.info(f"[Webhook] From={from_number} | Body={body[:80]} | MsgId={msg_id[:20] if msg_id else '-'}")
 
+    # -- Havenly Stays demo bot branch ------------------------------------------
+    # Keyed on Meta's phone_number_id (a different WhatsApp test number from
+    # production), NOT on message content or sender — so it can never
+    # misfire onto real Cozeevo traffic. Fully isolated: own DB, own
+    # WhatsApp send function, own handler. Short-circuits before dedup,
+    # role_service, intent_detector, gatekeeper, and the production DB.
+    _demo_phone_number_id = os.getenv("HAVENLY_WHATSAPP_PHONE_NUMBER_ID")
+    if _demo_phone_number_id:
+        try:
+            _incoming_phone_number_id = payload["entry"][0]["changes"][0]["value"]["metadata"]["phone_number_id"]
+        except (KeyError, IndexError):
+            _incoming_phone_number_id = None
+        if _incoming_phone_number_id == _demo_phone_number_id:
+            from demo.havenly_stays.handler import handle_demo_message
+            from demo.havenly_stays.whatsapp_send import send_demo_whatsapp
+            demo_reply = await handle_demo_message(from_number, body)
+            if demo_reply:
+                background.add_task(send_demo_whatsapp, from_number, demo_reply)
+            return {"status": "ok"}
+
     # File-based debug log — journald not working
     with _open_log("/tmp/pg_webhook_debug.log") as _wdbg:
         _wdbg.write(f"[{from_number}] msg={body[:60]} msg_id={msg_id[:30] if msg_id else '-'}\n")
