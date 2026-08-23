@@ -35,6 +35,22 @@ GREETING_REPLY = (
     "I can help with room pricing, availability, or booking a visit. What would you like to know?"
 )
 
+_INTERPRET_PROMPT = (
+    f"You are extracting structured info from a WhatsApp message sent to {PROPERTY_NAME}, "
+    f"a PG accommodation in {LOCATION}. Today's date is __TODAY__.\n\n"
+    'Respond with ONLY strict JSON, no markdown fences: {"intent": "GREETING"|"PRICING"|"AVAILABILITY"|"VISIT_REQUEST"|"OTHER", '
+    '"room_type": "Single"|"Double Sharing"|"Triple Sharing"|null, "month": <1-12 integer or null>}\n\n'
+    "room_type: match ANY natural phrasing, not just exact words — \"a single\", \"solo stay\", \"single sharing\", "
+    "\"1 person room\" all mean Single; \"sharing with one other person\", \"2 sharing\" mean Double Sharing; "
+    "\"3 sharing\" means Triple Sharing. null if no room type is mentioned or implied.\n\n"
+    "month: the move-in month as 1-12, resolving relative phrases (\"next month\", \"this month\", \"in 3 weeks\") "
+    "against today's date above. null if no timeframe is mentioned.\n\n"
+    "intent: GREETING = just a hello with no question. PRICING = asking cost/rent. "
+    "AVAILABILITY = asking if/when a room is free. VISIT_REQUEST = wants to visit/tour in person. "
+    "OTHER = anything else (small talk is handled separately before this).\n\n"
+    "Guest's message: __MESSAGE__"
+)
+
 _UNCLEAR_PROMPT = (
     f"You are the WhatsApp receptionist for {PROPERTY_NAME}, a PG (paying guest) accommodation "
     f"in {LOCATION}. You only have real information about room pricing, room availability, and "
@@ -88,10 +104,33 @@ _REPROMPTS = {
 }
 
 
+async def _interpret(text: str) -> dict:
+    """Single LLM call replacing brittle keyword matching for topic + entity
+    detection — understands 'a single', 'solo stay', 'sharing with one other
+    person', 'next month', etc. instead of requiring exact keywords."""
+    default = {"intent": "OTHER", "room_type": None, "month": None}
+    try:
+        prompt = _INTERPRET_PROMPT.replace("__TODAY__", date.today().isoformat()).replace("__MESSAGE__", text)
+        raw = await get_claude_client()._call(prompt)
+        clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+        parsed = json.loads(clean)
+        return {
+            "intent": parsed.get("intent") if parsed.get("intent") in
+                ("GREETING", "PRICING", "AVAILABILITY", "VISIT_REQUEST", "OTHER") else "OTHER",
+            "room_type": parsed.get("room_type") if parsed.get("room_type") in
+                ("Single", "Double Sharing", "Triple Sharing") else None,
+            "month": parsed.get("month") if isinstance(parsed.get("month"), int) and 1 <= parsed.get("month") <= 12 else None,
+        }
+    except Exception as e:
+        logger.warning(f"[Demo] interpret failed: {e}")
+        return default
+
+
 async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
     intent = ix.classify(text)
 
-    # Small talk short-circuits even mid-flow — a "thanks" shouldn't get
+    # Small talk stays regex-only — cheap, reliable, no need for an LLM call
+    # to recognise "thanks". Short-circuits even mid-flow so it doesn't get
     # force-fit into whatever slot we were waiting on.
     if intent == ix.INTENT_THANKS:
         if sess.pending_field:
@@ -106,20 +145,20 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
     if sess.pending_field:
         return await _handle_pending(text, lead, sess, db)
 
-    if intent == ix.INTENT_GREETING:
+    parsed = await _interpret(text)
+    topic, room_type, month = parsed["intent"], parsed["room_type"], parsed["month"]
+
+    if topic == "GREETING":
         return GREETING_REPLY
 
-    if intent == ix.INTENT_PRICING:
-        room_type = ix.extract_room_type(text)
+    if topic == "PRICING":
         if not room_type:
             sess.pending_field = "room_type_for_pricing"
             return "Sure — which room type are you asking about? Single, Double Sharing, or Triple Sharing?"
         sess.context = {**(sess.context or {}), "interest": room_type}
         return await _price_reply(room_type, db)
 
-    if intent == ix.INTENT_AVAILABILITY:
-        month = ix.extract_month(text)
-        room_type = ix.extract_room_type(text)
+    if topic == "AVAILABILITY":
         if room_type:
             sess.context = {**(sess.context or {}), "interest": room_type}
         if not month:
@@ -128,7 +167,7 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
             return "Which month are you looking to move in?"
         return await _availability_reply(month, db, room_type=room_type)
 
-    if intent == ix.INTENT_VISIT_REQUEST:
+    if topic == "VISIT_REQUEST":
         return await _start_visit_flow(lead, sess)
 
     return await _handle_unclear(text, lead, sess)
@@ -244,7 +283,8 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
     field = sess.pending_field
 
     if field == "room_type_for_pricing":
-        room_type = ix.extract_room_type(text)
+        parsed = await _interpret(text)
+        room_type = parsed["room_type"]
         if not room_type:
             return "Sorry, I didn't catch that — Single, Double Sharing, or Triple Sharing?"
         sess.pending_field = None
@@ -252,10 +292,11 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
         return await _price_reply(room_type, db)
 
     if field == "month_for_availability":
-        month = ix.extract_month(text)
+        parsed = await _interpret(text)
+        month = parsed["month"]
         if not month:
             return "Sorry, which month did you mean? (e.g. September, or 'next month')"
-        room_type = (sess.context or {}).get("room_type_filter")
+        room_type = (sess.context or {}).get("room_type_filter") or parsed["room_type"]
         sess.pending_field = None
         sess.context = {"interest": room_type} if room_type else {}
         return await _availability_reply(month, db, room_type=room_type)
