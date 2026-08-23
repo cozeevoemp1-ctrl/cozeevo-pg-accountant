@@ -96,10 +96,14 @@ async def handle_demo_message(phone: str, text: str) -> str:
             lead_session.context = {}
         lead_session.last_active_at = datetime.utcnow()
 
-        history = await _load_history(session, phone)
         session.add(Message(phone=phone, role="guest", text=text[:2000]))
 
-        reply = await _route(text, lead, lead_session, session, history)
+        if os.getenv("HAVENLY_SCRIPTED_DEMO", "1") == "1":
+            from demo.havenly_stays.script import run_script
+            reply = await run_script(text, lead, lead_session, session)
+        else:
+            history = await _load_history(session, phone)
+            reply = await _route(text, lead, lead_session, session, history)
 
         session.add(Message(phone=phone, role="bot", text=reply[:2000]))
         return reply
@@ -288,14 +292,11 @@ async def _availability_reply(month: int, db, room_type: str = None) -> str:
         r = available[0]
         return (
             f"Yes — *{r.room_type}* is available from {target.strftime('%B %Y')} "
-            f"(Rs. {r.price_monthly:,}/month, {r.available_beds} bed(s) open from {r.available_from.strftime('%d %b %Y')}).\n\n"
+            f"(Rs. {r.price_monthly:,}/month).\n\n"
             "How long are you planning to stay, and would you like to book a visit?"
         )
 
-    lines = [
-        f"- {r.room_type}: Rs. {r.price_monthly:,}/month ({r.available_beds} bed(s) open from {r.available_from.strftime('%d %b %Y')})"
-        for r in available
-    ]
+    lines = [f"- {r.room_type}: Rs. {r.price_monthly:,}/month" for r in available]
     return f"Available from {target.strftime('%B %Y')}:\n" + "\n".join(lines) + "\n\nWant to book a visit?"
 
 
