@@ -52,6 +52,20 @@ class LeadSession(Base):
     last_active_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class Message(Base):
+    """Full conversation log per phone — persisted so a returning guest
+    (same day or days later) gets replies informed by what was already
+    discussed, not a blank slate each session."""
+
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    phone: Mapped[str] = mapped_column(String(20), index=True)
+    role: Mapped[str] = mapped_column(String(10))  # "guest" | "bot"
+    text: Mapped[str] = mapped_column(String(2000))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class VisitBooking(Base):
     __tablename__ = "visit_bookings"
 

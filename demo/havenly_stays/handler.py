@@ -21,13 +21,14 @@ from sqlalchemy import select
 from demo.havenly_stays import intents as ix
 from demo.havenly_stays.calendar_booking import book_visit_event
 from demo.havenly_stays.db import get_session
-from demo.havenly_stays.models import Lead, LeadSession, Room, VisitBooking
+from demo.havenly_stays.models import Lead, LeadSession, Message, Room, VisitBooking
 from demo.havenly_stays.whatsapp_send import send_demo_whatsapp
 from src.llm_gateway.claude_client import get_claude_client
 
 PROPERTY_NAME = "Havenly Stays"
 LOCATION = "Ariana"
 IDLE_RESET_MINUTES = 30
+HISTORY_LIMIT = 30
 OWNER_PHONE = os.getenv("HAVENLY_OWNER_PHONE") or os.getenv("HAVENLY_ADMIN_PHONE") or os.getenv("ADMIN_PHONE")
 
 GREETING_REPLY = (
@@ -48,7 +49,11 @@ _INTERPRET_PROMPT = (
     "intent: GREETING = just a hello with no question. PRICING = asking cost/rent. "
     "AVAILABILITY = asking if/when a room is free. VISIT_REQUEST = wants to visit/tour in person. "
     "OTHER = anything else (small talk is handled separately before this).\n\n"
-    "Guest's message: __MESSAGE__"
+    "Use the recent conversation below to resolve references like 'it', 'that one', or a bare "
+    "follow-up question — if a room type was already established earlier, carry it forward even "
+    "if this message doesn't restate it.\n\n"
+    "Recent conversation (oldest first, may be empty for a new guest):\n__HISTORY__\n\n"
+    "Guest's latest message: __MESSAGE__"
 )
 
 _UNCLEAR_PROMPT = (
@@ -66,7 +71,8 @@ _UNCLEAR_PROMPT = (
     "acknowledging what they asked, with no question in it — the caller will separately ask permission "
     "to forward it to the owner.\n\n"
     'Respond with ONLY strict JSON, no markdown fences: {"action": "clarify"|"escalate", "reply": "..."}\n\n'
-    "Guest's message: __MESSAGE__"
+    "Recent conversation (oldest first, may be empty for a new guest):\n__HISTORY__\n\n"
+    "Guest's latest message: __MESSAGE__"
 )
 
 
@@ -90,7 +96,26 @@ async def handle_demo_message(phone: str, text: str) -> str:
             lead_session.context = {}
         lead_session.last_active_at = datetime.utcnow()
 
-        return await _route(text, lead, lead_session, session)
+        history = await _load_history(session, phone)
+        session.add(Message(phone=phone, role="guest", text=text[:2000]))
+
+        reply = await _route(text, lead, lead_session, session, history)
+
+        session.add(Message(phone=phone, role="bot", text=reply[:2000]))
+        return reply
+
+
+async def _load_history(db, phone: str) -> str:
+    """Last HISTORY_LIMIT messages for this phone, oldest first — so a
+    returning guest (same session or days later) gets replies informed by
+    what was already discussed, not a blank slate."""
+    rows = (await db.execute(
+        select(Message).where(Message.phone == phone).order_by(Message.created_at.desc()).limit(HISTORY_LIMIT)
+    )).scalars().all()
+    rows = list(reversed(rows))
+    if not rows:
+        return "(no prior messages)"
+    return "\n".join(f"{'Guest' if r.role == 'guest' else 'You'}: {r.text}" for r in rows)
 
 
 _REPROMPTS = {
@@ -104,13 +129,19 @@ _REPROMPTS = {
 }
 
 
-async def _interpret(text: str) -> dict:
+async def _interpret(text: str, history: str = "(no prior messages)") -> dict:
     """Single LLM call replacing brittle keyword matching for topic + entity
     detection — understands 'a single', 'solo stay', 'sharing with one other
-    person', 'next month', etc. instead of requiring exact keywords."""
+    person', 'next month', etc. instead of requiring exact keywords. `history`
+    lets it resolve references to earlier turns instead of treating every
+    message as a blank slate."""
     default = {"intent": "OTHER", "room_type": None, "month": None}
     try:
-        prompt = _INTERPRET_PROMPT.replace("__TODAY__", date.today().isoformat()).replace("__MESSAGE__", text)
+        prompt = (
+            _INTERPRET_PROMPT.replace("__TODAY__", date.today().isoformat())
+            .replace("__HISTORY__", history)
+            .replace("__MESSAGE__", text)
+        )
         raw = await get_claude_client()._call(prompt)
         clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
         parsed = json.loads(clean)
@@ -126,7 +157,7 @@ async def _interpret(text: str) -> dict:
         return default
 
 
-async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
+async def _route(text: str, lead: Lead, sess: LeadSession, db, history: str) -> str:
     intent = ix.classify(text)
 
     # Small talk stays regex-only — cheap, reliable, no need for an LLM call
@@ -143,10 +174,21 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
         return "Sounds good — feel free to message anytime. Have a great day!"
 
     if sess.pending_field:
-        return await _handle_pending(text, lead, sess, db)
+        return await _handle_pending(text, lead, sess, db, history)
 
-    parsed = await _interpret(text)
+    # A bare "yes"/"ok" right after we suggested booking a visit means:
+    # accept that offer — not a fresh, context-free message.
+    if ix.classify(text) == ix.INTENT_CONFIRM and (sess.context or {}).get("suggested_action") == "visit":
+        sess.context = {**(sess.context or {}), "suggested_action": None}
+        return await _start_visit_flow(lead, sess)
+
+    parsed = await _interpret(text, history)
     topic, room_type, month = parsed["intent"], parsed["room_type"], parsed["month"]
+
+    # If this message doesn't restate a room type, fall back to whichever
+    # one was already established earlier in the conversation — "is it
+    # available from the 10th?" after discussing Single shouldn't forget.
+    room_type = room_type or (sess.context or {}).get("interest")
 
     if topic == "GREETING":
         return GREETING_REPLY
@@ -156,7 +198,7 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
             sess.pending_field = "room_type_for_pricing"
             return "Sure — which room type are you asking about? Single, Double Sharing, or Triple Sharing?"
         sess.context = {**(sess.context or {}), "interest": room_type}
-        return await _price_reply(room_type, db)
+        return _mark_visit_suggested(sess, await _price_reply(room_type, db))
 
     if topic == "AVAILABILITY":
         if room_type:
@@ -165,15 +207,24 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
             sess.pending_field = "month_for_availability"
             sess.context = {**(sess.context or {}), "room_type_filter": room_type}
             return "Which month are you looking to move in?"
-        return await _availability_reply(month, db, room_type=room_type)
+        return _mark_visit_suggested(sess, await _availability_reply(month, db, room_type=room_type))
 
     if topic == "VISIT_REQUEST":
         return await _start_visit_flow(lead, sess)
 
-    return await _handle_unclear(text, lead, sess)
+    return await _handle_unclear(text, lead, sess, history)
 
 
-async def _handle_unclear(text: str, lead: Lead, sess: LeadSession) -> str:
+def _mark_visit_suggested(sess: LeadSession, reply: str) -> str:
+    """Remember that we just offered a visit booking, so a bare 'yes' next
+    turn is understood as accepting it rather than falling through to the
+    LLM's generic unclear-message handling."""
+    if "book a visit" in reply.lower():
+        sess.context = {**(sess.context or {}), "suggested_action": "visit"}
+    return reply
+
+
+async def _handle_unclear(text: str, lead: Lead, sess: LeadSession, history: str) -> str:
     """Anything that isn't a recognised intent: the LLM decides between
     asking ONE clarifying question (still in scope: pricing/availability/
     visit, just missing a detail) or escalating (genuinely out of scope) —
@@ -181,7 +232,7 @@ async def _handle_unclear(text: str, lead: Lead, sess: LeadSession) -> str:
     ai = get_claude_client()
     action, reply = "escalate", "I'm not totally sure about that one."
     try:
-        raw = await ai._call(_UNCLEAR_PROMPT.replace("__MESSAGE__", text))
+        raw = await ai._call(_UNCLEAR_PROMPT.replace("__HISTORY__", history).replace("__MESSAGE__", text))
         clean = raw.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
         parsed = json.loads(clean)
         if parsed.get("action") in ("clarify", "escalate") and parsed.get("reply"):
@@ -279,27 +330,27 @@ async def _notify_owner(text: str, lead: Lead, interest: str = None) -> bool:
         return False
 
 
-async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
+async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history: str) -> str:
     field = sess.pending_field
 
     if field == "room_type_for_pricing":
-        parsed = await _interpret(text)
+        parsed = await _interpret(text, history)
         room_type = parsed["room_type"]
         if not room_type:
             return "Sorry, I didn't catch that — Single, Double Sharing, or Triple Sharing?"
         sess.pending_field = None
         sess.context = {**(sess.context or {}), "interest": room_type}
-        return await _price_reply(room_type, db)
+        return _mark_visit_suggested(sess, await _price_reply(room_type, db))
 
     if field == "month_for_availability":
-        parsed = await _interpret(text)
+        parsed = await _interpret(text, history)
         month = parsed["month"]
         if not month:
             return "Sorry, which month did you mean? (e.g. September, or 'next month')"
         room_type = (sess.context or {}).get("room_type_filter") or parsed["room_type"]
         sess.pending_field = None
         sess.context = {"interest": room_type} if room_type else {}
-        return await _availability_reply(month, db, room_type=room_type)
+        return _mark_visit_suggested(sess, await _availability_reply(month, db, room_type=room_type))
 
     if field == "visit_name":
         name = text.strip()
