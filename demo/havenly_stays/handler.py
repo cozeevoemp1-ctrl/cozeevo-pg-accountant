@@ -33,8 +33,8 @@ HISTORY_LIMIT = 30
 OWNER_PHONE = os.getenv("HAVENLY_OWNER_PHONE") or os.getenv("HAVENLY_ADMIN_PHONE") or os.getenv("ADMIN_PHONE")
 
 GREETING_REPLY = (
-    f"Hi! Welcome to {PROPERTY_NAME}, {LOCATION}.\n"
-    "I can help with room pricing, availability, or booking a visit. What would you like to know?"
+    f"Hi there! 👋 Welcome to {PROPERTY_NAME}, {LOCATION}! 🏠\n"
+    "I'd love to help — ask me about room pricing, availability, or let's book you a visit! 😊"
 )
 
 _INTERPRET_PROMPT = (
@@ -59,8 +59,10 @@ _INTERPRET_PROMPT = (
 
 _UNCLEAR_PROMPT = (
     f"You are the WhatsApp receptionist for {PROPERTY_NAME}, a PG (paying guest) accommodation "
-    f"in {LOCATION}. You only have real information about room pricing, room availability, and "
-    "booking a visit. Never invent facts (amenities, policies, deposit rules, food, wifi, pets, "
+    f"in {LOCATION}. Your personality is warm, friendly, and casual — like a helpful human texting "
+    "back, not a formal bot. Use light, natural emoji occasionally (never more than one or two per "
+    "message, never forced). You only have real information about room pricing, room availability, "
+    "and booking a visit. Never invent facts (amenities, policies, deposit rules, food, wifi, pets, "
     "negotiating price, etc.) that weren't given to you.\n\n"
     "A guest just sent a message that didn't match your normal pricing/availability/visit flow. "
     "Decide exactly ONE of two actions:\n"
@@ -181,13 +183,13 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db, history: str) -> 
     # force-fit into whatever slot we were waiting on.
     if intent == ix.INTENT_THANKS:
         if sess.pending_field:
-            return f"You're welcome! {_REPROMPTS.get(sess.pending_field, 'Anything else I can help with?')}"
-        return "You're welcome! Anything else I can help with?"
+            return f"You're welcome! 😊 {_REPROMPTS.get(sess.pending_field, 'Anything else I can help with?')}"
+        return "You're welcome! 😊 Anything else I can help with?"
 
     if intent == ix.INTENT_CLOSING:
         sess.pending_field = None
         sess.context = {}
-        return "Sounds good — feel free to message anytime. Have a great day!"
+        return "Sounds good — feel free to message anytime! Have a great day! 👋"
 
     if sess.pending_field:
         return await _handle_pending(text, lead, sess, db, history)
@@ -265,7 +267,7 @@ async def _handle_unclear(text: str, lead: Lead, sess: LeadSession, history: str
 
     sess.pending_field = "escalate_confirm"
     sess.context = {**(sess.context or {}), "escalate_text": text}
-    return f"{reply} Want me to pass this along to the property owner so they can help directly?"
+    return f"{reply} Want me to pass this along to the property owner so they can help directly? 🙋"
 
 
 async def _price_reply(room_type: str, db) -> str:
@@ -273,8 +275,8 @@ async def _price_reply(room_type: str, db) -> str:
     if not room:
         return f"Sorry, I don't have pricing for {room_type} right now."
     return (
-        f"*{room.room_type}* at {PROPERTY_NAME}, {LOCATION}: Rs. {room.price_monthly:,}/month.\n"
-        "Want to check availability, or book a visit?"
+        f"💰 *{room.room_type}* at {PROPERTY_NAME}, {LOCATION}: Rs. {room.price_monthly:,}/month.\n"
+        "Want to check availability, or book a visit? 🙂"
     )
 
 
@@ -303,25 +305,25 @@ async def _availability_reply(month: int, db, room_type: str = None) -> str:
     if len(available) == 1:
         r = available[0]
         return (
-            f"Yes — *{r.room_type}* is available from {target.strftime('%B %Y')} "
+            f"✅ Yes — *{r.room_type}* is available from {target.strftime('%B %Y')} "
             f"(Rs. {r.price_monthly:,}/month).\n\n"
-            "How long are you planning to stay, and would you like to book a visit?"
+            "How long are you planning to stay, and would you like to book a visit? 🏡"
         )
 
     lines = [f"- {r.room_type}: Rs. {r.price_monthly:,}/month" for r in available]
-    return f"Available from {target.strftime('%B %Y')}:\n" + "\n".join(lines) + "\n\nWant to book a visit?"
+    return f"Available from {target.strftime('%B %Y')}:\n" + "\n".join(lines) + "\n\nWant to book a visit? 🙂"
 
 
 async def _start_visit_flow(lead: Lead, sess: LeadSession) -> str:
     if not lead.name:
         sess.pending_field = "visit_name"
-        return "Great, let's set up a visit! What's your name?"
+        return "Great, let's set up a visit! 🎉 What's your name?"
     if not lead.email:
         sess.pending_field = "visit_email"
-        return f"Thanks {lead.name}! What email should I send the visit invite to?"
+        return f"Thanks {lead.name}! 😊 What email should I send the visit invite to? 📧"
     sess.pending_field = "visit_datetime"
     return (
-        "We do visits Monday to Friday, 12:30 PM – 8:30 PM. "
+        "🕒 We do visits Monday to Friday, 12:30 PM – 8:30 PM. "
         "What date and time works for you? (e.g. '28 August 4pm')"
     )
 
@@ -392,7 +394,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history:
         sess.pending_field = "visit_confirm"
         return (
             f"Just to confirm — visit on {parsed.strftime('%d %b %Y, %I:%M %p')} "
-            f"at {PROPERTY_NAME}, {LOCATION}. Shall I book it? (yes/no)"
+            f"at {PROPERTY_NAME}, {LOCATION}. Shall I book it? ✅ (yes/no)"
         )
 
     if field == "visit_confirm":
@@ -400,7 +402,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history:
         if intent == ix.INTENT_CANCEL:
             sess.pending_field = None
             sess.context = {}
-            return "No problem — let me know whenever you'd like to reschedule."
+            return "No problem — let me know whenever you'd like to reschedule! 🙂"
         if intent != ix.INTENT_CONFIRM:
             return "Should I go ahead and book that visit? (yes/no)"
 
@@ -430,8 +432,9 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history:
 
         if event_id:
             return (
-                f"Booked! Your visit to {PROPERTY_NAME}, {LOCATION} is confirmed for "
-                f"{slot.strftime('%d %b %Y, %I:%M %p')}. A calendar invite has been sent to {lead.email}."
+                f"🎉 Booked! Your visit to {PROPERTY_NAME}, {LOCATION} is confirmed for "
+                f"{slot.strftime('%d %b %Y, %I:%M %p')}. A calendar invite has been sent to {lead.email} 📅✨\n"
+                "Looking forward to seeing you!"
             )
 
         # Booking call failed (slot taken / calendar not reachable) — don't
@@ -443,7 +446,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history:
             interest,
         )
         return (
-            f"Hmm, that exact time didn't go through on our calendar — it might already be booked. "
+            f"Hmm, that exact time didn't go through on our calendar — it might already be booked. 🙏 "
             f"I've let the owner know you'd like a visit around {slot.strftime('%d %b %Y, %I:%M %p')} "
             "and they'll confirm a time with you directly."
         )
@@ -453,7 +456,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history:
         if intent == ix.INTENT_CANCEL:
             sess.pending_field = None
             sess.context = {}
-            return "No problem! Anything else I can help with?"
+            return "No problem! Anything else I can help with? 😊"
         if intent != ix.INTENT_CONFIRM:
             return "Just to confirm — should I pass your message along to the property owner? (yes/no)"
 
@@ -464,7 +467,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db, history:
         sess.context = {}
         sent = await _notify_owner(original_text, lead, interest)
         if sent:
-            return "Done — I've let the owner know, they'll follow up with you directly. Anything else I can help with?"
+            return "Done! ✅ I've let the owner know, they'll follow up with you directly. Anything else I can help with?"
         return "I noted that down for the owner to review. Anything else I can help with?"
 
     sess.pending_field = None
