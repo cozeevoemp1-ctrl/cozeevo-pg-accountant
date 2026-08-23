@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import date, datetime, timedelta
 
 import dateparser
@@ -161,7 +162,18 @@ async def _interpret(text: str, history: str = "(no prior messages)") -> dict:
         return default
 
 
+_GREETING_RESET_RE = re.compile(r"^\s*(hi+|hello+|hey+|helo)[.!]*\s*$", re.I)
+
+
 async def _route(text: str, lead: Lead, sess: LeadSession, db, history: str) -> str:
+    # A bare greeting ALWAYS restarts the conversation, no matter what we
+    # were mid-flow waiting on — a guest typing "hi" expects to start fresh,
+    # not have it swallowed as an answer to some earlier question.
+    if _GREETING_RESET_RE.match(text or ""):
+        sess.pending_field = None
+        sess.context = {}
+        return GREETING_REPLY
+
     intent = ix.classify(text)
 
     # Small talk stays regex-only — cheap, reliable, no need for an LLM call
