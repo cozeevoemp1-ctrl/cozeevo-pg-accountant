@@ -28,7 +28,7 @@ from src.llm_gateway.claude_client import get_claude_client
 PROPERTY_NAME = "Havenly Stays"
 LOCATION = "Ariana"
 IDLE_RESET_MINUTES = 30
-ADMIN_PHONE = os.getenv("HAVENLY_ADMIN_PHONE") or os.getenv("ADMIN_PHONE")
+OWNER_PHONE = os.getenv("HAVENLY_OWNER_PHONE") or os.getenv("HAVENLY_ADMIN_PHONE") or os.getenv("ADMIN_PHONE")
 
 GREETING_REPLY = (
     f"Hi! Welcome to {PROPERTY_NAME}, {LOCATION}.\n"
@@ -114,11 +114,14 @@ async def _route(text: str, lead: Lead, sess: LeadSession, db) -> str:
         if not room_type:
             sess.pending_field = "room_type_for_pricing"
             return "Sure — which room type are you asking about? Single, Double Sharing, or Triple Sharing?"
+        sess.context = {**(sess.context or {}), "interest": room_type}
         return await _price_reply(room_type, db)
 
     if intent == ix.INTENT_AVAILABILITY:
         month = ix.extract_month(text)
         room_type = ix.extract_room_type(text)
+        if room_type:
+            sess.context = {**(sess.context or {}), "interest": room_type}
         if not month:
             sess.pending_field = "month_for_availability"
             sess.context = {**(sess.context or {}), "room_type_filter": room_type}
@@ -217,20 +220,23 @@ async def _start_visit_flow(lead: Lead, sess: LeadSession) -> str:
     return "What date and time works for your visit? (e.g. '28 August 4pm')"
 
 
-async def _notify_admin(text: str, lead: Lead) -> bool:
-    if not ADMIN_PHONE:
-        logger.warning("[Demo] No HAVENLY_ADMIN_PHONE/ADMIN_PHONE set — cannot forward to owner.")
+async def _notify_owner(text: str, lead: Lead, interest: str = None) -> bool:
+    if not OWNER_PHONE:
+        logger.warning("[Demo] No HAVENLY_OWNER_PHONE/HAVENLY_ADMIN_PHONE/ADMIN_PHONE set — cannot forward to owner.")
         return False
+    interest = interest or "Not specified"
     msg = (
-        f"[Havenly Stays demo] A guest needs help:\n"
-        f"From: {lead.name or 'Unknown'} ({lead.phone})\n"
-        f"Message: {text}"
+        f"[Havenly Stays demo] A guest needs your help:\n"
+        f"Name: {lead.name or 'Not provided'}\n"
+        f"Phone: {lead.phone}\n"
+        f"Interested in: {interest}\n"
+        f"Concern: {text}"
     )
     try:
-        await send_demo_whatsapp(ADMIN_PHONE, msg)
+        await send_demo_whatsapp(OWNER_PHONE, msg)
         return True
     except Exception as e:
-        logger.warning(f"[Demo] Admin notify failed: {e}")
+        logger.warning(f"[Demo] Owner notify failed: {e}")
         return False
 
 
@@ -242,6 +248,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
         if not room_type:
             return "Sorry, I didn't catch that — Single, Double Sharing, or Triple Sharing?"
         sess.pending_field = None
+        sess.context = {**(sess.context or {}), "interest": room_type}
         return await _price_reply(room_type, db)
 
     if field == "month_for_availability":
@@ -250,7 +257,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
             return "Sorry, which month did you mean? (e.g. September, or 'next month')"
         room_type = (sess.context or {}).get("room_type_filter")
         sess.pending_field = None
-        sess.context = {}
+        sess.context = {"interest": room_type} if room_type else {}
         return await _availability_reply(month, db, room_type=room_type)
 
     if field == "visit_name":
@@ -290,6 +297,7 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
             return "Should I go ahead and book that visit? (yes/no)"
 
         ctx = sess.context or {}
+        interest = ctx.get("interest")
         slot = datetime.fromisoformat(ctx["visit_datetime"])
         booking = VisitBooking(lead_id=lead.id, slot_datetime=slot)
         db.add(booking)
@@ -321,9 +329,10 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
         # Booking call failed (slot taken / calendar not reachable) — don't
         # claim success. We still have the lead's intent recorded in our DB;
         # let the owner sort out the exact slot.
-        await _notify_admin(
+        await _notify_owner(
             f"Wants a visit on {slot.strftime('%d %b %Y, %I:%M %p')} but that slot didn't go through on the calendar — please confirm a time with them directly.",
             lead,
+            interest,
         )
         return (
             f"Hmm, that exact time didn't go through on our calendar — it might already be booked. "
@@ -340,10 +349,12 @@ async def _handle_pending(text: str, lead: Lead, sess: LeadSession, db) -> str:
         if intent != ix.INTENT_CONFIRM:
             return "Just to confirm — should I pass your message along to the property owner? (yes/no)"
 
-        original_text = (sess.context or {}).get("escalate_text", "")
+        ctx = sess.context or {}
+        original_text = ctx.get("escalate_text", "")
+        interest = ctx.get("interest")
         sess.pending_field = None
         sess.context = {}
-        sent = await _notify_admin(original_text, lead)
+        sent = await _notify_owner(original_text, lead, interest)
         if sent:
             return "Done — I've let the owner know, they'll follow up with you directly. Anything else I can help with?"
         return "I noted that down for the owner to review. Anything else I can help with?"
