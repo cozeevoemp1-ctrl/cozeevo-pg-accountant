@@ -1,5 +1,16 @@
 # Changelog
 
+## Session AH — 2026-08-21 — Thirumurugan deposit carryover fix (data-only, no code change)
+
+Kiran flagged: Thirumurugan (Room 510, tenancy 1270) deposit kept showing ₹10,000 outstanding in the Collect Payment modal despite being "waived last month."
+
+- **Root cause:** the prior "waiver" was applied to the wrong field. Someone edited `rent_schedule.adjustment` (a per-month RENT field, notes "Already paid" / "Deposit hold") to suppress that month's rent dues — but `deposit_due` in the Collect Payment modal is computed purely as `security_deposit − Σ(payments for_type=deposit)`, which the rent-schedule adjustment never touches. So it looked forgiven each month but reset every period.
+- **Real story (confirmed via DB):** this tenant had a prior tenancy (773, same room, earlier stint) with a ₹10,000 deposit paid 03-Jan-2026. He checked out 17-May-2026 and that deposit was **never refunded** (`checkout_records.deposit_refunded_amount = 0`). On his new tenancy (1270, check-in 30-May), only ₹3,000 fresh deposit was collected against a ₹13,000 requirement — the old ₹10,000 was sitting unaccounted-for instead of carrying forward.
+- **Fix (direct DB write, not app code):** inserted a `payments` row on tenancy 1270 — `for_type=deposit`, amount 10,000, `payment_mode=bank_transfer` (deliberately non-cash so it doesn't inflate the live "cash collected" figure for August — that sum only totals `payment_mode=cash` rows), with a note explaining the carryover. Added a matching `audit_log` entry. Annotated the old `refunds` row (id 88, tenancy 773) so nobody later assumes a second ₹10,000 refund is still owed separately. **`security_deposit` was deliberately left at ₹13,000** (Kiran: "don't reduce his deposit amount, we need to repay him") — the full amount stays owed back to him at eventual exit.
+- **New rule for future cases like this** — see [[rules_financial]] / `memory/rules_financial.md`: when a tenant re-checks-in to a new tenancy after a prior tenancy's deposit was never refunded, carry the old deposit forward as a `for_type=deposit` payment on the new tenancy (non-cash `payment_mode`), don't touch `security_deposit`, and never use `rent_schedule.adjustment` to fake-waive a deposit — that field only affects rent for that one month and doesn't persist.
+- Also answered (informational, no action): where the WhatsApp bot is hosted (Hostinger VPS, systemd `pg-accountant` + nginx, webhook-driven not polling) and a 10-step outline for a "rebuild this from scratch" YouTube walkthrough.
+- **Not pushed** — no code files changed this session; the fix was a live-DB correction only. Kiran asked not to push.
+
 ## Session AG (cont. 3) — 2026-08-14 — Phases 2+3: P&L drill-down + reclassification
 
 Kiran: "if I doubt an expense, how do I deep-dive and reclassify?" — that is spec 01 Phases 2+3, built together.
