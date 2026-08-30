@@ -726,6 +726,68 @@ async def update_session(token: str, req: UpdateSessionRequest, request: Request
             data["name"] = req.tenant_name.strip()
             obs.tenant_data = json.dumps(data)
 
+        # Quick-book sessions already have a real Tenant + Tenancy (no_show)
+        # row behind them — the occupancy engine, dues, and RS all read from
+        # Tenancy, not OnboardingSession. Without this sync an edit here looks
+        # applied in the Bookings UI but the room stays "occupied" forever and
+        # dues stay wrong, because Tenancy.checkin_date/agreed_rent/etc never move.
+        if obs.tenancy_id:
+            tenancy = await session.get(Tenancy, obs.tenancy_id)
+            if tenancy:
+                rs_recalc_needed = False
+
+                def _sync(field: str, new_value, audit_field: str | None = None):
+                    old = getattr(tenancy, field)
+                    old_str = old.isoformat() if hasattr(old, "isoformat") else (str(old) if old is not None else None)
+                    new_str = new_value.isoformat() if hasattr(new_value, "isoformat") else (str(new_value) if new_value is not None else None)
+                    if old_str == new_str:
+                        return
+                    setattr(tenancy, field, new_value)
+                    session.add(AuditLog(
+                        changed_by="admin",
+                        entity_type="tenancy",
+                        entity_id=tenancy.id,
+                        entity_name=tenancy_id_name,
+                        field=audit_field or field,
+                        old_value=old_str,
+                        new_value=new_str,
+                        source="dashboard",
+                        note=f"Synced from onboarding session {token}",
+                        org_id=tenancy.org_id,
+                    ))
+
+                tenancy_id_name = tenant.name if (tenant := await session.get(Tenant, tenancy.tenant_id)) else str(tenancy.id)
+
+                if req.checkin_date is not None:
+                    _sync("checkin_date", obs.checkin_date)
+                    rs_recalc_needed = True
+                if req.checkout_date is not None and tenancy.stay_type == StayType.daily:
+                    _sync("checkout_date", obs.checkout_date)
+                if req.room_number is not None:
+                    _sync("room_id", obs.room_id)
+                if req.agreed_rent is not None:
+                    _sync("agreed_rent", obs.agreed_rent)
+                    rs_recalc_needed = True
+                if req.maintenance_fee is not None:
+                    _sync("maintenance_fee", obs.maintenance_fee)
+                if req.security_deposit is not None:
+                    _sync("security_deposit", obs.security_deposit)
+                    rs_recalc_needed = True
+                if req.booking_amount is not None:
+                    _sync("booking_amount", obs.booking_amount)
+
+                if req.tenant_phone is not None or req.tenant_name is not None:
+                    tenant = tenant or await session.get(Tenant, tenancy.tenant_id)
+                    if tenant:
+                        if req.tenant_phone is not None:
+                            tenant.phone = obs.tenant_phone
+                        if req.tenant_name is not None:
+                            tenant.name = req.tenant_name.strip()
+
+                if rs_recalc_needed:
+                    from src.services.rent_schedule import recalc_checkin_month_rs
+                    await recalc_checkin_month_rs(session, tenancy)
+
         await session.commit()
         return {"ok": True, "token": token}
 
