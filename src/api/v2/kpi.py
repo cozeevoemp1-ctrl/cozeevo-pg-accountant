@@ -509,7 +509,7 @@ async def get_kpi_detail(
                     .where(
                         Tenancy.room_id.in_(vacant_room_ids),
                         Tenancy.status == TenancyStatus.no_show,
-                        Tenancy.checkin_date > today,
+                        Tenancy.checkin_date >= today,
                     )
                     .group_by(Tenancy.room_id)
                 )).all()
@@ -525,7 +525,7 @@ async def get_kpi_detail(
                     .where(
                         OnboardingSession.room_id.in_(vacant_room_ids),
                         OnboardingSession.status.in_(["pending_tenant", "pending_review", "expired"]),
-                        OnboardingSession.checkin_date > today,
+                        OnboardingSession.checkin_date >= today,
                     )
                     .group_by(OnboardingSession.room_id)
                 )).all()
