@@ -12,6 +12,7 @@ const TYPE_CONFIG: Record<ActivityFeedEvent["type"], { icon: string; color: stri
   checkout:    { icon: "←", color: "bg-[#FEF3C7] text-[#92400E]" },
   rent_change: { icon: "↑", color: "bg-[#EDE9FE] text-[#5B21B6]" },
   room_change: { icon: "⇄", color: "bg-[#FCE7F3] text-[#9D174D]" },
+  sharing_change: { icon: "⇵", color: "bg-[#E0E7FF] text-[#3730A3]" },
   void:        { icon: "✕", color: "bg-[#FEE2E2] text-[#991B1B]" },
   adjustment:  { icon: "~", color: "bg-[#FEF3C7] text-[#78350F]" },
   notice:      { icon: "!", color: "bg-[#FEF3C7] text-[#B45309]" },

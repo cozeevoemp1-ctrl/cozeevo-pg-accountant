@@ -1029,6 +1029,7 @@ async def get_activity_feed(
     NON_PAYMENT_FIELDS = {
         "agreed_rent", "status", "status+checkout_date",
         "room_id", "is_void", "adjustment", "rent_schedule_one_off",
+        "sharing_type",
     }
     async with get_session() as session:
         # Non-payment audit events (check-ins, rent changes, room moves, voids, adjustments)
@@ -1191,6 +1192,14 @@ async def get_activity_feed(
         elif r.field == "is_void":
             ev_type = "void"
             label = "Payment voided"
+            if r.note:
+                detail = r.note[:80]
+
+        elif r.field == "sharing_type":
+            ev_type = "sharing_change"
+            old_s = (r.old_value or "—").title()
+            new_s = (r.new_value or "—").title()
+            label = f"Sharing {old_s} → {new_s}"
             if r.note:
                 detail = r.note[:80]
 

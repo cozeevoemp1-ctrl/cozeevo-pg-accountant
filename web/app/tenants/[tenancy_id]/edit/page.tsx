@@ -52,6 +52,12 @@ export default function EditTenantPage() {
   // manual per-tenancy override (see resolve_sharing_on_room_change).
   const [sharingType, setSharingType] = useState<string>("")
   const [roomDefaultSharing, setRoomDefaultSharing] = useState<string | null>(null)
+  const [pendingSharing, setPendingSharing] = useState<string | null>(null)
+
+  function requestSharingChange(target: string) {
+    if (target === sharingType) return
+    setPendingSharing(target)
+  }
 
   async function fetchRoomInfo(room: string) {
     if (!room.trim()) return null
@@ -461,7 +467,7 @@ export default function EditTenantPage() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setSharingType(roomDefaultSharing || "")}
+                  onClick={() => requestSharingChange(roomDefaultSharing || "")}
                   className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 capitalize transition-colors ${
                     sharingType !== "premium"
                       ? "bg-brand-pink text-white border-brand-pink"
@@ -472,7 +478,7 @@ export default function EditTenantPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSharingType("premium")}
+                  onClick={() => requestSharingChange("premium")}
                   className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 transition-colors ${
                     sharingType === "premium"
                       ? "bg-brand-pink text-white border-brand-pink"
@@ -486,6 +492,29 @@ export default function EditTenantPage() {
                 <p className="text-[10px] text-ink-muted mt-1 px-1">
                   Tenant occupies all beds — remember to update Agreed Rent to the premium rate.
                 </p>
+              )}
+              {pendingSharing !== null && (
+                <div className="mt-2 rounded-tile bg-[#FFF7ED] border border-[#FDBA74] px-3 py-2.5 flex flex-col gap-2">
+                  <p className="text-xs font-semibold text-[#9A3412]">
+                    Switching to {pendingSharing === "premium" ? "Premium" : pendingSharing} — have you adjusted this tenant&apos;s Agreed Rent and Security Deposit to match?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPendingSharing(null)}
+                      className="flex-1 rounded-pill py-2 text-xs font-bold border-2 border-border-strong text-ink-muted bg-bg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSharingType(pendingSharing); setPendingSharing(null) }}
+                      className="flex-1 rounded-pill py-2 text-xs font-bold bg-[#9A3412] text-white"
+                    >
+                      Yes, rent/deposit adjusted →
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -903,7 +932,7 @@ export default function EditTenantPage() {
       <div className="fixed bottom-[80px] left-0 right-0 px-4 pb-2 pt-3 bg-bg border-t border-border">
         <button
           onClick={handleReview}
-          disabled={!!roomInfo?.is_full}
+          disabled={!!roomInfo?.is_full || pendingSharing !== null}
           className="w-full max-w-lg mx-auto block rounded-pill bg-brand-pink py-4 text-white font-bold text-base active:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Review Changes →

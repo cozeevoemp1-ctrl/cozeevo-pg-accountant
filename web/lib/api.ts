@@ -149,7 +149,7 @@ export function getRecentActivity(limit = 20, token?: string): Promise<ActivityR
 
 export interface ActivityFeedEvent {
   id: number;
-  type: "payment" | "checkin" | "checkout" | "rent_change" | "room_change" | "void" | "adjustment" | "notice" | "other";
+  type: "payment" | "checkin" | "checkout" | "rent_change" | "room_change" | "sharing_change" | "void" | "adjustment" | "notice" | "other";
   label: string;
   sublabel: string;
   detail: string;

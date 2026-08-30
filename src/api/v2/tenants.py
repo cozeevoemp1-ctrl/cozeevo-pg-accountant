@@ -846,7 +846,7 @@ async def update_tenant(
                     new_value=new_sharing.value if new_sharing else None,
                     room_number=room.room_number,
                     source="pwa",
-                    note="Manual sharing type override",
+                    note="Manual sharing type override — operator confirmed rent/deposit adjusted",
                     org_id=tenancy.org_id,
                 ))
 
