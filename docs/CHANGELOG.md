@@ -1,5 +1,55 @@
 # Changelog
 
+## Session AJ — 2026-08-30 — Vacant-beds "Until X" badge missing for same-day bookings
+
+Kiran: booked Room 411 (Aadi Gupta, check-in today) and the room card still showed plain "1 bed
+free" with no reservation tag, while other future-dated bookings (Room 417, "Until 31 Aug") showed
+correctly.
+
+- Root cause, confirmed against live DB: Aadi Gupta's booking is an `onboarding_sessions` row
+  (`pending_tenant`, link sent, tenant hasn't filled the form — no `Tenancy` row exists yet,
+  `tenancy_id IS NULL`). That's correctly excluded from the occupied *count* (nothing held/paid
+  yet). The reservation badge, however, is driven by a separate query
+  (`src/api/v2/kpi.py`, `type == "vacant"` upcoming-bookings lookup) that filtered
+  `checkin_date > today` (strict) for both `no_show` Tenancy rows and pending
+  `OnboardingSession` rows — excluding same-day bookings from the badge entirely.
+- Fix: both filters changed to `>= today` so a booking due to check in *today* shows the same
+  "Until <date>" tag as a future one, instead of rendering as fully vacant.
+- Pushed to `development` (b5bc0af), merged to `master` + shipped to prod on Kiran's confirmation.
+- **Not changed**: the vacant *count* itself. A booking still only reduces the hard bed count once
+  it's a real `no_show` Tenancy (i.e. approved past the onboarding form) — a pending link-sent
+  booking stays "free" in the count since the tenant could still no-show entirely. Only the visual
+  badge was the bug.
+
+## Session AI — 2026-08-30 — Manual sharing-type override (double↔premium) in Edit Tenant
+
+Kiran: room 615 (Sheetal, double) needed to go premium (whole-room) manually — asked where that
+workflow lives today. It didn't exist as a UI action; `sharing_type` was only ever auto-derived
+from the room's physical type on room transfer (`resolve_sharing_on_room_change`), and premium is
+never a room's physical type in our master data (`Room.room_type` never equals `premium` in the
+live DB) — it's always a per-tenancy override.
+
+- **Edit Tenant** (`web/app/tenants/[tenancy_id]/edit/page.tsx`) now shows a **Sharing Type**
+  toggle under the Room field whenever the room is a double/triple (or the tenancy is already
+  premium): `<room default> (default)` vs `Premium (whole room)`.
+- Tapping a different value opens an inline confirm — "have you adjusted this tenant's Agreed
+  Rent and Security Deposit?" — before it's applied. `Review Changes` is blocked until confirmed
+  or cancelled. Rent/deposit are NOT auto-adjusted; the operator does that in the same edit.
+- Backend: `PATCH /api/v2/app/tenants/{id}` accepts an explicit `sharing_type`
+  (`src/api/v2/tenants.py`), applied AFTER the existing room-change auto-derivation so it always
+  wins. **Gated**: switching to `premium` is rejected (409) unless `get_room_occupants()` confirms
+  no other active tenant (long-term or day-stay) is in that room.
+- Writes `AuditLog` (`field="sharing_type"`, note "operator confirmed rent/deposit adjusted").
+  Registered `sharing_type` in the Activity feed backend (`src/api/v2/kpi.py`) — it was being
+  written to `AuditLog` already for room-transfer auto-derivation but was silently filtered out of
+  `/activity/feed`'s `NON_PAYMENT_FIELDS` whitelist the whole time; now both auto-derived and
+  manual sharing changes show as "Sharing Double → Premium" with their own icon/filter type.
+- **Not yet done**: Sheet write-back — `sharing_type` changes don't push to the Google Sheet
+  (only `room`/`agreed_rent` do on transfer). Flag if the Sheet needs to reflect it.
+- Deployed to prod (`3c3c41a`), verified via `/healthz`. **`[Kiran]` end-to-end test on Sheetal
+  (tenancy 615, room 615) was in progress at session end** — confirm the toggle, the 409 gate (if
+  another tenant is present), and the Activity feed entry all behave as expected.
+
 ## Session AH — 2026-08-21 — Thirumurugan deposit carryover fix (data-only, no code change)
 
 Kiran flagged: Thirumurugan (Room 510, tenancy 1270) deposit kept showing ₹10,000 outstanding in the Collect Payment modal despite being "waived last month."
