@@ -823,6 +823,18 @@ async def update_tenant(
                 raise HTTPException(status_code=422, detail=f"Invalid sharing_type: {new_val}")
             old_sharing = tenancy.sharing_type.value if tenancy.sharing_type else None
             if new_sharing != tenancy.sharing_type:
+                if new_sharing == SharingType.premium:
+                    from src.services.room_occupancy import get_room_occupants
+                    occ = await get_room_occupants(session, room)
+                    others = [
+                        t.name for t, tc in occ.tenancies if tc.id != tenancy_id
+                    ] + [tc.tenant.name for tc in occ.daywise if tc.tenant]
+                    if others:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"Room {room.room_number} is not empty — still occupied by {', '.join(others)}. "
+                                   "Premium (whole-room) requires the room to be free of other tenants.",
+                        )
                 tenancy.sharing_type = new_sharing
                 session.add(AuditLog(
                     changed_by=user.actor,
