@@ -398,6 +398,7 @@ export interface PatchTenantBody {
   room_number?: string;
   prorate_this_month?: boolean;
   checkin_date?: string | null;
+  sharing_type?: string;
 }
 
 export interface PatchTenantResponse {

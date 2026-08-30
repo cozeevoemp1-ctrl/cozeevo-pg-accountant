@@ -47,17 +47,30 @@ export default function EditTenantPage() {
   const [roomInfoLoading, setRoomInfoLoading] = useState(false)
   const API_URL = BASE_URL
 
-  async function checkRoomOccupancy(room: string) {
-    if (!room.trim() || room.trim() === original?.room_number) { setRoomInfo(null); return }
-    setRoomInfoLoading(true)
+  // Sharing type — defaults to whatever the room derives (single/double/triple);
+  // premium is never a room's physical type in our master data, only ever a
+  // manual per-tenancy override (see resolve_sharing_on_room_change).
+  const [sharingType, setSharingType] = useState<string>("")
+  const [roomDefaultSharing, setRoomDefaultSharing] = useState<string | null>(null)
+
+  async function fetchRoomInfo(room: string) {
+    if (!room.trim()) return null
     try {
       const res = await fetch(`${API_URL}/api/onboarding/room-lookup/${encodeURIComponent(room.trim())}`, {
         headers: await authHeaders()
       })
-      if (!res.ok) { setRoomInfo(null); return }
-      setRoomInfo(await res.json())
-    } catch { setRoomInfo(null) }
-    finally { setRoomInfoLoading(false) }
+      if (!res.ok) return null
+      return await res.json()
+    } catch { return null }
+  }
+
+  async function checkRoomOccupancy(room: string) {
+    if (!room.trim() || room.trim() === original?.room_number) { setRoomInfo(null); return }
+    setRoomInfoLoading(true)
+    const data = await fetchRoomInfo(room)
+    setRoomInfo(data)
+    setRoomDefaultSharing(data?.sharing ?? null)
+    setRoomInfoLoading(false)
   }
 
   const [showConfirm, setShowConfirm] = useState(false)
@@ -101,6 +114,8 @@ export default function EditTenantPage() {
         setCheckinDate(formatDate(d.checkin_date))
         setExpectedCheckout(formatDate(d.expected_checkout))
         setNoticeDate(formatDate(d.notice_date))
+        setSharingType(d.sharing_type || "")
+        fetchRoomInfo(d.room_number).then((data) => setRoomDefaultSharing(data?.sharing ?? null))
       })
       .catch(() => setFetchError("Could not load tenant details"))
       .finally(() => setLoading(false))
@@ -113,6 +128,7 @@ export default function EditTenantPage() {
     if (name.trim() && name.trim() !== original.name) changes.name = name.trim()
     if (phone.trim() && phone.trim() !== original.phone) changes.phone = phone.trim()
     if (roomNumber.trim() && roomNumber.trim() !== original.room_number) changes.room_number = roomNumber.trim()
+    if (sharingType && sharingType !== (original.sharing_type || "")) changes.sharing_type = sharingType
     if (email.trim()) changes.email = email.trim()
     // Handle rent/daily_rate based on stay_type
     if (original.stay_type === "daily") {
@@ -153,6 +169,7 @@ export default function EditTenantPage() {
     if (changes.name) fields.push({ label: "Name", value: changes.name })
     if (changes.phone) fields.push({ label: "Phone", value: changes.phone })
     if (changes.email) fields.push({ label: "Email", value: changes.email })
+    if (changes.sharing_type) fields.push({ label: "Sharing Type", value: changes.sharing_type, highlight: true })
     if (changes.room_number) {
       fields.push({ label: "New Room", value: changes.room_number, highlight: true })
       if (proratedInfo && changes.agreed_rent === undefined) {
@@ -435,6 +452,42 @@ export default function EditTenantPage() {
                 Room {roomNumber}: {roomInfo.occupied}/{roomInfo.max_occupancy} beds occupied — space available
               </p>
             )
+          )}
+
+          {/* Sharing type — premium is never a room default, only a manual override */}
+          {original?.stay_type !== "daily" && (roomDefaultSharing === "double" || roomDefaultSharing === "triple" || sharingType === "premium") && (
+            <div className="mt-1">
+              <label className="block text-xs font-medium text-ink-muted mb-1">Sharing Type</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSharingType(roomDefaultSharing || "")}
+                  className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 capitalize transition-colors ${
+                    sharingType !== "premium"
+                      ? "bg-brand-pink text-white border-brand-pink"
+                      : "bg-bg text-ink-muted border-border-strong"
+                  }`}
+                >
+                  {roomDefaultSharing || "auto"} (default)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSharingType("premium")}
+                  className={`flex-1 rounded-pill py-2.5 text-xs font-bold border-2 transition-colors ${
+                    sharingType === "premium"
+                      ? "bg-brand-pink text-white border-brand-pink"
+                      : "bg-bg text-ink-muted border-border-strong"
+                  }`}
+                >
+                  Premium (whole room)
+                </button>
+              </div>
+              {sharingType === "premium" && (
+                <p className="text-[10px] text-ink-muted mt-1 px-1">
+                  Tenant occupies all beds — remember to update Agreed Rent to the premium rate.
+                </p>
+              )}
+            </div>
           )}
         </div>
 

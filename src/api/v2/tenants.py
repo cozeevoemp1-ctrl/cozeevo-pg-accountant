@@ -811,6 +811,33 @@ async def update_tenant(
                             _prorated = int(float(tenancy.agreed_rent or 0) * _remaining / _dim)
                             _rs.rent_due = _D(str(_prorated))
 
+        # Explicit sharing_type override (e.g. double → premium or back) — applied after
+        # room reassignment so it wins over the auto-derived value from resolve_sharing_on_room_change.
+        # Premium is never a room's physical type in our master data (see RoomType comment) —
+        # it's always a per-tenancy override, so this is the only way it gets set.
+        if "sharing_type" in body:
+            new_val = body["sharing_type"]
+            try:
+                new_sharing = SharingType(new_val) if new_val else None
+            except ValueError:
+                raise HTTPException(status_code=422, detail=f"Invalid sharing_type: {new_val}")
+            old_sharing = tenancy.sharing_type.value if tenancy.sharing_type else None
+            if new_sharing != tenancy.sharing_type:
+                tenancy.sharing_type = new_sharing
+                session.add(AuditLog(
+                    changed_by=user.actor,
+                    entity_type="tenancy",
+                    entity_id=tenancy_id,
+                    entity_name=tenant.name,
+                    field="sharing_type",
+                    old_value=old_sharing,
+                    new_value=new_sharing.value if new_sharing else None,
+                    room_number=room.room_number,
+                    source="pwa",
+                    note="Manual sharing type override",
+                    org_id=tenancy.org_id,
+                ))
+
         # Rent-only RS update: when prorate_this_month is explicitly set and no room change
         if body.get("prorate_this_month") is not None and "agreed_rent" in body and "room_number" not in body:
             import calendar as _cal
