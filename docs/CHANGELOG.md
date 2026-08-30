@@ -1,5 +1,45 @@
 # Changelog
 
+## Session AK — 2026-08-30 — G19 room_type never actually fixed + booking-edit sync bug (Tenancy never updates from OnboardingSession edits)
+
+Kiran: "g19 which sharing type is it" → led to two separate confirmed bugs.
+
+**1. G19 room_type revert (data-only fix, no code change needed)**
+- DB showed `rooms.room_type='double'` (max_occupancy=2) for G19, contradicting docs which said
+  G19 was fixed to single back on 2026-05-14 (`docs/CHANGELOG.md` "Room type corrections").
+- Root cause: the 2026-05-14 fix only patched `max_occupancy=1` directly, never the `room_type`
+  enum column. The 2026-05-20 refactor (`1.76.12`, `src/database/migrate_all.py`) that made
+  `max_occupancy` derive universally from `room_type` (`single=1, double=2, triple=3`) then silently
+  reverted G19 back to 2 beds on its next run, since `room_type` itself was still `'double'`. G16
+  got the correct fix at the time (`room_type='single'`); G19 didn't.
+- Fixed: `UPDATE rooms SET room_type='single', max_occupancy=1 WHERE room_number='G19'`. No script/doc
+  constant changes needed — `get_total_revenue_beds()` (`src/services/occupancy.py`) sums
+  `Room.max_occupancy` live from DB, so total revenue beds dropped by 1 automatically.
+
+**2. OnboardingSession edits never synced to the linked Tenancy row (real code bug, fixed)**
+- Symptom: G19 wasn't showing "Until 12 Sep" in the vacant-beds list even after Lokesh corrected a
+  mis-typed check-in date (12 Aug → 12 Sep) on a quick-booked session (Shekhar Paliwal) via the
+  Bookings page Edit action.
+- Root cause: `quick_book` (`src/api/v2/bookings.py`) creates a real `Tenant` + `Tenancy`
+  (`status=no_show`) + `OnboardingSession` together at booking time. But `PATCH
+  /api/onboarding/admin/{token}` (`update_session` in `src/api/onboarding_router.py`) only ever
+  wrote to the `OnboardingSession` row — never to the already-linked `Tenancy`
+  (`obs.tenancy_id`). The occupancy engine, dues, and RentSchedule all read from `Tenancy`, not
+  `OnboardingSession`, so the Bookings-page UI showed the corrected date while the room stayed
+  blocked with the original (already-past) check-in date forever. Confirmed via zero `AuditLog`
+  rows for the tenancy despite the edit having visibly "saved" in the UI.
+- Fix (`src/api/onboarding_router.py`, `update_session`): every editable field
+  (`checkin_date`, `checkout_date` for day-stays, `room_id`, `agreed_rent`, `maintenance_fee`,
+  `security_deposit`, `booking_amount`, tenant `phone`/`name`) now mirrors onto the linked
+  `Tenancy`/`Tenant` whenever `obs.tenancy_id` is set, with `AuditLog` entries, and calls
+  `recalc_checkin_month_rs()` when `checkin_date`/`agreed_rent`/`security_deposit` changes (per the
+  5-call-site rule in `CLAUDE.md`).
+- Backfilled the one live affected row (tenancy 1337, Shekhar Paliwal → `checkin_date=2026-09-12`)
+  with a manual `AuditLog` entry noting it predates the fix.
+- Shipped directly to master (webhook auto-deploy), verified live via `/healthz` (`commit 12872c0`).
+- **Not yet verified**: re-test the Bookings-page Edit flow live in the PWA to confirm G19 now shows
+  "Until 12 Sep 2026" in the vacant-beds search instead of being silently excluded.
+
 ## Session AJ — 2026-08-30 — Vacant-beds "Until X" badge missing for same-day bookings
 
 Kiran: booked Room 411 (Aadi Gupta, check-in today) and the room card still showed plain "1 bed
