@@ -13,7 +13,7 @@ import {
   type PnlLineItemsResponse, type PnlMonthResponse, type PnlNode,
 } from "@/lib/api"
 import { rupeeExact } from "@/lib/format"
-import { fmtDateShort, monthLabel, periodMonth } from "@/lib/date"
+import { addMonths, fmtDateShort, monthLabel, periodMonth } from "@/lib/date"
 import { MonthNav } from "@/components/ui/month-nav"
 import { Sheet } from "@/components/ui/modal"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -84,7 +84,7 @@ export function PnlMonthCard({ refreshSignal }: {
       live, so a refetch IS the recalculation). */
   refreshSignal?: { month?: string; n: number }
 } = {}) {
-  const [month, setMonth] = useState(periodMonth())
+  const [month, setMonth] = useState(addMonths(periodMonth(), -1)) // month being closed, not the one that just started
   const [data, setData] = useState<PnlMonthResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")

@@ -3,19 +3,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { getPnlAdjustments, savePnlAdjustments } from "@/lib/api";
 import { rupee } from "@/lib/format";
-import { periodMonth } from "@/lib/date";
+import { addMonths, periodMonth } from "@/lib/date";
 
-const FIELDS: { key: "cash_holding" | "rent_paid_cash" | "cash_expense"; label: string; hint: string }[] = [
+type AdjKey = "cash_holding" | "rent_paid_cash" | "cash_expense" | "offline_cash";
+const FIELDS: { key: AdjKey; label: string; hint: string }[] = [
   { key: "cash_holding",   label: "Cash holding (physical)",     hint: "Cash in hand at month close — balance-sheet line" },
   { key: "rent_paid_cash", label: "Rent paid in cash",           hint: "Property rent paid to landlords in cash — OPEX" },
   { key: "cash_expense",   label: "Cash expense (other)",        hint: "Other operating costs paid in cash — OPEX" },
+  { key: "offline_cash",   label: "Cash collected, not in app",  hint: "Cash received this month that was never entered in the app — added to the cash income line" },
 ];
+const EMPTY = { cash_holding: "", rent_paid_cash: "", cash_expense: "", offline_cash: "" };
+const ZERO  = { cash_holding: 0,  rent_paid_cash: 0,  cash_expense: 0,  offline_cash: 0 };
 
 export function PnlAdjustmentsCard({ onSaved }: { onSaved?: (month: string) => void } = {}) {
-  const [month, setMonth] = useState(periodMonth());
-  const [vals, setVals] = useState({ cash_holding: "", rent_paid_cash: "", cash_expense: "" });
+  // Default = PREVIOUS month: these figures are entered at month close, and on
+  // the 1st the current month has nothing to close (Kiran keyed August into
+  // September on 2026-09-01). The picker still switches to any month.
+  const [month, setMonth] = useState(addMonths(periodMonth(), -1));
+  const [vals, setVals] = useState<Record<AdjKey, string>>(EMPTY);
   // Values as loaded from the server — used to detect overwrites of saved figures
-  const [saved, setSaved] = useState({ cash_holding: 0, rent_paid_cash: 0, cash_expense: 0 });
+  const [saved, setSaved] = useState<Record<AdjKey, number>>(ZERO);
   const [overwriteWarning, setOverwriteWarning] = useState<string[] | null>(null);
   const [frozen, setFrozen] = useState(false);
   const [state, setState] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
@@ -31,11 +38,13 @@ export function PnlAdjustmentsCard({ onSaved }: { onSaved?: (month: string) => v
         cash_holding:   a.cash_holding   ? String(a.cash_holding)   : "",
         rent_paid_cash: a.rent_paid_cash ? String(a.rent_paid_cash) : "",
         cash_expense:   a.cash_expense   ? String(a.cash_expense)   : "",
+        offline_cash:   a.offline_cash   ? String(a.offline_cash)   : "",
       });
       setSaved({
         cash_holding:   a.cash_holding   || 0,
         rent_paid_cash: a.rent_paid_cash || 0,
         cash_expense:   a.cash_expense   || 0,
+        offline_cash:   a.offline_cash   || 0,
       });
       setOverwriteWarning(null);
       setState("idle");
@@ -68,6 +77,7 @@ export function PnlAdjustmentsCard({ onSaved }: { onSaved?: (month: string) => v
         cash_holding:   parseFloat(vals.cash_holding)   || 0,
         rent_paid_cash: parseFloat(vals.rent_paid_cash) || 0,
         cash_expense:   parseFloat(vals.cash_expense)   || 0,
+        offline_cash:   parseFloat(vals.offline_cash)   || 0,
       });
       setState("saved");
       // The P&L is computed live server-side — telling the page the month is
@@ -95,7 +105,7 @@ export function PnlAdjustmentsCard({ onSaved }: { onSaved?: (month: string) => v
       </div>
 
       <p className="text-[10px] text-ink-muted -mt-1">
-        These three never appear in the bank statement — enter them so the month&apos;s P&amp;L matches reality.
+        These figures never appear in the bank statement — enter them so the month&apos;s P&amp;L matches reality.
       </p>
 
       {frozen ? (

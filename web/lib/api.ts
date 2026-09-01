@@ -894,6 +894,7 @@ export interface PnlAdjustments {
   cash_holding: number;
   rent_paid_cash: number;
   cash_expense: number;
+  offline_cash: number;
   notes: string | null;
 }
 
@@ -907,6 +908,7 @@ export function savePnlAdjustments(body: {
   cash_holding: number;
   rent_paid_cash: number;
   cash_expense: number;
+  offline_cash?: number;
   notes?: string;
 }): Promise<{ ok: boolean; month: string }> {
   return _post(`/api/v2/app/finance/pnl/adjustments`, body);
