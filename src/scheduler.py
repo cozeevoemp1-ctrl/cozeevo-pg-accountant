@@ -39,7 +39,6 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
@@ -59,8 +58,9 @@ _ASYNC_DB_URL = _raw_url if "+asyncpg" in _raw_url else _raw_url.replace("postgr
 # pool the live app itself depends on. See db_manager.script_database_url —
 # same fix as the 2026-09-01 rollover-failure root cause (session pool pinned
 # at Supabase's 15-connection project cap with zero headroom for anything else).
-_ASYNC_DB_URL_TXN = _ASYNC_DB_URL.replace(":5432/", ":6543/")
-_TXN_ENGINE_KWARGS = {"echo": False, "poolclass": NullPool, "connect_args": {"statement_cache_size": 0}}
+from src.database.db_manager import script_database_url, script_engine_kwargs
+_ASYNC_DB_URL_TXN = script_database_url(_ASYNC_DB_URL)
+_TXN_ENGINE_KWARGS = {"echo": False, **script_engine_kwargs()}
 _ADMIN_PHONE  = os.getenv("ADMIN_PHONE", "")
 _BACKUP_DIR   = Path(os.getenv("BACKUP_DIR", "data/backups"))
 

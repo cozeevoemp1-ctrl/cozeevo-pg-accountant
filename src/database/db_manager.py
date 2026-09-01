@@ -54,11 +54,34 @@ def script_database_url(database_url: str) -> str:
     One-off scripts (monthly rollover, sync jobs, scheduler background tasks) are
     short-lived — open, run a few queries, exit. They belong on the transaction
     pooler, which has its own separate connection budget, so they NEVER compete
-    with the long-lived app process for the session-mode pool's 15 slots. Use
-    together with NullPool + connect_args={"statement_cache_size": 0} (required
-    for asyncpg on a transaction-mode pgbouncer/Supavisor pooler).
+    with the long-lived app process for the session-mode pool's 15 slots.
+    Appends prepared_statement_cache_size=0 (SQLAlchemy asyncpg dialect param,
+    URL-query only) — required on a transaction-mode pooler where server
+    backends are shared across clients. Use together with script_engine_kwargs().
     """
-    return database_url.replace(":5432/", ":6543/").replace(":5432?", ":6543?")
+    url = database_url.replace(":5432/", ":6543/").replace(":5432?", ":6543?")
+    if "prepared_statement_cache_size" not in url:
+        url += ("&" if "?" in url else "?") + "prepared_statement_cache_size=0"
+    return url
+
+
+def script_engine_kwargs() -> dict:
+    """Engine kwargs for short-lived scripts on the transaction-mode pooler.
+
+    NullPool (no persistent pooling), asyncpg statement cache off, and unique
+    prepared-statement names — all three are required for asyncpg through a
+    transaction-mode pgbouncer/Supavisor pooler, where numerically-named
+    prepared statements collide across shared server backends
+    (DuplicatePreparedStatementError). Per SQLAlchemy's asyncpg dialect docs.
+    """
+    from uuid import uuid4
+    return {
+        "poolclass": NullPool,
+        "connect_args": {
+            "statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+        },
+    }
 
 
 def init_engine(
@@ -117,13 +140,13 @@ async def init_db_for_script(database_url: str):
     Does NOT run create_all/seed — scripts run against an already-initialized DB.
     """
     txn_url = script_database_url(database_url)
+    kwargs = script_engine_kwargs()
     return init_engine(
         txn_url,
-        poolclass=NullPool,
         pool_size=None,
         max_overflow=None,
         pool_recycle=None,
-        connect_args={"statement_cache_size": 0},
+        **kwargs,
     )
 
 

@@ -94,11 +94,8 @@ async def main(args):
 
     print(f"=== Sync Sheet '{tab_name}' from DB ===\n")
 
-    from sqlalchemy.pool import NullPool
-    engine = create_async_engine(
-        DATABASE_URL, echo=False, poolclass=NullPool,
-        connect_args={"statement_cache_size": 0},
-    )
+    from src.database.db_manager import script_engine_kwargs
+    engine = create_async_engine(DATABASE_URL, echo=False, **script_engine_kwargs())
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with Session() as session:

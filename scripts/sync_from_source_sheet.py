@@ -133,12 +133,11 @@ async def main(write: bool):
 
     # Transaction-mode pooler (6543) — never competes with the live app's
     # session-mode (5432) connection budget.
-    from src.database.db_manager import script_database_url
-    from sqlalchemy.pool import NullPool
+    from src.database.db_manager import script_database_url, script_engine_kwargs
     init_engine(
         script_database_url(os.getenv("DATABASE_URL")),
-        poolclass=NullPool, pool_size=None, max_overflow=None, pool_recycle=None,
-        connect_args={"statement_cache_size": 0},
+        pool_size=None, max_overflow=None, pool_recycle=None,
+        **script_engine_kwargs(),
     )
     async with get_session() as s:
         # Index rooms
