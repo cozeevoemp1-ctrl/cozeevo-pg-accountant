@@ -108,3 +108,24 @@ def test_frozen_month_consistent_and_not_drillable():
 if __name__ == "__main__":
     import pytest
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_sub_buckets_sum_to_category_and_are_drillable():
+    """Food & Groceries expands into sub-buckets (Chicken / Eggs / …) whose amounts
+    sum exactly to the category line; blank sub_category rows surface as Unsorted.
+    Sub-buckets never change a total — they only regroup the drill-down."""
+    rec = dict(RECORD)
+    rec["opex_by_cat"] = dict(RECORD["opex_by_cat"], **{"Food & Groceries": 10_000.0})
+    rec["opex_sub_by_cat"] = {"Food & Groceries": {"Chicken": 6_000.0, "Eggs": 3_500.0, "Unsorted": 500.0}}
+    tree, totals = _build_pnl_tree_dynamic(rec)
+    by_key = {n["key"]: n for n in _flat(tree)}
+    food = by_key["opex.Food & Groceries"]
+    assert round(sum(c["amount"] for c in food["children"]), 2) == food["amount"] == -10_000.0
+    assert [c["key"] for c in food["children"]] == [
+        "opex.Food & Groceries::Chicken", "opex.Food & Groceries::Eggs", "opex.Food & Groceries::Unsorted",
+    ]
+    assert all(c["drillable"] for c in food["children"])
+    # categories without sub-buckets carry no children and totals are unchanged
+    assert "children" not in by_key["opex.Electricity"]
+    base_tree, base_totals = _build_pnl_tree_dynamic(dict(rec, opex_sub_by_cat={}))
+    assert totals == base_totals

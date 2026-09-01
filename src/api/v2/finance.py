@@ -180,6 +180,12 @@ _VERIFIED_YM = {_pnl_label_to_ym(m) for m in PNL_VERIFIED_MONTHS}
 # Expense categories that are NOT operating opex — handled on their own SOP lines
 _NON_OPEX_EXP_CATS = {"Tenant Deposit Refund", "Non-Operating"}
 
+# OPEX categories that expand one more level (by sub_category) on the P&L card.
+# Food & Groceries → Milk / Curd / Paneer / Chicken / Eggs / Vegetables / Gas /
+# Groceries (Kiran 2026-09-01). Sub-buckets never change a total — display only.
+_SUBBUCKET_CATS = ("Food & Groceries",)
+_SUBBUCKET_UNSORTED = "Unsorted"
+
 
 async def _compute_dynamic_pnl_months(session) -> list[dict]:
     """
@@ -265,6 +271,25 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             else:
                 opex_by_cat[cat] = opex_by_cat.get(cat, 0.0) + amt
 
+        # Sub-buckets for the categories that expand a second level on the card.
+        # Grouped by whatever sub_category the rows carry (blank → "Unsorted"),
+        # so children always sum exactly to the category total.
+        sub_rows = await session.execute(
+            select(BankTransaction.category, BankTransaction.sub_category,
+                   func.sum(BankTransaction.amount))
+            .where(
+                BankTransaction.txn_type == "expense",
+                BankTransaction.txn_date.between(start, end),
+                BankTransaction.category.in_(_SUBBUCKET_CATS),
+            )
+            .group_by(BankTransaction.category, BankTransaction.sub_category)
+        )
+        opex_sub_by_cat: dict[str, dict[str, float]] = {}
+        for cat, sub, amt in sub_rows:
+            bucket = opex_sub_by_cat.setdefault(cat, {})
+            k = (sub or "").strip() or _SUBBUCKET_UNSORTED
+            bucket[k] = bucket.get(k, 0.0) + float(amt or 0)
+
         # Non-Operating breakdown by sub_category — so buyouts / hand loans / capital
         # returns show as named lines in the P&L excluded section, never a blind lump.
         nonop_rows = await session.execute(
@@ -327,6 +352,7 @@ async def _compute_dynamic_pnl_months(session) -> list[dict]:
             "income_hulk": inc_by_acct.get("HULK", 0.0),
             "cash": cash + (float(adj.offline_cash) if adj and getattr(adj, "offline_cash", None) else 0.0),
             "opex_by_cat": opex_by_cat,
+            "opex_sub_by_cat": opex_sub_by_cat,
             "dep_refunded": dep_refunded,
             "non_op": non_op,
             "non_op_detail": non_op_detail,
@@ -421,11 +447,18 @@ def _build_pnl_tree_dynamic(d: dict):
         _pnl_node("income.cash", "Cash (physical, incl. offline)",
                   d.get("cash", 0), drillable=True),
     ]
-    opex_children = [
-        _pnl_node(f"opex.{cat}", cat, -amt, drillable=True)
-        for cat, amt in sorted((d.get("opex_by_cat") or {}).items(), key=lambda kv: -kv[1])
-        if amt
-    ]
+    sub_by_cat = d.get("opex_sub_by_cat") or {}
+    opex_children = []
+    for cat, amt in sorted((d.get("opex_by_cat") or {}).items(), key=lambda kv: -kv[1]):
+        if not amt:
+            continue
+        subs = sub_by_cat.get(cat) or {}
+        kids = [
+            _pnl_node(f"opex.{cat}::{sub}", sub, -sub_amt, drillable=True)
+            for sub, sub_amt in sorted(subs.items(), key=lambda kv: -kv[1])
+            if sub_amt
+        ] or None
+        opex_children.append(_pnl_node(f"opex.{cat}", cat, -amt, drillable=True, children=kids))
     if d.get("rent_paid_cash"):
         opex_children.append(_pnl_node(
             "opex.manual.rent_paid_cash", "Property rent — paid in cash",
@@ -651,12 +684,21 @@ async def get_pnl_line_items(
             # No allowlist here: legacy categories (e.g. "Furniture & Supplies")
             # exist in old rows and must still be listable. Unknown cat → 0 rows.
             cat = key[len("opex."):]
+            # "opex.<cat>::<sub>" = one sub-bucket (Food & Groceries → Chicken …)
+            sub = None
+            if "::" in cat:
+                cat, sub = cat.split("::", 1)
+            conds = [
+                BankTransaction.txn_type == "expense",
+                BankTransaction.category == cat,
+                BankTransaction.txn_date.between(start, end),
+            ]
+            if sub == _SUBBUCKET_UNSORTED:
+                conds.append(func.coalesce(BankTransaction.sub_category, "") == "")
+            elif sub is not None:
+                conds.append(BankTransaction.sub_category == sub)
             txns = (await session.scalars(
-                select(BankTransaction).where(
-                    BankTransaction.txn_type == "expense",
-                    BankTransaction.category == cat,
-                    BankTransaction.txn_date.between(start, end),
-                ).order_by(BankTransaction.amount.desc())
+                select(BankTransaction).where(*conds).order_by(BankTransaction.amount.desc())
             )).all()
             rows = [_bank_row(t) for t in txns]
 

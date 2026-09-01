@@ -8,7 +8,7 @@ WhatsApp finance_handler can share the same vendor/keyword rules.
 Usage:
     from src.rules.pnl_classify import classify_txn
 
-    cat, sub = classify_txn("Virani Trading", "expense")  # → ("Food & Groceries", "Grocery - Virani Trading")
+    cat, sub = classify_txn("Virani Trading", "expense")  # → ("Food & Groceries", "Groceries")
 """
 from __future__ import annotations
 
@@ -108,29 +108,47 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Furniture & Supplies", "Wooden Stove / Kitchen Items (shalu.pravi)", ["shalu.pravi"]),
     ("Furniture & Supplies", "Other Furniture / Supplies",   ["furniture","refurbish","3d bo","laughing bud","fans","ceiling fan"]),
 
-    # ── FOOD & GROCERIES ──────────────────────────────────────────────────────
-    ("Food & Groceries",     "Grocery - Virani Trading",     ["virani"]),
-    ("Food & Groceries",     "Food Supplies - Vyapar",       ["vyapar"]),
-    ("Food & Groceries",     "Gas Cylinders (DRP Ent.)",     ["cylinder","lpg","drp enterprise","9880707836","gas advance"]),
-    ("Food & Groceries",     "Chicken / Meat",               ["chicken","biryani","meat","q858145123","paytmqr6li6zl","paytmqr6wro5d","paytmqr6pxr4","q213610007","q494874704","q457756301","q236290371","q067427224"]),
-    ("Food & Groceries",     "Eggs",                         ["eggs","egg trays","9900343230"]),
-    ("Food & Groceries",     "Vegetables & Greens",          ["vegetable","veggies","veggie","greens","tomato","chilli","cucumber","lemon","coriander","pudina","paneer","curd","vangi"]),
-    ("Food & Groceries",     "Ninjacart (Veg Supplier)",     ["ninjacart","ninja kart","ninjakart","ninja cart","paytm-7102662","paytm-30461933","oidninj"]),
-    ("Food & Groceries",     "Zepto / Blinkit / Swiggy",     ["zepto","blinkit","swiggystores","swiggy484","swiggy","instamart","zeptonow"]),
-    ("Food & Groceries",     "Amazon Grocery / India",       ["amazon pay groceries","amazon india"]),  # must be before generic amazon→F&S
-    ("Food & Groceries",     "WholesaleMandi / Origin",      ["wholesalemandi","wholesale mandi","origin903039","origin108856","paid to origin"]),
-    ("Food & Groceries",     "D-Mart / Retail",              ["dmart","d-mart","innovdmart"]),
-    ("Food & Groceries",     "Cooking Oil / Masala",         ["oil","ruchi gold","basmati rice","rice"]),
-    ("Food & Groceries",     "HP Gas",                       ["hp gas","q947171136"]),
-    ("Food & Groceries",     "Drumstick / Fresh Veg",        ["drumstick"]),
-    ("Food & Groceries",     "Batter / Idli Mix",            ["batter","idli"]),
-    ("Food & Groceries",     "Star Bazaar / Ratnadeep",      ["star bazaar","ratnadeep"]),
-    ("Food & Groceries",     "Flowers / Pooja",              ["pooja flower","flowers","flower"]),
-    ("Food & Groceries",     "Flipkart Groceries (Paytm)",   ["paytm-56505013"]),
-    ("Food & Groceries",     "Vegetables - Jaydev",          ["jaydevjena73"]),
-    ("Food & Groceries",     "Vegetables - Shahbaz",         ["shahbaz80508637"]),
-    ("Food & Groceries",     "Vegetables (9663049651)",      ["9663049651"]),
-    ("Food & Groceries",     "Other Groceries / Provisions", ["grocer","kirana","milk","food","provision"]),
+    # Tools bought from food-vendor QRs ("10 MM spanner") — must sit BEFORE the
+    # food block or "spanner" matches the Paneer keyword "panner".
+    ("Maintenance & Repairs","Tools & Hardware",             ["spanner","screwdriver","screw driver","plier","hammer","drill bit"]),
+
+    # ── FOOD & GROCERIES — 8 buckets (Kiran-approved 2026-09-01) ─────────────
+    # sub_category = bucket name. Two passes, in this order:
+    #   1. NARRATION keywords — what was bought wins (curd bought from the veg
+    #      vendor is Curd).
+    #   2. PAYEE handles learned from Oct'25–Aug'26 history — used only when the
+    #      narration says nothing ("Sent using Paytm UPI").
+    # Anything that reaches neither lands in Groceries (the default bucket).
+    # These sub-buckets never change a P&L total (OPEX sums by category); they
+    # only drive the Food & Groceries drill-down on the Finance page.
+    # 1 — narration keywords
+    ("Food & Groceries",     "Milk",        ["milk"]),
+    ("Food & Groceries",     "Curd",        ["curd"]),
+    ("Food & Groceries",     "Paneer",      ["paneer","panner","pnner"]),
+    ("Food & Groceries",     "Chicken",     ["chicken","biryani","mutton","meat","fish"]),
+    ("Food & Groceries",     "Eggs",        ["egg","tray"]),
+    ("Food & Groceries",     "Vegetables",  ["vegetable","veggie","ninja","pudina","corrindar","corriander","coriander",
+                                             "dhaniya","danaiya","lemon","mint leaves","tomato","tomoto","onion","greens",
+                                             "drumstick","chilli","cucumber","vangi","pumpkin","coconut","mutter","matar",
+                                             "pooja flower","flowers","flower"]),
+    ("Food & Groceries",     "Gas",         ["gas cylinder","hp gas","gas delivery","cylinder","lpg","gas advance","drp enterprise"]),
+    ("Food & Groceries",     "Groceries",   ["groceri","grocery","grocer","kirana","rice","cooking oil","ruchi gold","masala",
+                                             "atta","sugar","provision","dmart","d-mart","innovdmart","zepto","blinkit","swiggy",
+                                             "instamart","virani","vyapar","bigbasket","amazon pay groceries","amazon india",
+                                             "wholesalemandi","wholesale mandi","paid to origin","star bazaar","ratnadeep",
+                                             "batter","idli","iddly"]),
+    # 2 — payee handles (vendor memory)
+    ("Food & Groceries",     "Milk",        ["9133078020"]),
+    ("Food & Groceries",     "Chicken",     ["q858145123","pay9739392035","paytmqr6li6zl","paytmqr6wro5d","paytmqr6pxr4",
+                                             "q213610007","q494874704","q457756301","q236290371","q067427224"]),
+    ("Food & Groceries",     "Eggs",        ["paytmqr17suedc9ig","9900343230"]),
+    ("Food & Groceries",     "Vegetables",  ["7996305311","saanvienterprises9","subhashini1506","9845606011","msqr.sree",
+                                             "paytm-7102662","paytm-30461933","oidninj","jaydevjena73","shahbaz80508637","9663049651"]),
+    ("Food & Groceries",     "Gas",         ["9739889051","9880707836","q947171136"]),
+    ("Food & Groceries",     "Groceries",   ["dmartavenuesupermart","pinedmartka","grofers","amazonpaygrocery","q482630349",
+                                             "paytm-56505013","9353557479","origin903039","origin108856"]),
+    # 3 — weakest signal last: a bare "food"/"kitchen" narration from an unknown payee
+    ("Food & Groceries",     "Groceries",   ["food","kitchen"]),
 
     # ── FUEL & DIESEL ─────────────────────────────────────────────────────────
     ("Fuel & Diesel",        "DG Rent / Generator",          ["sunilgn8834","dg rent"]),
@@ -271,7 +289,6 @@ EXPENSE_RULES: list[tuple[str, str, list[str]]] = [
     ("Staff & Labour",       "Staff Advance",                ["lalbabukumar","master advance","9346853507"]),
     ("Staff & Labour",       "Staff - Inar Devi",            ["inar devi"]),
     ("Waste Disposal",       "Garbage / Supervisor",         ["garbage remov"]),
-    ("Food & Groceries",     "Vegetables & Greens",          ["paneer","panner","mutter","tomoto","tomato","coriander","corrindar"]),
     ("Maintenance & Repairs","General Maintenance",          ["maintenance","maintain","stabilizer","stabiliser"]),
 
     # ── BANK CHARGES ──────────────────────────────────────────────────────────
