@@ -163,10 +163,9 @@ async def generate_rent_schedule_for_month(year: int, month: int) -> dict:
         await session.commit()
 
     logger.info(
-        "[monthly_rollover] period=%s created=%d skipped_existing=%d "
-        "skipped_exited=%d noshow=%d first_month=%d carry_forward=%d",
-        period.isoformat(), stats["created"], stats["skipped_existing"],
-        stats["skipped_exited"], stats["noshow"], stats["first_month"],
-        stats["carry_forward"],
+        f"[monthly_rollover] period={period.isoformat()} created={stats['created']} "
+        f"skipped_existing={stats['skipped_existing']} skipped_exited={stats['skipped_exited']} "
+        f"noshow={stats['noshow']} first_month={stats['first_month']} "
+        f"carry_forward={stats['carry_forward']}"
     )
     return stats

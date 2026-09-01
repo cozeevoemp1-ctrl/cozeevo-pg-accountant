@@ -39,6 +39,10 @@ from src.services.rent_status import NO_SHOW, EXIT, PAID, PARTIAL
 DATABASE_URL = os.environ["DATABASE_URL"]
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+# Transaction-mode pooler (6543) — this is a short-lived one-off script; it must
+# never compete with the live app's session-mode (5432) connection budget.
+from src.database.db_manager import script_database_url
+DATABASE_URL = script_database_url(DATABASE_URL)
 
 MONTH_NAMES = {1: "JANUARY", 2: "FEBRUARY", 3: "MARCH", 4: "APRIL",
                5: "MAY", 6: "JUNE", 7: "JULY", 8: "AUGUST",
@@ -90,7 +94,11 @@ async def main(args):
 
     print(f"=== Sync Sheet '{tab_name}' from DB ===\n")
 
-    engine = create_async_engine(DATABASE_URL, echo=False)
+    from sqlalchemy.pool import NullPool
+    engine = create_async_engine(
+        DATABASE_URL, echo=False, poolclass=NullPool,
+        connect_args={"statement_cache_size": 0},
+    )
     Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with Session() as session:

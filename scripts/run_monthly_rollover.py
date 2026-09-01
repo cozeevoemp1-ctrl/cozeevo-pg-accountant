@@ -42,8 +42,10 @@ def _next_month(today: date) -> tuple[int, int, str]:
 
 async def _generate_rs(year: int, month: int) -> dict:
     import os
-    from src.database.db_manager import init_db
-    await init_db(os.environ["DATABASE_URL"])
+    from src.database.db_manager import init_db_for_script
+    # Transaction-mode pooler (6543) — never competes with the live app's
+    # session-mode (5432) connection budget. See db_manager.init_db_for_script.
+    await init_db_for_script(os.environ["DATABASE_URL"])
     from src.services.monthly_rollover import generate_rent_schedule_for_month
     return await generate_rent_schedule_for_month(year, month)
 

@@ -131,7 +131,15 @@ async def main(write: bool):
              "created_tenancy": 0, "updated_status": 0, "cash_added": 0, "upi_added": 0}
     missing_rooms = []
 
-    init_engine(os.getenv("DATABASE_URL"))
+    # Transaction-mode pooler (6543) — never competes with the live app's
+    # session-mode (5432) connection budget.
+    from src.database.db_manager import script_database_url
+    from sqlalchemy.pool import NullPool
+    init_engine(
+        script_database_url(os.getenv("DATABASE_URL")),
+        poolclass=NullPool, pool_size=None, max_overflow=None, pool_recycle=None,
+        connect_args={"statement_cache_size": 0},
+    )
     async with get_session() as s:
         # Index rooms
         room_rows = (await s.execute(select(Room))).scalars().all()

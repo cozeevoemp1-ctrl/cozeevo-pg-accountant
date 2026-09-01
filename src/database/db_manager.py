@@ -11,6 +11,7 @@ from typing import AsyncGenerator, Optional
 from loguru import logger
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
 from src.database.models import (
     Base,
@@ -31,7 +32,45 @@ _engine = None
 _session_factory = None
 
 
-def init_engine(database_url: str, echo: bool = False):
+# Supabase's session-mode pooler (port 5432) caps this project at 15 concurrent
+# client connections TOTAL — shared with Supavisor internals, postgres_exporter,
+# pg_cron, etc. Without an explicit cap, SQLAlchemy's default pool_size=5 +
+# max_overflow=10 lets EACH of the app's 2 uvicorn workers grow to 15 connections
+# on its own (30 total demand). Once concurrent traffic ever pushes the app to
+# that ceiling, ALL 15 project slots stay pinned by the app indefinitely (they
+# don't shrink back down between requests) — leaving zero headroom for anything
+# else (one-off scripts, the monthly rollover subprocess, admin queries) forever,
+# until the process restarts. Root cause of the 2026-09-01 rollover failure.
+# Keep the app's own footprint small and let pool_recycle force periodic churn
+# so a burst can't permanently claim the whole project quota.
+APP_POOL_SIZE = 2
+APP_MAX_OVERFLOW = 2
+APP_POOL_RECYCLE = 900  # seconds — recycle idle connections instead of pinning them forever
+
+
+def script_database_url(database_url: str) -> str:
+    """Rewrite a session-mode (5432) Supabase pooler URL to transaction-mode (6543).
+
+    One-off scripts (monthly rollover, sync jobs, scheduler background tasks) are
+    short-lived — open, run a few queries, exit. They belong on the transaction
+    pooler, which has its own separate connection budget, so they NEVER compete
+    with the long-lived app process for the session-mode pool's 15 slots. Use
+    together with NullPool + connect_args={"statement_cache_size": 0} (required
+    for asyncpg on a transaction-mode pgbouncer/Supavisor pooler).
+    """
+    return database_url.replace(":5432/", ":6543/").replace(":5432?", ":6543?")
+
+
+def init_engine(
+    database_url: str,
+    echo: bool = False,
+    *,
+    pool_size: int | None = APP_POOL_SIZE,
+    max_overflow: int | None = APP_MAX_OVERFLOW,
+    pool_recycle: int | None = APP_POOL_RECYCLE,
+    poolclass=None,
+    connect_args: dict | None = None,
+):
     global _engine, _session_factory
     # Normalise URL scheme for asyncpg
     if database_url.startswith("postgresql://"):
@@ -41,18 +80,51 @@ def init_engine(database_url: str, echo: bool = False):
     else:
         async_url = database_url
 
-    _engine = create_async_engine(async_url, echo=echo, future=True)
+    engine_kwargs: dict = {"echo": echo, "future": True}
+    if poolclass is not None:
+        engine_kwargs["poolclass"] = poolclass
+    else:
+        # NullPool / sqlite doesn't accept pool_size / max_overflow / pool_recycle.
+        if "sqlite" not in async_url:
+            if pool_size is not None:
+                engine_kwargs["pool_size"] = pool_size
+            if max_overflow is not None:
+                engine_kwargs["max_overflow"] = max_overflow
+            if pool_recycle is not None:
+                engine_kwargs["pool_recycle"] = pool_recycle
+    if connect_args:
+        engine_kwargs["connect_args"] = connect_args
+
+    _engine = create_async_engine(async_url, **engine_kwargs)
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)
     return _engine
 
 
-async def init_db(database_url: str):
+async def init_db(database_url: str, **engine_kwargs):
     """Create all tables if they don't exist, then seed defaults."""
-    engine = init_engine(database_url)
+    engine = init_engine(database_url, **engine_kwargs)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database initialized.")
     await _seed_expense_categories()
+
+
+async def init_db_for_script(database_url: str):
+    """Init the DB for a short-lived one-off script (rollover, sync jobs, etc).
+
+    Routes through the transaction-mode pooler (6543) with NullPool so the
+    script's connection(s) never draw from the app's session-mode (5432) budget.
+    Does NOT run create_all/seed — scripts run against an already-initialized DB.
+    """
+    txn_url = script_database_url(database_url)
+    return init_engine(
+        txn_url,
+        poolclass=NullPool,
+        pool_size=None,
+        max_overflow=None,
+        pool_recycle=None,
+        connect_args={"statement_cache_size": 0},
+    )
 
 
 # ── Session management ─────────────────────────────────────────────────────

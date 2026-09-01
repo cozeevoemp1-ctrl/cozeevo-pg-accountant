@@ -39,6 +39,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 load_dotenv()
 
@@ -51,6 +52,15 @@ _raw_url      = os.getenv("DATABASE_URL", "")
 # Normalize: strip +asyncpg if present to get plain sync URL for SQLAlchemyJobStore
 _SYNC_DB_URL  = _raw_url.replace("postgresql+asyncpg://", "postgresql://")
 _ASYNC_DB_URL = _raw_url if "+asyncpg" in _raw_url else _raw_url.replace("postgresql://", "postgresql+asyncpg://")
+# These job functions each open their OWN ad-hoc engine (separate from the app's
+# request-scoped pool in db_manager.py) and dispose it when done — a short-lived
+# burst, not a persistent connection. Route them through the transaction-mode
+# pooler (6543) with NullPool so they never draw from the session-mode (5432)
+# pool the live app itself depends on. See db_manager.script_database_url —
+# same fix as the 2026-09-01 rollover-failure root cause (session pool pinned
+# at Supabase's 15-connection project cap with zero headroom for anything else).
+_ASYNC_DB_URL_TXN = _ASYNC_DB_URL.replace(":5432/", ":6543/")
+_TXN_ENGINE_KWARGS = {"echo": False, "poolclass": NullPool, "connect_args": {"statement_cache_size": 0}}
 _ADMIN_PHONE  = os.getenv("ADMIN_PHONE", "")
 _BACKUP_DIR   = Path(os.getenv("BACKUP_DIR", "data/backups"))
 
@@ -82,11 +92,10 @@ def _acquire_scheduler_lock() -> bool:
         os.ftruncate(fd, 0)
         os.write(fd, f"{os.getpid()}\n".encode())
         _scheduler_lock_fd = fd   # keep fd open so kernel holds the lock
-        logger.info("[Scheduler] acquired lock %s (pid=%d)", lock_path, os.getpid())
+        logger.info(f"[Scheduler] acquired lock {lock_path} (pid={os.getpid()})")
         return True
     except (BlockingIOError, OSError) as e:
-        logger.info("[Scheduler] lock held by another worker — skipping (pid=%d, %s)",
-                    os.getpid(), e)
+        logger.info(f"[Scheduler] lock held by another worker — skipping (pid={os.getpid()}, {e})")
         return False
 
 
@@ -193,7 +202,7 @@ def start_scheduler() -> AsyncIOScheduler:
     for _stale_id in _STALE_REMINDER_IDS:
         try:
             scheduler.remove_job(_stale_id)
-            logger.info("[Scheduler] Purged stale tenant reminder job: %s", _stale_id)
+            logger.info(f"[Scheduler] Purged stale tenant reminder job: {_stale_id}")
         except Exception:
             pass  # already absent
     _log_next_runs(scheduler)
@@ -246,7 +255,7 @@ async def _prep_reminder(when: str = "today") -> None:
 
     logger.info(f"[Scheduler] prep_reminder ({when}) — target={target}")
 
-    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     try:
         async with engine.connect() as conn:
             # Tenancy-based check-ins (active / no_show)
@@ -446,13 +455,13 @@ async def _rent_reminder(mode: str = "day1") -> None:
         template_name = "rent_reminder"
         log_tag       = f"overdue_daily (day {today.day}, unpaid)"
     else:
-        logger.warning("[Scheduler] _rent_reminder unknown mode: %s", mode)
+        logger.warning(f"[Scheduler] _rent_reminder unknown mode: {mode}")
         return
 
     month_label = period.strftime("%B %Y")
-    logger.info("[Scheduler] rent_reminder (%s) — period=%s", log_tag, period)
+    logger.info(f"[Scheduler] rent_reminder ({log_tag}) — period={period}")
 
-    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     try:
         async with engine.connect() as conn:
             if all_active:
@@ -500,7 +509,7 @@ async def _rent_reminder(mode: str = "day1") -> None:
         await engine.dispose()
 
     if not rows:
-        logger.info("[Scheduler] rent_reminder (%s) — no recipients.", log_tag)
+        logger.info(f"[Scheduler] rent_reminder ({log_tag}) — no recipients.")
         return
 
     sent = 0
@@ -515,15 +524,13 @@ async def _rent_reminder(mode: str = "day1") -> None:
             if ok:
                 sent += 1
         except Exception as e:
-            logger.warning("[Scheduler] rent_reminder (%s) — send to %s exception: %s",
-                           log_tag, phone, e)
+            logger.warning(f"[Scheduler] rent_reminder ({log_tag}) — send to {phone} exception: {e}")
 
-    logger.info("[Scheduler] rent_reminder (%s) — %d/%d sent via %s",
-                log_tag, sent, len(rows), template_name)
+    logger.info(f"[Scheduler] rent_reminder ({log_tag}) — {sent}/{len(rows)} sent via {template_name}")
 
     # Notify all admin/owner phones so the team knows reminders went out.
     from src.whatsapp.webhook_handler import _send_whatsapp
-    engine2 = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine2 = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     try:
         async with engine2.connect() as conn2:
             admin_rows = (await conn2.execute(text("""
@@ -562,7 +569,7 @@ async def _daily_reconciliation() -> None:
     """
     from src.whatsapp.webhook_handler import _send_whatsapp
 
-    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     today  = date.today()
     period = date(today.year, today.month, 1)
 
@@ -626,7 +633,7 @@ async def _daily_reconciliation() -> None:
     )
 
     # Outbound messaging disabled — reconciliation summary goes to the log only.
-    logger.info("[Scheduler] daily_reconciliation report:\n%s", report)
+    logger.info(f"[Scheduler] daily_reconciliation report:\n{report}")
     logger.info(f"[Scheduler] daily_reconciliation done — gap ₹{gap or 0:,.0f}")
 
 
@@ -639,7 +646,7 @@ async def _weekly_backup() -> None:
     This is a SAFETY NET — Supabase has its own PITR backup on paid plans.
     Keeps 8 weeks of rolling backups locally (older folders are pruned).
     """
-    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     today  = date.today().isoformat()
     backup_path = _BACKUP_DIR / today
     backup_path.mkdir(parents=True, exist_ok=True)
@@ -733,8 +740,7 @@ async def _monthly_tab_rollover() -> None:
     next_year, next_month_num = today.year, today.month
     next_month_name = MONTHS[next_month_num - 1]
 
-    logger.info("[Scheduler] Monthly rollover fire — target %s %d",
-                next_month_name, next_year)
+    logger.info(f"[Scheduler] Monthly rollover fire — target {next_month_name} {next_year}")
 
     # Use the running interpreter — works identically on Windows dev + Linux VPS.
     import sys as _sys
@@ -748,17 +754,22 @@ async def _monthly_tab_rollover() -> None:
         )
         if result.returncode != 0:
             # No WhatsApp notification — all outbound messaging is disabled.
-            # Failures are surfaced in the server log only.
-            logger.error("[Scheduler] Monthly rollover FAILED (rc=%s) for %s %d — run manually: "
-                         "python scripts/run_monthly_rollover.py %s %d\n%s",
-                         result.returncode, next_month_name, next_year,
-                         next_month_name, next_year, (result.stderr or result.stdout)[-600:])
+            # Failures are surfaced in the server log only. run_monthly_rollover.py
+            # reports errors via print() (stdout), not stderr — include both.
+            detail = ((result.stderr or "") + "\n" + (result.stdout or "")).strip()[-800:]
+            logger.error(
+                f"[Scheduler] Monthly rollover FAILED (rc={result.returncode}) for "
+                f"{next_month_name} {next_year} — run manually: "
+                f"python scripts/run_monthly_rollover.py {next_month_name} {next_year}\n{detail}"
+            )
             return
 
-        logger.info("[Scheduler] Monthly rollover done: %s %d — tab + RentSchedule rows generated",
-                    next_month_name, next_year)
+        logger.info(
+            f"[Scheduler] Monthly rollover done: {next_month_name} {next_year} — "
+            "tab + RentSchedule rows generated"
+        )
     except Exception as e:
-        logger.error("[Scheduler] Monthly rollover exception: %s", e)
+        logger.error(f"[Scheduler] Monthly rollover exception: {e}")
 
 
 
@@ -778,7 +789,7 @@ async def _checkout_deposit_alerts() -> None:
     from src.whatsapp.webhook_handler import _send_whatsapp
 
     today = date.today()
-    engine = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     logger.info(f"[Scheduler] checkout_deposit_alerts — {today}")
 
     try:
@@ -846,7 +857,7 @@ async def _checkout_deposit_alerts() -> None:
     finally:
         await engine.dispose()
 
-    engine2 = create_async_engine(_ASYNC_DB_URL, echo=False)
+    engine2 = create_async_engine(_ASYNC_DB_URL_TXN, **_TXN_ENGINE_KWARGS)
     try:
         async with engine2.connect() as conn:
             # Monthly tenancy alerts (with deposit refund flow)
