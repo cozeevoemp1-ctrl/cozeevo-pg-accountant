@@ -1,5 +1,49 @@
 # Changelog
 
+## Session AL — 2026-09-01 — September rollover failure: session-pool exhaustion (EMAXCONNSESSION)
+
+Kiran (1 Sep, home screen near-empty): "why has the app not rolled over? data looks corrupted."
+
+**Symptom:** Sept collection card showed Rs.55.5k of Rs.71.5k / "Dues pending 2" for a 245-tenant
+property. Not corruption — only 6 `rent_schedule` rows existed for 2026-09 (vs 278 for Aug).
+The midnight monthly rollover job fired on time (00:00 IST) but its subprocess died before
+creating any rows.
+
+**Root cause (verified):** Supabase session-mode pooler (5432) caps the project at 15 concurrent
+connections. `db_manager.init_engine` never set `pool_size`/`max_overflow`, so SQLAlchemy defaults
+(5+10 per worker x 2 uvicorn workers) let the app grow to the full 15 under a traffic burst — and
+the pool never shrinks, so all 15 slots stayed pinned from the Aug-30 restart onward
+(`pg_stat_activity` showed all 15 backends idle, opened 09:55–14:06 UTC Aug 30, held ever since).
+The rollover subprocess then couldn't get a single connection (`EMAXCONNSESSION`); so did
+`daily_reconciliation` at 02:00. May–Aug rollovers worked only because peak concurrency hadn't
+yet reached the cap — tenant/PWA growth crossed it this cycle. Compounding bug: scheduler logging
+used printf-style `%s` with loguru (which silently drops args), so the failure logged as literal
+`%s` with zero diagnostics.
+
+**Permanent fix (edcc5f8 + 17a3722, deployed + verified):**
+- `db_manager`: explicit app pool caps — `pool_size=2, max_overflow=2, pool_recycle=900` per
+  worker (max 8 of 15 slots; 7 always free). App can never claim the whole quota again.
+- `db_manager.script_database_url()` + `script_engine_kwargs()` + `init_db_for_script()`: one-off
+  scripts route through the transaction-mode pooler (6543) with NullPool +
+  `statement_cache_size=0` + `prepared_statement_cache_size=0` + uuid
+  `prepared_statement_name_func` (all required — cache-size 0 alone still hit
+  `DuplicatePreparedStatementError` on shared txn-mode backends, caught on first VPS run).
+- Switched to these helpers: `run_monthly_rollover.py`, `sync_from_source_sheet.py`,
+  `sync_sheet_from_db.py`, and every scheduler ad-hoc engine (reconciliation, backup, reminders,
+  prep, checkout alerts). Scripts and app now draw from separate connection budgets — the
+  conflict class is eliminated, not just made less likely.
+- Fixed `%s`-style loguru calls in `scheduler.py` + `monthly_rollover.py`; rollover failure log
+  now includes rc + stderr/stdout tail. (Same broken pattern remains in gsheets.py,
+  onboarding_router.py, api/v2/* — logged as pending cleanup.)
+
+**Recovery:** September backfilled via the fixed script itself (idempotent): 255 RS rows,
+Rs.40.3L expected across 245 active tenancies; sheet tab + reconciliation done. Verified clean
+end-to-end run ON the VPS with the live app running. `/healthz` = 17a3722.
+
+**Also verified (Kiran's revert worry):** VPS HEAD == origin/master; session-AK fixes
+(12872c0 onboarding-edit sync, 3c3c41a sharing-type confirmation, vacant-badge fix) all present
+in deployed code. Nothing was reverted — the app only LOOKED broken because Sept RS rows were missing.
+
 ## Session AK — 2026-08-30 — G19 room_type never actually fixed + booking-edit sync bug (Tenancy never updates from OnboardingSession edits)
 
 Kiran: "g19 which sharing type is it" → led to two separate confirmed bugs.
