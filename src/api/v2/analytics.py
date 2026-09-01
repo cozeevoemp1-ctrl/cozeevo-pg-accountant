@@ -81,7 +81,13 @@ def _next_month(d: date) -> date:
 
 
 def _present_at(target: date):
-    """Tenancy was occupying a bed on `target` date."""
+    """Tenancy was occupying a bed AND paying rent on `target` date.
+
+    Used only by the avg-rent query. Deliberately excludes no_show: those are
+    counted in the occupancy bed count (see services/occupancy.py) but nobody is
+    paying that rent, so they must not weight the average. Includes on-notice
+    tenants (status=exited, checkout_date in the future) who are still in the bed.
+    """
     return and_(
         Tenancy.checkin_date <= target,
         or_(
@@ -90,10 +96,6 @@ def _present_at(target: date):
                 Tenancy.status == TenancyStatus.exited,
                 Tenancy.checkout_date != None,
                 Tenancy.checkout_date > target,
-            ),
-            and_(
-                Tenancy.status == TenancyStatus.no_show,
-                Tenancy.checkin_date <= target,
             ),
         ),
     )
@@ -161,29 +163,9 @@ async def get_occupancy(
         today_beds = await get_occupied_beds(session, today)
         today_pct = await get_occupancy_pct(session, today)
 
-        # Current month avg rent per bed (KPI card)
-        cur_rent_row = (await session.execute(
-            select(
-                func.sum(Tenancy.agreed_rent).label("total_rent"),
-                func.sum(
-                    case(
-                        (Tenancy.sharing_type == "premium", Room.max_occupancy),
-                        else_=literal_column("1"),
-                    )
-                ).label("total_beds"),
-            )
-            .select_from(Tenancy)
-            .join(Room, Room.id == Tenancy.room_id)
-            .where(
-                Room.is_staff_room == False,
-                Room.room_number != "000",
-                Tenancy.stay_type == StayType.monthly,
-                Tenancy.status == TenancyStatus.active,
-            )
-        )).one()
-        current_avg_rent = int(
-            (cur_rent_row.total_rent or 0) / (cur_rent_row.total_beds or 1)
-        )
+        # Current avg rent per bed (KPI card) — same query as the chart's
+        # current-month point, so the two surfaces can never disagree.
+        _, _, current_avg_rent = await _live_month_stats(session, today, total_beds)
 
         # Check-ins by month + sharing_type (monthly stays) — always from DB
         ci_monthly_rows = (await session.execute(

@@ -1,5 +1,23 @@
 # Changelog
 
+## Session AM — 2026-09-01 — Occupancy tab: avg rent KPI vs chart mismatch
+
+Kiran: "why is the average rent different here (KPI ₹14,559) and in the chart (Sep '26 ₹14,550)?"
+
+**Cause:** same formula (Σ agreed_rent / Σ beds, monthly only), two hand-written `WHERE` clauses in
+`src/api/v2/analytics.py`. KPI card = `status=active` only. Chart's live-month point =
+`_present_at(today)` = active OR on-notice (exited, checkout in future) OR **no_show** — the no_show
+clause was copied from `get_occupied_beds` (where it's deliberate for bed *count*) into the rent
+query, where it weights the average with rent nobody pays. Live diff: 5 no_shows (517/318/407/118
+booked 1 Sep, 621 from Jul) in the chart only; Room 602 (on notice, checkout 30 Sep, ₹16k) in the
+chart only because its status is already `exited`.
+
+**Fix:** `current_avg_rent` now calls `_live_month_stats(session, today, total_beds)` — one query
+path for both surfaces. `_present_at` drops the no_show clause (it is used only by the rent query;
+occupancy counts still go through `services/occupancy.py` and still include no_shows). Verified by
+calling `get_occupancy()` directly: KPI 14,566 == Sep '26 point 14,566. Jul/Aug live months shift
+by a few rupees (no_shows removed); frozen Nov–Apr `VERIFIED_MONTHS` untouched.
+
 ## Session AL — 2026-09-01 — September rollover failure: session-pool exhaustion (EMAXCONNSESSION)
 
 Kiran (1 Sep, home screen near-empty): "why has the app not rolled over? data looks corrupted."
