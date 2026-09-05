@@ -30,7 +30,19 @@ Agreement PDF, selfie and ID proof all saved.
    template — Meta rejects it with 131047 for any tenant who has never replied. Ashfaaq's
    PDF was never delivered and still needs re-sending manually.
 
-No code, schema or data changes this session.
+**Fixed (`cc27b67`, live on VPS):**
+- `src/api/onboarding_router.py` — an already-approved session now returns
+  `200 {status: already_checked_in, tenant_id, tenancy_id}` instead of `400 Cannot approve`.
+  Every other non-pending status still 400; unknown token still 404.
+- `web/app/onboarding/bookings/page.tsx` — the card is removed from local state as soon as
+  approve returns 200, so a failed post-approve reload can no longer leave a stale card
+  that invites a second click.
+
+Verified by calling `_approve_session_impl` against the real room-223 session: returns
+`already_checked_in` / tenancy 1357 and writes nothing (payments still exactly 3).
+
+Still open: the agreement-PDF 24-hr window (issue 1 in `docs/specs/current-issues.md`) and
+re-sending Ashfaaq Ahmed's PDF. No schema or data changes this session.
 
 ## Session AO — 2026-09-05 — Room 621 Harshit: half-cancelled booking repaired; audit-trail rule
 
