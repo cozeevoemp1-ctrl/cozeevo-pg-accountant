@@ -469,10 +469,18 @@ data/raw/file.csv
 
 ## 15a. Tenant Messaging Policy — NEVER expose our URLs (HARD RULE, 5 Sep 2026)
 
-**No URL of ours is ever put in a message to a tenant. No exceptions.**
-Not a Supabase storage link (signed or not), not an API endpoint, not an internal
-dashboard, not a debug or preview link. It exposes our infrastructure, it is
-forwardable to anyone, and it outlives the conversation.
+**`cozeevo.com` is the ONLY hostname a customer ever sees. No exceptions.**
+Every customer-facing link — now and for anything built later — is served from
+`cozeevo.com`. `api.getkozzy.com` and `app.getkozzy.com` must never appear in a
+message to a tenant, and neither must a Supabase storage link (signed or not), an
+API endpoint, an internal dashboard, or a debug/preview link. It exposes our
+infrastructure, it is forwardable to anyone, and it outlives the conversation.
+
+`cozeevo.com` serves the tenant form and nothing else — `/join/`, the form's own
+`/api/onboarding/` calls, and its logo. Every other path on that host returns 404,
+so no API surface is reachable from the hostname customers hold. Any future
+customer-facing page gets added to that server block the same way — never by
+pointing a tenant at the app or API host.
 
 - **Documents go as WhatsApp ATTACHMENTS, never as download links.** Meta fetches the
   file server-to-server at send time, so a 1-hour signed URL is enough and the tenant

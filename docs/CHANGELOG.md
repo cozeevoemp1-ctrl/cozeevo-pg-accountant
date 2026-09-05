@@ -41,8 +41,27 @@ Agreement PDF, selfie and ID proof all saved.
 Verified by calling `_approve_session_impl` against the real room-223 session: returns
 `already_checked_in` / tenancy 1357 and writes nothing (payments still exactly 3).
 
-Still open: the agreement-PDF 24-hr window (issue 1 in `docs/specs/current-issues.md`) and
-re-sending Ashfaaq Ahmed's PDF. No schema or data changes this session.
+**WhatsApp delivery (`fd7dd53`, `4fe6929`).** Meta's 24-hr window opens only when the
+customer *replies* — a template does not open it. The agreement went out as a free-form
+document 1s after the confirmation template, so it was dropped (131047) for every tenant
+who had never messaged the bot: **52 of 64 check-ins in 60 days lost their agreement**;
+2 received it; 10 had no PDF. New `src/services/tenant_delivery.py` checks the window
+BEFORE sending (the rejection is asynchronous, so send-and-fallback is impossible) and
+sends the PDF as an attachment or not at all. Kiran's rule: never a download link —
+no storage/API URL in a customer's chat, ever. Also fixed: `_send_whatsapp_template`
+returns False rather than raising, so all four link-send call sites were reporting a
+phantom success and their free-form fallback was dead code.
+
+**Tenant links moved to cozeevo.com (`fbd7e16`, applied live).** The form link was
+`api.getkozzy.com/onboard/{token}` — an API hostname in a customer's hands. Now
+`https://cozeevo.com/join/<token>`: DNS A → VPS, certbot cert, an nginx block that serves
+`/join/`, `/api/onboarding/` and the logo and **404s everything else**, `BASE_URL` set and
+verified in the running process. `/onboard/{token}` kept alive for links already sent.
+Rule written into BRAIN §15a: cozeevo.com is the only hostname a customer ever sees.
+
+**Parked:** the agreement PDF needs a document-header WhatsApp template to reach a
+first-time tenant. Kiran parked it — do not build until he confirms. Ashfaaq (223) and
+51 others remain undelivered. No schema or data changes this session.
 
 ## Session AO — 2026-09-05 — Room 621 Harshit: half-cancelled booking repaired; audit-trail rule
 
