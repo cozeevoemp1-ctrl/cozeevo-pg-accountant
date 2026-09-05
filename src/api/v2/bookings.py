@@ -339,13 +339,17 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
             if req.stay_type == "daily":
                 assert checkout is not None
                 rate_str = f"Rs.{int(req.daily_rate):,}/night"
+                # Template first — the only path that reaches a tenant who has never
+                # messaged us (every pre-booking). It RETURNS False on failure rather
+                # than raising, so branch on the value, not on an exception.
                 try:
-                    await _send_whatsapp_template(
+                    whatsapp_sent = bool(await _send_whatsapp_template(
                         phone_wa, "cozeevo_checkin_form",
                         [str(room.room_number), rate_str, onboard_link],
-                    )
-                    whatsapp_sent = True
+                    ))
                 except Exception:
+                    whatsapp_sent = False
+                if not whatsapp_sent:
                     nights = (checkout - checkin).days
                     msg = (
                         f"Hello {req.tenant_name.strip()}! Welcome to *Cozeevo Co-living*\n\n"
@@ -356,17 +360,18 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                         f"Please complete your registration:\n{onboard_link}\n\n"
                         "This link is valid for 48 hours."
                     )
+                    # Free-form: only lands inside an open 24-hr window.
                     await _send_whatsapp(phone_wa, msg)
-                    whatsapp_sent = True
             else:
                 rent_str = f"Rs.{int(req.monthly_rent):,}"
                 try:
-                    await _send_whatsapp_template(
+                    whatsapp_sent = bool(await _send_whatsapp_template(
                         phone_wa, "cozeevo_checkin_form",
                         [str(room.room_number), rent_str, onboard_link],
-                    )
-                    whatsapp_sent = True
+                    ))
                 except Exception:
+                    whatsapp_sent = False
+                if not whatsapp_sent:
                     msg = (
                         f"Hello {req.tenant_name.strip()}! Welcome to *Cozeevo Co-living*\n\n"
                         f"{room_line}\n"
@@ -375,8 +380,8 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                         f"Please complete your registration:\n{onboard_link}\n\n"
                         "This link is valid for 48 hours."
                     )
+                    # Free-form: only lands inside an open 24-hr window.
                     await _send_whatsapp(phone_wa, msg)
-                    whatsapp_sent = True
         except Exception:
             pass  # Booking succeeds even if WhatsApp fails
 

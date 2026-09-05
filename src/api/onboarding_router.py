@@ -307,18 +307,21 @@ async def create_session(req: CreateSessionRequest, request: Request):
                     phone_wa = "91" + phone_wa
                 rent_str = f"Rs.{int(req.agreed_rent):,}" if req.agreed_rent else "Rs.0"
 
-                # Try template first if room is assigned (works without 24hr window)
-                if room:
-                    try:
-                        await _send_whatsapp_template(
-                            phone_wa, "cozeevo_checkin_form",
-                            [room.room_number, rent_str, onboard_link]
-                        )
-                        whatsapp_sent = True
-                    except Exception:
-                        pass  # Fall through to regular message
+                # Template first — it is the ONLY thing that reaches a tenant who has
+                # never messaged us, which is every pre-booking and pre-registration.
+                # Send it even with no room yet: the param just says so.
+                # (_send_whatsapp_template RETURNS False on failure, it does not raise —
+                #  branching on the exception alone used to report a phantom success.)
+                try:
+                    whatsapp_sent = bool(await _send_whatsapp_template(
+                        phone_wa, "cozeevo_checkin_form",
+                        [room.room_number if room else "To be assigned", rent_str, onboard_link]
+                    ))
+                except Exception:
+                    whatsapp_sent = False
 
-                # Fallback to regular message (needs 24hr window, or room not yet assigned)
+                # Free-form fallback — only lands if the tenant has written to us
+                # in the last 24 hours; harmless to attempt, never counted as sent.
                 if not whatsapp_sent:
                     summary_lines = [f"Hello! Welcome to *Cozeevo Co-living*\n"]
                     if room:
@@ -335,7 +338,6 @@ async def create_session(req: CreateSessionRequest, request: Request):
                     summary_lines.append(f"\nPlease complete your registration:\n{onboard_link}")
                     summary_lines.append(f"\nThis link is valid for 48 hours.")
                     await _send_whatsapp(phone_wa, "\n".join(summary_lines))
-                    whatsapp_sent = True
             except Exception as e:
                 import logging, traceback
                 logger = logging.getLogger(__name__)
@@ -885,19 +887,28 @@ async def resend_link(token: str, request: Request):
         room = await session.get(Room, obs.room_id) if obs.room_id else None
         room_number = room.room_number if room else "?"
         rent_str = f"Rs.{int(obs.agreed_rent):,}" if obs.agreed_rent else "?"
+        # The template is what reaches a tenant who has never messaged us — it must
+        # be trusted by RETURN VALUE, not by the absence of an exception.
         try:
-            await _send_whatsapp_template(
+            sent = bool(await _send_whatsapp_template(
                 phone_wa, "cozeevo_checkin_form",
                 [str(room_number), rent_str, onboard_link],
-            )
+            ))
         except Exception:
+            sent = False
+        if not sent:
+            # Free-form: only lands inside an open 24-hr window.
             await _send_whatsapp(
                 phone_wa,
                 f"Reminder from *Cozeevo Co-living*\n\n"
                 f"Please complete your registration:\n{onboard_link}\n\n"
                 f"This link is valid for 48 hours."
             )
-        return {"status": "sent", "token": token, "regenerated": is_expired or obs.status == "expired"}
+        return {
+            "status": "sent" if sent else "send_failed",
+            "token": token,
+            "regenerated": is_expired or obs.status == "expired",
+        }
 
 
 @router.post("/admin/{token}/regen-pdf")
@@ -953,21 +964,12 @@ async def regen_pdf(token: str, request: Request):
         send = (request.query_params.get("send") or "").lower() in ("1", "true", "yes")
         if send and obs.tenant_phone:
             try:
-                from src.whatsapp.webhook_handler import _send_whatsapp_document
-                from src.services.storage import sign_stored_url as _sign
-                # pdf_path is a private-bucket Supabase URL. Meta fetches this link
-                # at send time, so a short-lived signed URL is sufficient. (Also
-                # fixes a pre-existing bug: the old /static/{url} concat was garbage.)
-                pdf_url = await _sign(pdf_path)
-                phone_wa = obs.tenant_phone.strip()
-                if not phone_wa.startswith("91"):
-                    phone_wa = "91" + phone_wa
-                await _send_whatsapp_document(
-                    phone_wa, pdf_url,
-                    f"Cozeevo_Agreement_{td.get('name', 'tenant').replace(' ', '_')}.pdf",
-                    caption="Your Cozeevo Co-living rental agreement (re-sent).",
+                # Attachment inside an open 24-hr window, template link outside it —
+                # a bare document send never reaches a tenant who hasn't written to us.
+                from src.services.tenant_delivery import send_agreement
+                whatsapp_sent, _how = await send_agreement(
+                    obs.tenant_phone, td.get("name", ""), pdf_path, resend=True,
                 )
-                whatsapp_sent = True
             except Exception:
                 pass
 
@@ -2337,12 +2339,10 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         if obs.agreement_pdf_path and obs.tenant_phone:
             try:
                 from src.whatsapp.webhook_handler import (
-                    _send_whatsapp_document, _send_whatsapp, _send_whatsapp_template,
+                    _send_whatsapp, _send_whatsapp_template,
                 )
-                # agreement_pdf_path is a private-bucket Supabase URL — sign it so
-                # Meta can fetch it at send time (buckets are no longer public).
-                from src.services.storage import sign_stored_url as _sign
-                pdf_url = await _sign(obs.agreement_pdf_path)
+                # The PDF is signed inside send_agreement() below — the expiry it
+                # needs depends on whether it goes as an attachment or as a link.
 
                 phone_wa = obs.tenant_phone.strip()
                 if not phone_wa.startswith("91"):
@@ -2457,13 +2457,18 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                                 note="receptionist override at approve",
                             ))
 
-                # 3. Signed agreement PDF
-                await _send_whatsapp_document(
-                    phone_wa, pdf_url,
-                    f"Cozeevo_Agreement_{tenant_name.replace(' ', '_')}.pdf",
-                    "Your signed rental agreement"
+                # 3. Signed agreement PDF — attachment only if the tenant has an
+                # open 24-hr window, otherwise the link via an approved template.
+                # A first-time tenant has never messaged us, so a free-form
+                # document is silently rejected (131047) — see tenant_delivery.
+                from src.services.tenant_delivery import send_agreement
+                _pdf_ok, _pdf_how = await send_agreement(
+                    phone_wa, tenant_name, obs.agreement_pdf_path,
                 )
-                whatsapp_note = " | Booking confirmation + PDF sent"
+                whatsapp_note = (
+                    f" | Booking confirmation + agreement sent ({_pdf_how})"
+                    if _pdf_ok else " | Booking confirmation sent, AGREEMENT NOT DELIVERED"
+                )
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error("WhatsApp PDF delivery failed: %s", e)
