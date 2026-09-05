@@ -26,6 +26,10 @@ forms had no lock-in input, so `lock_in_months` was always 0.
   match the typed name — `src/utils/name_match.py` (12 tests) + identical JS mirror, enforced at
   Step 3 and at submit (400).
 - `scheduler.py` check-in digest: notes = admin_notes | special_terms.
+- KYC uploads are hard errors now: missing selfie/ID front (or Aadhaar back) → 400, storage
+  failure → 502 "Could not save … submit again". Previously a failed upload was a log warning
+  and the form still went through with the proof missing. Nothing is written to the session
+  before the uploads succeed, so a failed submit leaves no partial state.
 - Data fix: `scripts/_fix_106_lockin.py --write` → tenancy 1296 + session 273 `lock_in_months=3`,
   audit_log row. Tenant row is spelled "Raghad Mittal" (session says "Raghav") — left as is.
 

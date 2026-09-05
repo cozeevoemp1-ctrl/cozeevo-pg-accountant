@@ -1321,9 +1321,19 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
         token_short = obs.token[:8]
         saved_files = {}
 
+        # KYC images are our proof — a failed upload is a hard error (400/502), never a
+        # warning. Selfie + ID front are always required; ID back is required for Aadhaar.
+        _labels = {"selfie": "your photo", "id_proof": "your ID proof",
+                   "id_proof_back": "the back side of your Aadhaar"}
+        _required = {"selfie", "id_proof"}
+        if (req.id_proof_type or "").strip().lower() == "aadhaar":
+            _required.add("id_proof_back")
+
         for field_name, data_url in [("selfie", req.selfie_photo), ("id_proof", req.id_photo),
                                      ("id_proof_back", req.id_photo_back)]:
             if not data_url or "base64," not in data_url:
+                if field_name in _required:
+                    raise HTTPException(400, f"Please upload {_labels[field_name]}")
                 continue
             try:
                 header, b64_data = data_url.split("base64,", 1)
@@ -1338,9 +1348,17 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
                 file_bytes = b64mod.b64decode(b64_data)
                 path = f"onboarding/{token_short}/{field_name}{ext}"
                 url = await _storage.upload(_storage.BUCKET_KYC, path, file_bytes, ct)
+                if not url:
+                    raise RuntimeError("storage returned no URL")
                 saved_files[field_name] = url
+            except HTTPException:
+                raise
             except Exception as _e:
-                _log.warning("KYC upload %s failed: %s", field_name, _e)
+                _log.error(f"KYC upload {field_name} failed for {token_short}: {_e}")
+                raise HTTPException(
+                    502,
+                    f"Could not save {_labels[field_name]}. Please check your connection and submit again.",
+                )
 
         # Upload signature (base64 image) to Supabase
         if req.signature_image and "base64," in req.signature_image:
