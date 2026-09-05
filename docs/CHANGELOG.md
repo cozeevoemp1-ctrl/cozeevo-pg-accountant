@@ -1,5 +1,37 @@
 # Changelog
 
+## Session AP — 2026-09-05 — Room 223 "cannot check in": diagnosis only, no code changed
+
+Kiran: "why 223 is not able to check in?" — screenshot showed
+`Cannot approve — status is approved` next to Save & Check In.
+
+**Root cause: it had already checked in.** The first click succeeded; a deploy restart
+landed on the very next request, so the list refresh failed and the card never left the
+screen. The second click hit the idempotency guard, whose message reads like a failure.
+
+Timeline (nginx + journald, UTC):
+```
+16:22:31  POST /api/onboarding/<tok>/approve        200   check-in written
+16:22:32  GET  /api/onboarding/admin/pending        502   load() threw, card left stale
+16:22:44  systemd Stopping/Started pg-accountant          restart window to 16:22:57
+16:23:02  POST /api/onboarding/<tok>/approve        400   "Cannot approve — status is approved"
+```
+
+**Data verified clean — no duplicate.** Tenancy 1357 active (Ashfaaq Ahmed, room 223,
+check-in 5 Sep), one RS row Sep ₹21,133, exactly three payments (₹5,000 booking +
+₹6,633 rent + ₹2,000 deposit = ₹13,633), remaining ₹12,500 as shown in the UI.
+Agreement PDF, selfie and ID proof all saved.
+
+**Two defects filed in `docs/specs/current-issues.md` (open, awaiting approval to fix):**
+1. `onboarding_router.py:1646` should return 200 "already checked in" instead of 400, and
+   `bookings/page.tsx:126` should retry a failed post-approve `load()` rather than leaving
+   a stale card that invites a second click.
+2. The signed agreement PDF is sent as a free-form document 1s after the confirmation
+   template — Meta rejects it with 131047 for any tenant who has never replied. Ashfaaq's
+   PDF was never delivered and still needs re-sending manually.
+
+No code, schema or data changes this session.
+
 ## Session AO — 2026-09-05 — Room 621 Harshit: half-cancelled booking repaired; audit-trail rule
 
 Kiran: "621 room booking is not shown anywhere — where is he?" He appeared only in the
