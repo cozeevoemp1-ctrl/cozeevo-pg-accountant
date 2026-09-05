@@ -298,6 +298,15 @@ interface QuickBookModalProps {
   onSuccess: () => void;
 }
 
+/** Lock-in choices shared by the pre-book modal and the pre-register page. */
+export const LOCK_IN_OPTIONS = [
+  { value: "0", label: "No lock-in" },
+  { value: "1", label: "1 month" },
+  { value: "2", label: "2 months" },
+  { value: "3", label: "3 months" },
+  { value: "6", label: "6 months" },
+] as const;
+
 function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: QuickBookModalProps) {
   const canFullRoom = freeBeds >= maxOccupancy && maxOccupancy > 1;
   const [stayType, setStayType] = useState<"monthly" | "daily">("monthly");
@@ -319,6 +328,8 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
   const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("upi");
   const [maintenance, setMaintenance] = useState("5000");
   const [deposit, setDeposit] = useState("");
+  const [lockIn, setLockIn] = useState("0");
+  const [specialTerms, setSpecialTerms] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -350,6 +361,7 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               security_deposit: parseFloat(deposit) || 0,
               booking_amount: parseFloat(advance) || 0,
               advance_mode: advanceMode,
+              special_terms: specialTerms.trim() || undefined,
               notes: notes.trim() || undefined,
             }
           : {
@@ -364,6 +376,8 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
               booking_amount: parseFloat(advance) || 0,
               advance_mode: advanceMode,
               sharing_type: monthlyBedType === "premium" ? "premium" : "",
+              lock_in_months: parseInt(lockIn, 10) || 0,
+              special_terms: specialTerms.trim() || undefined,
               notes: notes.trim() || undefined,
             }
       );
@@ -548,6 +562,16 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                       </button>
                     </div>
                   </div>
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Lock-in period</label>
+                    <select
+                      value={lockIn}
+                      onChange={(e) => setLockIn(e.target.value)}
+                      className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2.5 text-ink outline-none focus:ring-2 focus:ring-brand-pink"
+                    >
+                      {LOCK_IN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
                 </>
               )}
               {/* Advance — common for both stay types */}
@@ -572,7 +596,17 @@ function QuickBookModal({ room, freeBeds, maxOccupancy, onClose, onSuccess }: Qu
                 </div>
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Notes (admin only)</label>
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Special terms (shown to customer)</label>
+                <textarea
+                  value={specialTerms}
+                  onChange={(e) => setSpecialTerms(e.target.value)}
+                  placeholder="Printed on the agreement, e.g. rent ₹500 higher from Jan…"
+                  rows={2}
+                  className="w-full text-sm rounded-tile bg-bg border border-border-strong px-3 py-2 text-ink placeholder:text-ink-muted outline-none focus:ring-2 focus:ring-brand-pink resize-none"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wide block mb-1">Notes (admin only, never shown to customer)</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}

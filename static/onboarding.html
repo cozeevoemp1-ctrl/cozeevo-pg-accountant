@@ -597,6 +597,10 @@
             <div class="room-card-label">Lock-in</div>
             <div class="room-card-value" id="card-lockin">—</div>
           </div>
+          <div class="room-card-item" id="card-terms-item" style="grid-column:1 / -1; display:none;">
+            <div class="room-card-label">Special terms</div>
+            <div class="room-card-value" id="card-terms" style="white-space:pre-wrap;">—</div>
+          </div>
         </div>
       </div>
     </div>
@@ -745,6 +749,22 @@
       <div class="error-msg" id="err-id-photo">Please upload a photo of your ID</div>
     </div>
 
+    <!-- Aadhaar BACK side — required for Aadhaar: the address is printed on the back -->
+    <div class="field" id="id-back-field">
+      <label>Aadhaar Back Side <span class="required-star">*</span></label>
+      <div class="upload-area" id="id-back-upload-area">
+        <input type="file" id="id-back-input" accept="image/*" style="display:none;" onchange="handleIdBackUpload(this)">
+        <div id="id-back-preview" class="upload-preview"></div>
+        <div class="upload-placeholder" id="id-back-placeholder">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#A0AEC0" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Tap to upload the back of your Aadhaar</span>
+          <span style="font-size:11px; color:#A0AEC0;">Address is read from this side</span>
+        </div>
+      </div>
+      <div id="id-back-extract-status" style="display:none; margin-top:6px; font-size:12px; color:#718096;"></div>
+      <div class="error-msg" id="err-id-back">Please upload the back side of your Aadhaar (address side)</div>
+    </div>
+
     <div class="field">
       <label for="id-number" class="required">ID Number</label>
       <input type="text" id="id-number" placeholder="Auto-filled from photo · You can correct it" style="text-transform:uppercase;" required>
@@ -780,6 +800,7 @@
       <div class="agreement-row"><span>Monthly Rent</span><span id="agree-rent">—</span></div>
       <div class="agreement-row"><span>Security Deposit</span><span id="agree-deposit">—</span></div>
       <div class="agreement-row"><span>Lock-in Period</span><span id="agree-lockin">—</span></div>
+      <div class="agreement-row" id="agree-terms-row" style="display:none;"><span>Special Terms</span><span id="agree-terms" style="text-align:right;white-space:pre-wrap;">—</span></div>
     </div>
 
     <div class="terms-box" id="terms-box">
@@ -832,6 +853,7 @@
   let token = null;
   let sessionData = {};
   let currentStep = 1;
+  let ocrIdName = '';   // name as read from the ID front — must match the typed name (spec 04)
   let sigDrawn = false;
 
   // ── Draft auto-save (localStorage) ────────────────────────────────────────
@@ -910,6 +932,13 @@
     // Signature mirror: update typed-signature whenever name changes or checkbox toggled.
     document.getElementById('name').addEventListener('input', mirrorSignature);
     document.getElementById('agree-checkbox').addEventListener('change', mirrorSignature);
+    // Aadhaar back-side slot only applies to Aadhaar (address is on the back)
+    const idTypeEl = document.getElementById('id-type');
+    const toggleBackSlot = () => {
+      document.getElementById('id-back-field').style.display = idTypeEl.value === 'Aadhaar' ? '' : 'none';
+    };
+    idTypeEl.addEventListener('change', toggleBackSlot);
+    toggleBackSlot();
   });
 
   function extractToken() {
@@ -962,6 +991,7 @@
         maintenance: data.maintenance_fee || 0,
         future_rent: data.future_rent || null,
         future_rent_after_months: data.future_rent_after_months || null,
+        special_terms: data.special_terms || '',
         rules: data.rules || [],
       });
       document.getElementById('main-content').style.display = 'block';
@@ -992,6 +1022,13 @@
     document.getElementById('card-rent').textContent = fmtMoney(data.monthly_rent);
     document.getElementById('card-deposit').textContent = fmtMoney(data.deposit);
     document.getElementById('card-lockin').textContent = data.lockin_months ? data.lockin_months + ' months' : '—';
+
+    // Special terms (customer-facing; same text is printed in the agreement PDF)
+    const terms = (data.special_terms || '').trim();
+    document.getElementById('card-terms').textContent = terms || '—';
+    document.getElementById('card-terms-item').style.display = terms ? 'block' : 'none';
+    document.getElementById('agree-terms').textContent = terms || '—';
+    document.getElementById('agree-terms-row').style.display = terms ? 'flex' : 'none';
 
     // Planned rent increase note
     const _rentIncreaseNote = (fr, frm, checkinISO) => {
@@ -1083,6 +1120,7 @@
           maintenance: sessionData.maintenance_fee || 0,
           future_rent: sessionData.future_rent || null,
           future_rent_after_months: sessionData.future_rent_after_months || null,
+          special_terms: sessionData.special_terms || '',
           rules: sessionData.rules || [],
         });
       }
@@ -1145,13 +1183,20 @@
       const emgPhone = stripDigits(document.getElementById('emg-phone').value);
       const emgRel = document.getElementById('emg-rel').value;
       const selfName = document.getElementById('name').value.trim();
+      const selfPhone = stripDigits(document.getElementById('tenant-phone').value).slice(-10);
 
       if (!emgName) { setError('emg-name', 'err-emg-name'); ok = false; }
       else if (selfName && emgName.toLowerCase() === selfName.toLowerCase()) {
         document.getElementById('err-emg-name').textContent = 'Emergency contact must be a different person';
         setError('emg-name', 'err-emg-name'); ok = false;
       }
-      if (emgPhone.length !== 10) { setError('emg-phone', 'err-emg-phone'); ok = false; }
+      if (emgPhone.length !== 10) {
+        document.getElementById('err-emg-phone').textContent = 'Enter a valid 10-digit mobile number';
+        setError('emg-phone', 'err-emg-phone'); ok = false;
+      } else if (selfPhone && emgPhone === selfPhone) {
+        document.getElementById('err-emg-phone').textContent = 'Emergency contact phone must be different from your own number';
+        setError('emg-phone', 'err-emg-phone'); ok = false;
+      }
       if (!emgRel) { setError('emg-rel', 'err-emg-rel'); ok = false; }
     }
 
@@ -1171,6 +1216,21 @@
         ok = false;
       }
       if (!idPhoto || idPhoto.length === 0) { setError('id-upload-area', 'err-id-photo'); ok = false; }
+      // Aadhaar needs both sides — address is on the back (spec 04)
+      if (idType === 'Aadhaar' && !getUploadDataUrl('id-back-preview')) {
+        setError('id-back-upload-area', 'err-id-back'); ok = false;
+      }
+      // Name on the ID must match the name typed in Step 1 (mirror of src/utils/name_match.py)
+      const typedName = document.getElementById('name').value.trim();
+      if (ocrIdName && typedName && !namesMatch(typedName, ocrIdName)) {
+        const st = document.getElementById('id-extract-status');
+        st.style.display = 'block';
+        st.style.color = '#E53E3E';
+        st.textContent = 'Name on ID ("' + ocrIdName + '") does not match the name you entered ("' + typedName + '"). Go back to Step 1 and correct your name, or upload the correct ID.';
+        setError('id-upload-area', 'err-id-photo');
+        document.getElementById('err-id-photo').textContent = 'Name on the ID does not match the name entered';
+        ok = false;
+      }
       const addr = document.getElementById('perm-address').value.trim();
       if (!addr || addr.length < 5) {
         document.getElementById('err-perm-address').textContent = addr ? 'Please enter a complete address' : 'Permanent address is required (auto-fills from Aadhaar above)';
@@ -1185,6 +1245,20 @@
     return (v || '').replace(/\D/g, '');
   }
 
+  // Name on the ID vs typed name. MIRROR of src/utils/name_match.py — keep identical:
+  // lowercase, letters only, drop 1-letter tokens, every token of the shorter name
+  // must appear in the longer name.
+  function nameTokens(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(t => t.length > 1);
+  }
+  function namesMatch(a, b) {
+    const ta = nameTokens(a), tb = nameTokens(b);
+    if (!ta.length || !tb.length) return false;
+    const shorter = ta.length <= tb.length ? ta : tb;
+    const longer  = ta.length <= tb.length ? tb : ta;
+    return shorter.every(t => longer.indexOf(t) !== -1);
+  }
+
   // Wire up upload clicks via JS (not inline onclick — avoids auto-trigger on display change)
   document.getElementById('selfie-upload-area').addEventListener('click', function(e) {
     e.stopPropagation();
@@ -1193,6 +1267,10 @@
   document.getElementById('id-upload-area').addEventListener('click', function(e) {
     e.stopPropagation();
     document.getElementById('id-photo-input').click();
+  });
+  document.getElementById('id-back-upload-area').addEventListener('click', function(e) {
+    e.stopPropagation();
+    document.getElementById('id-back-input').click();
   });
 
   // Compress an image File/Blob to a JPEG data URL at reduced size.
@@ -1321,6 +1399,7 @@
             if (!typeField.value) { typeField.value = 'Aadhaar'; }
           }
           if (f.name) {
+            ocrIdName = String(f.name).trim();
             const nameField = document.getElementById('name');
             if (!nameField.value.trim()) { nameField.value = f.name; filled.push('name'); }
           }
@@ -1337,9 +1416,15 @@
             if (addrField && !addrField.value.trim()) { addrField.value = f.address; filled.push('address'); }
           }
 
-          if (filled.length > 0) {
+          const typedName = document.getElementById('name').value.trim();
+          if (ocrIdName && typedName && !namesMatch(typedName, ocrIdName)) {
+            statusEl.style.color = '#E53E3E';
+            statusEl.textContent = 'Name on ID ("' + ocrIdName + '") does not match the name you entered ("' + typedName + '"). Correct your name in Step 1 or upload the correct ID.';
+          } else if (filled.length > 0) {
             statusEl.style.color = '#2E7D32';
-            statusEl.textContent = 'Extracted: ' + filled.join(', ') + ' — please verify';
+            const addrHint = (filled.indexOf('address') === -1 && document.getElementById('id-type').value === 'Aadhaar')
+              ? ' · Address not on this side — upload the back of your Aadhaar below' : '';
+            statusEl.textContent = 'Extracted: ' + filled.join(', ') + ' — please verify' + addrHint;
           } else {
             statusEl.style.color = '#718096';
             statusEl.textContent = 'Could not read details — please fill manually.';
@@ -1395,6 +1480,54 @@
     }
   }
 
+  // Aadhaar BACK side: stored as proof (saved_files.id_proof_back) and OCR'd for the address only.
+  function handleIdBackUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image of the back of your Aadhaar'); return; }
+    if (file.size > 20 * 1024 * 1024) { alert('File too large (max 20MB)'); return; }
+
+    compressImage(file, 1800, 0.92, function(dataUrl) {
+      const preview = document.getElementById('id-back-preview');
+      preview.innerHTML = '<img src="' + dataUrl + '" alt="Aadhaar back">';
+      preview.classList.add('visible');
+      const area = document.getElementById('id-back-upload-area');
+      area.classList.add('has-file');
+      area.classList.remove('error');
+      const placeholder = area.querySelector('.upload-placeholder');
+      if (placeholder) placeholder.style.display = 'none';
+
+      const statusEl = document.getElementById('id-back-extract-status');
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#718096';
+      statusEl.textContent = 'Reading address...';
+
+      fetch('/api/onboarding/' + extractToken() + '/extract-id', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ image_b64: dataUrl, mime_type: file.type || 'image/jpeg' }),
+      })
+      .then(r => r.json())
+      .then(data => {
+        const f = data.fields || {};
+        const addrField = document.getElementById('perm-address');
+        if (f.address) {
+          addrField.value = f.address;   // back side wins — it is the address side
+          addrField.classList.remove('error');
+          statusEl.style.color = '#2E7D32';
+          statusEl.textContent = 'Address read from Aadhaar — please verify below';
+        } else {
+          statusEl.style.color = '#E65100';
+          statusEl.textContent = 'Could not read the address — please type it below.';
+        }
+      })
+      .catch(() => {
+        statusEl.style.color = '#E65100';
+        statusEl.textContent = 'Could not read the address — please type it below.';
+      });
+    });
+  }
+
   function setError(fieldId, errId) {
     const field = document.getElementById(fieldId);
     if (field) field.classList.add('error');
@@ -1444,8 +1577,10 @@
       // Step 4
       id_proof_type: document.getElementById('id-type').value,
       id_proof_number: document.getElementById('id-number').value.trim().toUpperCase(),
-      // Uploads
+      // Uploads — every image is kept as proof
       id_photo: getUploadDataUrl('id-photo-preview'),
+      id_photo_back: getUploadDataUrl('id-back-preview'),
+      aadhaar_name: ocrIdName || '',
       selfie_photo: getUploadDataUrl('selfie-preview-wrap'),
       // Digital signature — typed-name token (no drawn PNG).
       // Format: "I_AGREE:<name>:<ISO-8601 timestamp>"
@@ -1457,7 +1592,9 @@
 
     // Validate mandatory uploads + address
     if (!payload.selfie_photo) { showError('Please upload your photo (Step 1 — tap the circle next to your room details).'); return; }
-    if (!payload.id_photo) { showError('Please upload your ID proof document (Step 4).'); return; }
+    if (!payload.id_photo) { showError('Please upload your ID proof document (Step 3).'); return; }
+    if (payload.id_proof_type === 'Aadhaar' && !payload.id_photo_back) { showError('Please upload the back side of your Aadhaar (Step 3).'); return; }
+    if (payload.aadhaar_name && !namesMatch(payload.name, payload.aadhaar_name)) { showError('The name you entered does not match the name on your ID. Please correct it in Step 1.'); return; }
 
     showLoading('Submitting registration...');
 

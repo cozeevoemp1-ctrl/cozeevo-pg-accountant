@@ -1,5 +1,38 @@
 # Changelog
 
+## Session AN — 2026-09-05 — Booking terms / lock-in / stricter KYC (spec 04) — on `development`, NOT merged
+
+Kiran: "does the note field on the booking form go to the customer?" — it did. "Notes (admin only)"
+on the pre-book modal + pre-register page was stored in `onboarding_sessions.special_terms`, which
+the agreement PDF prints under "Special Terms". Room 106 (Raghav Mittal) went out with "Lock in
+period three months" as a special term while the same PDF's table said "Lock-in: 0 months" — the
+forms had no lock-in input, so `lock_in_months` was always 0.
+
+**Changes (`docs/specs/04-booking-terms-lockin-kyc.md`):**
+- Three fields, three meanings: `lock_in_months` (structured), `special_terms` (customer-facing,
+  form + PDF), NEW `admin_notes` column (internal only, never in the public token endpoint or PDF).
+  Migration `run_add_onboarding_admin_notes_2026_09_05` applied to DB via txn pooler.
+- `bookings.py` quick-book: `lock_in_months`, `special_terms`, `notes`→`admin_notes`.
+- Pre-book modal (`kpi-grid.tsx`) + pre-register page: Lock-in select (shared `LOCK_IN_OPTIONS`),
+  "Special terms (shown to customer)", "Notes (admin only, never shown to customer)".
+- Bookings page: TERMS line (lock-in + special terms) above the NOTE line.
+- `onboarding_router.py`: `_tenancy_notes_from_obs()` single source for tenancy/Sheet notes on
+  approve (admin_notes + "Terms: …"), replaces 5 inline `obs.special_terms` sites; monthly
+  tenancy now also gets notes (was never set).
+- Customer form (`static/onboarding.html`): Special terms shown in room card + agreement card below
+  lock-in; emergency phone == own phone rejected (client + server 400); Aadhaar BACK side is a
+  required second upload (address is on the back) — OCR'd via `/extract-id`, stored as
+  `saved_files.id_proof_back`, linked as `Document(id_proof)` on approve; Aadhaar OCR name must
+  match the typed name — `src/utils/name_match.py` (12 tests) + identical JS mirror, enforced at
+  Step 3 and at submit (400).
+- `scheduler.py` check-in digest: notes = admin_notes | special_terms.
+- Data fix: `scripts/_fix_106_lockin.py --write` → tenancy 1296 + session 273 `lock_in_months=3`,
+  audit_log row. Tenant row is spelled "Raghad Mittal" (session says "Raghav") — left as is.
+
+**Verified:** pytest name_match 12/12, `tsc --noEmit` clean, py_compile clean, migration column
+present. **NOT browser-tested** (Playwright MCP down this session) — merge to master after Kiran
+runs one pre-book → form → approve cycle.
+
 ## Session AM — 2026-09-01 — Occupancy tab: avg rent KPI vs chart mismatch
 
 Kiran: "why is the average rent different here (KPI ₹14,559) and in the chart (Sep '26 ₹14,550)?"

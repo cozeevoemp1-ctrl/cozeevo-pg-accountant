@@ -1152,6 +1152,15 @@ async def run_add_planned_rent_increase_2026_04_28(conn) -> None:
     print("  [ok] future_rent, future_rent_after_months added")
 
 
+async def run_add_onboarding_admin_notes_2026_09_05(conn) -> None:
+    """Split internal notes from customer-facing special_terms (spec 04)."""
+    print("\n-- Add onboarding_sessions.admin_notes (2026-09-05) --")
+    await conn.execute(text(
+        "ALTER TABLE onboarding_sessions ADD COLUMN IF NOT EXISTS admin_notes TEXT"
+    ))
+    print("  [ok] admin_notes added")
+
+
 async def run_add_staff_kyc_fields_2026_04_26(conn) -> None:
     """Add salary, date_of_birth, aadhar_number, kyc_document_url, kyc_verified to staff."""
     print("\n-- Add staff KYC fields (2026-04-26) --")
@@ -1773,6 +1782,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_add_cancellation_reason_2026_04_25b(conn)
             await _migrate_checkout_sessions(conn)
             await run_add_planned_rent_increase_2026_04_28(conn)
+            await run_add_onboarding_admin_notes_2026_09_05(conn)
             await run_rent_schedule_cascade_2026_04_25(conn)
             await run_payment_unique_hash_2026_04_25(conn)
             await run_payments_freeze_trigger_2026_04_27(conn)

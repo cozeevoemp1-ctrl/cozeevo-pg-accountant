@@ -8,6 +8,7 @@ import Link from "next/link";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { PageHeader } from "@/components/ui/page-header";
 import { fmtDate } from "@/lib/date";
+import { LOCK_IN_OPTIONS } from "@/components/home/kpi-grid";
 
 export default function PreRegisterPage() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function PreRegisterPage() {
   const [deposit, setDeposit]       = useState("");
   const [advance, setAdvance]       = useState("");
   const [advanceMode, setAdvanceMode] = useState<"cash" | "upi">("upi");
+  const [lockIn, setLockIn]         = useState("0");
+  const [specialTerms, setSpecialTerms] = useState("");
   const [notes, setNotes]           = useState("");
   const [bedType, setBedType]       = useState<"regular" | "premium">("regular");
   const [depositOverridden, setDepositOverridden] = useState(false);
@@ -132,6 +135,8 @@ export default function PreRegisterPage() {
         booking_amount:   parseFloat(advance) || 0,
         advance_mode:     advanceMode,
         sharing_type:     bedType === "premium" ? "premium" : "",
+        lock_in_months:   parseInt(lockIn, 10) || 0,
+        special_terms:    specialTerms.trim() || undefined,
         notes:            notes.trim() || undefined,
       });
       setDone(result);
@@ -323,7 +328,29 @@ export default function PreRegisterPage() {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notes</label>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Lock-in period</label>
+            <select
+              value={lockIn}
+              onChange={e => setLockIn(e.target.value)}
+              className="mt-1 w-full h-[42px] rounded-lg border border-border-strong bg-surface px-3 text-sm text-ink focus:outline-none focus:border-brand-pink"
+            >
+              {LOCK_IN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Special terms (shown to customer)</label>
+            <textarea
+              value={specialTerms}
+              onChange={e => setSpecialTerms(e.target.value)}
+              placeholder="Printed on the agreement, e.g. rent ₹500 higher from Jan…"
+              rows={2}
+              className="mt-1 w-full rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-brand-pink resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Notes (admin only, never shown to customer)</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}

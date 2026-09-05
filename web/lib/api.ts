@@ -1132,7 +1132,9 @@ export async function quickBook(payload: {
   sharing_type?: string;
   booking_amount?: number;
   advance_mode?: string;
-  notes?: string;
+  lock_in_months?: number;   // monthly only; 0 = none
+  special_terms?: string;    // CUSTOMER-FACING — shown on onboarding form + agreement PDF
+  notes?: string;            // INTERNAL — admin only, never sent to the tenant
 }): Promise<QuickBookResult> {
   return _post("/api/v2/app/bookings/quick-book", payload);
 }

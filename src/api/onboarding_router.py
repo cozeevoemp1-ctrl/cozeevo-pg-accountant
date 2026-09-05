@@ -111,7 +111,9 @@ class TenantSubmitRequest(BaseModel):
     office_phone: str = ""
     id_proof_type: str = ""
     id_proof_number: str = ""
-    id_photo: str = ""       # base64 image or PDF data URL
+    id_photo: str = ""       # base64 image or PDF data URL (Aadhaar FRONT)
+    id_photo_back: str = ""  # base64 image data URL (Aadhaar BACK — address side; required for Aadhaar)
+    aadhaar_name: str = ""   # name as OCR'd from the ID front — must match `name` (spec 04)
     selfie_photo: str = ""   # base64 image data URL
     signature_image: str     # base64 PNG
 
@@ -488,7 +490,7 @@ async def get_session_detail(token: str, request: Request):
         from src.services import storage as _storage
         _sf = td.get("saved_files")
         if isinstance(_sf, dict):
-            for _k in ("selfie", "id_proof", "signature"):
+            for _k in ("selfie", "id_proof", "id_proof_back", "signature"):
                 if _sf.get(_k):
                     _sf[_k] = await _storage.sign_stored_url(_sf[_k])
         _agreement_signed = await _storage.sign_stored_url(obs.agreement_pdf_path or "")
@@ -510,6 +512,7 @@ async def get_session_detail(token: str, request: Request):
             "checkin_date": obs.checkin_date.isoformat() if obs.checkin_date else "",
             "lock_in_months": obs.lock_in_months or 0,
             "special_terms": obs.special_terms or "",
+            "admin_notes": obs.admin_notes or "",
             "sharing_type": obs.sharing_type or "",
             "tenant_data": td,
             "signature_image": obs.signature_image or "",
@@ -598,7 +601,9 @@ async def list_pending(request: Request):
                 "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
                 "expired_ago": expired_ago,
                 "is_qr": (obs.created_by_phone or "") == "qr_scan",
-                "notes": obs.special_terms or "",
+                "notes": obs.admin_notes or "",
+                "special_terms": obs.special_terms or "",
+                "lock_in_months": obs.lock_in_months or 0,
                 "is_replacement": is_replacement,
                 "current_occupants": current_occupants,
             })
@@ -634,6 +639,8 @@ async def list_pending(request: Request):
                     "expired_ago": "",
                     "is_qr": False,
                     "notes": tenancy.notes or "",
+                    "special_terms": "",
+                    "lock_in_months": tenancy.lock_in_months or 0,
                     "is_replacement": False,
                     "current_occupants": [],
                 })
@@ -1250,6 +1257,20 @@ def _substitute_house_rules(obs: OnboardingSession) -> list[str]:
     return [rule.format(rent=rent, deposit=deposit, lock_in=lock_in, food=food, maintenance=maintenance) for rule in HOUSE_RULES]
 
 
+def _tenancy_notes_from_obs(obs: OnboardingSession) -> str:
+    """Tenancy.notes at check-in = internal admin_notes + customer-facing special_terms.
+
+    Single source for every tenancy/Sheet write on approve (spec 04). Both fields are
+    kept so the tenancy row still shows the agreed terms after the session is gone.
+    """
+    parts = []
+    if obs.admin_notes and obs.admin_notes.strip():
+        parts.append(obs.admin_notes.strip())
+    if obs.special_terms and obs.special_terms.strip():
+        parts.append(f"Terms: {obs.special_terms.strip()}")
+    return " | ".join(parts)
+
+
 # ── Tenant submits form ──────────────────────────────────────────────────────
 
 @router.post("/{token}/submit")
@@ -1257,9 +1278,31 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
     _rate_check(f"submit:{request.client.host}", 5, 60)  # 5/min per IP
     # File size check (base64 ~1.37x original). Signature is now a short
     # text token ("I_AGREE:<name>:<timestamp>") so it always passes.
-    for field_name, data in [("selfie", req.selfie_photo), ("id_proof", req.id_photo), ("signature", req.signature_image)]:
+    for field_name, data in [("selfie", req.selfie_photo), ("id_proof", req.id_photo),
+                             ("id_proof_back", req.id_photo_back), ("signature", req.signature_image)]:
         if data and len(data) > MAX_UPLOAD_SIZE:
             raise HTTPException(413, f"{field_name} file too large (max 4MB)")
+
+    # Emergency contact must be a different person — same phone as the tenant is rejected.
+    import re as _re_ec
+    _ec_phone = _re_ec.sub(r"\D", "", req.emergency_contact_phone or "")[-10:]
+    _own_phone = _re_ec.sub(r"\D", "", req.phone or "")[-10:]
+    if _ec_phone and _own_phone and _ec_phone == _own_phone:
+        raise HTTPException(400, "Emergency contact phone must be different from your own phone number")
+
+    # Name on the ID must match the name typed in the form (rule: src/utils/name_match.py).
+    if req.aadhaar_name.strip():
+        from src.utils.name_match import names_match
+        if not names_match(req.name, req.aadhaar_name):
+            raise HTTPException(
+                400,
+                f"Name entered ({req.name.strip()}) does not match the name on the ID ({req.aadhaar_name.strip()})",
+            )
+
+    # Aadhaar needs both sides — the address is on the back.
+    if (req.id_proof_type or "").strip().lower() == "aadhaar" and not req.id_photo_back:
+        raise HTTPException(400, "Please upload the back side of your Aadhaar card (address side)")
+
     async with get_session() as session:
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
@@ -1278,7 +1321,8 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
         token_short = obs.token[:8]
         saved_files = {}
 
-        for field_name, data_url in [("selfie", req.selfie_photo), ("id_proof", req.id_photo)]:
+        for field_name, data_url in [("selfie", req.selfie_photo), ("id_proof", req.id_photo),
+                                     ("id_proof_back", req.id_photo_back)]:
             if not data_url or "base64," not in data_url:
                 continue
             try:
@@ -1340,7 +1384,7 @@ async def tenant_submit(token: str, req: TenantSubmitRequest, request: Request):
             {"phone": _phone10, "token": token},
         )
 
-        tenant_data = req.model_dump(exclude={"signature_image", "id_photo", "selfie_photo"})
+        tenant_data = req.model_dump(exclude={"signature_image", "id_photo", "id_photo_back", "selfie_photo"})
         tenant_data["saved_files"] = saved_files  # paths for approve step
         obs.tenant_data = json.dumps(tenant_data)
         obs.signature_image = req.signature_image
@@ -1836,7 +1880,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 _pre_tenancy.agreed_rent      = _daily_rate
                 _pre_tenancy.booking_amount   = obs.booking_amount or 0
                 _pre_tenancy.maintenance_fee  = obs.maintenance_fee or 0
-                _pre_tenancy.notes            = obs.special_terms or ""
+                _pre_tenancy.notes            = _tenancy_notes_from_obs(obs)
                 _pre_tenancy.sharing_type     = _dw_sharing
                 _pre_tenancy.entered_by       = "onboarding_form"
                 tenancy = _pre_tenancy
@@ -1854,7 +1898,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     agreed_rent=_daily_rate,
                     booking_amount=obs.booking_amount or 0,
                     maintenance_fee=obs.maintenance_fee or 0,
-                    notes=obs.special_terms or "",
+                    notes=_tenancy_notes_from_obs(obs),
                     sharing_type=_dw_sharing,
                     entered_by="onboarding_form",
                 )
@@ -1898,7 +1942,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                         checkin=checkin.strftime("%d/%m/%Y"),
                         checkout=checkout.strftime("%d/%m/%Y"),
                         status="ACTIVE",
-                        notes=obs.special_terms or "",
+                        notes=_tenancy_notes_from_obs(obs),
                         entered_by="onboarding_form",
                     )
                     if gs_r.get("success"):
@@ -1925,7 +1969,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     deposit=0.0,
                     booking=float(obs.booking_amount or 0),
                     maintenance=float(obs.maintenance_fee or 0),
-                    notes=obs.special_terms or "",
+                    notes=_tenancy_notes_from_obs(obs),
                     dob=td.get("dob", ""),
                     father_name=td.get("father_name", ""),
                     father_phone=td.get("father_phone", ""),
@@ -2003,6 +2047,9 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 _pre_tenancy.maintenance_fee = obs.maintenance_fee or 0
                 _pre_tenancy.sharing_type = sharing_default
                 _pre_tenancy.lock_in_months = obs.lock_in_months or 0
+                _obs_notes = _tenancy_notes_from_obs(obs)
+                if _obs_notes and not (_pre_tenancy.notes or "").strip():
+                    _pre_tenancy.notes = _obs_notes
                 _pre_tenancy.entered_by = (req.entry_source or "onboarding_form") if req else "onboarding_form"
                 _pre_tenancy.status = _target_status
                 tenancy = _pre_tenancy
@@ -2031,6 +2078,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     booking_amount=obs.booking_amount or 0, maintenance_fee=obs.maintenance_fee or 0,
                     lock_in_months=obs.lock_in_months or 0,
                     sharing_type=sharing_default,
+                    notes=_tenancy_notes_from_obs(obs) or None,
                     entered_by=(req.entry_source or "onboarding_form") if req else "onboarding_form",
                     status=_target_status,
                 )
@@ -2160,7 +2208,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                 checkin=checkin.strftime("%d/%m/%Y"),
                 agreed_rent=float(obs.agreed_rent or 0), deposit=float(obs.security_deposit or 0),
                 booking=float(obs.booking_amount or 0), maintenance=float(obs.maintenance_fee or 0),
-                notes=obs.special_terms or "",
+                notes=_tenancy_notes_from_obs(obs),
                 dob=td.get("date_of_birth", ""), father_name=td.get("father_name", ""),
                 father_phone=td.get("father_phone", ""), address=td.get("permanent_address", ""),
                 emergency_contact=td.get("emergency_contact_name", ""),
@@ -2225,6 +2273,7 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         doc_map = {
             "selfie": DocumentType.photo,
             "id_proof": DocumentType.id_proof,
+            "id_proof_back": DocumentType.id_proof,
             "signature": DocumentType.photo,
         }
         _tenancy_id_for_docs = tenancy.id if tenancy is not None else None

@@ -41,7 +41,9 @@ class QuickBookRequest(BaseModel):
     booking_amount: float = 0.0     # advance paid at booking
     advance_mode: str = "upi"       # "cash" | "upi" — how advance was collected
     sharing_type: str = ""          # "premium" = full room; "" = single bed
-    notes: str = ""                 # stored in onboarding_sessions.special_terms
+    lock_in_months: int = 0         # 0 = no lock-in; shown on tenant form + agreement PDF
+    special_terms: str = ""         # CUSTOMER-FACING: shown on tenant form + printed in agreement PDF
+    notes: str = ""                 # INTERNAL: stored in onboarding_sessions.admin_notes, never sent to tenant
 
 
 @router.post("/quick-book")
@@ -64,6 +66,12 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
 
     if req.stay_type == "daily" and req.daily_rate <= 0:
         raise HTTPException(400, "Daily rate must be > 0")
+
+    if req.lock_in_months < 0 or req.lock_in_months > 24:
+        raise HTTPException(400, "lock_in_months must be between 0 and 24")
+    _lock_in = req.lock_in_months if req.stay_type == "monthly" else 0
+    _special_terms = req.special_terms.strip() or None
+    _admin_notes = req.notes.strip() or None
 
     try:
         checkin = date.fromisoformat(req.checkin_date)
@@ -183,7 +191,9 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 stay_type="daily",
                 sharing_type=_sharing,
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
-                special_terms=req.notes.strip() or None,
+                lock_in_months=_lock_in,
+                special_terms=_special_terms,
+                admin_notes=_admin_notes,
                 expires_at=datetime.utcnow() + timedelta(hours=48),
             )
         else:
@@ -205,7 +215,9 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
                 stay_type="monthly",
                 sharing_type=_sharing,
                 tenant_data=json.dumps({"name": req.tenant_name.strip()}),
-                special_terms=req.notes.strip() or None,
+                lock_in_months=_lock_in,
+                special_terms=_special_terms,
+                admin_notes=_admin_notes,
                 expires_at=datetime.utcnow() + timedelta(hours=48),
             )
         session.add(obs)

@@ -36,7 +36,9 @@ interface Booking {
   expires_at?: string
   expired_ago?: string
   is_qr?: boolean
-  notes?: string
+  notes?: string           // admin_notes — internal only
+  special_terms?: string   // customer-facing — on the tenant form + agreement PDF
+  lock_in_months?: number
   is_replacement?: boolean
   current_occupants?: string[]
 }
@@ -693,7 +695,19 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
         </div>
       )}
 
-      {/* Admin notes */}
+      {/* Lock-in + customer-facing special terms (both go to the tenant form + PDF) */}
+      {(b.lock_in_months || b.special_terms) && !editing && (
+        <div className="flex items-start gap-1.5 bg-[#F0F9FF] border border-[#BAE6FD] rounded-lg px-2.5 py-2 -mt-1">
+          <span className="text-[10px] font-bold text-[#0369A1] flex-shrink-0 mt-0.5">TERMS</span>
+          <p className="text-[11px] text-[#0C4A6E] leading-snug">
+            {b.lock_in_months ? `Lock-in ${b.lock_in_months} month${b.lock_in_months > 1 ? "s" : ""}` : ""}
+            {b.lock_in_months && b.special_terms ? " · " : ""}
+            {b.special_terms || ""}
+          </p>
+        </div>
+      )}
+
+      {/* Admin notes — internal only, never sent to the tenant */}
       {b.notes && !editing && (
         <div className="flex items-start gap-1.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2.5 py-2 -mt-1">
           <span className="text-[10px] font-bold text-[#92400E] flex-shrink-0 mt-0.5">NOTE</span>

@@ -276,7 +276,8 @@ async def _prep_reminder(when: str = "today") -> None:
             obs_checkins_raw = (await conn.execute(text("""
                 SELECT obs.tenant_data, obs.tenant_phone, r.room_number,
                        COALESCE(obs.sharing_type, '') AS sharing,
-                       COALESCE(obs.special_terms, '') AS notes
+                       COALESCE(CONCAT_WS(' | ', NULLIF(obs.admin_notes, ''),
+                                          NULLIF(obs.special_terms, '')), '') AS notes
                 FROM onboarding_sessions obs
                 JOIN rooms r ON r.id = obs.room_id
                 WHERE obs.checkin_date = :target

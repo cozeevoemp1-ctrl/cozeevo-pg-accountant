@@ -867,7 +867,8 @@ class OnboardingSession(Base):
     checkout_date     = Column(Date)
     num_days          = Column(Integer, default=0)
     daily_rate        = Column(Numeric(10, 2), default=0)
-    special_terms     = Column(Text)
+    special_terms     = Column(Text)                 # customer-facing: shown on onboarding form + printed in agreement PDF
+    admin_notes       = Column(Text)                 # internal only: never sent to the tenant form or PDF
     tenant_data       = Column(Text)
     signature_image   = Column(Text)
     agreement_pdf_path = Column(String(255))

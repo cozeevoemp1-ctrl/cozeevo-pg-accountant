@@ -393,6 +393,16 @@ delivery | purchase | maintenance | utility | supply | staff | visitor | payment
 
 Formula: `effective_date = 1st of (checkin_month + N)`. At approval, if set, pre-inserts a `rent_revisions` row so rollover applies it automatically.
 
+**`onboarding_sessions`** — notes split (2026-09-05, spec 04):
+| Column | Type | Who sees it |
+|--------|------|-------------|
+| `lock_in_months` | INTEGER | Tenant form (room card + agreement card) + PDF table. Set from the booking forms' Lock-in select. |
+| `special_terms` | TEXT | **Customer-facing.** Tenant form below lock-in + PDF "Special Terms". |
+| `admin_notes` | TEXT | **Internal only.** Bookings page NOTE line + check-in digest. Never returned by `GET /api/onboarding/{token}`, never in the PDF. |
+
+On approve, `tenancies.notes` = `admin_notes` + `"Terms: <special_terms>"` (`_tenancy_notes_from_obs()`).
+`tenant_data.saved_files` may also hold `id_proof_back` (Aadhaar back side, required for Aadhaar).
+
 ---
 
 ## 6. Critical Data Rules
