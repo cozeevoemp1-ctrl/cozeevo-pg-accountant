@@ -33,9 +33,17 @@ forms had no lock-in input, so `lock_in_months` was always 0.
 - Data fix: `scripts/_fix_106_lockin.py --write` → tenancy 1296 + session 273 `lock_in_months=3`,
   audit_log row. Tenant row is spelled "Raghad Mittal" (session says "Raghav") — left as is.
 
-**Verified:** pytest name_match 12/12, `tsc --noEmit` clean, py_compile clean, migration column
-present. **NOT browser-tested** (Playwright MCP down this session) — merge to master after Kiran
-runs one pre-book → form → approve cycle.
+**Verified — 21/21 end-to-end smoke test** against a locally-run API on the live DB (WhatsApp sends
+patched out, no approve step, test session + KYC files deleted afterwards): quick-book stores the
+three fields separately; public `GET /api/onboarding/{token}` returns lock_in + special_terms and
+leaks no admin_notes; served form contains the new markup; emergency-phone-equals-own → 400;
+Aadhaar name mismatch → 400; Aadhaar without back side → 400; valid submit → 200 with selfie +
+id_proof + id_proof_back all in storage; simulated storage outage → 502 (submit rejected).
+Plus pytest 64/64, `tsc --noEmit` clean, `npm run build` clean.
+
+**Shipped to production** 2026-09-05 — master `80793ee`, `api.getkozzy.com/healthz` confirms the
+commit. Not yet exercised: the approve step (Documents rows for `id_proof_back`) — deliberately
+skipped locally since it writes tenants/tenancies/Sheet. Check it on the next real check-in.
 
 ## Session AM — 2026-09-01 — Occupancy tab: avg rent KPI vs chart mismatch
 
