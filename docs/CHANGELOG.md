@@ -1,5 +1,46 @@
 # Changelog
 
+## Session AO — 2026-09-05 — Room 621 Harshit: half-cancelled booking repaired; audit-trail rule
+
+Kiran: "621 room booking is not shown anywhere — where is he?" He appeared only in the
+"Awaiting check-in" tile, 62 days overdue, while physically living in Room 621 since 5 Jul.
+
+**Root cause.** The booking was raised 17 Jul (back-dated to 5 Jul) with a ₹2,500 advance;
+the onboarding link was never opened, so tenancy 1301 stayed `no_show`.
+`scripts/_cleanup_2026_08_06.py` step F1 then cancelled onboarding session 279 as a "32-day
+stale hold" (audit_log 2274) **without touching the tenancy** — and wrote no audit row against
+it. Result: a paying resident invisible everywhere, billed nothing for two months, holding a
+phantom bed in a double room (`room_occupancy.py:174` counts a past-dated `no_show` as occupied,
+so 621 read 2/2 with only Kumar Satyam actually paying).
+
+**Repair — `scripts/_fix_harshit_621_checkin.py`** (dry-run by default, `--write` to apply):
+- Tenancy 1301 `no_show` → `active`, check-in 5 Jul unchanged.
+- July rent schedule row **created** (₹23,693 = 27/31 prorated ₹12,193 + ₹14,000 deposit
+  − ₹2,500 booking, via `first_month_rent_due()`); Aug + Sep rows `na`/₹0 → `paid`/₹14,000.
+- Four payments back-entered per Kiran's account: 5 Jul ₹20,000 cash rent + ₹12,500 UPI deposit,
+  ₹14,000 cash Aug, ₹14,000 cash Sep. **Aug/Sep dates default to the 5th** — exact days unknown,
+  editable in the PWA.
+- Onboarding session 279 `cancelled` → `pending_tenant`, fresh token, 7-day expiry — he has no
+  KYC, no ID proof and no signed agreement on file after two months' residence.
+- 11 audit_log rows written (2844–2852 + payments); Sheet resynced for Jul/Aug/Sep.
+
+**Open:** ledger closes at **₹8,807 credit** — ₹60,500 collected vs ₹51,693 charged. Kiran said
+"cleared all dues", so either the deposit is above ₹14,000, one amount is off, or he is prepaid
+into October. Not adjusted — left visible rather than absorbed silently.
+
+**Sweep:** Harshit was the only tenancy in this half-cancelled state. The 3 remaining overdue
+no-shows (Balakrishna G13, Jainik 318, Vinayak 611) all have live sessions and are 1–4 days old.
+
+**New rule — every write must be visible in the trail** (`docs/architecture/BRAIN.md` §15b,
+memory `rules_audit_logs.md`): any DB change, including one-off fix scripts, must write
+`audit_log` **and** surface in the activity feed. The feed filters on `field` — only
+`agreed_rent, status, status+checkout_date, room_id, is_void, adjustment,
+rent_schedule_one_off, sharing_type` render, so any other `field` is stored but invisible.
+Never half-finish a state change across `onboarding_sessions` and `tenancies`.
+
+**Stale ref found:** `CLAUDE.md` docs index points at `docs/BRAIN.md`; the file is
+`docs/architecture/BRAIN.md`.
+
 ## Session AN — 2026-09-05 — Booking terms / lock-in / stricter KYC (spec 04) — on `development`, NOT merged
 
 Kiran: "does the note field on the booking form go to the customer?" — it did. "Notes (admin only)"

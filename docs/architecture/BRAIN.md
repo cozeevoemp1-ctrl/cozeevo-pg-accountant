@@ -498,6 +498,34 @@ Dashboard (reads DB)            Kiran views (read-only)
 - Rent changes also tracked in rent_revisions with effective dates
 - Source: whatsapp / dashboard / system / import
 
+**Every write must be visible in the trail (CRITICAL — Kiran, 2026-09-05):**
+
+Any change to data — bot, PWA, or a one-off `scripts/_fix_*.py` — must land in `audit_log`
+**and** actually surface in the PWA activity feed and the tenant history panel. A silent DB
+write is a bug even when the write itself is correct.
+
+- **The activity feed filters on `field`.** `get_activity_feed()` in `src/api/v2/kpi.py`
+  renders only audit rows whose `field` is in `NON_PAYMENT_FIELDS`:
+  `agreed_rent`, `status`, `status+checkout_date`, `room_id`, `is_void`, `adjustment`,
+  `rent_schedule_one_off`, `sharing_type`.
+  An audit row with any other `field` is stored but **never displayed**. Use
+  `rent_schedule_one_off` for rent-schedule edits and `status` for tenancy / onboarding-session
+  state changes.
+- Payments render straight from the `payments` table, so they always appear in the feed —
+  but still write the `payment.log` audit row so they show in tenant history.
+- Every audit row needs old value, new value, `room_number`, `source`, and a `note` that
+  explains **why** in plain language. "status: no_show → active" alone is not an explanation.
+- **Never half-finish a state change across two tables.** Prefer the real endpoint
+  (`POST /tenancies/{id}/cancel-no-show`, `POST /checkin`) — it syncs both sides and audits.
+  If a script must touch `onboarding_sessions`, state what the linked `tenancies` row now
+  says, and vice versa.
+
+Precedent: `scripts/_cleanup_2026_08_06.py` step F1 cancelled onboarding session 279
+(Harshit Srivastava, Room 621) but left tenancy 1301 at `no_show`, with no audit row on the
+tenancy at all. A paying resident stayed invisible for two months, was billed nothing, and
+held a phantom bed in a double room. Repaired 2026-09-05 by
+`scripts/_fix_harshit_621_checkin.py`.
+
 **Planned rent increase at onboarding (2026-04-28):**
 - Two nullable columns on `onboarding_sessions`: `future_rent`, `future_rent_after_months`
 - Formula: `effective_date = 1st of (checkin_month + N)` — current month counts as month 1
