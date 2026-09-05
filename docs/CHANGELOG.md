@@ -41,6 +41,17 @@ Never half-finish a state change across `onboarding_sessions` and `tenancies`.
 **Stale ref found:** `CLAUDE.md` docs index points at `docs/BRAIN.md`; the file is
 `docs/architecture/BRAIN.md`.
 
+**Policy set for next session — spec 05 (specced, NOT built).** Kiran: "hereafter if any
+booking is cancelled due to inactivity or not checked in it should show up in vacant beds,
+it should not get stuck in awaiting, become stale."
+`docs/specs/05-stale-booking-auto-release.md` + memory `rules_stale_bookings.md`.
+Two-stage by design — warn operators at ~7 days, release at ~14 — because a real resident
+whose check-in was never recorded is byte-identical to a genuine no-show, which is exactly
+how Harshit would have been silently cancelled. Release reuses `cancel_no_show`
+(`tenants.py:1198-1252`) extracted into `services/bookings.py::release_booking()`; vacant-beds
+needs no change since `room_occupancy.py:62` already excludes `cancelled`. Booking advance is
+never voided. 3 decisions open: grace period, auto vs manual button, advance handling.
+
 ## Session AN — 2026-09-05 — Booking terms / lock-in / stricter KYC (spec 04) — on `development`, NOT merged
 
 Kiran: "does the note field on the booking form go to the customer?" — it did. "Notes (admin only)"
