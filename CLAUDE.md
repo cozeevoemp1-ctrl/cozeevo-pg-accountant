@@ -37,6 +37,8 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
 - **Test locally before any VPS deploy**
 - **`security_deposit` is required on monthly bookings** — never default to agreed_rent; reject with 422
 - **First-month RS auto-recalc** — whenever security_deposit/checkin_date/agreed_rent changes, call `recalc_checkin_month_rs()` from `src/services/rent_schedule.py`; 5 call-sites must stay in sync
+- **Customer-facing vs internal fields** (spec 04) — `onboarding_sessions.special_terms` is **printed in the signed agreement PDF and shown on the tenant form**; `admin_notes` is staff-only and must never enter the public `GET /api/onboarding/{token}` response or the PDF. Terms with a number (lock-in, notice, escalation) get a typed column + its own input — never a sentence in a notes box. Grep `src/services/pdf_generator.py` before touching any session column.
+- **KYC images are proof** — a failed Supabase upload must **reject** the onboarding submit (502), never warn-and-continue. Aadhaar requires **both** sides (address is on the back); ID name must match the typed name (`src/utils/name_match.py` + its identical JS mirror in `static/onboarding.html`).
 
 ## Sheet column rule (CRITICAL — no exceptions)
 **Never reference Google Sheet columns by numeric index anywhere in the project.**
@@ -187,6 +189,8 @@ Kiran's Excel (offline)
 | `web/components/finance/investment-section.tsx` | Finance Investment section — collapsible per-investor groups from `investment_expenses` table; hides if count=0 |
 | `src/parsers/yes_bank.py` | Yes Bank CSV parser — shared by finance API and export_classified.py |
 | `src/utils/inr_format.py` | INR number format constant + inr()/inr_short() helpers — single source of truth |
+| `src/utils/name_match.py` | `names_match()` — ID-OCR name vs typed name (spec 04). MIRRORED verbatim as `namesMatch()` in `static/onboarding.html` — change both or neither. Tests: `tests/test_name_match.py` |
+| `static/onboarding.html` | Tenant-facing onboarding form (served at `/onboard/{token}`) — Aadhaar front+back upload, OCR autofill, lock-in + special terms display, name/emergency-phone validation |
 | `web/middleware.ts` | Next.js auth gate — unauthenticated → /login; staff on /finance/** → /; 3s timeout fail-open; /auth/** and /mockups/** always allowed (no login) |
 | `mockups/` | Sales-demo mockups (static HTML, dummy data, no backend) — source of truth to edit/reskin per client. See `mockups/README.md`. Deployed copy in `web/public/mockups/` (kept in sync manually), live at `app.getkozzy.com/mockups/<file>.html` with no login required |
 | `web/app/login/page.tsx` | PWA login — email+password sign-in + "Forgot password?" reset flow |
