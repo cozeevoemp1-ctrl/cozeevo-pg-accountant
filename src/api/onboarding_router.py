@@ -1642,6 +1642,18 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
         obs = await session.scalar(select(OnboardingSession).where(OnboardingSession.token == token))
         if not obs:
             raise HTTPException(404, "Session not found")
+        # Already checked in — this is a duplicate click, not an error. Returning 400
+        # here made staff think the check-in had FAILED (Room 223, 5 Sep 2026: the
+        # approve succeeded, the list refresh 502'd during a deploy restart, the card
+        # stayed on screen, and the retry's "Cannot approve" looked like a failure).
+        # Answer 200 with the existing ids so the caller can just move on.
+        if obs.status == "approved":
+            return {
+                "status": "already_checked_in",
+                "tenant_id": obs.tenant_id,
+                "tenancy_id": obs.tenancy_id,
+                "message": "Already checked in — nothing further to do.",
+            }
         if obs.status != "pending_review":
             raise HTTPException(400, f"Cannot approve — status is {obs.status}")
 

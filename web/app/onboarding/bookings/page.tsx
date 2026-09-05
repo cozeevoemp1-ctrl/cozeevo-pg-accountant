@@ -124,6 +124,11 @@ export default function BookingsPage() {
         const d = await res.json().catch(() => ({}))
         throw new Error((d as { detail?: string }).detail ?? `Error ${res.status}`)
       }
+      // Check-in is committed server-side at this point. Drop the card immediately
+      // instead of waiting on the refresh: a failed reload used to leave the card on
+      // screen looking un-checked-in, and the second click read as a failure
+      // (Room 223, 5 Sep 2026). The reload below is a correction, not the source of truth.
+      setBookings(prev => prev.filter(b => b.token !== token))
       await load()
     } finally {
       setCheckingIn(null)
