@@ -330,7 +330,7 @@ async def quick_book(req: QuickBookRequest, user: AppUser = Depends(get_current_
 
         # Send WhatsApp (template first, fall back to freeform)
         base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-        onboard_link = f"{base_url}/onboard/{token}"
+        onboard_link = f"{base_url}/join/{token}"
         whatsapp_sent = False
         phone_wa = f"91{phone}"
         try:

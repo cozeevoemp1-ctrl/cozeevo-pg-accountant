@@ -297,7 +297,7 @@ async def create_session(req: CreateSessionRequest, request: Request):
 
         # Auto-send onboarding link to tenant via WhatsApp
         base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-        onboard_link = f"{base_url}/onboard/{token}"
+        onboard_link = f"{base_url}/join/{token}"
         whatsapp_sent = False
         if req.tenant_phone:
             try:
@@ -874,7 +874,7 @@ async def resend_link(token: str, request: Request):
             obs.expires_at = datetime.utcnow() + timedelta(hours=48)
 
         base_url = os.getenv("BASE_URL", "https://api.getkozzy.com")
-        onboard_link = f"{base_url}/onboard/{token}"
+        onboard_link = f"{base_url}/join/{token}"
 
         if not obs.tenant_phone:
             raise HTTPException(400, "No tenant phone on this session")

@@ -481,9 +481,10 @@ forwardable to anyone, and it outlives the conversation.
   free-form document is rejected (131047). `send_agreement()` returns `no_window` and
   the caller tells staff — it must never fall back to sending a link instead.
 - **The one URL a tenant legitimately receives is the onboarding form link**
-  (`/onboard/{token}`, one-time, expiring). It is currently served from
-  `api.getkozzy.com` — an API hostname a customer should not see. Open item: move it
-  to a customer-facing domain.
+  (one-time, expiring). It is served from **`https://cozeevo.com/join/{token}`** — the
+  brand tenants know, on a host that serves the form and nothing else (no PWA, no API,
+  everything else 404). `BASE_URL` is the single switch; `/onboard/{token}` stays alive
+  forever for links already sent. nginx block + apply steps: `deploy/nginx/`.
 - **Never send a tenant anything as a "test".** Test sends go nowhere near a real
   number without Kiran saying so first.
 

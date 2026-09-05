@@ -26,7 +26,8 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
 - **Single source of truth for constants**: TOTAL_BEDS → `src/services/occupancy.py`
   (`get_total_revenue_beds` / `_sync`); frozen sheet months → `gsheets.FROZEN_MONTHS`;
   admin phone → `role_service.get_primary_admin_phone()`; PWA API base →
-  `web/lib/api.ts BASE_URL`. Never re-derive these inline.
+  `web/lib/api.ts BASE_URL`; tenant onboarding link → `BASE_URL` env + `/join/{token}`
+  (never hardcode a host in a tenant-facing link). Never re-derive these inline.
 
 ## Core rules
 - **`docs/REPORTING.md`** — single source of truth for ALL financial logic

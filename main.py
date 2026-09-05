@@ -41,6 +41,7 @@ class LocalOnlyMiddleware:
         if (path.startswith("/webhook") or path == "/healthz" or path == "/"
                 or path.startswith("/static") or path.startswith("/media")
                 or path.startswith("/onboard")
+                or path.startswith("/join")
                 or path == "/qr"
                 or path.startswith("/api/onboarding")
                 or path.startswith("/api/checkout")  # 410 tombstones
@@ -263,9 +264,15 @@ async def qr_entry(request: Request, building: str = ""):
     return RedirectResponse(url=f"/onboard/{token}", status_code=302)
 
 
+@app.get("/join/{token}", response_class=HTMLResponse)
 @app.get("/onboard/{token}", response_class=HTMLResponse)
 async def serve_onboarding_form(token: str):
-    """Serve the tenant onboarding form."""
+    """Serve the tenant onboarding form.
+
+    /join is the tenant-facing path, served from cozeevo.com (BRAIN 15a — a
+    customer never sees an app or API hostname). /onboard stays forever: links
+    already sent on api.getkozzy.com must keep working.
+    """
     form_path = Path("static/onboarding.html")
     if not form_path.exists():
         return HTMLResponse("<h1>Form not available yet</h1>", status_code=404)
