@@ -961,6 +961,7 @@ async def regen_pdf(token: str, request: Request):
             pass
 
         # Optionally resend to tenant
+        whatsapp_note = ""
         send = (request.query_params.get("send") or "").lower() in ("1", "true", "yes")
         if send and obs.tenant_phone:
             try:
@@ -970,10 +971,14 @@ async def regen_pdf(token: str, request: Request):
                 whatsapp_sent, _how = await send_agreement(
                     obs.tenant_phone, td.get("name", ""), pdf_path, resend=True,
                 )
+                whatsapp_note = _how
             except Exception:
                 pass
 
-        return {"status": "ok", "pdf_path": pdf_path, "whatsapp_sent": whatsapp_sent}
+        return {
+            "status": "ok", "pdf_path": pdf_path,
+            "whatsapp_sent": whatsapp_sent, "whatsapp_note": whatsapp_note,
+        }
 
 
 # ── Staff signature store / retrieve ─────────────────────────────────────────
@@ -2466,8 +2471,12 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     phone_wa, tenant_name, obs.agreement_pdf_path,
                 )
                 whatsapp_note = (
-                    f" | Booking confirmation + agreement sent ({_pdf_how})"
-                    if _pdf_ok else " | Booking confirmation sent, AGREEMENT NOT DELIVERED"
+                    " | Booking confirmation + agreement PDF sent"
+                    if _pdf_ok else
+                    " | Booking confirmation sent — AGREEMENT NOT SENT (tenant must "
+                    "message us once before WhatsApp will accept an attachment)"
+                    if _pdf_how == "no_window" else
+                    " | Booking confirmation sent, AGREEMENT NOT DELIVERED"
                 )
             except Exception as e:
                 import logging

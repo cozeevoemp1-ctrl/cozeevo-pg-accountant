@@ -467,6 +467,33 @@ data/raw/file.csv
 
 ---
 
+## 15a. Tenant Messaging Policy — NEVER expose our URLs (HARD RULE, 5 Sep 2026)
+
+**No URL of ours is ever put in a message to a tenant. No exceptions.**
+Not a Supabase storage link (signed or not), not an API endpoint, not an internal
+dashboard, not a debug or preview link. It exposes our infrastructure, it is
+forwardable to anyone, and it outlives the conversation.
+
+- **Documents go as WhatsApp ATTACHMENTS, never as download links.** Meta fetches the
+  file server-to-server at send time, so a 1-hour signed URL is enough and the tenant
+  never sees it. `src/services/tenant_delivery.py` is the only place that does this.
+- **If it cannot be attached, it is not sent.** Outside Meta's 24-hour window a
+  free-form document is rejected (131047). `send_agreement()` returns `no_window` and
+  the caller tells staff — it must never fall back to sending a link instead.
+- **The one URL a tenant legitimately receives is the onboarding form link**
+  (`/onboard/{token}`, one-time, expiring). It is currently served from
+  `api.getkozzy.com` — an API hostname a customer should not see. Open item: move it
+  to a customer-facing domain.
+- **Never send a tenant anything as a "test".** Test sends go nowhere near a real
+  number without Kiran saying so first.
+
+Storage buckets are private (`kyc-documents`, `agreements`) — verified: an
+unauthenticated read of a stored path returns 400. See also
+`rules_storage_signed_urls` in memory: every internal read is wrapped in
+`storage.sign_stored_url()`.
+
+---
+
 ## 15b. Data Sync Policy — DB / Sheet / Dashboard
 
 **Rule: DB is the single source of truth. All changes go through the bot.**

@@ -7,13 +7,24 @@ template does NOT open it. So the signed agreement, which went out as a free-for
 document one second after the confirmation template, was rejected with error 131047
 for every first-time tenant — 57 such failures in the previous 45 days.
 
-Worse, the failure is invisible at send time: Meta answers 200 and the rejection
-arrives seconds later on the status webhook. So we cannot "send and fall back on
-error" — we have to decide BEFORE sending, by checking whether the tenant has
-actually written to us in the last 24 hours.
+The failure is invisible at send time: Meta answers 200 and the rejection arrives
+seconds later on the status webhook. So this cannot be a send-and-fall-back — we
+decide BEFORE sending, by checking whether the tenant has written to us in the
+last 24 hours.
 
-Rule: free-form (documents, plain text) only inside an open window. Outside it,
-everything goes through an approved template.
+**Kiran's rule (5 Sep 2026): the agreement goes as a PDF ATTACHMENT or not at all.**
+Never a download link. No URL of ours — storage, API or otherwise — is ever put in
+a message to a tenant: it exposes our infrastructure, it is forwardable, and it
+outlives the conversation. When a document cannot be attached, we report that to
+staff instead of substituting a link.
+
+Meta fetches the attachment server-to-server at send time, so the tenant never sees
+a URL and a short 1-hour signature is all that is needed.
+
+Outside the 24-hr window a free-form document is impossible. Attaching a PDF there
+needs a template with a DOCUMENT header (e.g. `cozeevo_agreement_document`), which
+must be created and approved on the WABA first — see docs/specs/current-issues.md.
+Until that exists, `send_agreement` returns `no_window` and the caller tells staff.
 """
 
 from __future__ import annotations
@@ -25,9 +36,13 @@ from sqlalchemy import select, func
 
 logger = logging.getLogger(__name__)
 
-# Approved evergreen wrapper: {{1}}=greeting name, {{2}}=free text.
-# See memory reference_whatsapp_templates.md.
-_FREE_TEXT_TEMPLATE = "custom_broadcast_notice"
+
+def tpl_param(text: str) -> str:
+    """Meta rejects template body params containing newlines, tabs, or 4+ spaces
+    with `(#132018) Param text cannot have new-line/tab characters...` — a 400 at
+    send time, so the message simply never goes out. Flatten to one line.
+    """
+    return " ".join((text or "").split())
 
 
 def normalize_wa(phone: str) -> str:
@@ -73,46 +88,32 @@ async def send_agreement(
     *,
     resend: bool = False,
 ) -> tuple[bool, str]:
-    """Deliver the signed agreement. Returns (delivered, how).
+    """Deliver the signed agreement as a PDF attachment. Returns (delivered, how).
 
-    Inside the 24-hr window → the PDF as a real WhatsApp document attachment.
-    Outside it → the download link inside the approved free-text template, which
-    reaches a tenant who has never messaged us. Never a bare free-form send.
-
-    `pdf_stored` is the stored bucket URL; it is signed here, with an expiry that
-    matches how the tenant receives it: Meta fetches an attachment within seconds,
-    but a link the tenant taps two days later needs to still work.
+    `how` is "document" when attached, "no_window" when the tenant has not written
+    to us in 24 hours (nothing sent — a free-form document would be rejected), or
+    "missing phone or pdf". Never sends a link.
     """
     from src.services.storage import sign_stored_url
-    from src.whatsapp.webhook_handler import _send_whatsapp_document, _send_whatsapp_template
+    from src.whatsapp.webhook_handler import _send_whatsapp_document
 
     phone_wa = normalize_wa(phone)
     if not (phone_wa and pdf_stored):
         return False, "missing phone or pdf"
 
-    first_name = (tenant_name or "Resident").strip().split(" ")[0] or "Resident"
+    if not await has_open_window(phone_wa):
+        # Free-form documents are rejected outside the window (131047). Do NOT
+        # substitute a link — staff handle it instead.
+        logger.info("[delivery] agreement NOT sent to %s — no open 24-hr window", phone_wa)
+        return False, "no_window"
+
     filename = f"Cozeevo_Agreement_{(tenant_name or 'tenant').replace(' ', '_')}.pdf"
-
-    if await has_open_window(phone_wa):
-        pdf_url = await sign_stored_url(pdf_stored, expires_in=3600)
-        await _send_whatsapp_document(
-            phone_wa, pdf_url, filename,
-            caption=("Your Cozeevo Co-living rental agreement (re-sent)."
-                     if resend else "Your signed rental agreement"),
-        )
-        return True, "document"
-
-    # 14 days — the tenant may open this days after check-in.
-    pdf_url = await sign_stored_url(pdf_stored, expires_in=14 * 24 * 3600)
-    body = (
-        ("Here is your signed Cozeevo Co-living rental agreement again:\n"
-         if resend else
-         "Your signed Cozeevo Co-living rental agreement is ready:\n")
-        + pdf_url
-        + "\n\nReply to this message if you would like it sent as a PDF attachment."
+    # 1 hour: Meta fetches this server-to-server within seconds and the tenant
+    # never sees the URL. Nothing long-lived is handed out.
+    pdf_url = await sign_stored_url(pdf_stored, expires_in=3600)
+    await _send_whatsapp_document(
+        phone_wa, pdf_url, filename,
+        caption=("Your Cozeevo Co-living rental agreement (re-sent)."
+                 if resend else "Your signed rental agreement"),
     )
-    sent = await _send_whatsapp_template(phone_wa, _FREE_TEXT_TEMPLATE, [first_name, body])
-    if sent:
-        return True, "template_link"
-    logger.error("[delivery] agreement template send failed for %s", phone_wa)
-    return False, "failed"
+    return True, "document"

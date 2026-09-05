@@ -38,6 +38,7 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
 - **`security_deposit` is required on monthly bookings** — never default to agreed_rent; reject with 422
 - **First-month RS auto-recalc** — whenever security_deposit/checkin_date/agreed_rent changes, call `recalc_checkin_month_rs()` from `src/services/rent_schedule.py`; 5 call-sites must stay in sync
 - **Customer-facing vs internal fields** (spec 04) — `onboarding_sessions.special_terms` is **printed in the signed agreement PDF and shown on the tenant form**; `admin_notes` is staff-only and must never enter the public `GET /api/onboarding/{token}` response or the PDF. Terms with a number (lock-in, notice, escalation) get a typed column + its own input — never a sentence in a notes box. Grep `src/services/pdf_generator.py` before touching any session column.
+- **Never expose our URLs to a tenant** (BRAIN 15a, 5 Sep 2026) — no Supabase storage link, no API endpoint, no dashboard URL in any tenant message. Documents go as WhatsApp **attachments** via `src/services/tenant_delivery.py`; if the 24-hr window is closed it is **not sent** and staff are told — never a link fallback. No test sends to real numbers.
 - **KYC images are proof** — a failed Supabase upload must **reject** the onboarding submit (502), never warn-and-continue. Aadhaar requires **both** sides (address is on the back); ID name must match the typed name (`src/utils/name_match.py` + its identical JS mirror in `static/onboarding.html`).
 
 ## Sheet column rule (CRITICAL — no exceptions)
@@ -166,6 +167,7 @@ Kiran's Excel (offline)
 | `src/whatsapp/chat_api.py` | Webhook + pending state |
 | `src/whatsapp/media_handler.py` | WhatsApp media download + Supabase KYC upload |
 | `src/whatsapp/handlers/receipt_handler.py` | Receipt image handler — Claude Haiku vision (`_claude_read_image`) classifies tenant UPI screenshots; replaced Gemini (429-failing) |
+| `src/services/tenant_delivery.py` | **Only path for sending a tenant a document.** Checks Meta's 24-hr window (inbound message in `whatsapp_log`) BEFORE sending — outside it a free-form document is silently rejected (131047). PDFs go as **attachments only**; never a storage/API link (see BRAIN 15a). |
 | `src/services/storage.py` | Supabase Storage wrapper (kyc-documents, agreements buckets) |
 | `src/database/models.py` | ORM models |
 | `src/database/migrate_all.py` | Master migration (append only, never remove) |
