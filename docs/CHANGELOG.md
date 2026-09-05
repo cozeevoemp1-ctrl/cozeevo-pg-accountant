@@ -59,6 +59,14 @@ phantom success and their free-form fallback was dead code.
 verified in the running process. `/onboard/{token}` kept alive for links already sent.
 Rule written into BRAIN §15a: cozeevo.com is the only hostname a customer ever sees.
 
+**Hardened (`f60464d`, applied live).** Kiran asked what `/api/onboarding/` was doing on the
+customer host — it turned out that prefix is shared with STAFF endpoints (`/admin/*`,
+`/create`, `/direct-checkin`, `/approve`, `/manual-checkin`, `/staff-signature`). All
+auth-protected, but reachable from the hostname customers hold. nginx now matches only a
+UUID-shaped token plus `/extract-id` or `/submit`; everything else 404s. Verified live:
+form + its 3 calls 200; `/admin/pending`, `/admin/all`, `/create`, `/<token>/approve`,
+`/api/v2/app/*`, `/docs` and the PWA all 404.
+
 **Parked:** the agreement PDF needs a document-header WhatsApp template to reach a
 first-time tenant. Kiran parked it — do not build until he confirms. Ashfaaq (223) and
 51 others remain undelivered. No schema or data changes this session.
