@@ -1,5 +1,18 @@
 # Changelog
 
+## Session AQ — 2026-09-07 — Every new onboarding link showed "Invalid or Expired"
+
+Kiran: new links (room 608, G11) all landed on the token-error screen.
+
+**Root cause: the form never read the new URL shape.** fbd7e16 moved tenant links to
+`cozeevo.com/join/<token>` and `main.py:267` serves the form there, but
+`extractToken()` in `static/onboarding.html` still matched only `/\/onboard\/(...)/`.
+No match, no `?token=` query param, so the token was `null` and `showTokenError()` fired
+before any API call. Nothing was wrong with the sessions or with the nginx UUID regex.
+
+**Fix:** one line — the path regex now accepts both `/join/` and `/onboard/`
+(`static/onboarding.html:948`). Old `/onboard/` links keep working.
+
 ## Session AP — 2026-09-05 — Room 223 "cannot check in": diagnosis only, no code changed
 
 Kiran: "why 223 is not able to check in?" — screenshot showed

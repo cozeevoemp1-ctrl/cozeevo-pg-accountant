@@ -942,9 +942,10 @@
   });
 
   function extractToken() {
-    // Support /onboard/{token} path or ?token= query param
+    // Support /join/{token} (tenant-facing, cozeevo.com), the legacy
+    // /onboard/{token} path, or ?token= query param
     const path = window.location.pathname;
-    const m = path.match(/\/onboard\/([^/?#]+)/);
+    const m = path.match(/\/(?:join|onboard)\/([^/?#]+)/);
     if (m) return m[1];
     const params = new URLSearchParams(window.location.search);
     return params.get('token') || null;
