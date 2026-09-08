@@ -23,6 +23,15 @@ that was never made.
   section instead of vanishing.
 - `GET /api/onboarding/admin/pending` now returns `booking_amount`.
 
+**Follow-up same session — the section stayed empty.** The first pass patched
+`GET /admin/all`; the page calls `GET /admin/pending`, which hard-restricts to
+pending_tenant/pending_review/expired *and* skips any session whose tenancy is
+cancelled. Fixed there: cancelled sessions are included (60-day window, superseded
+excluded, limit 150) and exempted from the tenancy skip. Plus a supersede guard —
+a cancelled session is hidden when a newer live session exists for the same phone,
+since a booking cancelled and immediately re-made is a correction, not a
+cancellation. That takes 16 raw cancelled rows down to **7 genuine ones**.
+
 **Known gaps (not fixed):** the cancel endpoint validates a Supabase JWT but
 discards the identity, hardcoding `changed_by="admin"` — it should log
 `user.actor` like `quick_book` does. And a manual cancel never sets

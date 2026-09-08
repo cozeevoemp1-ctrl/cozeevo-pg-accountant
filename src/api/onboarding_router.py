@@ -539,19 +539,59 @@ async def list_pending(request: Request):
     _check_admin_pin(request)
     now = datetime.utcnow()
     async with get_session() as session:
+        from sqlalchemy import or_, and_
+        # Cancelled bookings stay in the list as a record — one that vanishes is
+        # indistinguishable from a booking that was never made (room 611, 6 Sep 2026).
+        # Bounded to 60 days and excluding "superseded" so the list stays workable.
+        cancelled_window = now - timedelta(days=60)
         result = await session.execute(
             select(OnboardingSession).where(
-                OnboardingSession.status.in_(["pending_tenant", "pending_review", "expired"])
-            ).order_by(OnboardingSession.created_at.desc()).limit(100)
+                or_(
+                    OnboardingSession.status.in_(["pending_tenant", "pending_review", "expired"]),
+                    and_(
+                        OnboardingSession.status == "cancelled",
+                        OnboardingSession.created_at >= cancelled_window,
+                        or_(
+                            OnboardingSession.cancellation_reason == None,
+                            OnboardingSession.cancellation_reason != "superseded",
+                        ),
+                    ),
+                )
+            ).order_by(OnboardingSession.created_at.desc()).limit(150)
         )
         sessions = result.scalars().all()
+
+        # A booking that was cancelled and immediately re-made is not a cancellation
+        # — it is a correction. Suppress a cancelled session when a newer live one
+        # exists for the same phone (the "superseded" case, which the manual cancel
+        # path never flags). Keyed on phone, since the room often changes too.
+        _cancelled_phones = {o.tenant_phone for o in sessions
+                             if o.status == "cancelled" and o.tenant_phone}
+        _newest_live = {}
+        if _cancelled_phones:
+            for _ph, _made in (await session.execute(
+                select(OnboardingSession.tenant_phone, func.max(OnboardingSession.created_at))
+                .where(
+                    OnboardingSession.tenant_phone.in_(_cancelled_phones),
+                    OnboardingSession.status != "cancelled",
+                )
+                .group_by(OnboardingSession.tenant_phone)
+            )).all():
+                _newest_live[_ph] = _made
+
         items = []
         for obs in sessions:
+            if obs.status == "cancelled":
+                _live = _newest_live.get(obs.tenant_phone or "")
+                if _live and obs.created_at and _live > obs.created_at:
+                    continue
             # Skip sessions whose linked tenancy is no longer a live booking:
             # active  = tenant already checked in (was stuck in Bookings),
             # cancelled/exited = superseded or gone. A still-pending booking has
             # either no tenancy yet or a no_show tenancy, which we keep showing.
-            if obs.tenancy_id:
+            # A cancelled session keeps its (cancelled) tenancy — that pairing is
+            # exactly what we want to show, so it is exempt from this skip.
+            if obs.tenancy_id and obs.status != "cancelled":
                 _tcy = await session.get(Tenancy, obs.tenancy_id)
                 if _tcy and _tcy.status in (
                     TenancyStatus.active, TenancyStatus.cancelled, TenancyStatus.exited
