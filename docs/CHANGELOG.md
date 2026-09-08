@@ -1,5 +1,34 @@
 # Changelog
 
+## Session AQ (cont.) — 2026-09-08 — Cancelled bookings stay on the Bookings page
+
+Traced "611 should have 2 people, shows 1": nothing was lost. Vinayak Pragovola's
+booking (611 bed 2, ₹14,000 advance paid 1-Sep) was cancelled by hand on
+6-Sep 19:31 IST from the PWA, which flipped tenancy 1345 `no_show → cancelled`,
+voided its pending RS rows and freed the bed. Nginx shows the same browser cancelled
+Balakrishna's G13 booking 19s later and re-created it at 14:34 UTC as Lokesh — so
+the cancels were Lokesh's, though the endpoint records only `changed_by="admin"`.
+
+**The page hid the evidence.** `web/app/onboarding/bookings/page.tsx` built only
+ready/awaiting/expired buckets and dropped every other status, and `onCancelled`
+spliced the row out of local state. A cancelled booking looked identical to one
+that was never made.
+
+- Collapsed "N cancelled" section at the bottom + a Cancelled filter chip that
+  auto-expands it. Read-only card (`CancelledRow`): name struck through, room,
+  phone, check-in date, booked date, and **advance paid in warn colour** so
+  orphaned money is visible — 18 cancelled sessions surface, several holding
+  live advances.
+- `onCancelled` now calls `load()`, so a just-cancelled booking moves into the
+  section instead of vanishing.
+- `GET /api/onboarding/admin/pending` now returns `booking_amount`.
+
+**Known gaps (not fixed):** the cancel endpoint validates a Supabase JWT but
+discards the identity, hardcoding `changed_by="admin"` — it should log
+`user.actor` like `quick_book` does. And a manual cancel never sets
+`cancellation_reason`, so a booking cancelled-and-re-made (Mohit Goyal G11)
+is indistinguishable from a real cancellation.
+
 ## Session AQ — 2026-09-07 — Every new onboarding link showed "Invalid or Expired"
 
 Kiran: new links (room 608, G11) all landed on the token-error screen.
