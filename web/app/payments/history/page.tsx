@@ -153,6 +153,14 @@ export default function PaymentHistoryPage() {
   }
 
   const displayList = selectedTenant ? tenantPayments : allPayments
+  // History is grouped by PERSON (every tenancy sharing the phone), so it can span
+  // several rooms — a room transfer or a re-checkin. Label the card with all of
+  // them: showing only the picked tenancy's room made one person's payments look
+  // like they belonged to a different tenant in that room (Dhruv 309 vs 414).
+  const historyRooms = Array.from(
+    new Set(tenantPayments.map(p => p.room_number).filter(Boolean) as string[])
+  )
+  const multiRoom = historyRooms.length > 1
   const isLoading = selectedTenant ? loadingTenant : loadingAll
 
   return (
@@ -176,7 +184,15 @@ export default function PaymentHistoryPage() {
           <div className="flex items-center gap-2 bg-surface rounded-card border border-border px-4 py-3">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-extrabold text-ink">{selectedTenant.name}</p>
-              <p className="text-[11px] text-ink-muted">Room {selectedTenant.room_number} · {tenantPayments.length} payments</p>
+              <p className="text-[11px] text-ink-muted">
+                Room {historyRooms.length ? historyRooms.join(", ") : selectedTenant.room_number}
+                {" · "}{tenantPayments.length} payments
+              </p>
+              {multiRoom && (
+                <p className="text-[11px] text-ink-muted">
+                  Same person across {historyRooms.length} rooms — full history shown
+                </p>
+              )}
             </div>
             <button
               onClick={clearTenant}
@@ -212,7 +228,7 @@ export default function PaymentHistoryPage() {
               <PaymentRow
                 key={p.payment_id}
                 payment={p}
-                showTenant={!selectedTenant}
+                showTenant={!selectedTenant || multiRoom}
                 isJustSaved={p.payment_id === savedId}
                 onEdit={() => openEdit(p)}
               />
