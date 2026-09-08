@@ -453,6 +453,7 @@ async def list_all_sessions(request: Request, status: str = "", date_from: str =
                 "approved_at": obs.approved_at.isoformat() if obs.approved_at else "",
                 "approved_by_phone": obs.approved_by_phone or "",
                 "agreed_rent": float(obs.agreed_rent or 0),
+                "booking_amount": float(obs.booking_amount or 0),
                 "checkin_status": checkin_status,
                 "expires_at": obs.expires_at.isoformat() if obs.expires_at else "",
                 "expired_ago": expired_ago,

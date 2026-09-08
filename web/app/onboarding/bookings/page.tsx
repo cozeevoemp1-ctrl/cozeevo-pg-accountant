@@ -72,9 +72,10 @@ export default function BookingsPage() {
   const [checkingIn, setCheckingIn] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [filter, setFilter] = useState(searchParams.get("q") ?? "")
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending_review" | "pending_tenant" | "expired">("all")
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending_review" | "pending_tenant" | "expired" | "cancelled">("all")
   const [stayFilter, setStayFilter]     = useState<"all" | "monthly" | "daily">("all")
   const [monthFilter, setMonthFilter]   = useState<string>("all") // "all" or "YYYY-MM"
+  const [showCancelled, setShowCancelled] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,7 +86,7 @@ export default function BookingsPage() {
       // Show all bookings: pending_tenant (awaiting form), pending_review (form filled), and expired
       const all = (d.sessions as Booking[])
       // Sort: check-in today first, then pending_review → pending_tenant → expired, then by date
-      const statusOrder: Record<string, number> = { pending_review: 0, pending_tenant: 1, expired: 2 }
+      const statusOrder: Record<string, number> = { pending_review: 0, pending_tenant: 1, expired: 2, cancelled: 3 }
       all.sort((a, b) => {
         const aToday = isToday(a.checkin_date) ? 0 : 1
         const bToday = isToday(b.checkin_date) ? 0 : 1
@@ -154,6 +155,9 @@ export default function BookingsPage() {
   const ready    = bookings.filter((b) => b.status === "pending_review" && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
   const awaiting = bookings.filter((b) => b.status === "pending_tenant" && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
   const expired  = bookings.filter((b) => b.status === "expired"        && match(b) && statusMatch(b) && stayMatch(b) && monthMatch(b))
+  // Cancelled stays visible as a record — a booking that vanishes on cancel is
+  // indistinguishable from one that was never made (room 611, 6 Sep 2026).
+  const cancelled = bookings.filter((b) => b.status === "cancelled"     && match(b) && statusMatch(b) && stayMatch(b))
 
   return (
     <main className="min-h-screen bg-bg overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -186,6 +190,7 @@ export default function BookingsPage() {
                   { label: "Ready", count: bookings.filter(b => b.status === "pending_review").length, key: "pending_review" as const },
                   { label: "Awaiting form", count: bookings.filter(b => b.status === "pending_tenant").length, key: "pending_tenant" as const },
                   { label: "Expired", count: bookings.filter(b => b.status === "expired").length, key: "expired" as const },
+                  { label: "Cancelled", count: bookings.filter(b => b.status === "cancelled").length, key: "cancelled" as const },
                 ] as const).filter(s => s.count > 0 || s.key === "all").map(s => (
                   <button key={s.key} onClick={() => setStatusFilter(s.key)}
                     className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${statusFilter === s.key ? "bg-brand-pink text-white" : "bg-bg border border-[#E5E1DC] text-ink-muted"}`}>
@@ -248,7 +253,7 @@ export default function BookingsPage() {
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
                     onReload={load}
-                    onCancelled={() => setBookings(bk => bk.filter(x => x.token !== b.token))}
+                    onCancelled={load}
                   />
                 ))}
               </>
@@ -267,7 +272,7 @@ export default function BookingsPage() {
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
                     onReload={load}
-                    onCancelled={() => setBookings(bk => bk.filter(x => x.token !== b.token))}
+                    onCancelled={load}
                   />
                 ))}
               </>
@@ -286,8 +291,29 @@ export default function BookingsPage() {
                     checkingIn={checkingIn}
                     onCheckin={saveAndCheckin}
                     onReload={load}
-                    onCancelled={() => setBookings(bk => bk.filter(x => x.token !== b.token))}
+                    onCancelled={load}
                   />
+                ))}
+              </>
+            )}
+
+            {/* Cancelled — kept visible so a cancelled booking is still a record.
+                Collapsed by default; auto-opens when the Cancelled chip is picked. */}
+            {cancelled.length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowCancelled(v => !v)}
+                  className="mt-2 flex w-full items-center justify-between rounded-tile border border-border-strong bg-surface px-4 py-2.5 text-left"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    {cancelled.length} cancelled
+                  </span>
+                  <span className="text-xs font-bold text-ink-muted">
+                    {(showCancelled || statusFilter === "cancelled") ? "Hide" : "Show"}
+                  </span>
+                </button>
+                {(showCancelled || statusFilter === "cancelled") && cancelled.map((b) => (
+                  <CancelledRow key={b.token} b={b} />
                 ))}
               </>
             )}
@@ -1225,6 +1251,38 @@ function BookingCard({ b, checkingIn, onCheckin, onReload, onCancelled }: {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Read-only record of a cancelled booking. No actions: restoring one has to
+    re-check the bed and un-void the rent schedule, so it is a bot/edit job. */
+function CancelledRow({ b }: { b: Booking }) {
+  return (
+    <div className="rounded-tile border border-border bg-surface px-4 py-3 opacity-75">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-ink line-through decoration-ink-muted/50">
+            {b.tenant_name || "(no name)"}
+          </p>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            Room {b.room || "—"}
+            {b.tenant_phone ? ` · ${b.tenant_phone}` : ""}
+          </p>
+        </div>
+        <span className="flex-shrink-0 rounded-full bg-bg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-muted">
+          Cancelled
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
+        {b.checkin_date && <span>Check-in was {fmtDate(b.checkin_date)}</span>}
+        {b.created_at && <span>Booked {fmtDate(b.created_at.slice(0, 10))}</span>}
+        {!!b.booking_amount && (
+          <span className="font-semibold text-status-warn">
+            {rupee(b.booking_amount)} advance paid
+          </span>
+        )}
+      </div>
     </div>
   )
 }
