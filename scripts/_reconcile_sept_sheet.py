@@ -24,6 +24,7 @@ import gspread
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -32,7 +33,6 @@ load_dotenv()
 
 from _reconcile_aug_cash import money, norm_name, norm_room, room_key, similar  # noqa: E402
 from _reconcile_aug_upi import phone10  # noqa: E402
-from src.database.db_manager import get_session, init_engine  # noqa: E402
 
 SOURCE_SHEET_ID = os.getenv("SOURCE_SHEET_ID", "1Vr_fSIOuuKBK4MWF-FVqgAIUPbqun3POszaXYfj-Ea0")
 CREDS = "credentials/gsheets_service_account.json"
@@ -125,8 +125,14 @@ def read_daywise(sh):
 
 
 async def load_db():
-    init_engine(os.environ["DATABASE_URL"])
-    async with get_session() as s:
+    # Transaction-mode pooler (6543) — session mode 5432 is pinned full by the
+    # live app. pgbouncer there cannot hold prepared statements, so the asyncpg
+    # statement cache must be off or every second run dies on
+    # DuplicatePreparedStatementError.
+    url = os.environ["DATABASE_URL"].replace(":5432/", ":6543/")
+    engine = create_async_engine(url, connect_args={
+        "statement_cache_size": 0, "prepared_statement_cache_size": 0})
+    async with engine.connect() as s:
         tenancies = (await s.execute(text("""
             SELECT tc.id, r.room_number, t.name, t.phone,
                    tc.status::text AS status, tc.stay_type::text AS stay_type,
@@ -171,6 +177,7 @@ async def load_db():
             FROM daywise_stays
             WHERE checkin_date BETWEEN :d1 AND :d2
         """), {"d1": SEP_FROM, "d2": SEP_TO})).mappings().all()
+    await engine.dispose()
     return tenancies, pays, pre_sep, day
 
 
@@ -283,6 +290,39 @@ def match(sheet_row, people, used, by_phone=None):
     return None
 
 
+def match_all(sheet_rows, people, by_phone):
+    """Match every sheet row in passes, strongest evidence first.
+
+    Row-by-row matching lets a weak name-only hit on an early row consume the
+    person that a later row identifies by exact phone — 'Kishore Babu' is then
+    reported as missing from the app while his money sits there under 'Kishore
+    Babu Natarajan'. Phone is exact, so every phone match is claimed before any
+    name is considered.
+    """
+    used: set[int] = set()
+    matched: list[tuple[dict, Person]] = []
+    pending = list(sheet_rows)
+
+    def sweep(pick):
+        nonlocal pending
+        rest = []
+        for r in pending:
+            p = pick(r)
+            if p is None or id(p) in used:
+                rest.append(r)
+                continue
+            used.add(id(p))
+            matched.append((r, p))
+        pending = rest
+
+    sweep(lambda r: by_phone.get(r["phone"]) if r["phone"] else None)
+    sweep(lambda r: next((p for p in people if id(p) not in used and r["room"] in p.rooms
+                          and any(similar(n, r["name"]) for n in p.names)), None))
+    sweep(lambda r: next((p for p in people if id(p) not in used
+                          and any(similar(n, r["name"]) for n in p.names)), None))
+    return matched, pending, used
+
+
 
 
 async def main():
@@ -303,15 +343,7 @@ async def main():
 
     people, by_phone = build_people(tenancies, paid_by_tenancy, pre_by_tenancy)
 
-    used: set[int] = set()
-    matched, unmatched_sheet = [], []
-    for r in lt:
-        p = match(r, people, used, by_phone)
-        if p is None:
-            unmatched_sheet.append(r)
-            continue
-        used.add(id(p))
-        matched.append((r, p))
+    matched, unmatched_sheet, used = match_all(lt, people, by_phone)
     unmatched_db = [p for p in people if id(p) not in used]
 
     print("=" * 100)
