@@ -143,12 +143,24 @@ async def _tenancy_ids_for_person(session, tenant_id: int) -> list[int]:
             select(Tenancy.id).where(Tenancy.tenant_id == tenant_id)
         )).scalars().all())
 
+    # Same phone is NOT proof of same person — couples, siblings and parent/child
+    # legitimately share a number (4 such pairs live as of Sep 2026), and merging
+    # them showed one tenant the other's payments. Gate the phone group on the
+    # name matching too, using the project's one comparator.
+    from src.utils.name_match import names_match
+
+    owner_name = await session.scalar(select(Tenant.name).where(Tenant.id == tenant_id))
     norm = func.right(func.regexp_replace(Tenant.phone, r"[^0-9]", "", "g"), 10)
-    return list((await session.execute(
-        select(Tenancy.id)
+    rows = (await session.execute(
+        select(Tenancy.id, Tenancy.tenant_id, Tenant.name)
         .join(Tenant, Tenant.id == Tenancy.tenant_id)
         .where(norm == digits[-10:])
-    )).scalars().all())
+    )).all()
+    return [
+        tid for tid, owner, name in rows
+        # the person's own tenancies always count, whatever the name says
+        if owner == tenant_id or names_match(owner_name or "", name or "")
+    ]
 
 
 @router.get("/payments", response_model=List[PaymentListItem])

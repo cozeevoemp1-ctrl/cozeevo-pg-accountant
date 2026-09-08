@@ -1,5 +1,34 @@
 # Changelog
 
+## Session AQ (cont.) — 2026-09-08 — "two Dhruvs, same history": payment identity
+
+Kiran: two tenants named Dhruv in rooms 309 and 414 showed the *same* 11 payments.
+
+**Not a data bug — both cards were the same man.** Payment history is grouped by
+PERSON: `_tenancy_ids_for_person` expands the passed `tenancy_id` to every tenancy
+sharing the phone (the fix that stopped Room 415's Aug rent looking unpaid). Dhruv
+(tenant 810, …9354) holds tenancy 1096 (309, active) **and** 807 (414, exited), so
+either one returns his 11 payments. Dhruv Singh (tenant 984, …3119) is a different
+man with 8 payments of his own. Verified every write landed on the right tenancy —
+all Apr-onward rent on 1096; only the two March rows sit on the exited 414 tenancy.
+
+Two fixes:
+
+1. **Display** (`web/app/payments/history/page.tsx`) — the header printed the
+   *selected tenancy's* room over a person-wide list, and `showTenant` hid the
+   per-row room exactly when a tenant was selected, so nothing contradicted it.
+   The header now lists every room the history covers, says so when there is more
+   than one, and falls back to per-row tenant+room.
+
+2. **Grouping** (`src/api/v2/payments.py`) — phone alone is not identity.
+   `check_tenant_integrity.py` found **4 live pairs of different people sharing a
+   number**, each seeing the other's payments. The phone group is now gated on
+   `names_match()` too (own tenancies always included). Verified: separates all 4
+   shared pairs, keeps every SPLIT pair merged, Dhruv keeps his cross-room 11.
+
+Integrity check also reports 10 SPLIT pairs (one person, two tenant rows — the
+phone group re-joins these correctly) and 8 orphan tenant rows. Not cleaned up.
+
 ## Session AQ (cont.) — 2026-09-08 — Cancelled bookings stay on the Bookings page
 
 Traced "611 should have 2 people, shows 1": nothing was lost. Vinayak Pragovola's
