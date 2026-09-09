@@ -23,16 +23,21 @@ const TYPE_LABEL: Record<string, string> = {
   rent: "rent", deposit: "deposit", booking: "advance", maintenance: "maintenance",
 };
 
-/** One shared column track — the header row and every data row use this exact string,
- *  so the vertical rules can never drift apart. */
+/** One shared column track. The header row and every data row use this exact string,
+ *  so the vertical rules can never drift apart.
+ *  NOTE: no `items-center` — that shrinks each cell to its content height and the
+ *  border-l segments stop touching, which reads as a dotted line. Cells must stretch. */
 const COLS = "grid grid-cols-[1fr_76px_76px_64px]";
 
-/** Cash or UPI collected across a day's rows. */
-function dayTotal(list: MonthPayment[], mode: "cash" | "upi"): number {
+/** Vertical rule + stretch. Content is centred inside the cell, not by the grid. */
+const CELL = "border-l border-border-strong flex flex-col justify-center";
+
+/** Cash or UPI collected across a set of rows. */
+function total(list: MonthPayment[], mode: "cash" | "upi"): number {
   return list.reduce((s, r) => s + (r.mode === mode ? r.amount : 0), 0);
 }
 
-/** Every elapsed day of `month`, newest first. Current month stops at today. */
+/** Every elapsed day of `month`, newest first. The current month stops at today. */
 function daysOf(month: string): string[] {
   const [y, m] = month.split("-").map(Number);
   const now = new Date();
@@ -42,13 +47,13 @@ function daysOf(month: string): string[] {
     `${month}-${String(last - i).padStart(2, "0")}`);
 }
 
-function dayLabel(iso: string): string {
-  return iso === todayISOLocal() ? "Today" : fmtDateShort(iso);
-}
-
 function todayISOLocal(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function dayLabel(iso: string): string {
+  return iso === todayISOLocal() ? "Today" : fmtDateShort(iso);
 }
 
 export function PaymentsTable() {
@@ -59,7 +64,7 @@ export function PaymentsTable() {
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [q, setQ] = useState("");
-  const [day, setDay] = useState("");   // "" = whole month
+  const [day, setDay] = useState("");   // "" = whole month, no totals shown
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -72,16 +77,10 @@ export function PaymentsTable() {
 
   /** Same tenant + amount + purpose on the same day — a likely double entry. */
   const dupIds = useMemo(() => {
-    const count = new Map<string, number>();
-    (rows ?? []).forEach(r => {
-      const k = `${r.tenant_name}|${r.amount}|${r.for_type}|${r.date}`;
-      count.set(k, (count.get(k) ?? 0) + 1);
-    });
-    return new Set(
-      (rows ?? [])
-        .filter(r => (count.get(`${r.tenant_name}|${r.amount}|${r.for_type}|${r.date}`) ?? 0) > 1)
-        .map(r => r.id),
-    );
+    const seen = new Map<string, number>();
+    const key = (r: MonthPayment) => `${r.tenant_name}|${r.amount}|${r.for_type}|${r.date}`;
+    (rows ?? []).forEach(r => seen.set(key(r), (seen.get(key(r)) ?? 0) + 1));
+    return new Set((rows ?? []).filter(r => (seen.get(key(r)) ?? 0) > 1).map(r => r.id));
   }, [rows]);
 
   const shown = useMemo(() => {
@@ -146,17 +145,57 @@ export function PaymentsTable() {
 
       <div className="flex items-center gap-2 mt-3">
         <div className="flex-1">
-          <DatePickerInput value={day} onChange={setDay} />
+          {/* key resets the picker's own internal state when the filter is cleared,
+              otherwise it keeps showing the old date after Clear. */}
+          <DatePickerInput key={day || "none"} value={day} onChange={setDay} />
         </div>
         {day && (
           <button
             onClick={() => setDay("")}
-            className="px-3 py-2 rounded-xl border border-border-strong bg-surface text-xs font-medium text-ink-muted"
+            aria-label="Clear date filter"
+            className="mt-1 h-[46px] px-4 rounded-lg border border-border-strong bg-surface
+                       text-xs font-semibold text-ink-muted whitespace-nowrap
+                       focus:outline-none focus:ring-2 focus:ring-brand-pink"
           >
-            Clear
+            Clear ✕
           </button>
         )}
       </div>
+
+      {/* Totals — only while a day is picked. No filter, no totals. */}
+      {day && (
+        <div className="mt-3 bg-surface border border-border-strong rounded-[10px] overflow-hidden">
+          <div className={COLS}>
+            <div className="pl-3 pr-2 py-2.5 flex flex-col justify-center">
+              <p className="text-[11px] uppercase tracking-[0.09em] font-bold text-ink-muted">
+                {dayLabel(day)} collected
+              </p>
+              <p className="text-[11px] text-ink-muted">
+                {shown.length} {shown.length === 1 ? "payment" : "payments"}
+                {filter !== "all" && ` · ${FILTERS.find(f => f.key === filter)?.label.toLowerCase()}`}
+              </p>
+            </div>
+            <div className={`${CELL} px-2 py-2.5 text-right`}>
+              <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-method-cash">Cash</span>
+              <span className="text-[15px] font-bold tabular-nums text-method-cash">
+                {total(shown, "cash") ? indianNumber(total(shown, "cash")) : "·"}
+              </span>
+            </div>
+            <div className={`${CELL} px-2 py-2.5 text-right`}>
+              <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-method-upi">UPI</span>
+              <span className="text-[15px] font-bold tabular-nums text-method-upi">
+                {total(shown, "upi") ? indianNumber(total(shown, "upi")) : "·"}
+              </span>
+            </div>
+            <div className={`${CELL} px-2 pr-3 py-2.5 text-right`}>
+              <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-ink-muted">Total</span>
+              <span className="text-[13px] font-bold tabular-nums text-ink">
+                {indianNumber(total(shown, "cash") + total(shown, "upi"))}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="mt-4 px-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-ink-muted">
         Payments · {day ? fmtDateShort(day) : monthLabel(month)}
@@ -171,17 +210,17 @@ export function PaymentsTable() {
             return (
               <div key={d}>
                 {/* Header row repeats per day and shares COLS, so labels always sit over their columns */}
-                <div className={`${COLS} items-end bg-bg border-t border-b border-border-strong first:border-t-0`}>
-                  <span className="pl-3 pr-2 pt-2 pb-1.5 text-[10px] uppercase tracking-[0.09em] font-bold text-ink-muted">
+                <div className={`${COLS} bg-bg border-t border-b border-border-strong`}>
+                  <span className="pl-3 pr-2 pt-2 pb-1.5 text-[10px] uppercase tracking-[0.09em] font-bold text-ink-muted self-end">
                     {dayLabel(d)}
                   </span>
-                  <span className="border-l border-border-strong px-2 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-method-cash">
+                  <span className={`${CELL} px-2 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-method-cash justify-end`}>
                     Cash
                   </span>
-                  <span className="border-l border-border-strong px-2 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-method-upi">
+                  <span className={`${CELL} px-2 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-method-upi justify-end`}>
                     UPI
                   </span>
-                  <span className="border-l border-border-strong px-2 pr-3 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-ink-muted">
+                  <span className={`${CELL} px-2 pr-3 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-ink-muted justify-end`}>
                     Date
                   </span>
                 </div>
@@ -190,16 +229,15 @@ export function PaymentsTable() {
                   <p className="px-3 py-2.5 text-[11.5px] text-ink-muted">
                     Nothing collected on this day.
                   </p>
-                ) : <>{list.map(r => {
+                ) : list.map(r => {
                   const dup = dupIds.has(r.id);
                   const backdated = r.logged_at.slice(0, 10) !== r.date;
                   return (
                     <div
                       key={r.id}
-                      className={`${COLS} items-center border-b border-border-strong last:border-b-0
-                                  ${dup ? "bg-[#FDF3E6]" : ""}`}
+                      className={`${COLS} border-b border-border-strong last:border-b-0 ${dup ? "bg-tile-orange" : ""}`}
                     >
-                      <div className="min-w-0 pl-3 pr-2 py-2">
+                      <div className="min-w-0 pl-3 pr-2 py-2 flex flex-col justify-center">
                         <p className="text-[13.5px] font-semibold text-ink truncate">
                           {r.tenant_name}
                           {dup && (
@@ -217,37 +255,23 @@ export function PaymentsTable() {
                           )}
                         </p>
                       </div>
-                      <div className={`border-l border-border-strong px-2 py-2 text-right text-[13.5px] font-semibold tabular-nums ${
-                        r.mode === "cash" ? "text-method-cash" : "text-border-strong font-normal"
+                      <div className={`${CELL} px-2 py-2 text-right text-[13.5px] tabular-nums ${
+                        r.mode === "cash" ? "text-method-cash font-semibold" : "text-border-strong"
                       }`}>
                         {r.mode === "cash" ? indianNumber(r.amount) : "·"}
                       </div>
-                      <div className={`border-l border-border-strong px-2 py-2 text-right text-[13.5px] font-semibold tabular-nums ${
-                        r.mode === "upi" ? "text-method-upi" : "text-border-strong font-normal"
+                      <div className={`${CELL} px-2 py-2 text-right text-[13.5px] tabular-nums ${
+                        r.mode === "upi" ? "text-method-upi font-semibold" : "text-border-strong"
                       }`}>
                         {r.mode === "upi" ? indianNumber(r.amount) : "·"}
                       </div>
-                      <div className="border-l border-border-strong px-2 pr-3 py-2 text-right text-[10.5px] leading-tight text-ink-muted tabular-nums">
-                        <span className="block font-semibold text-ink">{fmtDateShort(r.date)}</span>
-                        {fmtTime(r.logged_at)}
+                      <div className={`${CELL} px-2 pr-3 py-2 text-right text-[10.5px] leading-tight text-ink-muted tabular-nums`}>
+                        <span className="font-semibold text-ink">{fmtDateShort(r.date)}</span>
+                        <span>{fmtTime(r.logged_at)}</span>
                       </div>
                     </div>
                   );
                 })}
-                  {/* Day subtotal — what should be in the cash box at close of day. */}
-                  <div className={`${COLS} items-center border-b border-border-strong last:border-b-0 bg-bg`}>
-                    <span className="pl-3 pr-2 py-2 text-[11px] font-semibold text-ink-muted">
-                      {dayLabel(d)} total · {list.length} {list.length === 1 ? "payment" : "payments"}
-                    </span>
-                    <span className="border-l border-border-strong px-2 py-2 text-right text-[13px] font-bold tabular-nums text-method-cash">
-                      {dayTotal(list, "cash") ? indianNumber(dayTotal(list, "cash")) : "·"}
-                    </span>
-                    <span className="border-l border-border-strong px-2 py-2 text-right text-[13px] font-bold tabular-nums text-method-upi">
-                      {dayTotal(list, "upi") ? indianNumber(dayTotal(list, "upi")) : "·"}
-                    </span>
-                    <span className="border-l border-border-strong px-2 pr-3 py-2" />
-                  </div>
-                </>}
               </div>
             );
           })}
