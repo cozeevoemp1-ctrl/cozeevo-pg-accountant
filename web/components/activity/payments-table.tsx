@@ -162,9 +162,23 @@ export function PaymentsTable() {
         )}
       </div>
 
-      <p className="mt-4 px-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-ink-muted">
-        Payments · {day ? fmtDateShort(day) : monthLabel(month)}
-      </p>
+      {/* Month label and export share a row, so the download is reachable without
+          scrolling past the whole month. */}
+      <div className="mt-4 px-1 flex items-center justify-between gap-2">
+        <span className="px-2 text-[10px] uppercase tracking-[0.1em] font-semibold text-ink-muted">
+          Payments · {day ? fmtDateShort(day) : monthLabel(month)}
+        </span>
+        <button
+          onClick={onDownload}
+          disabled={downloading}
+          aria-label={`Download ${monthLabel(month)} payments as Excel`}
+          className="px-3 py-1.5 rounded-full border border-border-strong bg-surface
+                     text-[11px] font-semibold text-ink whitespace-nowrap disabled:opacity-60
+                     focus:outline-none focus:ring-2 focus:ring-brand-pink"
+        >
+          {downloading ? "Preparing…" : "↓ Excel"}
+        </button>
+      </div>
 
       {shown.length === 0 ? (
         <div className="mt-2"><EmptyState>No payments match</EmptyState></div>
@@ -262,8 +276,9 @@ export function PaymentsTable() {
                    text-sm font-semibold text-ink disabled:opacity-60
                    focus:outline-none focus:ring-2 focus:ring-brand-pink"
       >
-        {/* Exports the full month, not the filtered view — the .xlsx carries an
-            autofilter so you slice it in Excel. */}
+        {/* Same action as the ↓ Excel button at the top — kept here too so it's at hand
+            after scrolling the month. Exports the full month, not the filtered view;
+            the .xlsx carries an autofilter so you slice it in Excel. */}
         {downloading ? "Preparing…" : `Download Excel · ${monthLabel(month)}`}
       </button>
     </div>
