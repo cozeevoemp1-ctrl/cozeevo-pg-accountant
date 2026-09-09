@@ -1,5 +1,51 @@
 # Changelog
 
+## Session AR (cont.) — 2026-09-09 — Two of the five missing UPI receipts entered
+
+Follow-up to the Sept UPI reconciliation above. Kiran asked why 514 Agnihotri's
+Rs.2,000 cancelled booking was missing from the UPI total, then handed over two more.
+
+**514 Agnihotri — no bug.** Payment `22236` (Rs.2,000, upi, `for_type=booking`,
+1 Sep, not void) was already there and already counted. `cash_flow_by_method()`
+([reporting.py:51](../src/services/reporting.py)) filters only on `is_void`,
+`payment_mode NOT NULL` and date — a `cancelled` tenancy is never excluded, and
+neither is the `booking_advances` line. Tenancy is `1343`, room **514** (not 541).
+
+**Entered (`scripts/_add_settlement_payments_sept.py`):**
+
+| Who | Tenancy | Amount | Mode | period | Payment id |
+|---|---|---|---|---|---|
+| G19 Dhamodharan | `793` (exited 31 Aug) | Rs.609 | UPI | Sep 2026 | `22544` |
+| 512 Nirmala Janakiraman | `1278` (exited 2 Sep) | Rs.1,600 | UPI | Sep 2026 | `22545` |
+
+Both appended to the existing tenancy — no new tenancy rows — through
+`log_payment()` so each carries a dedup hash and an `audit_log` row with
+`field = payment.log` (ids `3061`/`3062`, feed-visible).
+
+**Gotcha found: `log_payment()` fabricates a due on an exited tenancy.** When the
+period has no `RentSchedule` row it auto-creates one with
+`rent_due = first_month_rent_due(...)` ([payments.py:199](../src/services/payments.py)).
+For Dhamodharan that invented a **Rs.22,500 September due** for a man who left
+31 Aug. The script deletes the row when — and only when — it did not exist before
+the call. Any future payment logged against an exited tenancy needs the same guard.
+
+**Still open — Rs.66,000 collected but not in the app:** 613 Sanjoy Roy Choudary
+25,000 · G15 Raghubir Singh 25,000 · 204 Anshit 16,000. (Was Rs.68,209; the
+Nirmala and Dhamodharan lines are now closed.)
+
+**Sept totals after this work:** cash Rs.26,29,600 / UPI Rs.15,45,506. Reconciles
+exactly with the Hasini void logged above: 15,56,297 - 13,000 + 2,209 = 15,45,506.
+
+**Not done:** Google Sheet mirror. Both tenants are exited so their rows may be
+absent from the Sept monthly tab, and `sync_sheet_from_db.py --write` rewrites the
+whole tab — deferred rather than run against a Sheet while Lokesh and Prabhakaran
+were actively logging payments.
+
+**Flagged, not fixed:** `audit_log.created_at` disagrees between app-server and
+script writes by ~1h20m (id `3060` reads 17:32 UTC, later ids `3061`/`3062` read
+16:10 UTC). Any feed ordered by `created_at` rather than `id` will scramble.
+
+
 ## Session AR — 2026-09-09 — Activity: month payments table with Cash/UPI columns
 
 **Reconciliation first.** Kiran's 312-row UPI sheet totalled Rs.15,86,506 against a DB
