@@ -41,6 +41,33 @@ tokens in `web/tailwind.config.ts`.
 cash Rs.26,29,600, UPI Rs.15,56,297 across 303 rows. `npm run build`, `tsc --noEmit`
 and `scripts/check_ui_consistency.py` all pass.
 
+**Iterations after first ship** (645415e, 4a97905, 8053498):
+- Day totals sit in the day header row, at the TOP of that day's rows, carrying both
+  the column labels and the figures. The bottom subtotal row and the separate
+  filtered-totals card were both removed as duplicates.
+- Column rules read as dotted because the grid had `items-center`, which shrinks each
+  cell to its content height so the `border-l` segments stop touching. Cells now
+  stretch (`CELL`) and centre their own content — one unbroken vertical line.
+- Date filter + `Clear ✕`; a `key` on `DatePickerInput` resets its internal state,
+  which otherwise kept displaying the cleared date.
+- Compact `↓ Excel` button on the month-label row, so the export is reachable without
+  scrolling the month; the full-width button at the bottom stays.
+- **A client-side exception after the first deploy was a stale service worker**, not a
+  code fault: the VPS build was clean, the server logged nothing, and a fresh browser
+  loaded with 0 console errors. Chunk hashes change every deploy — hard-refresh after one.
+
+**Fixed a real duplicate: Hasini Anugandula, room 620 (payment 22524, Rs.13,000).**
+Lokesh pre-booked her 16:36 on 9 Sep with a mistyped phone (…823), the booking was
+cancelled 16:38, and he re-booked 16:40 with the right number (…826) — but the advance
+on the cancelled tenancy was never voided, so money paid once was counted twice. Voided
+(`is_void=true` + audit_log 3060, `field="is_void"` so it shows in the Feed), never
+deleted. Her live total is Rs.22,100 = 13,000 advance + 9,100 rent, matching the source
+sheet. September UPI 15,56,297 -> **15,43,297**; 9 Sep UPI 2,07,909 -> 1,94,909.
+Recipe + guards: `scripts/_void_hasini_620_duplicate.py`.
+
+**Root cause NOT fixed:** cancelling a booking frees the bed and voids the rent
+schedule but leaves the advance live. 7 more cancelled bookings still hold Rs.29,500.
+
 
 ## Session AQ (cont.) — 2026-09-08 — "two Dhruvs, same history": payment identity
 

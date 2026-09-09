@@ -222,6 +222,9 @@ Kiran's Excel (offline)
 | `scripts/_send_laundry_notice.py` | One-off manual broadcast: `laundry_rules_notice` template to all active tenants + operator CC (same reliable `send_template()` path for both — see [[rules_whatsapp_cc]] for why CC must never use free-form text). Dry-run by default, `--send` for live. |
 | `scripts/_send_bike_parking_notice.py` | **Canonical broadcast recipe** — operators FIRST (TIER_250 cap: 250 unique conversations/24h silently drops whoever sits past position 250), wamid collection, delivery report at end. Copy this for future notices. |
 | `src/whatsapp/broadcast_report.py` | Broadcast delivery report — `summarize_statuses()` + `send_delivery_report()`: joins a broadcast's wamids against `whatsapp_status_log` and WhatsApps a delivered/read/FAILED summary to the 4 operators (OPERATORS list lives here). Meta 200 ≠ delivery; this is the truth. |
+| `src/api/v2/kpi.py` → `GET /activity/payments` | Month payments ledger — every non-void payment collected in a calendar month. **LEFT JOINs rooms** (the `/activity/feed` query inner-joins and silently drops a payment on a roomless tenancy); scoped by `payment_date` so it always equals `cash_flow_by_method`. `_month_payment_rows()` is the single source for the table and the export |
+| `src/reports/month_payments_xlsx.py` | `.xlsx` for the above — HEADERS-keyed dict rows (never numeric indices), `INR_NUMBER_FORMAT`, frozen header, autofilter, `=SUM()` totals |
+| `web/components/activity/payments-table.tsx` | PWA Activity → Payments: current month (auto-rolls), every elapsed day, `Tenant \| Cash \| UPI \| Date`, per-day totals in the day header, date filter, duplicate CHECK tag, Excel export |
 | `src/rules/pnl_classify.py` | Bank-transaction classifier rules (category/sub_category by keyword, first match wins) — shared by CSV import and the WhatsApp finance handler. Add new vendor/keyword rules here, never inline elsewhere. |
 
 ## DO NOT touch
