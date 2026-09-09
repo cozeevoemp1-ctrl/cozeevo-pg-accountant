@@ -162,41 +162,6 @@ export function PaymentsTable() {
         )}
       </div>
 
-      {/* Totals — only while a day is picked. No filter, no totals. */}
-      {day && (
-        <div className="mt-3 bg-surface border border-border-strong rounded-[10px] overflow-hidden">
-          <div className={COLS}>
-            <div className="pl-3 pr-2 py-2.5 flex flex-col justify-center">
-              <p className="text-[11px] uppercase tracking-[0.09em] font-bold text-ink-muted">
-                {dayLabel(day)} collected
-              </p>
-              <p className="text-[11px] text-ink-muted">
-                {shown.length} {shown.length === 1 ? "payment" : "payments"}
-                {filter !== "all" && ` · ${FILTERS.find(f => f.key === filter)?.label.toLowerCase()}`}
-              </p>
-            </div>
-            <div className={`${CELL} px-2 py-2.5 text-right`}>
-              <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-method-cash">Cash</span>
-              <span className="text-[15px] font-bold tabular-nums text-method-cash">
-                {total(shown, "cash") ? indianNumber(total(shown, "cash")) : "·"}
-              </span>
-            </div>
-            <div className={`${CELL} px-2 py-2.5 text-right`}>
-              <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-method-upi">UPI</span>
-              <span className="text-[15px] font-bold tabular-nums text-method-upi">
-                {total(shown, "upi") ? indianNumber(total(shown, "upi")) : "·"}
-              </span>
-            </div>
-            <div className={`${CELL} px-2 pr-3 py-2.5 text-right`}>
-              <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-ink-muted">Total</span>
-              <span className="text-[13px] font-bold tabular-nums text-ink">
-                {indianNumber(total(shown, "cash") + total(shown, "upi"))}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
       <p className="mt-4 px-3 text-[10px] uppercase tracking-[0.1em] font-semibold text-ink-muted">
         Payments · {day ? fmtDateShort(day) : monthLabel(month)}
       </p>
@@ -209,20 +174,32 @@ export function PaymentsTable() {
             const list = byDay.get(d) ?? [];
             return (
               <div key={d}>
-                {/* Header row repeats per day and shares COLS, so labels always sit over their columns */}
+                {/* Day header — column labels AND that day's totals, at the TOP of its rows.
+                    Shares COLS, so the labels and figures sit over their own columns. */}
                 <div className={`${COLS} bg-bg border-t border-b border-border-strong`}>
-                  <span className="pl-3 pr-2 pt-2 pb-1.5 text-[10px] uppercase tracking-[0.09em] font-bold text-ink-muted self-end">
-                    {dayLabel(d)}
-                  </span>
-                  <span className={`${CELL} px-2 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-method-cash justify-end`}>
-                    Cash
-                  </span>
-                  <span className={`${CELL} px-2 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-method-upi justify-end`}>
-                    UPI
-                  </span>
-                  <span className={`${CELL} px-2 pr-3 pt-2 pb-1.5 text-right text-[10px] uppercase tracking-[0.1em] font-bold text-ink-muted justify-end`}>
-                    Date
-                  </span>
+                  <div className="pl-3 pr-2 py-2 flex flex-col justify-center">
+                    <span className="text-[10px] uppercase tracking-[0.09em] font-bold text-ink-muted">
+                      {dayLabel(d)}
+                    </span>
+                    <span className="text-[10.5px] text-ink-muted">
+                      {list.length} {list.length === 1 ? "payment" : "payments"}
+                    </span>
+                  </div>
+                  <div className={`${CELL} px-2 py-2 text-right`}>
+                    <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-method-cash">Cash</span>
+                    <span className="text-[13.5px] font-bold tabular-nums text-method-cash">
+                      {total(list, "cash") ? indianNumber(total(list, "cash")) : "·"}
+                    </span>
+                  </div>
+                  <div className={`${CELL} px-2 py-2 text-right`}>
+                    <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-method-upi">UPI</span>
+                    <span className="text-[13.5px] font-bold tabular-nums text-method-upi">
+                      {total(list, "upi") ? indianNumber(total(list, "upi")) : "·"}
+                    </span>
+                  </div>
+                  <div className={`${CELL} px-2 pr-3 py-2 text-right justify-end`}>
+                    <span className="text-[10px] uppercase tracking-[0.1em] font-bold text-ink-muted">Date</span>
+                  </div>
                 </div>
 
                 {list.length === 0 ? (
