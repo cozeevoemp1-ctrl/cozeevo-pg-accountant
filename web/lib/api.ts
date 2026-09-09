@@ -164,6 +164,41 @@ export function getActivityFeed(limit = 60, token?: string): Promise<{ events: A
   return _get(`/api/v2/app/activity/feed?limit=${limit}`, token);
 }
 
+// ── Activity: month payments table ─────────────────────────────────────────
+
+export interface MonthPayment {
+  id: number;
+  amount: number;
+  /** Day the money arrived (YYYY-MM-DD) — what the month is scoped by. */
+  date: string;
+  /** When it was entered in the app (IST ISO). Differs from `date` on back-dated entries. */
+  logged_at: string;
+  mode: string;          // "cash" | "upi" | ...
+  for_type: string;      // "rent" | "deposit" | "booking" | "maintenance"
+  tenant_name: string;
+  room_number: string;
+  period_month: string;
+}
+
+export interface MonthPaymentsResponse {
+  month: string;
+  payments: MonthPayment[];
+}
+
+/** Payments collected in a calendar month. Omit `month` for the current one. */
+export function getMonthPayments(month?: string, token?: string): Promise<MonthPaymentsResponse> {
+  const q = month ? `?month=${encodeURIComponent(month)}` : "";
+  return _get(`/api/v2/app/activity/payments${q}`, token);
+}
+
+/** Same rows as an .xlsx download. */
+export function downloadMonthPaymentsExcel(month: string): Promise<void> {
+  return _downloadExcel(
+    `/api/v2/app/activity/payments/excel?month=${encodeURIComponent(month)}`,
+    `Payments_Cozeevo_${month}.xlsx`,
+  );
+}
+
 export interface KpiDetailItem {
   tenancy_id?: number;
   name: string;

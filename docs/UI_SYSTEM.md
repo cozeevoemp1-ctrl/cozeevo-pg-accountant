@@ -27,6 +27,7 @@ Never: local `inr()`/`fmtINR()`, inline `` `₹${x.toLocaleString("en-IN")}` ``,
 | `fmtDate(iso)` | `5 Jan 2026` |
 | `fmtDateShort(iso)` | `5 Jan` |
 | `fmtDateTime(iso)` | `5 Jan 2026, 3:42 PM` |
+| `fmtTime(iso)` | `3:42 pm` (time only — pairs with `fmtDateShort` in tables) |
 | `todayISO()` / `nowTime()` | `2026-01-05` / `15:42` |
 | `monthLabel("2026-01")` | `Jan 2026` (`{long:true}` → `January 2026`) |
 | `addMonths("2026-01", -1)` | `2025-12` |
@@ -69,6 +70,7 @@ page/component is a bug. New endpoint → add the typed wrapper first.
 | `ink` / `ink-muted` | `#0F0E0D` / `#6F655D` | text |
 | `brand-pink` / `brand-blue` | `#EF1F9C` / `#00AEED` | brand |
 | `status-paid/due/warn` | greens/pink/orange | statuses |
+| `method-cash` / `method-upi` | `#A87400` / `#0F0E0D` | cash vs UPI wherever both are columns |
 | `tile-green/pink/blue/orange` | pastels | KPI tiles |
 
 Never type a hex that has a token (`#E2DEDD` was an accidental fork of `#E0DDD8` — use

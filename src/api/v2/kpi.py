@@ -1,10 +1,13 @@
 """GET /api/v2/app/reporting/kpi and GET /api/v2/app/activity/recent."""
 from __future__ import annotations
 
+import io
+import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import case, func, literal_column, select, desc, or_, and_, exists
 
 from src.api.v2.auth import AppUser, get_current_user
@@ -17,6 +20,7 @@ from src.database.models import (
     Room, Tenancy, TenancyStatus, StayType,
     Tenant,
 )
+from src.reports.month_payments_xlsx import build_month_payments_xlsx
 from src.schemas.kpi import ActivityItem, ActivityResponse, KpiResponse
 from src.services.occupancy import get_total_revenue_beds, get_occupied_beds, get_occupancy_pct
 from src.services.daily_dues import daily_dues
@@ -1243,6 +1247,98 @@ async def get_activity_feed(
             break
 
     return {"events": events}
+
+
+_MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
+
+
+async def _month_payment_rows(session, month: str) -> list[dict]:
+    """
+    Every non-void payment collected in `month` (YYYY-MM), newest first.
+
+    Single source for the Activity month table and its Excel export.
+
+    Two deliberate differences from /activity/feed:
+      * LEFT JOIN on rooms — the feed inner-joins, so a payment on a tenancy with no
+        room silently disappears. Fine for a feed, not for money.
+      * scoped by payment_date (the day the money arrived), matching
+        services.reporting.cash_flow_by_method so this can never disagree with the
+        Collection card. created_at is carried separately as `logged_at`.
+    """
+    y, m = int(month[:4]), int(month[5:7])
+    from_date = date(y, m, 1)
+    to_date = date(y + (m == 12), (m % 12) + 1, 1) - timedelta(days=1)
+
+    rows = (await session.execute(
+        select(
+            Payment.id, Payment.amount, Payment.payment_mode, Payment.for_type,
+            Payment.payment_date, Payment.created_at, Payment.period_month,
+            Tenant.name.label("tenant_name"),
+            Room.room_number.label("room_number"),
+        )
+        .join(Tenancy, Payment.tenancy_id == Tenancy.id)
+        .join(Tenant, Tenancy.tenant_id == Tenant.id)
+        .outerjoin(Room, Tenancy.room_id == Room.id)
+        .where(
+            Payment.is_void == False,  # noqa: E712
+            Payment.payment_date >= from_date,
+            Payment.payment_date <= to_date,
+        )
+        .order_by(desc(Payment.payment_date), desc(Payment.created_at), desc(Payment.id))
+    )).all()
+
+    out = []
+    for r in rows:
+        mode = r.payment_mode.value if hasattr(r.payment_mode, "value") else (r.payment_mode or "")
+        ftype = r.for_type.value if hasattr(r.for_type, "value") else (r.for_type or "")
+        # created_at is naive UTC; IST is what staff actually collected at.
+        logged = (r.created_at + timedelta(hours=5, minutes=30)) if r.created_at else None
+        out.append({
+            "id": r.id,
+            "amount": int(r.amount or 0),
+            "date": r.payment_date.isoformat() if r.payment_date else "",
+            "logged_at": logged.isoformat() if logged else "",
+            "mode": mode,
+            "for_type": ftype,
+            "tenant_name": r.tenant_name or "",
+            "room_number": r.room_number or "",
+            "period_month": r.period_month.isoformat() if r.period_month else "",
+        })
+    return out
+
+
+@activity_router.get("/payments")
+async def get_month_payments(
+    month: str | None = None,
+    user: AppUser = Depends(get_current_user),
+):
+    """Payments collected in a calendar month (YYYY-MM). Defaults to the current month."""
+    month = month or date.today().strftime("%Y-%m")
+    if not _MONTH_RE.match(month):
+        raise HTTPException(status_code=422, detail="month must be YYYY-MM")
+    async with get_session() as session:
+        rows = await _month_payment_rows(session, month)
+    return {"month": month, "payments": rows}
+
+
+@activity_router.get("/payments/excel")
+async def download_month_payments_excel(
+    month: str | None = None,
+    user: AppUser = Depends(get_current_user),
+):
+    """Same rows as GET /activity/payments, as a styled .xlsx."""
+    month = month or date.today().strftime("%Y-%m")
+    if not _MONTH_RE.match(month):
+        raise HTTPException(status_code=422, detail="month must be YYYY-MM")
+    async with get_session() as session:
+        rows = await _month_payment_rows(session, month)
+
+    buf = io.BytesIO(build_month_payments_xlsx(month, rows))
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="Payments_Cozeevo_{month}.xlsx"'},
+    )
 
 
 @activity_router.get("/recent-checkins")

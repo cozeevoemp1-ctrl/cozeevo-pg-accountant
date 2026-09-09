@@ -24,6 +24,11 @@ export default {
           due: "#EF1F9C",
           warn: "#C25000",
         },
+        // Payment method colours — cash vs UPI, used wherever the two are columns.
+        method: {
+          cash: "#A87400",   // dark gold, legible on surface
+          upi: "#0F0E0D",    // same as ink — UPI is the default/most common
+        },
         tile: {
           green: "#E1F3DF",
           pink: "#FCE2EE",

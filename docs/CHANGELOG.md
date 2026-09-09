@@ -1,5 +1,47 @@
 # Changelog
 
+## Session AR — 2026-09-09 — Activity: month payments table with Cash/UPI columns
+
+**Reconciliation first.** Kiran's 312-row UPI sheet totalled Rs.15,86,506 against a DB
+UPI total of Rs.15,47,797. The Rs.38,709 headline gap was *net* and hid Rs.1,27,709 of
+real discrepancy in both directions:
+
+- **Rs.68,209 collected but never entered** — 613 Sanjoy Roy Choudary 25,000,
+  G15 Raghubir Singh 25,000, 204 Anshit 16,000, 512 Nirmala Janakiraman 1,600,
+  G19 Dhamodharan 609. Still open.
+- **Rs.15,000 counted in the wrong month** — 218 Srujan Krishna paid 24-25 Aug.
+- **Rs.13,000 double-charged** — 620 Hasini Anugandula, two identical booking rows
+  4 minutes apart (11:06 / 11:10). Still open, not voided.
+- Rs.44,500 of deposits/bookings the sheet omitted happened to offset the shortfall
+  almost exactly. A total-vs-total check would have shown nothing wrong.
+
+**Built: `/activity?view=payments`.**
+
+- `GET /api/v2/app/activity/payments?month=YYYY-MM` (`src/api/v2/kpi.py`) — every
+  non-void payment collected in a calendar month, defaulting to the current one.
+  Two deliberate differences from `/activity/feed`: **LEFT JOIN on rooms** (the feed
+  inner-joins, so a payment on a roomless tenancy silently vanishes — fine for a feed,
+  not for money), and scoping by `payment_date` so it matches `cash_flow_by_method`
+  and can never disagree with the Collection card.
+- `GET /api/v2/app/activity/payments/excel` + `src/reports/month_payments_xlsx.py` —
+  styled .xlsx, HEADERS-keyed dict rows (never numeric indices), INR_NUMBER_FORMAT,
+  frozen header, autofilter, =SUM() totals row.
+- `web/components/activity/payments-table.tsx` — current month (rolls on its own),
+  every elapsed day listed, `Tenant | Cash | UPI | Date` with continuous grid rules
+  from one shared `COLS` constant, per-day Cash/UPI subtotals in their own columns,
+  date picker to isolate one day, type/mode filters, name+room search, and a CHECK
+  tag on same-tenant/amount/purpose/day rows (surfaces the Hasini duplicate).
+- Feed / Payments toggle on `/activity`; the feed query is skipped when the table is shown.
+
+**New primitives** (added and documented in `docs/UI_SYSTEM.md`, per its own rule):
+`fmtTime()` in `web/lib/date.ts`; `method-cash` (#A87400) / `method-upi` (#0F0E0D)
+tokens in `web/tailwind.config.ts`.
+
+**Verified:** endpoint totals equal `cash_flow_by_method` for 2026-09 exactly —
+cash Rs.26,29,600, UPI Rs.15,56,297 across 303 rows. `npm run build`, `tsc --noEmit`
+and `scripts/check_ui_consistency.py` all pass.
+
+
 ## Session AQ (cont.) — 2026-09-08 — "two Dhruvs, same history": payment identity
 
 Kiran: two tenants named Dhruv in rooms 309 and 414 showed the *same* 11 payments.

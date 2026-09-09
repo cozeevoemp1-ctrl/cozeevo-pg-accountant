@@ -43,6 +43,15 @@ export function fmtDateTime(iso: string | null | undefined): string {
   return `${fmtDate(iso)}, ${h}:${t[2]} ${ampm}`;
 }
 
+/** "2026-01-05T15:42:00" → "3:42 pm". Time only — pairs with fmtDateShort in tables. */
+export function fmtTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const t = /[T ](\d{2}):(\d{2})/.exec(iso);
+  if (!t) return "";
+  const h = +t[1];
+  return `${h % 12 || 12}:${t[2]} ${h >= 12 ? "pm" : "am"}`;
+}
+
 /** Today's local date as "YYYY-MM-DD". */
 export function todayISO(): string {
   const d = new Date();
