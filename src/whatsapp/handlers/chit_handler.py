@@ -93,24 +93,37 @@ async def _query(raw: str, session: AsyncSession) -> str:
     # WhatsApp has no tables; a ``` monospace block renders aligned columns on a phone.
     # Width kept ≤ 30 chars so it doesn't wrap on a normal screen.
     head = f"*Chit payments{(' — ' + scope) if scope else ''}*"
-    tbl = [f"{'#':>2} {'Date':6} {'Name':10} {'Amount':>9}", "-" * 30]
     total = Decimal(0)
+    body = []
     for r in rows:
         total += r.amount
-        nm = _short(r.name) + ("" if r.category == "Chit" else "*")
-        tbl.append(f"{r.id:>2} {r.payment_date.strftime('%d %b'):6} {nm:10} {inr(r.amount):>9}")
-    tbl.append("-" * 30)
-    tbl.append(f"{'':2} {'Total':6} {'':10} {inr(total):>9}")
+        nm = _short(r.name, 8) + ("" if r.category == "Chit" else "*")
+        body.append([str(r.id), r.payment_date.strftime("%d %b"), nm, inr(r.amount)])
+    tbl = _grid(["#", "Date", "Name", "Amount"], body, [2, 6, 8, 9], align="rllr",
+                footer=["", "Total", "", inr(total)])
     out = [head, "```", *tbl, "```"]
     if any(r.category != "Chit" for r in rows):
         out.append("_* = Loan_")
 
     if not name and not month:
-        by = [f"{'Name':16} {'Amount':>9} {'n':>2}", "-" * 30]
-        for n, c, s in await svc.totals_by_name(session):
-            by.append(f"{_short(n, 16):16} {inr(s):>9} {c:>2}")
-        out += ["", "*By name*", "```", *by, "```"]
+        by = [[_short(n, 15), inr(s), str(c)] for n, c, s in await svc.totals_by_name(session)]
+        out += ["", "*By name*", "```", *_grid(["Name", "Amount", "n"], by, [15, 9, 2], align="lrr"), "```"]
     return "\n".join(out)
+
+
+def _grid(headers: list[str], rows: list[list[str]], widths: list[int], align: str,
+          footer: list[str] | None = None) -> list[str]:
+    """ASCII box grid (+--+ / |..|) — box-drawing glyphs aren't monospace on every phone.
+    Total width = sum(widths) + len(widths) + 1; keep ≤ 30 so it doesn't wrap."""
+    def line(cells):
+        return "|" + "|".join(
+            (c.rjust(w) if a == "r" else c.ljust(w))[:w] for c, w, a in zip(cells, widths, align)
+        ) + "|"
+    sep = "+" + "+".join("-" * w for w in widths) + "+"
+    out = [sep, line(headers), sep, *[line(r) for r in rows], sep]
+    if footer:
+        out += [line(footer), sep]
+    return out
 
 
 def _short(name: str, width: int = 10) -> str:
