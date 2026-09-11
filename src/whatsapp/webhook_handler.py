@@ -663,6 +663,66 @@ async def _send_whatsapp_document(to_number: str, document_url: str, filename: s
         logger.warning(f"[Meta] document log failed: {_e}")
 
 
+async def send_whatsapp_image_bytes(to_number: str, png: bytes, caption: str = "",
+                                    filename: str = "table.png") -> bool:
+    """Send an in-memory PNG as a WhatsApp image: upload to Meta's /media endpoint
+    (no public URL needed), then send by media id. Returns True on 200.
+    Operator-facing only — tables the text renderer can't do (see table_image.py)."""
+    if is_demo_mode():
+        logger.info(f"[DEMO] Suppressed outbound WhatsApp image to {to_number}")
+        return False
+    token    = os.getenv("WHATSAPP_TOKEN", "")
+    phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    if not (token and phone_id):
+        logger.warning("[Meta] WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID not set")
+        return False
+
+    to = _to_e164_for_meta(to_number)
+    base = f"https://graph.facebook.com/v18.0/{phone_id}"
+    auth = {"Authorization": f"Bearer {token}"}
+    import httpx
+    success = False
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            up = await client.post(
+                f"{base}/media", headers=auth,
+                data={"messaging_product": "whatsapp", "type": "image/png"},
+                files={"file": (filename, png, "image/png")},
+            )
+            if up.status_code != 200:
+                logger.error(f"[Meta] Image upload failed {up.status_code}: {up.text[:200]}")
+                return False
+            media_id = up.json().get("id")
+            body = {
+                "messaging_product": "whatsapp", "to": to, "type": "image",
+                "image": {"id": media_id, **({"caption": caption} if caption else {})},
+            }
+            resp = await client.post(f"{base}/messages", json=body,
+                                     headers={**auth, "Content-Type": "application/json"})
+        if resp.status_code == 200:
+            logger.info(f"[Meta] Image sent to {to}: {filename}")
+            success = True
+        else:
+            logger.error(f"[Meta] Image send failed {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"[Meta] Image send exception: {e}")
+
+    try:
+        from src.database.db_manager import get_session
+        from src.database.models import WhatsappLog, MessageDirection
+        async with get_session() as _sess:
+            _sess.add(WhatsappLog(
+                direction=MessageDirection.outbound,
+                from_number=phone_id, to_number=to,
+                message_text=f"[IMAGE:{filename}] {caption}"[:4096],
+                intent="IMAGE" if success else "IMAGE_FAILED",
+            ))
+            await _sess.commit()
+    except Exception as _e:
+        logger.warning(f"[Meta] image log failed: {_e}")
+    return success
+
+
 # -- Meta media downloader -----------------------------------------------------
 
 async def _download_media(media_id: str, media_mime: Optional[str]) -> Optional[str]:

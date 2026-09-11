@@ -44,7 +44,7 @@ async def handle_chit(intent: str, entities: dict, ctx: CallerContext, session: 
         return await _void(raw, session)
     if intent == "CHIT_EDIT":
         return await _edit(raw, ctx, session)
-    return await _query(raw, session)
+    return await _query(raw, session, ctx.phone)
 
 
 # ── CHIT_LOG ──────────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ async def _log(raw: str, ctx: CallerContext, session: AsyncSession) -> str:
 
 # ── CHIT_QUERY ────────────────────────────────────────────────────────────────
 
-async def _query(raw: str, session: AsyncSession) -> str:
+async def _query(raw: str, session: AsyncSession, ctx_phone: str | None = None) -> str:
     month = svc.parse_month(raw)
     name_hint = svc.parse_name(raw) if not month else svc.parse_name(raw)
     for w in ("summary", "total", "totals", "list", "all", "show", "history", "payments", "payment", "so far", "much", "how", "what", "have", "we", "is", "i", "me"):
@@ -90,25 +90,60 @@ async def _query(raw: str, session: AsyncSession) -> str:
     if not rows:
         return f"No chit payments found{(' for ' + scope) if scope else ''}."
 
-    # WhatsApp has no tables; a ``` monospace block renders aligned columns on a phone.
-    # Width kept ≤ 30 chars so it doesn't wrap on a normal screen.
-    head = f"*Chit payments{(' — ' + scope) if scope else ''}*"
-    total = Decimal(0)
+    total = sum((r.amount for r in rows), Decimal(0))
+    by_name = await svc.totals_by_name(session) if not (name or month) else []
+    title = f"Chit payments{(' — ' + scope) if scope else ''}"
+
+    # Preferred: a spreadsheet-style PNG (WhatsApp text can't hold a real grid).
+    # Sent directly from here; "" tells chat_api there is no text reply to send.
+    png = _render_png(title, rows, total, by_name)
+    if png and ctx_phone and await _send_png(ctx_phone, png, f"{title} · Total {inr(total)}"):
+        return ""
+
+    # Fallback: ASCII grid in a ``` block (≤ 30 chars wide so it doesn't wrap).
     body = []
     for r in rows:
-        total += r.amount
         nm = _short(r.name, 8) + ("" if r.category == "Chit" else "*")
         body.append([str(r.id), r.payment_date.strftime("%d %b"), nm, inr(r.amount)])
     tbl = _grid(["#", "Date", "Name", "Amount"], body, [2, 6, 8, 9], align="rllr",
                 footer=["", "Total", "", inr(total)])
-    out = [head, "```", *tbl, "```"]
+    out = [f"*{title}*", "```", *tbl, "```"]
     if any(r.category != "Chit" for r in rows):
         out.append("_* = Loan_")
-
-    if not name and not month:
-        by = [[_short(n, 15), inr(s), str(c)] for n, c, s in await svc.totals_by_name(session)]
+    if by_name:
+        by = [[_short(n, 15), inr(s), str(c)] for n, c, s in by_name]
         out += ["", "*By name*", "```", *_grid(["Name", "Amount", "n"], by, [15, 9, 2], align="lrr"), "```"]
     return "\n".join(out)
+
+
+def _render_png(title: str, rows, total: Decimal, by_name) -> bytes | None:
+    try:
+        from src.services.table_image import Sheet, Table, render_png
+        from datetime import date as _date
+        main = Table(
+            headers=["S.No", "Date", "Name", "Category", "Amount", "Mode"],
+            rows=[[str(r.id), r.payment_date.strftime("%d %b %Y"), r.name, r.category,
+                   inr(r.amount), (r.payment_mode or "-")] for r in rows],
+            align="rlllrl",
+            footer=["", "", "Total", "", inr(total), ""],
+        )
+        tables = [main]
+        if by_name:
+            tables.append(Table(title="By name",
+                                headers=["Name", "Payments", "Total"],
+                                rows=[[n, str(c), inr(s)] for n, c, s in by_name],
+                                align="lrr"))
+        return render_png(Sheet(title=title, subtitle=f"as of {_date.today().strftime('%d %b %Y')}", tables=tables))
+    except Exception:
+        return None
+
+
+async def _send_png(phone: str, png: bytes, caption: str) -> bool:
+    try:
+        from src.whatsapp.webhook_handler import send_whatsapp_image_bytes
+        return await send_whatsapp_image_bytes(phone, png, caption=caption, filename="chit_payments.png")
+    except Exception:
+        return False
 
 
 def _grid(headers: list[str], rows: list[list[str]], widths: list[int], align: str,
