@@ -92,7 +92,9 @@ Maintenance fees (non-refundable) are retained income and stay in Gross Inflows.
 - Ashokan & Jitendra buyout (₹75L settlement, 18 Jun 2026) = capital transaction →
   `Non-Operating` bank category + `investment_expenses` ledger. Cap table now ₹2.31 Cr.
 - Hand loans (Bava ₹19L from PG) and chit savings (Balaji/Boopalan ₹8.5L cash) = loan
-  receivables in a 4-account register — shown below the P&L, excluded from opex, and added
+  receivables in a 4-account register
+- Chit instalments are logged per payment in `chit_payments` (from 2026-09-11; entry via
+  `scripts/chit_payments.py`). Not yet wired into the cash-position line. — shown below the P&L, excluded from opex, and added
   back in the cash position ("+ Loans given") so the cash count reconciles.
 
 Capital contributions (owner equity injections) are shown separately — NOT in income.

@@ -1531,6 +1531,30 @@ async def run_pnl_offline_cash_2026_08_08(conn) -> None:
     print("  [ok] pnl_monthly_adjustments.offline_cash added")
 
 
+async def run_chit_payments_2026_09_11(conn) -> None:
+    """Chit / hand-loan instalment register (Kiran 2026-09-11). Balance-sheet
+    only — never opex, never in the P&L. Replaces the free-text lump sums that
+    lived in pnl_monthly_adjustments.notes."""
+    await conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS chit_payments (
+            id           SERIAL PRIMARY KEY,
+            payment_date DATE NOT NULL,
+            name         VARCHAR(100) NOT NULL,
+            category     VARCHAR(50) NOT NULL DEFAULT 'Chit',
+            amount       NUMERIC(12,2) NOT NULL,
+            payment_mode VARCHAR(20),
+            notes        TEXT,
+            is_void      BOOLEAN NOT NULL DEFAULT false,
+            created_by   VARCHAR(100),
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """))
+    await conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_chit_payments_date ON chit_payments (payment_date)"
+    ))
+    print("  [ok] chit_payments created")
+
+
 async def run_whatsapp_status_log_2026_08_13(conn) -> None:
     """Meta delivery-status webhook capture (sent/delivered/read/failed per wamid).
     Why: Meta returns HTTP 200 for sends it later silently drops (TIER_250
@@ -1801,6 +1825,7 @@ async def main(args: argparse.Namespace) -> None:
             await run_no_overlap_tenancy_constraint_2026_06_28(conn)
             await run_whatsapp_status_log_2026_08_13(conn)
             await run_btxn_manual_category_2026_08_14(conn)
+            await run_chit_payments_2026_09_11(conn)
     # Runs outside the main transaction (needs separate commits for enum values)
     try:
         await run_simplify_roles_2026_04_01(engine)

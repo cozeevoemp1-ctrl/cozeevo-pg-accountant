@@ -1550,6 +1550,24 @@ class PnlMonthlyAdjustment(Base):
     updated_at     = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
+class ChitPayment(Base):
+    """Chit fund / hand-loan instalments paid out of the business (balance-sheet
+    only — NEVER an expense, never enters the P&L; see REPORTING.md 1.2).
+    One row per instalment. S.No = id."""
+    __tablename__ = "chit_payments"
+
+    id           = Column(Integer, primary_key=True)                       # S.No
+    payment_date = Column(Date, nullable=False)
+    name         = Column(String(100), nullable=False)                     # Belandur, Boobalan, Balaji, Tanvi, Mama ...
+    category     = Column(String(50), nullable=False, server_default="Chit", default="Chit")  # Chit / Loan
+    amount       = Column(Numeric(12, 2), nullable=False)
+    payment_mode = Column(String(20), nullable=True)                       # cash / bank
+    notes        = Column(Text, nullable=True)
+    is_void      = Column(Boolean, nullable=False, server_default="false", default=False)
+    created_by   = Column(String(100), nullable=True)
+    created_at   = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class OperationalLogCategory(str, enum.Enum):
     power_outage        = "power_outage"
     hp_gas              = "hp_gas"

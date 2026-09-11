@@ -1,5 +1,21 @@
 # Changelog
 
+## Session AS — 2026-09-11 — Chit instalment register (`chit_payments`)
+
+Kiran asked whether monthly chit payments were recorded anywhere. They were not:
+the only trace was the July lump sums in `pnl_monthly_adjustments.notes` (free text)
+and nothing at all for Aug/Sep.
+
+- New table `chit_payments` (S.No = id, date, name, category, amount, mode, notes,
+  is_void) — `run_chit_payments_2026_09_11` in migrate_all, `ChitPayment` model.
+  Balance-sheet only, never opex, not wired into the P&L.
+- `scripts/chit_payments.py` — `list / add / void / seed`. Seeded Kiran's 6 rows:
+  Belandur Balaji 5L on 9 Jul, 8 Aug, 9 Sep; Boobalan 3.5L 10 Jul, 5.5L 9 Aug, 5.5L 11 Sep.
+  Total 29,50,000. Mode assumed cash (July note said cash) — Aug/Sep unconfirmed.
+- Open: Aug/Sep `pnl_monthly_adjustments` notes carry no chit outflow, so the
+  cash-position line does not yet subtract these 21L. Wire `chit_payments` into
+  the cash position only after Kiran confirms.
+
 ## Session AR (cont.) — 2026-09-09 — Two of the five missing UPI receipts entered
 
 Follow-up to the Sept UPI reconciliation above. Kiran asked why 514 Agnihotri's
