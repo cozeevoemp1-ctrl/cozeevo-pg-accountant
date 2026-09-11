@@ -85,6 +85,11 @@ _SPLIT_UPI_MODES = r"upi|gpay|phonepe|paytm|online|netbanking|net\s*banking|neft
 # ── Owner / Power-user intents ────────────────────────────────────────────────
 
 _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
+    # ── Chit / hand-loan register (Kiran + Prabhakaran ONLY — gatekeeper enforces) ──
+    # Must be first: "paid boobalan chit 5.5L" would otherwise hit PAYMENT_LOG/ADD_EXPENSE.
+    (re.compile(r"(?:void|delete|cancel|remove|undo)\s+chit\s*#?\s*\d+|chit\s*#?\s*\d+\s+(?:void|delete|cancel|remove|undo|wrong)", re.I), "CHIT_VOID", 0.97),
+    (re.compile(r"\bchits?\b.*?\d[\d,]*(?:\.\d+)?\s*(?:l\b|lakhs?|lacs?|k\b|thousand|,\d{3})|\d[\d,]*(?:\.\d+)?\s*(?:l\b|lakhs?|lacs?|k\b|thousand|,\d{3}).*?\bchits?\b|\bchits?\b.*?\b\d{4,}\b|\b\d{4,}\b.*?\bchits?\b", re.I), "CHIT_LOG", 0.96),
+    (re.compile(r"\bchits?\b", re.I), "CHIT_QUERY", 0.95),
     # Start onboarding / KYC for a new tenant (must be first — very specific)
     (re.compile(r"(?:start onboarding|begin onboarding|start kyc|begin kyc|start checkin|begin checkin|onboard\s+\w+|kyc for|checkin for\s+\w+|onboarding\s+for\s+\w+|start\s+registration|registration\s+(?:for|of)\s+\w+)", re.I), "START_ONBOARDING", 0.96),
     # Record checkout / offboarding form

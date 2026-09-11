@@ -19,6 +19,8 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.whatsapp.handlers.account_handler import FINANCIAL_INTENTS
+from src.whatsapp.handlers.chit_handler import CHIT_INTENTS, handle_chit
+from src.services.chit_payments import phone_allowed as _chit_phone_allowed
 from src.whatsapp.handlers.owner_handler import handle_owner
 from src.whatsapp.handlers.tenant_handler import handle_tenant
 from src.whatsapp.handlers.lead_handler import handle_lead
@@ -41,6 +43,13 @@ async def route(
 ) -> str | None:
     # Stash raw message in entities so handlers can access it without signature change
     entities.setdefault("_raw_message", message)
+
+    # HARD BOUNDARY: chit register is Kiran + Prabhakaran only (services/chit_payments.CHIT_PHONES).
+    # Checked here by phone, not role — an "owner" or "admin" role is not enough.
+    if intent in CHIT_INTENTS:
+        if not _chit_phone_allowed(ctx.phone):
+            return await handle_owner("UNKNOWN", entities, ctx, session)
+        return await handle_chit(intent, entities, ctx, session)
 
     if ctx.role in OWNER_ROLES:
         if intent in FINANCIAL_INTENTS:

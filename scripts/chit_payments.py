@@ -17,6 +17,7 @@ load_dotenv()
 from sqlalchemy import select
 from src.database.db_manager import get_session, init_db_for_script
 from src.database.models import ChitPayment
+from src.services import chit_payments as svc
 from src.utils.inr_format import inr
 
 # Kiran 2026-09-11 (WhatsApp): the chit instalments actually paid so far.
@@ -33,34 +34,28 @@ SEED_NOTE = "entered from Kiran's list 2026-09-11"
 
 async def _list(month: str | None):
     async with get_session() as s:
-        q = select(ChitPayment).where(ChitPayment.is_void.is_(False)).order_by(ChitPayment.payment_date, ChitPayment.id)
-        rows = (await s.execute(q)).scalars().all()
-    if month:
-        rows = [r for r in rows if r.payment_date.strftime("%Y-%m") == month]
-    print(f"{'S.No':>4}  {'Date':10}  {'Name':14}  {'Category':8}  {'Amount':>12}  Mode   Notes")
+        rows = await svc.list_payments(s, month=month)
+    print(f"{'S.No':>4}  {'Date':10}  {'Name':16}  {'Category':8}  {'Amount':>12}  Mode   Notes")
     total = Decimal(0)
     for r in rows:
         total += r.amount
-        print(f"{r.id:>4}  {r.payment_date}  {r.name:14}  {r.category:8}  {inr(r.amount):>12}  {r.payment_mode or '-':6} {r.notes or ''}")
-    print(f"{'':4}  {'':10}  {'TOTAL':14}  {'':8}  {inr(total):>12}   ({len(rows)} rows)")
+        print(f"{r.id:>4}  {r.payment_date}  {r.name:16}  {r.category:8}  {inr(r.amount):>12}  {r.payment_mode or '-':6} {r.notes or ''}")
+    print(f"{'':4}  {'':10}  {'TOTAL':16}  {'':8}  {inr(total):>12}   ({len(rows)} rows)")
 
 
 async def _add(a):
     async with get_session() as s:
-        row = ChitPayment(payment_date=date.fromisoformat(a.date), name=a.name, category=a.category,
-                          amount=Decimal(str(a.amount)), payment_mode=a.mode, notes=a.notes, created_by="cli")
-        s.add(row)
+        row = await svc.add_payment(s, payment_date=date.fromisoformat(a.date), name=a.name, category=a.category,
+                                    amount=Decimal(str(a.amount)), payment_mode=a.mode, notes=a.notes, created_by="cli")
         await s.commit()
-        await s.refresh(row)
         print(f"added S.No {row.id}: {row.payment_date} {row.name} {row.category} {inr(row.amount)}")
 
 
 async def _void(a):
     async with get_session() as s:
-        row = await s.get(ChitPayment, a.id)
+        row = await svc.void_payment(s, a.id)
         if not row:
-            sys.exit(f"no row id {a.id}")
-        row.is_void = True
+            sys.exit(f"no active row id {a.id}")
         await s.commit()
         print(f"voided S.No {a.id}: {row.payment_date} {row.name} {inr(row.amount)}")
 

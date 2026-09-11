@@ -62,6 +62,9 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | RULES | "house rules" | all handlers | all | PG house rules |
 | HELP | "help", "menu" | all handlers | all | Role-specific menu |
 | UPDATE_TENANT_NOTES | "update agreement for Raj" | owner_handler | owner | Edit permanent tenant notes |
+| CHIT_LOG | "paid boobalan chit 5.5L on 11 sep", "chit belandur 5L" | chit_handler | **Kiran + Prabhakaran phones only** | Record a chit / hand-loan instalment (`chit_payments`). Name fuzzy-matched to known names; "loan" → category Loan; bank/upi → mode bank; date defaults today |
+| CHIT_QUERY | "chit payments", "chit sep", "chit boobalan", "chit summary" | chit_handler | **Kiran + Prabhakaran phones only** | List instalments, filter by month / name, totals by name |
+| CHIT_VOID | "void chit 6", "delete chit #6" | chit_handler | **Kiran + Prabhakaran phones only** | Void an instalment (is_void, never delete) |
 | MY_BALANCE | "my balance" | tenant_handler | tenant | Own dues (DISABLED) |
 | MY_PAYMENTS | "my payments" | tenant_handler | tenant | Own payment history (DISABLED) |
 | MY_DETAILS | "my room" | tenant_handler | tenant | Own stay details (DISABLED) |
@@ -104,6 +107,7 @@ Returns `CallerContext` with: phone, role, name, tenant_id, auth_user_id, is_blo
 Message → Rate Limit → Role Detection → Intent Detection (regex 97%)
     ↓
 [Gatekeeper]
+    CHIT_* intent → phone in services/chit_payments.CHIT_PHONES? → chit_handler, else generic UNKNOWN reply (hard boundary, role is NOT enough)
     Financial intent → account_handler
     Operational intent → owner_handler
     ↓

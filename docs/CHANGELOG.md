@@ -12,6 +12,12 @@ and nothing at all for Aug/Sep.
 - `scripts/chit_payments.py` — `list / add / void / seed`. Seeded Kiran's 6 rows:
   Belandur Balaji 5L on 9 Jul, 8 Aug, 9 Sep; Boobalan 3.5L 10 Jul, 5.5L 9 Aug, 5.5L 11 Sep.
   Total 29,50,000. Mode assumed cash (July note said cash) — Aug/Sep unconfirmed.
+- WhatsApp intents `CHIT_LOG` / `CHIT_QUERY` / `CHIT_VOID` (`src/whatsapp/handlers/chit_handler.py`,
+  parsing in `src/services/chit_payments.py` shared with the CLI). **Hard boundary:** gatekeeper
+  checks `CHIT_PHONES` (Kiran 7845952289 + Prabhakaran 9444296681) by phone before routing —
+  Lakshmi (owner) and Lokesh get the generic "didn't understand" reply. Verified locally for all
+  four numbers; NL forms: "paid boobalan chit 5.5L on 11 sep", "chit belandur 5L", "chit sep",
+  "chit boobalan", "void chit 6". Amounts accept 5.5L / 5,50,000 / 3.5 lakh / 50k.
 - Open: Aug/Sep `pnl_monthly_adjustments` notes carry no chit outflow, so the
   cash-position line does not yet subtract these 21L. Wire `chit_payments` into
   the cash position only after Kiran confirms.

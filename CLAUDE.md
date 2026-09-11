@@ -226,6 +226,7 @@ Kiran's Excel (offline)
 | `src/api/v2/kpi.py` → `GET /activity/payments` | Month payments ledger — every non-void payment collected in a calendar month. **LEFT JOINs rooms** (the `/activity/feed` query inner-joins and silently drops a payment on a roomless tenancy); scoped by `payment_date` so it always equals `cash_flow_by_method`. `_month_payment_rows()` is the single source for the table and the export |
 | `src/reports/month_payments_xlsx.py` | `.xlsx` for the above — HEADERS-keyed dict rows (never numeric indices), `INR_NUMBER_FORMAT`, frozen header, autofilter, `=SUM()` totals |
 | `web/components/activity/payments-table.tsx` | PWA Activity → Payments: current month (auto-rolls), every elapsed day, `Tenant \| Cash \| UPI \| Date`, per-day totals in the day header, date filter, duplicate CHECK tag, Excel export |
+| `src/services/chit_payments.py` + `src/whatsapp/handlers/chit_handler.py` | Chit register service (add/list/void/NL parsing) + WhatsApp CHIT_LOG/QUERY/VOID. **HARD BOUNDARY: `CHIT_PHONES` = Kiran + Prabhakaran only, enforced by phone in gatekeeper — never widen to a role.** |
 | `scripts/chit_payments.py` + `chit_payments` table | Chit / hand-loan instalment register (S.No, date, name, category, amount). Balance-sheet only — never opex, never in P&L. `list / add / void / seed`. |
 | `src/rules/pnl_classify.py` | Bank-transaction classifier rules (category/sub_category by keyword, first match wins) — shared by CSV import and the WhatsApp finance handler. Add new vendor/keyword rules here, never inline elsewhere. |
 
