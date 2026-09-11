@@ -13,6 +13,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.models import ChitPayment
+from src.utils.inr_format import inr
 
 # ── HARD BOUNDARY (Kiran 2026-09-11): only these two numbers may log, query or
 # void chit payments over WhatsApp. Not owners, not receptionist, not env-configurable.
@@ -182,3 +183,32 @@ def parse_name(text: str, date_text: str = "") -> str:
     t = _NOISE.sub(" ", t)
     t = re.sub(r"[^\w\s]", " ", t)
     return re.sub(r"\s+", " ", t).strip()
+
+
+async def edit_payment(session: AsyncSession, row_id: int, *, payment_date: date | None = None,
+                       name: str | None = None, amount: Decimal | None = None, category: str | None = None,
+                       payment_mode: str | None = None, edited_by: str | None = None
+                       ) -> tuple[ChitPayment | None, list[str]]:
+    """Update fields in place; every change is appended to `notes` as an audit trail
+    ('edited 2026-09-11 by 7845952289: amount 5,50,000→5,00,000'). Returns (row, changes)."""
+    row = await session.get(ChitPayment, row_id)
+    if not row or row.is_void:
+        return None, []
+    changes: list[str] = []
+    for field, new in (("payment_date", payment_date), ("name", name), ("amount", amount),
+                       ("category", category), ("payment_mode", payment_mode)):
+        if new is None:
+            continue
+        old = getattr(row, field)
+        if field == "amount":
+            new = Decimal(new)
+        if old == new:
+            continue
+        fmt = (lambda v: inr(v)) if field == "amount" else (lambda v: v.strftime("%d %b")) if field == "payment_date" else str
+        changes.append(f"{field.replace('payment_', '')} {fmt(old)}→{fmt(new)}")
+        setattr(row, field, new)
+    if changes:
+        stamp = f"edited {date.today()} by {edited_by or '?'}: " + ", ".join(changes)
+        row.notes = f"{row.notes} | {stamp}" if row.notes else stamp
+        await session.flush()
+    return row, changes

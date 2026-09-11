@@ -12,6 +12,8 @@ and nothing at all for Aug/Sep.
 - `scripts/chit_payments.py` — `list / add / void / seed`. Seeded Kiran's 6 rows:
   Belandur Balaji 5L on 9 Jul, 8 Aug, 9 Sep; Boobalan 3.5L 10 Jul, 5.5L 9 Aug, 5.5L 11 Sep.
   Total 29,50,000. Mode assumed cash (July note said cash) — Aug/Sep unconfirmed.
+- `CHIT_EDIT`: "chit 6 amount 5L", "chit 6 date 10 sep", "chit 6 name boobalan", several at once —
+  in-place update, change stamped into `notes` (who/when/old→new). Delete = void only.
 - WhatsApp intents `CHIT_LOG` / `CHIT_QUERY` / `CHIT_VOID` (`src/whatsapp/handlers/chit_handler.py`,
   parsing in `src/services/chit_payments.py` shared with the CLI). **Hard boundary:** gatekeeper
   checks `CHIT_PHONES` (Kiran 7845952289 + Prabhakaran 9444296681) by phone before routing —

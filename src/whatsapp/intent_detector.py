@@ -88,6 +88,7 @@ _OWNER_RULES: list[tuple[re.Pattern, str, float]] = [
     # ── Chit / hand-loan register (Kiran + Prabhakaran ONLY — gatekeeper enforces) ──
     # Must be first: "paid boobalan chit 5.5L" would otherwise hit PAYMENT_LOG/ADD_EXPENSE.
     (re.compile(r"(?:void|delete|cancel|remove|undo)\s+chit\s*#?\s*\d+|chit\s*#?\s*\d+\s+(?:void|delete|cancel|remove|undo|wrong)", re.I), "CHIT_VOID", 0.97),
+    (re.compile(r"(?:edit|update|change|modify|correct|fix)\s+chit\s*#?\s*\d+|\bchit\s*#?\s*\d+\s+(?:date|dated|on|amount|amt|name|to|for|cash|bank|upi|loan|is)\b", re.I), "CHIT_EDIT", 0.97),
     (re.compile(r"\bchits?\b.*?\d[\d,]*(?:\.\d+)?\s*(?:l\b|lakhs?|lacs?|k\b|thousand|,\d{3})|\d[\d,]*(?:\.\d+)?\s*(?:l\b|lakhs?|lacs?|k\b|thousand|,\d{3}).*?\bchits?\b|\bchits?\b.*?\b\d{4,}\b|\b\d{4,}\b.*?\bchits?\b", re.I), "CHIT_LOG", 0.96),
     (re.compile(r"\bchits?\b", re.I), "CHIT_QUERY", 0.95),
     # Start onboarding / KYC for a new tenant (must be first — very specific)

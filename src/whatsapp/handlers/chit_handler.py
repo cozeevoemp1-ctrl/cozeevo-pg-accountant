@@ -12,6 +12,7 @@ Intents:
   CHIT_LOG    "paid boobalan chit 5.5L on 11 sep", "chit belandur 5,00,000 today"
   CHIT_QUERY  "chit payments", "chit sep", "chit boobalan", "chit summary"
   CHIT_VOID   "void chit 6", "delete chit 6", "cancel chit 6"
+  CHIT_EDIT   "chit 6 amount 5L", "chit 6 date 10 sep", "chit 6 name boobalan", "change chit 6 to 5.5L"
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ from src.services import chit_payments as svc
 from src.utils.inr_format import inr
 from src.whatsapp.role_service import CallerContext
 
-CHIT_INTENTS: frozenset[str] = frozenset({"CHIT_LOG", "CHIT_QUERY", "CHIT_VOID"})
+CHIT_INTENTS: frozenset[str] = frozenset({"CHIT_LOG", "CHIT_QUERY", "CHIT_VOID", "CHIT_EDIT"})
 
 _DENIED = "Sorry, I didn't understand that. Type *help* for commands."
 
@@ -41,6 +42,8 @@ async def handle_chit(intent: str, entities: dict, ctx: CallerContext, session: 
         return await _log(raw, ctx, session)
     if intent == "CHIT_VOID":
         return await _void(raw, session)
+    if intent == "CHIT_EDIT":
+        return await _edit(raw, ctx, session)
     return await _query(raw, session)
 
 
@@ -119,3 +122,44 @@ async def _void(raw: str, session: AsyncSession) -> str:
         return f"No active chit payment #{m.group(1)}."
     await session.commit()
     return f"Voided #{row.id}: {row.name} {inr(row.amount)} on {row.payment_date.strftime('%d %b %Y')}."
+
+
+# ── CHIT_EDIT ─────────────────────────────────────────────────────────────────
+
+async def _edit(raw: str, ctx: CallerContext, session: AsyncSession) -> str:
+    """'chit 6 date 10 sep' · 'chit 6 amount 5L' · 'chit 6 name boobalan' ·
+    'change chit 6 to 5.5L' · 'chit 6 date 10 sep amount 5L' (several at once)."""
+    m = re.search(r"\bchit\s*#?\s*(\d+)\b", raw, re.I)
+    if not m:
+        return "Which one? Example: *chit 6 amount 5L* or *chit 6 date 10 sep*"
+    row_id = int(m.group(1))
+    rest = raw[m.end():]  # only what follows the S.No — keeps the S.No out of amount/date parsing
+    kw: dict = {}
+    if re.search(r"\b(?:date|dated|on)\b", rest, re.I) or svc.parse_date(rest)[1]:
+        d, dt = svc.parse_date(rest)
+        if dt:
+            kw["payment_date"] = d
+            rest = rest.replace(dt, " ")
+    amt = svc.parse_amount(rest)
+    if amt is not None:
+        kw["amount"] = amt
+    nm = re.search(r"\b(?:name|to|for)\s+([A-Za-z][A-Za-z ]*?)(?:\s+(?:date|amount|on|dated|cash|bank|loan|chit)\b|\s*$)", rest, re.I)
+    if nm and not re.fullmatch(r"(?:cash|bank|loan|chit)", nm.group(1).strip(), re.I):
+        kw["name"] = await svc.canonical_name(session, nm.group(1).strip())
+    if re.search(r"\b(?:bank|upi|neft|imps|rtgs)\b", rest, re.I):
+        kw["payment_mode"] = "bank"
+    elif re.search(r"\bcash\b", rest, re.I):
+        kw["payment_mode"] = "cash"
+    if re.search(r"\bloan\b", rest, re.I):
+        kw["category"] = "Loan"
+    if not kw:
+        return ("Nothing to change. Examples:\n*chit 6 amount 5L*\n*chit 6 date 10 sep*\n"
+                "*chit 6 name boobalan*\n*chit 6 bank*")
+    row, changes = await svc.edit_payment(session, row_id, edited_by=ctx.phone, **kw)
+    if row is None:
+        return f"No active chit payment #{row_id}."
+    if not changes:
+        return f"#{row_id} already has those values — nothing changed."
+    await session.commit()
+    return (f"Updated #{row.id}: " + ", ".join(changes) + "\n"
+            f"Now: {row.payment_date.strftime('%d %b %Y')} {row.name} — {inr(row.amount)} ({row.payment_mode})")

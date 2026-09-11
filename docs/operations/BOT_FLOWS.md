@@ -64,6 +64,7 @@ Complete reference for all intents, role-based routing, pending state machine, a
 | UPDATE_TENANT_NOTES | "update agreement for Raj" | owner_handler | owner | Edit permanent tenant notes |
 | CHIT_LOG | "paid boobalan chit 5.5L on 11 sep", "chit belandur 5L" | chit_handler | **Kiran + Prabhakaran phones only** | Record a chit / hand-loan instalment (`chit_payments`). Name fuzzy-matched to known names; "loan" → category Loan; bank/upi → mode bank; date defaults today |
 | CHIT_QUERY | "chit payments", "chit sep", "chit boobalan", "chit summary" | chit_handler | **Kiran + Prabhakaran phones only** | List instalments, filter by month / name, totals by name |
+| CHIT_EDIT | "chit 6 amount 5L", "chit 6 date 10 sep", "chit 6 name boobalan", "chit 6 bank", "edit chit 6 date 10 sep amount 5L" | chit_handler | **Kiran + Prabhakaran phones only** | Edit date / amount / name / mode / category in place; every change appended to `notes` as an audit trail |
 | CHIT_VOID | "void chit 6", "delete chit #6" | chit_handler | **Kiran + Prabhakaran phones only** | Void an instalment (is_void, never delete) |
 | MY_BALANCE | "my balance" | tenant_handler | tenant | Own dues (DISABLED) |
 | MY_PAYMENTS | "my payments" | tenant_handler | tenant | Own payment history (DISABLED) |
