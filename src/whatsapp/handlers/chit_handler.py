@@ -90,20 +90,35 @@ async def _query(raw: str, session: AsyncSession) -> str:
     if not rows:
         return f"No chit payments found{(' for ' + scope) if scope else ''}."
 
-    lines = [f"*Chit payments{(' — ' + scope) if scope else ''}*"]
+    # WhatsApp has no tables; a ``` monospace block renders aligned columns on a phone.
+    # Width kept ≤ 30 chars so it doesn't wrap on a normal screen.
+    head = f"*Chit payments{(' — ' + scope) if scope else ''}*"
+    tbl = [f"{'#':>2} {'Date':6} {'Name':10} {'Amount':>9}", "-" * 30]
     total = Decimal(0)
     for r in rows:
         total += r.amount
-        tag = "" if r.category == "Chit" else f" ({r.category})"
-        lines.append(f"#{r.id} {r.payment_date.strftime('%d %b')} {r.name}{tag} — {inr(r.amount)}")
-    lines.append(f"Total: {inr(total)} ({len(rows)})")
+        nm = _short(r.name) + ("" if r.category == "Chit" else "*")
+        tbl.append(f"{r.id:>2} {r.payment_date.strftime('%d %b'):6} {nm:10} {inr(r.amount):>9}")
+    tbl.append("-" * 30)
+    tbl.append(f"{'':2} {'Total':6} {'':10} {inr(total):>9}")
+    out = [head, "```", *tbl, "```"]
+    if any(r.category != "Chit" for r in rows):
+        out.append("_* = Loan_")
 
     if not name and not month:
-        lines.append("")
-        lines.append("*By name*")
+        by = [f"{'Name':16} {'Amount':>9} {'n':>2}", "-" * 30]
         for n, c, s in await svc.totals_by_name(session):
-            lines.append(f"{n}: {inr(s)} ({c})")
-    return "\n".join(lines)
+            by.append(f"{_short(n, 16):16} {inr(s):>9} {c:>2}")
+        out += ["", "*By name*", "```", *by, "```"]
+    return "\n".join(out)
+
+
+def _short(name: str, width: int = 10) -> str:
+    """First word if the full name won't fit the column ('Belandur Balaji' → 'Belandur')."""
+    if len(name) <= width:
+        return name
+    first = name.split()[0]
+    return first if len(first) <= width else first[:width - 1] + "."
 
 
 def _month_label(ym: str) -> str:
