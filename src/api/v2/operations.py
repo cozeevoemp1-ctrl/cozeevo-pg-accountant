@@ -9,7 +9,7 @@ GET  /api/v2/app/operations/staff    — active staff names (employee dropdown)
 
 Categories and required detail fields:
   power_outage : outage_start (ISO datetime), outage_end (ISO datetime, optional)
-  vacation     : employee (staff name), start_date (YYYY-MM-DD), end_date (YYYY-MM-DD)
+  vacation     : employee (one of VACATION_EMPLOYEES), start_date (YYYY-MM-DD), end_date (YYYY-MM-DD)
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import OperationalLog, OperationalLogCategory, Staff
+from src.database.models import OperationalLog, OperationalLogCategory
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 
@@ -48,16 +48,17 @@ async def list_operations(
     }
 
 
+# Employees eligible for the Vacation log — deliberately NOT the whole `staff`
+# table (that includes owners/managers). Edit here to add someone.
+VACATION_EMPLOYEES = ["Lokesh", "Dilip"]
+
+
 @router.get("/staff")
 async def list_staff_names(user: AppUser = Depends(get_current_user)):
-    """Active staff names for the vacation employee dropdown."""
+    """Employee names for the vacation dropdown."""
     if user.role not in _STAFF_ROLES:
         raise HTTPException(403, "Staff only")
-    async with get_session() as session:
-        rows = (await session.execute(
-            select(Staff.name).where(Staff.active.is_(True)).order_by(Staff.name)
-        )).scalars().all()
-    return {"staff": list(rows)}
+    return {"staff": VACATION_EMPLOYEES}
 
 
 @router.post("")

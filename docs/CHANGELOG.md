@@ -8,8 +8,8 @@
   page labels/fields/renderers/summary cards all updated.
 - Power Outage fields relabelled "Start date & time" / "End date & time" (detail keys
   `outage_start` / `outage_end` unchanged — 3 existing rows keep working).
-- Vacation: `employee` (dropdown of active `staff` rows via new
-  `GET /api/v2/app/operations/staff`), `start_date`, `end_date` — all required.
+- Vacation: `employee` (dropdown from `VACATION_EMPLOYEES` = Lokesh, Dilip in
+  `operations.py`, served by new `GET /api/v2/app/operations/staff`), `start_date`, `end_date` — all required.
   Summary card lists the employees on vacation this month.
 
 ## Session AS — 2026-09-11 — Chit instalment register (`chit_payments`)
