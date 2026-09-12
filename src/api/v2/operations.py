@@ -5,12 +5,11 @@ GET  /api/v2/app/operations          — list logs (optional ?category=, ?limit=
 POST /api/v2/app/operations          — create a new log entry
 DELETE /api/v2/app/operations/{id}   — delete a log entry (admin only)
 
+GET  /api/v2/app/operations/staff    — active staff names (employee dropdown)
+
 Categories and required detail fields:
-  power_outage       : outage_start (ISO datetime), outage_end (ISO datetime, optional)
-  hp_gas             : booking_date (YYYY-MM-DD), received_date (YYYY-MM-DD), cylinder_count (int)
-  water_tanker       : received_at (ISO datetime)
-  garbage_collection : informed_date (YYYY-MM-DD), collected_date (YYYY-MM-DD, optional),
-                       completed_date (YYYY-MM-DD, optional)
+  power_outage : outage_start (ISO datetime), outage_end (ISO datetime, optional)
+  vacation     : employee (staff name), start_date (YYYY-MM-DD), end_date (YYYY-MM-DD)
 """
 from __future__ import annotations
 
@@ -20,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.v2.auth import AppUser, get_current_user
 from src.database.db_manager import get_session
-from src.database.models import OperationalLog, OperationalLogCategory
+from src.database.models import OperationalLog, OperationalLogCategory, Staff
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 
@@ -47,6 +46,18 @@ async def list_operations(
         "logs": [_serialize(r) for r in rows],
         "count": len(rows),
     }
+
+
+@router.get("/staff")
+async def list_staff_names(user: AppUser = Depends(get_current_user)):
+    """Active staff names for the vacation employee dropdown."""
+    if user.role not in _STAFF_ROLES:
+        raise HTTPException(403, "Staff only")
+    async with get_session() as session:
+        rows = (await session.execute(
+            select(Staff.name).where(Staff.active.is_(True)).order_by(Staff.name)
+        )).scalars().all()
+    return {"staff": list(rows)}
 
 
 @router.post("")
@@ -133,10 +144,8 @@ async def delete_operation(
 def _validate_details(category: str, details: dict) -> None:
     """Raise 422 if required fields are missing for the category."""
     required: dict[str, list[str]] = {
-        "power_outage":        ["outage_start"],
-        "hp_gas":              ["booking_date", "received_date", "cylinder_count"],
-        "water_tanker":        ["received_at"],
-        "garbage_collection":  ["informed_date"],
+        "power_outage": ["outage_start"],
+        "vacation":     ["employee", "start_date", "end_date"],
     }
     missing = [f for f in required.get(category, []) if not details.get(f)]
     if missing:

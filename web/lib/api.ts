@@ -1178,9 +1178,7 @@ export async function quickBook(payload: {
 
 export type OperationalLogCategory =
   | "power_outage"
-  | "hp_gas"
-  | "water_tanker"
-  | "garbage_collection"
+  | "vacation"
 
 export interface OperationalLogEntry {
   id:         number
@@ -1202,6 +1200,10 @@ export function getOperationalLogs(category?: OperationalLogCategory, limit = 50
   if (category) q.set("category", category)
   q.set("limit", String(limit))
   return _get(`/api/v2/app/operations?${q.toString()}`)
+}
+
+export function getOperationsStaff(): Promise<{ staff: string[] }> {
+  return _get("/api/v2/app/operations/staff")
 }
 
 export function createOperationalLog(body: CreateOperationalLogBody): Promise<OperationalLogEntry> {

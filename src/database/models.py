@@ -1569,16 +1569,14 @@ class ChitPayment(Base):
 
 
 class OperationalLogCategory(str, enum.Enum):
-    power_outage        = "power_outage"
-    hp_gas              = "hp_gas"
-    water_tanker        = "water_tanker"
-    garbage_collection  = "garbage_collection"
+    power_outage = "power_outage"
+    vacation     = "vacation"
 
 
 class OperationalLog(Base):
     """
     L3 — Structured operational event log.
-    Tracks power outages, gas deliveries, water tankers, and garbage collection.
+    Tracks power outages and staff vacations.
     Details are stored as JSONB — schema varies by category.
     """
     __tablename__ = "operational_logs"

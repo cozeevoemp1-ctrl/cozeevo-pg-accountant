@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   getOperationalLogs,
   createOperationalLog,
+  getOperationsStaff,
   patchOperationalLog,
   deleteOperationalLog,
   type OperationalLogEntry,
@@ -22,30 +23,24 @@ import Link from "next/link"
 // ── static config ─────────────────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<OperationalLogCategory, string> = {
-  power_outage:       "Power Outage",
-  hp_gas:             "HP Gas",
-  water_tanker:       "Water Tanker",
-  garbage_collection: "Garbage Collection",
+  power_outage: "Power Outage",
+  vacation:     "Vacation",
 }
 
 const CATEGORY_ICONS: Record<OperationalLogCategory, string> = {
-  power_outage:       "⚡",
-  hp_gas:             "🔥",
-  water_tanker:       "💧",
-  garbage_collection: "🗑",
+  power_outage: "⚡",
+  vacation:     "🏖",
 }
 
 const ALL_CATEGORIES: OperationalLogCategory[] = [
   "power_outage",
-  "hp_gas",
-  "water_tanker",
-  "garbage_collection",
+  "vacation",
 ]
 
 interface Field {
   key:      string
   label:    string
-  type:     "datetime" | "date" | "number"
+  type:     "datetime" | "date" | "number" | "staff"
   required: boolean
   hint?:    string
   placeholder?: string
@@ -53,22 +48,13 @@ interface Field {
 
 const FIELDS: Record<OperationalLogCategory, Field[]> = {
   power_outage: [
-    { key: "outage_start", label: "Outage date & time",   type: "datetime", required: true },
-    { key: "outage_end",   label: "Restored date & time", type: "datetime", required: false, hint: "Leave blank if not yet restored" },
+    { key: "outage_start", label: "Start date & time", type: "datetime", required: true },
+    { key: "outage_end",   label: "End date & time",   type: "datetime", required: false, hint: "Leave blank if not yet restored" },
   ],
-  hp_gas: [
-    { key: "booking_date",   label: "Booking date",     type: "date",   required: true },
-    { key: "received_date",  label: "Received date",    type: "date",   required: true },
-    { key: "cylinder_count", label: "No. of cylinders", type: "number", required: true, placeholder: "e.g. 2" },
-  ],
-  water_tanker: [
-    { key: "received_at", label: "Received date & time", type: "datetime", required: true },
-    { key: "litres",      label: "Litres filled",        type: "number",   required: false, placeholder: "e.g. 5000" },
-  ],
-  garbage_collection: [
-    { key: "informed_date",  label: "Informed date",          type: "date", required: true },
-    { key: "collected_date", label: "Collected date",         type: "date", required: false, hint: "Leave blank if not yet collected" },
-    { key: "completed_date", label: "Service completed date", type: "date", required: false },
+  vacation: [
+    { key: "employee",   label: "Employee",   type: "staff", required: true },
+    { key: "start_date", label: "Start date", type: "date",  required: true },
+    { key: "end_date",   label: "End date",   type: "date",  required: true },
   ],
 }
 
@@ -78,26 +64,15 @@ function renderDetails(category: OperationalLogCategory, details: Record<string,
   switch (category) {
     case "power_outage":
       return [
-        `Outage: ${fmtDateTime(details.outage_start as string) || "—"}`,
-        details.outage_end ? `Restored: ${fmtDateTime(details.outage_end as string)}` : "Not yet restored",
+        `Start: ${fmtDateTime(details.outage_start as string) || "—"}`,
+        details.outage_end ? `End: ${fmtDateTime(details.outage_end as string)}` : "Not yet restored",
       ]
-    case "hp_gas":
+    case "vacation":
       return [
-        `Booked: ${fmtDate(details.booking_date as string) || "—"}`,
-        `Received: ${fmtDate(details.received_date as string) || "—"}`,
-        `Cylinders: ${details.cylinder_count}`,
+        `Employee: ${details.employee || "—"}`,
+        `From: ${fmtDate(details.start_date as string) || "—"}`,
+        `To: ${fmtDate(details.end_date as string) || "—"}`,
       ]
-    case "water_tanker":
-      return [
-        `Received: ${fmtDateTime(details.received_at as string) || "—"}`,
-        details.litres ? `Litres: ${details.litres}` : "",
-      ].filter(Boolean)
-    case "garbage_collection":
-      return [
-        `Informed: ${fmtDate(details.informed_date as string) || "—"}`,
-        details.collected_date ? `Collected: ${fmtDate(details.collected_date as string)}` : "Not yet collected",
-        details.completed_date ? `Completed: ${fmtDate(details.completed_date as string)}` : "",
-      ].filter(Boolean)
     default:
       return []
   }
@@ -115,6 +90,7 @@ export default function OperationsPage() {
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState("")
   const [saved, setSaved]           = useState(false)
+  const [staffNames, setStaffNames] = useState<string[]>([])
 
   // logs list
   const [logs, setLogs]             = useState<OperationalLogEntry[]>([])
@@ -138,6 +114,23 @@ export default function OperationsPage() {
   }, [])
 
   useEffect(() => { loadLogs() }, [loadLogs])
+  useEffect(() => {
+    getOperationsStaff().then(r => setStaffNames(r.staff)).catch(() => setStaffNames([]))
+  }, [])
+
+  const staffSelect = (value: string, onChange: (v: string) => void) => (
+    <div className="mt-1 relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full h-[42px] rounded-lg border border-border-strong bg-surface px-3 pr-8 text-sm text-ink appearance-none focus:outline-none focus:border-brand-pink"
+      >
+        <option value="">Select employee</option>
+        {staffNames.map(n => <option key={n} value={n}>{n}</option>)}
+      </select>
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted text-xs">▼</span>
+    </div>
+  )
 
   function onCategoryChange(cat: OperationalLogCategory) {
     setCategory(cat)
@@ -261,7 +254,9 @@ export default function OperationsPage() {
               <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
                 {f.label}{f.required && " *"}
               </label>
-              {f.type === "datetime" ? (
+              {f.type === "staff" ? (
+                staffSelect(fieldValues[f.key] ?? "", v => setFieldValues(prev => ({ ...prev, [f.key]: v })))
+              ) : f.type === "datetime" ? (
                 <DateTimePickerInput
                   value={fieldValues[f.key] ?? ""}
                   onChange={v => setFieldValues(prev => ({ ...prev, [f.key]: v }))}
@@ -325,13 +320,9 @@ export default function OperationsPage() {
                 const lastDate  = last ? (fmtDate(last.created_at) || "—") : "Never"
                 // category-specific extra
                 let extra = ""
-                if (cat === "hp_gas" && thisMonth.length) {
-                  const total = thisMonth.reduce((s, l) => s + (Number(l.details.cylinder_count) || 0), 0)
-                  if (total) extra = `${total} cylinders`
-                }
-                if (cat === "water_tanker" && thisMonth.length) {
-                  const total = thisMonth.reduce((s, l) => s + (Number(l.details.litres) || 0), 0)
-                  if (total) extra = `${total.toLocaleString()} L`
+                if (cat === "vacation" && thisMonth.length) {
+                  const names = Array.from(new Set(thisMonth.map(l => String(l.details.employee || "")).filter(Boolean)))
+                  if (names.length) extra = names.join(", ")
                 }
                 return (
                   <div key={cat} className="bg-surface border border-border rounded-card px-3 py-3">
@@ -417,7 +408,9 @@ export default function OperationsPage() {
                             <label className="text-xs font-semibold text-ink-muted uppercase tracking-wide">
                               {f.label}
                             </label>
-                            {f.type === "datetime" ? (
+                            {f.type === "staff" ? (
+                              staffSelect(editValues[f.key] ?? "", v => setEditValues(prev => ({ ...prev, [f.key]: v })))
+                            ) : f.type === "datetime" ? (
                               <DateTimePickerInput
                                 value={editValues[f.key] ?? ""}
                                 onChange={v => setEditValues(prev => ({ ...prev, [f.key]: v }))}

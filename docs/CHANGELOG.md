@@ -1,5 +1,17 @@
 # Changelog
 
+## Session AT — 2026-09-12 — Operations Log: categories trimmed, Vacation added
+
+- Categories now `power_outage` + `vacation` only (HP Gas / Water Tanker / Garbage
+  Collection removed — DB had zero rows for them; `category` is a plain String column,
+  no migration needed). `OperationalLogCategory` enum, `_validate_details`, api.ts type,
+  page labels/fields/renderers/summary cards all updated.
+- Power Outage fields relabelled "Start date & time" / "End date & time" (detail keys
+  `outage_start` / `outage_end` unchanged — 3 existing rows keep working).
+- Vacation: `employee` (dropdown of active `staff` rows via new
+  `GET /api/v2/app/operations/staff`), `start_date`, `end_date` — all required.
+  Summary card lists the employees on vacation this month.
+
 ## Session AS — 2026-09-11 — Chit instalment register (`chit_payments`)
 
 Kiran asked whether monthly chit payments were recorded anywhere. They were not:
