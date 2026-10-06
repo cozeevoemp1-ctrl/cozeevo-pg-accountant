@@ -1,5 +1,30 @@
 # Changelog
 
+## Session AU — 2026-10-06 — Backdated check-ins, NA rent rows, deploy queue
+
+- **Room 121 (Mopuri Adithya Reddy, check-in 21 Sep)** couldn't be checked in: the
+  `payments_freeze` trigger locks every month before the current one, and the
+  check-in's Sept rent payment hit it (500). Kiran: keep the lock for staff — so
+  checked in from the VPS via a one-off that sets `allow_historical_write` for that
+  one transaction (tenancy 1405, Rs4,333 rent + Rs1,500 deposit, UPI). Future
+  backdated-into-closed-month check-ins: same one-off, by Claude.
+- **Returning tenant name**: approve matched tenant 672 ("Adithya Reddy", old Room
+  522 stay) by phone and kept the old name. Renamed to the form name, audit-logged.
+- **Kaarthikeyan Andolu G07**: Sept day stay back-recorded (tenancy 1406, 25 Sep -> 1
+  Oct, Rs2,800 cash 30 Sep) + Oct monthly checked in (1394, Rs17,000 due after Rs3,000 advance).
+- **Bug fixed (e8893d7)**: rollover seeds a no_show tenancy's RentSchedule as
+  `na`/0; check-in recomputed `rent_due` but left `status=na` (bot report "NA",
+  tenant arrears dropped the month); the bot check-in path didn't touch RS at all.
+  New `rent_schedule.activate_rs_on_checkin()` called from approve, PWA physical
+  check-in, and the WhatsApp resolver. 15 active tenancies' rows flipped na -> pending (audit-logged).
+- **Known, left alone (Kiran: users handle the Sheet)**: monthly-tab Balance subtracts
+  the booking advance again although first-month Rent Due already nets it.
+- **Deploy queue**: `scripts/vps_deploy.sh` (= `/opt/deploy.sh`) skipped any push that
+  arrived mid-deploy — pushing development then master deployed the OLD master.
+  Now a push during a deploy is queued and the running deploy re-pulls; nothing is dropped.
+- Local working copy had lost its `.git` (and 16 tracked files) after 12 Sep;
+  restored from GitHub, working files untouched.
+
 ## Session AT — 2026-09-12 — Operations Log: categories trimmed, Vacation added
 
 - Categories now `power_outage` + `vacation` only (HP Gas / Water Tanker / Garbage
