@@ -56,6 +56,33 @@ def first_month_rent_due(tenancy: "Tenancy", period_month: date) -> Decimal:
     return rent
 
 
+async def activate_rs_on_checkin(session: "AsyncSession", tenancy: "Tenancy") -> None:
+    """Turn a booking's placeholder RentSchedule rows into real dues at check-in.
+
+    The monthly rollover seeds a no_show tenancy's rows as status=na, rent_due=0.
+    Check-in paths recompute rent_due but used to leave status=na, so the month
+    read "NA" in the bot report and dropped out of the tenant's own arrears
+    (tenant_handler filters status != na). Call from every no_show -> active path.
+    """
+    from sqlalchemy import select as _select
+    from src.database.models import RentSchedule, RentStatus
+
+    checkin = getattr(tenancy, "checkin_date", None)
+    if not checkin:
+        return
+    rows = (await session.execute(
+        _select(RentSchedule).where(
+            RentSchedule.tenancy_id == tenancy.id,
+            RentSchedule.status == RentStatus.na,
+            RentSchedule.period_month >= checkin.replace(day=1),
+        )
+    )).scalars().all()
+    for rs in rows:
+        if not rs.rent_due:
+            rs.rent_due = first_month_rent_due(tenancy, rs.period_month)
+        rs.status = RentStatus.pending
+
+
 async def recalc_checkin_month_rs(session: "AsyncSession", tenancy: "Tenancy") -> None:
     """Recalculate rent_due for the check-in month RentSchedule row.
 

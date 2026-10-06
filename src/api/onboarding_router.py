@@ -2189,6 +2189,10 @@ async def _approve_session_impl(token: str, req: ApproveRequest | None):
                     period = date(period.year + 1, 1, 1)
                 else:
                     period = date(period.year, period.month + 1, 1)
+            if tenancy.status == TenancyStatus.active:
+                from src.services.rent_schedule import activate_rs_on_checkin
+                await session.flush()
+                await activate_rs_on_checkin(session, tenancy)
 
             # Payments at check-in
             def _ci_mode(field_mode: str) -> PaymentMode:

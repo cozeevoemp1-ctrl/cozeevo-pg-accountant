@@ -331,6 +331,8 @@ async def record_physical_checkin(
                         due_date        = period,
                     ))
             await session.flush()
+            from src.services.rent_schedule import activate_rs_on_checkin
+            await activate_rs_on_checkin(session, tenancy)
 
         # Guard: block duplicate physical check-in payment on the same day
         existing_today = await session.scalar(

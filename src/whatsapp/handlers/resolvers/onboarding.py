@@ -273,6 +273,8 @@ async def resolve_confirm_checkin_arrival(
         tenancy.checkin_date = today
 
     tenancy.status = TenancyStatus.active
+    from src.services.rent_schedule import activate_rs_on_checkin
+    await activate_rs_on_checkin(session, tenancy)
 
     # Log payment collected at door
     collected_amount = action_data.get("collected_amount", 0)
