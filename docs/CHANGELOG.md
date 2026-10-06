@@ -1,6 +1,6 @@
 # Changelog
 
-## Session AU — 2026-10-06 — Backdated check-ins, NA rent rows, deploy queue
+## Session AV — 2026-10-06 — Backdated check-ins, NA rent rows, deploy queue
 
 - **Room 121 (Mopuri Adithya Reddy, check-in 21 Sep)** couldn't be checked in: the
   `payments_freeze` trigger locks every month before the current one, and the

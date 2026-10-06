@@ -37,9 +37,10 @@ Architecture: Meta webhook → nginx → FastAPI (no n8n).
 - **Regex handles 97% of intents** — AI (Groq) only for ambiguous/lead/classification
 - **Test locally before any VPS deploy**
 - **`security_deposit` is required on monthly bookings** — never default to agreed_rent; reject with 422
-- **First-month RS auto-recalc** — whenever security_deposit/checkin_date/agreed_rent changes, call `recalc_checkin_month_rs()` from `src/services/rent_schedule.py`; 5 call-sites must stay in sync
+- **First-month RS auto-recalc** — whenever security_deposit/checkin_date/agreed_rent changes, call `recalc_checkin_month_rs()` from `src/services/rent_schedule.py`; 5 call-sites must stay in sync. Every no_show → active path must also call `activate_rs_on_checkin()` (booking RS rows are seeded `na`/0)
 - **Customer-facing vs internal fields** (spec 04) — `onboarding_sessions.special_terms` is **printed in the signed agreement PDF and shown on the tenant form**; `admin_notes` is staff-only and must never enter the public `GET /api/onboarding/{token}` response or the PDF. Terms with a number (lock-in, notice, escalation) get a typed column + its own input — never a sentence in a notes box. Grep `src/services/pdf_generator.py` before touching any session column.
 - **Never expose our URLs to a tenant** (BRAIN 15a, 5 Sep 2026) — no Supabase storage link, no API endpoint, no dashboard URL in any tenant message. Documents go as WhatsApp **attachments** via `src/services/tenant_delivery.py`; if the 24-hr window is closed it is **not sent** and staff are told — never a link fallback. No test sends to real numbers.
+- **Backdated check-in into a closed month** — `payments_freeze` blocks it by design (Kiran: keep the lock for staff). Claude does it from the VPS with a one-off that sets `allow_historical_write` for that one transaction (recipe: CHANGELOG Session AV).
 - **KYC images are proof** — a failed Supabase upload must **reject** the onboarding submit (502), never warn-and-continue. Aadhaar requires **both** sides (address is on the back); ID name must match the typed name (`src/utils/name_match.py` + its identical JS mirror in `static/onboarding.html`).
 
 ## Sheet column rule (CRITICAL — no exceptions)
@@ -113,9 +114,11 @@ python scripts/_generate_audit_logs.py   # → docs/DEPOSIT_REFUND_AUDIT.md + do
 # VPS deploy — AUTOMATIC. Every push to master fires a GitHub webhook →
 # kozzy-webhook.service on the VPS runs /opt/deploy.sh: git pull +
 # restart pg-accountant, and if web/ changed, npm run build + restart kozzy-pwa.
+# (Webhook fires on EVERY branch push; pushes landing mid-deploy are queued and
+# re-pulled, never skipped — source: scripts/vps_deploy.sh = /opt/deploy.sh.)
 # Pushing IS deploying. Do NOT ask permission to deploy for code changes.
 # Verify live: curl https://api.getkozzy.com/healthz
-# (returns {"commit":"<sha>"} — compare to HEAD). If webhook fails: push an empty commit.
+# (returns {"commit":"<sha>"} — compare to HEAD). If /healthz != HEAD: ssh root@187.127.130.194 /opt/deploy.sh
 #
 # SSH WORKS from this machine (verified 2026-08-13): ssh root@187.127.130.194
 # (key ~/.ssh/id_ed25519). Use it directly for anything the git webhook can't carry —
@@ -175,7 +178,7 @@ Kiran's Excel (offline)
 | `src/api/v2/notices.py` | GET /notices/active — tenants on notice (deposit eligible vs forfeited) |
 | `src/api/v2/rooms.py` | GET /rooms/check — room availability check (free beds, occupants) |
 | `services/room_transfer.py` | Shared execute_room_transfer() — single source of truth for bot + PWA |
-| `src/services/rent_schedule.py` | `first_month_rent_due()` — canonical first-month formula; `prorated_first_month_rent()` — proration helper; `recalc_checkin_month_rs()` — recomputes first-month RS when security_deposit/checkin_date/agreed_rent changes; must be called from all 5 edit paths |
+| `src/services/rent_schedule.py` | `first_month_rent_due()` — canonical first-month formula; `prorated_first_month_rent()` — proration helper; `recalc_checkin_month_rs()` — recomputes first-month RS when security_deposit/checkin_date/agreed_rent changes; must be called from all 5 edit paths; `activate_rs_on_checkin()` — flips booking placeholder RS rows na→pending at check-in (approve, PWA physical check-in, bot resolver) |
 | `src/services/dues.py` | **Single source for ALL monthly dues math** (Phase 3, 2026-08-07): `monthly_dues()` split view (PWA current-month surfaces), `paid_toward_period_clause()`/`period_remaining()`/`outstanding_months()` bundled view (bot/rollover/reporting), `first_month_due()`. Every dues change goes here — never inline the formula again. Tests: `tests/test_dues_logic.py` |
 | `src/api/checkout_router.py` | RETIRED 2026-08-07 — all `/api/checkout/*` are 410 tombstones; v2 `/api/v2/app/checkout/create` is the only checkout path |
 | `GET /api/v2/app/config` | Business-rule constants for frontend (`notice_by_day`, `total_beds` from rooms table) — `web/lib/config.ts` hook consumes it; never hardcode these in UI |
